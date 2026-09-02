@@ -237,6 +237,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
@@ -624,7 +625,11 @@ effectObjectRefs effect = case effect of
   -- beside this one is a PlayerRef.
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> [attacker]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ ref) -> [ref]
+  -- One side only, and only when a ref names it: the Matching arm is a Filter
+  -- (CR 611.2c's class), and what the attack is aimed at is a PlayerScope.
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
+    RestrictedCreatures.Named ref -> [ref]
+    RestrictedCreatures.Matching _ -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.Designate {} -> []
@@ -1458,7 +1463,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- CantBeRegenerated's reason again.
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _) ->
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- RequireBlock's reason, one axis over.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
@@ -7085,31 +7090,45 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               | object <- objects
               ]
          in gs1 {GameState.blockProhibitions = stored <> GameState.blockProhibitions gs1}
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration ref) ->
-    -- CR 508.1c / 611.1: store one restriction per permanent the ref names.
-    -- ForbidBlock above is the model and every one of its arguments carries over:
-    -- the ref is enumerated ONCE, for the CR 608.2f simultaneity objectRefObjects
-    -- buys, and an illegal slot (CR 608.2b) stores nothing, which is Netter
-    -- en-Dal's fizzle.
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected aimedAt) ->
+    -- CR 508.1c / 611.1: store one restriction per permanent a Named ref names,
+    -- or ONE row for a Matching class. ForbidBlock above is the model for the
+    -- first and every one of its arguments carries over: the ref is enumerated
+    -- ONCE, for the CR 608.2f simultaneity objectRefObjects buys, and an illegal
+    -- slot (CR 608.2b) stores nothing, which is Netter en-Dal's fizzle.
+    --
+    -- The class is NOT enumerated, CR 611.2c's third sentence: a restriction on a
+    -- declaration modifies no characteristic and no controller, so it reaches
+    -- creatures that enter after this resolution, and the Filter is stored to be
+    -- re-read at each declaration. Its bound player slots are baked now,
+    -- Expiry.arm's reason for baking a ForAsLongAs condition -- the bindings that
+    -- answer them are gone once this resolution is over.
+    --
+    -- CR 109.5's controller is baked, AffectPlayers' reason: the source is a
+    -- sorcery in a graveyard by the time "you" is asked of the row.
     --
     -- Nothing is written onto the permanent itself, and nothing is projected: CR
     -- 613.11 keeps a restriction on a declaration out of the layers, so the row
-    -- is read at Pawl.Engine.CombatRestriction.attackProhibited and never by a
-    -- projection.
+    -- is read at Pawl.Engine.CombatRestriction.attackProhibited (or, aimed, at
+    -- Pawl.Engine.CombatRestriction.cantAttackPlayer) and never by a projection.
     State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
-        let objects = objectRefObjects legal resolving controller source gs ref
+        let subjects = case affected of
+              RestrictedCreatures.Named ref -> fmap RestrictedCreatures.Named (objectRefObjects legal resolving controller source gs ref)
+              RestrictedCreatures.Matching f -> [RestrictedCreatures.Matching (Filter.bakeBound (Binding.playersIn legal) f)]
             (ts, gs1) = Game.freshTimestamp gs
             stored =
               [ ActiveAttackProhibition.MkActiveAttackProhibition
                   { ActiveAttackProhibition.source = source,
+                    ActiveAttackProhibition.controller = controller,
                     ActiveAttackProhibition.timestamp = ts,
                     ActiveAttackProhibition.expiry = expiry,
-                    ActiveAttackProhibition.object = object
+                    ActiveAttackProhibition.affected = subject,
+                    ActiveAttackProhibition.aimedAt = aimedAt
                   }
-              | object <- objects
+              | subject <- subjects
               ]
          in gs1 {GameState.attackProhibitions = stored <> GameState.attackProhibitions gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->

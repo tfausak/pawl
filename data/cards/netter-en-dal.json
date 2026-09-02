@@ -40,12 +40,15 @@
                       {
                         "type": "ForbidAttack",
                         "value": {
+                          "affected": {
+                            "type": "Named",
+                            "value": {
+                              "type": "InSlot",
+                              "value": "target"
+                            }
+                          },
                           "duration": {
                             "type": "UntilEndOfTurn"
-                          },
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "target"
                           }
                         }
                       }
