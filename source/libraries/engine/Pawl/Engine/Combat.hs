@@ -1211,7 +1211,7 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- Battlefield-scoped, so this stays these two clauses: an object that has LEFT the
 -- battlefield is a separate clause of CR 506.4, in Pawl.Engine.Departure and
 -- Pawl.Engine.Damage. Creatures only, which is what `combatants` gathers -- CR
--- 506.4d falls out of that split (Pawl.CombatSpec's CreaturePlaneswalkerInCombat
+-- 506.4d falls out of that split (Pawl.CombatEffectSpec's CreaturePlaneswalkerInCombat
 -- is the proof), and the phases-out clause is Pawl.Engine.Phasing.phaseOut's. Not
 -- implemented: CR 506.4e and the becomes-a-battle clause (#981).
 --
