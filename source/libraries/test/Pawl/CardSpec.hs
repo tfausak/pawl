@@ -9484,9 +9484,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Stir the Grave's slot names its bound as well"
       (manaValueAtMostAmountCounts (S.combinedFace stir))
       (1, 0)
-    -- The pool's fifth author, and the only one in `data/cards/` whose slot is
-    -- also JOINTLY JUDGED (Pawl.Engine.Target.jointlyJudged) -- a printing that
-    -- paired the two would refute it: Synthetic Borrowed Exhumation reads the
+    -- The pool's fifth author, and the first whose slot is also JOINTLY JUDGED
+    -- (Pawl.Engine.Target.jointlyJudged): Synthetic Borrowed Exhumation reads the
     -- same announced X off a pool scoped to what its sibling slot targets, so CR
     -- 601.2c's joint check re-derives the bound rather than merely offering it.
     exhumation <- S.printingOf s registry "Synthetic Borrowed Exhumation"
@@ -9495,11 +9494,22 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the Exhumation's slot names its bound as well"
       (manaValueAtMostAmountCounts (S.combinedFace exhumation))
       (1, 0)
+    -- The pool's sixth author, jointly judged through the BOUND itself rather
+    -- than through the pool beside it: Synthetic Measured Refrain's bound folds
+    -- over what a sibling slot names (CR 400.7j), which is the read CR 700.2d's
+    -- per-occurrence rename has to follow -- Pawl.TargetSpec's "CR 700.2d a
+    -- repeated mode's computed bound measures its own occurrence's sibling slot".
+    measured <- S.printingOf s registry "Synthetic Measured Refrain"
+    Spec.assertEqWith
+      s
+      "the Refrain's slot names its bound as well"
+      (manaValueAtMostAmountCounts (S.combinedFace measured))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueAtMostAmountCounts . S.combinedFace) ps))
-      5
+      6
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the SAME atom, buried under all three combinators, in a target
     -- slot that names no amount -- the position a card author would most plausibly
