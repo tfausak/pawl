@@ -2898,7 +2898,7 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     -- THE gameplay-level pair, first. With nothing to enchant there is no
     -- {1}{R} candidate to name, so CR 601.2b settles on the printed {R} and a
     -- creature spell reaches the stack -- where the whole cast used to unwind at
-    -- CR 601.2e and leave the stack empty (#2911).
+    -- CR 601.2e and leave the stack empty; see #2911.
     Spec.assertEqWith
       s
       "CR 601.2c: with no creature in play the Rollicker reaches the stack as a creature spell"

@@ -230,7 +230,7 @@ flashOn oid face gs =
 -- CR 702.103b grants "enchant creature" to a spell cast bestowed, so the slot CR
 -- 601.2c will judge exists only on the board that announcement produces
 -- (`proposedFor`). Read printed, a bestow candidate is fillable on a board with
--- no creature at all and CR 601.2e then takes the whole cast back (#2911).
+-- no creature at all and CR 601.2e then takes the whole cast back; see #2911.
 targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
@@ -1388,7 +1388,7 @@ castSpellWith applied pid oid name facing = do
           -- them must narrow what CR 601.2b offers rather than refuse the cast.
           -- This is the narrowing the player SEES -- Prompt.ChooseCost is built
           -- from this list -- and it is what keeps a bestow cast on a board with
-          -- no creature from being offered and then rejected (#2911).
+          -- no creature from being offered and then rejected; see #2911.
           --
           -- Asked HERE, one step ahead of rule 601.2a's move, because that is
           -- where both questions have an answer: prohibitsCasting's sorcery-speed
