@@ -8639,11 +8639,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.2c's batch reading of PermanentReturnedToHand (Tameshi, Reality
   -- Architect's "whenever ONE OR MORE noncreature permanents are returned to
   -- hand"), delegated for PermanentsDie's reason: which moves this condition
-  -- admits is the singular arm's answer, and firing once for the batch is
+  -- admits is the arm below's answer, and firing once for the batch is
   -- `batchScoped` below plus eventTriggers' dedup, never this arm.
   TriggerCondition.PermanentsReturnedToHand f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentReturnedToHand f) event
-  -- CR 603.6c's family with the DESTINATION pinned: the arm above's match,
-  -- narrowed to the one zone this condition names. CR 110.1 is what makes the
+  -- CR 603.6c's family with the DESTINATION pinned: PermanentLeavesTheBattlefield's
+  -- match above, narrowed to the one zone this condition names. CR 110.1 is what makes the
   -- origin implicit -- a permanent is on the battlefield, so "returned to hand"
   -- is battlefield-to-hand and admits no other pair.
   --
@@ -8653,8 +8653,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- hand. Without the look-back "you control" would be asked of a card in a
   -- hand, which CR 108.4 gives no controller.
   --
-  -- CR 603.6c's leaving-the-game form is declined, unlike the arm above: a
-  -- permanent that leaves the game reaches no zone at all, so it is not
+  -- CR 603.6c's leaving-the-game form is declined, unlike PermanentLeavesTheBattlefield's
+  -- arm: a permanent that leaves the game reaches no zone at all, so it is not
   -- returned to anyone's hand.
   TriggerCondition.PermanentReturnedToHand f ->
     let admits departed = case Projection.viewWithLastKnown departed gs departed of
@@ -11337,7 +11337,7 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- The arm above with the destination pinned to a hand, which CR 400.3 makes
   -- the OWNER's: Warped Devotion's "whenever a permanent is returned to a
   -- player's hand, THAT PLAYER discards a card" names the owner, and
-  -- Binding.controllerOfBound would name the wrong seat for a stolen permanent.
+  -- PlayerRef.ControllerOfBound would name the wrong seat for a stolen permanent.
   -- Read off the arrival (ZoneChange.object) rather than the departed id, which
   -- CR 400.7 deleted; CR 108.3 keeps the owner the same across the move. The
   -- lookup is total for a recorded event -- the funnel minted the arrival into
