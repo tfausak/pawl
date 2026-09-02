@@ -1201,7 +1201,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       --
       -- The PROTECTOR conjunct is a regression fence rather than a proven behavior:
       -- mutating it away leaves the suite green, CR 310.9f's change needing an
-      -- effect that moves a designation. Not implemented: any such effect (#853).
+      -- effect that moves a designation. Not implemented: any such effect (#2980).
       --
       -- Combat.attackingNothing leads here as it does above, and for the same
       -- reason: it is the only one of the four that remembers a removal rather

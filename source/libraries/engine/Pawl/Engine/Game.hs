@@ -297,7 +297,12 @@ removeFromCombat oid gs =
             -- combat has no place in that record either. Cleanliness rather than
             -- a proven behavior, for the reason above: its one reader looks the
             -- attacker up in Combat.attackers first.
-            Combat.attackedUnder = Map.delete oid (Combat.attackedUnder c)
+            Combat.attackedUnder = Map.delete oid (Combat.attackedUnder c),
+            -- CR 506.4's battle comparand belongs to an attack for the same
+            -- reason, and is cleanliness on the same terms: its one reader
+            -- (Pawl.Engine.Combat.noteAttackingNothing) folds over
+            -- Combat.attackers, which this call has just emptied of the entry.
+            Combat.attackedControlledBy = Map.delete oid (Combat.attackedControlledBy c)
           }
    in gs {GameState.combat = c1}
 

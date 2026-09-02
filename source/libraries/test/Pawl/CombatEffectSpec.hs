@@ -729,6 +729,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       -- CR 802.2a: the seat each attack names, which is what a
                       -- declaration would have recorded.
                       Combat.Type.attackedUnder = Map.singleton oid S.bob,
+                      Combat.Type.attackedControlledBy = Map.empty,
                       Combat.Type.joinedUnder = Map.singleton oid S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
@@ -1012,7 +1013,7 @@ snatch victim p = case p of
 -- its controller changes, ..." -- and a creature so removed "stops being an
 -- attacking, blocking, blocked, and/or unblocked creature".
 --
--- Ray of Command is the pool's producer for the control-change clause: {3}{U},
+-- Ray of Command is this group's producer for the control-change clause: {3}{U},
 -- INSTANT, "Untap target creature an opponent controls and gain control of it
 -- until end of turn. That creature gains haste until end of turn." Act of Treason
 -- has the same three effects and cannot reach this window at all, because it is a

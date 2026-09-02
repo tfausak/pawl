@@ -78,6 +78,27 @@ data Combat = MkCombat
     -- Pawl.Engine.Projection.viewOfCharacteristics as CR 506.4's comparand for
     -- "if its controller ... changes".
     attackedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- | CR 506.4 for an attacked BATTLE: who controlled it as the attacking
+    -- creature joined combat -- the comparand for "if its controller ...
+    -- changes".
+    --
+    -- Stored for joinedUnder's reason, and SEPARATE from attackedUnder above
+    -- because for a battle those are two different seats: CR 310.9b makes the
+    -- defending player the battle's PROTECTOR, which a control change leaves
+    -- where it was (CR 310.9d). The planeswalker arm needs no entry here --
+    -- CR 508.1b makes a defending player the controller of the planeswalker
+    -- attacked, so attackedUnder already IS that permanent's controller.
+    --
+    -- Keyed by the ATTACKER for attackedUnder's reason: a battle one creature
+    -- has stopped attacking can still be attacked by another put onto the
+    -- battlefield attacking it under the new controller (CR 508.4), and that
+    -- creature saw no control change.
+    --
+    -- Written by Pawl.Engine.Combat.declareAttackers and
+    -- Pawl.Engine.Combat.putOntoBattlefieldAttacking, pruned by
+    -- Pawl.Engine.Game.removeFromCombat, and read by
+    -- Pawl.Engine.Combat.noteAttackingNothing alone.
+    attackedControlledBy :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | WHAT has been attacked this combat phase: the CR 508.1b target announced
     -- for each creature declared as an attacker or put onto the battlefield
     -- attacking (CR 508.8). Written by Pawl.Engine.Combat.declareAttackers and

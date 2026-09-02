@@ -790,12 +790,14 @@ performStateBasedActions = Event.simultaneously $ do
         CommandZoneDecision.Returns -> Just oid
         CommandZoneDecision.Leaves -> Nothing
   -- CR 310.11's second sentence: "if no player can be chosen this way, the battle
-  -- is put into its owner's graveyard". NOT EXERCISED by any test, and not for want
-  -- of trying -- a Siege's candidates are its controller's opponents still in the
-  -- game, so reaching this needs a game whose battle's controller has no opponent
-  -- left, and CR 104.2a ended that game already. Kept because the alternative is a
-  -- battle that sits at no protector forever, re-asked and unanswerable every pass
-  -- (#853).
+  -- is put into its owner's graveyard". NOT EXERCISED by any test, and no board
+  -- can exercise it: CR 310.9a's two branches are the whole candidate rule, and
+  -- neither empties in a running game. A Siege's candidates are its controller's
+  -- opponents still in the game, so an empty list means a controller with no
+  -- opponent left, which CR 104.2a has already ended; a battle with no battle
+  -- types takes its own controller, who is in the game by virtue of controlling a
+  -- permanent (CR 800.4a). Kept because the alternative is a battle that sits at
+  -- no protector forever, re-asked and unanswerable every pass.
   let undefendable = Maybe.mapMaybe (\(oid, picked) -> if Maybe.isNothing picked then Just oid else Nothing) redesignated
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
