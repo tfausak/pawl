@@ -24,7 +24,7 @@ import qualified Pawl.Types.Printing as Printing
 -- second copy in the deck. Pawl.Engine.Setup.createDeck reads the two fields into
 -- the two zones.
 --
--- ONE commander, not a set: CR 903.3 says "a legendary creature card", and the
+-- ONE commander, not a set: CR 903.3 designates one card per deck, and the
 -- partner and background rules that let a deck have two (CR 702.124, CR 702.124k)
 -- have no producer here (#939).
 data Deck = MkDeck

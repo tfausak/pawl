@@ -3824,6 +3824,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
         -- ReplacementEffect that exiles what would go to a graveyard applies to
         -- it. The recursion is one deep -- the second move's destination is the
         -- graveyard, and this guard asks only about the battlefield.
+        --
+        -- Not implemented: the graveyard id this arm answers is the card's new
+        -- incarnation, and a caller that BINDS the result binds a graveyard object
+        -- where it asked for a battlefield one. Unreachable today -- both stack
+        -- callers void the result, and no card in data/cards/ moves a spell from
+        -- the stack to the battlefield (#2869).
         Just settled
           | ZoneChange.to settled == Zone.Battlefield && EntryRestriction.prohibited oid fromZone gs ->
               if fromZone == Zone.Stack

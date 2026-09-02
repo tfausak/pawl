@@ -1246,7 +1246,8 @@ addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
 --
 -- Every arm here is a REGRESSION FENCE rather than a proven behaviour: no
 -- Effect.Replace in data/cards/ carries an EntryR whose rewrite is anything but
--- Tapped, so neutralizing any arm leaves the whole suite green. They are written
+-- Tapped or UnderSourceControl (Gather Specimens), and both answer nothing here,
+-- so neutralizing any arm leaves the whole suite green. They are written
 -- because the narrowing one caller over is only sound if this list is complete --
 -- a rewrite read left out is a slot the installed row does not carry, and the
 -- Filter or Quantity that wanted it then answers vacuously at the event.
@@ -6410,6 +6411,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   pure (victim, List.genericTake wanted (valid <> filler))
             _ -> pure (victim, [])
     doomed <- traverse pickFor victims
+    -- One at a time rather than as one event, Effect.Sacrifice's fold above
+    -- (#757). The reachable caller of the two: All Is Dust lands here.
     Monad.forM_ doomed (\(victim, oids) -> Monad.mapM_ (Event.sacrifice victim) oids)
   Effect.Create (Create.MkCreate quantity card entry mSlot creator) -> do
     gs <- State.get

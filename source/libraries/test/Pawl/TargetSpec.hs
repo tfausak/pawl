@@ -1020,6 +1020,76 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           "and bob's own black Doom Blade can, CR 702.11d stopping only what his opponents control"
       _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
 
+  -- CR 702.11d read against a spell whose colour the LAYERS gave it, rather than
+  -- its printed one. Celestial Dawn ({1}{W}{W} Enchantment, oracle text verified
+  -- against Scryfall) says "Nonland permanents you control are white. The same is
+  -- true for spells you control and nonland cards you own that aren't on the
+  -- battlefield", which the card transcribes as a pair of
+  -- Affected.MatchingOffBattlefield sets; the spell half is what this reads, so
+  -- alice's GREEN Giant Growth is white while it waits on the stack (CR 105.2)
+  -- and the Knight's hexproof then stops it.
+  --
+  -- Knight of Malice ({1}{B} Creature -- Human Knight 2/2, "First strike /
+  -- Hexproof from white / This creature gets +1/+0 as long as any player controls
+  -- a white permanent"), oracle text verified against Scryfall. Its variant
+  -- arrives off the card's own `keywords` through the codec, and the Knight stays
+  -- BLACK on both boards, which is what makes the stopping leg discriminating: an
+  -- implementation reading the quality off the candidate finds no white on it and
+  -- lets the spell through either way.
+  --
+  -- Two boards differing in exactly ONE thing, Celestial Dawn's presence, with
+  -- both spell-side questions asked on each. The last leg is the falsifier for an
+  -- affected set reaching every object instead of the ones its filter names: bob's
+  -- Giant Growth is nobody's spell but his, so it stays green.
+  --
+  -- The BORROWED pair is what separates the sentence's two halves, and why the
+  -- card carries two sets rather than one: a spell alice cast off a card BOB owns
+  -- is white by "spells you control" and not by "nonland cards you own", CR 405.4's
+  -- controller and CR 108.3's owner being different players there. Dire Fleet
+  -- Daredevil is the printing that produces that board, driven in Pawl.CastSpec;
+  -- here the caster is written onto the stack object, since what these two legs
+  -- read off it is one projection and not the cast.
+  Spec.it s "CR 105.2/702.11d Celestial Dawn whitens its controller's spell, which Knight of Malice's hexproof then stops" $ do
+    knight <- S.printingOf s registry "Knight of Malice"
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    giantGrowth <- S.printingOf s registry "Giant Growth"
+    case S.spellTargetSlot giantGrowth of
+      Just slot -> do
+        let (bobKnight, board0) = S.addCreature knight S.bob (Setup.emptyGame S.bothPlayers)
+            (aliceKnight, dawnless) = S.addCreature knight S.alice board0
+            dawned = snd (S.addCreature dawn S.alice dawnless)
+            reachesFrom (spellId, onStack) caster victim =
+              Set.member (Recipient.ToCreature victim) (Target.legalRecipients (Just caster) spellId slot onStack)
+            reaches board caster = reachesFrom (S.spellOnStack giantGrowth caster board) caster
+            -- CR 405.4: a spell's controller is the player who cast it, which is
+            -- what Object.enteredUnder holds -- Projection.defaultControllerOf
+            -- falls back to CR 108.3's owner only in its absence.
+            borrowed board victim =
+              let (spellId, onStack) = S.spellOnStack giantGrowth S.bob board
+                  underAlice = Map.adjust (\o -> o {Object.enteredUnder = Just S.alice}) spellId (GameState.objects onStack)
+               in reachesFrom (spellId, onStack {GameState.objects = underAlice}) S.alice victim
+        Spec.assertBool
+          s
+          (reaches dawnless S.alice bobKnight)
+          "without Celestial Dawn alice's green Giant Growth reaches bob's Knight of Malice"
+        Spec.assertBool
+          s
+          (not (reaches dawned S.alice bobKnight))
+          "with Celestial Dawn on her battlefield her spell is white, and CR 702.11d stops it"
+        Spec.assertBool
+          s
+          (borrowed dawnless bobKnight)
+          "without it a Giant Growth alice cast off bob's card reaches his Knight too"
+        Spec.assertBool
+          s
+          (not (borrowed dawned bobKnight))
+          "with it that spell is white as well, by the clause naming the spells she CONTROLS"
+        Spec.assertBool
+          s
+          (reaches dawned S.bob aliceKnight)
+          "while bob's own Giant Growth is untouched, and reaches alice's Knight"
+      _ -> Spec.assertFailure s "Giant Growth should declare a target slot"
+
   -- CR 702.16b: "A permanent or player with protection can't be targeted by
   -- spells with the stated quality and can't be targeted by abilities from a
   -- source with the stated quality." Apostle of Purifying Light ({1}{W} Creature
