@@ -44,10 +44,11 @@
 -- target permanent until end of turn) is what lets a battle's protector take the
 -- battle at sorcery speed; Word of Seizing ({3}{R}{R} Instant, split second,
 -- untap target permanent and gain control of it until end of turn) is what moves
--- a controller after attackers are declared: the pool's other thefts are either
--- sorcery-speed (Act of Treason, Zealous Conscripts) or filtered to a type a
--- battle does not have -- Ray of Command to a creature, Aladdin to an artifact,
--- Aura Graft to an Aura.
+-- a controller once attackers are declared. Every other GainControl in
+-- `data/cards` on 2026-09-02 is sorcery-speed, hangs off a trigger the attack
+-- cannot raise, or is filtered to a type a battle does not have -- Ray of Command
+-- to a creature, Aladdin to an artifact, Aura Graft to an Aura. Another instant,
+-- or an instant-speed activation naming a permanent, would serve here too.
 --
 -- And CR 509.1a's third subject, "a battle they protect", which is a filter atom
 -- (Filter.IsAttackingBattle) rather than a rule of combat: filterSpec below, whose
@@ -640,10 +641,12 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
   Spec.it s "CR 508.4 the other road into combat records the same two seats" $ do
     -- CR 506.4's comparand is written by both writers of `attackers`, and a
     -- creature put onto the battlefield attacking never went through CR 508.1b.
-    -- Read off the RECORD and not off a board: the pool's producers of that road
-    -- are attack triggers (Hanweir Garrison), so the arriving creature and the
-    -- instant that would move the battle cannot be ordered against each other by
-    -- a pure answerer. The pair above is where the record is proved to matter.
+    -- Read off the RECORD and not off a board: that road's producers are attack
+    -- triggers (Hanweir Garrison, Hero of Bladehold), so the creature arrives
+    -- while a trigger resolves, and a pure answerer cannot order that against the
+    -- instant that would then move the battle (see the vacuity traps in
+    -- docs/agents/implementing.md). The pair above is where the record is proved
+    -- to matter; this case is what keeps the second writer from going dead.
     (gs, battle, mine, _, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker"] [] []
     case mine of
       [arrival] -> do
@@ -934,10 +937,10 @@ conscriptAnswer spell victim p = case p of
 --
 -- Word of Seizing, {3}{R}{R} Instant: "Split second. Untap target permanent and
 -- gain control of it until end of turn. It gains haste until end of turn."
--- TARGET PERMANENT at INSTANT speed is what makes it the producer: nothing else
--- in the pool can change a battle's controller after attackers are declared.
--- Split second is on the card and idle on this board -- nobody else wants to
--- respond -- and is carried anyway because a card file states what is printed.
+-- TARGET PERMANENT at INSTANT speed is what makes it the producer; this module's
+-- header records what the rest of the pool offers. Split second is idle on this
+-- board -- nobody else wants to respond -- and is on the card because a card file
+-- states what is printed.
 seizing ::
   (Monad m) =>
   Spec.Spec m n ->

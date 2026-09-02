@@ -309,10 +309,9 @@ stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs =
   List.any (\defender -> List.elem oid (attackableBattles defender gs)) (Defender.defendingPlayers gs)
 
--- CR 506.4's comparand for an attacked BATTLE: who controls it, for the CR 508.1b
--- announcement that names one and nobody else. Nothing for a player or a
--- planeswalker -- Pawl.Types.Combat's attackedControlledBy says why the
--- planeswalker needs no entry.
+-- CR 506.4's comparand for a CR 508.1b announcement that named a BATTLE: who
+-- controls that battle. Nothing for a player or a planeswalker --
+-- Pawl.Types.Combat's attackedControlledBy says why the planeswalker needs none.
 --
 -- One function so that the two writers of `attackers` cannot record the seat
 -- differently, which is what Defender.playerOf is for attackedUnder beside it.
@@ -1763,10 +1762,10 @@ putOntoBattlefieldAttacking oid = do
                           (Combat.attackedUnder c)
                           (\seat -> Map.insert oid seat (Combat.attackedUnder c))
                           (Defender.playerOf Projection.controllerWithLastKnown target gs),
-                      -- CR 506.4's controller clause for a battle, declareAttackers'
-                      -- write on the CR 508.4 road: this creature joined combat
-                      -- now, so the seat it compares against is who controls the
-                      -- battle now -- whatever seat an earlier attacker recorded.
+                      -- CR 506.4's controller clause for a battle, on the CR
+                      -- 508.4 road: THIS creature joins combat now, so the seat
+                      -- it compares against is who controls the battle now --
+                      -- whatever seat an earlier attacker recorded for it.
                       Combat.attackedControlledBy =
                         Maybe.maybe
                           (Combat.attackedControlledBy c)
