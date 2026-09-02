@@ -229,6 +229,8 @@ library codec
     Pawl.Codec.CoinFaceSpec
     Pawl.Codec.CoinFlipped
     Pawl.Codec.CoinFlippedSpec
+    Pawl.Codec.CoinReading
+    Pawl.Codec.CoinReadingSpec
     Pawl.Codec.Color
     Pawl.Codec.ColorSpec
     Pawl.Codec.Combat
@@ -1392,6 +1394,7 @@ library types
     Pawl.Types.ClauseIndex
     Pawl.Types.CoinFace
     Pawl.Types.CoinFlipped
+    Pawl.Types.CoinReading
     Pawl.Types.Color
     Pawl.Types.Combat
     Pawl.Types.CombatRestriction

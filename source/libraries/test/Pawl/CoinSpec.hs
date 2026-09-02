@@ -1,7 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers: CR 705 FLIPPING A COIN -- Pawl.Types.FlipCoin, Pawl.Engine.Coin,
+-- Covers: CR 705 FLIPPING A COIN -- Pawl.Types.FlipCoin, Pawl.Types.CoinReading,
+-- Pawl.Engine.Coin,
 -- Pawl.Types.StatedFlip, Effect.FlipCoin's arm in Pawl.Engine.Resolve, and the
 -- Pawl.Types.Prompt / Pawl.Types.Response pairs the call and the flip are
 -- externalised through. The transcript legs live in
@@ -11,17 +12,19 @@
 -- group proves with Tavern Scoundrel: what a trigger sees is a rule 603 question
 -- rather than a rule 705 one, and Winter Sky watches nothing.
 --
--- NOT rule 705.2's FIRST sentence on its own -- the flip nobody wins, which is
--- an entry replacement rather than an effect (Molten Sentry), and is proved in
--- Pawl.ReplacementSpec beside the rest of the CR 614.1c family. It appears here
--- once, in the CR 705.3 group, because rule 705.3 is the one rule both roads
--- have to obey and Pawl.Engine.Coin is the one road they share.
+-- NOT rule 705.2's first sentence as an ENTRY REPLACEMENT (Molten Sentry), which
+-- is proved in Pawl.ReplacementSpec beside the rest of the CR 614.1c family. It
+-- appears here twice: in the CR 705.3 group, because rule 705.3 is the one rule
+-- both roads have to obey and Pawl.Engine.Coin is the one road they share, and
+-- as an EFFECT in the face-reading group below (Odds), which is the same
+-- sentence on the other road.
 --
 -- Its own module rather than a group in Pawl.DiceSpec: CR 705 and CR 706 are
 -- different rules sharing no type, no prompt and no effect. A coin has no size,
 -- no results table and no modifier; a die has no call and no winner.
 --
--- ONE FIXTURE. Winter Sky ({R} Sorcery, "Flip a coin. If you win the flip,
+-- THREE FIXTURES, one per group; the two below Winter Sky are documented where
+-- they are built. Winter Sky ({R} Sorcery, "Flip a coin. If you win the flip,
 -- Winter Sky deals 1 damage to each creature and each player. If you lose the
 -- flip, each player draws a card.") is CR 705.2's win/lose reading with both
 -- branches spelled in opcodes that already existed, so the flip is the only new
@@ -73,6 +76,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
@@ -83,16 +87,20 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Coin" $ do
   flipCoinSpec s registry
+  multiCoinSpec s registry
+  faceReadingSpec s registry
   statedFlipSpec s registry
 
 -- Set a seat's life directly, so the two seats start on different numbers and
@@ -403,3 +411,224 @@ statedFlipSpec s registry = Spec.describe s "StateCoinFlip (CR 705.3)" $ do
         Spec.assertEqWith s "CR 705.3: the stated heads picks the 5/2" (S.powerToughnessOf stated underEdgar) (Just (5, 2))
         Spec.assertEqWith s "CR 705.1: the actual tails picks the 2/5" (S.powerToughnessOf actual underHelper) (Just (2, 5))
       _ -> Spec.assertFailure s "Molten Sentry did not reach the battlefield"
+
+-- CR 705.1's OTHER producer, and the one that makes an instruction's coins more
+-- than one: Flock of Rabid Sheep ({X}{G}{G} Sorcery, "Flip X coins. For each
+-- flip you win, create a 2/2 green Sheep creature token named Rabid Sheep";
+-- name, cost, type line and Oracle text checked against api.scryfall.com
+-- 2026-09-01). Its tally is the token count, so a board reads how many of the
+-- flips were won rather than merely that one was.
+--
+-- FIVE Forests, which is exactly {3}{G}{G}: X=3 is payable and X=4 is not, so an
+-- announcement that ignored the pinned answer could not quietly flip more.
+--
+-- `helper` is the creature planted under alice, and is the only difference
+-- between the two boards the CR 705.3 case below compares: Edgar, King of
+-- Figaro, or a Bird Maiden that states nothing.
+flockBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe String -> m (ObjectId.ObjectId, GameState.GameState)
+flockBoard s registry helper = do
+  flock <- S.printingOf s registry "Flock of Rabid Sheep"
+  forest <- S.printingOf s registry "Forest"
+  let lands = S.landsFor forest S.alice 5 (Setup.emptyGame S.bothPlayers)
+  planted <- case helper of
+    Nothing -> pure lands
+    Just name -> do
+      creature <- S.printingOf s registry name
+      pure (snd (S.addCreature creature S.alice lands))
+  let (gs, oid) = S.handOne flock planted
+  pure (oid, gs)
+
+-- The `i`th element, or a fallback past the end. The fallbacks are the answers
+-- that LOSE a flip -- a tails coin against a call of heads -- so a run that
+-- flipped more coins than the case pinned cannot inflate the tally.
+atIndex :: [CoinFace.CoinFace] -> CoinFace.CoinFace -> Int -> CoinFace.CoinFace
+atIndex xs fallback i = Maybe.fromMaybe fallback (Maybe.listToMaybe (drop i xs))
+
+-- Pins every coin of the instruction BY INDEX, which a pure @Prompt r -> r@
+-- answerer cannot do: the calls and the faces of three coins are three pairs of
+-- structurally identical prompts, and one answer for all of them cannot tell a
+-- three-coin instruction from a one-coin one. The counter advances on the FLIP,
+-- so the call CR 705.2 asks first reads the same index the coin that follows it
+-- does.
+flockAnswer :: [CoinFace.CoinFace] -> [CoinFace.CoinFace] -> Prompt.Prompt r -> State.State Int r
+flockAnswer faces calls p = case p of
+  Prompt.ChooseX {} -> pure 3
+  Prompt.CallCoin {} -> do
+    i <- State.get
+    pure (atIndex calls CoinFace.Heads i)
+  Prompt.FlipCoin -> do
+    i <- State.get
+    State.put (i + 1)
+    pure (atIndex faces CoinFace.Tails i)
+  _ -> pure (S.identityAnswer p)
+
+-- Cast the Flock for X=3 and resolve it, returning the settled board and how
+-- many coins the engine actually flipped.
+castFlock :: [CoinFace.CoinFace] -> [CoinFace.CoinFace] -> (ObjectId.ObjectId, GameState.GameState) -> (GameState.GameState, Int)
+castFlock faces calls (oid, board) =
+  let ((_, gs), flips) = State.runState (Engine.runGame (flockAnswer faces calls) board (S.cast S.alice oid >> Stack.resolveTop)) 0
+   in (S.settleSba gs, flips)
+
+-- How many Rabid Sheep the Flock left on the battlefield, which is its tally of
+-- won flips.
+sheep :: GameState.GameState -> Int
+sheep = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Rabid Sheep")) S.alice
+
+multiCoinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+multiCoinSpec s registry = Spec.describe s "FlipCoin over several coins (CR 705.1)" $ do
+  Spec.it s "CR 705.2 one instruction flips every coin it names and tallies the flips won" $ do
+    board <- flockBoard s registry Nothing
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation. Three coins, each called separately: heads called heads (won),
+    -- tails called heads (lost), tails called tails (won). TWO is a reading no
+    -- other implementation of this instruction produces -- one coin gives 1
+    -- (the first flip was won), the coin COUNT gives 3, and the number of coins
+    -- that came up heads gives 1.
+    Spec.assertEqWith
+      s
+      "CR 705.2: two of the three flips were won, so two Sheep"
+      (sheep (fst (castFlock [CoinFace.Heads, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Tails] board)))
+      2
+    -- Supporting, and after the assertion it could otherwise absorb: the engine
+    -- flipped three coins and not one.
+    Spec.assertEqWith
+      s
+      "CR 705.1: the instruction flipped three coins"
+      (snd (castFlock [CoinFace.Heads, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Tails] board))
+      3
+  Spec.it s "CR 705.3 a statement spent on an instruction reaches every coin of it" $ do
+    edgarBoard <- flockBoard s registry (Just "Edgar, King of Figaro")
+    plainBoard <- flockBoard s registry (Just "Bird Maiden")
+    -- Edgar's ruling on exactly this shape: "if an effect tells you to flip
+    -- multiple coins at once ... Edgar's last ability modifies that set of
+    -- flips". His "the FIRST time you flip one or more coins each turn" is spent
+    -- on the INSTRUCTION, so all three coins come up heads and all three are
+    -- won. Spending it on the first FLIP instead would leave 1, and the two
+    -- calls of heads against real tails coins would lose.
+    Spec.assertEqWith
+      s
+      "CR 705.3: all three coins of the one instruction are stated, so three Sheep"
+      (sheep (fst (castFlock [CoinFace.Tails, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Heads] edgarBoard)))
+      3
+    -- The pair, one thing different: the same board and the same answers with a
+    -- vanilla creature in Edgar's seat, where every call of heads meets a tails
+    -- coin and every flip is lost.
+    Spec.assertEqWith
+      s
+      "CR 705.2: with nobody stating a result all three flips are lost"
+      (sheep (fst (castFlock [CoinFace.Tails, CoinFace.Tails, CoinFace.Tails] [CoinFace.Heads, CoinFace.Heads, CoinFace.Heads] plainBoard)))
+      0
+
+-- CR 705.2's FIRST sentence as an effect rather than an entry replacement: Odds
+-- (the left half of Odds // Ends, {U}{R} Instant, "Flip a coin. If it comes up
+-- heads, counter target instant or sorcery spell. If it comes up tails, copy
+-- that spell and you may choose new targets for the copy"; name, cost, type
+-- line and Oracle text read off the card_faces array at api.scryfall.com
+-- 2026-09-01). Its two branches read the FACE, and no player wins or loses.
+--
+-- Lightning Bolt is the spell it answers, so the two branches are three damage
+-- apart in each direction: countered leaves bob at 20, copied takes him to 14.
+-- Two seats are enough -- the copy keeps the Bolt's target, so no third seat has
+-- a role.
+--
+-- Three lands, exactly both costs: two Mountains and an Island.
+oddsBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+oddsBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  odds <- S.printingOf s registry "Odds"
+  let lands = S.landsFor island S.alice 1 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+      (withBolt, boltId) = S.handOne bolt lands
+      (oddsId, board) = S.addHandCard odds S.alice withBolt
+  pure (boltId, oddsId, board)
+
+-- Answer a ChooseTargets by FILTERING the offered set down to one recipient,
+-- never by building one: CR 608.2b re-reads what was chosen, and a hand-built
+-- Recipient.ToObject of the same permanent is a different recipient that the
+-- re-read drops with no error.
+pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
+pinTarget recipient p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter (== recipient) offered) sets
+  _ -> S.identityAnswer p
+
+-- alice casts Lightning Bolt at bob and then -- CR 117.3c, still holding
+-- priority -- Odds at the Bolt, and the whole stack resolves under a coin pinned
+-- to `face`.
+afterOdds :: CoinFace.CoinFace -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
+afterOdds face (boltId, oddsId, board) =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.FlipCoin -> face
+        -- CR 707.10c's re-target prompt, which the copy raises because Odds says
+        -- "you may choose new targets for the copy". Pinned back onto bob rather
+        -- than left to the fallback, so the copy deals its damage where the Bolt
+        -- would have.
+        Prompt.ChooseTargets {} -> pinTarget (Recipient.ToPlayer S.bob) p
+        _ -> S.identityAnswer p
+      cast1 = S.runPure (pinTarget (Recipient.ToPlayer S.bob)) board (Cast.castSpell S.alice boltId boltName Facing.FaceUp)
+      drain n g = if n <= (0 :: Int) || null (GameState.stack g) then g else drain (n - 1) (S.runPure answer g Stack.resolveTop)
+   in case GameState.stack cast1 of
+        [] -> cast1
+        boltSpell : _ ->
+          let cast2 = S.runPure (pinTarget (Recipient.ToObject boltSpell)) cast1 (Cast.castSpell S.alice oddsId oddsName Facing.FaceUp)
+           in S.settleSba (drain 8 cast2)
+
+-- How many CR 705.2 CALLS the whole run asked. Not readable off the board, so it
+-- takes a State-counting answerer.
+oddsCalls :: CoinFace.CoinFace -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState) -> Int
+oddsCalls face (boltId, oddsId, board) =
+  let counting :: Prompt.Prompt r -> State.State Int r
+      counting p = case p of
+        Prompt.CallCoin {} -> do
+          State.modify' (+ 1)
+          pure (S.identityAnswer p)
+        Prompt.FlipCoin -> pure face
+        _ -> pure (S.identityAnswer p)
+      drain :: Int -> GameState.GameState -> State.State Int GameState.GameState
+      drain n g =
+        if n <= 0 || null (GameState.stack g)
+          then pure g
+          else do
+            (_, next) <- Engine.runGame counting g Stack.resolveTop
+            drain (n - 1) next
+      cast1 = S.runPure (pinTarget (Recipient.ToPlayer S.bob)) board (Cast.castSpell S.alice boltId boltName Facing.FaceUp)
+   in case GameState.stack cast1 of
+        [] -> 0
+        boltSpell : _ ->
+          let cast2 = S.runPure (pinTarget (Recipient.ToObject boltSpell)) cast1 (Cast.castSpell S.alice oddsId oddsName Facing.FaceUp)
+           in State.execState (drain 8 cast2) 0
+
+boltName :: CardName.CardName
+boltName = CardName.MkCardName (Text.pack "Lightning Bolt")
+
+oddsName :: CardName.CardName
+oddsName = CardName.MkCardName (Text.pack "Odds")
+
+faceReadingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+faceReadingSpec s registry = Spec.describe s "FlipCoin read for its face (CR 705.2)" $ do
+  Spec.it s "CR 705.2 an effect that cares only about the face reads the face" $ do
+    board <- oddsBoard s registry
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation, and on the TAILS leg, which is the one leg the win/lose reading
+    -- cannot reach the same answer on: Replay.defaultAnswer calls and flips
+    -- heads, so a flip read as a WIN would counter the Bolt on both legs.
+    Spec.assertEqWith
+      s
+      "CR 705.2: tails copies the Bolt, so bob takes it twice"
+      (S.lifeOf S.bob (afterOdds CoinFace.Tails board))
+      (Just 14)
+    -- The pair, one thing different: the same board and the same answers with
+    -- the coin the other way up.
+    Spec.assertEqWith
+      s
+      "CR 705.2: heads counters the Bolt, so bob takes nothing"
+      (S.lifeOf S.bob (afterOdds CoinFace.Heads board))
+      (Just 20)
+  Spec.it s "CR 705.2 no call is made for a flip nobody wins" $ do
+    board <- oddsBoard s registry
+    -- "No player wins or loses a coin flip for this kind of effect", so there is
+    -- nothing to call and nothing for a CR 723 controller to usurp. Not readable
+    -- off the board -- both legs above leave the same board whether or not a
+    -- call was asked and thrown away.
+    Spec.assertEqWith s "CR 705.2: Odds asks no call" (oddsCalls CoinFace.Tails board) 0

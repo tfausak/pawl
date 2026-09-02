@@ -28,6 +28,7 @@ import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ClassLevel as ClassLevel
+import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -1625,7 +1626,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.FlipCoin FlipCoin.MkFlipCoin {FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip")})
+      (Effect.FlipCoin FlipCoin.MkFlipCoin {FlipCoin.count = Quantity.Literal 1, FlipCoin.reading = CoinReading.Wins, FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip")})
       " {\"type\":\"FlipCoin\",\"value\":{\"slot\":\"flip\"}} "
   Spec.it s "ExileHandThenDraw" $
     Common.assertJsonCodec
