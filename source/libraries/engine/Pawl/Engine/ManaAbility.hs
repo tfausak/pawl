@@ -152,8 +152,8 @@ costMovesLibraryCard component = case component of
 -- want different halves of it: the classification below asks only whether there
 -- is an addition at all, and CR 605.3b's inline payment
 -- (Mana.manaOptionsOfGiven) has to stamp what the instruction says onto every
--- unit it adds -- CR 106.6's spending restriction today, the recipient (#1673)
--- and the retention (#1808) when those land.
+-- unit it adds -- CR 106.6's spending restriction and CR 106.4's retention
+-- today, the recipient (#1673) when that lands.
 --
 -- None of those three narrows the CLASSIFICATION, and CR 605.1a is why: its four
 -- criteria say nothing about whose pool the mana goes to ("a player's", not its
