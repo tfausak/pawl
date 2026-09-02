@@ -15,9 +15,10 @@
 -- goaded", and two seats collapse that onto nobody. bob goads a creature ALICE
 -- controls, and carol is the player the requirement is about.
 --
--- TWO BOARDS, differing only in whom CR 507.1 made the defending player, because
--- pawl chooses one defending player per combat (see #175) and that is what decides
--- whether the second requirement can be obeyed at all:
+-- TWO BOARDS, differing only in which player `attacking` records as the single
+-- defending player -- stated rather than run, so CR 507.1's turn-based action is
+-- not what picks it -- because that is what decides whether the second
+-- requirement can be obeyed at all:
 --
 -- \* against CAROL, both requirements are live, and they part company on the
 --   PLANESWALKER -- attacking a planeswalker carol controls is not attacking
