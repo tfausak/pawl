@@ -2688,26 +2688,40 @@ permanentReturnedToHandSpec s registry =
 -- returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve brackets as one
 -- Pawl.Types.EventGroup.
 --
+-- WHY A SYNTHETIC BESIDE THE PRINTING. Tameshi's "triggers only once each turn"
+-- makes the batch reading indistinguishable from the per-permanent one on any
+-- board: two triggers with the second declined by the limit and one trigger
+-- leave the same game. Scryfall o:"one or more" o:"returned to", 2026-09-02,
+-- matches Tameshi alone, and o:/whenever one or more [^.]* hands?/ adds no
+-- other returned-to-hand printing; a printing of Tameshi's condition without
+-- the rider is the card that refutes Synthetic Return Ledger {1}{U}
+-- Enchantment, "Whenever one or more noncreature permanents are returned to
+-- hand, draw a card" (data/cards/synthetic-return-ledger.json) -- CR 603.2c's
+-- first sentence, which nothing in the CR forbids printing bare.
+--
 -- The discrimination is alice's hand once Retract has returned two artifacts:
--- three cards (both artifacts and ONE draw) is the batch reading, four is the
--- per-permanent one Justice's condition takes, two is silence. Justice, Vance
+-- four cards (both artifacts, Tameshi's one draw and the Ledger's one) is the
+-- batch reading, five is the per-permanent one -- the Ledger drawing twice
+-- where Tameshi's limit hides the second -- and two is silence. Justice, Vance
 -- Astrovik stands on the same board reading the same event the singular way and
 -- grows by two -- the two readings side by side off one event group, which the
 -- group count pins as the precondition the way permanentsDieSpec does.
 permanentsReturnedToHandSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 permanentsReturnedToHandSpec s registry =
-  let -- alice: Tameshi, Justice, Sol Ring, Bonesplitter and a Goblin Piker on
-      -- the battlefield, one Island for Retract, Retract alone in hand, and a
-      -- library to draw from.
+  let -- alice: Tameshi, the Ledger, Justice, Sol Ring, Bonesplitter and a Goblin
+      -- Piker on the battlefield, one Island for Retract, Retract alone in hand,
+      -- and a library to draw from.
       board = do
         tameshi <- S.printingOf s registry "Tameshi, Reality Architect"
+        ledger <- S.printingOf s registry "Synthetic Return Ledger"
         justice <- S.printingOf s registry "Justice, Vance Astrovik"
         solRing <- S.printingOf s registry "Sol Ring"
         bonesplitter <- S.printingOf s registry "Bonesplitter"
         piker <- S.printingOf s registry "Goblin Piker"
         island <- S.printingOf s registry "Island"
         retract <- S.printingOf s registry "Retract"
-        let (tameshiId, g1) = S.addCreature tameshi S.alice (S.landsInPlay island 1)
+        let (tameshiId, g0) = S.addCreature tameshi S.alice (S.landsInPlay island 1)
+            (_, g1) = S.addCreature ledger S.alice g0
             (justiceId, g2) = S.addCreature justice S.alice g1
             (solRingId, g3) = S.addCreature solRing S.alice g2
             (bonesplitterId, g4) = S.addCreature bonesplitter S.alice g3
@@ -2737,32 +2751,32 @@ permanentsReturnedToHandSpec s registry =
           )
    in Spec.describe s "PermanentsReturnedToHand" $ do
         -- The proving case: Retract returns two artifacts as one event group.
-        Spec.it s "CR 603.2c Retract returning two artifacts draws Tameshi one card and grows Justice twice" $ do
+        Spec.it s "CR 603.2c Retract returning two artifacts draws one card each for Tameshi and the Ledger, and grows Justice twice" $ do
           (_, justiceId, _, _, _, retractId, withRetract) <- board
           let cast = S.runPure S.identityAnswer withRetract (S.cast S.alice retractId)
               resolved = S.runPure S.identityAnswer cast Stack.resolveTop
               settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
               after = resolveWholeStack settled
-          Spec.assertEqWith s "alice holds the two artifacts and ONE drawn card, not two" (S.handSize S.alice after) 3
+          Spec.assertEqWith s "alice holds the two artifacts and ONE draw each from Tameshi and the Ledger, not two from the Ledger" (S.handSize S.alice after) 4
           Spec.assertEqWith s "Justice grew once per artifact, the singular reading of the same event" (sizeOf justiceId after) (Just 4, Just 4)
           Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (length (returnGroups settled)) 1
-          Spec.assertEqWith s "three triggers reached the stack: Tameshi's once, Justice's twice" (length (GameState.stack settled)) 3
+          Spec.assertEqWith s "four triggers reached the stack: Tameshi's and the Ledger's once each, Justice's twice" (length (GameState.stack settled)) 4
           Spec.assertEqWith s "alice's hand was Retract alone before" (S.handSize S.alice withRetract) 1
         -- The printed "noncreature", the condition's own Filter: one board, two
         -- permanents returned one at a time, and only the artifact draws.
         Spec.it s "CR 603.2c a creature returned to hand draws nothing where an artifact does" $ do
           (_, _, solRingId, _, pikerId, _, withRetract) <- board
           Spec.assertEqWith s "the Piker's return leaves alice with Retract and the Piker" (S.handSize S.alice (returnByHand pikerId withRetract)) 2
-          Spec.assertEqWith s "the Sol Ring's, on the same board, adds a draw" (S.handSize S.alice (returnByHand solRingId withRetract)) 3
+          Spec.assertEqWith s "the Sol Ring's, on the same board, adds Tameshi's draw and the Ledger's" (S.handSize S.alice (returnByHand solRingId withRetract)) 4
         -- The printed "only once each turn", Pawl.Types.TriggerLimit's
-        -- OncePerTurn on this condition: a second batch in the same turn is a
-        -- second trigger event (permanentsDieSpec's point), and the limit
-        -- declines it.
-        Spec.it s "CR 603.2c a second batch in the same turn draws nothing more" $ do
+        -- OncePerTurn on Tameshi's condition: a second batch in the same turn is a
+        -- second trigger event (permanentsDieSpec's point), which the Ledger
+        -- answers again and Tameshi's limit declines.
+        Spec.it s "CR 603.2c a second batch in the same turn draws for the Ledger and not for Tameshi" $ do
           (_, _, solRingId, bonesplitterId, _, _, withRetract) <- board
           let first = returnByHand solRingId withRetract
-          Spec.assertEqWith s "the second return adds the Bonesplitter alone" (S.handSize S.alice (returnByHand bonesplitterId first)) 4
-          Spec.assertEqWith s "the first drew" (S.handSize S.alice first) 3
+          Spec.assertEqWith s "the second return adds the Bonesplitter and the Ledger's draw, not Tameshi's" (S.handSize S.alice (returnByHand bonesplitterId first)) 6
+          Spec.assertEqWith s "the first drew for both" (S.handSize S.alice first) 4
         -- CR 603.10a: a leaves-the-battlefield ability looks back, so Tameshi
         -- swept up in the same batch as the Sol Ring still sees it go and still
         -- draws -- Event.looksBack's batch arm, PermanentsDie's own Example in
@@ -2772,7 +2786,7 @@ permanentsReturnedToHandSpec s registry =
           (tameshiId, _, solRingId, _, _, _, withRetract) <- board
           let gone = S.runPure S.identityAnswer withRetract (Event.simultaneously (Event.changeZone tameshiId Zone.Hand >> Event.changeZone solRingId Zone.Hand))
               after = resolveWholeStack (S.runPure S.identityAnswer gone Engine.settleForPriority)
-          Spec.assertEqWith s "alice holds Retract, Tameshi, the Sol Ring and one drawn card" (S.handSize S.alice after) 4
+          Spec.assertEqWith s "alice holds Retract, Tameshi, the Sol Ring, Tameshi's draw and the Ledger's" (S.handSize S.alice after) 5
           Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (length (returnGroups gone)) 1
 
 -- What PermanentReturnedToHand's bindings are FOR -- Warped Devotion {2}{B}
