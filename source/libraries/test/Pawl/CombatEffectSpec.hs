@@ -729,6 +729,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       -- CR 802.2a: the seat each attack names, which is what a
                       -- declaration would have recorded.
                       Combat.Type.attackedUnder = Map.singleton oid S.bob,
+                      Combat.Type.attackedControlledBy = Map.empty,
                       Combat.Type.joinedUnder = Map.singleton oid S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),

@@ -278,6 +278,28 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     let gone = S.departs Departure.Type.Conceded S.carol entered
         (acted, _) = S.runPureWith S.identityAnswer gone Sba.performStateBasedActions
     Spec.assertBool s acted "the pass reports the repair"
+  Spec.it s "CR 704.5y whole cards: a protector who steals the battle stops being its protector" $ do
+    -- Rule 704.5y at gameplay level, which needs a control-change effect that can
+    -- name a battle: Zealous Conscripts' GainControl draws from Pool.Permanents,
+    -- and Target.permanentRecipients is the whole battlefield.
+    --
+    -- carol protects alice's Siege and then takes it, so she is a player who
+    -- can't be its protector (CR 310.12a wants an opponent of its controller) --
+    -- and rule 704.5y, which carries no attacking rider, re-chooses. The board is
+    -- three-seated so that the re-choice has two candidates and cannot be elided.
+    (board, battle, spell, decoy) <- conscriptedSiege s registry
+    let stolen = runConscripts board spell battle
+        elsewhere = runConscripts board spell decoy
+    Spec.assertEqWith s "CR 704.5y: bob protects it now" (protectorOf battle stolen) (Just S.bob)
+    Spec.assertEqWith s "the twin, one target apart: carol still protects the Siege she did not take" (protectorOf battle elsewhere) (Just S.carol)
+    -- The two legs differ in the theft and in nothing else.
+    Spec.assertEqWith s "carol controls the Siege on the theft leg" (Projection.controllerOf battle stolen) (Just S.carol)
+    Spec.assertEqWith s "alice still controls it on the twin" (Projection.controllerOf battle elsewhere) (Just S.alice)
+    Spec.assertEqWith s "and the twin's Plains is what carol took instead" (Projection.controllerOf decoy elsewhere) (Just S.carol)
+    Spec.assertEqWith s "the Plains is alice's on the theft leg" (Projection.controllerOf decoy stolen) (Just S.alice)
+    -- CR 704.5y repairs the designation rather than burying the battle: its own
+    -- last clause is reached only where no player can be chosen.
+    Spec.assertBool s (S.onBattlefield battle stolen) "the Siege is still on the battlefield"
   Spec.it s "CR 400.7 a battle that leaves the battlefield forgets its protector" $ do
     (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
     Spec.assertEqWith s "carol protects it while it is on the battlefield" (protectorOf oid entered) (Just S.carol)
@@ -561,6 +583,50 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     Spec.assertBool s (not (Battle.isBeingAttacked battle gone)) "nothing is attacking it"
     Spec.assertEqWith s "bob protects it now" (protectorOf battle checked) (Just S.bob)
 
+  Spec.it s "CR 506.4 whole cards: a Word of Seizing on the attacked Siege stops it being attacked" $ do
+    -- The CONTROLLER clause of rule 506.4, which no candidate list can see: bob
+    -- steals the Siege mid-combat and carol goes on protecting it (CR 310.9d), so
+    -- Combat.attackableBattles still finds it under the same defending player and
+    -- only the recorded seat says the controller changed.
+    --
+    -- bob and not carol, and not alice: alice already controls it, so the spell
+    -- would change nothing, and carol taking it would fire CR 704.5y and move the
+    -- PROTECTOR -- the clause the candidate list already answers -- leaving the
+    -- controller clause unproven.
+    (gs, battle, mine, theirs, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker"] (replicate 5 "Mountain") []
+    (board, spell) <- seizing s registry gs
+    case (mine, theirs) of
+      ([attacker], land : _) -> do
+        let stolen = runToEndOfCombat (seizeAnswer battle spell battle) board
+            elsewhere = runToEndOfCombat (seizeAnswer battle spell land) board
+        -- GAMEPLAY FIRST, on the quantity the two readings differ on: the Piker
+        -- is a 2/1 and the Siege prints defense 5, so "removed from combat" and
+        -- "still attacked" are 5 and 3 (CR 510.1b, CR 310.6).
+        Spec.assertEqWith s "CR 510.1b: a Siege removed from combat is assigned no combat damage" (S.counterOf CounterKind.Defense battle stolen) 5
+        Spec.assertEqWith s "the twin, one target apart: the Siege bob never took is dealt the Piker's 2" (S.counterOf CounterKind.Defense battle elsewhere) 3
+        Spec.assertBool s (Set.member attacker (Combat.Type.attackingNothing (GameState.combat stolen))) "CR 506.4c: the Piker is attacking nothing"
+        Spec.assertBool s (not (Set.member attacker (Combat.Type.attackingNothing (GameState.combat elsewhere)))) "and on the twin it is still attacking the Siege"
+        -- The two legs differ in the CONTROLLER and in nothing else: carol
+        -- protects the battle on both, so the removal cannot be the clause
+        -- stillAttackedBattle already answers.
+        Spec.assertEqWith s "bob controls the Siege on the theft leg" (Projection.controllerOf battle stolen) (Just S.bob)
+        Spec.assertEqWith s "alice still controls it on the twin" (Projection.controllerOf battle elsewhere) (Just S.alice)
+        Spec.assertEqWith s "carol protects it on both" (fmap (protectorOf battle) [stolen, elsewhere]) [Just S.carol, Just S.carol]
+        -- CR 506.4c: the entry naming the battle stays put, which is what makes
+        -- the removal readable at all.
+        Spec.assertEqWith
+          s
+          "the attackers map still names the Siege"
+          (Map.lookup attacker (Combat.Type.attackers (GameState.combat stolen)))
+          (Just (AttackTarget.OfBattle battle))
+        -- Both legs really cast the spell, and each resolved on the permanent it
+        -- named: bob's five Mountains are exactly the {3}{R}{R}, so all five are
+        -- tapped for it and the target alone is untapped again.
+        Spec.assertEqWith s "the twin untapped the Mountain it named" (fmap Object.tapped (Game.lookupObject land elsewhere)) (Just TapState.Untapped)
+        Spec.assertEqWith s "where the theft leg left it tapped for the spell" (fmap Object.tapped (Game.lookupObject land stolen)) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should have one attacker and five Mountains"
+    Spec.assertBool s (Projection.controllerOf battle gs == Just S.alice) "alice controlled the Siege before either leg"
+
 -- CR 509.1a's and CR 802.4a's THIRD subject -- "a battle they protect" -- through
 -- the filter atom that asks it, Filter.IsAttackingBattle. Rule 310 rather than
 -- rule 508, because CR 310.9d is the whole content of the atom: the seat it
@@ -781,6 +847,87 @@ snareAnswer battle snare ability victim p = case p of
     | elem (A.Activate snare ability) actions -> A.Activate snare ability
     | otherwise -> A.Pass
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, rs) -> Set.filter (== Recipient.ToCreature victim) rs) sets
+  _ -> attackTheBattle battle p
+
+-- castInvasionThreeSeated's board handed to CAROL's precombat main phase, with
+-- five Mountains and a Zealous Conscripts for her and one extra Plains for alice.
+-- Gives back the board, the Siege, the Conscripts and that Plains -- the twin
+-- leg's target, and alice's rather than carol's so that both legs really change a
+-- permanent's controller.
+--
+-- Zealous Conscripts, {4}{R} Creature -- Human Warrior 3/3: "Haste. When this
+-- creature enters, gain control of target permanent until end of turn. Untap that
+-- permanent. It gains haste until end of turn."
+conscriptedSiege ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+conscriptedSiege s registry = do
+  (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
+  mountain <- S.printingOf s registry "Mountain"
+  plains <- S.printingOf s registry "Plains"
+  conscripts <- S.printingOf s registry "Zealous Conscripts"
+  let lands = List.foldl' (\g _ -> snd (S.addCreature mountain S.carol g)) entered [1 :: Int .. 5]
+      (decoy, withDecoy) = S.addCreature plains S.alice lands
+      (spell, handed) = S.addHandCard conscripts S.carol withDecoy
+  pure
+    ( handed
+        { GameState.activePlayer = S.carol,
+          GameState.phase = Phase.PrecombatMain,
+          GameState.priority = Just S.carol
+        },
+      battle,
+      spell,
+      decoy
+    )
+
+-- Cast the Conscripts, aim its entry trigger at `victim`, and settle: the trigger
+-- resolves and CR 704.5's pass runs inside the same priority loop.
+runConscripts :: GameState.GameState -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState
+runConscripts gs spell victim =
+  let cast = S.runPure (conscriptAnswer spell victim) gs (S.cast S.carol spell)
+   in S.runPure (conscriptAnswer spell victim) cast Engine.priorityLoop
+
+-- Cast `spell` and narrow every target slot to `victim`, naming bob for CR
+-- 704.5y's re-choice. Two candidates make that a real prompt: alice and bob are
+-- both opponents of carol, who controls the battle once the trigger resolves.
+conscriptAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+conscriptAnswer spell victim p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
+    action : _ -> action
+    [] -> A.Pass
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
+  _ -> protectTo S.bob p
+
+-- Put a Word of Seizing in bob's hand, giving back the board and the card.
+--
+-- Word of Seizing, {3}{R}{R} Instant: "Split second. Untap target permanent and
+-- gain control of it until end of turn. It gains haste until end of turn."
+-- TARGET PERMANENT at INSTANT speed is what makes it the producer: nothing else
+-- in the pool can change a battle's controller after attackers are declared.
+-- Split second is on the card and idle on this board -- nobody else wants to
+-- respond -- and is carried anyway because a card file states what is printed.
+seizing ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  GameState.GameState ->
+  m (GameState.GameState, ObjectId.ObjectId)
+seizing s registry gs = do
+  word <- S.printingOf s registry "Word of Seizing"
+  let (spell, handed) = S.addHandCard word S.bob gs
+  pure (handed, spell)
+
+-- Announce the attack at the battle, and cast `spell` at `victim` the first time
+-- its controller has priority. The target set is FILTERED rather than replaced,
+-- for snareAnswer's reason.
+seizeAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+seizeAnswer battle spell victim p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
+    action : _ -> action
+    [] -> A.Pass
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
   _ -> attackTheBattle battle p
 
 -- battleCombat's board wound forward to the END of combat under `answer`, so a

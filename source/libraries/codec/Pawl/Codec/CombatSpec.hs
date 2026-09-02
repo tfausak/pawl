@@ -21,6 +21,7 @@ empty =
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
       Combat.attackedUnder = Map.empty,
+      Combat.attackedControlledBy = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
@@ -43,7 +44,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
   -- CR 511.3's cleared record.
   Spec.it s "a cleared combat" $
     Common.assertCodec s Combat.codec empty (" " <> emptyJson <> " ")
-  -- Every axis at once, and every id distinct: the three maps are keyed by an
+  -- Every axis at once, and every id distinct: the maps are keyed by an
   -- ObjectId, so a decimal-keyed JSON object is the wire form, and the three
   -- AttackTarget sets carry different announcements (CR 508.1b) so that no two
   -- of them can be swapped silently.
@@ -59,6 +60,10 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           -- CR 802.2a, keyed by the ATTACKER where joinedUnder above is keyed by
           -- the combatant, so distinct ids on both sides of the entry.
           Combat.attackedUnder = Map.singleton (ObjectId.MkObjectId 14) (PlayerId.MkPlayerId 15),
+          -- CR 506.4 for a battle, keyed by the attacker like attackedUnder
+          -- above and holding a DIFFERENT seat -- the battle's controller, not
+          -- its protector -- so distinct ids on both sides again.
+          Combat.attackedControlledBy = Map.singleton (ObjectId.MkObjectId 16) (PlayerId.MkPlayerId 17),
           Combat.attacked = Set.singleton (AttackTarget.OfPlayer (PlayerId.MkPlayerId 2)),
           Combat.declaredAttacked = Set.singleton (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           Combat.declaredAttackedThisStep = Set.singleton (AttackTarget.OfBattle (ObjectId.MkObjectId 9)),
@@ -78,6 +83,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           <> ",\"struckFirst\":[5]"
           <> ",\"joinedUnder\":{\"6\":7}"
           <> ",\"attackedUnder\":{\"14\":15}"
+          <> ",\"attackedControlledBy\":{\"16\":17}"
           <> ",\"attacked\":[{\"type\":\"OfPlayer\",\"value\":2}]"
           <> ",\"declaredAttacked\":[{\"type\":\"OfPlaneswalker\",\"value\":8}]"
           <> ",\"declaredAttackedThisStep\":[{\"type\":\"OfBattle\",\"value\":9}]"

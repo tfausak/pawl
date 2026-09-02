@@ -163,6 +163,7 @@ noCombat =
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
       Combat.attackedUnder = Map.empty,
+      Combat.attackedControlledBy = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
