@@ -2107,8 +2107,7 @@ canPayComponent pid oid component gs = case component of
 -- stamp before paying. Nothing for a payment with no announcement behind it.
 --
 -- Pawl.Engine.Binding.slotObjects rather than the raw bindings, so a batch slot
--- is visible whole (CR 115.10a) -- the same map every resolution-time Context
--- carries.
+-- is visible whole -- the same map every resolution-time Context carries.
 announcedSlots :: Maybe ObjectId -> GameState -> Map.Map SlotName.SlotName (Set.Set ObjectId)
 announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
   Nothing -> Map.empty
@@ -2828,7 +2827,8 @@ payActivation inFlight pid oid cost = do
   -- ability is being ACTIVATED and no resolution is behind it.
   --
   -- No slots, by CR 605.1a rather than by this caller's position: a mana ability
-  -- "doesn't target", so its announcement binds nothing a criterion could read.
+  -- "doesn't require a target", so its announcement binds nothing a criterion
+  -- could read.
   outcome <- if paid then payComponents PaymentMoment.OutsideResolution Map.empty pid oid (Cost.components cost) else pure Payment.Unpaid
   let settled = case outcome of
         Payment.Paid _ -> paid

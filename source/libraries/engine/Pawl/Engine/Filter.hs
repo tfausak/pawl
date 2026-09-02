@@ -801,13 +801,16 @@ data Context = MkContext
     -- clause) and Pawl.Engine.Replacement.candidateContext are the producers --
     -- the last of them off the snapshot ActiveReplacement.slots holds, the
     -- resolution that installed the row being over -- and all four go through
-    -- contextWithSlots below.
+    -- contextWithSlots below. Pawl.Engine.Cost's candidate pools are a fifth
+    -- producer, off the announced stack object's bindings (Cost.announcedSlots):
+    -- CR 601.2c chooses the targets before CR 601.2h pays.
     --
     -- Outside those, contextFor leaves it empty, and every atom that reads it
     -- (IsBound, SameNameAsBound, IsControllerOfBound, ControlledByBound,
     -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
-    -- fold, trigger matching, cost payment, combat declarations, duration expiry
+    -- fold, trigger matching, a cost paid with nothing announced, combat
+    -- declarations, duration expiry
     -- -- but it was NOT honest of every in-resolution caller: four of them build a
     -- bare contextFor while a resolution's bindings do exist (#2141), and
     -- Pawl.Engine.Projection.freezeQuantities was a fifth until it took its
