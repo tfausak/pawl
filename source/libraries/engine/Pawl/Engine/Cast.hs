@@ -564,9 +564,14 @@ proposedFor oid castFor gs = if castBestowed castFor then stampBestowed oid gs e
 -- for. CR 601.2e is why that is not merely tidier: the legality check comes
 -- AFTER rule 601.2b's announcements, so a player who announced the prohibited
 -- candidate under 601.3a's lenience would lose the whole casting there.
+--
+-- And the X search is told which candidate it is asked about, because CR
+-- 107.3b fixes X at 0 for one that pays neither the mana cost nor an
+-- alternative cost including X: Omniscience's {0} route on Molten Disaster is
+-- an even spell however the printed {X}{R}{R} beside it might be announced.
 candidateAllowed :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
 candidateAllowed pid oid name proposed candidate =
-  not (PlayerEffect.prohibitsCasting pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed))
+  not (PlayerEffect.prohibitsCasting pid oid name (Cost.variableChoice (CandidateCost.cost candidate)) (proposedFor oid (CandidateCost.keyword candidate) proposed))
 
 -- CR 601.2c asked of ONE candidate, on the same board rule 702.103d judges it on:
 -- a bestowed Nyxborn Rollicker is an Aura spell with enchant creature, so it is
