@@ -3922,8 +3922,35 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- cannot come off the projection here, which sees the object face up
               -- in the zone it is leaving.
               entryFacing = if dest == requestedDest then facing else Facing.FaceUp
+              -- CR 608.3f / 707.10f: a copy of a permanent spell "will become a
+              -- token permanent as it is put onto the battlefield" -- so the
+              -- arriving incarnation's Source is a token's, decided INSIDE the
+              -- move for the reason CR 709.5d's designation is: the CR 400.7
+              -- incarnation must never exist as a copy of a spell on the
+              -- battlefield, where CR 704.5e would remove it, and the CR 614.1c
+              -- entry loop and every CR 603.6a trigger must already see a token
+              -- entering. NOT "created" (CR 111.13): this is a zone change and
+              -- not Event.createTokens, so no CR 111.3 minted-entry event and no
+              -- CR 614.16 count replacement reaches it. Every other Source, and
+              -- every other destination, is carried across unchanged.
+              --
+              -- The token keeps the copy's snapshot (CR 111.13: "the
+              -- characteristics of the spell that became that token"), the way
+              -- createTokens stamps a token copy's. UNOBSERVED, said plainly
+              -- rather than left to look tested: every copy in the pool is of a
+              -- card-backed spell, whose snapshot is the printing the token's
+              -- Source already names, so dropping the stamp leaves the suite
+              -- green. A copy carrying a CR 707.9b exception is what would tell
+              -- them apart, and no producer in data/cards/ applies one to a spell.
+              arriving = case (Object.source obj, dest) of
+                (Source.OfSpellCopy printingId, Zone.Battlefield) ->
+                  (Object.newIncarnation obj)
+                    { Object.source = Source.OfToken printingId,
+                      Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Binding.copyOf (Object.bindings obj))
+                    }
+                _ -> Object.newIncarnation obj
               mkObj entrySeed ts =
-                (Object.newIncarnation obj)
+                arriving
                   { Object.zone = dest,
                     Object.timestamp = ts,
                     Object.tapped = tapped,

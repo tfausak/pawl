@@ -2602,8 +2602,8 @@ cloudformBoard island piker cloudform =
 -- without "Any player may activate this ability" (#2213), which leaves pawl's
 -- card stricter than printed -- only its controller can destroy it.
 --
--- CR 702.103c's copies hold by construction but no board in the pool mints one;
--- see #2355.
+-- CR 702.103c's copy of a bestowed Aura spell is Pawl.CopySpec's (Lithoform
+-- Engine copying a bestowed Rollicker).
 --
 -- The LAST case is the one board shape the paragraph above does not describe: no
 -- creature at all, and then one, because what it measures is whether CR 601.2c

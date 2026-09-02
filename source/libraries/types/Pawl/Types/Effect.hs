@@ -269,8 +269,7 @@ data Effect card ability
     -- it" carries over.
     --
     -- Not implemented: copying an activated or triggered ability, CR 707.10's
-    -- other two nouns (#2208); and CR 707.10f's token permanent, which a copy of
-    -- a permanent spell becomes as it resolves (#2207).
+    -- other two nouns (#2208).
     CopySpell CopySpell.CopySpell
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition asked as the event

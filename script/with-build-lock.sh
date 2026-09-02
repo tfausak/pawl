@@ -8,20 +8,32 @@
 # target exists; it holds the owner's PID. Taking over a lock whose owner has
 # died is an atomic rename, so of several waiters exactly one wins. The path
 # is fixed rather than TMPDIR-relative so every shell locks the same file.
+# PAWL_BUILD_SLOTS builds may run at once (one lock file per slot; slot 0 is
+# the base path, so an older copy of this script still shares it). Measured
+# 2026-09-02: one `cabal test` peaks at about 1.8 GB resident, so two fit an
+# 8 GB machine and three did not.
 set -euo pipefail
-lock="${PAWL_BUILD_LOCK:-/tmp/pawl-build.lock}"
-mine="$lock.$$"
+base="${PAWL_BUILD_LOCK:-/tmp/pawl-build.lock}"
+slots="${PAWL_BUILD_SLOTS:-2}"
+mine="$base.$$"
 child=""
+lock=""
 echo $$ > "$mine"
 trap 'rm -f "$mine"' EXIT
-while ! ln "$mine" "$lock" 2>/dev/null; do
-  owner=$(cat "$lock" 2>/dev/null || true)
-  if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-    stale="$lock.stale.$$"
-    if mv "$lock" "$stale" 2>/dev/null; then rm -f "$stale"; fi
-    continue
-  fi
-  sleep 15
+while [ -z "$lock" ]; do
+  i=0
+  while [ "$i" -lt "$slots" ]; do
+    if [ "$i" -eq 0 ]; then candidate="$base"; else candidate="$base.slot$i"; fi
+    if ln "$mine" "$candidate" 2>/dev/null; then lock="$candidate"; break; fi
+    owner=$(cat "$candidate" 2>/dev/null || true)
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+      stale="$candidate.stale.$$"
+      if mv "$candidate" "$stale" 2>/dev/null; then rm -f "$stale"; fi
+      continue
+    fi
+    i=$((i + 1))
+  done
+  [ -n "$lock" ] || sleep 15
 done
 release() {
   if [ "$(cat "$lock" 2>/dev/null)" = "$$" ]; then rm -f "$lock"; fi
