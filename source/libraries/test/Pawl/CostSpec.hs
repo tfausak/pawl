@@ -122,17 +122,17 @@ doorSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       let (oid, gs) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
           tapped = S.tapObject oid gs
-      Spec.assertBool s (Cost.canPayComponent S.alice oid CostComponent.TapThis gs) "untapped pays"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice oid CostComponent.TapThis tapped)) "tapped does not"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid CostComponent.TapThis gs) "untapped pays"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice oid CostComponent.TapThis tapped)) "tapped does not"
     -- CR 701.21a: "A player can't sacrifice something that isn't a permanent,
     -- or something that's a permanent they don't control."
     Spec.it s "CR 701.21a SacrificeThis needs a permanent this player controls" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
-      Spec.assertBool s (Cost.canPayComponent S.alice onField CostComponent.SacrificeThis gs1) "a controlled permanent pays"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice inHand CostComponent.SacrificeThis gs1)) "a card in hand does not"
-      Spec.assertBool s (not (Cost.canPayComponent S.bob onField CostComponent.SacrificeThis gs1)) "another player's permanent does not"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice onField CostComponent.SacrificeThis gs1) "a controlled permanent pays"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice inHand CostComponent.SacrificeThis gs1)) "a card in hand does not"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob onField CostComponent.SacrificeThis gs1)) "another player's permanent does not"
     -- CR 701.68b: "if a player is given the choice to blight but is unable to
     -- put N -1/-1 counters on a creature they control (usually because they
     -- control no creatures), they can't choose to blight."
@@ -145,11 +145,11 @@ doorSpec s registry =
     Spec.it s "CR 701.68b Blight is payable only by a player who controls a creature" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-      Spec.assertBool s (Cost.canPayComponent S.alice oid (CostComponent.Blight 1) gs) "a creature its payer controls pays"
-      Spec.assertBool s (not (Cost.canPayComponent S.bob oid (CostComponent.Blight 1) gs)) "an opponent's creature does not"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.Blight 1) gs) "a creature its payer controls pays"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob oid (CostComponent.Blight 1) gs)) "an opponent's creature does not"
       -- CR 122.6 puts any number of counters on any creature, so no N outruns a
       -- 2/1 -- rule 701.68b's "unable" has only the cause the rule itself names.
-      Spec.assertBool s (Cost.canPayComponent S.alice oid (CostComponent.Blight 9) gs) "and no N is too large for a candidate that exists"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.Blight 9) gs) "and no N is too large for a candidate that exists"
     -- CR 702.29a's "Discard this card", the exact mirror of SacrificeThis
     -- above: one names a permanent its controller owns the choice of, the other
     -- names a card in a hand. Asked of the ZONE and the OWNER, because CR 108.4
@@ -162,9 +162,9 @@ doorSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
-      Spec.assertBool s (Cost.canPayComponent S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary) gs1) "a card in hand pays"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice onField (CostComponent.DiscardThis DiscardCause.Ordinary) gs1)) "a permanent does not"
-      Spec.assertBool s (not (Cost.canPayComponent S.bob inHand (CostComponent.DiscardThis DiscardCause.Ordinary) gs1)) "and it is not the other player's to discard"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary) gs1) "a card in hand pays"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice onField (CostComponent.DiscardThis DiscardCause.Ordinary) gs1)) "a permanent does not"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob inHand (CostComponent.DiscardThis DiscardCause.Ordinary) gs1)) "and it is not the other player's to discard"
     -- CR 701.9a through Event.changeZone, the CR 400.7 funnel: the discarded
     -- card lands in its owner's graveyard as a new incarnation, so the old id
     -- is gone rather than moved.
@@ -246,10 +246,10 @@ doorSpec s registry =
           two = CostComponent.Sacrifice (Sacrifice.MkSacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain))
           three = CostComponent.Sacrifice (Sacrifice.MkSacrifice 3 (Filter.Type.HasSubtype Subtype.Mountain))
           islands = CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.HasSubtype Subtype.Island))
-      Spec.assertBool s (Cost.canPayComponent S.alice S.noSource two gs) "two Mountains pay for two"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource three gs)) "but not for three"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource islands gs)) "and not for an Island"
-      Spec.assertBool s (not (Cost.canPayComponent S.bob S.noSource two gs)) "and bob controls none of them"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource two gs) "two Mountains pay for two"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource three gs)) "but not for three"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource islands gs)) "and not for an Island"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob S.noSource two gs)) "and bob controls none of them"
     -- CR 118.6: unpayable below the count, payable at or above it -- the same
     -- shape CR 118.3's Sacrifice test above takes, for the SPENT direction of
     -- the player-counter substrate (P10 #37 GainPlayerCounters is the ADD
@@ -259,8 +259,8 @@ doorSpec s registry =
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           two = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
           one = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice gs0
-      Spec.assertBool s (Cost.canPayComponent S.alice oid (CostComponent.PayEnergy 2) two) "two energy pays PayEnergy 2"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice oid (CostComponent.PayEnergy 2) one)) "one energy cannot"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.PayEnergy 2) two) "two energy pays PayEnergy 2"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice oid (CostComponent.PayEnergy 2) one)) "one energy cannot"
     -- CR 107.14: paying energy removes exactly that many counters.
     Spec.it s "CR 107.14 paying PayEnergy removes that many energy counters" $ do
       piker <- S.printingOf s registry "Goblin Piker"
@@ -277,9 +277,9 @@ doorSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
-      Spec.assertBool s (Cost.canPayComponent S.alice onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "a permanent on the battlefield pays"
-      Spec.assertBool s (Cost.canPayComponent S.bob onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "and pays for a player who does not control it"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice inHand (CostComponent.PutPlusOneCountersOnThis 1) gs1)) "a card in hand does not"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "a permanent on the battlefield pays"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.bob onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "and pays for a player who does not control it"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice inHand (CostComponent.PutPlusOneCountersOnThis 1) gs1)) "a card in hand does not"
 
 -- Greed {3}{B} Enchantment: "{B}, Pay 2 life: Draw a card."
 --
@@ -746,6 +746,35 @@ spitefulSpec s registry =
       Spec.assertEqWith s "and the Altar tapped for it" (S.tappedCount S.alice activated) 1
       let resolved = S.runPure S.identityAnswer activated Stack.resolveTop
       Spec.assertBool s (not (S.onBattlefield giantId resolved)) "and the ability destroyed it on resolution"
+    -- CR 601.2 / 601.3 at the OFFER, which runs before CR 601.2c has bound
+    -- anything: the gate's question is whether SOME announcement this player
+    -- could make leaves the cost payable, since CR 601.2 makes a casting legal
+    -- when the player can comply with every step. Two boards differing in
+    -- exactly one Goblin Piker -- one Swamp, one Hill Giant and the Rite in hand
+    -- on both, so the mana, the timing and the target slot are the same. With
+    -- the Giant the only creature every announcement aims at it, and CR 701.21a
+    -- then has nothing left to take.
+    Spec.it s "CR 601.2 the cast is offered only where some target choice leaves the cost payable" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rite <- S.printingOf s registry "Synthetic Spiteful Rite"
+      let (_, aloneId, alone) = spitefulBoard S.addHandCard swamp giant piker rite 0
+          (_, pairedId, paired) = spitefulBoard S.addHandCard swamp giant piker rite 1
+      Spec.assertBool s (not (any (S.isCastOf aloneId) (Action.legalActions S.alice alone))) "with the target the only creature no announcement pays, so the cast is not offered"
+      Spec.assertBool s (any (S.isCastOf pairedId) (Action.legalActions S.alice paired)) "and one more creature makes some announcement pay, so it is"
+    -- CR 602.2b sends an activation through the same steps, and
+    -- Activate.aimingSomewhere is the gate. The same pair of boards with the
+    -- Altar on the battlefield in the Rite's place.
+    Spec.it s "CR 602.2b the activation is offered only where some target choice leaves the cost payable" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      altar <- S.printingOf s registry "Synthetic Spiteful Altar"
+      let (_, aloneId, alone) = spitefulBoard S.addCreature swamp giant piker altar 0
+          (_, pairedId, paired) = spitefulBoard S.addCreature swamp giant piker altar 1
+      Spec.assertBool s (not (any (isActivateOf aloneId) (Action.legalActions S.alice alone))) "with the target the only creature no announcement pays, so the activation is not offered"
+      Spec.assertBool s (any (isActivateOf pairedId) (Action.legalActions S.alice paired)) "and one more creature makes some announcement pay, so it is"
 
 -- Headless Skaab {2}{U} Creature -- Zombie Warrior 3/6: "As an additional cost
 -- to cast this spell, exile a creature card from your graveyard. This creature
@@ -1350,8 +1379,8 @@ asmorFoodSpec s registry =
       Spec.assertEqWith s "the cost is two Foods and no mana at all" (ActivatedAbility.cost ability) (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [component])
       Spec.assertEqWith s "both boards have an empty stack" (GameState.stack three, GameState.stack one) ([], [])
       Spec.assertEqWith s "and alice has priority on both" (GameState.priority three, GameState.priority one) (Just S.alice, Just S.alice)
-      Spec.assertBool s (Cost.canPayComponent S.alice asmorThree component three) "three Foods pay the component"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice asmorOne component one)) "one Food beside two non-Foods does not"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice asmorThree component three) "three Foods pay the component"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice asmorOne component one)) "one Food beside two non-Foods does not"
       Spec.assertBool s (Activate.activatable S.alice asmorThree ability three) "so the ability is activatable with three"
       Spec.assertBool s (not (Activate.activatable S.alice asmorOne ability one)) "and is not with one"
       Spec.assertBool s (any (isActivateOf asmorThree) (Action.legalActions S.alice three)) "and it is menued with three"
@@ -1547,7 +1576,7 @@ jaradSpec s registry =
       -- else -- not the mana part, not a zone gate, not a missing candidate.
       Spec.assertBool
         s
-        (all (\c -> Cost.canPayComponent S.alice loneId c lone) (Cost.Type.components cost))
+        (all (\c -> Cost.canPayComponent Map.empty S.alice loneId c lone) (Cost.Type.components cost))
         "each component on its own is payable off the one Bayou"
       Spec.assertBool s (not (Cost.canPay S.alice loneId cost lone)) "but the cost as a whole is not"
       Spec.assertBool s (Cost.canPay S.alice pairId cost pair) "and a Forest beside the Bayou pays it"
@@ -1835,8 +1864,8 @@ hatredSpec s registry =
       Spec.assertEqWith s "the printed additional cost is CR 601.2b's variable" (Face.additionalCosts (S.combinedFace hatred)) [CostComponent.PayLifeX]
       Spec.assertBool s (Cost.hasVariable printed) "so the cost has a variable, though its mana part has none"
       Spec.assertBool s (notElem ManaSymbol.Variable (foldMap ManaCost.unwrap (Face.manaCost (S.combinedFace hatred)))) "the mana part really has none"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource CostComponent.PayLifeX gs)) "and it is unpayable until announced"
-      Spec.assertBool s (Cost.canPayComponent S.alice S.noSource (CostComponent.PayLife 20) gs) "while the announced 20 it substitutes to is payable"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.PayLifeX gs)) "and it is unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayLife 20) gs) "while the announced 20 it substitutes to is payable"
     -- The same fence one keyword action over, and the same board serves: alice
     -- controls a Goblin Piker, so CR 701.68b's only refusal does not apply and
     -- an announced blight IS payable -- which is what leaves the unannounced one
@@ -1850,9 +1879,9 @@ hatredSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       hatred <- S.printingOf s registry "Hatred"
       let (_, _, gs) = hatredBoard swamp piker hatred 20
-      Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource CostComponent.BlightX gs)) "unpayable until announced"
-      Spec.assertBool s (Cost.canPayComponent S.alice S.noSource (CostComponent.Blight 1) gs) "an announced 1 is payable"
-      Spec.assertBool s (Cost.canPayComponent S.alice S.noSource (CostComponent.Blight 99) gs) "and so is an announced 99, CR 701.68b naming no number that is too many"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.BlightX gs)) "unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight 1) gs) "an announced 1 is payable"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight 99) gs) "and so is an announced 99, CR 701.68b naming no number that is too many"
       Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.BlightX])) "it is a CR 107.3 variable"
       Spec.assertBool s (not (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.BlightX]))) "whose demand never grows, so only CR 101.1 can refuse a value"
 
@@ -2496,8 +2525,8 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
         -- the criterion's `Not IsTapped` with nothing to offer.
         unpayable = S.tapObject spotId (S.tapObject giantId payable)
         component = CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You, Filter.Type.Not Filter.Type.IsTapped]))
-    Spec.assertBool s (Cost.canPayComponent S.alice drumId component payable) "two untapped creatures pay"
-    Spec.assertBool s (not (Cost.canPayComponent S.alice drumId component unpayable)) "two tapped ones do not"
+    Spec.assertBool s (Cost.canPayComponent Map.empty S.alice drumId component payable) "two untapped creatures pay"
+    Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice drumId component unpayable)) "two tapped ones do not"
     Spec.assertEqWith s "and the ability adds no mana" (pooledFrom S.identityAnswer drumId unpayable) 0
     Spec.assertBool s (not (isTapped drumId (afterDrum S.identityAnswer drumId unpayable))) "leaving the Drum untapped"
   -- CR 302.6 and CR 107.5 gate on the tap SYMBOL in the creature's OWN
@@ -2804,8 +2833,8 @@ melokuSpec s registry = Spec.describe s "Meloku the Clouded Mirror" $ do
         component = CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents 1 (Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.ControlledBy PlayerRelation.You]))
     Spec.assertBool s (Activate.activatable S.alice payableId (theAbility meloku) payable) "a land alice controls: activatable"
     Spec.assertBool s (not (Activate.activatable S.alice payableId (theAbility meloku) unpayable)) "the same land under bob: not"
-    Spec.assertBool s (Cost.canPayComponent S.alice payableId component payable) "and the component itself is payable on the one board"
-    Spec.assertBool s (not (Cost.canPayComponent S.alice payableId component unpayable)) "and not on the other"
+    Spec.assertBool s (Cost.canPayComponent Map.empty S.alice payableId component payable) "and the component itself is payable on the one board"
+    Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice payableId component unpayable)) "and not on the other"
   -- CR 400.3: the destination is the OWNER's hand, not the payer's. alice
   -- controls bob's Island through a control effect, so "a land you control"
   -- admits it and the return still lands in bob's hand.
@@ -3086,9 +3115,9 @@ millikinSpec s registry =
           offers oid gs = length (filter (isActivateOf oid) (Action.legalActions S.alice gs))
       Spec.assertEqWith s "CR 602.2b offered with one card in the library" (offers stockedId stocked) 1
       Spec.assertEqWith s "and not offered with none" (offers emptyId emptied) 0
-      Spec.assertBool s (Cost.canPayComponent S.alice stockedId (CostComponent.MillCards 1) stocked) "the component alone is payable at one card"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice emptyId (CostComponent.MillCards 1) emptied)) "and unpayable at none"
-      Spec.assertBool s (not (Cost.canPayComponent S.alice stockedId (CostComponent.MillCards 2) stocked)) "and one card does not pay a two-card mill"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice stockedId (CostComponent.MillCards 1) stocked) "the component alone is payable at one card"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice emptyId (CostComponent.MillCards 1) emptied)) "and unpayable at none"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice stockedId (CostComponent.MillCards 2) stocked)) "and one card does not pay a two-card mill"
 
     -- CR 601.2h's two passes. Millikin's cost holds exactly one part of each --
     -- {T} moves no card out of a library, the mill moves one into a public
