@@ -2734,6 +2734,72 @@ splitDefenderSpec s registry = Spec.describe s "SplitDefendingPlayer" $ do
     -- altogether rather than one that reads the right seat.
     (gs, wraith, blocker, _) <- splitDefenderJaceBoard s registry "Island" "Swamp"
     Spec.assertBool s (not (blocks blocker wraith gs)) "CR 702.14c carol's own Swamp stops her block"
+  -- CR 506.4c's creature at three seats: Jace is buried after the declaration,
+  -- so the Piker "continues to be an attacking creature, although it is not
+  -- attacking any player, planeswalker, or battle. It may be blocked." By whom
+  -- is CR 802.2a -- the controller of the planeswalker it was attacking before
+  -- the removal -- and CR 802.4a then bars everyone else. Before that reading
+  -- the engine offered the creature to EVERY defending player, so bob's block
+  -- here judged legal; an engine offering it to nobody fails carol's.
+  --
+  -- bob's block is judged FIRST: it is the assertion the fold-onto-everyone
+  -- reading fails, and carol's would pass under it.
+  Spec.it s "CR 802.4a once the planeswalker is gone, only ITS controller may block the creature attacking nothing" $ do
+    (gs, attacker, bobs, carols, jaceId) <- removedJaceBlockBoard s registry True
+    Spec.assertBool s (not (blockOf S.bob bobs attacker gs)) "CR 802.4a: the Piker is attacking neither bob, a planeswalker he controls nor a battle he protects, so his block is illegal"
+    Spec.assertBool s (blockOf S.carol carols attacker gs) "CR 506.4c / CR 802.2a: carol controlled the Jace it was attacking, so her block is legal"
+    -- The premises, after the gameplay assertions so neither can absorb a
+    -- mutation of them.
+    Spec.assertBool s (not (S.onBattlefield jaceId gs)) "CR 704.5i: the Bolt's 3 took all of Jace's loyalty"
+    Spec.assertBool s (Map.member attacker (Combat.Type.attackers (GameState.combat gs))) "CR 506.4c: still an attacking creature"
+    Spec.assertEqWith s "CR 802.2 both opponents defend, bob first" (Combat.Type.defenders (GameState.combat gs)) [S.bob, S.carol]
+    Spec.assertEqWith s "CR 802.4b: the Piker is on carol's list alone" (fmap (\d -> Combat.attackersOn d gs) [S.bob, S.carol]) [[], [attacker]]
+  Spec.it s "CR 802.4a the same two blocks judge the same way while the planeswalker is still attacked" $ do
+    -- The pair, differing in whether the Bolt was cast: the removal changes
+    -- nothing about who may block, which is what CR 506.4c's "It may be blocked"
+    -- asks of it.
+    (gs, attacker, bobs, carols, jaceId) <- removedJaceBlockBoard s registry False
+    Spec.assertBool s (not (blockOf S.bob bobs attacker gs)) "CR 802.4a: bob's block is illegal while the Piker attacks carol's Jace"
+    Spec.assertBool s (blockOf S.carol carols attacker gs) "CR 802.4a: carol's is legal, the Piker attacking a planeswalker she controls"
+    Spec.assertBool s (S.onBattlefield jaceId gs) "Jace is still on the battlefield"
+    Spec.assertEqWith s "and carol controls him" (Projection.controllerOf jaceId gs) (Just S.carol)
+  where
+    blockOf pid blocker attacker = Combat.legalBlockDeclaration pid (Map.singleton blocker (Set.singleton attacker))
+
+-- CR 506.4c at three seats: alice attacks CAROL's Jace Beleren with a Goblin
+-- Piker, both opponents defend (CR 802.2, the default option), and each holds a
+-- Goblin Piker to block with. With `bolted`, alice's Lightning Bolt buries Jace
+-- after the declaration -- CR 506.4's "leaves the battlefield", by CR 704.5i --
+-- so the attacker is attacking nothing. `bolted` is the ONE thing the two cases
+-- above differ in.
+--
+-- Plain Pikers on every side, so no ability of the attacker refers to a
+-- defending player and the block is judged on CR 802.4a alone.
+removedJaceBlockBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+removedJaceBlockBoard s registry bolted = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  mountain <- S.printingOf s registry "Mountain"
+  jace <- S.printingOf s registry "Jace Beleren"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  let (gs0, ours, yours, hers) = S.threePlayerCombat [piker, mountain] [piker] [jace, piker]
+  case (ours, yours, hers) of
+    ([attacker, _], [bobs], [jaceId, carols]) -> do
+      let (boltId, gs1) = S.addHandCard bolt S.alice gs0
+          staged = S.addCounter CounterKind.Loyalty 3 jaceId gs1
+          settled =
+            (S.runPure S.identityAnswer staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)))
+              { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                GameState.priority = Just S.alice
+              }
+          declared = S.runPure attackThePlaneswalker settled (Combat.declareAttackers S.alice)
+          burned = S.settleSba (S.runPure (aimedAtObject jaceId) declared (do S.cast S.alice boltId; Stack.resolveTop))
+      pure (if bolted then burned else declared, attacker, bobs, carols, jaceId)
+    _ -> Spec.assertFailure s "fixture should give alice a Piker and a Mountain, bob a Piker, and carol a Jace and a Piker"
 
 -- Soul Snare's only activated ability -- "{W}, Sacrifice this enchantment: Exile
 -- target creature that's attacking you or a planeswalker you control" -- read off
