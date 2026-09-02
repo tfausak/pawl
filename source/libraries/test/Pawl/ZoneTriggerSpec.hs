@@ -5229,8 +5229,107 @@ screamsFromWithinSpec s registry =
         Spec.it s "CR 113.6m control: an ordinary graveyard-recursion trigger is still pinned to the graveyard" $ do
           squee <- S.printingOf s registry "Squee, Goblin Nabob"
           screams <- S.printingOf s registry "Screams from Within"
-          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap Event.zoneFunctionedFrom (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
-          Spec.assertEqWith s "the Aura's names no zone at all" (fmap Event.zoneFunctionedFrom (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
+          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap (Event.zoneFunctionedFrom (Face.delayedAbilities (S.combinedFace squee))) (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
+          Spec.assertEqWith s "the Aura's names no zone at all" (fmap (Event.zoneFunctionedFrom (Face.delayedAbilities (S.combinedFace screams))) (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
+
+-- CR 113.6m's FINAL sentence, over a whole card: "the same is true if the effect
+-- of that ability creates a delayed triggered ability whose effect moves the
+-- object out of a particular zone". Prized Amalgam {1}{U}{B} Creature -- Zombie
+-- 3/3, "Whenever a creature enters, if it entered from your graveyard or you cast
+-- it from your graveyard, return this card from your graveyard to the battlefield
+-- tapped at the beginning of the next end step", is the printing that turns on
+-- it. (Name, cost, type line and oracle text checked against Scryfall.)
+--
+-- The ability's only zone-relevant content sits INSIDE the delayed ability its
+-- arm creates, so without the sentence Event.zoneFunctionedFrom answers Nothing
+-- off the arm, CR 113.6's own default puts the ability on the battlefield, and
+-- the card gets both halves wrong at once: it never fires from the graveyard,
+-- where all its work is, and it fires from the battlefield, where CR 113.6m says
+-- it does not function at all. One leg each below.
+--
+-- The two boards differ in ONE thing, the zone the Amalgam starts in. The two
+-- Swamps, the Skeleton in the graveyard, the activation and the end step are
+-- shared, so the negative cannot pass for want of mana or of a trigger event.
+--
+-- Reassembling Skeleton supplies the entry, for
+-- Pawl.ConditionSpec.interveningRecheckSpec's reason: "{1}{B}: Return this card
+-- from your graveyard to the battlefield tapped" is one activation, so a creature
+-- enters out of a graveyard with no reanimation spell in the way and the
+-- Amalgam's intervening "if it entered from your graveyard" is true.
+--
+-- The negative's quantity is what the STACK holds, as it is for
+-- screamsFromWithinSpec's proving leg. "Functions only in that zone" is a claim
+-- about whether the ability triggers at all, and the end-step board cannot make
+-- it: the armed move names the graveyard, an Amalgam standing on the battlefield
+-- is not in one, and the board after the end step looks the same either way.
+prizedAmalgamSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prizedAmalgamSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      -- TriggerSpec's tokenSetSpec's step: the phase written and the CR 513.1
+      -- event recorded, which is what a "beginning of the next end step" delayed
+      -- ability watches for.
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      amalgamName = CardName.MkCardName (Text.pack "Prized Amalgam")
+      skeletonName = CardName.MkCardName (Text.pack "Reassembling Skeleton")
+      -- CR 400.7 mints a fresh id for a returned card, so both censuses go by
+      -- name. Game.zoneMembers indexes the battlefield by OWNER (CR 108.3), which
+      -- is the seat everything below is made under, and alice owns all of it.
+      onBattlefieldNamed name gs = filter (\oid -> S.soleFaceName oid gs == name) (Set.toList (GameState.battlefield gs))
+      -- The tap state of every Prized Amalgam on the battlefield. The printed
+      -- "tapped" is what tells the delayed return from an Amalgam that was
+      -- already standing there.
+      amalgamTapStates gs = fmap (\oid -> fmap Object.tapped (Game.lookupObject oid gs)) (onBattlefieldNamed amalgamName gs)
+      -- alice holding priority in her own main phase with two untapped Swamps --
+      -- the {1}{B} the Skeleton's ability costs -- plus a Reassembling Skeleton in
+      -- her graveyard, and the Amalgam wherever `place` puts it.
+      board place amalgam skeleton swamp =
+        let base =
+              (S.landsInPlay swamp 2)
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+         in S.addGraveyardCard skeleton S.alice (snd (place amalgam S.alice base))
+      -- Activate the Skeleton's graveyard ability, resolve it, and settle, so
+      -- CR 603.3 has placed whatever the entry triggered.
+      raiseWith place amalgam skeleton swamp k =
+        let (gyId, staged) = board place amalgam skeleton swamp
+         in case Activate.abilitiesFor gyId staged of
+              [ability] -> k (settle (resolveTop (S.runPure S.identityAnswer staged (Activate.activateAbility S.alice gyId ability))))
+              abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
+      -- Into the end step and all the way down: the delayed ability triggers, is
+      -- placed, and resolves.
+      throughEndStep gs = S.runPure S.identityAnswer (settle (beginEndStep gs)) Engine.priorityLoop
+   in Spec.describe s "PrizedAmalgam" $ do
+        -- The proving leg. CR 113.6m's final sentence is the whole of why the
+        -- ability is read from the graveyard at all.
+        Spec.it s "CR 113.6m an ability whose delayed trigger returns it from the graveyard functions there" $ do
+          amalgam <- S.printingOf s registry "Prized Amalgam"
+          skeleton <- S.printingOf s registry "Reassembling Skeleton"
+          swamp <- S.printingOf s registry "Swamp"
+          raiseWith S.addGraveyardCard amalgam skeleton swamp $ \raised -> do
+            let after = throughEndStep (resolveTop raised)
+            Spec.assertEqWith s "CR 113.6m the Amalgam came back from the graveyard, tapped" (amalgamTapStates after) [Just TapState.Tapped]
+            -- The preconditions the assertion rests on, AFTER it so none of them
+            -- can absorb a mutation aimed at the sentence.
+            Spec.assertEqWith s "the Skeleton really entered from the graveyard" (length (onBattlefieldNamed skeletonName raised)) 1
+            Spec.assertEqWith s "the Amalgam's trigger was on the stack" (length (GameState.stack raised)) 1
+            Spec.assertEqWith s "and resolving it armed exactly one delayed ability" (Seq.length (GameState.delayedTriggers (resolveTop raised))) 1
+        -- The "ONLY" in "functions only in that zone", and the leg that reddens
+        -- if the reading is left additive. One difference from the leg above:
+        -- the Amalgam starts on the battlefield.
+        Spec.it s "CR 113.6m the same ability does not function from the battlefield" $ do
+          amalgam <- S.printingOf s registry "Prized Amalgam"
+          skeleton <- S.printingOf s registry "Reassembling Skeleton"
+          swamp <- S.printingOf s registry "Swamp"
+          raiseWith S.addCreature amalgam skeleton swamp $ \raised -> do
+            let after = throughEndStep raised
+            Spec.assertEqWith s "CR 113.6m nothing triggered off the entry" (length (GameState.stack raised)) 0
+            Spec.assertEqWith s "so nothing was armed to fire at the end step" (Seq.length (GameState.delayedTriggers after)) 0
+            Spec.assertEqWith s "and the one Amalgam is the untapped one that was already there" (amalgamTapStates after) [Just TapState.Untapped]
+            Spec.assertEqWith s "off the same entry the leg above triggers on" (length (onBattlefieldNamed skeletonName raised)) 1
 
 -- CR 303.4b's ENCHANTED CREATURE under CR 400.7f's condition: the other
 -- permanent an "enchanted creature dies" event names, which Screams from Within
@@ -5328,6 +5427,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   soulshiftSpec s registry
   hauntSpec s registry
   screamsFromWithinSpec s registry
+  prizedAmalgamSpec s registry
   banewaspAfflictionSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry

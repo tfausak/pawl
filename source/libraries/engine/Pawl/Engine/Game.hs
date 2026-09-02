@@ -11,6 +11,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Asked as Asked
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
@@ -28,6 +29,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -53,6 +55,7 @@ import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -694,6 +697,20 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
   _ -> do
     card <- cardOfWithLastKnown oid gs
     Just (resolveFaceFor (lookupObject oid gs) card)
+
+-- CR 603.7: the delayed triggered abilities declared on the face `oid` is
+-- showing, empty for an id with no face to read. The lookup CR 113.6m's final
+-- sentence needs -- Pawl.Engine.EffectZone.zoneFunctionedFrom has an
+-- Effect.ArmDelayedTrigger's NAME and this is where the name's text lives.
+--
+-- Through faceOfWithLastKnown, so a departed permanent's ability is read against
+-- the same declarations it carried while it existed (CR 608.2h). The face-up
+-- face only, where Pawl.Engine.Resolve.declaredDelayedAbility falls back to the
+-- card's other faces: that fallback is about which face happens to be up as an
+-- opcode RUNS, and a zone-functioning question is asked of the face the ability
+-- was read off.
+delayedAbilitiesOf :: ObjectId -> GameState -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
+delayedAbilitiesOf oid gs = maybe Map.empty Face.delayedAbilities (faceOfWithLastKnown oid gs)
 
 -- CR 708.2 / CR 708.8 over ONE object: write which face it is showing, and give
 -- it CR 613.7f's new timestamp -- "a permanent receives a new timestamp each time
