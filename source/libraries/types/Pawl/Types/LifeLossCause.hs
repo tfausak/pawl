@@ -24,13 +24,10 @@ data LifeLossCause
     -- why a lifelink source still gains its controller the whole amount dealt.
     ByDamage
   | -- | CR 119.3: the life an effect causes a player to lose --
-    -- Pawl.Engine.Resolve's Effect.LoseLife arm, and its Effect.SetLifeTotal arm
-    -- where the new total is lower, CR 119.5 spelling that as the player losing
-    -- "the necessary amount of life".
-    --
-    -- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution move a
-    -- life total without proposing a loss of their own, so no replacement reaches
-    -- either (#2544).
+    -- Pawl.Engine.Resolve's Effect.LoseLife arm, and every arm of its that arrives
+    -- at a lower TOTAL (a set, CR 701.12c's exchange, CR 119.7's redistribution),
+    -- rule 119.5 spelling that as the player losing "the necessary amount of
+    -- life".
     ByEffect
   | -- | CR 119.4: the life a PAYMENT costs its payer -- Pawl.Engine.Event.payLife,
     -- reached from a cost component, from CR 107.4f's Phyrexian symbol and from
