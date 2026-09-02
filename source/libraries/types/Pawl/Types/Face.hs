@@ -273,11 +273,18 @@ data Face card = MkFace
     -- why a cost naming cards of a stated quality in a hidden zone (Magmatic
     -- Insight's discarded land) excuses a cast an effect instructs "if able".
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
-    -- | CR 101.1: the ceiling this face's own words put on the value of X its
+    -- | CR 101.1: the ceilings this face's own words put on the value of X its
     -- controller announces at CR 601.2b -- Soul Immolation's "X can't be greater
-    -- than the greatest toughness among creatures you control". Nothing for every
+    -- than the greatest toughness among creatures you control". Empty for every
     -- card that states none, which is nearly all of them -- Scryfall
     -- `o:/X can.t be greater than/`, 2026-08-20, is what finds the ones that do.
+    --
+    -- A LIST because a face can carry more than one such sentence and CR 101.2
+    -- makes every one of them bind: Pawl.Engine.Card.merge2 concatenates the two
+    -- halves of a split card here, as it does every other ability list, so CR
+    -- 709.4c's combined view and CR 702.102b's fused split spell answer to both
+    -- halves' ceilings at once. Pawl.Engine.Cost.maximumX is where the pair
+    -- becomes one bound.
     --
     -- CR 101.1 and not CR 107.3a is the rule with the force here: rule 107.3a
     -- says only that the controller "chooses and announces the value of X", and
@@ -293,7 +300,7 @@ data Face card = MkFace
     -- at once. A ceiling carried by the component would be invisible to the mana
     -- half.
     --
-    -- A Quantity and not a Natural: every printing states a per-board amount, and
+    -- Quantities and not Naturals: every printing states a per-board amount, and
     -- Pawl.Engine.Cost.maximumX evaluates it against this face's controller and
     -- the spell on the stack.
     --
@@ -304,7 +311,7 @@ data Face card = MkFace
     -- Not implemented: the same sentence printed on an ACTIVATED ability, whose X
     -- is announced through CR 602.2b and whose ceiling is that ability's rather
     -- than the face's (Blighted Nightmare) (#1985).
-    maximumX :: Maybe Quantity.Quantity,
+    maximumX :: [Quantity.Quantity],
     -- | CR 118.9: this face's printed alternative costs, which its controller MAY
     -- pay rather than the spell's mana cost (Fireblast). CR 118.9c: this does not
     -- change the card's mana cost.

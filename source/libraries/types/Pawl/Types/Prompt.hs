@@ -460,7 +460,7 @@ data Prompt r where
   -- the stack. The Natural is the greatest value this player could LEGALLY
   -- ANNOUNCE now, climbed by Cast.affordableX / Activate.affordableX over the
   -- cost that will really be paid and stopped at CR 101.1's card-stated ceiling
-  -- where the face prints one (Cost.maximumX); the payable half counts LIFE as
+  -- where the face prints any (Cost.maximumX); the payable half counts LIFE as
   -- well as mana, Cost.canPay measuring CR 601.2b's nonhybrid resolutions.
   --
   -- ADVISORY, and the answer is filtered against it nowhere -- but the two

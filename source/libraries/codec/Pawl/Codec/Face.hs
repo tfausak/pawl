@@ -115,9 +115,9 @@ codec cardCodec = Fields.object $ do
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   blockCosts <- Fields.defaulted "blockCosts" [] (Common.list BlockCost.codec) Face.blockCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
-  -- CR 101.1: the ceiling this face's own words put on CR 601.2b's announced X
+  -- CR 101.1: the ceilings this face's own words put on CR 601.2b's announced X
   -- (Pawl.Types.Face).
-  maximumX <- Fields.defaulted "maximumX" Nothing (Common.maybe Quantity.codec) Face.maximumX
+  maximumX <- Fields.defaulted "maximumX" [] (Common.list Quantity.codec) Face.maximumX
   alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) Face.alternativeCosts
   -- CR 601.2f: the reductions this face applies to its own cost to cast
   -- (Pawl.Types.CostReduction).
