@@ -129,10 +129,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Beast"
+            "type": "Mutant"
           },
           {
-            "type": "Mutant"
+            "type": "Beast"
           }
         ],
         "types": [
