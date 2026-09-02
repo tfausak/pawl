@@ -35,10 +35,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 --
 -- No FACE. CR 705.2 draws the line itself: an effect either cares about the
 -- win\/loss or cares about heads\/tails, and Pawl.Types.FlipCoin's haddock argues
--- the two readings apart at length. A face field would be for an effect that
--- BINDS the face for a later effect to read (gap #2308); the winnerless flip
--- does not want one, since ChoiceByCoinFlip consumes its face inside the entry
--- rewrite and never binds it.
+-- the two readings apart at length. Nothing in rule 603's vocabulary watches a
+-- face -- TriggerCondition.PlayerWinsCoinFlip is the only condition over this
+-- event -- and an effect that reads the face reads it off the tally
+-- Pawl.Types.FlipCoin binds, never off the log.
 --
 -- Construct with BRACE syntax everywhere: positional construction absorbs a new
 -- field in argument order with nothing red (#2009, #2021).
