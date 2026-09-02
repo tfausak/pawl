@@ -1045,23 +1045,6 @@ stillAdmitted :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.Control
 stillAdmitted pcs grants pools perspective source recipient slot gs =
   Set.member recipient (admittedGiven pcs grants pools perspective False Map.empty source slot gs)
 
--- One legal set per named slot; casting prompts with exactly this map. `source`
--- is the object the targeting is relative to -- the spell object at cast, the
--- source permanent for an ability. CR 601.2c's "another" needs no separate pass:
--- a slot that excludes its source says so with Not IsSource, and a slot that does
--- not is untouched, so Prodigal Sorcerer may still target itself with AnyTarget
--- (CR 115.4). CR 115.5's self-exclusion is
--- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
--- source that is itself on the stack -- see legalRecipients.
---
--- `seed` is what the announcement ALREADY has bound before any target is chosen
--- -- CR 601.2b's announced X for a cast (Stir the Grave's bound), CR 603.2's
--- trigger bindings for a triggered ability being placed (Harness the Storm's cast
--- spell, Venerable Warsinger's event amount), CR 707.10's copied decisions minus
--- the targets CR 707.10c is re-choosing (Resolve.chooseNewTargetsFor), and empty
--- for an activation, whose X does not reach a slot yet (#2672). It joins the
--- per-slot bindings the two passes below build, so an atom that reads a slot
--- cannot tell the two apart.
 -- CR 601.2c's announcements a payability gate still has to consider, as the slot
 -- maps each would bind: every way of filling every slot of the map handed in,
 -- which holds one slot's WHOLE legal object set per slot (legalSets, read
@@ -1086,6 +1069,23 @@ aimings slots =
     [Map.empty]
     (filter (not . Set.null . snd) (Map.toList slots))
 
+-- One legal set per named slot; casting prompts with exactly this map. `source`
+-- is the object the targeting is relative to -- the spell object at cast, the
+-- source permanent for an ability. CR 601.2c's "another" needs no separate pass:
+-- a slot that excludes its source says so with Not IsSource, and a slot that does
+-- not is untouched, so Prodigal Sorcerer may still target itself with AnyTarget
+-- (CR 115.4). CR 115.5's self-exclusion is
+-- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
+-- source that is itself on the stack -- see legalRecipients.
+--
+-- `seed` is what the announcement ALREADY has bound before any target is chosen
+-- -- CR 601.2b's announced X for a cast (Stir the Grave's bound), CR 603.2's
+-- trigger bindings for a triggered ability being placed (Harness the Storm's cast
+-- spell, Venerable Warsinger's event amount), CR 707.10's copied decisions minus
+-- the targets CR 707.10c is re-choosing (Resolve.chooseNewTargetsFor), and empty
+-- for an activation, whose X does not reach a slot yet (#2672). It joins the
+-- per-slot bindings the two passes below build, so an atom that reads a slot
+-- cannot tell the two apart.
 legalSets :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSets perspective seed source slots gs =
   let pcs = Projection.projectAll gs
