@@ -100,8 +100,8 @@ data Modification ability
     -- Folded into the ProjectedCharacteristics list CR 113.3 puts its kind in,
     -- which is what decides everything about the granted ability's identity: it
     -- becomes an ability OF THE RECEIVING OBJECT, so CR 113.7 makes that object
-    -- the ability's source, CR 602.2 lets only that object's controller activate
-    -- an activated one, CR 603.3a makes that same player the controller of a
+    -- the ability's source, CR 602.2 makes that object's controller the default
+    -- activator of an activated one, CR 603.3a makes that same player the controller of a
     -- triggered one, CR 113.8 makes them the controller of the ability on the
     -- stack, and every binding it names -- the tap cost, IsSource, the counter it
     -- puts on "this creature", the "you" that draws -- resolves against the

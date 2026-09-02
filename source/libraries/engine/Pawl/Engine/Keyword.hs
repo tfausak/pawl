@@ -16,6 +16,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
@@ -424,6 +425,7 @@ cycling cost searchFor =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
+      ActivatedAbility.activator = Activator.Controller,
       -- CR 702.29a gives the card this ability outright, with no "as long as".
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
@@ -479,6 +481,7 @@ reinforce n cost =
       -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
       -- default, and gives the ability outright with no "as long as".
       ActivatedAbility.restrictions = [],
+      ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
@@ -655,6 +658,7 @@ crew n =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
+      ActivatedAbility.activator = Activator.Controller,
       -- CR 702.122a gives the permanent this ability outright, with no "as long
       -- as", cycling's answer.
       ActivatedAbility.condition = Nothing,
@@ -700,6 +704,7 @@ levelUp cost =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
@@ -726,6 +731,7 @@ outlast cost =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
@@ -765,6 +771,7 @@ equip cost =
           (ModeSelection.ChooseExactly 1),
       -- CR 702.6a's "Activate only as a sorcery", which CR 307.5 spells out.
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
@@ -805,6 +812,7 @@ fortify cost =
           (ModeSelection.ChooseExactly 1),
       -- CR 702.67a's "Activate only as a sorcery", which CR 307.5 spells out.
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
       ActivatedAbility.name = Nothing
     }
