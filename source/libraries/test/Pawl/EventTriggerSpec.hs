@@ -44,6 +44,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ControlChanged as ControlChanged
@@ -61,6 +62,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Moved as Moved
@@ -2520,136 +2522,142 @@ communalVigilSpec s registry =
 -- "fire once per member" -- Event.eventTriggers consulted Event.batchScoped and
 -- Event.delayedPending did not; see #2384.
 --
---   * Synthetic Communal Reckoning {B}{B} Instant
---     (data/cards/synthetic-communal-reckoning.json): "Until end of turn,
---     whenever one or more players gain life, you lose 3 life."
---   * Synthetic Communal Relapse {B}{B} Instant
---     (data/cards/synthetic-communal-relapse.json): "The next time one or more
---     players gain life, you lose 3 life."
+--   * Forth Eorlingas! {X}{R}{W} Sorcery (data/cards/forth-eorlingas.json):
+--     "Create X 2/2 red Human Knight creature tokens with trample and haste.
+--     Whenever one or more creatures you control deal combat damage to one or
+--     more players this turn, you become the monarch." Name, cost, type line
+--     and Oracle text checked against Scryfall 2026-09-02.
 --
--- WHY A SYNTHETIC. Three printings arm a delayed ability on a batch condition --
--- Forth Eorlingas! ("whenever one or more creatures you control deal combat
--- damage to one or more players this turn"), Aphelia, Viper Whisperer and
--- Garruk, Curse Breaker -- and when this group was written every one of them
--- watched batched COMBAT DAMAGE or a batched ATTACK, which pawl then had no
--- TriggerCondition for. On the LIFE axis the query is Scryfall o:/one or more
--- [^.]*gain(s)? life/, 2026-08-26, which matches Path of Bravery alone -- its
--- "one or more" counts attacking creatures. Batched combat damage IS a condition
--- now (TriggerCondition.PermanentsDealCombatDamageToPlayer), so Forth Eorlingas!
--- is the card that refutes the synthetic; replacing it is #2940.
+-- It replaced Synthetic Communal Reckoning ("until end of turn, whenever one or
+-- more players gain life, you lose 3 life") once batched combat damage was a
+-- TriggerCondition; see #2940. communalRelapseSpec's synthetic stays: CR
+-- 603.7b's second sentence turns on an entry having NO stated duration, and
+-- "this turn" is one (#2955).
 --
--- The PAYLOAD is slot-free on purpose, and the corpus lint "every slot a delayed
--- ability reads is bound by its card" would reject one that read an EVENT slot:
--- Event.eventBindingSlots gives a batch condition none, the trigger event being
--- the whole batch, so False Cure's "that player" has nothing to name here. "You lose 3 life" reads
--- CR 603.7d's controller off the entry instead, which is why the count is
--- observable at all: alice's life total falls once per firing.
+-- The board: alice casts it for X in her precombat main, and the hasty Knights
+-- attack bob and connect in one combat damage step -- one Pawl.Types.EventGroup,
+-- Pawl.Engine.Damage.dealWave bracketing the step (CR 510.2), which the group
+-- count pins as the precondition. Becoming the monarch is idempotent (CR 725.3;
+-- Monarch.crown records nothing for a player already crowned), so the COUNT of
+-- firings is read off the stack as the step's turn-based action settles, the
+-- reading Megrim's group takes above: one trigger for the batch, where a
+-- per-member gatherer stacks two.
 --
--- The batch is Centaur Peacemaker's "each player gains 4 life" once more, one
--- EventGroup across the seats (CR 608.2f).
-communalReckoningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-communalReckoningSpec s registry =
+-- "Creatures you control": on alice's own turn no creature she does not control
+-- can deal combat damage to a player, so the ControlledBy half of the filter is
+-- written as printed and unexercised here.
+forthEorlingasSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forthEorlingasSpec s registry =
   let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
-      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
-      -- singularCureSpec's staging: the permanent is already placed, its Moved
-      -- event is recorded, and CR 603.6a's scan runs at the next settle.
-      entering oid gs =
-        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs))
-      -- The distinct EventGroups the log's life gains carry, and how many gains
-      -- there were. The precondition every case rests on, asserted rather than
-      -- assumed: were the seats' gains not one group, "once for the batch" would
-      -- be indistinguishable from "once per group".
-      gainsIn gs =
-        Maybe.mapMaybe
-          ( \logged -> case LoggedEvent.event logged of
-              GameEvent.LifeGained _ -> Just (LoggedEvent.group logged)
-              _ -> Nothing
+      combatDamage = Phase.Combat CombatStep.CombatDamage
+      declareAttackers = Phase.Combat CombatStep.DeclareAttackers
+      -- CR 601.2b's X, and nothing else pinned: the answer is what makes X
+      -- tokens rather than none.
+      choosingX :: Natural -> Prompt.Prompt r -> r
+      choosingX x p = case p of
+        Prompt.ChooseX {} -> x
+        _ -> S.identityAnswer p
+      -- Attacks with nothing, so a turn's combat passes without the Knights
+      -- connecting -- S.identityAnswer attacks with everything.
+      passive :: Prompt.Prompt r -> r
+      passive p = case p of
+        Prompt.DeclareAttackers {} -> []
+        _ -> S.identityAnswer p
+      knights gs = filter (\oid -> Set.member Subtype.Knight (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+      -- The distinct EventGroups the log's combat damage carries.
+      combatDamageGroups gs =
+        List.nub
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.DamageDealt ev | DamageEvent.kind ev == DamageKind.Combat -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
           )
-          (Foldable.toList (GameState.events gs))
-      -- alice casts the named Instant off two Swamps with a Centaur Peacemaker
-      -- already on the battlefield, waiting to enter. Its own minimal board,
-      -- singularCureSpec's reason: any other life gain would be a second batch.
-      armed name base = do
-        swamp <- S.printingOf s registry "Swamp"
-        spell <- S.printingOf s registry name
-        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
-        let lands = S.landsFor swamp S.alice 2 base
-            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
-            (spellId, withSpell) = S.addHandCard spell S.alice withPeacemaker
-        pure (peacemakerId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
-      -- The same Reckoning with a LONE gain to watch: bob's Radiant Fountain (CR
-      -- 119.3, "you gain 2 life") entering instead of the Peacemaker.
-      armedWithFountain = do
-        swamp <- S.printingOf s registry "Swamp"
-        spell <- S.printingOf s registry "Synthetic Communal Reckoning"
-        fountain <- S.printingOf s registry "Radiant Fountain"
-        let lands = S.landsFor swamp S.alice 2 S.threePlayerGame
-            (fountainId, withFountain) = S.addCreature fountain S.bob lands
-            (spellId, withSpell) = S.addHandCard spell S.alice withFountain
-        pure (fountainId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
-   in Spec.describe s "CR 603.2c Synthetic Communal Reckoning" $ do
-        -- The proving case. Three seats gain 4 in ONE event group, which is one
-        -- trigger event, so the entry fires ONCE and alice pays 3: she is at 21,
-        -- 20 plus her own 4 less the one drain. A gatherer that fired per member
-        -- takes 9 and leaves her at 15.
-        Spec.it s "CR 603.2c three seats gaining at once are one trigger event, so the entry fires once" $ do
-          (peacemakerId, gs) <- armed "Synthetic Communal Reckoning" S.threePlayerGame
-          let after = entering peacemakerId gs
-          Spec.assertEqWith s "alice gained 4 and lost 3 once" (S.lifeOf S.alice after) (Just 21)
-          Spec.assertEqWith s "alice started at 20" (S.lifeOf S.alice gs) (Just 20)
-          Spec.assertEqWith s "bob gained his 4 and pays nothing" (S.lifeOf S.bob after) (Just 24)
-          Spec.assertEqWith s "and so did carol" (S.lifeOf S.carol after) (Just 24)
-          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (3, 1)
+      -- Run whole steps until `done` holds of the board, bounded so a bug cannot
+      -- loop forever; wide enough for the two turns the negative below plays.
+      runUntil step done gs0 =
+        let go n g =
+              if n <= (0 :: Int) || done g || Maybe.isJust (GameState.result g)
+                then g
+                else go (n - 1) (step g)
+         in go 40 gs0
+      -- alice, in her precombat main with the four lands {2}{R}{W} needs at X=2,
+      -- casts the spell for `x` and resolves it. Both libraries are stocked
+      -- because the negative below plays through two draw steps (CR 104.3c).
+      armed x = do
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        spell <- S.printingOf s registry "Forth Eorlingas!"
+        let lands = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard plains pid g)) lands (concat (replicate 4 [S.alice, S.bob]))
+            (spellId, withSpell) = S.addHandCard spell S.alice stocked
+            gs =
+              withSpell
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice,
+                  GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Phase.PrecombatMain) (GameState.remaining withSpell))
+                }
+        pure (resolveAll (snd (Engine.runGamePure (choosingX x) gs (S.cast S.alice spellId))))
+      -- From a board sitting at some turn's declare attackers step: the Knights
+      -- attack bob, the damage step's turn-based action deals their damage, and
+      -- the settle that follows puts whatever triggered onto the stack. Read
+      -- there for the count, then resolved for the crown -- one run, read twice.
+      connecting gs =
+        let atDamage = S.runToStep combatDamage S.aggressiveAnswer gs
+            placed = S.runPure S.aggressiveAnswer atDamage (Engine.runTurnBasedActions combatDamage >> Engine.settleForPriority)
+         in (placed, resolveAll placed)
+   in Spec.describe s "CR 603.2c Forth Eorlingas!" $ do
+        Spec.it s "CR 111.3 / 601.2b cast for X=2, it mints two 2/2 red Human Knights with trample and haste and arms one entry" $ do
+          gs <- armed 2
+          case knights gs of
+            tokens@[_, _] -> do
+              Spec.assertEqWith s "each is 2/2" (fmap (\oid -> (Projection.powerOf oid gs, Projection.toughnessOf oid gs)) tokens) [(Just 2, Just 2), (Just 2, Just 2)]
+              Spec.assertEqWith s "each is red" (fmap (\oid -> Projection.colorsOf oid gs) tokens) [Set.singleton Color.Red, Set.singleton Color.Red]
+              Spec.assertBool s (all (\oid -> Set.member Subtype.Human (Projection.subtypesOf oid gs)) tokens) "each is a Human too"
+              Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Haste oid gs) tokens) "each has haste"
+              Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Trample oid gs) tokens) "each has trample"
+              Spec.assertBool s (all (\oid -> Projection.controllerOf oid gs == Just S.alice) tokens) "and alice controls both"
+            other -> Spec.assertFailure s ("expected exactly two Knight tokens, got " <> show (length other))
+          Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers gs)) 1
+          Spec.assertEqWith s "nobody is the monarch yet" (GameState.monarch gs) Nothing
+        -- The proving case. Two Knights connect in ONE combat damage step, which
+        -- is one trigger event, so the entry fires ONCE: one trigger on the
+        -- stack, and alice is crowned. A gatherer that fired per member stacks
+        -- two -- and crowns alice all the same, which is why the count is read
+        -- before the stack resolves.
+        Spec.it s "CR 603.2c two Knights connecting in one step are one trigger event, so the entry fires once" $ do
+          gs <- armed 2
+          let (placed, after) = connecting (runUntil (\g -> S.runPure S.identityAnswer g Engine.runStep) ((== declareAttackers) . GameState.phase) gs)
+          Spec.assertEqWith s "alice became the monarch" (GameState.monarch after) (Just S.alice)
+          Spec.assertEqWith s "one trigger on the stack for the batch, not one per Knight" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "both Knights connected, for four" (S.lifeOf S.bob after) (Just 16)
+          Spec.assertEqWith s "CR 510.2: the two damage events were one event group" (length (combatDamageGroups placed)) 1
           Spec.assertEqWith s "and CR 603.7b's stated duration kept the entry armed" (Seq.length (GameState.delayedTriggers after)) 1
-        -- The other half of the pair, differing in exactly one thing -- how many
-        -- occurrences the batch holds. FOUR seats and still one firing, where a
-        -- per-member reading now takes 12 and leaves alice at 12. A fixed
-        -- number of firings passes at most one of the two boards.
-        Spec.it s "CR 603.2c a fourth seat in the batch is not a fourth firing" $ do
-          (peacemakerId, gs) <- armed "Synthetic Communal Reckoning" S.fourPlayerGame
-          let after = entering peacemakerId gs
-          Spec.assertEqWith s "alice still paid exactly 3" (S.lifeOf S.alice after) (Just 21)
-          Spec.assertEqWith s "dave gained his 4 too" (S.lifeOf S.dave after) (Just 24)
-          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (4, 1)
-        -- The control that separates "once per event GROUP" from a collapse
-        -- coarser than the group -- once per scan, which is the wrong-direction
-        -- fix the boards above cannot tell apart, each holding one group. TWO
-        -- life-gain groups reach ONE settle, and each is its own trigger event:
-        -- alice pays 6. A per-scan collapse takes 3.
-        --
-        -- The log is written directly, S.withEvents giving each event its own
-        -- group, because the only funnel that makes a second batch also settles
-        -- between them -- and then the two groups would be two scans, which is
-        -- not the reading under test.
-        Spec.it s "CR 704.3 two gain groups in one scan are two trigger events" $ do
-          (_, gs) <- armed "Synthetic Communal Reckoning" S.threePlayerGame
-          let staged = S.withEvents [GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 4), GameEvent.LifeGained (LifeChange.MkLifeChange S.carol 5)] gs
-              after = resolveAll (settle staged)
-          Spec.assertEqWith s "alice paid 3 for each of the two groups" (S.lifeOf S.alice after) (Just 14)
-          Spec.assertEqWith s "alice was at 20 before the staged gains" (S.lifeOf S.alice gs) (Just 20)
-          Spec.assertEqWith s "two gains, in two event groups" (length (gainsIn staged), length (List.nub (gainsIn staged))) (2, 2)
-        -- The plumbing control: ONE gain drains alice once too -- the reading
-        -- both implementations share. bob gains his 2 and keeps it; the entry's
-        -- payload names its controller, not the gainer.
-        Spec.it s "CR 119.3 a lone gain is one trigger event as well" $ do
-          (fountainId, gs) <- armedWithFountain
-          let after = entering fountainId gs
-          Spec.assertEqWith s "alice paid her 3" (S.lifeOf S.alice after) (Just 17)
-          Spec.assertEqWith s "bob gained 2 and kept it" (S.lifeOf S.bob after) (Just 22)
-          Spec.assertEqWith s "carol neither gained nor paid" (S.lifeOf S.carol after) (Just 20)
-          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), length (List.nub (gainsIn after))) (1, 1)
-        -- The vacuity guard, falseCureSpec's: the same Peacemaker with NO entry
-        -- armed leaves every seat holding its 4 (CR 119.3). Without it a board
-        -- where nobody actually gained would read as a passing 21 above, alice
-        -- never having gained her 4 nor paid her 3.
-        Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
-          peacemaker <- S.printingOf s registry "Centaur Peacemaker"
-          let (peacemakerId, gs) = S.addCreature peacemaker S.alice S.threePlayerGame
-              after = entering peacemakerId gs
-          Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
-          Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
-          Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol after) (Just 24)
+        -- The floor the two readings share: one Knight is one occurrence either
+        -- way, so a fixed count of one passes here and fails above.
+        Spec.it s "CR 603.2c a lone Knight connecting is one trigger event as well" $ do
+          gs <- armed 1
+          let (placed, after) = connecting (runUntil (\g -> S.runPure S.identityAnswer g Engine.runStep) ((== declareAttackers) . GameState.phase) gs)
+          Spec.assertEqWith s "alice became the monarch" (GameState.monarch after) (Just S.alice)
+          Spec.assertEqWith s "one trigger on the stack" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "the one Knight connected, for two" (S.lifeOf S.bob after) (Just 18)
+        -- "This turn", differing from the proving case in exactly one thing:
+        -- which turn's combat the Knights attack in. The turn that armed the
+        -- entry passes with no attack, bob takes his, and on alice's next turn
+        -- the same two Knights connect for the same four -- and crown nobody,
+        -- CR 514.2's cleanup having ended the entry's duration.
+        Spec.it s "CR 603.7b / 514.2 the same Knights connecting on alice's next turn crown nobody" $ do
+          gs <- armed 2
+          let later = runUntil (\g -> S.runPure passive g Engine.runStep) (\g -> GameState.turnNumber g == 3 && GameState.phase g == declareAttackers) gs
+              (placed, after) = connecting later
+          Spec.assertEqWith s "nobody became the monarch" (GameState.monarch after) Nothing
+          Spec.assertEqWith s "nothing triggered off the batch" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "though both Knights connected, for four" (S.lifeOf S.bob after) (Just 16)
+          Spec.assertEqWith s "it is alice's next turn" (GameState.turnNumber later, GameState.activePlayer later) (3, S.alice)
+          Spec.assertEqWith s "the entry is gone, not masked" (Seq.length (GameState.delayedTriggers later)) 0
+          Spec.assertEqWith s "bob took no damage before it" (S.lifeOf S.bob later) (Just 20)
 
 -- CR 603.7b's SECOND sentence read the other way round: "if its trigger event
 -- occurs MORE THAN ONCE simultaneously". A batch-scoped condition's trigger
@@ -2677,10 +2685,11 @@ communalRelapseSpec s registry =
           State.modify (+ 1)
           pure (S.identityAnswer p)
         _ -> pure (S.identityAnswer p)
-      -- communalReckoningSpec's board, and its staging -- but run through
-      -- Engine.runGame with a State answerer rather than the pure one, so the
-      -- questions can be counted as the Peacemaker's entry trigger resolves and
-      -- the delayed entry is gathered.
+      -- falseCureSpec's Peacemaker board -- alice casts the named Instant off
+      -- two Swamps with a Centaur Peacemaker already placed, waiting to enter --
+      -- but run through Engine.runGame with a State answerer rather than the
+      -- pure one, so the questions can be counted as the Peacemaker's entry
+      -- trigger resolves and the delayed entry is gathered.
       staged name base = do
         swamp <- S.printingOf s registry "Swamp"
         spell <- S.printingOf s registry name
@@ -6027,7 +6036,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   singularCureSpec s registry
   apnapDelayedSpec s registry
   communalVigilSpec s registry
-  communalReckoningSpec s registry
+  forthEorlingasSpec s registry
   communalRelapseSpec s registry
   enrageSpec s registry
   belltowerSphinxSpec s registry
