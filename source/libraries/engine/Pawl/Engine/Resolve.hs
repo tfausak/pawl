@@ -2094,8 +2094,8 @@ resolveSpellWith runSubgame oid = do
                         let legalNowForMay = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
                             boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) gateBindings)
                         -- CR 608.2d's "or" next, and BEFORE the "may": Twiddle
-                        -- prints one "may" over the pair, so the branch the
-                        -- controller did not announce has no "may" left to offer.
+                        -- prints one "may" over the pair, so a branch a player
+                        -- did not announce has no "may" left to offer THEM.
                         (announced, picked') <- if gated then chosenBranch oid effectController idx cIdx legalNowForMay picked clause else pure (Just Set.empty, picked)
                         let branch = maybe True (not . Set.null) announced
                         taken <- if branch then exercises oid effectController idx cIdx boundNowForMay legalNowForMay announced clause else pure False
@@ -2352,7 +2352,8 @@ armsReflexive source effect gs = case effect of
 -- own riders gave (Clause.ifTaken says why that rather than the board), and a
 -- name the fold has not reached -- a later clause, or one that does not exist --
 -- is False. ANY of the names is enough, which is what Worms of the Earth's "if a
--- player does either" prints over the two halves of an either-or pair. Asked BEFORE the other three, so a skipped clause raises no prompt.
+-- player does either" prints over the two halves of an either-or pair. Asked
+-- BEFORE the other three, so a skipped clause raises no prompt.
 --
 -- A pure function rather than a Game action: it reads nothing but the fold.
 ifTakenHolds :: Set ClauseIndex -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool

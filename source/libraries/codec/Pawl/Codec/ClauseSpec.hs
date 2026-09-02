@@ -94,8 +94,9 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       " {\"ifTaken\":[0,1]} "
   -- CR 608.2d: Twiddle's tap names the untap it is exclusive with, and the key is
   -- emitted only when there is one. A DIFFERENT key from ifTaken, though both
-  -- hold a bare ordinal: one clause may hang off an earlier one and branch
-  -- against another, and a wire that fused them could not say which.
+  -- name clause ordinals: one clause may hang off an earlier one and branch
+  -- against another, and a wire that fused them could not say which. The
+  -- chooser is elided here, Twiddle's being the unmarked "you" (CR 405.4).
   Spec.it s "a clause exclusive with a sibling writes the orElse key" $
     Common.assertJsonCodec
       s

@@ -3094,8 +3094,10 @@ subgameSpellOn borrowed name effects gs0 =
 wormsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 wormsSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
-      -- Rule 508 aside, an upkeep is a step, so the trigger's TurnScope.EachTurn
-      -- condition needs the event as well as the phase.
+      -- CR 503.1's upkeep step, entered the way the trigger reads it: the
+      -- TriggerCondition.StepBegins condition matches the EVENT, so the fixture
+      -- records one beside setting the phase. TurnScope.EachTurn is "each
+      -- upkeep", so alice's own is enough.
       beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
