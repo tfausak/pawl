@@ -59,7 +59,8 @@ data Source
     -- ITS OWN CONSTRUCTOR, and neither of the two it resembles: OfCard would make
     -- CR 704.5e's "a copy of a spell in a zone other than the stack ceases to
     -- exist" unaskable, and OfToken is CR 111.3 token-ness, which a copy of a
-    -- spell does not acquire until CR 707.10f's permanent resolves (#2207).
+    -- spell acquires only as CR 707.10f's permanent is put onto the battlefield
+    -- (Pawl.Engine.Event's zone-change funnel rewrites it there).
     OfSpellCopy PrintingId.PrintingId
   | -- | CR 725.2 / CR 702.179d: a triggered ability with no object source, which
     -- Pawl.Types.InherentTriggerSource carries and documents.
