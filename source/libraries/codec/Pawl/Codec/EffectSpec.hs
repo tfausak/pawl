@@ -128,6 +128,7 @@ import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
@@ -625,6 +626,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.RedistributeLifeTotals
       " {\"type\":\"RedistributeLifeTotals\"} "
+  -- CR 702.179's speed, up and down. Synthetic Speed Boost's own value.
+  Spec.it s "IncreaseSpeed" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity PlayerRef.EachPlayer (Quantity.Literal 2)))
+      " {\"type\":\"IncreaseSpeed\",\"value\":{\"player\":{\"type\":\"EachPlayer\"},\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
+  -- Its own payload rather than the PlayerQuantity above, over the floor
+  -- Spikeshell Harrier prints; see Pawl.Types.SpeedDecrease.
+  Spec.it s "DecreaseSpeed" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "permanent"))) (Quantity.Literal 1) 1))
+      " {\"type\":\"DecreaseSpeed\",\"value\":{\"player\":{\"type\":\"ControllerOfBound\",\"value\":\"permanent\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"floor\":1}} "
   -- Create's EntryRiders, bound slot and CR 111.2 creator are each ELIDED when
   -- they are the default, exactly like MoveToZone above; the riders and the slot
   -- were once the middle two of four emitted forms, told apart at decode by JSON
