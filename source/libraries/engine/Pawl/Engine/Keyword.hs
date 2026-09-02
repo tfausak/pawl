@@ -1790,7 +1790,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- grants protection from a quality and says the effect does not remove Auras,
   -- or does not remove what is already attached. The pool's one grant is an
   -- activated ability (Tower of the Magistrate) and carries no such rider, so
-  -- nothing here can either (#2229).
+  -- nothing here can either (#3046).
   Keyword.Protection quality ->
     [ AttachRestriction.MkAttachRestriction
         { AttachRestriction.affected = Affected.Matching Filter.IsSource,

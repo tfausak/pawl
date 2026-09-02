@@ -27,10 +27,10 @@ import qualified Pawl.Types.Quantity as Quantity
 -- Not implemented: a conjure whose card is not NAMED outright. A duplicate of an
 -- object already in the game (Futurist Spellthief\'s "conjure a duplicate of
 -- target spell into your hand") wants an
--- 'Pawl.Types.ObjectRef.ObjectRef' where this field holds text, and a random
--- pick from a printed spellbook (Tome of the Infinite\'s "conjure a random card
--- from Tome of the Infinite\'s spellbook") wants a list plus a choice the engine
--- makes. Neither is a card this field can hold (#2643).
+-- 'Pawl.Types.ObjectRef.ObjectRef' where this field holds text (#2643), and a
+-- random pick from a printed spellbook (Tome of the Infinite\'s "conjure a random
+-- card from Tome of the Infinite\'s spellbook") wants a list plus a choice the
+-- engine makes (#3062). Neither is a card this field can hold.
 --
 -- Not implemented: a conjurer other than the resolving controller. That is a
 -- SHAPE and not one card -- a chosen player (Juggernaut Peddler\'s "that player

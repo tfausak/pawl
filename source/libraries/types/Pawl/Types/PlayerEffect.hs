@@ -335,7 +335,7 @@ data PlayerEffect
     -- written by the card, so there is nothing here for a Filter to carry. A
     -- protection ability whose quality IS card data -- rule 702.16j's "protection
     -- from everything", or a stated colour -- wants a Filter-carrying constructor
-    -- beside this one and has no player-side producer yet (#2229).
+    -- beside this one and has no player-side producer yet (#3048).
     --
     -- Rule 702.16e's "any damage ... is prevented" reaches the protected PLAYER
     -- through Pawl.Engine.Replacement.collect's third segment, which mints a CR

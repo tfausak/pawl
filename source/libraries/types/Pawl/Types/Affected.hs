@@ -52,7 +52,7 @@ data Affected
     -- JSON cannot carry a comment: Painter's own filter is And [], which matches
     -- EVERY object, while the card scopes to three kinds of thing. So this also
     -- reaches an ability on the stack (CR 113.1c) and an emblem in the command
-    -- zone (CR 114.5). Neither is observable today (#1551).
+    -- zone (CR 114.5). Neither is observable today (#1551, #3061).
     MatchingAnywhere (Filter.Filter Keyword.Keyword)
   | -- | Matching with the battlefield gate INVERTED: any object matching the
     -- Filter that is not on the battlefield. Teferi, Mage of Zhalfir's "creature

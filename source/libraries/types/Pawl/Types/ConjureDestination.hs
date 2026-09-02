@@ -17,8 +17,8 @@ module Pawl.Types.ConjureDestination where
 -- "conjure X duplicates of it into exile"), which is an axis of its own rather
 -- than a fifth arm nothing else was waiting on -- Scryfall @o:conjure o:exile@,
 -- 2026-08-29, five printings name this destination and not one of them names the
--- card it conjures, so each is held out by #2643 as well and no board reaches
--- such an arm (#2653).
+-- card it conjures, so each is held out by #2643 or #3062 as well and no board
+-- reaches such an arm (#2653).
 data ConjureDestination
   = -- | Emporium Thopterist\'s "conjure a card named Ornithopter into your
     -- hand".
