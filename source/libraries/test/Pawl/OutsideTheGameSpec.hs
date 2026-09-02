@@ -10,17 +10,20 @@
 -- subgame sees it, which is Pawl.Engine.Setup's subgameStateFrom and
 -- applyCrossings with Pawl.Engine.Engine.playSubgame between them.
 --
--- Gameplay-level but for three cases: the CR 103.2a setup case and the two CR
--- 729.4 cases before it call the unit under test directly. Every other case
--- casts a printed wish and resolves it through the stack, so what is asserted is
--- the whole path from card JSON to the card in hand -- Burning Wish ({1}{R}
--- sorcery, "You may reveal a sorcery card you own from outside the game and put
--- it into your hand. Exile Burning Wish.") for the pool, with Cunning Wish for
--- the cycle's instant speed and Death Wish for a card that prints no reveal,
--- and, in the last three cases, a Shahrazad subgame for CR 729.4's main game --
--- Living Wish reaching two main-game creatures, then Death Wish reaching a
--- main-game Titania's Song (CR 604.2's handover), then Burning Wish reaching the
--- resolving Shahrazad itself (CR 729.5).
+-- Gameplay-level but for the CR 103.2a setup case and the CR 729.4 group that
+-- follows it, which reach OutsideTheGame.eligible and OutsideTheGame.bringInto
+-- directly on a board Setup.subgameStateFrom built -- the main game those cases
+-- read is played out through the stack, but the wish inside the subgame is
+-- called rather than cast. Every other case casts a printed wish and resolves it
+-- through the stack, so what is asserted is the whole path from card JSON to the
+-- card in hand -- Burning Wish ({1}{R} sorcery, "You may reveal a sorcery card
+-- you own from outside the game and put it into your hand. Exile Burning Wish.")
+-- for the pool, with Cunning Wish for the cycle's instant speed and Death Wish
+-- for a card that prints no reveal, and, in the last three cases, a Shahrazad
+-- subgame for CR 729.4's main game -- Living Wish reaching two main-game
+-- creatures, then Death Wish reaching a main-game Titania's Song (CR 604.2's
+-- handover), then Burning Wish reaching the resolving Shahrazad itself (CR
+-- 729.5).
 --
 -- Not implemented: Ring of Ma'ruf is not in data/cards/, so nothing here reaches
 -- outside the game through a draw replacement (#2470).
@@ -48,6 +51,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -388,6 +392,62 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bobsBearId S.alice))
     Spec.assertEqWith s "alice's hand stays empty: bob's creature is not hers to reach" (printingsIn Zone.Hand S.alice after) []
     Spec.assertEqWith s "and bob's card is untouched" (Map.member bobsBearId (GameState.outsideObjects after)) True
+  -- CR 708.2 over CR 729.4: what a subgame's wish sees of a FACE-DOWN main-game
+  -- permanent. alice casts Soul Summons ({1}{W} sorcery, "Manifest the top card
+  -- of your library") in the main game over Sign in Blood, so the permanent
+  -- standing outside the subgame is a card whose PRINTED face and whose CR 708.2a
+  -- face-down characteristics disagree about every card type it has: a sorcery
+  -- underneath, a 2/2 creature with no name on the table.
+  --
+  -- TWO WISHES over the SAME board, which is what makes the reading falsifiable
+  -- in both directions. Living Wish's creature-or-land filter must reach the
+  -- manifest and did not before; Burning Wish's sorcery filter must NOT reach it
+  -- and did before. The Soul Summons in alice's main-game graveyard is the
+  -- control the second leg needs -- a FACE-UP sorcery outside the subgame, so
+  -- "the sorcery wish brought nothing in" cannot pass for the right answer, and
+  -- the answerer below asks for the manifest by id and settles for the graveyard
+  -- card only because the manifest is not on offer.
+  --
+  -- The two Plains are lands outside the subgame, so the creature-or-land leg
+  -- offers three candidates for one pick and cannot short-circuit. The Goblin
+  -- Piker under Sign in Blood keeps CR 104.3c off the board and leaves the
+  -- library non-empty for CR 729.2 to move.
+  Spec.it s "CR 708.2/729.4 a manifested main-game sorcery is offered to a subgame's wish as a creature and not as a sorcery" $ do
+    summons <- S.printingOf s registry "Soul Summons"
+    plains <- S.printingOf s registry "Plains"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (g1, summonsId) = S.handOne summons (S.landsInPlay plains 2)
+        (_, g2) = S.addLibraryCard piker S.alice g1
+        (_, g3) = S.addLibraryCard signInBlood S.alice g2
+        parent = S.runPure S.identityAnswer g3 (S.cast S.alice summonsId >> Stack.resolveTop)
+        faceDownIds = [oid | oid <- Set.toList (GameState.battlefield parent), maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid parent)]
+        manifestedId = Maybe.fromMaybe summonsId (Maybe.listToMaybe faceDownIds)
+        sub = Setup.subgameStateFrom S.alice parent
+        creatureOrLand = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
+        -- Pinned by id, never by searching for a legal option: an answerer that
+        -- picked whatever the filter offered would repair the assertion under a
+        -- mutation. It falls back to the head only where the manifest is absent,
+        -- which is the whole of what the sorcery leg asserts.
+        preferManifest :: Prompt.Prompt r -> r
+        preferManifest p = case p of
+          Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== OutsideCard.InAnotherGame manifestedId) (NonEmpty.toList candidates))
+          _ -> S.identityAnswer p
+        wishing predicate = snd (Engine.runGamePure preferManifest sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) manifestedId S.alice))
+        offeredOuter predicate = [oid | OutsideCard.InAnotherGame oid <- OutsideTheGame.eligible predicate manifestedId S.alice sub]
+    -- CR 708.2a's 2/2 creature is what the creature-or-land wish reaches, and CR
+    -- 708.9's reveal is what arrives: the card itself, not the 2/2.
+    Spec.assertEqWith s "CR 708.2a/729.4: the creature-or-land wish takes the manifest, and CR 708.9 hands it over as the sorcery card underneath" (printingsIn Zone.Hand S.alice (wishing creatureOrLand)) [signInBlood]
+    -- The other arm of the same rule: "no characteristics other than those
+    -- listed" leaves the manifest no card type but creature, so the sorcery wish
+    -- has to settle for the face-up sorcery in the main-game graveyard.
+    Spec.assertEqWith s "CR 708.2: the sorcery wish cannot reach the manifest and takes the face-up main-game sorcery instead" (printingsIn Zone.Hand S.alice (wishing (Filter.HasCardType CardType.Sorcery))) [summons]
+    -- Preconditions, after the behaviour: the fixture really did manifest a
+    -- sorcery, and the offer really did have a choice in it.
+    Spec.assertEqWith s "the manifest is face down on the main-game battlefield" (length faceDownIds) 1
+    Spec.assertEqWith s "and the card under it is Sign in Blood" (Game.printingOfObject manifestedId parent) (Just signInBlood)
+    Spec.assertEqWith s "the creature-or-land wish was offered the manifest beside alice's two main-game Plains" (length (offeredOuter creatureOrLand), elem manifestedId (offeredOuter creatureOrLand)) (3, True)
+    Spec.assertEqWith s "and the sorcery wish was offered the graveyard card alone" (elem manifestedId (offeredOuter (Filter.HasCardType CardType.Sorcery)), length (offeredOuter (Filter.HasCardType CardType.Sorcery))) (False, 1)
   -- CR 729.4 / 729.4a / 729.5, the whole road at gameplay level and the case #152
   -- is about. alice casts Shahrazad in the main game; inside the subgame she casts
   -- Living Wish ({1}{G} sorcery, "You may reveal a creature or land card you own
