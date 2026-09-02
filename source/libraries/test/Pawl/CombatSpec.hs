@@ -1925,10 +1925,11 @@ removingLandwalk s hammerheimId victim board = case Projection.abilitiesOf hamme
 -- one written landwalk away would already free the block, and the board could not
 -- tell a removal that reached one instance from one that reached the family.
 --
--- The Crossroads is the sibling keyword. "All creatures have haste" is a CR
--- 613.6 static whose timestamp is the enchantment's own, so it is in place before
--- the removal resolves and a CR 613.1f WIPE would take the Hag's haste with the
--- landwalks; a family removal must leave it standing. Haste and not an evasion
+-- The Crossroads is the sibling keyword. "All creatures have haste" is a static
+-- ability, so CR 613.7a gives its effect the enchantment's own timestamp and CR
+-- 613.7b gives the removal a later one: the grant is in place first, and a CR
+-- 613.1f WIPE would take the Hag's haste with the landwalks where a family
+-- removal must leave it standing. Haste and not an evasion
 -- keyword deliberately: a granted flying would decide the block by itself and
 -- mask the case.
 --

@@ -2075,9 +2075,10 @@ rewriteModification pairs m =
         -- above: "loses islandwalk" is text printed on the REMOVER, so a text
         -- change affecting it swaps the land-type word before the removal is
         -- read. Scarwood Hag's "loses forestwalk" is the printing that carries
-        -- one, and it is not in the pool: Sky Tether's flying is the only
-        -- keyword any card here removes, so this arm is a regression fence where
-        -- the hacked Lord of Atlantis proves the grant above.
+        -- one, and it is not in the pool: every written keyword a card here
+        -- removes is payload-free -- Sky Tether's flying, Melira's infect -- so
+        -- this arm is a regression fence where the hacked Lord of Atlantis proves
+        -- the grant above.
         Modification.LoseKeyword k -> Modification.LoseKeyword (Filter.rewriteKeyword [(from, to)] k)
         -- Nothing to rewrite, and not for want of a descent: CR 612.1 swaps a
         -- WORD, and a KeywordFamily holds none -- "all landwalk abilities" names
@@ -4552,9 +4553,9 @@ affectedReadsPeers a = case a of
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
 -- The arms that write Keywords: GainKeyword, LoseKeyword, LoseKeywordFamily,
--- GainEnchant and LoseAllAbilities per CR 613.1f, both subtype-setting arms per CR 305.7, and
--- ChangeSubtypeWord per CR 612.1, a text change reaching the land type inside a
--- landwalk keyword.
+-- GainEnchant and LoseAllAbilities per CR 613.1f, both subtype-setting arms per
+-- CR 305.7, and ChangeSubtypeWord per CR 612.1, a text change reaching the land
+-- type inside a landwalk keyword.
 --
 -- ChangeSubtypeWord also rewrites PC.characteristicPT, deliberately not PowerA:
 -- this asks what a modification writes IN ITS OWN LAYER, and the rewritten CDA
@@ -6002,9 +6003,8 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- removes it leaves the suite green: every layer-6 write to PC.keywords either
 -- adds one instance, DELETES whole keys (Modification.LoseKeyword and
 -- Modification.LoseKeywordFamily, which the CR gives no way to spend one
--- instance of) or empties the map, so a live count
--- strictly between zero and the layer-3 count is unreachable, and a deleted key
--- is not walked at all. It is arithmetic insurance, not a rule -- which surviving
+-- instance of) or empties the map, so a live count strictly between zero and the
+-- layer-3 count is unreachable, and a deleted key is not walked at all. It is arithmetic insurance, not a rule -- which surviving
 -- instance counts as the printed one is a question CR 702.135b leaves moot, the
 -- instances being interchangeable.
 mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
