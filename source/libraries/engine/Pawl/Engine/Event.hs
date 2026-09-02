@@ -812,10 +812,25 @@ mintCard pid under printingId dest position gs =
 -- Here rather than in Pawl.Engine.Resolve, createEmblem's placement: the mint is
 -- what the two roads into mintCard share, and an opcode arm is not the place to
 -- decide what an object minted from a card looks like.
-conjure :: PlayerId -> Card -> Zone -> LibraryPosition.LibraryPosition -> Game ObjectId
+--
+-- CR 800.4d: "If an object that would be owned by a player who has left the game
+-- would be created in any zone, it isn't created." A conjured card is owned by
+-- the conjuring player, so a departed one creates nothing -- and the check is
+-- ahead of Game.intern, since a printing interned for a card that is never
+-- minted is a row nothing points at. Not CR 800.4b's third sentence, which the
+-- token funnel createTokens cites: that rule leaves the object in its current
+-- zone, and a conjured card is in no zone to remain in.
+--
+-- Nothing is this funnel's word for a card that was not created, the empty Seq's
+-- twin in conjureOntoBattlefield below.
+conjure :: PlayerId -> Card -> Zone -> LibraryPosition.LibraryPosition -> Game (Maybe ObjectId)
 conjure pid card dest position = do
-  printingId <- State.state (Game.intern (Printing.MkPrinting card))
-  State.state (mintCard pid Nothing printingId dest position)
+  gs <- State.get
+  if List.notElem pid (Game.stillPlaying gs)
+    then pure Nothing
+    else do
+      printingId <- State.state (Game.intern (Printing.MkPrinting card))
+      Just <$> State.state (mintCard pid Nothing printingId dest position)
 
 -- The same keyword action with the BATTLEFIELD as its destination, which is the
 -- one arrival that is an entry: `conjure` above puts the card into a zone and
@@ -842,14 +857,34 @@ conjure pid card dest position = do
 -- Mutating it to Nothing leaves Pawl.ConjureSpec green, and would stop doing so
 -- the day a printing names a conjurer other than the resolving controller
 -- (#2638).
+--
+-- CR 800.4d's guard, `conjure` above's, for the same reason and read off the
+-- same parameter -- and CR 800.4b's third sentence agrees for this destination
+-- once the card exists, since an object that would be put onto the battlefield
+-- under a departed player's control does not arrive. `controller` is also the
+-- OWNER (mintCard's `pid` below is the same seat), so one read answers both
+-- rules. Reachable in gameplay the day a printing names a conjurer other than
+-- the resolving controller (#2638); until then a departed player controls no
+-- resolving spell or ability (CR 800.4a, whose three clauses
+-- Pawl.Engine.Departure performs), so Pawl.EventSpec's "CR 800.4d no card is
+-- conjured under a player who has left the game" drives both funnels directly,
+-- as the createTokens case beside it does.
+--
+-- Inline rather than delegating to a `conjureOntoBattlefieldFor` body, which is
+-- createTokens' reason: the project writes no export lists, so a second
+-- top-level name would be a public door past the check.
 conjureOntoBattlefield :: PlayerId -> Card -> Natural -> Game (Seq.Seq ObjectId)
 conjureOntoBattlefield controller card count = do
-  printingId <- State.state (Game.intern (Printing.MkPrinting card))
-  ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue))
-  let siblingsOf oid = Set.delete oid (Set.fromList ids)
-  Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
-  Monad.mapM_ recordMintedEntry ids
-  pure (Seq.fromList ids)
+  gs <- State.get
+  if List.notElem controller (Game.stillPlaying gs)
+    then pure Seq.empty
+    else do
+      printingId <- State.state (Game.intern (Printing.MkPrinting card))
+      ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue))
+      let siblingsOf oid = Set.delete oid (Set.fromList ids)
+      Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
+      Monad.mapM_ recordMintedEntry ids
+      pure (Seq.fromList ids)
 
 -- CR 114.2: a player gets an emblem with the given abilities, put into the
 -- command zone and both owned and controlled by them. CR 613.7a: its entry
@@ -865,6 +900,11 @@ conjureOntoBattlefield controller card count = do
 -- countered): harmless, nothing reads them here. `enteredUnder = Nothing` is
 -- what makes Projection.defaultControllerOf answer the owner, which is CR
 -- 109.4c and so CR 114.2's last sentence.
+--
+-- Not implemented: CR 800.4d's roster read, which the two conjure funnels above
+-- and createTokens below all make before minting (#2914). Unobservable while
+-- both roads here hand it the resolving controller, who by CR 800.4a controls no
+-- resolving spell or ability once they have left.
 createEmblem :: PlayerId -> Card -> Game ObjectId
 createEmblem pid card = do
   -- An emblem's characteristics are effect-defined (CR 114.3), so its entry is
