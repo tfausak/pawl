@@ -12103,9 +12103,11 @@ eventBindingSlots cond = case cond of
   -- CR 603.10a's departed permanent, the arm above's reason, and beside it the
   -- player whose hand it reached -- CR 400.3's OWNER, which Warped Devotion's
   -- "that player discards a card" reads. Both guaranteed given a match: the one
-  -- event this condition admits is a zone change, whose arrival is a card in a
-  -- hand with an owner. CR 400.7e's `became` is withheld, the hand being hidden
-  -- (CR 400.2).
+  -- event this condition admits is a zone change out of the battlefield, and the
+  -- funnel files CR 608.2h's record of the departing id in the same write that
+  -- deletes it. NOT off the arrival, which CR 704.5d can have already taken away
+  -- (a token); eventBindings' own arm has the whole of that. CR 400.7e's
+  -- `became` is withheld, the hand being hidden (CR 400.2).
   TriggerCondition.PermanentReturnedToHand _ -> Set.fromList [Binding.departedPermanent, Binding.triggerPlayer]
   -- Empty where the arm above binds two, and NECESSARILY so, PermanentsDie's
   -- reason one event family over: the batch may return several permanents to
