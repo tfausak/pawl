@@ -1282,6 +1282,10 @@ chooseTargets decider pid oid x slots sets = do
 -- collapse to one candidate, so the offer says how many piles there are and
 -- never how many cards are in one.
 --
+-- Not implemented: naming one pile TWICE, which a slot wanting two exiled cards
+-- would want -- an announcement is a Set Recipient, so it holds a pile once
+-- (#2936).
+--
 -- Taken here rather than in the pool, because the two halves of rule 406.4 are
 -- about different moments: legality is the card's (basePoolGiven's exile arm),
 -- and only the ANNOUNCEMENT is narrowed. Every caller that raises a prompt over
@@ -1326,9 +1330,15 @@ piledOffer perspective gs = Set.map replace
 -- announcement is judged after, so a slot whose Filter refuses the card the draw
 -- named has made an illegal announcement and CR 601.2e reverses the casting.
 -- Narrowing here instead would make the draw incapable of failing, and would
--- weight it towards the cards the chooser wanted. Both callers judge what comes
--- back -- selectionLegal for CR 601.2c, and Pawl.Engine.Resolve's own gate for CR
--- 707.10c's re-target.
+-- weight it towards the cards the chooser wanted. What comes back is judged by
+-- selectionLegal at CR 601.2c (a cast, an activation) and by
+-- Pawl.Engine.Resolve's own gate at CR 707.10c's re-target.
+--
+-- A TRIGGER's placement judges nothing, so a card the draw named that the slot
+-- refuses stands as the target and CR 608.2b counters the ability at resolution,
+-- where CR 603.3d removes it from the stack at once (gap #2472). Riftsweeper is
+-- the pool's one triggered exile slot and its "face-up exiled card" is offered no
+-- pile, so no card reaches it.
 --
 -- Elided at one member and skipped at none, the posture the three randomness
 -- prompts over a candidate list take (Pawl.Engine.Resolve's RandomObject and

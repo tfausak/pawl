@@ -368,8 +368,10 @@ foretoldBoard s registry = do
 -- draw runs over. So the draw can name the Goblin Piker, and a spell whose one
 -- target is illegal was never cast (CR 601.2e).
 --
--- ONE board, cast twice with the same answerer but for the draw, so the only
--- thing that can account for the two outcomes is which card came out of the pile.
+-- ONE board through both cases. The first casts the sorcery twice with the same
+-- answerer but for the draw, so the only thing that can account for the two
+-- outcomes is which card came out of the pile; the second copies it with
+-- Twincast, which is where CR 707.10c reads the same draw.
 runicRepetition :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 runicRepetition s registry = Spec.describe s "Runic Repetition" $ do
   Spec.it s "CR 406.4 the draw reaches a card the spell's own restriction refuses, and CR 601.2e reverses the casting" $ do
