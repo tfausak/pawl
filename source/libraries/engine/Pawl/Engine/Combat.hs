@@ -203,16 +203,13 @@ attackableBattles defender gs =
       isOne oid = Battle.isBattle (Projection.project oid gs)
    in filter (\oid -> protects oid && isOne oid) (Set.toAscList (GameState.battlefield gs))
 
--- CR 802.2a: which defending player an ATTACK TARGET names, or Nothing where it
--- names none of them -- a planeswalker or battle CR 506.4 has removed from
--- combat, or a player who has left the game (CR 800.4e).
---
--- Defender.playerOf is the same question asked of a creature's ability, and the
--- two arms come apart on purpose: that one must answer a seat for CR 702.19e's
--- trampler even once the planeswalker is gone, where this one is a partition of
--- the attackers over the defending players and must answer nobody rather than
--- guess. So this reads the CANDIDATE LISTS -- the same ones CR 508.1b drew the
--- declaration from -- and Defender.playerOf reads the combat record.
+-- CR 802.2a: which defending player an ANNOUNCEMENT names, or Nothing where it
+-- names none of them. Read off the CANDIDATE LISTS CR 508.1b draws the
+-- declaration from, which is what barredAnnouncements wants: a gate on the
+-- declaration is about a seat a candidate could be announced at, and an
+-- announcement outside those lists has nobody to be about. Once a creature IS
+-- attacking, Defender.playerOf is the reader -- the lists forget a planeswalker
+-- or battle CR 506.4 has removed from combat, and rule 802.2a does not.
 targetDefender :: AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
 targetDefender target gs = case target of
   AttackTarget.OfPlayer pid -> if List.elem pid (Defender.defendingPlayers gs) then Just pid else Nothing
@@ -238,19 +235,32 @@ attackTargetKind target = case target of
 -- check below are handed it, so a defending player's blocks are judged ignoring
 -- creatures attacking anyone else.
 --
--- An attacker whose target names NO defending player is offered to every one of
--- them rather than to none, which keeps CR 506.4c's creature -- still attacking,
--- attacking nothing -- blockable exactly as it was before this list narrowed.
--- Not implemented: whom such a creature may be blocked by at all. CR 509.1a and
--- CR 802.4a both name only a creature attacking that player, a planeswalker they
--- control or a battle they protect, and a creature attacking nothing is none of
--- the three -- against CR 506.4c's own "It may be blocked" (#2899).
+-- Read through Defender.playerOf rather than off the candidate lists, and the
+-- difference is CR 506.4c's creature: its planeswalker or battle removed from
+-- combat, it "continues to be an attacking creature, although it is not
+-- attacking any player, planeswalker, or battle. It may be blocked." Blocked by
+-- WHOM is CR 802.2a: "defending player" is one specific player, and for a
+-- creature removed from combat it is the controller of the planeswalker, or the
+-- protector of the battle, it was attacking before the removal. Rule 506.4c's
+-- creature is still attacking, so that sentence reaches it by extension rather
+-- than by its letter -- but it is the only seat the rules tie the creature to,
+-- and CR 802.4a bars every other defending player, so it stays on that one
+-- player's list alone. Folded onto every list instead, CR 802.4b's separate
+-- judgement of each player's blocks let two players block it at once.
+-- Pawl.CombatEffectSpec's "CR 802.4a" pair under SplitDefendingPlayer is the
+-- three-seat board that tells the readings apart.
+--
+-- A creature attacking a player who has left the game keeps naming that player,
+-- who defends nothing any more, so it is on no list: CR 800.4e drops its damage,
+-- not the attack, and rule 802.4a offers it to nobody else.
+--
+-- Not implemented: the seat BEFORE a removal by control change. Defender.playerOf
+-- reads the planeswalker's live controller and the battle's live protector, so a
+-- planeswalker stolen mid-combat puts its attacker on the thief's list (#2948).
 attackersOn :: PlayerId -> GameState -> [ObjectId]
 attackersOn pid gs =
   let recorded = Combat.attackers (GameState.combat gs)
-      mine oid = case Map.lookup oid recorded of
-        Nothing -> False
-        Just target -> Maybe.maybe True (== pid) (targetDefender target gs)
+      mine oid = Defender.playerOfAttacker Projection.controllerWithLastKnown oid gs == Just pid
    in filter mine (Map.keys recorded)
 
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it

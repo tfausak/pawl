@@ -32,6 +32,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -1910,8 +1911,53 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- produced it, does nothing. Pawl.CostSpec's Altar's Reap
                       -- group is the proof (Baral pays the sacrifice, and the
                       -- Reap still costs {B}).
-                      adjustments <- Cost.announceReductions pid sid bestowedGs announcedCost (Cost.spellAdjustments pid sid bestowedGs)
-                      let paidCost = Cost.totalWith adjustments announcedCost
+                      --
+                      -- CR 601.2c's RECORD, written before CR 601.2f prices the
+                      -- spell and not after CR 601.2h pays for it: a cost
+                      -- adjustment may read what the spell targets
+                      -- (Filter.TargetsSource, Terror of the Peaks), and rule
+                      -- 601.2f runs after the targets are fixed. `reject`
+                      -- rewinds this write with everything else.
+                      --
+                      -- CR 109.5: "The words 'you' and 'your' on an object
+                      -- refer to the object's controller, its would-be
+                      -- controller (if a player is attempting to play, cast,
+                      -- or activate it)". `pid` is both here -- the caster is
+                      -- the spell's controller -- so the slot is stamped
+                      -- alongside the chosen targets, as
+                      -- Activate.activateAbility does for CR 109.5's
+                      -- activated-ability sentence and Engine.placeBorne for
+                      -- its triggered-ability one. Char's "and 2 damage to
+                      -- you" is what reads it (Pawl.CastSpec's Char case).
+                      State.modify'
+                        ( \g ->
+                            g
+                              { GameState.objects =
+                                  Map.adjust
+                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.fromChoices chosen mAmount chosenModes)})
+                                    sid
+                                    (GameState.objects g)
+                              }
+                        )
+                      pricedGs <- State.get
+                      adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.spellAdjustments pid sid pricedGs)
+                      -- CR 601.2f's "plus all additional costs", gathered NOW
+                      -- that the targets are fixed, where `gathered` at CR
+                      -- 601.2b above could not see them: a component read off
+                      -- the targets (Terror of the Peaks' "spells ... that
+                      -- target this creature cost an additional 3 life") is
+                      -- this step's. `announcedCost`'s components are
+                      -- `announcedAtX`'s plus the early gather's plus CR
+                      -- 107.4f's life for the Phyrexian symbols Cost.announce
+                      -- settled; the middle term is swapped for the target-fixed
+                      -- gather and the announcement's own suffix kept, so a
+                      -- component that stopped matching once the targets were
+                      -- fixed is dropped as well as one that started. The MANA
+                      -- is `announcedCost`'s throughout: CR 118.13a made those
+                      -- choices at 601.2b and nothing here reopens them.
+                      let lateCost = Cost.plusComponents adjustments announcedAtX
+                          announcedSuffix = Cost.Type.components announcedCost List.\\ Cost.Type.components (Cost.plusComponents gathered announcedAtX)
+                          paidCost = Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix}
                       payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal

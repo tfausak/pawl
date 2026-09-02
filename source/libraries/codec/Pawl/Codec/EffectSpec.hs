@@ -117,6 +117,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.Scope as Scope
@@ -1462,8 +1463,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     Common.assertCodec
       s
       codec
-      (Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
-      " {\"type\":\"ForbidAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
+      (Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))) Nothing))
+      " {\"type\":\"ForbidAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"affected\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}}}} "
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
       s
@@ -1748,19 +1749,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Set.empty))
+      (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")), TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Literal 1})
       " {\"type\":\"TakeExtraTurn\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"skips\":[]}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (PlayerRef.Relative PlayerRelation.You) (Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))))
+      (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.Relative PlayerRelation.You, TakeExtraTurn.skips = Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)), TakeExtraTurn.count = Quantity.Literal 1})
       " {\"type\":\"TakeExtraTurn\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"skips\":[{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Untap\"}}}]}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn PlayerRef.EachPlayer (Set.fromList [PhaseSelector.Step (Phase.Beginning BeginningStep.Untap), PhaseSelector.CombatPhase])))
+      (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.EachPlayer, TakeExtraTurn.skips = Set.fromList [PhaseSelector.Step (Phase.Beginning BeginningStep.Untap), PhaseSelector.CombatPhase], TakeExtraTurn.count = Quantity.Literal 1})
       " {\"type\":\"TakeExtraTurn\",\"value\":{\"player\":{\"type\":\"EachPlayer\"},\"skips\":[{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Untap\"}}},{\"type\":\"CombatPhase\"}]}} "
 
 -- The stand-in a parametricity test hands over in place of a real card codec:
