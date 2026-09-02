@@ -2936,6 +2936,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentsDie f -> TriggerCondition.PermanentsDie (Filter.rewrite pairs f)
   TriggerCondition.PermanentLeavesTheBattlefield f -> TriggerCondition.PermanentLeavesTheBattlefield (Filter.rewrite pairs f)
   TriggerCondition.PermanentReturnedToHand f -> TriggerCondition.PermanentReturnedToHand (Filter.rewrite pairs f)
+  TriggerCondition.PermanentsReturnedToHand f -> TriggerCondition.PermanentsReturnedToHand (Filter.rewrite pairs f)
   -- The Filter is rewritten and the counter kind is not: CR 612.1's pairs swap
   -- SUBTYPE words, and a counter kind names none.
   TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.rewrite pairs f))
