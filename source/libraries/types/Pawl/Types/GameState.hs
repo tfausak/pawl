@@ -314,7 +314,8 @@ data GameState = MkGameState
     -- cleared: Pawl.Engine.Resolve's two resolution loops read this only as the
     -- fallback for an object Game.lookupObject can no longer find, and an id is
     -- never reused -- GameState.nextObjectId only ever climbs (Game.freshObjectId
-    -- increments it, Setup.funnelBack takes the max of the two games'). Never
+    -- increments it; Setup.funnelBack takes the max of the two games' and then
+    -- climbs past it for each card CR 712.21's split mints). Never
     -- pruned, as `lastKnown` is not, and one entry per resolution that outlived
     -- its own object.
     detachedBindings :: Map.Map ObjectId.ObjectId (Map.Map SlotName.SlotName Binding.Binding),

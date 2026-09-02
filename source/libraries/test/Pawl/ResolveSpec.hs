@@ -40,6 +40,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -70,6 +71,7 @@ import qualified Pawl.Types.Facing as Facing
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
@@ -97,6 +99,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -116,6 +119,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
@@ -3065,7 +3069,113 @@ subgameSpellOn borrowed name effects gs0 =
           }
    in (spellId, gs2 {GameState.objects = Map.insert spellId spellObj (GameState.objects gs2), GameState.stack = spellId : GameState.stack gs2})
 
+-- CR 608.2d's either-or announced BY EACH PLAYER, with CR 118.12's cost on one
+-- branch and CR 603.5's "may" on the other, and CR 608.2c's "if a player does
+-- either" hung off both of them.
+--
+-- Worms of the Earth, {2}{B}{B}{B} Enchantment, whose third sentence is "At the
+-- beginning of each upkeep, any player may sacrifice two lands of their choice
+-- or have this enchantment deal 5 damage to that player. If a player does
+-- either, destroy this enchantment." The sacrifice is CR 118.12's cost -- which
+-- is what stops a landless seat destroying the enchantment for free, CR 118.3
+-- never offering a cost that cannot be paid -- and the damage is an ordinary
+-- effect, no Pawl.Types.CostComponent taking damage.
+--
+-- THREE SEATS, none of them able to stand in for another: alice controls the
+-- enchantment and is the active player, bob and carol are the two seats a case
+-- puts on different branches, and a two-seat board could not tell "the seat who
+-- announced the sacrifice" from "the seat who did not announce the damage".
+--
+-- The answerer says YES to whichever second question it is asked -- the pay and
+-- the "may" alike -- so the ANNOUNCEMENT is the only thing that decides what
+-- happens to a seat. That is what makes the exclusivity observable: an engine
+-- offering both branches to everybody would have bob sacrifice AND take the
+-- damage in the first two cases.
+wormsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wormsSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- CR 503.1's upkeep step, entered the way the trigger reads it: the
+      -- TriggerCondition.StepBegins condition matches the EVENT, so the fixture
+      -- records one beside setting the phase. TurnScope.EachTurn is "each
+      -- upkeep", so alice's own is enough.
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      lands gs = (landCount "Swamp" S.alice gs, landCount "Forest" S.bob gs, landCount "Mountain" S.carol gs)
+      landCount name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name))
+      wormsStands = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Worms of the Earth")) S.alice
+      sacrificeBranch = ClauseIndex.MkClauseIndex 0
+      damageBranch = ClauseIndex.MkClauseIndex 1
+      -- Choice-keyed, and keyed on the SEAT: a seat the map does not name
+      -- announces the sacrifice and then refuses to pay for it, which is the
+      -- decline every printed reading allows.
+      announcing :: Map.Map PlayerId.PlayerId ClauseIndex.ClauseIndex -> Prompt.Prompt r -> r
+      announcing choices p = case p of
+        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _
+          | d == player -> Map.findWithDefault sacrificeBranch player choices
+        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+          | d == player -> if Map.member player choices then PaymentDecision.Pays else PaymentDecision.Declines
+        Prompt.ChooseOptional (Decider.MkDecider d) player _ _ _
+          | d == player -> if Map.member player choices then OptionalDecision.Exercises else OptionalDecision.Declines
+        _ -> S.identityAnswer p
+      -- A different basic per seat, so a land count reads one seat's payment and
+      -- not the table's, and THREE of them where the cost takes two -- a seat
+      -- that paid keeps one, which "sacrificed everything he had" would not.
+      boardOf carolLands = do
+        worms <- S.printingOf s registry "Worms of the Earth"
+        swamp <- S.printingOf s registry "Swamp"
+        forest <- S.printingOf s registry "Forest"
+        mountain <- S.printingOf s registry "Mountain"
+        let g0 = S.landsFor swamp S.alice 3 S.threePlayerGame
+            g1 = S.landsFor forest S.bob 3 g0
+            g2 = S.landsFor mountain S.carol carolLands g1
+            (wormsId, g3) = S.addCreature worms S.alice g2
+        pure (wormsId, settle (beginUpkeep g3))
+   in Spec.describe s "CR 608.2d an either-or announced by each player" $ do
+        Spec.it s "CR 118.12 the seat that announced the sacrifice pays it, and the enchantment is destroyed" $ do
+          (_, onStack) <- boardOf 3
+          let after = S.runPure (announcing (Map.singleton S.bob sacrificeBranch)) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 701.21a bob sacrificed two of his three Forests, and nobody else lost a land" (lands after) (3, 1, 3)
+          Spec.assertEqWith s "CR 608.2d the branch he did not announce did not happen: no seat took the 5 damage" (lives after) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith s "CR 608.2c \"if a player does either\": the enchantment is gone" (wormsStands after) 0
+          Spec.assertEqWith s "CR 701.8a and it is in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+          Spec.assertEqWith s "CR 603.2 the upkeep trigger really was on the stack" (length (GameState.stack onStack)) 1
+          Spec.assertEqWith s "and the board it resolved against had every seat level, with three lands each" (lives onStack, lands onStack) ((Just 20, Just 20, Just 20), (3, 3, 3))
+        Spec.it s "CR 608.2d the seat that announced the damage takes it instead, and the enchantment is destroyed" $ do
+          (_, onStack) <- boardOf 3
+          let after = S.runPure (announcing (Map.singleton S.bob damageBranch)) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 120.1 bob took the 5 damage and nobody else did" (lives after) (Just 20, Just 15, Just 20)
+          Spec.assertEqWith s "CR 118.12 the cost on the branch he did not announce was never offered him: his three Forests stand" (lands after) (3, 3, 3)
+          Spec.assertEqWith s "CR 608.2c \"if a player does either\": the enchantment is gone" (wormsStands after) 0
+        Spec.it s "CR 608.2c two seats on different branches destroy the enchantment once" $ do
+          (_, onStack) <- boardOf 3
+          let after = S.runPure (announcing (Map.fromList [(S.bob, sacrificeBranch), (S.carol, damageBranch)])) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 701.21a bob paid with two Forests and carol paid nothing" (lands after) (3, 1, 3)
+          Spec.assertEqWith s "CR 120.1 carol took the 5 damage and bob, who sacrificed instead, did not" (lives after) (Just 20, Just 20, Just 15)
+          Spec.assertEqWith s "CR 608.2c the one destruction the sentence prints happened: alice's graveyard holds the enchantment alone" (wormsStands after, length (Game.zoneMembers Zone.Graveyard S.alice after)) (0, 1)
+        Spec.it s "CR 608.2c with every seat declining, the enchantment survives untouched" $ do
+          (_, onStack) <- boardOf 3
+          let after = S.runPure (announcing Map.empty) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 608.2c nobody did either, so the enchantment stands" (wormsStands after) 1
+          Spec.assertEqWith s "no land was sacrificed" (lands after) (3, 3, 3)
+          Spec.assertEqWith s "and no seat took the damage" (lives after) (Just 20, Just 20, Just 20)
+        -- The fence on the branch that is a COST: a seat who announces the
+        -- sacrifice but controls one land is never asked to pay it (CR 118.3),
+        -- so the enchantment is not destroyed. Without CR 118.12 carrying that
+        -- branch -- a plain instruction to sacrifice two lands would do as much
+        -- as it could and count as done -- every landless seat would destroy the
+        -- enchantment for free at every upkeep.
+        Spec.it s "CR 118.3 a seat who cannot pay the sacrifice is not offered it" $ do
+          (_, onStack) <- boardOf 1
+          let ((_, after), asked) = Replay.record (announcing (Map.singleton S.carol sacrificeBranch)) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 608.2c nothing was done, so the enchantment stands" (wormsStands after) 1
+          Spec.assertEqWith s "carol's one Mountain is still hers" (lands after) (3, 3, 1)
+          Spec.assertEqWith s "and she took no damage in its place" (lives after) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith s "CR 118.3 the cost was offered to the two seats who could pay it and not to carol" [d | Response.ChoseToPay d <- asked] [PaymentDecision.Declines, PaymentDecision.Declines]
+          Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length [c | Response.ChoseClause c <- asked]) 3
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
   resolveSpec s registry
+  wormsSpec s registry

@@ -377,13 +377,49 @@ newGame perform matchup = do
     Event.shuffleLibrary pid
   Mulligan.openingHands perform (fmap fst (NonEmpty.toList matchup))
 
+-- CR 712.21 / CR 108.2: a melded permanent is ONE object represented by TWO
+-- cards, so a funnel that carries cards over -- CR 727.2's restart and CR
+-- 729.5's subgame teardown -- has to take the two and not the one. Replaces each
+-- such object with one card object per component, minting ids off `next`, and
+-- answers the advanced supply. Every other object is passed through untouched.
+--
+-- Read through Game.componentsOf, a classifier over Source and never a case on
+-- Source.OfMeld, so CR 730.3's merged permanent (#874) arrives through the same
+-- door -- the posture Event.changeZoneAttaching's CR 712.21 split already takes.
+--
+-- No zone conjunct where that split carries one: this is not a zone change but
+-- the rebuild of a game's whole object pool, and both callers empty every zone
+-- anyway. Nothing outside the battlefield can hold a Source.OfMeld in any case
+-- -- Event.meld is the only writer of one and it places the permanent there.
+-- This is the second road off the battlefield beside changeZoneAttaching's, and
+-- it keeps that invariant the same way: the melded object is dropped outright
+-- rather than moved, so no other zone can come to hold one.
+--
+-- Object.newIncarnation is CR 400.7's forgetting, the same one `toLibraryCard`
+-- performs below; only Object.source differs between the two cards, since each
+-- represents itself again and not the permanent they were. CR 712.21a's
+-- arrangement is not asked: both callers shuffle what they build (CR 103.5, CR
+-- 729.5), so the order the two cards are placed in is not observable.
+splitComponents :: ObjectId -> Map.Map ObjectId Object.Object -> (Map.Map ObjectId Object.Object, ObjectId)
+splitComponents next objects =
+  let bump (ObjectId.MkObjectId n) = ObjectId.MkObjectId (n + 1)
+      mint obj (acc, oid) printingId =
+        (Map.insert oid ((Object.newIncarnation obj) {Object.source = Source.OfCard printingId}) acc, bump oid)
+      step (acc, oid) (key, obj) =
+        let components = Game.componentsOf (Object.source obj)
+         in if Seq.null components
+              then (Map.insert key obj acc, oid)
+              else Foldable.foldl' (mint obj) (acc, oid) components
+   in List.foldl' step (Map.empty, next) (Map.toAscList objects)
+
 -- CR 727.2 / 729.2: build every player's library from the EXISTING object pool
 -- -- each player's owned cards, wherever they currently sit -- then shuffle and
 -- draw opening hands (CR 103.5). Deliberately not newGame: it reuses the real
 -- objects (ownership preserved) instead of minting fresh ones from Deck
 -- definitions. Only Magic cards survive; an ability on the stack, a token, an
--- emblem or a trigger is not a card (CR 727.2 / 111.7). Shared by restart (CR
--- 727) and subgames (CR 729).
+-- emblem or a trigger is not a card (CR 727.2 / 111.7), and a melded permanent
+-- is two of them, which `splitComponents` makes so before the funnel runs (CR
+-- 712.21 / CR 108.2). Shared by restart (CR 727) and subgames (CR 729).
 --
 -- `owners` is the still-playing seats in seating order: CR 727.1 / 729.2
 -- rebuild the game for the players who are in it, and CR 103.5's declaration
@@ -402,6 +438,16 @@ newGame perform matchup = do
 -- commander).
 startGameFromCards :: HandActionPerformer -> Set.Set ObjectId -> Game ()
 startGameFromCards perform exemptions = do
+  -- CR 727.2 / CR 712.21, BEFORE `gs` is read: the split has to be in the state
+  -- rather than in the `let` below, because `commanderOf` and `vanguardIds` ask
+  -- Commander.isCommander and Vanguard.isVanguard of `gs` -- so a component
+  -- minted outside it could not be recognised as CR 903.6's commander. With it
+  -- here, CR 903.9c's answer falls out of the existing funnel: the component
+  -- card that is the commander goes to the command zone and its partner to the
+  -- library.
+  State.modify' $ \g ->
+    let (split, next) = splitComponents (GameState.nextObjectId g) (GameState.objects g)
+     in g {GameState.objects = split, GameState.nextObjectId = next}
   gs <- State.get
   let owners = Game.stillPlayingInOrder gs
       -- Cards in exile, and nothing else: CR 727.2's "all Magic cards" is what
@@ -411,9 +457,9 @@ startGameFromCards perform exemptions = do
       exempt =
         Map.keysSet
           (Map.filter isCard (Map.restrictKeys (GameState.objects gs) (Set.intersection exemptions (GameState.exile gs))))
-      -- Not implemented: a melded permanent, which this answers False for, so a
-      -- restart drops it instead of carrying its two cards into the new game
-      -- (#2489).
+      -- A melded permanent never reaches this: `splitComponents` above has
+      -- already replaced it with its two component cards, each of which answers
+      -- True here (CR 712.21 / CR 108.2).
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
@@ -769,8 +815,10 @@ subgameStateFrom starter parent =
       -- the proof.
       --
       -- Not implemented: a melded permanent, which this answers Nothing for. One
-      -- OutsideObject names one printing, so recording it would have to drop a
-      -- component (#2489).
+      -- OutsideObject names one printing and GameState.outsideObjects is keyed
+      -- by the outer object's id, so recording it would have to drop a component
+      -- (#2489). The other two funnels that sorted objects into cards split it
+      -- instead; this is the site that still does not.
       asOutside obj = case Object.source obj of
         Source.OfCard printingId -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId (Object.facing obj))
         _ -> Nothing
@@ -1062,7 +1110,8 @@ applyCrossings finalSub parent =
 -- subgameStateFrom's `libIds` and `cmdIds`; see there for why the two sides must
 -- stay identical. Returned cards keep their subgame ids, all above the parent
 -- supply, so Map.union cannot collide; the supplies advance to the subgame
--- high-water mark.
+-- high-water mark, and past it for each card a melded permanent's split minted
+-- (CR 712.21).
 --
 -- A subgame that began with more than two players is CR 800.1 multiplayer even
 -- when its departing player has only two opponents in the PARENT, so a
@@ -1094,9 +1143,17 @@ applyCrossings finalSub parent =
 -- needed.
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
-  let -- Not implemented: a melded permanent, which this answers False for, so a
-      -- subgame's end drops it instead of returning its two cards to the
-      -- main-game library (#2489).
+  let -- CR 729.5 / CR 712.21, the same split startGameFromCards performs, in a
+      -- PURE function: the fresh ids are threaded off the MERGED supply by hand,
+      -- so a component can collide with neither game's objects, and
+      -- GameState.nextObjectId below is the advanced supply rather than that
+      -- merge. Only the subgame's pool is split; the parent's own battlefield is
+      -- untouched by rule 729.5 (CR 729.1a), and `recovered` draws from the
+      -- parent's library and command zone, where no melded permanent can sit.
+      supply = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub)
+      (subObjects, nextId) = splitComponents supply (GameState.objects finalSub)
+      -- A melded permanent never reaches this, for `splitComponents`' reason at
+      -- startGameFromCards.
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
@@ -1115,11 +1172,11 @@ funnelBack finalSub parent =
       -- subgame can put in that zone anyway (CR 903.9a, CR 313.2), and an emblem
       -- there is not a card and never was in scope.
       subCmdIds = GameState.command finalSub
-      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys (GameState.objects finalSub) subCmdIds))
+      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects subCmdIds))
       backFromSub =
         fmap
           toCommandCard
-          (Map.filterWithKey (\oid obj -> isCard obj && (Commander.isCommander oid finalSub || Vanguard.isVanguard oid finalSub)) (Map.restrictKeys (GameState.objects finalSub) subCmdIds))
+          (Map.filterWithKey (\oid obj -> isCard obj && (Commander.isCommander oid finalSub || Vanguard.isVanguard oid finalSub)) (Map.restrictKeys subObjects subCmdIds))
       oldLibIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
@@ -1132,7 +1189,7 @@ funnelBack finalSub parent =
       -- (CR 729.5's first sentence).
       oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
       movedIds = Set.union oldLibIds oldCmdIds
-      ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems (GameState.objects finalSub)))
+      ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems subObjects))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
@@ -1208,7 +1265,7 @@ funnelBack finalSub parent =
           -- CR 729.5c. The parent's other command-zone residents are untouched:
           -- CR 729.2c moved only the commanders, so only they can come back.
           GameState.command = Set.union (Set.difference (GameState.command parent) oldCmdIds) (Map.keysSet toCommand),
-          GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
+          GameState.nextObjectId = nextId,
           -- The subgame's cards come back as library objects above, and each
           -- names its printing by id -- so the entries those ids name have to
           -- come back too, or the returned cards would resolve to nothing.

@@ -466,8 +466,8 @@ data Response
     -- usually the resolving controller, and one answer per seat where the clause
     -- names several (Pawl.Types.Optionality.Optional).
     ChoseOptional OptionalDecision.OptionalDecision
-  | -- | CR 608.2d: which branch of an either-or clause pair the resolving
-    -- controller announced (Pawl.Types.Clause.orElse). Distinct from
+  | -- | CR 608.2d: which branch of an either-or clause pair a player announced
+    -- (Pawl.Types.OrElse), one answer per seat the chooser names. Distinct from
     -- ChoseOptional, which records whether the branch that WON is then
     -- exercised: Twiddle asks both, one after the other, so two answers in one
     -- replay are not a duplicate. Distinct from ChoseModes, which records CR
