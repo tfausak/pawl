@@ -3247,6 +3247,8 @@ canHostSubjects predicate = case predicate of
   -- PlayerRelation, which holds no Filter for a card author to reach.
   Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
+  Filter.Type.TargetsSource -> 0
+  Filter.Type.TargetsPlayer _ -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
   Filter.Type.SameNameAsBound _ -> 0
@@ -4312,6 +4314,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.ControlledByRecipient -> []
   Filter.Type.OwnedBy _ -> []
   Filter.Type.IsSource -> []
+  Filter.Type.TargetsSource -> []
+  Filter.Type.TargetsPlayer _ -> []
   -- Reads the whole bound set off Filter.Context, so a group is every one of its
   -- members rather than nothing -- the atom this lint must NOT report.
   Filter.Type.IsBound _ -> []

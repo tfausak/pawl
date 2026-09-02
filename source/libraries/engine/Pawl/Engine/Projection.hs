@@ -14,6 +14,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Defender as Defender
@@ -21,11 +22,13 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
@@ -109,6 +112,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -126,7 +130,7 @@ import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Milled as Milled
-import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -174,6 +178,7 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -188,6 +193,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -888,6 +894,8 @@ viewOfCard face =
           -- CR 601.2a: a printed FACE was never cast, so WasCastFrom is vacuously
           -- False against it -- `zone` above's reason.
           Filter.castFrom = Nothing,
+          -- CR 115.1: a printed face is on no stack and targets nothing.
+          Filter.targets = Set.empty,
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
@@ -1075,6 +1083,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- are the only place the answer exists. Nothing for an id naming nothing
       -- and for every object that was never cast.
       Filter.castFrom = Game.lookupObject oid gs >>= Object.castFrom,
+      -- CR 115.1 off the OBJECT's bindings, live: CR 601.2c fixed the targets and
+      -- CR 115.7 can move them, so nothing here is a stamp. Empty for an id
+      -- naming nothing and for everything off the stack.
+      Filter.targets = maybe Set.empty (targetsOfStackObject gs) (Game.lookupObject oid gs),
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3).
@@ -2850,7 +2862,7 @@ rewriteWithCounters pairs w =
 -- effects, and its TARGET SLOTS, whose Filter is the candidate set CR 601.2c
 -- (imported by CR 602.2b) reads. The Pool is not an omission: it names a rules
 -- category (CR 115) rather than a word printed on the card.
-rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Type.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Modal.Type.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteModal pairs modal =
   let rewriteClause c =
         c
@@ -2863,7 +2875,7 @@ rewriteModal pairs modal =
           { Mode.clauses = fmap rewriteClause (Mode.clauses m),
             Mode.targetSlots = fmap (rewriteTargetSlot pairs) (Mode.targetSlots m)
           }
-   in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
+   in modal {Modal.Type.modes = fmap rewriteMode (Modal.Type.modes modal)}
 
 -- CR 612.1 through the cost a clause offers as it resolves (CR 118.12).
 -- Lithophage's "sacrifice this creature unless you sacrifice a Mountain" is the
@@ -4221,6 +4233,10 @@ filterReads f = case f of
   -- rule change an owner, so no Modification writes Object.owner.
   Filter.Type.OwnedBy _ -> Set.empty
   Filter.Type.IsSource -> Set.empty
+  -- CR 115.1 / 109.3: a target is a property of a stack object and no
+  -- characteristic, so no Modification writes one.
+  Filter.Type.TargetsSource -> Set.empty
+  Filter.Type.TargetsPlayer _ -> Set.empty
   -- Reads an IDENTITY, which CR 109.3 does not count as a characteristic.
   Filter.Type.IsBound _ -> Set.empty
   -- Reads NAMES at both ends, which no Modification writes.
@@ -4434,6 +4450,8 @@ filterReadsPeers f = case f of
   Filter.Type.ControlledByRecipient -> False
   Filter.Type.OwnedBy _ -> False
   Filter.Type.IsSource -> False
+  Filter.Type.TargetsSource -> False
+  Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
   Filter.Type.SameNameAsBound _ -> False
   -- The bound object's controller arrives on the Context, filled by
@@ -5953,6 +5971,47 @@ mintedTriggeredAbilitiesOf pc =
 -- of that map directly rather than asking for a projection it already has.
 enchantOf :: ObjectId -> GameState -> [TargetSlot.TargetSlot]
 enchantOf oid gs = PC.enchant (project oid gs)
+
+-- CR 115.1: what a stack object TARGETS -- the recipients under its declared
+-- target slots, which is CR 601.2c's (602.2b's, 603.3d's) announcement read live
+-- off Object.bindings, so a CR 115.7 change of target is seen at once. What
+-- Pawl.Engine.Filter.View's `targets` is filled from.
+--
+-- RESTRICTED to the declared slots, because Binding.targets is not only a
+-- target: Pawl.Engine.Binding.toRecipients writes a recipient set for CR
+-- 115.10a's non-targets too (a paid slot, a drawn pile). The declared slots are
+-- the chosen modes' (CR 700.2) under the instance names Pawl.Engine.Modal gives
+-- them -- the names Pawl.Engine.Cast, Activate and Engine bind under -- plus CR
+-- 303.4a's enchant slot for a card-backed spell, by its reserved NAME rather than
+-- off the projection: a bestowed grant (CR 702.103b) binds under the same name,
+-- and reading `enchantOf` here would run a projection inside every view.
+--
+-- Empty for anything off the stack: CR 115.1 makes a target a property of a
+-- spell or ability, and a permanent's bindings are its own resolution's. Empty
+-- for the three sources that are never on the stack at all.
+--
+-- Both the restriction and the zone guard are FENCES rather than proven
+-- behaviour: no board in the suite puts a non-target recipient binding on a
+-- stack object and then asks a target atom of it, nor asks one of a permanent
+-- carrying bindings, so dropping either leaves the suite green.
+targetsOfStackObject :: GameState -> Object.Object -> Set Recipient.Recipient
+targetsOfStackObject gs obj
+  | Object.zone obj /= Zone.Stack = Set.empty
+  | otherwise =
+      let bindings = Object.bindings obj
+          chosen = Binding.modesOf bindings
+          ofModal = Map.keysSet . Modal.modesTargetSlots chosen
+          ofFace face = Set.insert Card.enchantSlot (Map.keysSet (Card.modesTargetSlots chosen face))
+          declared = case Object.source obj of
+            Source.OfCard _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
+            Source.OfSpellCopy _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
+            Source.OfAbility src -> ofModal (ActivatedAbility.modal (ActivatedAbilitySource.ability src))
+            Source.OfTrigger src -> ofModal (TriggeredAbility.modal (TriggeredAbilitySource.ability src))
+            Source.OfInherentTrigger src -> ofModal (TriggeredAbility.modal (InherentTriggerSource.ability src))
+            Source.OfMeld _ -> Set.empty
+            Source.OfToken _ -> Set.empty
+            Source.OfEmblem _ -> Set.empty
+       in Set.unions (Map.elems (Map.restrictKeys (Binding.targetsOf bindings) declared))
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Type.Subtype
 subtypesOf = subtypesGiven Map.empty
