@@ -672,9 +672,9 @@ data Object = MkObject
     -- Pawl.Engine.Resolve's CopySpell arm builds the copy from the original's
     -- own record and rewrites every field CR 707.10 names, this one not among
     -- them, and Pawl.Engine.Projection.bestowGathered keys off nothing else than
-    -- this field and Object.timestamp. Unobserved
-    -- rather than unimplemented -- the pool's one copier reaches instants and
-    -- sorceries alone, so no board mints such a copy; see #2355.
+    -- this field and Object.timestamp. Pawl.CopySpec's "CR 702.103c a copy of
+    -- a bestowed Rollicker resolves as a token Aura attached to the same host"
+    -- is the proof.
     --
     -- CR 702.103g's phasing in unattached reaches Pawl.Engine.Sba's CR 702.103f
     -- pass one pass later, since Pawl.Engine.Phasing.phaseIn detaches first --

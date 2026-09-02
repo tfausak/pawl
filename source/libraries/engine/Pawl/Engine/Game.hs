@@ -938,8 +938,9 @@ sourceIsToken source = case source of
   Source.OfAbility _ -> False
   Source.OfTrigger _ -> False
   Source.OfEmblem _ -> False
-  -- CR 707.10f is what would make one: a copy of a permanent spell becomes a
-  -- token as it RESOLVES, and until then it is a spell (#2207).
+  -- CR 707.10f: a copy of a permanent spell becomes a token as it RESOLVES --
+  -- Pawl.Engine.Event's zone-change funnel rewrites its Source as it arrives on
+  -- the battlefield -- and until then it is a spell.
   Source.OfSpellCopy _ -> False
   Source.OfInherentTrigger _ -> False
 
