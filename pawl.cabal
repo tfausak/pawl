@@ -125,6 +125,8 @@ library codec
     Pawl.Codec.AgainstSlotSpec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
+    Pawl.Codec.AimedAt
+    Pawl.Codec.AimedAtSpec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
     Pawl.Codec.Amass
@@ -702,6 +704,8 @@ library codec
     Pawl.Codec.RequiredDefenderSpec
     Pawl.Codec.RestartSignal
     Pawl.Codec.RestartSignalSpec
+    Pawl.Codec.RestrictedCreatures
+    Pawl.Codec.RestrictedCreaturesSpec
     Pawl.Codec.Result
     Pawl.Codec.ResultSpec
     Pawl.Codec.ReturnPermanents
@@ -1334,6 +1338,7 @@ library types
     Pawl.Types.AfterTurn
     Pawl.Types.AgainstSlot
     Pawl.Types.Aggregation
+    Pawl.Types.AimedAt
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
     Pawl.Types.AppliedReduction
@@ -1668,6 +1673,7 @@ library types
     Pawl.Types.RequiredDefender
     Pawl.Types.Response
     Pawl.Types.RestartSignal
+    Pawl.Types.RestrictedCreatures
     Pawl.Types.Result
     Pawl.Types.ReturnPermanents
     Pawl.Types.ReturnWatch

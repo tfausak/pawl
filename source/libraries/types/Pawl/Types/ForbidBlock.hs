@@ -18,8 +18,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- a SOURCE on the battlefield, where this outlives its source (CR 611.2a) and
 -- names the permanents it covers once, at resolution.
 --
--- Only the "can't block" arm: Pawl.Types.ForbidAttack states CR 508.1c's side of
--- the same shape.
+-- Only the "can't block" arm: Pawl.Types.ForbidAttack states CR 508.1c's side,
+-- with two more axes this side has no printing for -- a class of creatures (CR
+-- 611.2c) and what the attack is aimed at (CR 802.3a).
 data ForbidBlock = MkForbidBlock
   { duration :: Duration.Duration,
     ref :: ObjectRef.ObjectRef

@@ -2846,10 +2846,19 @@ payComponent moment pid oid component = case component of
     Event.changeZone oid Zone.Hand
     pure bindsNothing
   -- CR 119.4: the payment is subtracted from the life total, shared with CR
-  -- 107.4f's Phyrexian symbol as the payability check above is.
+  -- 107.4f's Phyrexian symbol as the payability check above is -- and ASKED
+  -- AGAIN here, because not every component reached the gate: a component a
+  -- cost effect reads off the spell's targets (Filter.TargetsSource) joins at
+  -- CR 601.2f, after the castability gate and CR 601.2b's announcement ran
+  -- without it. An Unpaid is CR 601.2h's failed payment, which reverses the
+  -- casting; Pawl.CastSpec's Terror of the Peaks group is the proof.
   CostComponent.PayLife n -> do
-    Event.payLife pid n
-    pure bindsNothing
+    gs <- State.get
+    if Event.canPayLife pid n gs
+      then do
+        Event.payLife pid n
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- Unpayable, `canPayComponent`'s answer and for its reason. Unpaid rather than
   -- a guessed 0, which CR 601.2h turns into the reversal of the whole casting.
   CostComponent.PayLifeX -> pure Payment.Unpaid
