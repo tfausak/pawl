@@ -80,6 +80,7 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
 import Pawl.Types.Timestamp (Timestamp)
+import qualified Pawl.Types.VariableChoice as VariableChoice
 
 -- CR 109.5: "you" on an object is its controller, and for a static ability the
 -- CURRENT controller. `pid` is the player being asked about; `controller` is the
@@ -475,7 +476,11 @@ castsPerPlayer gs =
 -- prohibition that names the spell as it stands is ignored when a choice still to
 -- be made during the proposal could take it out of the class. X is the one such
 -- choice searched for there, and Void Winnower against Molten Disaster is what
--- observes it.
+-- observes it. `variable` says whether X is a choice at all for the candidate
+-- being asked about: CR 107.3b fixes it at 0 for a cost that pays neither the
+-- mana cost nor an alternative cost including X, so the caller -- which judges
+-- each of CR 601.2b's candidates on its own (Cast.candidateAllowed) -- hands in
+-- the candidate's answer.
 --
 -- CR 702.103b's bestow is the other one, and it does not come through this
 -- function at all: Pawl.Engine.Cast.castable asks this predicate once per
@@ -495,8 +500,8 @@ castsPerPlayer gs =
 -- A NAME cannot be searched over, and no card asks it to: CR 201.1 fixes a
 -- spell's name with the half and the facing, both of which are already chosen
 -- here.
-prohibitsCasting :: PlayerId -> ObjectId -> CardName -> GameState -> Bool
-prohibitsCasting pid oid name gs =
+prohibitsCasting :: PlayerId -> ObjectId -> CardName -> VariableChoice.VariableChoice -> GameState -> Bool
+prohibitsCasting pid oid name variable gs =
   let cast = castsThisTurn pid gs
       prohibits (source, effect) = case effect of
         PlayerEffect.CantCastSpells -> True
@@ -558,7 +563,7 @@ prohibitsCasting pid oid name gs =
         -- callers ask this before CR 601.2a's move, so the object the view is
         -- taken of still lies where the cast would take it from.
         PlayerEffect.CantCastMatching criterion ->
-          matchesObjectFrom source criterion oid gs && not (choiceCouldEscape source criterion oid gs)
+          matchesObjectFrom source criterion oid gs && not (choiceCouldEscape source criterion oid variable gs)
         -- CR 307.5 / Teferi, Mage of Zhalfir: outside that rule's moment this
         -- player casts nothing. Turn.sorcerySpeedWindow is CR 307.5's three
         -- conjuncts and the window CR 307.1 already shares, so there is one copy
@@ -973,9 +978,14 @@ contextFrom src oid gs =
 --
 -- Over the PRINTED MANA COST's variables, which is exactly where CR 202.3 reads
 -- a mana value from -- an X in an additional cost buys the caster nothing here,
--- because it is not in the mana cost at all. Not implemented: CR 107.3b's clamp,
--- which leaves 0 as the only legal X for a spell cast while paying neither its
--- mana cost nor an alternative cost including X (#1362).
+-- because it is not in the mana cost at all.
+--
+-- And only where X is the caster's to announce: CR 107.3b leaves 0 as the only
+-- legal X for a spell cast while paying neither its mana cost nor an alternative
+-- cost including X, so under that candidate there is no choice to search and
+-- the printed mana value is the one the prohibition judges. Pawl.PlayerEffectSpec's
+-- "CR 107.3b a free cast fixes X at 0, so the {X} spell is refused as even" is
+-- the proof, off Omniscience.
 --
 -- FINITE by Filter.manaValueThresholds' argument: two steps past the greatest
 -- literal the criterion compares against, nothing but parity is left to change,
@@ -985,9 +995,11 @@ contextFrom src oid gs =
 -- Asked ONCE, and nothing re-asks it: CR 601.3a lets the player begin "ignoring
 -- the effect", so a player who then announces an X that leaves the spell in the
 -- prohibited class still casts it.
-choiceCouldEscape :: Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
-choiceCouldEscape src criterion oid gs =
-  let variables = variablesIn oid gs
+choiceCouldEscape :: Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
+choiceCouldEscape src criterion oid variable gs =
+  let variables = case variable of
+        VariableChoice.Announced -> variablesIn oid gs
+        VariableChoice.FixedAtZero -> 0
       -- The SAME context matchesObjectFrom builds, and it has to be: this asks
       -- whether that match could flip, so a context that answered an atom
       -- differently would be asking about a different criterion.
