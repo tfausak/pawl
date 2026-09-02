@@ -74,9 +74,10 @@ data Expiry
     -- sentence therefore end together -- every effect the resolution stored
     -- carries this same arm and the same source.
     --
-    -- Carries the SEAT beside it, as While above does: CR 109.5's "you" for an
-    -- activated ability is the player who activated it, so the offer is baked at
-    -- arming time rather than re-read off the source's current controller. A
+    -- Carries the SEAT beside it, as While above does: CR 109.5's "you" is the
+    -- player who activated the ability or controlled the spell, so the offer is
+    -- baked at arming time rather than re-read off the source's current
+    -- controller. A
     -- Licid taken by Confiscate after it animated itself is the board that tells
     -- the two apart.
     WhenPaid PaidExpiry.PaidExpiry
