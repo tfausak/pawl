@@ -1149,7 +1149,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       --
       -- A REGRESSION FENCE rather than a proven behavior, the battle arm's
       -- posture below: THE RECORD already answers at every moment CR 117.5
-      -- samples, so mutating this conjunct to True leaves the suite green.
+      -- samples, so mutating this conjunct to True leaves the suite green. Not
+      -- implemented: a board that separates the two readings (#2839).
       --
       -- CARD TYPE, through `peers`, which is what makes rule 506.4's planeswalker
       -- clause reachable without Projection.isPlaneswalkerOf: that one calls project,
@@ -5011,8 +5012,12 @@ projectDeciding admits cands = forObject
                         -- same-layer candidate's affected set, which no effect at
                         -- this layer has been applied to -- see reachable above.
                         --
-                        -- The CR 702.178a gate A Tale for the Ages puts in a CR
-                        -- 613.8-movable layer is not reached at all (gap #1757).
+                        -- A REGRESSION FENCE rather than a proved behaviour: A
+                        -- Tale for the Ages' CR 303.4b "enchanted creatures you
+                        -- control" does reach this reader from a CR
+                        -- 613.8-movable layer, but no board makes the bounded
+                        -- reading and a full one disagree, so swapping this for
+                        -- fullView leaves the suite green (gap #1757).
                         viewOfBoard board o = case Map.lookup o board of
                           Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noValueAt lyr (noncreaturePT o gs p)) (controllerOf o gs) (countersOf o gs) gs)
                           Nothing -> bounded o

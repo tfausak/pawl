@@ -1462,8 +1462,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- road face up at its MANA cost, down which Replacement.applies refuses the row
   -- (Pawl.FaceDownSpec's Misthoof Kirin pair). On the row rather than on the
   -- WithCounters class, because a CARD's own CR 614.1e counter clause carries no
-  -- such condition; see #987. morphCost answers one cost per permanent, so the rest
-  -- of the condition needs no test.
+  -- such condition; see #987. Not implemented: a permanent holding morph and
+  -- megamorph at two different costs, which morphCost cannot express -- it answers
+  -- ONE cost per permanent, so the rest of rule 702.37b's condition is untestable
+  -- (#1831).
   Keyword.Morph (Morph.MkMorph _ MorphVariant.Mega) ->
     List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (Just TurnUpProcedure.Morph) (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
   Keyword.Menace -> []
