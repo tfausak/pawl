@@ -55,6 +55,29 @@ data Combat = MkCombat
     -- once, and pawl plays that option by default
     -- (Pawl.Types.GameSettings.attackOption).
     joinedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- | CR 802.2a: the defending player each attacking creature's CR 508.1b
+    -- target named AS IT JOINED combat -- "the controller of the planeswalker
+    -- that creature was attacking before it was removed from combat".
+    --
+    -- joinedUnder's other half, stored for that field's reason and read the same
+    -- way: control is derived (layer 2), CR 506.4 removes the attacked
+    -- planeswalker from combat the moment its controller changes, and rule
+    -- 802.2a then names the seat it had BEFORE that removal -- which the live
+    -- read has already left behind. Nothing else in the game state remembers it.
+    --
+    -- Keyed by the ATTACKER, for attackingNothing's reason: a planeswalker one
+    -- creature has stopped attacking can be attacked by another put onto the
+    -- battlefield attacking it under its new controller (CR 508.4), so the seat
+    -- belongs to the attack and not to the permanent.
+    --
+    -- Written by Pawl.Engine.Combat.declareAttackers and
+    -- Pawl.Engine.Combat.putOntoBattlefieldAttacking, the two writers of
+    -- `attackers`, and pruned by Pawl.Engine.Game.removeFromCombat. Read by
+    -- Pawl.Engine.Defender.playerOfAttacker as CR 802.2a's answer, and by
+    -- Pawl.Engine.Combat.noteAttackingNothing and
+    -- Pawl.Engine.Projection.viewOfCharacteristics as CR 506.4's comparand for
+    -- "if its controller ... changes".
+    attackedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | WHAT has been attacked this combat phase: the CR 508.1b target announced
     -- for each creature declared as an attacker or put onto the battlefield
     -- attacking (CR 508.8). Written by Pawl.Engine.Combat.declareAttackers and

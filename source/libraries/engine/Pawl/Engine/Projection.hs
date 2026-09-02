@@ -1121,13 +1121,20 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- the same id are the other two conjuncts, and each is its own leg of
       -- Pawl.CombatEffectSpec's Aura Graft pair:
       --
-      -- CONTROLLER, compared against Defender.defendingPlayers. CR 506.2 admits
-      -- only the defending player's planeswalkers into a declaration, so "its controller
-      -- changes" and "its controller is no longer the defending player" name the same
-      -- planeswalkers -- which is the comparison Combat.stillAttacked makes through
-      -- Combat.attackablePlaneswalkers, and asking it here costs no projection.
-      -- MEMBERSHIP rather than Maybe equality, which two Nothings satisfy; the
-      -- arm answers Nothing on that path either way.
+      -- CONTROLLER, compared against the seat recorded as this creature joined
+      -- combat (Pawl.Types.Combat's attackedUnder), which is rule 506.4's own
+      -- comparand. Defender.defendingPlayers is the fallback where nothing was
+      -- recorded -- a combat record built by hand -- and only an approximation of
+      -- it: CR 506.2 admits only a defending player's planeswalkers into a
+      -- declaration, so at TWO seats "its controller changes" and "its controller
+      -- is no longer a defending player" name the same planeswalkers, while CR
+      -- 802.2's several defending players tell them apart. MEMBERSHIP rather than
+      -- Maybe equality on that path, which two Nothings satisfy; the arm answers
+      -- Nothing there either way.
+      --
+      -- A REGRESSION FENCE rather than a proven behavior, the battle arm's
+      -- posture below: THE RECORD already answers at every moment CR 117.5
+      -- samples, so mutating this conjunct to True leaves the suite green.
       --
       -- CARD TYPE, through `peers`, which is what makes rule 506.4's planeswalker
       -- clause reachable without Projection.isPlaneswalkerOf: that one calls project,
@@ -1156,7 +1163,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
         Just (AttackTarget.OfPlaneswalker pw)
           | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
             Set.member pw (GameState.battlefield gs),
-            List.any (\defending -> controllerOf pw gs == Just defending) (Defender.defendingPlayers gs),
+            Maybe.maybe
+              (List.any (\defending -> controllerOf pw gs == Just defending) (Defender.defendingPlayers gs))
+              (\seat -> controllerOf pw gs == Just seat)
+              (Map.lookup oid (Combat.attackedUnder (GameState.combat gs))),
             any (Set.member CardType.Planeswalker . Filter.cardTypes) (peers pw) ->
               controllerOf pw gs
         _ -> Nothing,
