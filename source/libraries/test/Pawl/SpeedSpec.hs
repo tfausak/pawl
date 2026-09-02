@@ -203,6 +203,20 @@ maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
     Spec.assertEqWith s "the card really is in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice gs) [gyId]
     Spec.assertEqWith s "and it offers one ability from there" (length (Activate.abilitiesFor gyId gs)) 1
     Spec.assertBool s (any (isActivateOf gyId) (Action.legalActions S.alice gs)) "and the activation is a legal action"
+  -- The same gate above 4, which is the second half of pawl's ruling on CR
+  -- 702.179e (Pawl.Engine.Speed.maxSpeed carries it): a player at 5 has max
+  -- speed, so a "Max speed --" card written as AtLeast 4 still functions. The
+  -- Surveyor's own gate, not the Raceway's, since each card carries its own copy
+  -- of CR 702.178a's comparison and only its own case can catch it drifting back
+  -- to Exactly. atSpeed rather than an effect, this group's posture throughout;
+  -- maxSpeedSpec drives the same ruling through Synthetic Speed Boost.
+  Spec.it s "CR 702.178a past max speed the Surveyor's ability is still offered" $ do
+    surveyor <- S.printingOf s registry "Loxodon Surveyor"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gyId, gs) = surveyorBoard surveyor swamp piker 5
+    Spec.assertBool s (any (isActivateOf gyId) (Action.legalActions S.alice gs)) "the activation is a legal action at speed 5"
+    Spec.assertEqWith s "and one ability is offered from the graveyard" (length (Activate.abilitiesFor gyId gs)) 1
   -- The other direction, and the whole reason the gate is re-asked outside the
   -- battlefield: one less speed and the same graveyard card offers nothing. The
   -- board is identical in every other respect -- same three Swamps, same library,
@@ -320,12 +334,38 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
         gs = atSpeed 4 S.alice (S.settleSba board)
     Spec.assertEqWith s "two activated abilities" (length (Projection.abilitiesOf racewayId gs)) 2
     Spec.assertEqWith s "and the granted one makes two mana" (pooledBy biggestYield racewayId gs) 2
+  -- A PROJECT DECISION and not a rule. CR 702.179e says "a player has max speed
+  -- if their speed is 4" and CR 702.178a compares against "is 4"; no subrule caps
+  -- speed and none permits exceeding the cap, so the CR settles neither
+  -- direction. Pawl rules that speed may go past 4 and that 4 OR MORE is max
+  -- speed -- Pawl.Engine.Speed.maxSpeed's comment carries the ruling -- and this
+  -- case is what records it, so a later CR clarification is this assertion plus
+  -- the AtLeast gate in the two "Max speed --" cards.
+  --
+  -- Gameplay level throughout, and through the CARD rather than through atSpeed:
+  -- Alice is put at 3 and Synthetic Speed Boost's "each player's speed increases
+  -- by 2" resolves, so the 5 is the effect's arithmetic and no other rule's --
+  -- rule 702.179d's climb is +1 and could not reach it, and nobody loses life
+  -- here for it to fire on. The mana yield comes before the ability count so the
+  -- behaviour, not the count that proxies it, is what a wrong gate reddens.
+  Spec.it s "CR 702.178a past 4 the Raceway keeps its max speed ability" $ do
+    raceway <- S.printingOf s registry "Muraganda Raceway"
+    boost <- S.printingOf s registry "Synthetic Speed Boost"
+    let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+        (withSpell, spellId) = S.handOne boost board
+        gs = atSpeed 3 S.alice (S.settleSba withSpell)
+        after = castOnce S.alice spellId gs
+    Spec.assertEqWith s "alice is at 3 before the spell" (speedOf S.alice gs) (Just (Just 3))
+    Spec.assertEqWith s "no inherent trigger was spent (CR 702.179d)" (foldr (:) [] (GameState.speedIncreasedThisTurn after)) []
+    Spec.assertEqWith s "the effect pushed her past 4, uncapped" (speedOf S.alice after) (Just (Just 5))
+    Spec.assertEqWith s "and the max speed ability still makes two mana at 5" (pooledBy biggestYield racewayId after) 2
+    Spec.assertEqWith s "two activated abilities at 5" (length (Projection.abilitiesOf racewayId after)) 2
   -- CR 604.1 makes a static ability "simply true", so CR 702.178a's clause is
   -- re-asked on every read rather than latched: dropping the same player's speed
   -- back takes the ability away again, with no event and no resolution in
-  -- between. Nothing here distinguishes "exactly 4" from "at least 4": rule
-  -- 702.179d's own climb cannot exceed 4, and whether an EFFECT may is unsettled
-  -- (#809), so no board tells the two apart.
+  -- between. Nothing HERE distinguishes "exactly 4" from "at least 4" -- rule
+  -- 702.179d's own climb cannot exceed 4 -- which is what the case below exists
+  -- for.
   Spec.it s "CR 604.1 the grant is re-asked, not latched" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
@@ -474,9 +514,9 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
 -- 702.179d's "+1" -- produces it; and the effect names EACH PLAYER, so bob, who
 -- controls nothing at all, is moved by the card or by nothing.
 --
--- Every board here stays below 4. Whether an effect may push a speed past CR
--- 702.179e's max speed is not settled (#809), and these cases decline to enshrine
--- an answer.
+-- Every board here stays below 4, so nothing in this group depends on pawl's
+-- ruling about speeds past CR 702.179e's max speed; maxSpeedSpec's "past 4 the
+-- Raceway keeps its max speed ability" is where that is settled.
 cardIncreaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
   -- CR 702.179c's FIRST reading: a player who already has speed and is instructed

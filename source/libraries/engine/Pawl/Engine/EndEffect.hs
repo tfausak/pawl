@@ -1,6 +1,8 @@
 -- CR 116.2c: the special action that lets a player pay a cost an effect named to
 -- end that effect. Gliding Licid's "You may pay {U} to end this effect" is the
--- clause; all twelve Licids print it, and nothing else in the pool does.
+-- clause; all twelve Licids print it. CR 116.2c names a second use -- "to stop a
+-- delayed triggered ability from triggering" -- which no printing reaches, so
+-- Synthetic Standing Bounty is what drives it.
 --
 -- The offer side and the payment side, exactly as Pawl.Engine.Ignore is for CR
 -- 116.2d. Which stored effects a payment reaches is Pawl.Engine.Expiry's
@@ -31,9 +33,10 @@ import Pawl.Types.PlayerId (PlayerId)
 -- at all: CR 116.2c's price, and CR 109.5's "you" as baked when the effect was
 -- stored.
 --
--- FIRST offer wins where an object somehow stored two. No printing does: a Licid
--- that has activated has lost the ability, so it cannot animate itself twice,
--- and no other card prints the clause.
+-- FIRST offer wins where an object somehow stored two. Nothing in `data/cards/`
+-- does: a Licid that has activated has lost the ability, so it cannot animate
+-- itself twice, and the synthetic's offer belongs to an instant that has left
+-- the stack, so it cannot resolve a second time under the same id.
 offerToEnd :: ObjectId -> GameState -> Maybe PaidExpiry.PaidExpiry
 offerToEnd oid gs = List.lookup oid (Expiry.paidExpiries gs)
 
@@ -42,9 +45,9 @@ offerToEnd oid gs = List.lookup oid (Expiry.paidExpiries gs)
 --
 --   * an effect of that object states a price at all, which is the whole of the
 --     permission -- "for as long as the effect allows it";
---   * this player is the one the effect allows it to. Every producer prints the
---     clause inside an ACTIVATED ability, so CR 109.5's "you" is the player who
---     activated it and not the current controller of the object it is on. That
+--   * this player is the one the effect allows it to. CR 109.5's "you" is the
+--     player who activated the ability, or controlled the spell, that stored the
+--     effect -- not the current controller of the object it is on. That
 --     seat rides the stored effect (PaidExpiry.player), baked by
 --     Pawl.Engine.Expiry.arm, so a control change afterwards leaves the offer
 --     where it was -- proved by Pawl.AuraSpec's "CR 109.5 the activator keeps the

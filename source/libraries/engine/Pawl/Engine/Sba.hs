@@ -558,7 +558,7 @@ chooseLegendVictims (controller, candidates) = do
 --
 -- CR 801.12 narrows this rule to a controller's range of influence. CR 801.1
 -- makes limited range of influence an OPTION, and GameSettings carries no field
--- for it (#175), so the narrowing is inert.
+-- for it (#2831), so the narrowing is inert.
 --
 -- A put-into-graveyard, NOT a destruction, so the caller consults neither
 -- indestructible (CR 702.12b) nor a regeneration shield.

@@ -59,7 +59,7 @@ data Object = MkObject
     --
     -- Not implemented: CR 708.5's "you can't look at face-down permanents
     -- controlled by another player" -- Object.source still holds the printing
-    -- (#682).
+    -- (#1412).
     facing :: Facing.Facing,
     -- | CR 406.3: this card was "exiled face down", which CR 110.5d says in as
     -- many words has no correlation to `facing` above. What it does is CR 406.4's

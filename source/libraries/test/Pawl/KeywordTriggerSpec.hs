@@ -4845,10 +4845,13 @@ afflictSpec s registry =
 -- players "each opponent you attacked" and "each opponent" are the same number,
 -- so a bonus that ignored the combat record entirely would pass every case.
 --
--- CR 802 is unavailable (#175), so one combat phase has ONE defending player and
--- the bonus pawl can reach is 0 or 1. What separates the two is CR 506.3's other
--- attackable permanents: a creature that attacked only a planeswalker attacked no
--- opponent.
+-- CR 802.2 is the default option (Setup.emptyGame), so both opponents defend; it
+-- is the ANSWERERS here that aim every attack at one of them, which holds the
+-- bonus to 0 or 1. What separates the two is CR 506.3's other attackable
+-- permanents: a creature that attacked only a planeswalker attacked no opponent.
+--
+-- Not implemented: a case splitting the declaration across both opponents, where
+-- CR 702.121a's bonus is 2 (#3039).
 meleeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 meleeSpec s registry =
   let -- Attacks `who` with everything, aiming every attack at the player.

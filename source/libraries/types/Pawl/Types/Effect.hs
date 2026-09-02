@@ -236,8 +236,8 @@ data Effect card ability
   | -- | The other direction: the named players each have their speed reduced by
     -- this much, never below the card's printed floor (Spikeshell Harrier).
     --
-    -- Whether an effect may push speed past 4 is unsettled (#809) and is
-    -- IncreaseSpeed's question.
+    -- Whether an effect may push speed past 4 is IncreaseSpeed's question;
+    -- Pawl.Engine.Speed.maxSpeed states pawl's answer.
     DecreaseSpeed SpeedDecrease.SpeedDecrease
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3), the `card` being the token's text embedded

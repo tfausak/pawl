@@ -68,6 +68,16 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- | CR 702.179e: "a player has max speed if their speed is 4". The one number
 -- rule 702.179 names, and the one CR 702.178a's "as long as your speed is 4"
 -- compares against, so both readings share it.
+--
+-- A PROJECT DECISION, not a reading the CR supports: nothing in rule 702.179
+-- caps speed and nothing permits exceeding 4 either, so pawl rules that an
+-- effect may push speed past 4 and that a player at 4 OR MORE has max speed.
+-- That is why every "Max speed --" card in data/cards/ writes CR 702.178a's
+-- gate as AtLeast 4 rather than the rule's literal Exactly 4, proven by
+-- Pawl.SpeedSpec's "past 4 the Raceway keeps its max speed ability". If a
+-- future CR clarifies the other way, the edit is those gates and that case.
+-- belowMaxSpeed below is NOT this question: CR 702.179d states its own "less
+-- than 4" and caps only its own climb.
 maxSpeed :: Natural
 maxSpeed = 4
 

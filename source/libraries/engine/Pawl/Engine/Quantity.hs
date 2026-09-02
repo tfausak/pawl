@@ -395,7 +395,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.WasToken -> fmap (\view -> if Filter.token view then 1 else 0) mView
   -- CR 509.1g's combat fact as a 0/1, WasToken's arm in every respect --
   -- including the reader, since a creature that has died is out of
-  -- GameState.combat as well as out of GameState.objects (#991).
+  -- GameState.combat as well as out of GameState.objects; see #991, whose
+  -- LastKnown blocking half is what makes this arm answer at all.
   Quantity.WasBlocking -> fmap (\view -> if Filter.blocking view then 1 else 0) mView
   -- CR 120.1's damage as a total, read off the event log for the object the
   -- quantity is aimed at (Game.damageDealtToThisTurn) rather than off its view:

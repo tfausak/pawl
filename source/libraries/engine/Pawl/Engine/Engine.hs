@@ -434,7 +434,7 @@ runTurnBasedActions phase = do
     -- has with chapter abilities. A turn-based action, not a trigger, which is why
     -- it lives here and not in the gatherer; the active player's, so it takes the
     -- CR 800.4j guard. Not implemented: CR 703.4g's Attraction roll, which that
-    -- rule puts immediately after this and which has no producer (#175).
+    -- rule puts immediately after this and which has no producer (#871).
     Phase.PrecombatMain -> Monad.when hasActive (advanceSagas active)
     -- CR 511.1: the end of combat step has no turn-based actions, so no arm here.
     -- CR 511.3's removal from combat is an end-of-STEP action; runStep does it.
@@ -1259,7 +1259,7 @@ turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnc
 -- have begun" rules still fire.
 --
 -- Not implemented: CR 805.8's shared team turns (#2848) and CR 807.4i/j's Grand
--- Melee turn markers (#175), each of which rewrites this rule for an option pawl
+-- Melee turn markers (#3003), each of which rewrites this rule for an option pawl
 -- does not carry.
 takeNextTurn :: GameState -> GameState
 takeNextTurn gs = case GameState.extraTurns gs of
