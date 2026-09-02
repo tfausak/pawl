@@ -214,6 +214,43 @@ designationSpec s registry = Spec.describe s "Designation" $ do
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible pikerId board)) "bob's Piker is not indestructible from a Walls in bob's command zone"
         Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible pikerId played) "and is once a Walls is on the battlefield beside it"
       _ -> Spec.assertFailure s "expected one commander in each command zone"
+  -- The same two limbs on a PRINTED REPLACEMENT ROW, which
+  -- Pawl.Engine.Projection.replacementsAffecting gathered by object rather than
+  -- by row until this case: rule 113.6p's list filtered the zone before any row's
+  -- stated set was asked, so a commander's row naming the command zone was
+  -- dropped (#2904). Pawl.ZoneReplacementSpec has the other four zones; this one
+  -- is here because a commander is what puts a card in the command zone.
+  --
+  -- Synthetic Archival Warden is "{1}{W} Legendary Creature -- Human Advisor 2/2.
+  -- If a creature you control would be put into a graveyard from anywhere, put it
+  -- on the bottom of its owner's library instead. This ability functions only in
+  -- the command zone." SYNTHETIC because no printing states this zone on a
+  -- REPLACEMENT row: the corpus's only row naming it is Nexus of Fate's, an
+  -- instant that can never be in a command zone, and Scryfall's "o:'in the
+  -- command zone' (t:creature or t:planeswalker)", 2026-09-01, returns the seven
+  -- Eminence-shaped commanders (Arahbo, Edgar Markov, Inalla, Oloro, Sahir, Sidar
+  -- Jabari, The Ur-Dragon), whose stated-zone abilities are triggers and a cost
+  -- reduction. So the CLAUSE is printed and only this event class is not.
+  --
+  -- ONE board carrying BOTH commanders again, and the two rows are told apart by
+  -- their DESTINATIONS rather than by their victims: Anafenza, the Foremost's row
+  -- states no zone and reaches "an opponent" -- alice, from bob's seat -- so it
+  -- would exile the same Piker the Warden's row archives. The library assertion
+  -- is what the fix buys; the exile assertion is what stops the fix being "drop
+  -- the gate".
+  Spec.it s "CR 113.6b a commander's replacement row that states the command zone functions from there" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    warden <- S.printingOf s registry "Synthetic Archival Warden"
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let deckFor c = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just c, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+        seated = S.runPure S.identityAnswer (commanderBoard mountain warden 0) (Setup.createDeck S.bob (deckFor anafenza))
+        (pikerId, board) = S.addCreature piker S.alice seated
+        binned = S.runPure S.identityAnswer board (Event.changeZone pikerId Zone.Graveyard)
+    Spec.assertEqWith s "CR 113.6b the Warden's row functions from the command zone, so alice's creature is in her library" (length (Game.zoneMembers Zone.Library S.alice binned)) 1
+    Spec.assertEqWith s "and the graveyard the move aimed at is empty" (length (Game.zoneMembers Zone.Graveyard S.alice binned)) 0
+    Spec.assertEqWith s "CR 113.6p is still the other limb: bob's Anafenza states no zone, so nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice binned)) 0
+    Spec.assertEqWith s "setup: a commander in each command zone, and an empty library for the redirect to fill" (length (inCommandZone board), length (Game.zoneMembers Zone.Library S.alice board)) (2, 0)
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do

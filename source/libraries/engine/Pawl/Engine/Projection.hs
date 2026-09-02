@@ -5283,7 +5283,7 @@ replacementsOfGiven pcs zone oid gs =
 -- reanimated beside Jedit Ojanen, and entering at 4/3 under Glorious Anthem.
 --
 -- Its own function rather than a local of replacementsOf, because CR 604.2 gates
--- a row wherever the row functions: replacementsAffecting's four off-battlefield
+-- a row wherever the row functions: replacementsAffecting's off-battlefield
 -- walks ask it of the printed face, where replacementsOf asks it of the
 -- projection.
 printedRowLives :: ObjectId -> GameState -> PrintedReplacement.PrintedReplacement effect -> Bool
@@ -5301,8 +5301,8 @@ functionsFromZoneOfRow zone pr =
    in Set.null zones || Set.member zone zones
 
 -- CR 113.6b's stated set without that default folded in, statesZone's twin: the
--- question the four zones CR 113.6 gives no default to have to ask, where "states
--- no zone" must mean "not here" rather than "wherever the caller is looking".
+-- question a zone CR 113.6 gives no default to has to ask, where "states no zone"
+-- must mean "not here" rather than "wherever the caller is looking".
 statesZoneOfRow :: Zone.Zone -> PrintedReplacement.PrintedReplacement effect -> Bool
 statesZoneOfRow zone = Set.member zone . PrintedReplacement.functionsFrom
 
@@ -5399,7 +5399,7 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- mints this row from counters on a PERMANENT, which CR 114.5 says an emblem is
 -- not and CR 313.2 says a vanguard card is not --
 -- so a row minted here can only ever be a candidate while its source is on the
--- battlefield, which is exactly "from the battlefield". The four walks that
+-- battlefield, which is exactly "from the battlefield". The walks that
 -- reach the other zones cannot carry it: CR 113.6b gathers PRINTED rows and this
 -- one is minted. Filter.IsSource is the rule's "this permanent", the self-scope
 -- CR 614.1c's entry rows use.
@@ -5630,22 +5630,30 @@ replacementsAffecting gs =
       -- CR 114.3 makes the emblem's abilities the whole of it, CR 313.2 keeps a
       -- vanguard card in this zone all game, and no copy effect reaches either.
       --
-      -- Not implemented: CR 113.6b's stated set for this zone. gatherGiven's static
-      -- walk keeps both limbs of rule 113.6 -- an object's own rule decides only
-      -- where the row states no zone -- and this filter runs ahead of
-      -- functionsFromZoneOfRow instead, so a row NAMING the command zone on
-      -- anything but an emblem or a vanguard card is dropped (#2904).
-      inCommand = filter (\oid -> Vanguard.functionsFromCommandZone oid gs) (Set.toList (GameState.command gs))
+      -- CR 113.6b is the OTHER limb this zone meets, and it sits BESIDE rule
+      -- 113.6p in that list rather than under it: a commander's or a dungeon
+      -- card's printed row that NAMES this zone functions from it too, its own
+      -- rule deciding only where the row states no zone. So the zone's objects
+      -- are SPLIT rather than filtered -- rule 113.6p's take the projecting walk
+      -- below, whose functionsFromZoneOfRow keeps their unstated rows, and
+      -- everything else in the zone reaches `stated` through statesZoneOfRow
+      -- alone. gatherGiven's fromCommandZone makes the same split with the same
+      -- two tests. Pawl.CommanderSpec's "CR 113.6b a commander's replacement row
+      -- that states the command zone functions from there" proves both halves on
+      -- one board.
+      (inCommand, statingCommand) = List.partition (\oid -> Vanguard.functionsFromCommandZone oid gs) (Set.toList (GameState.command gs))
       commandZoneHas oid = case Game.faceOf oid gs of
         Nothing -> False
         Just face -> not (null (Face.replacementEffects face))
-      -- CR 113.6b's stated set, in the four zones CR 113.6 gives no default that
+      -- CR 113.6b's stated set, in the zones CR 113.6 gives no default that
       -- reaches a replacement row: Nexus of Fate's "would be put into a graveyard
       -- from anywhere" names every one of them, and a row that states nothing is
       -- left to the two walks above. So this arm asks statesZoneOfRow rather than
       -- functionsFromZoneOfRow, gatherGiven's hidden-zone arms' reading for
       -- gatherGiven's reason: an unstated row gathered here would have every card
-      -- in every library replacing events from inside it.
+      -- in every library replacing events from inside it. The command zone is one
+      -- of them for everything rule 113.6p does not name, which is the split
+      -- above.
       --
       -- The PRINTED face, which is how every off-battlefield arm of gatherGiven
       -- reads one, rather than the projection the two walks above take: `project`
@@ -5657,9 +5665,7 @@ replacementsAffecting gs =
       -- CR 614.1c's entry rewrite, which a card that is not entering cannot use.
       --
       -- Not implemented: a row stating the exile zone, which gets no arm here --
-      -- the same hole gatherGiven's static walk has (gap #1933) -- and CR 113.6's
-      -- first-sentence default, which would function an instant's or sorcery's
-      -- unstated row from the stack (gap #2590).
+      -- the same hole gatherGiven's static walk has (gap #1933).
       statedFrom zone oid = case Game.lookupObject oid gs of
         Nothing -> []
         Just obj | not (mayStateZoneOfRow gs zone obj) -> []
@@ -5671,11 +5677,35 @@ replacementsAffecting gs =
               statesZoneOfRow zone pr,
               printedRowLives oid gs pr
             ]
+      -- The stack has a default where the four zones above have none, so it gets
+      -- its own arm: CR 113.6's first sentence functions an instant's or a
+      -- sorcery's abilities while the object is on the stack, and CR 113.6b's
+      -- stated set overrides that in both directions. gatherGiven's fromSpell is
+      -- the same pair on a static ability, down to reading the card TYPES off the
+      -- printed face -- a classification rather than an identity -- and this arm
+      -- takes no mayStateZoneOfRow prefilter for the same reason it takes the
+      -- default: an unstated row belongs here, and the stack is short.
+      fromSpellRow oid = case Game.lookupObject oid gs of
+        Nothing -> []
+        Just obj -> case Game.faceOfObject gs obj of
+          Nothing -> []
+          Just face ->
+            let isSpellStatic = not (Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face))))
+                keeps pr =
+                  if Set.null (PrintedReplacement.functionsFrom pr)
+                    then isSpellStatic
+                    else statesZoneOfRow Zone.Stack pr
+             in [ (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr)
+                | pr <- Face.replacementEffects face,
+                  keeps pr,
+                  printedRowLives oid gs pr
+                ]
       stated =
-        concatMap (statedFrom Zone.Stack) (GameState.stack gs)
+        concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
           <> foldZoneCards GameState.hand (statedFrom Zone.Hand) gs
           <> foldZoneCards GameState.library (statedFrom Zone.Library) gs
+          <> concatMap (statedFrom Zone.Command) statingCommand
       -- The short-circuit guards the two walks that PROJECT, and nothing else:
       -- `stated` reads printed faces behind mayStateZoneOfRow, so it costs what
       -- gatherGiven's hidden walks cost and answers [] on a board with no such row
