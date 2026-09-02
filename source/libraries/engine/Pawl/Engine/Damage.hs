@@ -1394,11 +1394,21 @@ processDamage events = do
 -- 117.5 boundary, so the triggers are gathered together either way and this
 -- fixes only the canonical order.
 --
--- ONE record per damage event, never per player: summing two sources' gains
--- first would be one event, and a Pridemate would get one counter where it is
--- owed two. Not implemented: the other direction, one source dealing damage to
--- several recipients at once being ONE life gain event, where this records one
--- per recipient (#2950).
+-- ONE record per SOURCE, which is both directions of CR 702.15e at once: two
+-- sources are two events, so summing them first would give a Pridemate one
+-- counter where it is owed two; one source dealing damage to several recipients
+-- at the same time is ONE event, so recording per damage event would give it two
+-- where it is owed one. CR 119.9 reads the trigger as "whenever a source causes
+-- [a player] to gain life", and the amount is that source's whole damage.
+--
+-- Keyed on the gainer as well as the source, which no board reaches today --
+-- CR 702.15b resolves one source's lifelink to one player -- and is what the key
+-- MEANS rather than a defence: the record names a player, so two players would
+-- be two gains however few sources caused them.
+--
+-- First-appearance order, so the records read in the order the batch dealt its
+-- damage. Pawl.EventTriggerSpec's lifelinkGainEventsSpec is the proof of both
+-- directions.
 --
 -- Whom the damage was dealt to is none of this function's business, exactly as
 -- it is none of `gainOne`'s: CR 702.15b hangs the gain off the SOURCE, so damage
@@ -1416,12 +1426,23 @@ recordLifelinkGains :: [DamageEvent.DamageEvent] -> Game ()
 recordLifelinkGains survivors =
   State.modify' $ \gs ->
     List.foldl'
-      ( \g ev -> case DamageEvent.dealtByLifelink ev of
-          Just pid | DamageEvent.amount ev > 0 -> Event.recordEvent (GameEvent.LifeGained (LifeChange.MkLifeChange pid (DamageEvent.amount ev))) g
-          _ -> g
-      )
+      (\g (pid, total) -> Event.recordEvent (GameEvent.LifeGained (LifeChange.MkLifeChange pid total)) g)
       gs
-      survivors
+      (lifelinkGains survivors)
+
+-- One (source, gainer) pair's damage, summed, in the order the sources first
+-- appear in the batch. The grouping recordLifelinkGains above records.
+lifelinkGains :: [DamageEvent.DamageEvent] -> [(PlayerId, Natural)]
+lifelinkGains survivors =
+  let keyed =
+        Maybe.mapMaybe
+          ( \ev -> case DamageEvent.dealtByLifelink ev of
+              Just pid | DamageEvent.amount ev > 0 -> Just ((DamageEvent.source ev, pid), DamageEvent.amount ev)
+              _ -> Nothing
+          )
+          survivors
+      totals = Map.fromListWith (+) keyed
+   in fmap (\key -> (snd key, Map.findWithDefault 0 key totals)) (List.nub (fmap fst keyed))
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).
