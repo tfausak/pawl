@@ -11411,7 +11411,8 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- marker on the object that is already there, and CR 400.7 mints nothing), so
   -- what carries the reuse is that CR 400.7e's slot is the printed word "that
   -- creature" -- the thing the EVENT names, which CR 113.7a's source is not --
-  -- and a fresh name would empty CR 603.1b's AnyOf intersection forever (#963).
+  -- and, as the arm above says, a fresh name would empty CR 603.1b's AnyOf
+  -- intersection forever.
   --
   -- Unconditional given a match, which is what eventBindingSlots' per-condition
   -- promise needs: every GameEvent.CountersPut carries exactly one
@@ -11425,8 +11426,9 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- naming an object that no longer exists.
   --
   -- Its BATCH sibling reaches the fallthrough instead and stamps nothing, which
-  -- is eventBindingSlots' answer for it: one PermanentsGetCounters trigger covers
-  -- a whole CR 704.3 batch, and one slot cannot name every permanent in it.
+  -- is eventBindingSlots' answer for it: CR 603.2c's batch reading fires one
+  -- PermanentsGetCounters trigger for placements across several permanents, and
+  -- one slot cannot name them all.
   (TriggerCondition.PermanentGetsCounters _, GameEvent.CountersPut change) ->
     Binding.setBecame (CounterChange.object change) Map.empty
   -- "That player": the discarder, which CR 701.9a makes one player and the event
@@ -11790,8 +11792,8 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
 --
 -- ONE arrival is bound exactly as it always was -- Binding.toObject, a recipient
 -- -- so every ordinary move produces the byte-identical binding it did before
--- this rule landed, and none of the pool's eight readers of the slot can tell
--- the difference. TWO OR MORE are bound as a GROUP (Binding.toObjects), which is
+-- this rule landed, and no reader of the slot in data/cards/ can tell the
+-- difference. TWO OR MORE are bound as a GROUP (Binding.toObjects), which is
 -- the shape Pawl.Types.Binding documents for "every object one instruction
 -- produced or acted on" and which Pawl.Engine.Resolve.objectRefObjects reads
 -- ahead of the recipient path for ObjectRef.InSlot.
