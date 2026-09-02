@@ -564,9 +564,9 @@ data ObjectRef
     -- which is what Prompt.Shuffle and Prompt.RandomFirstPlayer already do. So
     -- this arm no more picks a card than it lets a player pick one.
     --
-    -- NO FILTER beside the PlayerRef, where the chosen sibling carries one, and
-    -- ONE card per seat: Merfolk Spy states no characteristic and no count, and
-    -- nothing else in the pool asks for either (gap #1742).
+    -- NO FILTER beside the PlayerRef, where the chosen sibling carries one (gap
+    -- #1742), and ONE card per seat (gap #3060): Merfolk Spy states no
+    -- characteristic and no count, and nothing else in the pool asks for either.
     --
     -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
     -- read -- so objectRefObjects answers nothing for it and only

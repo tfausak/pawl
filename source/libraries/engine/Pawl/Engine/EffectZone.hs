@@ -18,8 +18,12 @@
 module Pawl.Engine.EffectZone where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
@@ -32,6 +36,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import Pawl.Types.Zone (Zone)
 
 -- CR 113.6m: "an ability whose cost or effect specifies that it moves the object
@@ -51,8 +56,15 @@ import Pawl.Types.Zone (Zone)
 -- move of anything but its own source states something nothing reads. That is a
 -- card-data error rather than a rules question, and it is inert: this function
 -- answers Nothing for it, which is the same answer the effect had before.
-zoneFunctionedFrom :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
-zoneFunctionedFrom effect = case effect of
+--
+-- The DELAYED ABILITIES the reading is against -- CR 113.6m's final sentence
+-- needs the text an Effect.ArmDelayedTrigger's name stands for, and the opcode
+-- carries only the name (Pawl.Types.Face.delayedAbilities holds the payload,
+-- Effect being first-order). Every caller supplies the map off the same card the
+-- ability is read from, which is where Pawl.Engine.Resolve.declaredDelayedAbility
+-- resolves the name at run time.
+zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
+zoneFunctionedFrom delayed effect = case effect of
   -- Only an InSlot naming the reserved source slot can be "the object it's on".
   -- A swept set is never one object, so no sweeping arm can be; a library's
   -- top card is one object, but it is named by POSITION rather than by that slot,
@@ -173,7 +185,26 @@ zoneFunctionedFrom effect = case effect of
   Effect.EndTurn -> Nothing
   Effect.EndCombatPhase -> Nothing
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
-  Effect.ArmDelayedTrigger {} -> Nothing
+  -- CR 113.6m's final sentence: "the same is true if the effect of that ability
+  -- creates a delayed triggered ability whose effect moves the object out of a
+  -- particular zone". Prized Amalgam's "return this card from your graveyard to
+  -- the battlefield tapped at the beginning of the next end step" is the printing
+  -- it decides -- the arm is the ability's only zone-relevant content, so without
+  -- this the Amalgam functions on the battlefield, where it can never do its work.
+  --
+  -- ONE LEVEL: the delayed ability's own effects are walked with an EMPTY map, so
+  -- a delayed ability that arms a second one contributes nothing. The rule says
+  -- "creates a delayed triggered ability whose effect moves the object", naming
+  -- the created ability's effect and not what that in turn creates, and the empty
+  -- map is also what makes this walk terminate on a card that arms itself.
+  --
+  -- Nothing for a name no face declares, which is a card-data error rather than a
+  -- rules question: Pawl.CardSpec's D4 dataflow lint rejects such a card, and the
+  -- answer here is the same Nothing the arm gave before.
+  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) ->
+    case Map.lookup name delayed of
+      Nothing -> Nothing
+      Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom Map.empty) (Modal.allEffects (TriggeredAbility.modal ability)))
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
   Effect.CantBeRegenerated {} -> Nothing
@@ -214,4 +245,4 @@ zoneFunctionedFrom effect = case effect of
   -- states, and CR 113.6m reads it. The loop's own reference names the members
   -- and is never "the object it's on", so only the body can answer at all. No
   -- card in the pool writes such a body.
-  Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe zoneFunctionedFrom (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom delayed) (Foldable.toList body))

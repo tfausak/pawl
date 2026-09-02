@@ -1775,7 +1775,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Not implemented, recorded here because the card JSON carries no comment: no
   -- Filter can say "a card or a spell", so both sets also reach an ability on the
   -- stack (CR 113.1c) and the ownership one an emblem in the command zone (CR
-  -- 114.5). Painter's Servant's over-reach, and the same issue (#1551).
+  -- 114.5). Painter's Servant's over-reach, and the same issues (#1551, #3061).
   --
   -- CR 305.7's gate reached by an affected set that asks who CONTROLS the
   -- candidate, which is the shape that used to make Projection.controllerOf

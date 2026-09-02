@@ -1103,7 +1103,7 @@ bakePlayerRef players ref = case ref of
   -- 603.2), and this reference names a slot holding an OBJECT, whose controller
   -- only a projection gives. A stored CR 611.2b duration reading it therefore
   -- goes unanswered and ends, which is Pawl.Engine.Condition.holds' stated
-  -- collapse; no card in the pool stores one (#1441).
+  -- collapse; no card in the pool stores one (#3058).
   PlayerRef.ControllerOfBound _ -> ref
   -- LEFT STANDING for ControllerOfBound's reason, plus one of its own: the slot
   -- this names holds a PLAYER, but what the reference reads is the live combat

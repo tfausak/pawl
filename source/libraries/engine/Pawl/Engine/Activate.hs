@@ -25,6 +25,7 @@ import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.AbilityKind as AbilityKind
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Card as Card
@@ -59,6 +60,7 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
@@ -125,7 +127,7 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- such second gate: Reassembling Skeleton's "{1}{B}: Return this card from
   -- your graveyard to the battlefield" is payable by a Skeleton standing on the
   -- battlefield, and only this filter stops it being offered there.
-  Just Zone.Battlefield -> filter (functionsIn Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
+  Just Zone.Battlefield -> filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
   -- CR 113.6j: the MINTED abilities rule 702 gives the printed keywords, plus the
   -- card's own AUTHORED ones that name the hand. The two are disjoint by
   -- construction -- handAbilitiesOf reads Face.keywords and zoneAbilitiesOf reads
@@ -206,7 +208,7 @@ familyGranting = familyGrantingGiven Map.empty
 zoneAbilitiesOf :: Zone.Zone -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
   (Just face, Just obj) ->
-    let functionsHere = functionsIn zone
+    let functionsHere = functionsIn (Face.delayedAbilities face) zone
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
           Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just (Object.owner obj)) (Just oid)) gs oid cond
@@ -252,24 +254,28 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- written, and a card whose later part moved the reserved source slot out of a
 -- zone an earlier part put it into is what would refute that; see #2501.
 --
--- Not implemented: CR 113.6m's delayed-triggered-ability sentence (#2500). The
--- clause's Aura half needs a trigger condition and so belongs to the triggered
--- reading alone.
-zoneFunctionedFrom :: ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe Zone.Zone
-zoneFunctionedFrom ability =
+-- CR 113.6m's final sentence is read by the fold too, Pawl.Engine.EffectZone's
+-- ArmDelayedTrigger arm answering off the `delayed` map this carries. The one
+-- card in data/cards/ whose ACTIVATED ability arms a delayed trigger is Grist,
+-- the Hunger Tide, and what it arms destroys a target rather than moving Grist,
+-- so the walk answers Nothing there. This reading is therefore a regression
+-- fence; the sentence itself is proved through the TRIGGERED one, on Prized
+-- Amalgam in Pawl.ZoneTriggerSpec.
+zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe Zone.Zone
+zoneFunctionedFrom delayed ability =
   case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of
     Just zone -> Just zone
     Nothing ->
       Maybe.listToMaybe
-        (Maybe.mapMaybe EffectZone.zoneFunctionedFrom (Modal.allEffects (ActivatedAbility.modal ability)))
+        (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom delayed) (Modal.allEffects (ActivatedAbility.modal ability)))
 
 -- CR 113.6m's "functions only in that zone", asked of one zone: does this
 -- ability function from there? True for an ability that names no zone at all,
 -- which CR 113.6's default puts on the battlefield -- so this is only ever asked
 -- of a zone abilitiesForGiven has already decided is a zone abilities are read
 -- from, and never of a library or a stack.
-functionsIn :: Zone.Zone -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Bool
-functionsIn zone ability = case zoneFunctionedFrom ability of
+functionsIn :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> Zone.Zone -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Bool
+functionsIn delayed zone ability = case zoneFunctionedFrom delayed ability of
   Nothing -> zone == Zone.Battlefield
   Just named -> zone == named
 

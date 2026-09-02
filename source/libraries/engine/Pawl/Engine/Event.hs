@@ -57,6 +57,7 @@ import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -12958,7 +12959,7 @@ eventTriggers events gs =
       -- clause is not implemented (#2502) -- `enchantedObjectLeaves` below
       -- reads only its Aura half -- so filtering there would read the rule's
       -- first sentence without the exception that governs this arm.
-      battlefieldAbilitiesOf pc = filter (functionsIn Zone.Battlefield) (abilitiesOf pc)
+      battlefieldAbilitiesOf oid pc = filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
       -- controller each of them had THEN. The three readings the live board gets
@@ -12980,8 +12981,8 @@ eventTriggers events gs =
       -- Only the STORED shape is named (#126); `candidates` below unions this
       -- with six sibling maps that are computed here and never serialized.
       onBattlefieldAt group =
-        Map.map
-          (\candidate -> (BattlefieldCandidate.controller candidate, battlefieldAbilitiesOf (BattlefieldCandidate.characteristics candidate)))
+        Map.mapWithKey
+          (\oid candidate -> (BattlefieldCandidate.controller candidate, battlefieldAbilitiesOf oid (BattlefieldCandidate.characteristics candidate)))
           (Map.findWithDefault liveBattlefield group (GameState.battlefieldWhenTriggered gs))
       -- The permanent this event took OFF the battlefield, read from
       -- CR 608.2h last known information -- both the abilities and the objects'
@@ -13021,7 +13022,10 @@ eventTriggers events gs =
       -- `leftBattlefield` is CR 603.10a's look-back at the event's own departure
       -- and takes them all, while `laterGroups` and `sameGroup` read a permanent
       -- that was standing on the battlefield when the event happened and so take
-      -- only the ones CR 113.6m leaves functioning there.
+      -- only the ones CR 113.6m leaves functioning there. It takes the departing
+      -- id as well as the characteristics: CR 113.6m's final sentence reads the
+      -- card's CR 603.7 declarations, which are not characteristics and so are
+      -- reached through Game.delayedAbilitiesOf off the id.
       departedFrom pick event = case event of
         GameEvent.Moved (Moved.MkMoved zc _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
@@ -13030,7 +13034,7 @@ eventTriggers events gs =
                 Just lk ->
                   Map.singleton
                     (ZoneChange.departed zc)
-                    (LastKnown.controller lk, pick (LastKnown.characteristics lk))
+                    (LastKnown.controller lk, pick (ZoneChange.departed zc) (LastKnown.characteristics lk))
         -- CR 800.4a's removal, recovered the same way and from the same record:
         -- the permanent is not on the battlefield at the CR 117.5 boundary
         -- because it is not in the game at all, so last known information is the
@@ -13039,7 +13043,7 @@ eventTriggers events gs =
         -- no other source.
         GameEvent.LeftTheGame oid -> case Map.lookup oid (GameState.lastKnown gs) of
           Nothing -> Map.empty
-          Just lk -> Map.singleton oid (LastKnown.controller lk, pick (LastKnown.characteristics lk))
+          Just lk -> Map.singleton oid (LastKnown.controller lk, pick oid (LastKnown.characteristics lk))
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
@@ -13089,7 +13093,7 @@ eventTriggers events gs =
       -- CR 603.10a's look-back at the permanent this event removed: every
       -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
       -- above gives.
-      leftBattlefield = departedFrom abilitiesOf
+      leftBattlefield = departedFrom (const abilitiesOf)
       -- CR 400.7f's own datum, and the one thing `eventBindings` is told that it
       -- could not read off the event it was handed: for each permanent this batch
       -- put from the battlefield into a graveyard, the id it BECAME there.
@@ -13316,7 +13320,7 @@ eventTriggers events gs =
       -- other source answers for.
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn Zone.Graveyard) (Face.triggeredAbilities face) of
+          case filter (functionsIn (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -13388,7 +13392,7 @@ eventTriggers events gs =
               case Map.lookup (ZoneChange.object zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
                 Just lk ->
-                  case filter (functionsIn Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
+                  case filter (functionsIn (Game.delayedAbilitiesOf (ZoneChange.object zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
                     [] -> Map.empty
                     abilities -> Map.singleton (ZoneChange.object zc) (LastKnown.controller lk, abilities)
         _ -> Map.empty
@@ -13418,7 +13422,7 @@ eventTriggers events gs =
       -- (#1479).
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn Zone.Exile) (Face.triggeredAbilities face) of
+          case filter (functionsIn (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -13443,7 +13447,7 @@ eventTriggers events gs =
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
-          Just face -> case filter (functionsIn Zone.Stack) (Face.triggeredAbilities face) of
+          Just face -> case filter (functionsIn (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) of
             [] -> Map.empty
             abilities -> Map.singleton spell (caster, abilities)
         GameEvent.Discarded {} -> Map.empty
@@ -13571,7 +13575,7 @@ eventTriggers events gs =
       revealedInHand event = case event of
         GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
           (Just obj, Just face) ->
-            case filter (functionsIn Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywords face)) of
+            case filter (functionsIn (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywords face)) of
               [] -> Map.empty
               abilities -> Map.singleton oid (Object.owner obj, abilities)
           _ -> Map.empty
@@ -13739,15 +13743,26 @@ eventTriggers events gs =
 -- name the reserved source slot for an object an earlier part already moved.
 -- See #2501.
 --
--- Not implemented: the delayed-triggered-ability sentence (#2500), which needs
--- no trigger condition either and so belongs to the fold below too.
-zoneFunctionedFrom :: TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
-zoneFunctionedFrom ability =
+-- CR 113.6m's FINAL sentence is read by the fold as well: the arm an
+-- Effect.ArmDelayedTrigger names is looked up in the `delayed` map this carries,
+-- and Pawl.Engine.EffectZone walks the ability it finds. Prized Amalgam is the
+-- printing it decides -- "return this card from your graveyard to the battlefield
+-- tapped at the beginning of the next end step" is its only zone-relevant
+-- content, and without the sentence the Amalgam functions on the battlefield,
+-- where its trigger can never do anything.
+--
+-- The `unless` clause governs that sentence too, and is read the same way: the
+-- Aura half by `enchantedObjectLeaves` above this fold, the trigger-condition
+-- half not at all (#2502) -- so an ability whose own condition is what put the
+-- card in the graveyard is pinned there whether its return is immediate or
+-- delayed. No card in the pool writes either shape.
+zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
+zoneFunctionedFrom delayed ability =
   if enchantedObjectLeaves (TriggeredAbility.condition ability)
     then Nothing
     else
       Maybe.listToMaybe
-        (Maybe.mapMaybe EffectZone.zoneFunctionedFrom (Modal.allEffects (TriggeredAbility.modal ability)))
+        (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom delayed) (Modal.allEffects (TriggeredAbility.modal ability)))
 
 -- CR 113.6m's Aura clause, asked of a trigger condition: does it specify "that
 -- the object it enchants leaves the battlefield"? CR 700.4 makes a death one, so
@@ -13798,8 +13813,8 @@ enchantedObjectLeaves condition = case condition of
 -- an ability whose condition already answers CR 113.6k, and if one did they
 -- would both say graveyard. The order is written down so a future card meets a
 -- decision rather than an accident.
-functionsIn :: Zone -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Bool
-functionsIn zone ability = case zoneFunctionedFrom ability of
+functionsIn :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> Zone -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Bool
+functionsIn delayed zone ability = case zoneFunctionedFrom delayed ability of
   Just named -> zone == named
   Nothing -> Set.member zone (zonesTriggeredFrom (TriggeredAbility.condition ability))
 

@@ -325,7 +325,7 @@ data Quantity
     -- the number of counters on Savanti Romero". Resourceful Defense's "if it had
     -- counters on it" is the same sum read as a Boolean, aimed by an AgainstSlot
     -- at Pawl.Engine.Binding's departedPermanent; Angelic Sleuth wants that and
-    -- nothing else and is still unwritten (#2347).
+    -- nothing else and is still unwritten (#3055).
     --
     -- ObjectCounters above in every respect but the kind: the same object (the one
     -- the evaluation is aimed at), the same injected ViewOf, and so the same CR
