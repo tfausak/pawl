@@ -205,10 +205,6 @@ data Object = MkObject
     -- PLAYABLE and not castable, after CR 601.1a, and both halves read it:
     -- Pawl.Engine.Cast.permitsCastFromExile and Pawl.Engine.Action.playableLands
     -- for CR 305.1's special action.
-    --
-    -- Not implemented: a player permitted to play someone else's exiled card is
-    -- named here and still cannot find it, Pawl.Engine.Game.zoneMembers filtering
-    -- exile by OWNER (#668).
     playableFromExile :: Maybe ExilePlayPermission.ExilePlayPermission,
     -- | CR 702.170a: this exiled card is a PLOTTED card, stamped with the turn on
     -- which it became one. The TURN NUMBER and not a Bool because CR 702.170d

@@ -3656,10 +3656,10 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
           Just face -> do
             -- CR 109.5: the permission names the ability's controller and no one
             -- else. Asked of permitsCastFromExile directly, because bob's cast
-            -- would be refused for two further reasons on this board -- he has no
-            -- mana, and Game.zoneMembers files exile by OWNER so he cannot reach
-            -- alice's card at all (#668) -- so a gameplay-level negative here
-            -- would be over-determined and would discriminate nothing.
+            -- would be refused on this board for a second reason -- he has no
+            -- mana -- so a gameplay-level negative here would be over-determined
+            -- and would discriminate nothing. Cast.zoneCandidates reads exile as
+            -- the shared zone, so bob does reach alice's card.
             Spec.assertBool s (Cast.permitsCastFromExile S.alice exiledId face after) "alice is permitted"
             Spec.assertBool s (not (Cast.permitsCastFromExile S.bob exiledId face after)) "bob is not"
       other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))

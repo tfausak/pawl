@@ -12,7 +12,8 @@
 -- (Combat.attackableBattles), CR 310.9b including its "notably, a Siege battle can
 -- be attacked by its own controller", CR 310.9c's blocking, and CR 310.9d with CR
 -- 508.5 (Defender.playerOf) -- including CR 506.4c's attacker left attacking a
--- battle that has gone, whose defending player is CR 608.2h's filed protector.
+-- battle that has gone, or whose protector CR 704.5y moved, whose defending
+-- player is the seat recorded as it joined combat.
 -- Those are attackSpec below; Pawl.CombatSpec keeps rule 508's own cases.
 --
 -- Also the pieces rule 310 needed underneath it, exercised here because this is
@@ -442,8 +443,8 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     -- attacking creature that is attacking nothing. Its swampwalk still refers to
     -- a defending player, and CR 508.5's second sentence names the protector it
     -- had before it was removed from combat -- carol, the seat with the Swamp,
-    -- read off CR 608.2h's filed designation. Reading the departed battle live
-    -- finds no object at all and would call this block legal.
+    -- read off Combat.attackedUnder. Reading the departed battle live finds no
+    -- object at all and would call this block legal.
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Swamp"]
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of
@@ -474,10 +475,10 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
       _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and two Bolts"
   Spec.it s "CR 508.5 the departed battle's CONTROLLER is not the seat that is read" $ do
-    -- THE FALSIFIER for reading the departed battle's last known CONTROLLER where
-    -- CR 508.5 names its protector. The Swamp sits with alice, who controlled the
-    -- Siege and attacks with the Wraith; carol, who protected it, holds an Island.
-    -- A controller-reading fallback would call this block illegal.
+    -- THE FALSIFIER for reading the departed battle's CONTROLLER where CR 508.5
+    -- names its protector. The Swamp sits with alice, who controlled the Siege
+    -- and attacks with the Wraith; carol, who protected it, holds an Island. A
+    -- controller-reading fallback would call this block illegal.
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith", "Swamp"] [] ["Goblin Piker", "Island"]
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of
@@ -491,8 +492,8 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
   -- both of alice's opponents defend (CR 802.2, the default option) and bob heads
   -- CR 802.4's APNAP order, so "the protector of the battle that creature was
   -- attacking" and "the first defending player" name different seats. CR 508.5's
-  -- second sentence is what has to be read off CR 608.2h's filed designation,
-  -- there being no live battle left to ask.
+  -- second sentence is what has to be read off the recorded seat, there being no
+  -- live battle left to ask.
   --
   -- The pair differs in one thing -- which of bob and carol holds the Swamp -- and
   -- the two readings answer it the opposite way round, so neither case can pass on
@@ -606,7 +607,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     -- PROTECTOR -- the clause the candidate list already answers -- leaving the
     -- controller clause unproven.
     (gs, battle, mine, theirs, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker"] (replicate 5 "Mountain") []
-    (board, spell) <- seizing s registry gs
+    (board, spell) <- seizing s registry S.bob gs
     case (mine, theirs) of
       ([attacker], land : _) -> do
         let stolen = runToEndOfCombat (seizeAnswer battle spell battle) board
@@ -638,6 +639,32 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertEqWith s "where the theft leg left it tapped for the spell" (fmap Object.tapped (Game.lookupObject land stolen)) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have one attacker and five Mountains"
     Spec.assertBool s (Projection.controllerOf battle gs == Just S.alice) "alice controlled the Siege before either leg"
+  Spec.it s "CR 508.5 whole cards: a protector who steals the attacked Siege keeps the block" $ do
+    -- CR 508.5's SECOND sentence with the battle still on the battlefield, which
+    -- is the case the last-known designation cannot reach. carol protects alice's
+    -- Siege and then takes it, so she is a player who can't be its protector (CR
+    -- 310.12a) and rule 704.5y re-chooses bob; CR 506.4 removed the battle from
+    -- combat as that happened, and rule 508.5 then names the protector it had
+    -- BEFORE the removal -- carol -- where the live designation names bob.
+    --
+    -- The pair differs in ONE thing: which of bob and carol holds the board's
+    -- only Bog Wraith. Both of alice's opponents defend (CR 802.2), so nothing
+    -- but the seat rule 508.5 names decides who may block the Piker, and the two
+    -- readings answer it the opposite way round.
+    (byCarol, battle, piker) <- seizedByProtector s registry S.carol
+    (byBob, _, otherPiker) <- seizedByProtector s registry S.bob
+    -- GAMEPLAY FIRST, on CR 509.1a's own question: the Piker is a 2/1 and the
+    -- Wraith a 3/3, so "may block" and "may not" are a dead attacker and a live
+    -- one (CR 510.1d, CR 704.5g).
+    Spec.assertBool s (not (S.onBattlefield piker byCarol)) "carol protected the Siege, so her Wraith blocks the Piker and kills it"
+    Spec.assertBool s (S.onBattlefield otherPiker byBob) "the twin, one seat apart: bob protects it only after the theft, so his Wraith may not block"
+    -- The premises, after the gameplay assertions so neither can absorb a
+    -- mutation of them.
+    Spec.assertEqWith s "CR 704.5y: bob protects the Siege once carol has taken it" (protectorOf battle byCarol) (Just S.bob)
+    Spec.assertEqWith s "CR 506.4: carol controls it, which is what moved the designation" (Projection.controllerOf battle byCarol) (Just S.carol)
+    Spec.assertBool s (Set.member piker (Combat.Type.attackingNothing (GameState.combat byCarol))) "CR 506.4c: the Piker is attacking nothing"
+    Spec.assertEqWith s "CR 802.2: both opponents defend" (Combat.Type.defenders (GameState.combat byCarol)) [S.bob, S.carol]
+    Spec.assertEqWith s "CR 802.2a's third sentence: carol is the recorded seat" (Map.lookup piker (Combat.Type.attackedUnder (GameState.combat byCarol))) (Just S.carol)
   Spec.it s "CR 508.4 the other road into combat records the same two seats" $ do
     -- CR 506.4's comparand is written by both writers of `attackers`, and a
     -- creature put onto the battlefield attacking never went through CR 508.1b.
@@ -933,7 +960,7 @@ conscriptAnswer spell victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
   _ -> protectTo S.bob p
 
--- Put a Word of Seizing in bob's hand, giving back the board and the card.
+-- Put a Word of Seizing in `who`'s hand, giving back the board and the card.
 --
 -- Word of Seizing, {3}{R}{R} Instant: "Split second. Untap target permanent and
 -- gain control of it until end of turn. It gains haste until end of turn."
@@ -945,11 +972,12 @@ seizing ::
   (Monad m) =>
   Spec.Spec m n ->
   Registry.Registry m ->
+  PlayerId.PlayerId ->
   GameState.GameState ->
   m (GameState.GameState, ObjectId.ObjectId)
-seizing s registry gs = do
+seizing s registry who gs = do
   word <- S.printingOf s registry "Word of Seizing"
-  let (spell, handed) = S.addHandCard word S.bob gs
+  let (spell, handed) = S.addHandCard word who gs
   pure (handed, spell)
 
 -- Announce the attack at the battle, and cast `spell` at `victim` the first time
@@ -983,6 +1011,34 @@ runToEndOfCombat answer gs =
               Phase.PostcombatMain
             ]
       }
+
+-- carol protects alice's Siege, alice attacks it with a Goblin Piker, and carol
+-- takes the battle with a Word of Seizing in the declare attackers step's
+-- priority round -- wound to the end of combat, so CR 509 and CR 510 both run.
+-- `blockerSeat` holds the board's only Bog Wraith, and both of alice's opponents
+-- defend (CR 802.2), so nothing but CR 508.5's seat decides who may block.
+seizedByProtector ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+seizedByProtector s registry blockerSeat = do
+  let wraith who = ["Bog Wraith" | who == blockerSeat]
+  (gs, battle, mine, _, _) <-
+    battleCombatOf s registry S.carol S.carol ["Goblin Piker"] (wraith S.bob) (replicate 5 "Mountain" <> wraith S.carol)
+  (board, spell) <- seizing s registry S.carol (bothDefending gs)
+  case mine of
+    [attacker] -> pure (runToEndOfCombat (seizeAndProtect battle spell) board, battle, attacker)
+    _ -> Spec.assertFailure s "fixture should have exactly one attacker"
+
+-- seizeAnswer aimed at the battle, naming bob for CR 704.5y's re-choice once
+-- carol controls it. Two candidates make that a real prompt: alice and bob are
+-- both opponents of carol.
+seizeAndProtect :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+seizeAndProtect battle spell p = case p of
+  Prompt.ChooseProtector {} -> S.bob
+  _ -> seizeAnswer battle spell battle p
 
 -- CR 310.6 / CR 120.3h: damage dealt to a battle removes that many defense
 -- counters, and CR 115.4 is what lets a damage spell name one.
