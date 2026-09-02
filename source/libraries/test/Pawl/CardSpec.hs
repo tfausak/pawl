@@ -345,7 +345,7 @@ vanillaFace name typeLine =
       Face.openingHandActions = [],
       Face.specialActions = [],
       Face.additionalCosts = [],
-      Face.maximumX = Nothing,
+      Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.enchant = [],
@@ -1665,7 +1665,7 @@ cardCounts card =
     -- CR 101.1's ceiling on CR 601.2b's X, which every printing states as a
     -- per-board amount (Soul Immolation's "the greatest toughness among
     -- creatures you control").
-    <> concatMap quantityCounts (Maybe.maybeToList (Face.maximumX card))
+    <> concatMap quantityCounts (Face.maximumX card)
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.power card))
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
     <> concatMap staticAbilityCounts (Face.staticAbilities card)
@@ -5756,7 +5756,7 @@ cardFilters card =
     Unframed
     ( concatMap keywordFilters (Set.toList (Face.keywords card))
         <> concatMap quantityFilters (Maybe.maybeToList (Face.characteristicPT card))
-        <> concatMap quantityFilters (Maybe.maybeToList (Face.maximumX card))
+        <> concatMap quantityFilters (Face.maximumX card)
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap targetSlotFilters (Face.enchant card)
@@ -6657,7 +6657,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let unrefusable c = declaresVariable c && not (Cost.demandGrowsWithX c)
         unrefusableX = any unrefusable . spellCostsOf
-        unbounded f = unrefusableX f && Maybe.isNothing (Face.maximumX f)
+        unbounded f = unrefusableX f && null (Face.maximumX f)
         offenders = filter (anyFace unbounded . Printing.card) ps
     -- Guards the sweep against passing vacuously: the pool must hold a card
     -- whose X reaches a cost only through a component with no growing demand.

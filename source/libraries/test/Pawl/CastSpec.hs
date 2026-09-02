@@ -3415,6 +3415,124 @@ wearTearSpec s registry = Spec.describe s "WearTear" $ do
     Spec.assertEqWith s "no enchantment: Wear alone, and no fused cast" (namesOffered artifactOnly) [wearName]
     Spec.assertEqWith s "an enchantment as well: the fused cast returns" (namesOffered bothTargets) [wearName, tearName, fusedName]
 
+-- Synthetic Bounded Blaze {X}{R} // Synthetic Bounded Bounty {X}{W}, both halves
+-- Instants with fuse
+-- (data/cards/synthetic-bounded-blaze-synthetic-bounded-bounty.json): "X can't be
+-- greater than the number of creatures you control. Synthetic Bounded Blaze deals
+-- X damage to each opponent." // "X can't be greater than the number of artifacts
+-- you control. You gain X life."
+--
+-- SYNTHETIC because no printing pairs fuse with X. Scryfall `keyword:fuse`,
+-- 2026-09-01, returns seventeen cards and none of them prints an {X} anywhere;
+-- `o:"X can't be greater than"` returns six and none of them is a split card. So
+-- CR 709.4c's combined view of two halves that each bound X has no printing, and
+-- CR 702.102b's fused split spell is the only cast that could be priced against
+-- one.
+--
+-- The two ceilings count DIFFERENT things, and neither counts a land: the mana is
+-- the same on every board below, so nothing here can pass because a cast was
+-- unaffordable.
+--
+-- CR 101.2 is what makes both bind -- each sentence is a "can't" and beats the
+-- permission on its own -- so the fused spell's ceiling is the lesser of them,
+-- which Pawl.Engine.Cost.maximumX takes.
+blazeName, bountyName, boundedFusedName :: CardName.CardName
+blazeName = CardName.MkCardName (Text.pack "Synthetic Bounded Blaze")
+bountyName = CardName.MkCardName (Text.pack "Synthetic Bounded Bounty")
+boundedFusedName = CardName.MkCardName (Text.pack "Synthetic Bounded Blaze//Synthetic Bounded Bounty")
+
+-- Three seats, so "each opponent" is not the same set as "each player": an
+-- ObjectRef.EachPlayer in the left half's place would take life from alice too.
+--
+-- Alice controls three Goblin Pikers -- the left half's ceiling, 3 -- and
+-- `artifacts` Chromatic Spheres, which is the right half's. Eight lands, four of
+-- each colour, pay {4}{R}{W} with room to spare, so every case below is affordable
+-- at every X it announces.
+boundedBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+boundedBoard mountain plains piker sphere blaze artifacts =
+  let withLands = S.landsFor plains S.alice 4 (S.landsFor mountain S.alice 4 S.threePlayerGame)
+      place printing g = snd (S.addCreature printing S.alice g)
+      withCreatures = List.foldl' (\g _ -> place piker g) withLands [1 .. 3 :: Int]
+      withArtifacts = List.foldl' (\g _ -> place sphere g) withCreatures [1 .. artifacts]
+      (spellId, withSpell) = S.addHandCard blaze S.alice withArtifacts
+   in ( spellId,
+        withSpell
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Announces this X and answers everything else the ordinary way.
+answerBoundedX :: Natural -> Prompt.Prompt r -> r
+answerBoundedX n p = case p of
+  Prompt.ChooseX {} -> n
+  _ -> S.identityAnswer p
+
+boundedFuseXSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boundedFuseXSpec s registry = Spec.describe s "BoundedFuseX" $ do
+  -- The PROVING case, and the pair to the one below: two boards differing in
+  -- exactly one Chromatic Sphere, so the refusal is the RIGHT half's ceiling and
+  -- nothing else. An engine keeping only the left half's ceiling reads 3 here,
+  -- permits the announcement, and deals two to each opponent.
+  Spec.it s "CR 709.4c a fused cast is refused an X above the RIGHT half's ceiling" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
+    let (spellId, board) = boundedBoard mountain plains piker sphere blaze 1
+        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.alice spellId boundedFusedName Facing.FaceUp; Stack.resolveTop)
+    Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "carol took nothing" (S.lifeOf S.carol after) (Just 20)
+    Spec.assertEqWith s "and alice gained nothing" (S.lifeOf S.alice after) (Just 20)
+    -- CR 601.2e's rewind: the whole casting is undone, not just the half that
+    -- broke its own ceiling.
+    Spec.assertEqWith s "the card is still in alice's hand" (S.handSize S.alice after) 1
+  -- The CONTROL. One more artifact makes the right half's ceiling 2, so the same
+  -- announcement on the same mana is legal and both halves resolve.
+  Spec.it s "CR 702.102b an X within both halves' ceilings is announced and both halves resolve" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
+    let (spellId, board) = boundedBoard mountain plains piker sphere blaze 2
+        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.alice spellId boundedFusedName Facing.FaceUp; Stack.resolveTop)
+    Spec.assertEqWith s "bob took two" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "carol took two" (S.lifeOf S.carol after) (Just 18)
+    Spec.assertEqWith s "and alice gained two" (S.lifeOf S.alice after) (Just 22)
+    Spec.assertEqWith s "the card left alice's hand" (S.handSize S.alice after) 0
+  -- The other direction, on the board the first case refuses: CR 709.3b puts ONE
+  -- half on the stack, so a cast of the left half alone is priced against the left
+  -- half's ceiling and the right half's does not reach it.
+  Spec.it s "CR 709.3b one half alone is bound by that half's ceiling only" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
+    let (spellId, board) = boundedBoard mountain plains piker sphere blaze 1
+        after = S.runPure (answerBoundedX 3) board (do Cast.castSpell S.alice spellId blazeName Facing.FaceUp; Stack.resolveTop)
+    Spec.assertEqWith s "bob took three" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "carol took three" (S.lifeOf S.carol after) (Just 17)
+    -- The right half was never cast, so its life gain never happened.
+    Spec.assertEqWith s "and alice gained nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "the card left alice's hand" (S.handSize S.alice after) 0
+  -- The right half alone, for the same reason in the other half's favour: its
+  -- ceiling is 1 on this board, so an X of 2 is refused where the fused cast's
+  -- control above allowed it on a board with a second artifact.
+  Spec.it s "CR 709.3b the right half alone is refused an X above its own ceiling" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
+    let (spellId, board) = boundedBoard mountain plains piker sphere blaze 1
+        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.alice spellId bountyName Facing.FaceUp; Stack.resolveTop)
+    Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and the card is still in her hand" (S.handSize S.alice after) 1
+
 -- Victor Mancha, Runaway {5} Legendary Artifact Creature -- Human Hero 4/4:
 -- "When Victor Mancha enters, exile target card from your graveyard. You may
 -- play it for as long as you control Victor Mancha." The pool's only
@@ -4049,6 +4167,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   corrosiveGaleSpec s registry
   waxWaneSpec s registry
   wearTearSpec s registry
+  boundedFuseXSpec s registry
   aftermathSpec s registry
   modalCastSpec s registry
   entwineSpec s registry

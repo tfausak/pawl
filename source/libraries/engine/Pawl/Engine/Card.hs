@@ -120,7 +120,7 @@ faceDownFace listed =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
-      Face.maximumX = Nothing,
+      Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
@@ -370,13 +370,13 @@ merge2 l r =
       -- object's own timestamp.
       Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
       -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
-      -- the combined view keeps whichever half prints one. The first, the printed
-      -- boxes above's rule. Reachable since fuse landed, Face.costReductions'
-      -- reason: Pawl.Engine.Cost.maximumX prices a fused cast off this view (CR
-      -- 702.102b). Not implemented: two halves each bounding X, where CR 709.4c
-      -- gives the fused spell both ceilings and this field holds one (#2789). No
-      -- printed fuse card has X at all.
-      Face.maximumX = firstJust (Face.maximumX l) (Face.maximumX r),
+      -- the combined view has BOTH halves', and CR 702.102b hands the pair to a
+      -- fused split spell. Concatenated rather than left-biased for that reason,
+      -- unlike the printed boxes above: CR 101.2 makes each "can't" bind, so
+      -- Pawl.Engine.Cost.maximumX takes the least of them, which is the ceiling a
+      -- fused cast is priced against. Reachable since fuse landed,
+      -- Face.costReductions' reason.
+      Face.maximumX = Face.maximumX l <> Face.maximumX r,
       -- CR 709.4c once more: "this spell can't be countered" is an ability in a
       -- half's text box (CR 113.6g puts it on the stack), so the combined view has
       -- it if EITHER half prints it -- and CR 702.102b hands that to a fused split
@@ -392,8 +392,8 @@ merge2 l r =
       -- half's clause.
       --
       -- Nothing proves the gameplay path: no printing pairs fuse with a
-      -- can't-be-countered clause -- every fuse card is a Dragon's Maze split card
-      -- plus Takesies // Backsies, and none of them says it -- so what the suite
+      -- can't-be-countered clause -- Scryfall `keyword:fuse o:"can't be
+      -- countered"`, 2026-09-01, no hit -- so what the suite
       -- holds is the FOLD, in Pawl.CardSpec's "CR 709.4 a split card's
       -- characteristics are its two halves combined", where only the right half
       -- carries the clause. The reader beyond it is one line already driven for
@@ -1197,7 +1197,7 @@ subtractHalf face =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
-      Face.maximumX = Nothing,
+      Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
