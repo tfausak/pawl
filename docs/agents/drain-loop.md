@@ -187,12 +187,14 @@ overwritten by another's, and restoring it injected a different unit's
 in-flight code into the tree --- a corruption no build catches, because both
 sides compile.
 
-**One build at a time, machine-wide.** The GHC job semaphore shares compile
+**Builds are counted, machine-wide.** The GHC job semaphore shares compile
 slots; it does not stop several worktrees running `cabal` at once, and with
 three going an 8 GB machine is unusable. Every `cabal` invocation in every
-lane goes through `script/with-build-lock.sh`, which queues on a lock
-directory and takes over a lock whose owner has died. Put that in every brief;
-more lanes are fine, more builds are not.
+lane goes through `script/with-build-lock.sh`, which queues on lock files and
+takes over a lock whose owner has died. It admits two builds at once
+(`PAWL_BUILD_SLOTS`, measured 2026-09-02: one `cabal test` peaks near 1.8 GB
+resident); set it to one if the machine is unhappy. Put that in every brief;
+lanes beyond the slot count just queue.
 
 **The GHC job semaphore breaks under concurrency.** `CLAUDE.md` describes the
 symptom and the escape (`cabal test --no-semaphore -j4`); what the loop adds is
