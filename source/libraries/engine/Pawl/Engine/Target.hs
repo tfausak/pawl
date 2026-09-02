@@ -1346,9 +1346,10 @@ piledOffer perspective gs = Set.map replace
 -- leaves nothing to draw, and CR 702.143e makes every foretold card such a
 -- pile. Filtered rather than trusted, so an answer naming a card outside the
 -- pile falls back to the first of them: an interpreter's answer is not a
--- player's choice, and neither caller's legality gate would catch a smuggled
--- card, CR 406.4 keeping every exiled card a legal target of an unqualified
--- slot.
+-- player's choice, and the gates below judge what the draw named rather than
+-- which pile it came out of -- so a card smuggled in from another pile passes
+-- them wherever the slot is unqualified, rule 406.4 keeping every exiled card
+-- legal for one.
 --
 -- A pile whose members have gone is DROPPED rather than kept: an answer holding
 -- a pile no longer offered is short by one target, which selectionLegal then
