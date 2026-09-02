@@ -2303,9 +2303,10 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- ignored convert arms no reflexive", the case that proves it.
 --
 -- Not implemented: only the instruction IMMEDIATELY before the arm is asked
--- about, and an instruction that happens without recording a game event would
--- suppress an arm that follows it; no card in `data/cards/` writes either shape
--- (#3057).
+-- about, an instruction that happens without recording a game event would
+-- suppress an arm that follows it, and an Effect.ForEach body's instructions go
+-- through applyEffectWith directly and are not gated at all; no card in
+-- `data/cards/` writes any of the three shapes (#3057).
 applyClauseEffects ::
   ObjectId ->
   (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
@@ -6269,11 +6270,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- a loss rather than two assignments, which is what puts a LifeGained and a
   -- LifeLost in the log.
   --
+  -- The LOWERED side goes through changeLifeByDelta, so it is proposed as a life
+  -- loss and CR 701.12c's "replacement effects may modify these gains and losses"
+  -- is reachable; ReplacementSpec's Bloodletter group proves it.
+  --
   -- Not implemented: CR 701.12c's deferral to CR 119.7-8, under which an
   -- exchange that would raise a player who can't gain life doesn't happen.
-  -- Vacuous: Pawl.Types.PlayerEffect has no such arm to consult. Nor does the
-  -- lowered side go through Event.resolveLifeLoss the way SetLifeTotal's does, so
-  -- no replacement reaches it (#2544).
+  -- Vacuous: Pawl.Types.PlayerEffect has no such arm to consult (#3078).
   Effect.ExchangeLifeTotals sides -> do
     gs <- State.get
     let twoSides = case sides of
@@ -6293,8 +6296,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- so the gain and the loss it decomposes into share one
         -- Pawl.Types.EventGroup rather than reading as two events in sequence.
         Event.simultaneously $ do
-          Event.changeLife this (thatLife - thisLife)
-          Event.changeLife that (thisLife - thatLife)
+          changeLifeByDelta this (thatLife - thisLife)
+          changeLifeByDelta that (thisLife - thatLife)
       -- CR 701.12a: if the entire exchange can't be completed, no part of it
       -- occurs.
       Nothing -> pure ()
@@ -6306,12 +6309,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- recipient's own (Biorhythm). Every evaluation and delta is read off `gs`, the
   -- state before any life moves (CR 608.2f).
   --
-  -- A DOWNWARD delta goes through Event.resolveLifeLoss first, CR 614.1's funnel
-  -- for the class, since rule 119.5 spells a lower total as the player losing "the
-  -- necessary amount of life" and a replacement watching life loss reaches it. The
-  -- SETTLED loss is what moves the total, so a row may leave the player somewhere
-  -- other than the number the card named. An upward delta is a life GAIN and
-  -- proposes nothing here.
+  -- Each delta goes through changeLifeByDelta, which proposes a DOWNWARD one as a
+  -- life loss, since rule 119.5 spells a lower total as the player losing "the
+  -- necessary amount of life".
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -6325,12 +6325,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- An undeterminable total is no instruction, asked per recipient: one
         -- seat's unanswerable count says nothing about the others.
         Monad.forM_ (evaluateForRecipient viewOf context gs resolving source pid quantity) $ \total ->
-          let delta = total - Player.life player
-           in if delta < 0
-                then do
-                  settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating (negate delta))
-                  Event.changeLife pid (negate (toInteger settled))
-                else Event.changeLife pid delta
+          changeLifeByDelta pid (total - Player.life player)
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
   -- game, not the keys of GameState.players, which keep a departed seat's row.
@@ -6340,10 +6335,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- FILTERED, NOT TRUSTED, all-or-nothing: only a whole permutation is a
   -- legal answer, so a bad one falls back to redistributing among nobody.
   --
+  -- A LOWERED total goes through changeLifeByDelta, the ExchangeLifeTotals arm's
+  -- road: rule 119.5's loss, proposed so a replacement reaches it (CR 614.1).
+  --
   -- Not implemented: CR 119.7-8's own restrictions on a player who can't gain or
-  -- lose life (vacuous, as for ExchangeLifeTotals), nor CR 810.9f's "not more
-  -- than one member of each team", which is a Two-Headed Giant rule (#2849). A lowered total
-  -- does not go through Event.resolveLifeLoss here either (#2544).
+  -- lose life (vacuous, as for ExchangeLifeTotals) (#3078), nor CR 810.9f's "not
+  -- more than one member of each team", which is a Two-Headed Giant rule (#2849).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
     let candidates = Game.stillPlaying gs
@@ -6362,7 +6359,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- one action taken on every seat it names, so the whole permutation's gains
       -- and losses share one Pawl.Types.EventGroup.
       Monad.when isPermutation . Event.simultaneously . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
-        Event.changeLife taker (lifeOf giver - lifeOf taker)
+        changeLifeByDelta taker (lifeOf giver - lifeOf taker)
   -- CR 702.179c: each named player's speed increases by this much. Its two
   -- readings -- a player who HAS speed goes up, a player with NONE has their
   -- speed BECOME the value -- are spelled separately, since DecreaseSpeed below
@@ -8924,6 +8921,24 @@ bindAmountSlot :: ObjectId -> SlotName -> Natural -> GameState -> GameState
 bindAmountSlot holder slot n gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
+-- CR 119.5 / 701.12c: move a player's life total by a delta. A DOWNWARD delta is
+-- a life loss and goes through Event.resolveLifeLoss first, CR 614.1's funnel for
+-- the class, so a replacement watching life loss reaches it and the SETTLED loss
+-- is what moves the total -- which is why a player may end up somewhere other
+-- than the total the effect named. An upward delta is a life GAIN and proposes
+-- nothing here.
+--
+-- The one road for every arm that arrives at a TOTAL rather than at an amount:
+-- Effect.SetLifeTotal, Effect.ExchangeLifeTotals and
+-- Effect.RedistributeLifeTotals.
+changeLifeByDelta :: PlayerId -> Integer -> Game ()
+changeLifeByDelta pid delta =
+  if delta < 0
+    then do
+      settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating (negate delta))
+      Event.changeLife pid (negate (toInteger settled))
+    else Event.changeLife pid delta
 
 -- CR 701.23: do to a found card what the search said -- a move for every
 -- destination and, for one of them, a CR 701.20a reveal first, through the CR
