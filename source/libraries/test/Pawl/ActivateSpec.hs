@@ -36,6 +36,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -106,7 +107,7 @@ chooseNoModes p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -137,6 +138,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   goldenEggSpec s registry
   presenceOfGondSpec s registry
   retractionHelixSpec s registry
+  anyPlayerActivationSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -323,6 +325,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
                   },
               ActivatedAbility.modal = singleModeAbility [] Map.empty,
               ActivatedAbility.restrictions = [],
+              ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
               ActivatedAbility.name = Nothing
             }
@@ -910,6 +913,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
                 (ModeSelection.ChooseExactly 1)
             )
             []
+            Activator.Controller
             Nothing
             Nothing
         after = S.runPure chooseNoModes gs (Activate.activateAbility S.alice oid twoModes)
@@ -1795,8 +1799,9 @@ printedActivationWholePhaseSpec s registry = Spec.describe s "PrintedActivationW
 
   -- CR 102.1's axis, unchanged by the widening: Jade Statue prints no "your", so
   -- its TurnScope is EachTurn and bob's combat phase is a window for it too.
-  -- Asked of alice, who controls it -- CR 602.2 restricts activation to the
-  -- controller -- on a turn that is not hers.
+  -- Asked of alice, who controls it: the Statue prints no "any player may
+  -- activate" clause, so CR 602.2's default keeps the activation hers -- on a
+  -- turn that is not.
   Spec.it s "CR 102.1 the window is EachTurn, so an opponent's combat phase qualifies" $ do
     statue <- S.printingOf s registry "Jade Statue"
     mountain <- S.printingOf s registry "Mountain"
@@ -1953,7 +1958,7 @@ tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"
 shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
   Just ab -> ab
-  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing Nothing
+  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
 
 -- alice controls Tovolar showing his BACK face -- "{X}{R}{G}: Target Wolf or
 -- Werewolf you control gets +X/+0 and gains trample until end of turn" -- a
@@ -3558,6 +3563,62 @@ grantedAbility printed oid gs = case filter (/= theAbility printed) (Projection.
   ability : _ -> Just ability
   [] -> Nothing
 
+-- CR 602.1b: an activation instruction "may state which players can activate
+-- that ability", which is what CR 602.2's "unless the object specifically says
+-- otherwise" defers to. The pool's two producers both print it as "Any player
+-- may activate this ability": Glittering Lion ({2}{W} Creature -- Cat 2/2,
+-- "{3}: Until end of turn, this creature loses 'Prevent all damage that would be
+-- dealt to this creature.'") and Aether Storm ({3}{U} Enchantment, "Pay 4 life:
+-- Destroy this enchantment. It can't be regenerated.").
+--
+-- The CONTROL is Withered Wretch ("{1}: Exile target card from a graveyard"),
+-- which alice controls on the SAME board: same zone, same controller, a generic
+-- activation cost bob's lands pay exactly as they pay the Lion's, and a target
+-- that lives in a graveyard, so neither seat's offer turns on who could aim it.
+-- The two abilities differ in the printed clause and in nothing else.
+--
+-- Both seats are asked about both permanents, and that is what makes the
+-- negative discriminate: alice is offered the Wretch's ability on this very
+-- board, so bob's not being offered it is CR 602.2's default rather than a
+-- missing target or missing mana.
+--
+-- The Aether Storm case drives the offer rather than reading it -- the
+-- activation is taken from the menu, so an ability the gate withheld is one no
+-- board below can activate -- and its assertions are where CR 602.1a is read:
+-- the life comes out of the ACTIVATING player, not the controller.
+anyPlayerActivationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+anyPlayerActivationSpec s registry = Spec.describe s "Any player may activate" $ do
+  let offeredTo pid oid gs = any (\a -> case a of A.Activate o _ -> o == oid; _ -> False) (Action.legalActions pid gs {GameState.priority = Just pid})
+      board = do
+        plains <- S.printingOf s registry "Plains"
+        lionPrinting <- S.printingOf s registry "Glittering Lion"
+        wretchPrinting <- S.printingOf s registry "Withered Wretch"
+        let lands = S.landsFor plains S.bob 3 (S.landsFor plains S.alice 3 (Setup.emptyGame S.bothPlayers))
+            (lion, g1) = S.addCreature lionPrinting S.alice lands
+            (wretch, g2) = S.addCreature wretchPrinting S.alice g1
+            (_, g3) = S.addGraveyardCard plains S.alice g2
+        pure (lion, wretch, g3 {GameState.phase = Phase.PrecombatMain})
+
+  Spec.it s "CR 602.1b the clause offers the ability to a player who controls neither the permanent nor its controller's seat" $ do
+    (lion, wretch, gs) <- board
+    Spec.assertBool s (offeredTo S.bob lion gs) "bob is offered the Lion's {3}"
+    Spec.assertBool s (not (offeredTo S.bob wretch gs)) "CR 602.2 and the Wretch's {1}, printing no such clause, stays alice's"
+    Spec.assertBool s (offeredTo S.alice wretch gs) "which alice is offered on this same board"
+    Spec.assertBool s (offeredTo S.alice lion gs) "CR 602.1b widens rather than moves: the Lion's controller keeps it too"
+
+  -- The SECOND producer, and a different cost vocabulary: Aether Storm's is life
+  -- rather than mana, so nothing here can pass because of a mana source.
+  Spec.it s "CR 602.1a an opponent's activation destroys Aether Storm and the life comes out of the opponent" $ do
+    stormPrinting <- S.printingOf s registry "Aether Storm"
+    let (storm, g0) = S.addCreature stormPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        gs = g0 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+        offers = [ab | A.Activate o ab <- Action.legalActions S.bob gs, o == storm]
+        step g ab = S.runPure S.identityAnswer (S.runPure S.identityAnswer g (Activate.activateAbility S.bob storm ab)) Stack.resolveTop
+        after = S.settleSba (List.foldl' step gs offers)
+    Spec.assertBool s (not (S.onBattlefield storm after)) "the enchantment its controller never touched has left the battlefield"
+    Spec.assertEqWith s "CR 602.1a and the 4 life came out of the player who activated it" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "rather than out of its controller" (S.lifeOf S.alice after) (Just 20)
+
 -- CR 611.2 / 613.1f, the RESOLUTION half of the grant Presence of Gond makes
 -- from a printed static ability: Retraction Helix ({U} Instant, "Until end of
 -- turn, target creature gains '{T}: Return target nonland permanent to its
@@ -3917,9 +3978,10 @@ threadedGate pid oid ability gs =
 -- Action.legalActions' two ACTIVATION lists rebuilt out of the plain per-call
 -- wrappers, which hoist nothing: Activate.activatable projects each object for
 -- itself and builds a fresh base pool and a fresh mana-source sweep per ability,
--- and Mana.manaSources takes its own board. Same zones in the same order as the
--- enumeration, so the two lists are comparable element for element and a hoist
--- that reordered the menu would show up here.
+-- and Mana.manaSources takes its own board. Same candidate objects in the same
+-- order as the enumeration -- Activate.activationSources, its plain half -- so
+-- the two lists are comparable element for element and a hoist that reordered
+-- the menu would show up here.
 --
 -- Only those two, because they are the only ones #716 and #1073 touched. The
 -- other kinds of action in the menu are enumerated identically either way, so
@@ -3927,7 +3989,7 @@ threadedGate pid oid ability gs =
 referenceActivations :: PlayerId.PlayerId -> GameState.GameState -> [A.Action]
 referenceActivations pid gs =
   let forObject oid = fmap (A.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
-      zones = Projection.controls pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs
+      zones = Activate.activationSources pid gs
    in concatMap forObject zones <> fmap A.ActivateManaAbility (Mana.manaSources Cost.manaActivations pid gs)
 
 -- The enumeration's activation slice. EXHAUSTIVE over Action, so a new kind of

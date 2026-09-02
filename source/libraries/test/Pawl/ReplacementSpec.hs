@@ -21,6 +21,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -49,6 +50,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -140,7 +142,7 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing
 
 wasAskedToReplace :: [Response.Response] -> Bool
 wasAskedToReplace responses =
@@ -4203,21 +4205,24 @@ jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (C
 -- where Gliding Licid's hangs on ActivatedAbility.name. The two are the whole of
 -- what Modification.LoseNamedAbility reaches.
 --
--- Not implemented: "Any player may activate this ability", so pawl's Lion asks CR
--- 602.1a's default and only its controller may activate. Stricter than printed,
--- and out of these cases' way -- alice activates her own Lion (#2213).
+-- The card's LAST sentence, "Any player may activate this ability", is CR
+-- 602.1b's activation instruction and pawl carries it on
+-- ActivatedAbility.activator; the case below where bob activates alice's Lion is
+-- what proves it at gameplay level, and Pawl.ActivateSpec's "Any player may
+-- activate" group is where the offer itself is read.
 --
 -- Two seats because the damage needs a source that is not the Lion; three lands
--- because {3} is the whole cost; a 2-power source against a 2/2 so one number
--- decides both the prevention and the lethality -- a 1-power source would leave
--- the Lion alive under either implementation.
+-- for each seat because {3} is the whole cost and both seats activate it here; a
+-- 2-power source against a 2/2 so one number decides both the prevention and the
+-- lethality -- a 1-power source would leave the Lion alive under either
+-- implementation.
 glitteringLionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ do
   let board = do
         plains <- S.printingOf s registry "Plains"
         lionPrinting <- S.printingOf s registry "Glittering Lion"
         pikerPrinting <- S.printingOf s registry "Goblin Piker"
-        let base = S.landsInPlay plains 3
+        let base = S.landsFor plains S.bob 3 (S.landsInPlay plains 3)
             (lion, g1) = S.addCreature lionPrinting S.alice base
             (attacker, g2) = S.addCreature pikerPrinting S.bob g1
         pure (lion, attacker, g2 {GameState.priority = Just S.alice})
@@ -4259,6 +4264,29 @@ glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ 
         -- CR 602.2b: the {3} was really paid, so the removal above is the
         -- ability's effect rather than something a free activation produced.
         Spec.assertEqWith s "CR 602.2b: and the three lands paid for it" (S.tappedCount S.alice resolved) 3
+
+  -- THE CASE THE PRINTED CLAUSE EXISTS FOR, and the whole point of the card: the
+  -- player whose creature is trying to kill the Lion is the one who turns the
+  -- shield off. The activation is taken from bob's own MENU rather than handed to
+  -- Activate.activateAbility directly -- an ability CR 602.2's default withheld
+  -- is one this case cannot activate at all, and then the Lion survives and the
+  -- graveyard assertion below is what says so.
+  Spec.it s "CR 602.1b bob activates alice's Lion, and his Piker's 2 then kills it" $ do
+    (lion, attacker, g) <- board
+    let offered = g {GameState.priority = Just S.bob, GameState.phase = Phase.PrecombatMain}
+        offers = [ab | Action.Activate o ab <- Action.legalActions S.bob offered, o == lion]
+        step gs ability = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (Activate.activateAbility S.bob lion ability)) Stack.resolveTop
+        resolved = List.foldl' step offered offers
+        after = dealAndCheck lion attacker resolved
+    -- By NAME and over the whole graveyard, as the case above: CR 111.7's new
+    -- object means the destroyed Lion is not `lion` any more.
+    Spec.assertEqWith s "CR 704.5g the 2 kills the 2/2 whose opponent turned its prevention off" (graveyardNames S.alice after) [CardName.MkCardName (Text.pack "Glittering Lion")]
+    Spec.assertBool s (not (S.onBattlefield lion after)) "so it has left the battlefield"
+    -- CR 602.1a: the activating player pays. bob's three lands are spent and
+    -- alice's three are not, which is also what rules out the offer having been
+    -- served to alice under bob's name.
+    Spec.assertEqWith s "CR 602.1a bob's three lands paid for it" (S.tappedCount S.bob resolved) 3
+    Spec.assertEqWith s "and its controller's are untouched" (S.tappedCount S.alice resolved) 0
 
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's

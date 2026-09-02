@@ -28,6 +28,7 @@ import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -279,11 +280,16 @@ functionsIn delayed zone ability = case zoneFunctionedFrom delayed ability of
   Nothing -> zone == Zone.Battlefield
   Just named -> zone == named
 
--- CR 602.2: only an object's controller, or its owner if it has no controller,
--- may activate its activated ability. Both halves of that parenthetical are live
--- here, which is why this cannot simply be Projection.controllerOf: a card in a
--- hand or a graveyard has no controller at all (CR 108.4), and CR 400.3 puts
--- every card in either in its owner's.
+-- CR 602.2's DEFAULT activator: an object's controller, or its owner if it has
+-- no controller. Both halves of that parenthetical are live here, which is why
+-- this cannot simply be Projection.controllerOf: a card in a hand or a graveyard
+-- has no controller at all (CR 108.4), and CR 400.3 puts every card in either in
+-- its owner's.
+--
+-- The default only. CR 602.2's own "unless the object specifically says
+-- otherwise" is read one function down, in mayActivateGiven, so what this
+-- answers stays a fact about the OBJECT and its zone rather than about one
+-- ability's printed instructions.
 --
 -- Nothing for every other zone, matching abilitiesFor's silence there.
 activatorOf :: ObjectId -> GameState -> Maybe PlayerId
@@ -300,6 +306,51 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
     Zone.Hand -> Just (Object.owner obj)
     Zone.Graveyard -> Just (Object.owner obj)
     _ -> Nothing
+
+-- CR 602.2's whole permission conjunct: its default, and the "unless the object
+-- specifically says otherwise" that CR 602.1b lets an ability write.
+--
+-- The AnyPlayer arm keeps the ZONE gate rather than dropping activatorOfGiven
+-- altogether. That function answers Nothing for a zone abilities are not read
+-- from at all -- abilitiesForGiven's silence there -- so keeping it means a
+-- printed "any player" widens WHO and nothing else. `stillPlaying` is the other
+-- half: CR 800.4 takes a departed player out of the game, and "any player" is
+-- the players in it.
+--
+-- CR 602.1a is untouched by either arm: the cost is paid by whoever is
+-- activating, which is `pid` at every conjunct of activatableGiven and at every
+-- payment activateAbility makes.
+mayActivateGiven :: [Projection.ControlGrant] -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
+mayActivateGiven grants pid srcId ability gs = case ActivatedAbility.activator ability of
+  Activator.Controller -> activatorOfGiven grants srcId gs == Just pid
+  Activator.AnyPlayer -> Maybe.isJust (activatorOfGiven grants srcId gs) && elem pid (Game.stillPlaying gs)
+
+-- The objects whose activated abilities `pid` may be offered, which is the
+-- candidate half of CR 602.2 as mayActivateGiven above is the permission half:
+-- what this player controls, plus their own hand and graveyard (CR 400.3), plus
+-- CR 602.1b's exception -- a permanent someone else controls whose ability says
+-- any player may activate it.
+--
+-- ONE reader for both. Action.legalActions and Pawl.ActivateSpec's differential
+-- reference each used to build this list themselves, and the widening is exactly
+-- the kind of second candidate list that then goes stale: a gate that admitted
+-- the opponent's Glittering Lion would have offered it to nobody, because no
+-- enumeration named the Lion.
+--
+-- The exception arm reads the BATTLEFIELD only. Every printing of the clause is
+-- on a permanent (Scryfall o:"any player may activate" game:paper, 2026-09-02,
+-- 41 cards), and a hand or graveyard is its owner's alone anyway, so an arm
+-- there would offer nothing any card asks for.
+activationSources :: PlayerId -> GameState -> [ObjectId]
+activationSources pid gs = activationSourcesGiven (Projection.controlGrants gs) Map.empty pid gs
+
+activationSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
+activationSourcesGiven grants pcs pid gs =
+  let own = Projection.controlsGiven grants pid gs
+      mine = Set.fromList own
+      openToAnyone oid = any ((== Activator.AnyPlayer) . ActivatedAbility.activator) (abilitiesForGiven pcs oid gs)
+      others = filter (\oid -> not (Set.member oid mine) && openToAnyone oid) (Set.toList (GameState.battlefield gs))
+   in own <> others <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs
 
 -- CR 606.3 (CR 306.5d says the same for planeswalkers): a loyalty ability may be
 -- activated only with priority and an empty stack during a main phase of its
@@ -545,7 +596,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
       -- aimingSomewhere. Shared with the mode conjunct's own `fillable` rather
       -- than taken twice: they are the same question (CR 700.2a).
       aimable = candidateSlotsGiven pcs grants pools pid srcId modal fillable gs
-   in activatorOfGiven grants srcId gs == Just pid
+   in mayActivateGiven grants pid srcId ability gs
         && elem ability (abilitiesForGiven pcs srcId gs)
         && not (ManaAbility.isManaAbility ability)
         -- CR 702.61a's other limb -- "players can't ... activate abilities that

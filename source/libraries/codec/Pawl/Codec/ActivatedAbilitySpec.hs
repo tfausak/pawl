@@ -10,6 +10,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
@@ -75,6 +76,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
               (ModeSelection.ChooseExactly 1)
           )
           [ActivationRestriction.SorcerySpeed]
+          Activator.Controller
           Nothing
           Nothing
       )
@@ -92,6 +94,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           [ ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers)) TurnScope.EachTurn),
             ActivationRestriction.AttackedThisStep
           ]
+          Activator.Controller
           Nothing
           Nothing
       )
@@ -107,6 +110,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           (Cost.MkCost Nothing [])
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           []
+          Activator.Controller
           Nothing
           Nothing
       )

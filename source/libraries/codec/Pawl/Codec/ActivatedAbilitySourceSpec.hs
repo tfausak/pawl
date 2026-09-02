@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -26,6 +27,7 @@ ability =
     (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
     (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
     []
+    Activator.Controller
     Nothing
     Nothing
 
