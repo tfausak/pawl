@@ -1530,7 +1530,7 @@ playMedic decision wanted spellId gs =
 -- answer (Pawl.Engine.Resolve.applyClauseEffects).
 gainLifeConvertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
-  -- THE proving case: all four limbs on one board. alice casts Blossoming Calm
+  -- THE proving case: the first four limbs on one board. alice casts Blossoming Calm
   -- ({W} instant, "you can't be the target of spells or abilities your opponents
   -- control until your next turn. You gain 2 life"), gains 2, takes the "may",
   -- and the reflexive returns the mana value 2 artifact tapped.
@@ -1661,6 +1661,8 @@ gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
         after = S.runCombat answer staged
     Spec.assertEqWith s "CR 701.28e the second trigger's convert was ignored, so the mana value 4 artifact stayed in the graveyard" (battlefieldAndGraveyard statue after) stillInGraveyard
     Spec.assertEqWith s "the FIRST trigger's reflexive still returned the mana value 2 artifact tapped" (battlefieldAndGraveyard weathervane after) returnedTapped
+    -- Ratchet is the first creature combatBoardOf placed, so `take 1` names it
+    -- and a board that had lost it would read as [] rather than as somebody else.
     Spec.assertEqWith s "Ratchet converted once and stayed on its back face" (fmap (\oid -> ratchetReadings oid after) (take 1 ours)) [ratchetBackReadings]
     Spec.assertEqWith s "both lifelink sources connected, so alice gained 2 twice" (S.lifeOf S.alice after) (Just 24)
 
