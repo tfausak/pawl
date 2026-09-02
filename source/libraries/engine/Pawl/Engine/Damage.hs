@@ -318,7 +318,7 @@ combatRecipient gs attacker target =
             Combat.stillAttacked oid gs ->
               Just (Recipient.ToPlaneswalker oid)
           | Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs ->
-              stillPlaying =<< Defender.playerOf Projection.controllerWithLastKnown target gs
+              stillPlaying =<< Defender.defenderOfAttack Projection.controllerWithLastKnown attacker target gs
           | otherwise -> Nothing
         -- CR 310.5 / 506.4, the planeswalker arm's twin: a battle that has left the
         -- battlefield is removed from combat and stops being attacked, so CR 510.1b
@@ -372,7 +372,7 @@ attackerAssignment gs contested (attacker, target) = case Projection.powerOf att
             -- CR 508.5 / CR 310.9d, shared with the landwalk reading in
             -- Defender.playerOf so the two cannot drift. Read once, for CR
             -- 702.19c's third recipient below and for CR 702.22j's chooser.
-            defending = Defender.playerOf Projection.controllerWithLastKnown target gs
+            defending = Defender.defenderOfAttack Projection.controllerWithLastKnown attacker target gs
             -- CR 702.19b: the trample-through recipient is whatever the creature
             -- is attacking, at threshold 0 -- there is no minimum to assign to it.
             --

@@ -62,6 +62,7 @@ emptyCombat =
       Combat.blockers = Map.empty,
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
+      Combat.attackedUnder = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
@@ -254,9 +255,9 @@ attackTargetKind target = case target of
 -- who defends nothing any more, so it is on no list: CR 800.4e drops its damage,
 -- not the attack, and rule 802.4a offers it to nobody else.
 --
--- Not implemented: the seat BEFORE a removal by control change. Defender.playerOf
--- reads the planeswalker's live controller and the battle's live protector, so a
--- planeswalker stolen mid-combat puts its attacker on the thief's list (#2948).
+-- The seat is rule 802.2a's third sentence throughout, so a planeswalker stolen
+-- mid-combat leaves its attacker on the list of the player who controlled it
+-- before the theft (Pawl.Types.Combat's attackedUnder).
 attackersOn :: PlayerId -> GameState -> [ObjectId]
 attackersOn pid gs =
   let recorded = Combat.attackers (GameState.combat gs)
@@ -1235,13 +1236,23 @@ removeChanged gs =
 noteAttackingNothing :: GameState -> GameState
 noteAttackingNothing gs =
   let c = GameState.combat gs
-      removed target = case target of
+      -- CR 506.4's controller clause, asked against the seat recorded as this
+      -- creature joined combat rather than against Defender.defendingPlayers.
+      -- The two differ at three seats and only there: with several defending
+      -- players (CR 802.2) a planeswalker passed from one of them to another is
+      -- still controlled by A defending player, which is all stillAttacked's
+      -- candidate lists can see, while rule 506.4 asks whether its controller
+      -- CHANGED.
+      seatMoved attacker pw = case Map.lookup attacker (Combat.attackedUnder c) of
+        Nothing -> False
+        Just seat -> Projection.controllerOf pw gs /= Just seat
+      removed attacker target = case target of
         -- CR 800.4e, not CR 506.4: a departed player is still being attacked, and
         -- Damage.combatRecipient is where the damage goes missing.
         AttackTarget.OfPlayer _ -> False
-        AttackTarget.OfPlaneswalker pw -> not (stillAttacked pw gs)
+        AttackTarget.OfPlaneswalker pw -> not (stillAttacked pw gs) || seatMoved attacker pw
         AttackTarget.OfBattle battle -> not (stillAttackedBattle battle gs)
-      gone = Map.keysSet (Map.filter removed (Combat.attackers c))
+      gone = Map.keysSet (Map.filterWithKey removed (Combat.attackers c))
    in gs {GameState.combat = c {Combat.attackingNothing = Set.union gone (Combat.attackingNothing c)}}
 
 -- CR 703.4h: immediately after the beginning of combat step begins, who is
@@ -1476,6 +1487,15 @@ attemptAttackDeclaration pid rejected = do
                     (GameState.combat g)
                       { Combat.attackers = Map.union recorded (Combat.attackers (GameState.combat g)),
                         Combat.joinedUnder = Map.union joined (Combat.joinedUnder (GameState.combat g)),
+                        -- CR 802.2a's third sentence, taken where the creature
+                        -- joins combat: the seat its target names NOW is the
+                        -- seat it named before any CR 506.4 removal, since a
+                        -- control change is itself one. Defender.playerOf so
+                        -- this and the reader cannot answer differently.
+                        Combat.attackedUnder =
+                          Map.union
+                            (Map.mapMaybe (\target -> Defender.playerOf Projection.controllerWithLastKnown target g) recorded)
+                            (Combat.attackedUnder (GameState.combat g)),
                         -- CR 508.8's first clause. Never cleared, so a CR 506.4
                         -- removal later in the step cannot un-declare these
                         -- creatures, and never narrowed to the targets still being
@@ -1699,6 +1719,16 @@ putOntoBattlefieldAttacking oid = do
                       -- CR 506.4's comparand: this is where the creature joins
                       -- combat.
                       Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c),
+                      -- CR 802.2a's third sentence, declareAttackers' write on
+                      -- the CR 508.4 road: this is where THIS creature joins
+                      -- combat, so this is the seat rule 802.2a remembers for
+                      -- it, whatever seat an earlier attacker recorded for the
+                      -- same permanent.
+                      Combat.attackedUnder =
+                        Maybe.maybe
+                          (Combat.attackedUnder c)
+                          (\seat -> Map.insert oid seat (Combat.attackedUnder c))
+                          (Defender.playerOf Projection.controllerWithLastKnown target gs),
                       -- CR 508.8's SECOND clause, written inside the guards rather
                       -- than in Resolve's Create arm: CR 506.3a-c and CR 508.4a
                       -- each let the permanent enter without ever becoming an
