@@ -93,8 +93,10 @@ import qualified Pawl.Types.Zone as Zone
 -- its printing at every frame boundary, which no rule asks for -- and it makes
 -- the wish able to name a card by a face the rules say the object does not have.
 --
--- Reading it does not LEAK it (CR 708.5): the entries scanned are the acting
--- player's own, by CR 108.3b's guard below.
+-- Reading it leaks nothing CR 708.5 protects, and less than the printed face
+-- did: what the filter is matched against is CR 708.2a's public 2/2, and every
+-- entry scanned is one the acting player OWNS (CR 108.3b's guard below), so it
+-- is a card they already know even where another player controls it.
 eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
