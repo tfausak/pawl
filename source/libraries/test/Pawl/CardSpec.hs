@@ -3293,6 +3293,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.Transformed -> 0
   Filter.Type.HasNonManaActivatedAbility -> 0
   Filter.Type.IsInZone _ -> 0
+  Filter.Type.WasCastFrom _ -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.HasDesignation _ -> 0
 
@@ -4363,6 +4364,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasCountersOfAnyKind -> []
   Filter.Type.HasNonManaActivatedAbility -> []
   Filter.Type.IsInZone _ -> []
+  Filter.Type.WasCastFrom _ -> []
   Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Or fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Not f -> filterSlotsReadSingly f

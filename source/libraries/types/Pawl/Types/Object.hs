@@ -672,9 +672,9 @@ data Object = MkObject
     -- Pawl.Engine.Resolve's CopySpell arm builds the copy from the original's
     -- own record and rewrites every field CR 707.10 names, this one not among
     -- them, and Pawl.Engine.Projection.bestowGathered keys off nothing else than
-    -- this field and Object.timestamp. Unobserved
-    -- rather than unimplemented -- the pool's one copier reaches instants and
-    -- sorceries alone, so no board mints such a copy; see #2355.
+    -- this field and Object.timestamp. Pawl.CopySpec's "CR 702.103c a copy of
+    -- a bestowed Rollicker resolves as a token Aura attached to the same host"
+    -- is the proof.
     --
     -- CR 702.103g's phasing in unattached reaches Pawl.Engine.Sba's CR 702.103f
     -- pass one pass later, since Pawl.Engine.Phasing.phaseIn detaches first --
@@ -758,6 +758,31 @@ data Object = MkObject
     -- spell with an announced X: a token, a permanent an effect put onto the
     -- battlefield, and every spell whose cost declared no variable.
     announcedX :: Maybe Natural.Natural,
+    -- | CR 601.2a: the zone this spell was moved to the stack FROM, which is what
+    -- "spells your opponents cast from graveyards or from exile" (Aven
+    -- Interrupter) and "spells you cast from your graveyard" (Patrician Geist)
+    -- name. Read by Pawl.Engine.Filter's WasCastFrom atom, off the field
+    -- Pawl.Engine.Projection.viewOfCharacteristics fills from here.
+    --
+    -- STORED rather than derived, and CR 400.7 is why: the object on the stack is
+    -- a new one "with no memory of, or relation to, its previous existence", so
+    -- the zone it left is not a fact any projection can recover. Object.zone
+    -- answers Stack for every spell CR 601.2f prices, which is what makes
+    -- Filter.IsInZone the wrong reader here (#2363).
+    --
+    -- Written TWICE for one cast, at the two moments CR 601.2 gives the question
+    -- an answer, both in Pawl.Engine.Cast: onto the pre-move card by `asProposed`,
+    -- which is the state the castability gate measures before rule 601.2a's move,
+    -- and onto the stack incarnation by `stampCastFrom` just after that move. The
+    -- two must agree or a card's gate and its payment price the same spell
+    -- differently.
+    --
+    -- Nothing for every object that was not cast: a card at rest in any zone, a
+    -- token, a permanent an effect put onto the battlefield, and an ability on the
+    -- stack. Forgotten by newIncarnation like every other per-incarnation field --
+    -- CR 400.7d's exception is about costs paid, and the zone a spell came from is
+    -- not one, so no permanent carries it.
+    castFrom :: Maybe Zone.Zone,
     -- | CR 701.35a: this permanent is DETAINED -- it "can't attack or block and
     -- its activated abilities can't be activated" -- until the next turn of each
     -- player named here. Empty for every permanent nothing has detained, which is
@@ -950,6 +975,9 @@ newIncarnation object =
       -- exception is written back by the move that carries it, in
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
       announcedX = Nothing,
+      -- CR 400.7 forgets the zone the spell came from with everything else, and
+      -- nothing writes it back: no permanent reads it.
+      castFrom = Nothing,
       -- CR 400.7 again, and rule 701.35a needs it: the detained permanent that
       -- leaves the battlefield and comes back is a new object, and nothing
       -- detained that one.

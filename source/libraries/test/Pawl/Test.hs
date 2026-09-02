@@ -979,6 +979,7 @@ spec s registry = do
   Pawl.CopySpec.copyTargetSpec s registry
   Pawl.CopySpec.stirCopySpec s registry
   Pawl.CopySpec.copiedAbilitySpec s registry
+  Pawl.CopySpec.permanentCopySpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry
