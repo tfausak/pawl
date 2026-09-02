@@ -106,6 +106,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 118.6: the cost of an object with no mana cost. Also the ChooseCost
@@ -620,6 +621,13 @@ substituteXInComponent x component = case component of
 -- only X is in "pay X life", is asked exactly as Blaze is.
 hasVariable :: Cost Keyword.Type.Keyword -> Bool
 hasVariable cost = manaHasVariable cost || any componentHasVariable (Cost.components cost)
+
+-- CR 107.3b, asked of ONE of CR 601.2b's candidates: whether announcing this
+-- cost leaves X the caster's to name or fixes it at 0. The same predicate
+-- Cast.castProposed asks before raising Prompt.ChooseX, so a gate that reads
+-- this and the announcement itself cannot disagree about which cost has an X.
+variableChoice :: Cost Keyword.Type.Keyword -> VariableChoice.VariableChoice
+variableChoice cost = if hasVariable cost then VariableChoice.Announced else VariableChoice.FixedAtZero
 
 -- Does the MANA half of this cost carry CR 107.3's {X}? Nothing is CR 118.6's
 -- unpayable cost, which declares nothing.

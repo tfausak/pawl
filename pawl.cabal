@@ -1743,6 +1743,7 @@ library types
     Pawl.Types.UntapRewrite
     Pawl.Types.Uses
     Pawl.Types.Vanguard
+    Pawl.Types.VariableChoice
     Pawl.Types.VentureMarkerEntered
     Pawl.Types.While
     Pawl.Types.WithCounters
