@@ -226,7 +226,8 @@ flashOn oid face gs =
 -- that reads the spell's own characteristics reads the half being cast too.
 --
 -- CR 303.4a's enchant slot comes off the OBJECT's projection rather than off the
--- printed face, which is Card.modesTargetSlotsGiven's reading one step earlier:
+-- printed face -- CR 601.2c's own reading (Card.modesTargetSlotsGiven), brought
+-- forward to the gate that decides whether to offer the cast at all:
 -- CR 702.103b grants "enchant creature" to a spell cast bestowed, so the slot CR
 -- 601.2c will judge exists only on the board that announcement produces
 -- (`proposedFor`). Read printed, a bestow candidate is fillable on a board with
