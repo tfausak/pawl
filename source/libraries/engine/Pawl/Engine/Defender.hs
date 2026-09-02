@@ -80,7 +80,12 @@ playerOf controllerOf target gs = case target of
   -- protector -- so the second arm is CR 608.2h's filed designation
   -- (Pawl.Types.LastKnown's protector) and never the head of defendingPlayers,
   -- which CR 802.2a denies is an answer at all once several players defend.
-  -- Pawl.BattleSpec's "CR 802.2a" pair is the three-seat board that proves it.
+  --
+  -- Both arms answer a DECLARED attack only where no seat was recorded, which in
+  -- a running game is never: defenderOfAttack below reads rule 508.5's second
+  -- sentence off Pawl.Types.Combat's attackedUnder, and reaches this function
+  -- only for a combat record built by hand. That leaves the filed designation
+  -- with no observer (#2985).
   --
   -- Battlefield membership rather than a missing object, the question
   -- attackableBattles already asks: the two arms are "is it there" and "was it
@@ -104,11 +109,13 @@ playerOf controllerOf target gs = case target of
 -- the moment its controller changes, so the recorded seat and the live one differ
 -- for precisely the creature that is no longer attacking it.
 --
--- The PLANESWALKER arm alone. A battle's defending player is its protector (CR
--- 310.9d), and only CR 310.9f moves a designation, which no printing does (#2980),
--- so its two tenses cannot come apart -- a battle whose CONTROLLER changes is
--- removed from combat with its protector unmoved, and the live read is still rule
--- 802.2a's answer. An attacked player is the seat itself.
+-- BOTH permanent arms, and for one reason. A battle's defending player is its
+-- protector (CR 310.9d), and that designation moves under CR 704.5y as well as
+-- under CR 310.9f: a protector who takes the battle becomes a player who can't
+-- protect it (CR 310.12a), so rule 704.5y re-chooses in the same breath that CR
+-- 506.4 removes the battle from combat. A battle's two tenses come apart exactly
+-- where a planeswalker's do, so both read the record. An attacked player is the
+-- seat itself.
 --
 -- playerOf's own live arms answer for an attacker with no recorded seat: a combat
 -- record built by hand rather than declared. In a running game both writers of
@@ -122,7 +129,7 @@ playerOfAttacker controllerOf attacker gs =
 -- Combat.attackers' own entries (Pawl.Engine.Damage).
 defenderOfAttack :: (ObjectId -> GameState -> Maybe PlayerId) -> ObjectId -> AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
 defenderOfAttack controllerOf attacker target gs = case target of
-  AttackTarget.OfPlaneswalker {} ->
+  AttackTarget.OfPlayer {} -> playerOf controllerOf target gs
+  _ ->
     Map.lookup attacker (Combat.attackedUnder (GameState.combat gs))
       Applicative.<|> playerOf controllerOf target gs
-  _ -> playerOf controllerOf target gs

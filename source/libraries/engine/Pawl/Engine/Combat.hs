@@ -299,7 +299,10 @@ stillAttacked oid gs =
 --
 -- The list also asks who protects the battle, so a protector moved to a third
 -- player mid-combat (CR 310.9f) reads here as removed from combat, which is what
--- rule 506.4 says. Not implemented: any effect that moves a designation (#2980).
+-- rule 506.4 says. CR 704.5y's repair moves one -- a protector who steals the
+-- battle -- but moves the CONTROLLER in the same breath, so that board cannot
+-- tell this clause from noteAttackingNothing's. Not implemented: an effect that
+-- moves a LEGAL designation, which is CR 310.9f's own event (#2980).
 --
 -- Rule 506.4's CONTROLLER clause is NOT here, because this list cannot see it: a
 -- control change leaves the protector where it was, so every candidate list still
@@ -1523,7 +1526,7 @@ attemptAttackDeclaration pid rejected = do
                             (Combat.attackedUnder (GameState.combat g)),
                         -- CR 506.4's controller clause for a battle, taken at the
                         -- same moment and off the battle itself: the seat above is
-                        -- its protector (CR 310.9b), which that rule names
+                        -- its protector (CR 310.9d), which that rule names
                         -- separately.
                         Combat.attackedControlledBy =
                           Map.union
@@ -1766,6 +1769,11 @@ putOntoBattlefieldAttacking oid = do
                       -- 508.4 road: THIS creature joins combat now, so the seat
                       -- it compares against is who controls the battle now --
                       -- whatever seat an earlier attacker recorded for it.
+                      --
+                      -- Not implemented: a board that drives rule 506.4's removal
+                      -- down this road, the ordering it needs being beyond a pure
+                      -- answerer; only a record assertion covers this write
+                      -- (#2986).
                       Combat.attackedControlledBy =
                         Maybe.maybe
                           (Combat.attackedControlledBy c)

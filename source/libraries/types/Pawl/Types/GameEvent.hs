@@ -242,9 +242,6 @@ data GameEvent
     -- a change to copiable values rather than a zone change, so no Moved event
     -- describes it. One direction only: no printed card triggers on a permanent
     -- being turned face down.
-    --
-    -- Not implemented: the watcher-scoped reading CR 708.7 also admits, which
-    -- would filter on the permanent's id (#959).
     TurnedFaceUp ObjectId.ObjectId
   | -- | CR 701.27a: a double-faced permanent TRANSFORMED. CR 701.27b makes that a
     -- different game action from TurnedFaceUp above and CR 712.18 keeps it the
