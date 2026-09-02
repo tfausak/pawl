@@ -104,10 +104,9 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- is how this stays readable at resolution. `you`'s "no card's targetSlots may
 -- name it" rule applies here too, under the same sweep. That an effect reading
 -- this slot sits under a condition that binds it is enforced by
--- Pawl.Engine.Event.eventBindingSlots: only the combat-damage-to-a-player, the
--- CR 701.9a discard, the CR 119.3 life-loss, the CR 119.9 life-GAIN, the CR
--- 601.2i cast, the CR 508.3a attack, the CR 508.3b attack and the CR 725.1
--- crowning conditions stamp it, so reading it under any other is a failing test.
+-- Pawl.Engine.Event.eventBindingSlots, whose arms are the enumeration of the
+-- conditions that stamp it -- CR 400.3's owner under the returned-to-hand
+-- condition among them. Reading it under any other is a failing test.
 --
 -- The two attack conditions name DIFFERENT players under the one slot, and the
 -- slot is the printed PHRASE rather than the fact: CR 508.3a's is the defending
@@ -385,8 +384,9 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- information.
 --
 -- Bound for the BYSTANDER conditions only --
--- TriggerCondition.PermanentLeavesTheBattlefield and, for CR 303.4b's enchanted
--- creature, AttachedCreatureDies, where Banewasp Affliction's "that creature's
+-- TriggerCondition.PermanentLeavesTheBattlefield, its destination-pinned
+-- PermanentReturnedToHand, and, for CR 303.4b's enchanted creature,
+-- AttachedCreatureDies, where Banewasp Affliction's "that creature's
 -- controller loses life equal to its toughness" reads it. Under
 -- TriggerCondition.SelfLeavesTheBattlefield and SelfDies the departed id already
 -- IS CR 113.7a's `triggerSource`, so a second name for one object would be the
