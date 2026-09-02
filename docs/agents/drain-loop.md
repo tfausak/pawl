@@ -94,8 +94,8 @@ loop's only outright waste; never hold a dispatch waiting on a merge. Two
 guards make this safe: the next brief must be FILE-DISJOINT from the PR still
 in flight (see "Scheduling"), and it derives against `origin/main`, so a later
 `git merge origin/main` brings the in-flight PR in cleanly. If the in-flight
-PR goes red, send its agent back; the two builds share the semaphore and that
-is fine.
+PR goes red, send its agent back; the two builds queue on the build lock and
+that is fine.
 
 **When nothing is file-disjoint, stack rather than idle.** Dispatch the next
 unit off the in-flight PR's branch as a draft, and have it rebase `--onto main`
@@ -196,12 +196,12 @@ takes over a lock whose owner has died. It admits two builds at once
 resident); set it to one if the machine is unhappy. Put that in every brief;
 lanes beyond the slot count just queue.
 
-**The GHC job semaphore breaks under concurrency.** `CLAUDE.md` describes the
-symptom and the escape (`cabal test --no-semaphore -j4`); what the loop adds is
-frequency. With several lanes live it is a recurring event, not a rare one, and
-the commonest cause is a tool timeout reaping a backgrounded `cabal`. Tell
-agents to run `cabal` in the foreground with a generous timeout, and never to
-`pkill` by pattern.
+**Backgrounded builds are how lanes stall.** The GHC job semaphore is gone
+(2026-09-02; it corrupted on every killed run and cabal hung on it), so the
+remaining way a lane wedges is a tool timeout reaping a backgrounded `cabal`
+while it holds a lock slot. Tell agents to run `cabal` in the foreground with
+a generous timeout, to split long runs by `--pattern`, and never to `pkill`
+by pattern; a run at 0% CPU for ten minutes is killed by its own PID.
 
 **Reap after every merge.** A finished unit leaves a worktree under
 `.claude/worktrees/`, its placeholder `worktree-agent-*` branch, the unit's own
