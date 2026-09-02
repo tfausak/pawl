@@ -3599,13 +3599,14 @@ costFilters = concatMap costComponentFilters . Cost.Type.components
 -- CR 118.9: an alternative cost reaches a Filter through its components, as any
 -- Cost does, and through the Condition CR 604.2 may gate it with.
 --
--- The COST half is SlotlessCostFramed for payGateFilters' reason: CR 118.9's
--- alternative is paid through Pawl.Engine.Cost, whose Context comes from
--- Pawl.Engine.Filter.contextFor and carries no slots; see #2883. The CONDITION half
--- is a separate question and keeps whatever the quoting position frames it as.
+-- The COST half is Unframed for Face.additionalCosts' reason: CR 118.9's
+-- alternative is paid at CR 601.2h, after CR 601.2c's targets exist, and
+-- Pawl.Engine.Cost.pay reads them (Cost.announcedSlots). It was
+-- SlotlessCostFramed between #2883 and #2924. The CONDITION half is a separate
+-- question and keeps whatever the quoting position frames it as.
 alternativeCostFilters :: AlternativeCost.AlternativeCost -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 alternativeCostFilters alternative =
-  slotlessCost (costFilters (AlternativeCost.cost alternative))
+  unframed (costFilters (AlternativeCost.cost alternative))
     <> concatMap conditionFilters (Maybe.maybeToList (AlternativeCost.condition alternative))
 
 -- CR 116.2: which spells a printed special action names -- only through the cost
@@ -3682,9 +3683,14 @@ affectedFilters affected = case affected of
 -- through its Quantity (Sphere of Safety counts "enchantments you control"), and
 -- the Fixed arm through its cost's components (Exalted Dragon sacrifices "a
 -- land").
+--
+-- The Fixed arm is SlotlessCostFramed: a declaration announces no targets (CR
+-- 508.1h, CR 509.1d), so Pawl.Engine.Cost.payTagged hands the toll no slots and
+-- a slot read in one has nothing to be about. Unframed promised otherwise until
+-- #2927.
 perCreatureFilters :: PerCreature.PerCreature -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 perCreatureFilters perCreature = case perCreature of
-  PerCreature.Fixed cost -> unframed (costFilters cost)
+  PerCreature.Fixed cost -> slotlessCost (costFilters cost)
   PerCreature.Counted quantity -> quantityFilters quantity
 
 -- refCounts' Filter twin: BOTH axes of every Quantity an ObjectRef holds, off
@@ -3879,10 +3885,16 @@ handActionFilters action =
 -- Condition and so both of a Quantity's axes, and through the non-mana
 -- components of CR 116.2c's price. TAGGED, because the first half reaches
 -- keywordFilters.
+--
+-- The price is SlotlessCostFramed: CR 116.2c's is a special action, which uses
+-- no stack (CR 116.1) and so announces no target for a slot read to be about --
+-- Face.specialActions' CR 116.2d reason exactly, and Pawl.Engine.EndEffect pays
+-- it through the same Pawl.Engine.Cost.pay with nothing announced. Unframed
+-- promised otherwise until #2927.
 durationFilters :: Duration.Duration -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 durationFilters duration =
   concatMap conditionFilters (durationConditions duration)
-    <> unframed
+    <> slotlessCost
       ( case duration of
           Duration.UntilPaid cost -> costFilters cost
           Duration.UntilEndOfTurn -> []
@@ -4981,39 +4993,32 @@ data Framing
     -- positions that are themselves framed, and the quoting position's promise is
     -- not the keyword's.
     KeywordFramed
-  | -- | A COST whose payment context is built by Pawl.Engine.Filter.contextFor,
-    -- which fills no `slotObjects` -- so Filter.IsBound there is a silent False,
-    -- exactly as it is under OutsideTheGameFramed, and for the mirror-image
-    -- reason: the candidate is an object all right, but no slot of any
-    -- resolution names it.
+  | -- | A COST paid with NO ANNOUNCEMENT behind it, so Pawl.Engine.Cost.pay
+    -- hands its pools no slots (Cost.announcedSlots is empty for it) and
+    -- Filter.IsBound there is a silent False -- exactly as it is under
+    -- OutsideTheGameFramed, and for the mirror-image reason: the candidate is
+    -- an object all right, but no slot of any announcement names it.
     --
-    -- FOUR positions: CR 118.12's gate cost, paid by
-    -- Pawl.Engine.Resolve.payGatePaidBy through
-    -- Pawl.Engine.Cost.canPay and .pay; CR 601.2f's additional cost and CR
-    -- 118.9's alternative cost, both paid through the same two functions as a
-    -- cast is announced; and CR 116.2d's ignore cost, paid there again by
-    -- Pawl.Engine.Ignore. The gate was tagged first, see #2881, and the other
-    -- three followed, see #2883. Card text reaches the first -- Lithophage's
-    -- "unless you sacrifice a Mountain" -- so all four are swept rather than
-    -- dropped.
+    -- The positions: CR 118.12's gate cost, paid by
+    -- Pawl.Engine.Resolve.payGatePaidBy; CR 116.2d's ignore cost, paid by
+    -- Pawl.Engine.Ignore; CR 116.2c's UntilPaid price, paid by
+    -- Pawl.Engine.EndEffect; and CR 508.1h's and CR 509.1d's per-creature
+    -- combat tolls, paid by Pawl.Engine.Cost.payTagged. Each is unanswerable by
+    -- the RULE and not merely by this engine: a special action uses no stack
+    -- (CR 116.1), a declaration announces no target, and a gate is paid as
+    -- something resolves rather than as it is announced. Card text reaches the
+    -- first -- Lithophage's "unless you sacrifice a Mountain" -- so all are
+    -- swept rather than dropped. The gate was tagged first, see #2881; the
+    -- ignore cost followed, see #2883; the toll and the price last, see #2927.
     --
-    -- CR 116.2d's is unanswerable by the RULE and not merely by this engine: a
-    -- special action uses no stack (CR 116.1), so no announcement has bound a
-    -- slot for the question to be about. The other three are unanswerable
-    -- because Pawl.Engine.Cost builds its Context with
-    -- Pawl.Engine.Filter.contextFor, which fills no slotObjects -- and for CR
-    -- 601.2f and CR 118.9 that is stricter than the rules, which fix the targets
-    -- at CR 601.2c before either cost is paid. Not implemented: threading an
-    -- announcement's bindings into cost payment, which is what a card asking the
-    -- question there would need (#2924). No printing asks it -- Scryfall
-    -- o:"additional cost" o:"other than the target", 2026-09-01, no hit.
-    --
-    -- Not implemented: the five OTHER cost positions a card can write -- an
-    -- activated ability's cost, CR 508.1h's and CR 509.1d's per-creature combat
-    -- costs, CR 116.2c's UntilPaid duration and CR 613.11's two added cost
-    -- lists. Every one is paid through the same Pawl.Engine.Cost, which has no
-    -- contextWithSlots caller at all, so each promises what this tag denies;
-    -- they are still Unframed (#2927).
+    -- NOT the costs an announcement pays -- CR 601.2f's additional cost, CR
+    -- 118.9's alternative, an activated ability's own, and CR 613.11's two
+    -- added lists -- which are Unframed: CR 601.2c chooses the targets before
+    -- CR 601.2h pays, Pawl.Engine.Cast and Pawl.Engine.Activate stamp them on
+    -- the stack object first, and Cost.announcedSlots reads them there. The two
+    -- cast positions were tagged here between #2883 and #2924, when no cost saw
+    -- a slot. Synthetic Spiteful Rite and Synthetic Spiteful Altar are the cards
+    -- (Pawl.CostSpec's "Synthetic Spiteful Rite" group).
     SlotlessCostFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
@@ -5043,13 +5048,14 @@ hostFramed framing = case framing of
 -- reads nothing at any of them. That is the test to put a new evaluator to,
 -- rather than a list of today's: the question is what the EVALUATING context
 -- holds, not how many builders there are -- Pawl.Engine.Filter.contextWithSlots
--- has six callers and Pawl.Engine.Target.slotContext writes a slot-carrying
--- Context out by hand. Neither reaches a keyword's payload: CR 702.11d and CR
--- 702.16b (Pawl.Engine.Target.targetable), CR 702.14c (Pawl.Engine.Combat), CR
--- 702.16c/d (Pawl.Engine.AttachRestriction), CR 702.16f
--- (Pawl.Engine.CombatRestriction), a keyword cost's criterion (Pawl.Engine.Cost)
--- and the CR 702.29e cycling mint's Search filter all evaluate in a context built
--- with no slots, and the CR 702.16e quality Pawl.Engine.Keyword transplants into
+-- has callers across the engine and Pawl.Engine.Target.slotContext writes a
+-- slot-carrying Context out by hand. None reaches a keyword's payload: CR
+-- 702.11d and CR 702.16b (Pawl.Engine.Target.targetable), CR 702.14c
+-- (Pawl.Engine.Combat), CR 702.16c/d (Pawl.Engine.AttachRestriction), CR
+-- 702.16f (Pawl.Engine.CombatRestriction) and the CR 702.29e cycling mint's
+-- Search filter all evaluate in a context built with no slots, a keyword cost's
+-- criterion (Pawl.Engine.Cost) in one whose slots are an announcement's targets
+-- and never the keyword's own, and the CR 702.16e quality Pawl.Engine.Keyword transplants into
 -- a DamageR's source half goes through candidateContext on the PERMANENT segment,
 -- whose ReplacementCandidate.slots is empty because no resolution installed a
 -- printed static ability. Target.slotContext's map is answered only by
@@ -5111,8 +5117,8 @@ searchFramed = fmap ((,) SearchFramed)
 outsideTheGameFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 outsideTheGameFramed = fmap ((,) OutsideTheGameFramed)
 
--- Tag a Filter position as a COST paid through Pawl.Engine.Filter.contextFor,
--- which fills no slots -- the four positions SlotlessCostFramed names.
+-- Tag a Filter position as a COST paid with no announcement behind it -- the
+-- positions SlotlessCostFramed names.
 slotlessCost :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 slotlessCost = fmap ((,) SlotlessCostFramed)
 
@@ -5757,6 +5763,11 @@ triggeredAbilityFilters ability =
 
 activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 activatedAbilityFilters ability =
+  -- CR 602.2b sends an activation through CR 601.2c before CR 601.2h, and
+  -- Pawl.Engine.Activate stamps the chosen targets on the ability object before
+  -- Pawl.Engine.Cost.pay reads them (Cost.announcedSlots) -- so a slot read in
+  -- the cost is answered, and Unframed's promise holds (Synthetic Spiteful
+  -- Altar). See SlotlessCostFramed for the positions where it does not.
   unframed (costFilters (ActivatedAbility.cost ability))
     -- CR 702.178a's "as long as" gate, the triggeredAbilityFilters treatment of
     -- CR 603.4's intervening "if" one field over.
@@ -5828,7 +5839,11 @@ cardFilters card =
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap targetSlotFilters (Face.enchant card)
-        <> concatMap (slotlessCost . costComponentFilters) (Face.additionalCosts card)
+        -- CR 601.2f's additional cost is paid AFTER CR 601.2c has chosen the
+        -- targets, and Pawl.Engine.Cost.pay reads them off the spell
+        -- (Cost.announcedSlots), so a slot read here is answered -- Unframed's
+        -- promise, kept. SlotlessCostFramed says which cost positions are not.
+        <> concatMap (unframed . costComponentFilters) (Face.additionalCosts card)
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
@@ -6155,8 +6170,8 @@ isBoundTag :: Text.Text
 isBoundTag = Text.pack "IsBound"
 
 -- How many CR 115.10a bound-object atoms this card carries in a position with no
--- resolution behind it -- a WISH's filter, a KEYWORD's own, or a COST paid
--- through Pawl.Engine.Filter.contextFor -- and how many anywhere else. The FIRST
+-- resolution behind it -- a WISH's filter, a KEYWORD's own, or a COST paid with
+-- no announcement behind it -- and how many anywhere else. The FIRST
 -- number is the offence here, which is the sibling position lints turned around:
 -- the atom is answerable in every position whose evaluator supplies the
 -- resolution's slots, and unanswerable in the three that supply none.
@@ -9665,27 +9680,43 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "CR 118.12 a planted atom in a gate's cost is an offence" (isBoundCounts gated) (1, 0)
     Spec.assertBool s (isBoundOffends gated) "and the lint says so"
-    -- THE THREE SIBLING POSITIONS, which #2883 tagged after #2881 tagged the
-    -- gate: an additional cost, an alternative cost's own half and a special
-    -- action's cost are paid through the same Pawl.Engine.Cost, so the same
-    -- buried atom is a silent False in each. Built
-    -- over the SAME `base` face and the SAME `buried` filter as every leg above,
-    -- so they differ from the accepted leg in position and in nothing else.
+    -- THE OTHER COST POSITIONS, every one paid through the same
+    -- Pawl.Engine.Cost.pay, split by whether an announcement is behind them.
+    -- Built over the SAME `base` face and the SAME `buried` filter as every leg
+    -- above, so they differ from the accepted leg in position and in nothing
+    -- else.
     let sacrificing = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)]
-        -- CR 601.2f, paid as the cast is announced.
+        sacrificeCost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) sacrificing
+        -- CR 601.2f, paid as the cast is announced -- after CR 601.2c.
         added = base {Face.additionalCosts = sacrificing}
         -- CR 118.9, the cost half only -- the CR 604.2 condition an alternative
         -- may carry is a separate question and is not tagged with it.
-        alternatively = base {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) sacrificing)]}
-        -- CR 116.2d, and the one of the four that no announcement could answer
-        -- in any engine: a special action uses no stack (CR 116.1).
-        ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) sacrificing)]}
+        alternatively = base {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing sacrificeCost]}
+        -- CR 602.2b, paid as the ability is activated -- after CR 601.2c too.
+        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost (spellOf []) [] Nothing Nothing]}
+        -- CR 116.2d: a special action uses no stack (CR 116.1), so no
+        -- announcement could answer in any engine.
+        ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn sacrificeCost]}
+        -- CR 116.2c: the same special action, as the price of ending an effect.
+        ending = base {Face.spell = spellOf [Effect.AffectPlayers (AffectPlayers.MkAffectPlayers (Duration.UntilPaid sacrificeCost) (AffectedPlayers.Scoped PlayerScope.You) PlayerEffect.CantCastSpells)]}
+        -- CR 508.1h and CR 509.1d: a declaration announces no target.
+        attacking = base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (PerCreature.Fixed sacrificeCost) AttackCostScope.Controller]}
+        blocking = base {Face.blockCosts = [BlockCost.MkBlockCost (Affected.Matching (Filter.Type.HasCardType CardType.Creature)) (PerCreature.Fixed sacrificeCost)]}
+    -- Ordered FIRST: the positions an announcement pays are accepted, which is
+    -- what #2924 changed -- Pawl.Engine.Cost.pay reads CR 601.2c's targets off
+    -- the stack object, so the atom is answered there.
     Spec.assertEqWith
       s
-      "CR 601.2f / 118.9 / 116.2d a planted atom in each of the other three costs is an offence"
-      (fmap isBoundCounts [added, alternatively, ignoring])
-      [(1, 0), (1, 0), (1, 0)]
-    Spec.assertBool s (all isBoundOffends [added, alternatively, ignoring]) "and the lint says so at all three"
+      "CR 601.2f / 118.9 / 602.2b a planted atom in a cost an announcement pays is answered"
+      (fmap isBoundCounts [added, alternatively, activating])
+      [(0, 1), (0, 1), (0, 1)]
+    Spec.assertBool s (not (any isBoundOffends [added, alternatively, activating])) "and the lint accepts all three"
+    Spec.assertEqWith
+      s
+      "CR 116.2d / 116.2c / 508.1h / 509.1d a planted atom in a cost nothing announces is an offence"
+      (fmap isBoundCounts [ignoring, ending, attacking, blocking])
+      [(1, 0), (1, 0), (1, 0), (1, 0)]
+    Spec.assertBool s (all isBoundOffends [ignoring, ending, attacking, blocking]) "and the lint says so at all four"
   -- CR 702 / CR 122.1b: a keyword's own Filter is read off a continuous effect or
   -- off the printed face, through Pawl.Engine.Filter.contextFor, which fills
   -- neither the resolution's slots nor the source's host. keywordFilters tags it

@@ -347,7 +347,7 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
               Spec.assertEqWith
                 s
                 "CR 701.21a every creature alice controls except the Aura itself"
-                (Replacement.sacrificeCandidates S.alice (Just aura) criterion before)
+                (Replacement.sacrificeCandidates Map.empty S.alice (Just aura) criterion before)
                 (List.sort [fodder, mine])
             _ -> Spec.assertFailure s "Gift of Doom's morph cost should be one sacrifice component"
 

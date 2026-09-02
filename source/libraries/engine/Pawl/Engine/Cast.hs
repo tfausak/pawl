@@ -1844,6 +1844,40 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   if not (Target.selectionLegal (Just pid) seed sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
                     then reject
                     else do
+                      -- CR 601.2c's RECORD, stamped on `sid` itself -- the
+                      -- incarnation CR 601.2a put on the stack, rather than
+                      -- whatever is on top of it now -- and written before CR
+                      -- 601.2f prices the spell, not after CR 601.2h pays for
+                      -- it. Two readers need it that early: a cost's criterion
+                      -- may name a target ("a creature other than the target",
+                      -- Synthetic Spiteful Rite), which Cost.announcedSlots
+                      -- reads off this object, and a cost adjustment may read
+                      -- what the spell targets (Filter.TargetsSource, Terror of
+                      -- the Peaks). Activate.activateAbility stamps at the same
+                      -- step. Nothing is lost by stamping early: `reject`
+                      -- rewinds this write with everything else, back to
+                      -- `before`, which never held them.
+                      --
+                      -- CR 109.5: "The words 'you' and 'your' on an object
+                      -- refer to the object's controller, its would-be
+                      -- controller (if a player is attempting to play, cast,
+                      -- or activate it)". `pid` is both here -- the caster is
+                      -- the spell's controller -- so the slot is stamped
+                      -- alongside the chosen targets, as
+                      -- Activate.activateAbility does for CR 109.5's
+                      -- activated-ability sentence and Engine.placeBorne for
+                      -- its triggered-ability one. Char's "and 2 damage to
+                      -- you" is what reads it (Pawl.CastSpec's Char case).
+                      State.modify'
+                        ( \g ->
+                            g
+                              { GameState.objects =
+                                  Map.adjust
+                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.fromChoices chosen mAmount chosenModes)})
+                                    sid
+                                    (GameState.objects g)
+                              }
+                        )
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian
                       -- symbols announced above, then the total cost. A criterion
                       -- is read against the spell's STACK incarnation, the
@@ -1880,34 +1914,6 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       -- produced it, does nothing. Pawl.CostSpec's Altar's Reap
                       -- group is the proof (Baral pays the sacrifice, and the
                       -- Reap still costs {B}).
-                      --
-                      -- CR 601.2c's RECORD, written before CR 601.2f prices the
-                      -- spell and not after CR 601.2h pays for it: a cost
-                      -- adjustment may read what the spell targets
-                      -- (Filter.TargetsSource, Terror of the Peaks), and rule
-                      -- 601.2f runs after the targets are fixed. `reject`
-                      -- rewinds this write with everything else.
-                      --
-                      -- CR 109.5: "The words 'you' and 'your' on an object
-                      -- refer to the object's controller, its would-be
-                      -- controller (if a player is attempting to play, cast,
-                      -- or activate it)". `pid` is both here -- the caster is
-                      -- the spell's controller -- so the slot is stamped
-                      -- alongside the chosen targets, as
-                      -- Activate.activateAbility does for CR 109.5's
-                      -- activated-ability sentence and Engine.placeBorne for
-                      -- its triggered-ability one. Char's "and 2 damage to
-                      -- you" is what reads it (Pawl.CastSpec's Char case).
-                      State.modify'
-                        ( \g ->
-                            g
-                              { GameState.objects =
-                                  Map.adjust
-                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.fromChoices chosen mAmount chosenModes)})
-                                    sid
-                                    (GameState.objects g)
-                              }
-                        )
                       pricedGs <- State.get
                       adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.spellAdjustments pid sid pricedGs)
                       -- CR 601.2f's "plus all additional costs", gathered NOW

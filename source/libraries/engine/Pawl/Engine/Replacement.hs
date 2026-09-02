@@ -117,6 +117,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
@@ -584,7 +585,7 @@ applies gs event candidate =
           maybe True (== kind) (CounterPattern.whichKind pat)
             && matchesPutter gs src (CounterPattern.subject pat) cause
             && matchesController gs src (CounterPattern.whose pat) oid
-            && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
+            && matchesPermanent gs Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 122.1 / 614.1: the same pattern against a PLAYER recipient. A
         -- pattern naming a kind admits none of these: `whichKind` is the object
         -- kinds, and a player can hold no counter of one (see
@@ -611,7 +612,7 @@ applies gs event candidate =
               not (Map.null (matchingEnteringCounters gs pat oid))
                 && matchesPutter gs src (CounterPattern.subject pat) (CounterCause.ByEffect putter)
                 && matchesController gs src (CounterPattern.whose pat) oid
-                && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
+                && matchesPermanent gs Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
         -- effect source's controller. CR 102.2's Opponents has no producer today.
         (ReplacementEffect.TokenR (TokenR.MkTokenR pat _), ProposedEvent.WouldCreateTokens pid _ _) ->
@@ -1168,9 +1169,14 @@ matchesZoneOwner gs you rel oid =
 -- with it, and Pawl.Engine.Cost, Pawl.Engine.Event and Pawl.Engine.Resolve's
 -- edict all reach it through that -- so there is no duplicate matcher to keep in
 -- step (#111).
-matchesPermanent :: GameState -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesPermanent gs source filter_ oid =
-  Filter.matches (Filter.contextFor (Game.teams gs) Nothing source) (Projection.viewOfObject oid gs) filter_
+--
+-- `slots` is what the surrounding announcement or resolution bound, for a
+-- criterion that names one of them -- "a creature other than the target",
+-- Filter.IsBound. A counter pattern is read off a static ability with nothing
+-- announced, so its two callers hand over none.
+matchesPermanent :: GameState -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesPermanent gs slots source filter_ oid =
+  Filter.matches (Filter.contextWithSlots (Game.teams gs) Nothing source slots) (Projection.viewOfObject oid gs) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
 -- the order Prompt.ChooseSacrifices and Prompt.ChooseAnyNumberToSacrifice offer
@@ -1198,9 +1204,13 @@ matchesPermanent gs source filter_ oid =
 -- offer, Pawl.Engine.Resolve's edict and Pawl.Engine.Event's as-enters offer all
 -- read. The other half of the gate is in Event.sacrifice, for the instructions
 -- that name a victim without consulting a candidate list.
-sacrificeCandidates :: PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-sacrificeCandidates pid source filter_ gs =
-  let matching = List.sort (filter (matchesPermanent gs source filter_) (Projection.controls pid gs))
+--
+-- `slots` is matchesPermanent's: Pawl.Engine.Cost hands over CR 601.2c's targets
+-- (Cost.announcedSlots) and Pawl.Engine.Resolve's edict its Context's, while the
+-- as-enters offer has nothing to hand, no announcement being in flight there.
+sacrificeCandidates :: Map.Map SlotName.SlotName (Set ObjectId) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+sacrificeCandidates slots pid source filter_ gs =
+  let matching = List.sort (filter (matchesPermanent gs slots source filter_) (Projection.controls pid gs))
       forbidden = SacrificeRestriction.cantBeSacrificed matching gs
    in filter (\oid -> not (Set.member oid forbidden)) matching
 
