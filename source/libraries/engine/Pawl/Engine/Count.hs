@@ -12,7 +12,6 @@ module Pawl.Engine.Count where
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
@@ -153,40 +152,6 @@ findableAfterMove :: GameState -> ObjectId -> Bool
 findableAfterMove gs oid = case Game.lookupObject oid gs of
   Nothing -> False
   Just object -> not (Game.isHiddenZone (Object.zone object))
-
--- The binding slots the per-member quantity of a count reads, with the reader
--- INJECTED for the module-cycle reason QuantityOf is. Only Aggregation.Greatest
--- carries a quantity; the other two aggregate the matched set alone, and
--- neither the Scope nor the Filter holds a slot name.
-slots :: (quantity -> Set slot) -> Count.Type.Count quantity -> Set slot
-slots slotsOfQuantity count = case Count.Type.aggregation count of
-  Aggregation.Members -> Set.empty
-  Aggregation.DistinctCardTypes -> Set.empty
-  Aggregation.Greatest quantity -> slotsOfQuantity quantity
-
--- Does the per-member quantity of a count satisfy the predicate? slots' shape
--- with a Bool in place of a Set, and injected for the same module-cycle reason:
--- Pawl.Engine.Quantity.readsX is the one caller and this module cannot import
--- it. The two aggregations carrying no quantity answer False for the reason they
--- answer the empty set above -- there is nothing there to ask.
-anyQuantity :: (quantity -> Bool) -> Count.Type.Count quantity -> Bool
-anyQuantity predicate count = case Count.Type.aggregation count of
-  Aggregation.Members -> False
-  Aggregation.DistinctCardTypes -> False
-  Aggregation.Greatest quantity -> predicate quantity
-
--- The count with its per-member quantity REWRITTEN, injected for slots' reason:
--- Pawl.Engine.Quantity.bakeBound is the one caller and this module cannot import
--- it. The two aggregations carrying no quantity are returned untouched, there
--- being nothing there to rewrite -- anyQuantity's False, one type over.
-mapQuantity :: (quantity -> quantity) -> Count.Type.Count quantity -> Count.Type.Count quantity
-mapQuantity f count =
-  count
-    { Count.Type.aggregation = case Count.Type.aggregation count of
-        Aggregation.Members -> Aggregation.Members
-        Aggregation.DistinctCardTypes -> Aggregation.DistinctCardTypes
-        Aggregation.Greatest quantity -> Aggregation.Greatest (f quantity)
-    }
 
 -- CR 109.1 / 120.1: THE player candidate's view -- Pawl.Engine.Filter.playerView
 -- with the one field a bare PlayerId cannot answer filled from the board.

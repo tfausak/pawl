@@ -46,6 +46,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -299,18 +300,18 @@ insertOne slot = joinTwo (oneSlot slot)
 -- namespace. Quantity.objectSlots names an OBJECT and evaluates against it, so a
 -- slot naming several leaves Pawl.Engine.Filter.slotOneObject with nothing to
 -- pick and the whole number unanswered -- SlotArity.One. Every other slot
--- Quantity.slots reports is a Quantity.InSlot, which reads the slot's AMOUNT
+-- QuantitySlot.slots reports is a Quantity.InSlot, which reads the slot's AMOUNT
 -- instead (Pawl.Engine.Binding.amountOf) and cannot be damaged by a plural slot
 -- at all -- SlotArity.Amount, an entry stating a read without claiming an arity.
 --
--- Both halves are reported so that the KEYS stay Quantity.slots' whole answer:
+-- Both halves are reported so that the KEYS stay QuantitySlot.slots' whole answer:
 -- an InSlot read is a read, and the D4 dataflow lint counts it; see #2774.
 -- Map.union is left-biased, so a slot read both ways is One.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots quantity =
   Map.union
     (Map.fromSet (const SlotArity.One) (Quantity.objectSlots quantity))
-    (Map.fromSet (const SlotArity.Amount) (Quantity.slots quantity))
+    (Map.fromSet (const SlotArity.Amount) (QuantitySlot.slots quantity))
 
 -- The Quantities an entry rider carries: CR 122.6's count per counter kind, which
 -- a card may write as anything a Quantity spells. A position the three walkers
@@ -1105,7 +1106,7 @@ targetSlotSlots slot =
     ]
   where
     -- The bound's own reads: quantitySlots' -- a Quantity.InSlot naming the
-    -- slot's amount -- plus the ones only Quantity.nestedRefs reports, a slot
+    -- slot's amount -- plus the ones only QuantitySlot.nestedRefs reports, a slot
     -- named through a PlayerRef buried inside the number ("mana value X or less,
     -- where X is the amount of life THAT PLAYER gained this turn") or through CR
     -- 400.7j's Scope.OverBound. Without them a bound naming a slot its carrier
@@ -1120,7 +1121,7 @@ targetSlotSlots slot =
     amountSlots quantity =
       joinSlots
         ( quantitySlots quantity
-            : fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (Quantity.nestedRefs quantity))
+            : fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (QuantitySlot.nestedRefs quantity))
         )
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
