@@ -4966,8 +4966,8 @@ data Framing
     -- reason: the candidate is an object all right, but no slot of any
     -- resolution names it.
     --
-    -- FOUR positions, every cost a card can print outside an ability's own:
-    -- CR 118.12's gate cost, paid by Pawl.Engine.Resolve.payGatePaidBy through
+    -- FOUR positions, every cost Pawl.Types.Face prints directly: CR 118.12's
+    -- gate cost, paid by Pawl.Engine.Resolve.payGatePaidBy through
     -- Pawl.Engine.Cost.canPay and .pay; CR 601.2f's additional cost and CR
     -- 118.9's alternative cost, both paid through the same two functions as a
     -- cast is announced; and CR 116.2d's ignore cost, paid there again by
@@ -4986,6 +4986,13 @@ data Framing
     -- announcement's bindings into cost payment, which is what a card asking the
     -- question there would need (#2924). No printing asks it -- Scryfall
     -- o:"additional cost" o:"other than the target", 2026-09-01, no hit.
+    --
+    -- Not implemented: the FIVE cost positions a card reaches through something
+    -- other than a Face field -- an activated ability's cost, CR 508.1h's and CR
+    -- 509.1d's per-creature combat costs, CR 611.2's UntilPaid duration and CR
+    -- 613.11's two added cost lists. Every one is paid through the same
+    -- Pawl.Engine.Cost, which has no contextWithSlots caller at all, so each
+    -- promises what this tag denies; they are still Unframed (#2927).
     SlotlessCostFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
