@@ -3645,6 +3645,7 @@ costComponentFilters component = case component of
   CostComponent.ReturnThis -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayLifeX -> []
+  CostComponent.PayEnergyX -> []
   CostComponent.DiscardThis _ -> []
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []

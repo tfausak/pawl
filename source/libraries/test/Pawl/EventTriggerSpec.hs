@@ -1941,6 +1941,21 @@ lifeGainTriggerSpec s registry =
               Spec.assertEqWith s "and bob lost two" (S.lifeOf S.bob settled) (Just 18)
               Spec.assertEqWith s "alice's Pridemate grew" (countersOn aliceMate settled) (Just 1)
               Spec.assertEqWith s "bob's Pridemate did not -- losing life is not gaining it" (countersOn bobMate settled) (Just 0)
+        -- The AMOUNT, which the two cases above never read: they count one
+        -- event, not the size of it. Sphinx of the Revelation's "whenever you
+        -- gain life, you get that many {E}" spends CR 603.2's own binding for
+        -- it (Pawl.Engine.Binding.eventAmount), so a 4-power lifelink hit has to
+        -- arrive as four counters and not as one.
+        Spec.it s "CR 119.9/603.2 whole card: the Sphinx's lifelink gain is worth that many energy counters" $ do
+          sphinx <- S.printingOf s registry "Sphinx of the Revelation"
+          let (gs0, mine, _) = S.combatBoardOf [sphinx] []
+          case mine of
+            [] -> Spec.assertFailure s "fixture should have given alice a Sphinx"
+            flier : _ -> do
+              let settled = resolveAll (S.fightWith (attacksWith flier) gs0)
+              Spec.assertEqWith s "alice got four energy counters, the life she gained" (S.playerCounterOf PlayerCounterKind.Energy S.alice settled) 4
+              Spec.assertEqWith s "off a gain of exactly four" (S.lifeOf S.alice settled) (Just 24)
+              Spec.assertEqWith s "and bob has none of his own" (S.playerCounterOf PlayerCounterKind.Energy S.bob settled) 0
         -- CR 119.9's last sentence: "if a player gains 0 life, no life gain event
         -- has occurred".
         --

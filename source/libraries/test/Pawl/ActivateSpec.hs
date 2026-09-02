@@ -69,6 +69,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
@@ -1974,6 +1975,26 @@ tovolarNightBoard s registry = do
       g2 = g1 {GameState.objects = Map.adjust turnedOver tovolarId (GameState.objects g1)}
   pure (tovolarId, wolfId, g2 {GameState.priority = Just S.alice})
 
+-- alice with a settled Sphinx of the Revelation, the Plains and two Islands its
+-- ability's {W}{U}{U} takes, `energy` energy counters and a library to draw
+-- from, holding priority. `energy` is the whole of what the "Pay X {E}" half is
+-- measured against: the mana half is paid the same way at every X.
+sphinxBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Natural ->
+  m (Printing.Printing, ObjectId.ObjectId, GameState.GameState)
+sphinxBoard s registry energy = do
+  sphinx <- S.printingOf s registry "Sphinx of the Revelation"
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  mountain <- S.printingOf s registry "Mountain"
+  let (srcId, g0) = S.addCreature sphinx S.alice (S.landsFor island S.alice 2 (S.landsInPlay plains 1))
+      g1 = List.foldl' (\gs _ -> snd (S.addLibraryCard mountain S.alice gs)) g0 [1 .. 6 :: Int]
+      g2 = S.addPlayerCounter PlayerCounterKind.Energy energy S.alice g1
+  pure (sphinx, srcId, g2 {GameState.priority = Just S.alice})
+
 -- Announces X and aims every target slot at `who`.
 answerXAt :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
 answerXAt x who p = case p of
@@ -2184,6 +2205,47 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
         Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0))
       ]
     Spec.assertEqWith s "all four lands paid the {2}{R}{G}" (S.tappedCount S.alice after) 4
+
+  -- CR 107.3a's X as an amount of ENERGY, which is the third substrate it can
+  -- name after mana and life (CostComponent.PayEnergyX). Sphinx of the
+  -- Revelation -- "{W}{U}{U}, {T}, Pay X {E}: Draw X cards" -- pays the X it
+  -- reads, so one board shows both halves: the counters really leave, and the
+  -- draw is measured by the value announced rather than by the counters spent.
+  --
+  -- THE FALSIFIER, the group's own: an X that never reaches the component costs
+  -- nothing, so a Sphinx whose announcement was dropped would draw nothing and
+  -- keep all five counters.
+  Spec.it s "CR 107.3a/602.2b whole card: the Sphinx pays X energy and draws that many" $ do
+    (sphinx, srcId, g1) <- sphinxBoard s registry 5
+    let act = do Activate.activateAbility S.alice srcId (theAbility sphinx); Stack.resolveTop
+        after = snd (Engine.runGamePure (answerXAt 3 S.bob) g1 act)
+    Spec.assertEqWith s "two counters left, so the announced 3 was really spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
+    Spec.assertEqWith s "and alice drew the announced 3" (S.handSize S.alice after) 3
+    Spec.assertEqWith s "the three lands and the Sphinx itself paid the rest" (S.tappedCount S.alice after) 4
+    Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
+
+  -- The bound moves with the ENERGY and with nothing else: the {W}{U}{U} is paid
+  -- the same way on both boards, so no constant and nothing read off the printed
+  -- cost tells them apart. CR 118.3 is what refuses the value above it.
+  Spec.it s "CR 601.2b the ChooseX bound is the energy the player can spend" $ do
+    let boundsOff n = do
+          (sphinx, srcId, g1) <- sphinxBoard s registry n
+          pure (State.execState (Engine.runGame (answerAtBound S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility sphinx))) [])
+    five <- boundsOff 5
+    two <- boundsOff 2
+    Spec.assertEqWith s "five counters bound X at 5" five [5]
+    Spec.assertEqWith s "two counters bound X at 2" two [2]
+
+  -- CR 602.2: an X the counters cannot cover reverses the whole activation. The
+  -- ENERGY is what refuses it here -- the mana half is payable at every X -- so
+  -- this is the case a free {X} could not pass.
+  Spec.it s "CR 602.2 an X past the energy on hand is a no-op" $ do
+    (sphinx, srcId, g1) <- sphinxBoard s registry 2
+    let after = snd (Engine.runGamePure (answerAboveBound S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility sphinx)))
+    Spec.assertEqWith s "no counter spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
+    Spec.assertEqWith s "nothing drawn" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "no land or Sphinx tapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
 
 -- Aims every target slot at one CREATURE. aimAt's counterpart for a board whose
 -- point is that no PLAYER was targeted: CR 115.4's "any target" pool offers a

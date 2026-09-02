@@ -1869,6 +1869,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ReturnThis -> component
   CostComponent.PayLife _ -> component
   CostComponent.PayLifeX -> component
+  CostComponent.PayEnergyX -> component
   CostComponent.DiscardThis _ -> component
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
