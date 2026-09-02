@@ -227,6 +227,42 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "and the other road put one in his hand" (length (Game.zoneMembers Zone.Hand S.bob intoHand)) 1
     Spec.assertEqWith s "minted by both roads" (Game.objectCount ontoBattlefield, Game.objectCount intoHand) (before + 2, before + 1)
 
+  -- The third creation funnel, on the conjure pair's rule. CR 800.4d reaches an
+  -- emblem because CR 109.1 counts one as an object and CR 114.2 makes the
+  -- player who gets it its owner. Not CR 800.4b, whose third sentence names the
+  -- battlefield and the stack: an emblem goes to the command zone.
+  --
+  -- Driven at the funnel, as the two cases above are: both roads into
+  -- Event.createEmblem hand it the resolving controller, who by CR 800.4a
+  -- controls no resolving spell or ability once they have left.
+  Spec.it s "CR 800.4d no emblem is created for a player who has left the game" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let emblemCard = Printing.card piker
+        gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
+        before = Game.objectCount gone
+        commandBefore = Set.size (GameState.command gone)
+        (minted, after) = Engine.runGamePure S.identityAnswer gone (Event.createEmblem S.alice emblemCard)
+    Spec.assertBool s (notElem S.alice (Game.stillPlaying gone)) "alice really has left"
+    Spec.assertEqWith s "nothing reached the command zone" (Set.size (GameState.command after)) commandBefore
+    Spec.assertEqWith s "and the funnel reports no emblem" minted Nothing
+    -- Not "created and then removed": the object count never moved, which a
+    -- clean-up implementation would fail.
+    Spec.assertEqWith s "no object was ever minted" (Game.objectCount after) before
+
+  -- The other half of the guard, the token and conjure pairs': on the SAME
+  -- departed board, bob is unaffected, so the case above cannot pass by refusing
+  -- every emblem or by reading the wrong seat.
+  Spec.it s "CR 800.4d a player still in the game still gets their emblem" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let emblemCard = Printing.card piker
+        gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
+        before = Game.objectCount gone
+        commandBefore = Set.size (GameState.command gone)
+        (minted, after) = Engine.runGamePure S.identityAnswer gone (Event.createEmblem S.bob emblemCard)
+    Spec.assertEqWith s "bob's emblem is in the command zone" (Set.size (GameState.command after)) (commandBefore + 1)
+    Spec.assertEqWith s "owned by bob (CR 114.2)" (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) minted) (Just (Just S.bob))
+    Spec.assertEqWith s "one object was minted" (Game.objectCount after) (before + 1)
+
   Spec.it s "CR 111.2 createTokens puts a token on the battlefield and emits an enters event" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers

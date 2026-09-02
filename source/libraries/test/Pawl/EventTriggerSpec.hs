@@ -2614,6 +2614,17 @@ communalVigilSpec s registry =
           Spec.assertEqWith s "every seat is 8 up over the two batches" (fmap (\pid -> S.lifeOf pid again) [S.alice, S.bob, S.carol]) [Just 28, Just 28, Just 28]
           Spec.assertEqWith s "and the second batch was one event group" (length (List.nub (gainsIn again))) 1
 
+-- Only `attacker` attacks in the double-block case below, so S.aggressiveAnswer's
+-- blockers all land on it (CR 509.1), and its CR 510.1c division puts one damage
+-- on each blocker: two recipients, one source, one combat damage step. Both
+-- halves are PINNED off what the prompt offered rather than built, so a mutation
+-- cannot be repaired by an answerer that goes looking for a legal division.
+lifelinkDivision :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+lifelinkDivision attacker p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+  Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
+  _ -> S.aggressiveAnswer p
+
 -- CR 702.15e against the CR 510.2 bracket: two lifelink attackers connecting in
 -- one combat damage step deal ONE damage event and cause TWO life gain events,
 -- so a batch reader of the gains fires twice in the same step where a batch
@@ -2622,6 +2633,13 @@ communalVigilSpec s registry =
 -- lands the gains AFTER the bracket closes, one group apiece; a bracket wide
 -- enough to take the gains in fused them, which is what the step read as for a
 -- while (related to #2814).
+--
+-- The other direction is the third case: ONE lifelink source dealing damage to
+-- two recipients at once is one life gain event, since CR 702.15e separates the
+-- events of multiple SOURCES and CR 119.9 hangs the trigger off the source
+-- causing the gain. Pawl.Engine.Damage.recordLifelinkGains sums a source's
+-- damage before it records, and a double-blocked Child of Night dividing its
+-- power is the board that tells the two readings apart.
 --
 -- Synthetic Communal Vigil is the batch reader, and communalVigilSpec above says
 -- why a synthetic. Child of Night {1}{B} Creature -- Vampire 2/1, lifelink, is
@@ -2647,6 +2665,22 @@ lifelinkGainEventsSpec s registry =
               GameEvent.DamageDealt ev -> DamageEvent.kind ev == DamageKind.Combat
               _ -> False
           )
+      combatDamageBy src gs =
+        Maybe.mapMaybe
+          ( \logged -> case LoggedEvent.event logged of
+              GameEvent.DamageDealt ev
+                | DamageEvent.source ev == src && DamageEvent.kind ev == DamageKind.Combat ->
+                    Just (DamageEvent.target ev, DamageEvent.amount ev)
+              _ -> Nothing
+          )
+          (Foldable.toList (GameState.events gs))
+      gainAmounts gs =
+        Maybe.mapMaybe
+          ( \logged -> case LoggedEvent.event logged of
+              GameEvent.LifeGained change -> Just (LifeChange.amount change)
+              _ -> Nothing
+          )
+          (Foldable.toList (GameState.events gs))
       -- alice attacks with `mine` into an empty board, the Vigil and the
       -- Pridemate out and six Plains in her library, so the Vigil can draw for
       -- every reading without CR 104.3c deciding a case for it. The Pridemate
@@ -2662,6 +2696,22 @@ lifelinkGainEventsSpec s registry =
             withVigil = snd (S.addCreature vigil S.alice stocked)
             (mate, staged) = S.addCreature pridemate S.alice withVigil
         pure (mate, S.runCombat S.aggressiveAnswer staged)
+      -- The same board with two Goblin Pikers, {1}{R} 2/1, in the way: they both
+      -- block the one Child, which divides its 2 power one apiece -- CR 510.1c's
+      -- division is free. A Piker's 1 toughness makes each half lethal, so both
+      -- leave the battlefield and the case reads the damage EVENTS rather than
+      -- the marks they would otherwise carry.
+      doubleBlockBoard = do
+        child <- S.printingOf s registry "Child of Night"
+        piker <- S.printingOf s registry "Goblin Piker"
+        plains <- S.printingOf s registry "Plains"
+        vigil <- S.printingOf s registry "Synthetic Communal Vigil"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        let (gs, ours, _) = S.combatBoardOf [child] [piker, piker]
+            stocked = foldr (\_ g -> snd (S.addLibraryCard plains S.alice g)) gs [1 .. 6 :: Int]
+            withVigil = snd (S.addCreature vigil S.alice stocked)
+            (mate, staged) = S.addCreature pridemate S.alice withVigil
+        pure (mate, ours, staged)
    in Spec.describe s "CR 702.15e lifelink gains beside the combat damage bracket" $ do
         -- The proving case: two lifelink sources connect at once, and the Vigil
         -- draws TWO -- 1 is the fused reading, 0 is silence.
@@ -2682,6 +2732,24 @@ lifelinkGainEventsSpec s registry =
           Spec.assertEqWith s "bob took both attackers" (S.lifeOf S.bob after) (Just 16)
           Spec.assertEqWith s "one gain, one group" (length (gainGroups after), length (List.nub (gainGroups after))) (1, 1)
           Spec.assertEqWith s "and the Pridemate took one counter" (S.counterOf CounterKind.PlusOnePlusOne mate after) 1
+        -- The other direction, and the discriminating case: ONE source, two
+        -- recipients at once. Two records of 1 is the per-recipient reading.
+        Spec.it s "CR 119.9 one lifelink source damaging two blockers at once is one life gain event" $ do
+          (mate, ours, staged) <- doubleBlockBoard
+          case ours of
+            [child] -> do
+              let after = S.runCombat (lifelinkDivision child) staged
+              Spec.assertEqWith s "the Pridemate took one counter for the one gain" (S.counterOf CounterKind.PlusOnePlusOne mate after) 1
+              Spec.assertEqWith s "the Vigil drew once" (S.handSize S.alice after) 1
+              Spec.assertEqWith s "CR 702.15b: one gain, of the source's whole damage" (gainAmounts after) [2]
+              Spec.assertEqWith s "one gain, one event group" (length (gainGroups after), length (List.nub (gainGroups after))) (1, 1)
+              Spec.assertEqWith s "alice gained 2 all told" (S.lifeOf S.alice after) (Just 22)
+              -- The precondition the reading rests on: the Child's 2 power really
+              -- did reach two recipients in the one step.
+              Spec.assertEqWith s "the Child's 2 power went 1 apiece to two recipients" (length (List.nub (fmap fst (combatDamageBy child after))), fmap snd (combatDamageBy child after)) (2, [1, 1])
+              Spec.assertEqWith s "CR 510.2: the damage stayed one event group" (length (List.nub (combatDamageGroups after))) 1
+              Spec.assertEqWith s "bob was not damaged" (S.lifeOf S.bob after) (Just 20)
+            _ -> Spec.assertFailure s "fixture should have one attacker"
 
 -- CR 603.2c's FIRST sentence on the CR 603.7 DELAYED path, which the two groups
 -- above cannot reach between them: Synthetic Communal Vigil proves the batch
