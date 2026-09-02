@@ -18,6 +18,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -86,6 +87,16 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.LoseKeyword Keyword.Flying)
       " {\"type\":\"LoseKeyword\",\"value\":{\"type\":\"Flying\"}} "
+  -- layer 6, CR 613.1f / 702.14a: the removal that names a FAMILY (Hammerheim).
+  -- The payload is a nullary tag rather than the tagged pair above, since
+  -- Pawl.Types.KeywordFamily is payload-free -- "all landwalk abilities" names
+  -- no land type.
+  Spec.it s "LoseKeywordFamily carries the family" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.LoseKeywordFamily KeywordFamily.Landwalk)
+      " {\"type\":\"LoseKeywordFamily\",\"value\":{\"type\":\"Landwalk\"}} "
   -- layer 7b (Humility 1/1; Opalescence mana value).
   Spec.it s "SetBasePowerToughness" $
     Common.assertCodec

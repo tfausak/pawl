@@ -830,6 +830,8 @@ modificationCounts modification = case modification of
   -- Carries a Keyword, whose Filter is reached through modificationFilters below
   -- rather than through this sweep -- the answer GainKeyword gives above.
   Modification.LoseKeyword _ -> []
+  -- Carries a payload-free family, which nests neither a Count nor a Filter.
+  Modification.LoseKeywordFamily _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.SetLandSubtype _ -> []
@@ -3920,7 +3922,7 @@ modificationFilters modification = case modification of
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
   -- other and has to be swept. NOT [] -- this, GainKeyword above and LoseKeyword
   -- below are the arms that answer with something, and every other one carries no
-  -- Filter at all.
+  -- Filter at all, LoseKeywordFamily's payload-free family included.
   Modification.GainEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities and grantedTriggeredAbilities below, at the
@@ -3935,6 +3937,10 @@ modificationFilters modification = case modification of
   -- CR 702.14a again, from the other side: a removal names the keyword in full,
   -- so its Filter is card text this sweep has to reach.
   Modification.LoseKeyword keyword -> keywordFilters keyword
+  -- CR 702.14a's generic term instead of a written instance, and a KeywordFamily
+  -- carries no Filter at all -- Hammerheim's "all landwalk abilities" names no
+  -- land type for this sweep to reach.
+  Modification.LoseKeywordFamily _ -> []
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []

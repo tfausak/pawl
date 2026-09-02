@@ -6,6 +6,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
@@ -19,8 +20,8 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- constructor -- the same standing Pawl.Engine.Resolve has over Effect.
 -- Pawl.CardSpec's lints also case on it, legitimately: a test-suite lint that
 -- walks the card pool is not rules core. GainKeyword and LoseKeyword carry a
--- Keyword, a closed-half CITATION, so casing on it is not an invariant
--- violation; and GainAbility carries a whole open-half ability that nothing cases on beyond CR
+-- Keyword and LoseKeywordFamily a KeywordFamily, closed-half CITATIONS, so
+-- casing on them is not an invariant violation; and GainAbility carries a whole open-half ability that nothing cases on beyond CR
 -- 113.3's ability KIND -- the projection appends it to one of two lists, and
 -- every reader downstream treats it as any other ability. The P/T arms carry
 -- records of signed Quantity. The layer-4 arms below reach card types, subtypes
@@ -165,9 +166,27 @@ data Modification ability
     -- protection from black" (Cephalid Snitch), "loses forestwalk" (Scarwood
     -- Hag) -- so a family designator would be a second spelling of the same
     -- removal, the objection KeywordFamily's own header raises against widening
-    -- HasKeyword. Not implemented: removing a whole family, which Hammerheim's
-    -- "loses all landwalk abilities" is the printing for (#2203).
+    -- HasKeyword. The removal that DOES name a family is the arm below, which
+    -- reaches every written instance at once.
     LoseKeyword Keyword.Keyword
+  | -- | layer 6, CR 613.1f / 702.14a: this object loses every keyword of one
+    -- FAMILY, Hammerheim's "target creature loses all landwalk abilities".
+    --
+    -- Beside LoseKeyword above rather than in place of it. CR 702.14a's "landwalk
+    -- is a generic term" is the clause this arm writes and the written removals
+    -- cannot: naming forestwalk leaves swampwalk standing, and a card that names
+    -- the family has no list of instances to enumerate.
+    -- Pawl.Engine.Projection.applyModification deletes every projected keyword
+    -- whose Pawl.Engine.Keyword.familyOf matches, which is why the payload is a
+    -- KeywordFamily and not a representative Keyword.
+    --
+    -- A closed-half CITATION exactly as LoseKeyword's Keyword is: KeywordFamily
+    -- names rule 702's abilities with their payloads dropped.
+    --
+    -- Not implemented: a removal scoped to every keyword an object has at once,
+    -- which names no family -- Modular Monstrosity's "loses all keyword
+    -- abilities" (gap #2983).
+    LoseKeywordFamily KeywordFamily.KeywordFamily
   | SetBasePowerToughness SetBasePowerToughness.SetBasePowerToughness -- layer 7b (Humility 1/1; Opalescence mana value)
   | ModifyPowerToughness ModifyPowerToughness.ModifyPowerToughness -- layer 7c (Giant Growth +3/+3)
   | SetLandSubtype Subtype.Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
