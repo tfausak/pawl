@@ -141,7 +141,7 @@ allows pid oid action gs = case HandAction.condition action of
 --
 -- Not implemented: CR 103.6b's second sentence, "the card remains revealed until
 -- the first turn begins". pawl's reveal is momentary and there is no per-object
--- revealed flag for it to set (#1408); with no hidden-information filter every
+-- revealed flag for it to set (#3045); with no hidden-information filter every
 -- interpreter already sees every hand, so a lasting reveal and a momentary one
 -- reach the same board.
 handWindow ::

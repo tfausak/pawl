@@ -6349,7 +6349,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Not implemented: no other opcode passes the chosen slots, so a card writing
   -- PlayerRef.ControllerOfBound in one of their references would lose the player
-  -- once the object moved (#1441).
+  -- once the object moved (#3059).
   Effect.DecreaseSpeed d -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -8246,7 +8246,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- data/cards reads a counter tally across permanents.
   --
   -- Not implemented: nothing records which creature was blighted, so CR 701.68c's
-  -- "blighted creature" and CR 701.68d's trigger have nothing to read (#1492).
+  -- "blighted creature" has nothing to read (#1492); CR 701.68d's trigger on a
+  -- player blighting has no condition to match either (#3065).
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

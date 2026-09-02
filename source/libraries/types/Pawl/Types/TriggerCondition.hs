@@ -313,7 +313,9 @@ data TriggerCondition
     -- Not implemented: the bystander form CR 701.27e also admits, a card
     -- watching another permanent transform (Corruption of Towashi, Neglected
     -- Heirloom). The event carries everything such a condition would read, so
-    -- what is missing is the arm rather than the record (#2050).
+    -- what is missing there is the arm rather than the record (#2050). A
+    -- condition naming a characteristic rather than a name (Cult of the Waxing
+    -- Moon) needs the record widened as well (#3051).
     SelfTransformedInto CardName.CardName
   | -- | CR 708.7's other written form read by a bystander (Aven Farseer),
     -- filtered and read live after CR 708.8 restores the copiable values.

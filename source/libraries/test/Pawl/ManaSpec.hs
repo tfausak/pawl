@@ -6445,9 +6445,9 @@ activateAndResolve answer gs oid ability =
 -- announced about this symbol, so the two rules are only observable together.
 --
 -- Not implemented: her second and third loyalty abilities, which
--- data/cards/tamiyo-compleated-sage.json omits -- a loyalty cost of -X, and a
--- token minted from a card's own text (#1997). Stricter than printed, and no
--- clause below rests on either.
+-- data/cards/tamiyo-compleated-sage.json omits -- a loyalty cost of -X (#1997),
+-- and a token minted from a card's own text (#3049). Stricter than printed, and
+-- no clause below rests on either.
 tamiyoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
   -- Off the card and off no board at all: CR 202.2d's colours and CR 202.3g's

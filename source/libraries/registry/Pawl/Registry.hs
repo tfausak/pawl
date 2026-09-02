@@ -7,7 +7,7 @@
 -- be used at whatever monad the caller has, without pretending to do IO. The
 -- parameter earns its keep at the other end: a registry fetching cards on
 -- demand from a remote source genuinely needs effects at lookup time, and m is
--- the difference (see #1676). Failure is a returned value rather than an
+-- the difference (see #3047). Failure is a returned value rather than an
 -- exception for the same reason: a pure registry cannot throw. How a registry
 -- answers is not part of the type.
 --

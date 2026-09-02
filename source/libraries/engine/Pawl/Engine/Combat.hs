@@ -1655,7 +1655,7 @@ attemptAttackDeclaration pid rejected = do
               -- Not implemented: CR 508.3a's attacks-a-permanent form, which
               -- neither event below can be matched on -- it needs the target
               -- beside the ATTACKER's identity, and this one carries CR 508.5's
-              -- defending player instead (#2279).
+              -- defending player instead (#3052).
               State.modify'
                 ( \g ->
                     let defendingFor oid = (\t -> Defender.playerOf Projection.controllerWithLastKnown t g) =<< Map.lookup oid recorded
