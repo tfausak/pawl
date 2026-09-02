@@ -187,12 +187,31 @@ overwritten by another's, and restoring it injected a different unit's
 in-flight code into the tree --- a corruption no build catches, because both
 sides compile.
 
+**One build at a time, machine-wide.** The GHC job semaphore shares compile
+slots; it does not stop several worktrees running `cabal` at once, and with
+three going an 8 GB machine is unusable. Every `cabal` invocation in every
+lane goes through `script/with-build-lock.sh`, which queues on a lock
+directory and takes over a lock whose owner has died. Put that in every brief;
+more lanes are fine, more builds are not.
+
 **The GHC job semaphore breaks under concurrency.** `CLAUDE.md` describes the
 symptom and the escape (`cabal test --no-semaphore -j4`); what the loop adds is
 frequency. With several lanes live it is a recurring event, not a rare one, and
 the commonest cause is a tool timeout reaping a backgrounded `cabal`. Tell
 agents to run `cabal` in the foreground with a generous timeout, and never to
 `pkill` by pattern.
+
+**Reap after every merge.** A finished unit leaves a worktree under
+`.claude/worktrees/`, its placeholder `worktree-agent-*` branch, the unit's own
+branch, and often a `cabal` process stalled on the semaphore at 0% CPU. None of
+it goes away on its own, and a stalled `cabal` keeps a build slot the live lanes
+need. Once a unit's PR is merged, from the primary checkout: `git worktree
+remove --force` its worktree (unlock first), `git worktree prune`, `git fetch
+--prune`, then delete every local branch whose upstream is `[gone]` or that has
+no commit beyond `origin/main`, skipping any branch a live worktree has checked
+out. Kill a stalled `cabal` by its PID after `lsof -p <pid> -d cwd` shows a
+finished worktree, never by pattern. Leave any branch you did not create that
+still carries commits, and say so; the owner keeps review branches.
 
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
 be up to date, so every merge invalidates every other armed PR and the queue
