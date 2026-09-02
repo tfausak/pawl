@@ -3604,6 +3604,153 @@ levelerSpec s registry =
             (sortedNames Zone.Library S.alice intact)
             (List.sort (fmap (Just . named) ["Bird Maiden", "Goblin Piker", "Ogre Sentry"]))
 
+-- Aim Caldera Breaker's reflexive at anything BUT bob's two creatures, falling
+-- back to the Angel when -- as the card's own words require -- there is nothing
+-- else. FILTERED rather than replaced, so a pool that wrongly offered alice's own
+-- Breaker or one of bob's Mountains would take the damage and leave the Angel at
+-- zero: "an opponent controls" and "creature or planeswalker" are read rather
+-- than assumed.
+calderaBreakerAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+calderaBreakerAnswer angel giant p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap
+      ( \(_, legal) ->
+          let others = Set.filter (\r -> Recipient.objectOf r /= Just angel && Recipient.objectOf r /= Just giant) legal
+           in if Set.null others then Set.filter ((== Just angel) . Recipient.objectOf) legal else others
+      )
+      sets
+  _ -> S.identityAnswer p
+
+-- ObjectRef.EachCardInYourLibrary with a STATED filter, the sweep levelerSpec
+-- above takes bare: CR 109.2a's "card" beside the name of a zone, where the bare
+-- form is CR 400.12's instruction to the zone itself.
+--
+-- Caldera Breaker {3}{R}{R}{R} Artifact Creature -- Golem 6/6 (Alchemy: Ixalan,
+-- Oracle text fetched from Scryfall 2026-09-02) is the producer: "When Caldera
+-- Breaker enters, exile all Mountain cards from your library. When you do,
+-- Caldera Breaker deals that much damage to target creature or planeswalker an
+-- opponent controls."
+--
+-- NOT A SEARCH, which is the rules question this arm rests on and which a stated
+-- characteristic does not change. CR 701.23a's search LOOKS AT a zone and FINDS
+-- cards matching a description; this text says neither word, so CR 701.23b's
+-- "isn't required to find" governs nobody here -- that rule is about a player who
+-- is searching -- CR 701.23f's search triggers do not fire, and CR 701.24
+-- shuffles nothing.
+--
+-- The board tells the readings apart. alice's library INTERLEAVES three Mountains
+-- with three distinct nonland cards, so "the matches", "the whole zone" and "a
+-- prefix" are three different exiles and the survivors' ORDER is readable -- which
+-- is what a shuffle would destroy. A Mountain sits in her hand and two more in
+-- bob's library, so a sweep that reached the other hidden zone or another seat
+-- would show. bob controls two creatures, so the reflexive's target slot has more
+-- candidates than its count and cannot short-circuit.
+--
+-- "That much" is CR 400.7j: exile is a public zone (CR 400.2), so a later part of
+-- the same effect can find the cards it put there, and the count is read off the
+-- slot the move bound rather than off the library that no longer holds them.
+calderaBreakerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+calderaBreakerSpec s registry =
+  let named = CardName.MkCardName . Text.pack
+      sortedNames zone pid gs = List.sort (namesIn zone pid gs)
+      -- alice: six Mountains to pay {3}{R}{R}{R}, a six-card library alternating
+      -- Mountain and not, a Mountain in hand and the Breaker in hand. bob: two
+      -- creatures and two Mountains in his own library.
+      board breaker mountain piker maiden sentry angel giant =
+        let g0 = S.landsFor mountain S.alice 6 (Setup.emptyGame S.bothPlayers)
+            -- addLibraryCard puts each card on TOP, so the library reads
+            -- Mountain, Piker, Mountain, Maiden, Mountain, Sentry from the top.
+            (_, g1) = S.addLibraryCard sentry S.alice g0
+            (_, g2) = S.addLibraryCard mountain S.alice g1
+            (_, g3) = S.addLibraryCard maiden S.alice g2
+            (_, g4) = S.addLibraryCard mountain S.alice g3
+            (_, g5) = S.addLibraryCard piker S.alice g4
+            (_, g6) = S.addLibraryCard mountain S.alice g5
+            (_, g7) = S.addLibraryCard mountain S.bob g6
+            (_, g8) = S.addLibraryCard mountain S.bob g7
+            (angelId, g9) = S.addCreature angel S.bob g8
+            (giantId, g10) = S.addCreature giant S.bob g9
+            -- handOne REPLACES alice's hand, so the Mountain that proves the
+            -- sweep found the library rather than the other hidden zone goes in
+            -- after it.
+            (g11, spell) = S.handOne breaker g10
+            (_, g12) = S.addHandCard mountain S.alice g11
+         in (g12, spell, angelId, giantId)
+      cast (withSpell, spell, angel, giant) =
+        let afterCast = S.runPure (calderaBreakerAnswer angel giant) withSpell (S.cast S.alice spell)
+         in S.runPure (calderaBreakerAnswer angel giant) afterCast Engine.priorityLoop
+      printings = do
+        breaker <- S.printingOf s registry "Caldera Breaker"
+        mountain <- S.printingOf s registry "Mountain"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        angel <- S.printingOf s registry "Angel of Finality"
+        giant <- S.printingOf s registry "Hill Giant"
+        pure (board breaker mountain piker maiden sentry angel giant)
+   in Spec.describe s "Caldera Breaker" $ do
+        -- The headline, gameplay-level first: the three Mountains leave and the
+        -- three nonland cards stay, IN THE ORDER THEY WERE IN.
+        Spec.it s "CR 109.2a only the matching cards leave the library, in place" $ do
+          staged <- printings
+          let after = cast staged
+          Spec.assertEqWith
+            s
+            "the three cards left in alice's library are the nonland ones, top to bottom"
+            (namesIn Zone.Library S.alice after)
+            (fmap (Just . named) ["Goblin Piker", "Bird Maiden", "Ogre Sentry"])
+          Spec.assertEqWith
+            s
+            "and exactly the three Mountains that were in it are in exile"
+            (sortedNames Zone.Exile S.alice after)
+            (replicate 3 (Just (named "Mountain")))
+          Spec.assertEqWith s "the Mountain in her hand is untouched, so the sweep found the library and not the other hidden zone" (sortedNames Zone.Hand S.alice after) [Just (named "Mountain")]
+        -- CR 109.5's "you" is one seat, and the filter is not a licence to reach
+        -- another library that also holds matches.
+        Spec.it s "CR 109.5 no other player's library is touched" $ do
+          staged <- printings
+          let after = cast staged
+          Spec.assertEqWith
+            s
+            "bob's library still holds both his Mountains"
+            (sortedNames Zone.Library S.bob after)
+            (replicate 2 (Just (named "Mountain")))
+          Spec.assertEqWith s "and nothing of his is in exile" (sortedNames Zone.Exile S.bob after) []
+        -- CR 603.12 and CR 400.7j: the reflexive fires once and reads "that much"
+        -- off the group the move bound, not off the library it emptied of matches.
+        Spec.it s "CR 603.12 / 400.7j the reflexive deals damage equal to the cards exiled" $ do
+          staged <- printings
+          let (_, _, angel, giant) = staged
+              after = cast staged
+          Spec.assertEqWith s "the targeted creature took three, one per exiled Mountain" (S.damageOf angel after) (Just 3)
+          Spec.assertEqWith s "and the other candidate took none, so the damage went to one target" (S.damageOf giant after) (Just 0)
+          Spec.assertEqWith s "which is the anti-vacuity: three Mountains really were exiled" (sortedNames Zone.Exile S.alice after) (replicate 3 (Just (named "Mountain")))
+        -- CR 701.23 and CR 701.24, read off the recorded responses: a sweep that
+        -- states a characteristic still asks nobody to find anything and shuffles
+        -- nothing. A board cannot show this on its own, because a search that
+        -- found every Mountain would leave the same exile.
+        Spec.it s "CR 701.23a a filtered sweep is not a search, and CR 701.24 shuffles nothing" $ do
+          staged <- printings
+          let (withSpell, spell, angel, giant) = staged
+              ((_, afterCast), castResponses) = Replay.record (calderaBreakerAnswer angel giant) withSpell (S.cast S.alice spell)
+              ((_, after), loopResponses) = Replay.record (calderaBreakerAnswer angel giant) afterCast Engine.priorityLoop
+              responses = castResponses <> loopResponses
+              searched r = case r of
+                Response.Searched _ -> True
+                Response.ChoseSearchZones _ -> True
+                _ -> False
+              shuffled r = case r of
+                Response.Shuffled _ -> True
+                _ -> False
+          Spec.assertBool s (not (null responses)) "the run recorded responses"
+          Spec.assertBool s (not (any searched responses)) "no search was put to a player"
+          Spec.assertBool s (not (any shuffled responses)) "and no library was shuffled"
+          Spec.assertEqWith
+            s
+            "and the survivors kept the order a shuffle would have destroyed"
+            (namesIn Zone.Library S.alice after)
+            (fmap (Just . named) ["Goblin Piker", "Bird Maiden", "Ogre Sentry"])
+
 -- Trumpet Blast ({2}{R} instant, "Attacking creatures get +2/+0 until end of
 -- turn") is the pool's first card whose CONTINUOUS effect names a filter-selected
 -- set rather than a target. Day of Judgment's EachMatching feeds a ONE-SHOT, so
@@ -4718,6 +4865,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   elvishPiperSpec s registry
   gloriousProtectorSpec s registry
   levelerSpec s registry
+  calderaBreakerSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry
