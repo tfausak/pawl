@@ -152,7 +152,7 @@ baseFace =
       Face.attackCosts = [],
       Face.blockCosts = [],
       Face.additionalCosts = [],
-      Face.maximumX = Nothing,
+      Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.mulliganActions = [],
@@ -191,7 +191,7 @@ minimalFace =
       Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
-      Face.maximumX = Nothing,
+      Face.maximumX = [],
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
@@ -261,7 +261,7 @@ populatedFace =
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
       Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
       Face.additionalCosts = [CostComponent.TapThis],
-      Face.maximumX = Just Quantity.ManaValue,
+      Face.maximumX = [Quantity.ManaValue],
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
       Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
       Face.counterability = Counterability.CantBeCountered,
@@ -301,7 +301,7 @@ populatedFaceJson =
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"scope\":{\"type\":\"Controller\"}}],"
     <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
-    <> "\"maximumX\":{\"type\":\"ManaValue\"},"
+    <> "\"maximumX\":[{\"type\":\"ManaValue\"}],"
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
     <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
