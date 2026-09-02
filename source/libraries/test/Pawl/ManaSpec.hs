@@ -4076,7 +4076,7 @@ lastingSpringSpec s registry = Spec.describe s "Synthetic Lasting Spring" $ do
   -- Sol Ring ({1}) is the gameplay reading: neither board has a land or any
   -- other mana source, so the floated {C} is the only way to pay, and the
   -- control's False says the sweep did run at that boundary.
-  Spec.it s "CR 514.2 the inline mana survives the step's end, and an ordinary {C} does not" $ do
+  Spec.it s "CR 500.5 the inline mana survives the step's end, and an ordinary {C} does not" $ do
     spring <- S.printingOf s registry "Synthetic Lasting Spring"
     powder <- S.printingOf s registry "Serum Powder"
     solRing <- S.printingOf s registry "Sol Ring"

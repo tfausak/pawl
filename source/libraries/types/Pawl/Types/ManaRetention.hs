@@ -5,7 +5,9 @@ module Pawl.Types.ManaRetention where
 -- (Pawl.Types.ManaAddition). Shizuko, Caller of Autumn's "until end of turn,
 -- they don't lose this mana as steps and phases end" and Avatar Roku,
 -- Firebender's "until end of combat, you don't lose this mana as steps end" are
--- the printings, one per non-@Ordinary@ arm.
+-- the printings, one per non-@Ordinary@ arm. Both resolve off the stack;
+-- Synthetic Lasting Spring is the unprinted third, since no printing puts the
+-- clause on an ACTIVATED mana ability (Pawl.ManaSpec's group has the census).
 --
 -- Not a Bool, for Pawl.Types.Optionality's reason: each arm says which rule is
 -- in play -- CR 514.2's, CR 500.5a's -- where @True@ would say only that
