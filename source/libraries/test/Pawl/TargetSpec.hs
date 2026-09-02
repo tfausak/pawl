@@ -2131,7 +2131,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- returns 22 cards, and no mode of any of them prints a target slot with a
   -- computed bound.
   --
-  -- CR 400.7j's fold over a bound slot is the bound, rather than
+  -- Pawl.Types.Scope's OverBound fold over a bound slot is the bound, rather than
   -- Quantity.AgainstSlot's power read, because the OFFER hands a dependent slot
   -- the UNION of what the slot it names could take (legalSetsGiven): a fold over
   -- three candidates answers 3, where a read that insists on ONE object

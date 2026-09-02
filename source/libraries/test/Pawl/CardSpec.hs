@@ -9517,7 +9517,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (1, 0)
     -- The pool's sixth author, jointly judged through the BOUND itself rather
     -- than through the pool beside it: Synthetic Measured Refrain's bound folds
-    -- over what a sibling slot names (CR 400.7j), which is the read CR 700.2d's
+    -- over what a sibling slot names (Scope.OverBound), which is the read CR 700.2d's
     -- per-occurrence rename has to follow -- Pawl.TargetSpec's "CR 700.2d a
     -- repeated mode's computed bound measures its own occurrence's sibling slot".
     measured <- S.printingOf s registry "Synthetic Measured Refrain"

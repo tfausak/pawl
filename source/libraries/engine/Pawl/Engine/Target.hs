@@ -1071,9 +1071,9 @@ legalSets perspective seed source slots gs =
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
 --
 -- TWO PASSES, because CR 601.2c makes one slot's legal set depend on another's:
--- a ZoneScope.InSlot pool names a slot, so the first pass answers every
--- slot with no bindings at all and the second re-answers only the slots that
--- name one, against the first pass. The rule chooses every target AT ONCE, so
+-- a ZoneScope.InSlot pool names a slot and so may a CR 202.3 computed bound, so
+-- the first pass answers every slot with no bindings at all and the second
+-- re-answers only the slots that name one (secondPass), against the first pass. The rule chooses every target AT ONCE, so
 -- there is no order to consult -- what a dependent slot is offered is the UNION
 -- over the answers the slot it names could still take, and selectionLegal is
 -- where the announcement is judged as one act.
@@ -1083,8 +1083,8 @@ legalSets perspective seed source slots gs =
 -- another dependent slot reads that slot's first-pass answer, which is empty.
 -- No card writes one, and nothing here would loop if one did.
 --
--- Ordinary cards pay nothing: `dependent` is empty for every slot map with no
--- slot-scoped pool in it, so the second pass is a Map.filter over a map with at
+-- Ordinary cards pay nothing: `dependent` is empty for every slot map secondPass
+-- reports nothing for, so the second pass is a Map.filter over a map with at
 -- most a handful of keys.
 legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
