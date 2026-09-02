@@ -11,6 +11,7 @@
 set -euo pipefail
 lock="${PAWL_BUILD_LOCK:-/tmp/pawl-build.lock}"
 mine="$lock.$$"
+child=""
 echo $$ > "$mine"
 trap 'rm -f "$mine"' EXIT
 while ! ln "$mine" "$lock" 2>/dev/null; do
