@@ -11,28 +11,19 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Black"
-            }
-          }
-        },
-        {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
               "type": "Red"
             }
           }
         }
       ],
-      "name": "Mayhem Devil",
+      "name": "Vengeful Tracker",
       "power": {
         "type": "Literal",
-        "value": 3
+        "value": 2
       },
       "toughness": {
         "type": "Literal",
-        "value": 3
+        "value": 2
       },
       "triggeredAbilities": [
         {
@@ -40,11 +31,13 @@
             "type": "PermanentSacrificed",
             "value": {
               "filter": {
-                "type": "And",
-                "value": []
+                "type": "HasCardType",
+                "value": {
+                  "type": "Artifact"
+                }
               },
               "player": {
-                "type": "AnyPlayer"
+                "type": "Opponent"
               }
             }
           },
@@ -61,11 +54,11 @@
                             {
                               "quantity": {
                                 "type": "Literal",
-                                "value": 1
+                                "value": 2
                               },
                               "ref": {
                                 "type": "InSlot",
-                                "value": "target"
+                                "value": "thatPlayer"
                               }
                             }
                           ]
@@ -73,14 +66,7 @@
                       }
                     ]
                   }
-                ],
-                "targetSlots": {
-                  "target": {
-                    "pool": {
-                      "type": "AnyTarget"
-                    }
-                  }
-                }
+                ]
               }
             ]
           }
@@ -89,7 +75,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Devil"
+            "type": "Detective"
+          },
+          {
+            "type": "Human"
           }
         ],
         "types": [

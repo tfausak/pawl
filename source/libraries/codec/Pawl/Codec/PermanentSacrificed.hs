@@ -2,21 +2,19 @@
 
 module Pawl.Codec.PermanentSacrificed where
 
-import qualified Pawl.Codec.ObjectId as ObjectId
-import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 
--- | A bare object keyed by the record's field names, replacing the two-element
--- array this payload used to be. Runtime-only: GameEvent serialises transcripts,
--- never card data.
+-- | A bare object keyed by the record's field names, as
+-- Pawl.Codec.PlayerAttacksWith is. Both keys are required: the unrestricted
+-- printed wording spells itself out as AnyPlayer and the trivial Filter rather
+-- than leaving either out.
 codec :: Codec.Codec PermanentSacrificed.PermanentSacrificed
 codec = Fields.object $ do
-  player <- Fields.required "player" PlayerId.codec PermanentSacrificed.player
-  permanent <- Fields.required "permanent" ObjectId.codec PermanentSacrificed.permanent
-  pure
-    PermanentSacrificed.MkPermanentSacrificed
-      { PermanentSacrificed.player = player,
-        PermanentSacrificed.permanent = permanent
-      }
+  player <- Fields.required "player" PlayerRelation.codec PermanentSacrificed.player
+  filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) PermanentSacrificed.filter
+  pure PermanentSacrificed.MkPermanentSacrificed {PermanentSacrificed.player = player, PermanentSacrificed.filter = filter_}

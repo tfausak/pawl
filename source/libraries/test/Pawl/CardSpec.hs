@@ -210,6 +210,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -889,8 +890,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
-  -- CR 701.21a's is nullary too, so it holds no Quantity either.
-  TriggerCondition.PermanentSacrificed -> []
+  -- CR 701.21a's carries a PlayerRelation and a Filter, neither of which holds a
+  -- Count.
+  TriggerCondition.PermanentSacrificed {} -> []
   -- CR 603.3b's carries a PlayerRelation, which holds no Count.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
@@ -4001,9 +4003,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
-  -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
-  -- PermanentDies below there is no Filter to sweep.
-  TriggerCondition.PermanentSacrificed -> []
+  -- CR 701.21a's Filter narrows the sacrificed permanent -- Vengeful Tracker's
+  -- "an artifact" -- and is swept like PermanentDies' below.
+  TriggerCondition.PermanentSacrificed payload -> unframed [PermanentSacrificed.filter payload]
   -- CR 603.3b's names a PlayerRelation; the Saga is found through CR 714.2d's
   -- final chapter number rather than through a Filter.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
@@ -4253,7 +4255,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfEvolves -> []
   TriggerCondition.AttachedCreatureMentors -> []
   TriggerCondition.SelfTrains -> []
-  TriggerCondition.PermanentSacrificed -> []
+  TriggerCondition.PermanentSacrificed {} -> []
   TriggerCondition.SagaFinalChapterTriggers _ -> []
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition, the one arm with an answer: Ray of

@@ -24,7 +24,7 @@ import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -762,11 +762,13 @@ data GameEvent
     -- name an incarnation that a redirected move never produced.
     --
     -- Carries the SACRIFICING player, whom CR 701.21a makes the permanent's
-    -- controller, and the permanent itself. Neither is read by a trigger today
-    -- (Pawl.Engine.Event.eventBindingSlots answers empty for the condition), the
-    -- payload being what a card printing "whenever YOU sacrifice" or "sacrifice a
-    -- creature ... return IT" would need.
-    PermanentSacrificed PermanentSacrificed.PermanentSacrificed
+    -- controller, and the permanent itself. The player is both compared against
+    -- the condition's PlayerRelation and bound for the payload to name (Vengeful
+    -- Tracker); the permanent is compared against its Filter.
+    --
+    -- Not implemented: a slot for the sacrificed permanent, which "sacrifice a
+    -- creature ... return IT" would read (#977).
+    PermanentSacrificed PermanentWasSacrificed.PermanentWasSacrificed
   | -- | CR 603.3b: an ABILITY TRIGGERED. The one entry in this log that describes
     -- something the rules did rather than something that happened to the board,
     -- and it is here because rule 603.3b names it as a trigger event in as many

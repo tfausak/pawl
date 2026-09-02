@@ -30,7 +30,7 @@ import qualified Pawl.Codec.Mentored as Mentored
 import qualified Pawl.Codec.Milled as Milled
 import qualified Pawl.Codec.Moved as Moved
 import qualified Pawl.Codec.ObjectId as ObjectId
-import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Codec.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Revealed as Revealed
 import qualified Pawl.Codec.SpellWasCast as SpellWasCast
@@ -74,7 +74,7 @@ codec =
       Arm.payload "Evolved" ObjectId.codec GameEvent.Evolved (\x -> case x of GameEvent.Evolved y -> Just y; _ -> Nothing),
       Arm.payload "Mentored" Mentored.codec GameEvent.Mentored (\x -> case x of GameEvent.Mentored y -> Just y; _ -> Nothing),
       Arm.payload "Trained" ObjectId.codec GameEvent.Trained (\x -> case x of GameEvent.Trained y -> Just y; _ -> Nothing),
-      Arm.payload "PermanentSacrificed" PermanentSacrificed.codec GameEvent.PermanentSacrificed (\x -> case x of GameEvent.PermanentSacrificed y -> Just y; _ -> Nothing),
+      Arm.payload "PermanentSacrificed" PermanentWasSacrificed.codec GameEvent.PermanentSacrificed (\x -> case x of GameEvent.PermanentSacrificed y -> Just y; _ -> Nothing),
       Arm.payload "AbilityTriggered" AbilityTriggered.codec GameEvent.AbilityTriggered (\x -> case x of GameEvent.AbilityTriggered y -> Just y; _ -> Nothing),
       Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged (\x -> case x of GameEvent.ControlChanged y -> Just y; _ -> Nothing),
       Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered (\x -> case x of GameEvent.VentureMarkerEntered y -> Just y; _ -> Nothing),

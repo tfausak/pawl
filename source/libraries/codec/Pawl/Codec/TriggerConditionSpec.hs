@@ -20,6 +20,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -752,14 +753,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfTrains
       " {\"type\":\"SelfTrains\"} "
-  -- CR 603.10a's sacrifice family. Nullary: "a player" is neither PlayerRelation
-  -- arm and "a permanent" names no Filter, so there is nothing to encode.
-  Spec.it s "PermanentSacrificed" $
+  -- CR 603.10a's sacrifice family, narrowed both ways: Vengeful Tracker's
+  -- "whenever an opponent sacrifices an artifact".
+  Spec.it s "PermanentSacrificed round-trips both halves" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      TriggerCondition.PermanentSacrificed
-      " {\"type\":\"PermanentSacrificed\"} "
+      (TriggerCondition.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed PlayerRelation.Opponent (Filter.HasCardType CardType.Artifact)))
+      " {\"type\":\"PermanentSacrificed\",\"value\":{\"player\":{\"type\":\"Opponent\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}}} "
   -- CR 603.3b's second class. The relation is the only payload: which Saga and
   -- which chapter are read off the event and the source's projection.
   Spec.it s "SagaFinalChapterTriggers round-trips its relation" $

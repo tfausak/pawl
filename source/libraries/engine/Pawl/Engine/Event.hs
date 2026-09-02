@@ -154,6 +154,7 @@ import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
@@ -5148,7 +5149,7 @@ sacrifice pid oid = do
         -- repeat terminates. This arm is the backstop under both.
         | SacrificeRestriction.prohibited oid gs -> pure ()
         | otherwise -> do
-            State.modify' (recordEvent (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed pid oid)))
+            State.modify' (recordEvent (GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed pid oid)))
             changeZone oid Zone.Graveyard
       Zone.Library -> pure ()
       Zone.Hand -> pure ()
@@ -10235,11 +10236,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- records is indistinguishable from a destruction's or a mill's -- an arm that
   -- read the zone change instead would fire on both.
   --
-  -- Nothing is compared. CR 701.21a's "a player" is every player, its own
-  -- controller included, and "a permanent" names no quality, so neither the
-  -- bearer nor `you` is consulted and the event's payload goes unread.
-  TriggerCondition.PermanentSacrificed -> case event of
-    GameEvent.PermanentSacrificed {} -> True
+  -- BOTH halves of the printed sentence are compared, against the two fields the
+  -- event carries. CR 701.21a's sacrificing player is related to CR 109.5's `you`
+  -- -- Vengeful Tracker's "an opponent" -- and the permanent is put to the Filter.
+  -- Mayhem Devil's unrestricted wording spells itself out as AnyPlayer over the
+  -- trivial Filter rather than as an absent payload.
+  --
+  -- viewWithLastKnown aimed at the sacrificed permanent twice over, PermanentDies'
+  -- posture and CR 603.10a's own look-back: this event is recorded BEFORE the
+  -- move, so by the time the trigger is gathered the permanent has left the
+  -- battlefield, and a TOKEN has ceased to exist outright -- CR 111.7's
+  -- parenthetical says the ability triggers anyway, which a live read could not
+  -- honour. A Treasure sacrificed for mana is the case.
+  --
+  -- Nothing is a permanent that is gone AND filed no last known information, about
+  -- which no Filter can honestly answer.
+  TriggerCondition.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed relation f) -> case event of
+    GameEvent.PermanentSacrificed ev
+      | PlayerRelation.holds (Game.teams gs) relation you (PermanentWasSacrificed.player ev) ->
+          let victim = PermanentWasSacrificed.permanent ev
+           in case Projection.viewWithLastKnown victim gs victim of
+                Nothing -> False
+                Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -11182,7 +11201,7 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 701.26a's tap is a first-pass event as well, and not an ability
   -- triggering.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
-  TriggerCondition.PermanentSacrificed -> False
+  TriggerCondition.PermanentSacrificed {} -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is read.
@@ -11753,6 +11772,23 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- outright, and CR 725.3 makes it exactly one.
   (TriggerCondition.PlayerBecomesMonarch _, GameEvent.BecameMonarch crowned) ->
     Binding.setTriggerPlayer crowned Map.empty
+  -- CR 701.21a's sacrificing player: Vengeful Tracker's "this creature deals 2
+  -- damage to THEM", a seat CR 109.5's "you" is not -- the condition's Opponent
+  -- relation is what makes the two come apart.
+  --
+  -- Bound whichever relation matched, the PlayerBecomesMonarch arm's reason:
+  -- eventBindingSlots answers per CONDITION with no relation in hand, so the slot
+  -- has to hold for every relation this condition admits, and under You it is a
+  -- redundant second name rather than a wrong one.
+  --
+  -- Unconditional given a match: GameEvent.PermanentSacrificed carries a PlayerId
+  -- outright, CR 701.21a's sacrifice having exactly one performer.
+  --
+  -- The PERMANENT is not bound. The id the event carries is the pre-move one CR
+  -- 603.10a looked back for, and which slot a printed "exile it" wants is the
+  -- question #977 still holds open.
+  (TriggerCondition.PermanentSacrificed {}, GameEvent.PermanentSacrificed ev) ->
+    Binding.setTriggerPlayer (PermanentWasSacrificed.player ev) Map.empty
   -- CR 120.3's "that much", read by the damage's RECIPIENT: Coalhauler Swine's
   -- "whenever this creature is dealt damage, it deals that much damage to each
   -- player". The same reserved slot CR 615.13's prevention and CR 119.9's life
@@ -12332,19 +12368,14 @@ eventBindingSlots cond = case cond of
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
   TriggerCondition.SelfTrains -> Set.empty
-  -- CR 701.21a's event names a player and a permanent, and this claims NEITHER --
-  -- a deliberate empty, decided rather than defaulted, since eventBindings' own
-  -- fallthrough would answer the same for a condition nobody wrote an arm for.
+  -- CR 701.21a's event names a player and a permanent, and this claims the
+  -- PLAYER: Vengeful Tracker's "deals 2 damage to them" reads the seat that
+  -- sacrificed, which the eventBindings arm stamps for every match.
   --
-  -- The permanent is not bound because CR 603.10a's look-back keeps the pre-move
-  -- id out of the graveyard: under a zone change `became` names the incarnation
-  -- the move produced (CR 400.7e), and this event is recorded BEFORE the move, so
-  -- the id it carries is the one that no longer exists. The player is not bound
-  -- because Mayhem Devil's "deals 1 damage to any target" names nobody the event
-  -- did.
-  -- A card saying "that player" or "return it to its owner's hand" is what earns
-  -- a slot here (#977).
-  TriggerCondition.PermanentSacrificed -> Set.empty
+  -- Not implemented: the sacrificed PERMANENT. This event is recorded before the
+  -- move (CR 603.10a's look-back), so the id it carries is the pre-move one, and
+  -- which slot a printed "exile it" should name is what #977 still holds open.
+  TriggerCondition.PermanentSacrificed {} -> Set.singleton Binding.triggerPlayer
   -- CR 601.2i's spell, the object the event names and nobody the bearer already
   -- does. Guaranteed given a match for the reason CR 615.13's amount is:
   -- GameEvent.SpellCast carries an ObjectId unconditionally, so no shape of the
@@ -12506,7 +12537,7 @@ looksBack condition = case condition of
   TriggerCondition.HauntedCreatureDies -> True
   -- CR 603.10a's second family in as many words: "abilities that trigger when a
   -- player sacrifices a permanent".
-  TriggerCondition.PermanentSacrificed -> True
+  TriggerCondition.PermanentSacrificed {} -> True
   -- CR 603.1b: one ability, several conditions. It looks back if ANY of them
   -- does -- the ability is on the rule's list if the rule reaches it at all, and
   -- a condition that does not look back is unaffected, since its own matcher
@@ -12682,7 +12713,7 @@ batchScoped condition = case condition of
   -- occurrence; no printing of that event says "one or more".
   TriggerCondition.AttachedCreatureBecomesTapped -> False
   TriggerCondition.HauntedCreatureDies -> False
-  TriggerCondition.PermanentSacrificed -> False
+  TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.AnyOf conditions -> any batchScoped conditions
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
@@ -13902,7 +13933,7 @@ zonesTriggeredFrom cond = case cond of
   -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
   -- condition that CANNOT trigger from the battlefield, and this one plainly can
   -- -- Mayhem Devil watches every sacrifice from the board it stands on.
-  TriggerCondition.PermanentSacrificed -> battlefield
+  TriggerCondition.PermanentSacrificed {} -> battlefield
   -- CR 603.8's state triggers are not event triggers, so this scan is not their
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> battlefield
@@ -14181,8 +14212,9 @@ controllerTurnScoped cond = case cond of
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
   TriggerCondition.SelfTrains -> False
   -- CR 701.21a says nothing about whose turn it is, and neither does the printed
-  -- "whenever a player sacrifices a permanent".
-  TriggerCondition.PermanentSacrificed -> False
+  -- "whenever an opponent sacrifices an artifact" -- the relation names a seat,
+  -- not a turn.
+  TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.SelfIsDealtDamage -> False
@@ -14512,7 +14544,7 @@ stateTriggers gs
               -- CR 701.21a is a game ACTION, so this is an event trigger too: it
               -- fires on the moment the permanent is sacrificed, and the board
               -- afterwards holds no state a read could recover.
-              TriggerCondition.PermanentSacrificed -> False
+              TriggerCondition.PermanentSacrificed {} -> False
               -- CR 714.2b is an EVENT trigger too: it fires on the moment counters
               -- are PUT ON, not on the count standing at or above N -- which is
               -- exactly the difference CR 603.8 draws, and the reason a Saga does

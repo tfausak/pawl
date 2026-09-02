@@ -11,6 +11,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -329,9 +330,11 @@ data TriggerCondition
   | -- | CR 702.149c: the bearer trained (Savior of Ollenbock). Self-scoped, and
     -- recorded only where a counter actually went on.
     SelfTrains
-  | -- | CR 603.10a: "whenever a player sacrifices a permanent" (Mayhem Devil) --
-    -- the CR 701.21a game action, not the zone change SelfDies reads.
-    PermanentSacrificed
+  | -- | CR 603.10a: "whenever an opponent sacrifices an artifact" (Vengeful
+    -- Tracker) -- the CR 701.21a game action, not the zone change SelfDies
+    -- reads. Mayhem Devil's unrestricted wording is AnyPlayer and the trivial
+    -- Filter.
+    PermanentSacrificed PermanentSacrificed.PermanentSacrificed
   | -- | CR 603.3b's second class: "whenever the final chapter ability of a Saga
     -- you control triggers" (Historian's Boon), against
     -- GameEvent.AbilityTriggered.
