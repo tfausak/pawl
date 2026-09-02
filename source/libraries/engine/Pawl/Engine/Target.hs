@@ -1267,7 +1267,10 @@ chooseTargets decider pid oid x slots sets = do
     then pure Map.empty
     else do
       answer <- Game.choose (Prompt.ChooseTargets decider pid oid asked)
-      Map.traverseWithKey (\slot picked -> drawFromPiles (Just pid) (Map.findWithDefault Set.empty slot sets) picked) answer
+      -- CR 406.4's draw, taken before selectionLegal judges the announcement:
+      -- the drawn card can be one the slot's Filter refuses, and CR 601.2e is
+      -- what then reverses the casting.
+      traverse (drawFromPiles (Just pid)) answer
 
 -- CR 406.4's second half, taken over one slot's legal set as a prompt is built:
 -- a candidate this chooser may not name specifically -- a card exiled face down
@@ -1279,18 +1282,31 @@ chooseTargets decider pid oid x slots sets = do
 -- collapse to one candidate, so the offer says how many piles there are and
 -- never how many cards are in one.
 --
+-- Not implemented: naming one pile TWICE, which a slot wanting two exiled cards
+-- would want -- an announcement is a Set Recipient, so it holds a pile once
+-- (#2936).
+--
 -- Taken here rather than in the pool, because the two halves of rule 406.4 are
 -- about different moments: legality is the card's (basePoolGiven's exile arm),
 -- and only the ANNOUNCEMENT is narrowed. Every caller that raises a prompt over
 -- a target set owes this call -- Pawl.Engine.Resolve.chooseNewTargetsFor is the
 -- other one -- or it would offer by name what the rule says may not be named.
 --
--- Applied to the set the slot's Filter already narrowed, so a pile stands for
--- its filter-passing members alone. Not implemented: the rule's own order, which
--- draws from the whole pile and then judges the card drawn, so a filtered slot
--- that offered a pile would here always draw a card it admits (#2567). No card in
--- `data/cards/` reaches it: Riftsweeper's "face-up exiled card" is the pool's
--- one filtered exile slot and it admits no face-down card, so it offers no pile.
+-- Applied to the set the slot's Filter already narrowed, so a pile reaches the
+-- offer only where at least one of its cards is a legal target. That is CR
+-- 601.2c rather than a narrowing of rule 406.4: a pile no card of which the slot
+-- admits is an announcement that cannot be legal however the draw falls, and
+-- Riftsweeper's "target face-up exiled card" is the case in the pool --
+-- Pawl.ExileSpec's "Riftsweeper's printed face-up qualifier refuses the foretold
+-- card even to alice, offering no pile in its place". What the pile stands FOR is
+-- not narrowed: drawFromPiles draws over the whole pile, and CR 601.2e judges the
+-- card it drew.
+--
+-- The gate reads only what its chooser may see, CR 406.3a being the reason: a
+-- face-down card has no characteristics, so the only filters that can admit one
+-- ask about public facts -- who owns it (CR 108.3), whether it is face down.
+-- pawl's own answer leaks where that rule is unimplemented, a face-down exiled
+-- card still reading its printed characteristics (#1479).
 piledOffer :: Maybe PlayerId -> GameState -> Set Recipient -> Set Recipient
 piledOffer perspective gs = Set.map replace
   where
@@ -1308,19 +1324,32 @@ piledOffer perspective gs = Set.map replace
 -- Prompt.RandomObject is the draw, which is the engine asking rather than
 -- rolling, and Game.ask rather than Game.choose: randomness is not CR 104.4b's
 -- optional action, so a loop containing a draw out of a pile stays a loop of
--- mandatory actions. `legal` is the slot's own legal set, the one piledOffer
--- substituted over, so the pile's members here are exactly the cards that
--- candidate stood for.
+-- mandatory actions.
+--
+-- THE WHOLE PILE, and not the slot's legal set: rule 406.4 draws first and the
+-- announcement is judged after, so a slot whose Filter refuses the card the draw
+-- named has made an illegal announcement and CR 601.2e reverses the casting.
+-- Narrowing here instead would make the draw incapable of failing, and would
+-- weight it towards the cards the chooser wanted. What comes back is judged by
+-- selectionLegal at CR 601.2c (a cast, an activation) and by
+-- Pawl.Engine.Resolve's own gate at CR 707.10c's re-target.
+--
+-- A TRIGGER's placement judges nothing, so a card the draw named that the slot
+-- refuses stands as the target and CR 608.2b counters the ability at resolution,
+-- where CR 603.3d removes it from the stack at once (gap #2472). Riftsweeper is
+-- the pool's one triggered exile slot and its "face-up exiled card" is offered no
+-- pile, so no card reaches it.
 --
 -- Elided at one member and skipped at none, the posture the three randomness
 -- prompts over a candidate list take (Pawl.Engine.Resolve's RandomObject and
 -- RandomOpponent, Pawl.Engine.Engine's RandomFirstPlayer): a one-card pile
 -- leaves nothing to draw, and CR 702.143e makes every foretold card such a
 -- pile. Filtered rather than trusted, so an answer naming a card outside the
--- pile falls back to the first of them -- from
--- Pawl.Engine.Resolve.chooseNewTargetsFor nothing downstream checks the drawn
--- card at all, and from chooseTargets selectionLegal would admit any other
--- exiled card, CR 406.4 keeping every one of them legal.
+-- pile falls back to the first of them: an interpreter's answer is not a
+-- player's choice, and the gates below judge what the draw named rather than
+-- which pile it came out of -- so a card smuggled in from another pile passes
+-- them wherever the slot is unqualified, rule 406.4 keeping every exiled card
+-- legal for one.
 --
 -- A pile whose members have gone is DROPPED rather than kept: an answer holding
 -- a pile no longer offered is short by one target, which selectionLegal then
@@ -1329,15 +1358,15 @@ piledOffer perspective gs = Set.map replace
 -- Not implemented: CR 406.4's last sentence, which delays the drawn card's
 -- reveal until a cost is paid. Nothing in pawl reveals a chosen target at all,
 -- and no cost in `data/cards/` chooses an exiled card (#2568).
-drawFromPiles :: Maybe PlayerId -> Set Recipient -> Set Recipient -> Game (Set Recipient)
-drawFromPiles perspective legal picked = do
+drawFromPiles :: Maybe PlayerId -> Set Recipient -> Game (Set Recipient)
+drawFromPiles perspective picked = do
   drawn <- traverse draw (Set.toList picked)
   pure (Set.fromList (Maybe.catMaybes drawn))
   where
     draw recipient = case recipient of
       Recipient.ToPile pile -> do
         gs <- State.get
-        case pileMembers perspective pile legal gs of
+        case pileMembers perspective pile gs of
           [] -> pure Nothing
           [only] -> pure (Just (Recipient.ToObject only))
           first : second : more -> do
@@ -1347,14 +1376,17 @@ drawFromPiles perspective legal picked = do
               if List.elem answer (NonEmpty.toList offered) then answer else first
       _ -> pure (Just recipient)
 
--- The cards piledOffer folded into one pile: the members of `legal` this chooser
--- may not name and Pawl.Engine.Exile.pileOf sorts into this pile. Ascending by
--- object id, which is Set.toList's order and is what the draw is offered.
-pileMembers :: Maybe PlayerId -> Pile.Pile -> Set Recipient -> GameState -> [ObjectId]
-pileMembers perspective pile legal gs =
+-- CR 406.4's pile itself: every exiled card this chooser may not name that
+-- Pawl.Engine.Exile.pileOf sorts into this pile. Ascending by object id, which is
+-- Set.toList's order and is what the draw is offered.
+--
+-- Read off the ZONE rather than off the slot's legal set, which is the whole of
+-- what makes the draw the rule's: a card the Filter refuses is in the pile like
+-- any other, and drawFromPiles says what judges it afterwards.
+pileMembers :: Maybe PlayerId -> Pile.Pile -> GameState -> [ObjectId]
+pileMembers perspective pile gs =
   [ oid
-  | recipient <- Set.toList legal,
-    oid <- Maybe.maybeToList (Recipient.objectOf recipient),
+  | oid <- Set.toList (GameState.exile gs),
     not (Exile.mayChoose perspective oid gs),
     Exile.pileOf oid gs == Just pile
   ]
