@@ -255,10 +255,12 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- zone an earlier part put it into is what would refute that; see #2501.
 --
 -- CR 113.6m's final sentence is read by the fold too, Pawl.Engine.EffectZone's
--- ArmDelayedTrigger arm answering off the `delayed` map this carries. No printing
--- puts such an arm in an ACTIVATED ability -- Prized Amalgam, the printing that
--- sentence decides, is a triggered one -- so the map is a regression fence here
--- and the behaviour is proved through the triggered reading.
+-- ArmDelayedTrigger arm answering off the `delayed` map this carries. The one
+-- card in data/cards/ whose ACTIVATED ability arms a delayed trigger is Grist,
+-- the Hunger Tide, and what it arms destroys a target rather than moving Grist,
+-- so the walk answers Nothing there. This reading is therefore a regression
+-- fence; the sentence itself is proved through the TRIGGERED one, on Prized
+-- Amalgam in Pawl.ZoneTriggerSpec.
 zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe Zone.Zone
 zoneFunctionedFrom delayed ability =
   case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of
