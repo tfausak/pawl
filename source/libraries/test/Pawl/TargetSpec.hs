@@ -2161,9 +2161,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (cheapId, g6) = S.addCreature rats S.bob g5
         (board, refrainId) = S.handOne refrain g6
         run victimTwo =
-          let answer = aimingMeasured [gaugeA, gaugeB] victimId gaugeC victimTwo
-              cast = S.runPure answer board (S.cast S.alice refrainId)
-           in (cast, S.runPure answer cast Stack.resolveTop)
+          let cast = S.runPure (aimingMeasured [gaugeA, gaugeB] victimId gaugeC victimTwo) board (S.cast S.alice refrainId)
+           in (cast, S.runPure (aimingMeasured [gaugeA, gaugeB] victimId gaugeC victimTwo) cast Stack.resolveTop)
         (castAtDear, atDear) = run dearId
         (_, atCheap) = run cheapId
         onBattlefield gs oid = elem oid (Game.zoneMembers Zone.Battlefield S.bob gs)

@@ -38,7 +38,6 @@ import qualified Pawl.Types.Plus as Plus
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
-import qualified Pawl.Types.Scope as Scope
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Teams as Teams

@@ -1100,11 +1100,13 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
 
 -- Which slots the second pass re-answers. The POOL's dependency is one half; the
 -- CR 202.3 computed BOUND's is the other, and it is here for the pool's reason
--- rather than for jointlyJudged's: a bound naming a sibling slot is unreadable
--- against the seed alone, and an unreadable bound leaves ManaValueAtMostAmount
--- vacuously False, so the first pass would offer such a slot NOTHING at all.
--- Re-answering it against the union is the widening every other dependent slot
--- gets, and jointlyJudged below is where the announcement is narrowed back.
+-- rather than for jointlyJudged's: against the seed alone a bound naming a
+-- sibling slot measures nothing at all -- CR 400.7j's fold over an unbound slot
+-- is 0, and a read that insists on one object (Binding.onlyOne) is unanswerable
+-- -- so ManaValueAtMostAmount narrows to the mana value 0 candidates or to none,
+-- and the first pass would offer such a slot an empty set. Re-answering it
+-- against the union is the widening every other dependent slot gets, and
+-- jointlyJudged below is where the announcement is narrowed back.
 --
 -- The FILTER's dependency is deliberately not here -- see jointlyJudged, whose
 -- own note says why "another" cannot be handed the union.

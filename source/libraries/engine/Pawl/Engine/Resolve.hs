@@ -1106,7 +1106,7 @@ targetSlotSlots slot =
     ]
   where
     -- The bound's own reads: quantitySlots' -- a Quantity.InSlot naming the
-    -- slot's amount -- plus the ones only Quantity.nestedRefs reports, a slot
+    -- slot's amount -- plus the ones only QuantitySlot.nestedRefs reports, a slot
     -- named through a PlayerRef buried inside the number ("mana value X or less,
     -- where X is the amount of life THAT PLAYER gained this turn") or through CR
     -- 400.7j's Scope.OverBound. Without them a bound naming a slot its carrier
@@ -1121,7 +1121,7 @@ targetSlotSlots slot =
     amountSlots quantity =
       joinSlots
         ( quantitySlots quantity
-            : fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (Quantity.nestedRefs quantity))
+            : fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (QuantitySlot.nestedRefs quantity))
         )
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
