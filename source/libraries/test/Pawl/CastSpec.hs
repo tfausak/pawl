@@ -4199,6 +4199,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   teferiSorcerySpeedSpec s registry
   grafdiggersCageCastSpec s registry
   avenInterrupterSpec s registry
+  terrorOfThePeaksSpec s registry
+  shellOfTheLastKappaSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
 -- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
@@ -4975,3 +4977,185 @@ avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
     Spec.assertEqWith s "and the sentence names no hand: the {1}{U} cast from bob's hand still taps two with the Bird out" (tappedAfter taxed handId) 2
     Spec.assertBool s (S.castable S.bob shortYardId shortOpen) "the gate agrees with the payment: on four Islands the untaxed flashback is offered"
     Spec.assertBool s (not (S.castable S.bob shortYardId shortTaxed)) "and with the Bird out the same four Islands cannot pay it, so it is not offered"
+
+-- Terror of the Peaks (OTJ 149) {3}{R}{R} Creature -- Dragon 5/4, Oracle text
+-- checked against Scryfall: "Flying / Spells your opponents cast that target
+-- this creature cost an additional 3 life to cast. / Whenever another creature
+-- you control enters, this creature deals damage equal to that creature's power
+-- to any target."
+--
+-- The second sentence is the customer: CR 601.2f prices a spell after CR 601.2c
+-- has fixed its targets, and Filter.TargetsSource is what lets the tax ask what
+-- they are. alice controls the Dragon with a Goblin Piker beside it, and the
+-- caster holds one Lightning Bolt and the one Mountain that pays for it. Every
+-- case is a PAIR differing in the aim alone -- the Dragon or the Piker -- and
+-- reads the caster's LIFE once the Bolt is on the stack: the life component is
+-- the only thing the tax costs, and nothing else on the board moves it before
+-- the Bolt resolves.
+terrorBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+terrorBoard mountain terror piker bolt caster =
+  let (terrorId, g1) = S.addCreature terror S.alice (S.landsFor mountain caster 1 (Setup.emptyGame S.bothPlayers))
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (boltId, g3) = S.addHandCard bolt caster g2
+   in (terrorId, pikerId, boltId, g3)
+
+-- Aims every target choice at the named PLAYER; avenAnswer above is the object
+-- half. Pinned rather than searched, for avenAnswer's reason.
+aimAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimAtPlayer pid prompt = case prompt of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
+  _ -> S.identityAnswer prompt
+
+-- A player's life total set by hand, for the case that asks what CR 601.2h does
+-- when the life is not there to pay.
+withLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameState
+withLife pid life gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = life}) pid (GameState.players gs)}
+
+terrorOfThePeaksSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
+  -- The headline pair. bob's Bolt at the Dragon costs him 3 life on top of the
+  -- {R}; the same Bolt at the Piker beside it costs the {R} alone. The Piker
+  -- half is what kills a reading of "any spell an opponent casts" -- same caster,
+  -- same controller of the target, same mana -- and the Bolt on the stack is what
+  -- says the cast went through rather than being refused.
+  Spec.it s "CR 601.2f a spell an opponent aims at the Dragon costs 3 life more, and one aimed at another creature of the same controller does not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    terror <- S.printingOf s registry "Terror of the Peaks"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (terrorId, pikerId, boltId, board) = terrorBoard mountain terror piker bolt S.bob
+        atDragon = S.runPure (avenAnswer terrorId) board (S.cast S.bob boltId)
+        atPiker = S.runPure (avenAnswer pikerId) board (S.cast S.bob boltId)
+    Spec.assertEqWith s "both seats start at 20" (S.lifeOf S.bob board) (Just 20)
+    Spec.assertEqWith s "CR 601.2f / 118.8 the Bolt at the Dragon cost bob 3 life" (S.lifeOf S.bob atDragon) (Just 17)
+    Spec.assertEqWith s "and it is on the stack, so the cast was made and not refused" (length (GameState.stack atDragon)) 1
+    Spec.assertEqWith s "the same Bolt at the Piker cost no life" (S.lifeOf S.bob atPiker) (Just 20)
+    Spec.assertEqWith s "and is on the stack too" (length (GameState.stack atPiker)) 1
+    Spec.assertEqWith s "the {R} was paid on both boards" (S.tappedCount S.bob atDragon, S.tappedCount S.bob atPiker) (1, 1)
+  -- CR 109.5 / PlayerScope.Opponents: "your opponents" excludes the Dragon's
+  -- own controller, so alice's Bolt at her own Dragon costs her nothing. Same
+  -- board with the Bolt and the Mountain moved to alice's seat.
+  Spec.it s "CR 109.5 the Dragon's own controller pays no life to target it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    terror <- S.printingOf s registry "Terror of the Peaks"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (terrorId, _, boltId, board) = terrorBoard mountain terror piker bolt S.alice
+        after = S.runPure (avenAnswer terrorId) board (S.cast S.alice boltId)
+    Spec.assertEqWith s "alice's own Bolt at her own Dragon cost her no life" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and is on the stack" (length (GameState.stack after)) 1
+  -- CR 601.2h: the tax is priced after CR 601.2c's targets are fixed, which is
+  -- after the castability gate ran -- so the gate offers the Bolt to a player
+  -- who cannot pay 3 life, and it is the PAYMENT that fails and CR 601.2's
+  -- rewind that answers. The pair again: at 2 life bob's Bolt at the Dragon
+  -- never leaves his hand, where the same Bolt at the Piker is cast.
+  Spec.it s "CR 601.2h a caster without the life to pay has the cast rewound, and the same caster aims the Bolt elsewhere" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    terror <- S.printingOf s registry "Terror of the Peaks"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (terrorId, pikerId, boltId, board) = terrorBoard mountain terror piker bolt S.bob
+        poor = withLife S.bob 2 board
+        atDragon = S.runPure (avenAnswer terrorId) poor (S.cast S.bob boltId)
+        atPiker = S.runPure (avenAnswer pikerId) poor (S.cast S.bob boltId)
+    Spec.assertEqWith s "CR 601.2h the Bolt at the Dragon was rewound: nothing is on the stack" (GameState.stack atDragon) []
+    Spec.assertEqWith s "bob still holds it" (S.handSize S.bob atDragon) 1
+    Spec.assertEqWith s "and paid nothing -- neither the life nor the Mountain" (S.lifeOf S.bob atDragon, S.tappedCount S.bob atDragon) (Just 2, 0)
+    Spec.assertEqWith s "where the same Bolt at the Piker is on the stack" (length (GameState.stack atPiker)) 1
+    Spec.assertBool s (S.castable S.bob boltId poor) "the gate offered the Bolt: CR 601.2c's choice is what decides whether the tax applies, and the gate runs before it"
+  -- The third sentence, on its own: a Goblin Piker (2/1) entering under alice
+  -- has the Dragon deal 2 -- the PIKER's power, not the Dragon's 5 -- to the
+  -- target alice names. The Dragon entering with the Piker already out deals
+  -- nothing, which is CR 603.2's "another".
+  Spec.it s "CR 603.2 another creature entering under alice has the Dragon deal that creature's power to any target" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    terror <- S.printingOf s registry "Terror of the Peaks"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature terror S.alice (S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers))
+        (pikerId, pikerBoard) = S.addHandCard piker S.alice g1
+        after = S.runPure (aimAtPlayer S.bob) pikerBoard (S.cast S.alice pikerId >> Engine.priorityLoop)
+        (_, g2) = S.addCreature piker S.alice (S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers))
+        (terrorId, terrorBoard') = S.addHandCard terror S.alice g2
+        itself = S.runPure (aimAtPlayer S.bob) terrorBoard' (S.cast S.alice terrorId >> Engine.priorityLoop)
+    Spec.assertEqWith s "the Piker entered" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+    Spec.assertEqWith s "CR 603.2 and the Dragon dealt the Piker's 2 to bob" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "the Dragon entering beside a Piker already out dealt nothing" (S.lifeOf S.bob itself) (Just 20)
+    Spec.assertEqWith s "though it did enter" (S.countOnBattlefieldByName (S.printingName terror) S.alice itself) 1
+
+-- Shell of the Last Kappa (CHK 269) {3} Legendary Artifact, Oracle text checked
+-- against Scryfall: "{3}, {T}: Exile target instant or sorcery spell that
+-- targets you. (The spell has no effect.) / {3}, {T}, Sacrifice Shell of the
+-- Last Kappa: You may cast a spell from among cards exiled with Shell of the
+-- Last Kappa without paying its mana cost."
+--
+-- Not implemented: the second ability. Effect.OfferCast names a SLOT, and no
+-- pool or effect binds the cards exiled with a source into one, so nothing can
+-- make the offer (#2946). The omission takes a benefit off the Shell's
+-- controller, which leaves the card stricter than printed.
+--
+-- THREE SEATS, so "you" is told from "a player": bob's Lightning Bolt aims at
+-- alice on one board and at carol on the next, alice holds the Shell and three
+-- Islands on both, and the question is whether the Shell can take the Bolt off
+-- the stack. Read at gameplay level -- the Bolt's owner's exile, and the life
+-- of whoever it was aimed at -- once the whole stack has resolved. The Piker
+-- board is CR 115.10a's: a Bolt at a creature alice controls targets the
+-- creature and not her.
+shellBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+shellBoard island mountain shell piker bolt =
+  let (shellId, g1) = S.addCreature shell S.alice (S.landsFor mountain S.bob 1 (S.landsFor island S.alice 3 S.threePlayerGame))
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (boltId, g3) = S.addHandCard bolt S.bob g2
+   in (shellId, pikerId, boltId, g3)
+
+-- bob casts the Bolt with `aim` answering its target, alice activates the Shell
+-- at the Bolt, and the stack resolves down. The activation is DRIVEN rather than
+-- offered, so a board on which the Bolt is not a legal target shows the
+-- activation failing to happen at all -- the Shell untapped, the Bolt resolving.
+shellRun :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+shellRun aim shellId boltId board =
+  let cast = S.runPure aim board (S.cast S.bob boltId)
+   in case Activate.abilitiesFor shellId cast of
+        [ability] -> S.runPure (avenAnswer boltId) cast (Activate.activateAbility S.alice shellId ability >> Engine.priorityLoop)
+        _ -> cast
+
+shellOfTheLastKappaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+shellOfTheLastKappaSpec s registry = Spec.describe s "Shell of the Last Kappa" $ do
+  Spec.it s "CR 115.1 a Bolt aimed at alice is exiled by her Shell, and one aimed at carol is not" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    shell <- S.printingOf s registry "Shell of the Last Kappa"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (shellId, _, boltId, board) = shellBoard island mountain shell piker bolt
+        atAlice = shellRun (aimAtPlayer S.alice) shellId boltId board
+        atCarol = shellRun (aimAtPlayer S.carol) shellId boltId board
+    Spec.assertEqWith s "CR 115.1 the Bolt at alice never resolved: she is at 20" (S.lifeOf S.alice atAlice) (Just 20)
+    Spec.assertEqWith s "CR 406.2 it is in bob's exile" (avenNamed bolt Zone.Exile S.bob atAlice) 1
+    Spec.assertEqWith s "and the Shell tapped to do it" (S.tappedCount S.alice atAlice) 4
+    Spec.assertEqWith s "the Bolt at carol resolved: she took 3" (S.lifeOf S.carol atCarol) (Just 17)
+    Spec.assertEqWith s "nothing of it is in exile" (avenNamed bolt Zone.Exile S.bob atCarol) 0
+    Spec.assertEqWith s "and the Shell never tapped, there being no spell targeting alice for it to aim at" (S.tappedCount S.alice atCarol) 0
+    Spec.assertEqWith s "the stack is empty on both boards" (GameState.stack atAlice, GameState.stack atCarol) ([], [])
+  Spec.it s "CR 115.10a a Bolt aimed at a creature alice controls does not target her" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    shell <- S.printingOf s registry "Shell of the Last Kappa"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (shellId, pikerId, boltId, board) = shellBoard island mountain shell piker bolt
+        atPiker = shellRun (avenAnswer pikerId) shellId boltId board
+    Spec.assertEqWith s "the Bolt resolved and the Piker died" (S.countOnBattlefieldByName (S.printingName piker) S.alice atPiker) 0
+    Spec.assertEqWith s "nothing is in bob's exile" (avenNamed bolt Zone.Exile S.bob atPiker) 0
+    Spec.assertEqWith s "and the Shell never tapped" (S.tappedCount S.alice atPiker) 0

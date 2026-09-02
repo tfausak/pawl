@@ -22,6 +22,7 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -55,6 +56,9 @@ blackCreature =
       -- the WasCastFrom cases below build their own view rather than reuse this
       -- one -- and here the field is the Nothing every uncast object carries.
       Filter.castFrom = Nothing,
+      -- CR 115.1: a permanent targets nothing; the Targets cases below build a
+      -- stack view of their own.
+      Filter.targets = Set.empty,
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -109,6 +113,7 @@ devoidBigCreature =
       Filter.owner = Nothing,
       Filter.zone = Nothing,
       Filter.castFrom = Nothing,
+      Filter.targets = Set.empty,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -217,6 +222,17 @@ noPerspective = Filter.contextFor Teams.none Nothing Nothing
 -- cases need and what no other view here can show.
 castFromGraveyard :: Filter.View
 castFromGraveyard = blackCreature {Filter.zone = Just Zone.Stack, Filter.castFrom = Just Zone.Graveyard}
+
+-- A SPELL on the stack aimed at creature 9 and at player 1 -- `blackCreature`
+-- moved to the stack and given targets, which is what the two Targets cases
+-- need: the candidate's own identity (7) is deliberately NOT among them, so a
+-- reading that compared the candidate to the source would answer the wrong way.
+targetingSpell :: Filter.View
+targetingSpell =
+  blackCreature
+    { Filter.zone = Just Zone.Stack,
+      Filter.targets = Set.fromList [Recipient.ToCreature (ObjectId.MkObjectId 9), Recipient.ToPlayer (PlayerId.MkPlayerId 1)]
+    }
 
 -- The player candidate every "vacuously false" case below is asked about.
 aPlayer :: Filter.View
@@ -582,6 +598,41 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         s
         (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) devoidBigCreature Filter.Type.IsSource))
         "no identity"
+
+  -- CR 115.1. The gameplay-level proofs are Pawl.CastSpec's Terror of the Peaks
+  -- group (a tax priced by what the spell targets) and its Shell of the Last
+  -- Kappa group (a target filter over the same); these cases pin the two atoms.
+  Spec.describe s "TargetsSource" $ do
+    Spec.it s "matches when the source is among the candidate's targets" $ do
+      Spec.assertBool s (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) targetingSpell Filter.Type.TargetsSource) "targets the source"
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 8))) targetingSpell Filter.Type.TargetsSource)) "and not a different object"
+
+    -- The trap the fixture is built against: the candidate IS object 7, and a
+    -- source of 7 must not make it "target" itself.
+    Spec.it s "is not IsSource: the candidate being the source targets nothing" $ do
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) targetingSpell Filter.Type.TargetsSource)) "the source is the candidate, not a target of it"
+
+    Spec.it s "no source in context, a player, and an object targeting nothing are vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self targetingSpell Filter.Type.TargetsSource)) "no source"
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) aPlayer Filter.Type.TargetsSource)) "player"
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.TargetsSource)) "a permanent targets nothing"
+
+  Spec.describe s "TargetsPlayer" $ do
+    Spec.it s "CR 115.1 You matches a spell aimed at the perspective, and Opponent one aimed at another player" $ do
+      Spec.assertBool s (Filter.matches other targetingSpell (Filter.Type.TargetsPlayer PlayerRelation.You)) "player 1 is targeted, from player 1"
+      Spec.assertBool s (not (Filter.matches self targetingSpell (Filter.Type.TargetsPlayer PlayerRelation.You))) "and not from player 0"
+      Spec.assertBool s (Filter.matches self targetingSpell (Filter.Type.TargetsPlayer PlayerRelation.Opponent)) "player 1 is player 0's opponent"
+      Spec.assertBool s (not (Filter.matches other targetingSpell (Filter.Type.TargetsPlayer PlayerRelation.Opponent))) "and not player 1's own"
+
+    -- CR 115.10a: the object target beside the player one is object 9, whose
+    -- controller the fixture does not even record; only a ToPlayer answers.
+    Spec.it s "an object target is not a player target" $ do
+      Spec.assertBool s (not (Filter.matches other (targetingSpell {Filter.targets = Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 9))}) (Filter.Type.TargetsPlayer PlayerRelation.You))) "a creature is not you"
+
+    Spec.it s "no perspective, a player, and an object targeting nothing are vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches noPerspective targetingSpell (Filter.Type.TargetsPlayer PlayerRelation.AnyPlayer))) "no perspective"
+      Spec.assertBool s (not (Filter.matches other aPlayer (Filter.Type.TargetsPlayer PlayerRelation.You))) "player"
+      Spec.assertBool s (not (Filter.matches other blackCreature (Filter.Type.TargetsPlayer PlayerRelation.You))) "a permanent targets nothing"
 
   -- CR 115.10a: what the RESOLUTION named, in either shape. blackCreature is
   -- object 7 throughout, so a slot naming 7 among others is the group read and a

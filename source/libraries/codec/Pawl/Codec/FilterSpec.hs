@@ -198,6 +198,18 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsSource
       " {\"type\":\"IsSource\"} "
+  Spec.it s "TargetsSource" $
+    Common.assertCodec
+      s
+      codec
+      Filter.TargetsSource
+      " {\"type\":\"TargetsSource\"} "
+  Spec.it s "TargetsPlayer You" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.TargetsPlayer PlayerRelation.You)
+      " {\"type\":\"TargetsPlayer\",\"value\":{\"type\":\"You\"}} "
   Spec.it s "IsBound" $
     Common.assertCodec
       s
