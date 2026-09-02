@@ -739,6 +739,12 @@ componentDemandGrowsWithX component = case component of
 -- creatures you control". Nothing where the face states none, which is every
 -- other printing in `data/cards/`.
 --
+-- The LEAST of them where the face states more than one, which CR 101.2 settles
+-- rather than this function: each sentence is a "can't" and beats the permission
+-- on its own, so a value both must satisfy is bounded by the smaller. The face
+-- that carries two is CR 709.4c's combined view of a split card whose halves
+-- each print one, priced as CR 702.102b's fused split spell.
+--
 -- Evaluated ONCE, here, against the board as it stands at the announcement, and
 -- never re-read: CR 601.2b names the value and no later rule revisits it, so a
 -- creature that leaves in response does not shrink an X already announced.
@@ -754,7 +760,9 @@ maximumX :: PlayerId -> ObjectId -> Face.Face card -> GameState -> Maybe Natural
 maximumX pid oid face gs =
   let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
       ceilingOf quantity = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid quantity))
-   in fmap ceilingOf (Face.maximumX face)
+   in case fmap ceilingOf (Face.maximumX face) of
+        [] -> Nothing
+        ceilings -> Just (minimum ceilings)
 
 -- CR 118.13: a mana symbol payable in multiple ways has its payment chosen by
 -- the payer -- CR 107.4f's Phyrexian symbol and both of CR 107.4e's hybrids.
