@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Binding as Binding.Type
 import Pawl.Types.Card (Card)
@@ -1070,20 +1071,21 @@ legalSets perspective seed source slots gs =
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
 --
 -- TWO PASSES, because CR 601.2c makes one slot's legal set depend on another's:
--- a ZoneScope.InSlot pool names a slot, so the first pass answers every
--- slot with no bindings at all and the second re-answers only the slots that
--- name one, against the first pass. The rule chooses every target AT ONCE, so
--- there is no order to consult -- what a dependent slot is offered is the UNION
--- over the answers the slot it names could still take, and selectionLegal is
--- where the announcement is judged as one act.
+-- a ZoneScope.InSlot pool names a slot and so may a CR 202.3 computed bound, so
+-- the first pass answers every slot with no bindings at all and the second
+-- re-answers only the slots that name one (secondPass), against the first pass.
+-- The rule chooses every target AT ONCE, so there is no order to consult -- what
+-- a dependent slot is offered is the UNION over the answers the slot it names
+-- could still take, and selectionLegal is where the announcement is judged as one
+-- act.
 --
 -- The second pass reads the FIRST pass's map and not its own, which is what
 -- makes a chain of dependent slots terminate rather than recur: a slot naming
 -- another dependent slot reads that slot's first-pass answer, which is empty.
 -- No card writes one, and nothing here would loop if one did.
 --
--- Ordinary cards pay nothing: `dependent` is empty for every slot map with no
--- slot-scoped pool in it, so the second pass is a Map.filter over a map with at
+-- Ordinary cards pay nothing: `dependent` is empty for every slot map secondPass
+-- reports nothing for, so the second pass is a Map.filter over a map with at
 -- most a handful of keys.
 legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
@@ -1093,18 +1095,44 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
       -- answers. Map.union is left-biased, so a target slot's own answer wins over
       -- a seed entry that happened to share its name.
       independent = fmap (answer seed) slots
-      dependent = fmap (answer (Map.union (fmap Binding.toRecipients independent) seed)) (Map.filter (dependsOnSlot . TargetSlot.pool) slots)
+      dependent = fmap (answer (Map.union (fmap Binding.toRecipients independent) seed)) (Map.filter (secondPass (Map.keysSet slots)) slots)
    in -- Map.union is left-biased, so the second pass wins wherever it answered.
       Map.union dependent independent
 
+-- Which slots the second pass re-answers. The POOL's dependency is one half; the
+-- CR 202.3 computed BOUND's is the other, and it is here for the pool's reason
+-- rather than for jointlyJudged's: against the seed alone a bound naming a
+-- sibling slot measures nothing at all -- CR 400.7j's fold over an unbound slot
+-- is 0, and a read that insists on one object (Binding.onlyOne) is unanswerable
+-- -- so ManaValueAtMostAmount narrows to the mana value 0 candidates or to none,
+-- and the first pass would offer such a slot an empty set. Re-answering it
+-- against the union is the widening every other dependent slot gets, and
+-- jointlyJudged below is where the announcement is narrowed back.
+--
+-- The FILTER's dependency is deliberately not here -- see jointlyJudged, whose
+-- own note says why "another" cannot be handed the union.
+secondPass :: Set SlotName -> TargetSlot -> Bool
+secondPass declared slot =
+  dependsOnSlot (TargetSlot.pool slot)
+    || boundNamesSibling declared slot
+
+-- Does this slot's CR 202.3 computed bound read one of the announcement's OWN
+-- slots? QuantitySlot.allSlots is the reading half of the rename CR 700.2d applies
+-- to the same field (Pawl.Engine.Modal.instanceScope), so a bound this reports is
+-- a bound that follows its mode's occurrence.
+boundNamesSibling :: Set SlotName -> TargetSlot -> Bool
+boundNamesSibling declared slot =
+  not (Set.disjoint declared (foldMap QuantitySlot.allSlots (TargetSlot.amount slot)))
+
 -- Must this slot's answer be judged against what its SIBLING slots were answered
--- with (CR 601.2c)? Two ways one slot depends on another, and they are the pool's
--- and the filter's:
+-- with (CR 601.2c)? Three ways one slot depends on another, and they are the
+-- pool's, the filter's and the bound's:
 --
 --   * the POOL names a slot (dependsOnSlot below), which is Dwell on the Past's
 --     "their graveyard";
 --   * the FILTER reads one, which is CR 601.2c's "another" between two slots of
---     one announcement -- Fall of the Hammer's Not (IsBound "dealer").
+--     one announcement -- Fall of the Hammer's Not (IsBound "dealer");
+--   * the CR 202.3 computed BOUND names one (boundNamesSibling above).
 --
 -- Filter.boundSlots is the read half, the same set Pawl.Engine.Resolve's dataflow
 -- lint folds over a mode's slots, so an atom that function does not report is one
@@ -1120,14 +1148,20 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
 -- slot filter names a seed is on a triggered ability, and no trigger reaches
 -- selectionLegal at all (#2472), so dropping `declared` reddens nothing.
 --
--- Only the JOINT CHECK reads this, never legalSetsGiven's second pass. That pass
--- is a WIDENING -- it offers the union over what a named slot could still take --
--- and "another" is a NARROWING, so handing it every sibling candidate at once
--- would exclude every candidate and leave the slot unfillable.
+-- The FILTER half is what only the JOINT CHECK reads, never legalSetsGiven's
+-- second pass. That pass is a WIDENING -- it offers the union over what a named
+-- slot could still take -- and "another" is a NARROWING, so handing it every
+-- sibling candidate at once would exclude every candidate and leave the slot
+-- unfillable. The other two halves the second pass does read; secondPass is which.
 jointlyJudged :: Set SlotName -> TargetSlot -> Bool
 jointlyJudged declared slot =
   dependsOnSlot (TargetSlot.pool slot)
     || not (Set.disjoint declared (foldMap Filter.boundSlots (TargetSlot.filter slot)))
+    -- The third read of a sibling slot, beside the pool's and the filter's: CR
+    -- 202.3's computed bound. legalSetsGiven's second pass answers such a slot
+    -- against the UNION of what the named slot could take, which for a bound is a
+    -- widening -- so this is where the announcement's own choice narrows it back.
+    || boundNamesSibling declared slot
 
 -- Does this pool's candidate set depend on what another target slot is answered
 -- with (CR 601.2c)? A ZoneScope's InSlot is the one axis that does, wherever

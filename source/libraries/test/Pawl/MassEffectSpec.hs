@@ -3115,7 +3115,7 @@ communeWithLavaSpec s registry =
             (True, False)
           -- The third reader of the same seam, and the one CR 603.3b's elision
           -- rests on: a PlayerRef nested in the depth is a TARGET slot that
-          -- Quantity.slots leaves to this module, so the effect must stop claiming
+          -- QuantitySlot.slots leaves to this module, so the effect must stop claiming
           -- its reads are fully stated. A LifeTotal over a slot rather than a bare
           -- Quantity.InSlot, since that arm is slotless-exhaustive on its own.
           Spec.assertEqWith
