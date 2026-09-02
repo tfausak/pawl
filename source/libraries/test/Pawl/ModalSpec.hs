@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -32,6 +33,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Effect as Effect
@@ -913,6 +915,65 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
     Spec.assertBool s (null (GameState.stack after)) "nothing reached the stack"
     Spec.assertEqWith s "no card was drawn: alice's library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 1
     Spec.assertEqWith s "and her graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+  -- CR 700.2d's exception on a TRIGGERED ability, which is the case the two
+  -- printings above cannot reach: every printing of "you may choose the same
+  -- mode more than once" is an instant or a sorcery (Scryfall
+  -- o:"the same mode more than once", 2026-09-01, 22 cards, all instants and
+  -- sorceries), so only a synthetic puts the repeat where CR 603.2's event
+  -- bindings exist at all. Synthetic Goading Refrain {2}{R} Creature -- Goblin
+  -- Rogue 2/2 (data/cards/synthetic-goading-refrain.json) is Seifer, Balamb
+  -- Rival's second line under that instruction: "Whenever you attack a player,
+  -- choose two. You may choose the same mode more than once. -- Goad target
+  -- creature that player controls. -- Draw a card."
+  --
+  -- What it discriminates: "that player" is CR 603.2's bound `thatPlayer`, which
+  -- is NOT one of the mode's own slots, so CR 700.2d's per-occurrence rename must
+  -- leave it alone. Renaming it makes occurrence 1's atom name `thatPlayer#1`,
+  -- which no binding is keyed by: announcement offers bob's Giants (the
+  -- announcement path bakes before it renames) and CR 608.2b then admits nobody,
+  -- so the second Giant is silently dropped and goes ungoaded (#2835).
+  --
+  -- TWO GIANTS rather than two printings: the occurrences are then
+  -- indistinguishable except by slot, so identity is the only thing separating
+  -- them, and alice's own attacker beside them is what says the atom is read at
+  -- all rather than every creature admitted.
+  Spec.it s "CR 700.2d a repeated mode on a trigger keeps reading the trigger's own bound player" $ do
+    elvesPrinting <- S.printingOf s registry "Llanowar Elves"
+    refrainPrinting <- S.printingOf s registry "Synthetic Goading Refrain"
+    giantPrinting <- S.printingOf s registry "Hill Giant"
+    let (gs, mine, theirs) = S.combatBoardOf [elvesPrinting, refrainPrinting] [giantPrinting, giantPrinting]
+    case (mine, theirs) of
+      ([elvesId, _], [firstGiant, secondGiant]) -> do
+        -- Both goads are pinned by slot name and FILTERED out of what the engine
+        -- offered, so a recipient CR 608.2b would drop cannot pass for the right
+        -- one and an answerer hunting for something legal cannot repair a
+        -- mutation.
+        let answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.DeclareAttackers _ _ ids -> filter (== elvesId) ids
+              Prompt.ChooseModes {} -> Seq.replicate 2 goadMode
+              Prompt.ChooseTargets _ _ _ sets ->
+                Map.mapWithKey
+                  (\slot (_, offered) -> Set.filter ((== Just (if slot == victimSlot then firstGiant else secondGiant)) . Recipient.objectOf) offered)
+                  sets
+              _ -> S.aggressiveAnswer p
+            after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) answer gs
+        Spec.assertEqWith s "CR 701.15a occurrence 1's Giant is goaded by alice" (Goad.goadedBy secondGiant after) (Set.singleton S.alice)
+        Spec.assertEqWith s "CR 700.2d and occurrence 0's is too, both targets surviving CR 608.2b" (Goad.goadedBy firstGiant after) (Set.singleton S.alice)
+        Spec.assertEqWith s "and alice's own attacker is not goaded: 'that player' is bob" (Goad.goadedBy elvesId after) Set.empty
+        Spec.assertEqWith
+          s
+          "CR 601.2c the repeat really declared two slots"
+          (fmap (Map.keys . Modal.modesTargetSlots (Seq.replicate 2 goadMode) . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace refrainPrinting)))
+          [[victimSlot, SlotName.MkSlotName (Text.pack "victim#1")]]
+      _ -> Spec.assertFailure s "fixture should give alice an Elves and a Refrain, and bob two Giants"
+
+goadMode :: ModeIndex.ModeIndex
+goadMode = ModeIndex.MkModeIndex 0
+
+victimSlot :: SlotName.SlotName
+victimSlot = SlotName.MkSlotName (Text.pack "victim")
 
 -- Vandalize's two modes, in printed order (CR 700.2 / data/cards/vandalize.json),
 -- under "Choose one or both --":
