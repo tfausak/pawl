@@ -1764,12 +1764,18 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "Urborg itself is only an Island now" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Island)
     Spec.assertEqWith s "and the Forest is a plain Forest again" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
 
-  -- Not implemented, so the card file omits it: Celestial Dawn's colour clause
-  -- for spells you control and nonland cards you own off the battlefield
-  -- (#1934). Nothing below looks at a card outside the battlefield. Its other
-  -- clauses are printed in full, the mana sentence included -- CR 609.4b's two
-  -- halves are a pair of PlayerEffect.SpendManaAsThough entries, proved in
-  -- Pawl.ManaSpec.
+  -- Celestial Dawn is printed in full. Its second sentence's off-battlefield
+  -- half is a pair of Affected.MatchingOffBattlefield sets rather than one,
+  -- because the printed clause switches from CONTROL ("spells you control") to
+  -- OWNERSHIP ("nonland cards you own"): the control half is proved by
+  -- Pawl.TargetSpec's Knight of Malice case, the ownership half by the graveyard
+  -- case below. The mana sentence is CR 609.4b's two halves as a pair of
+  -- PlayerEffect.SpendManaAsThough entries, proved in Pawl.ManaSpec.
+  --
+  -- Not implemented, recorded here because the card JSON carries no comment: no
+  -- Filter can say "a card or a spell", so both sets also reach an ability on the
+  -- stack (CR 113.1c) and the ownership one an emblem in the command zone (CR
+  -- 114.5). Painter's Servant's over-reach, and the same issue (#1551).
   --
   -- CR 305.7's gate reached by an affected set that asks who CONTROLS the
   -- candidate, which is the shape that used to make Projection.controllerOf
@@ -1818,6 +1824,26 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "so Celestial Dawn's set does not reach it" (Projection.subtypesOf bobLand unattached) (Set.singleton Subtype.Type.Forest)
     Spec.assertEqWith s "attached: alice controls it" (Projection.controllerOf bobLand gs) (Just S.alice)
     Spec.assertEqWith s "so now Celestial Dawn's set does reach it" (Projection.subtypesOf bobLand gs) (Set.singleton Subtype.Type.Plains)
+
+  -- The OWNERSHIP half of the same sentence (CR 105.2, CR 108.3), read in a
+  -- graveyard rather than on the battlefield. Three answers off one board, so
+  -- neither a set that reaches every object nor one that reaches none passes:
+  -- bob's copy of the same card is the OwnedBy conjunct and the Forest card is
+  -- the nonland one. The fourth is the same card on the same board with
+  -- Celestial Dawn taken away, which is the one thing the two differ in.
+  Spec.it s "CR 105.2 Celestial Dawn whitens the nonland cards its controller owns off the battlefield" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    let base = Setup.emptyGame S.bothPlayers
+        (alicePiker, g1) = S.addGraveyardCard piker S.alice base
+        (bobPiker, g2) = S.addGraveyardCard piker S.bob g1
+        (aliceForest, dawnless) = S.addGraveyardCard forest S.alice g2
+        gs = snd (S.addCreature dawn S.alice dawnless)
+    Spec.assertEqWith s "alice's Goblin Piker card in her graveyard is white" (Projection.colorsOf alicePiker gs) (Set.singleton Color.White)
+    Spec.assertEqWith s "bob's stays red, the clause naming the cards you own" (Projection.colorsOf bobPiker gs) (Set.singleton Color.Red)
+    Spec.assertEqWith s "her Forest card, being a land, stays colorless" (Projection.colorsOf aliceForest gs) Set.empty
+    Spec.assertEqWith s "and without Celestial Dawn hers is red too" (Projection.colorsOf alicePiker dawnless) (Set.singleton Color.Red)
 
   Spec.it s "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Blood Moon older)" $ do
     forest <- S.printingOf s registry "Forest"

@@ -616,6 +616,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   serraAvatarSpec s registry
   kirdApeSpec s registry
   knightOfGraceSpec s registry
+  knightOfMaliceSpec s registry
   woodElementalSpec s registry
   handOfThePraetorsSpec s registry
   ashayaBloodMoonSpec s registry
@@ -1282,6 +1283,27 @@ knightOfGraceSpec s registry = Spec.describe s "Knight of Grace" $ do
     let (knightId, alone) = S.addCreature knight S.alice (Setup.emptyGame S.bothPlayers)
         withBlack = snd (S.addCreature bogWraith S.alice alone)
     Spec.assertEqWith s "alice's own black creature turns it on as readily" (S.powerToughnessOf knightId withBlack) (Just (3, 2))
+
+-- Knight of Malice ({1}{B} Creature -- Human Knight, printed 2/2), third line:
+-- "This creature gets +1/+0 as long as any player controls a white permanent."
+-- Oracle text verified against Scryfall. Its other two lines, first strike and CR
+-- 702.11d's "hexproof from white", are Pawl.TargetSpec's half, where Celestial
+-- Dawn is what makes the hexproof interesting.
+--
+-- Knight of Grace's clause with its colour swapped, so the case is the PAIR on
+-- one board: each Knight is the other's condition, and a filter transcribed from
+-- the mirror without the swap reads the Malice as a 3/2 on the board where it
+-- stands alone.
+knightOfMaliceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+knightOfMaliceSpec s registry = Spec.describe s "Knight of Malice" $ do
+  Spec.it s "CR 604.2 a 2/2 with no white permanent, and a 3/2 once ANY player controls one" $ do
+    malice <- S.printingOf s registry "Knight of Malice"
+    grace <- S.printingOf s registry "Knight of Grace"
+    let (maliceId, alone) = S.addCreature malice S.alice (Setup.emptyGame S.bothPlayers)
+        (graceId, both) = S.addCreature grace S.bob alone
+    Spec.assertEqWith s "no white permanent anywhere" (S.powerToughnessOf maliceId alone) (Just (2, 2))
+    Spec.assertEqWith s "bob's white Knight entered, and it is any player's" (S.powerToughnessOf maliceId both) (Just (3, 2))
+    Spec.assertEqWith s "and the mirror reads alice's black Knight the same way" (S.powerToughnessOf graceId both) (Just (3, 2))
 
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), first line: "Serra
 -- Avatar's power and toughness are each equal to your life total." Oracle text
