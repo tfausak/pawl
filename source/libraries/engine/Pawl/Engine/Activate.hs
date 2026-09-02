@@ -349,6 +349,12 @@ mayActivateGiven grants pid srcId ability gs = case ActivatedAbility.activator a
 -- on a permanent (Scryfall o:"any player may activate" game:paper, 2026-09-02,
 -- 41 cards), and a hand or graveyard is its owner's alone anyway, so an arm
 -- there would offer nothing any card asks for.
+--
+-- The `activator` filter on that arm NARROWS a candidate list; it does not
+-- decide anything. mayActivateGiven is the permission and would refuse every
+-- object this filter drops, so the two agree by construction rather than by
+-- being kept in step -- which is why Pawl.ActivateSpec's Withered Wretch
+-- negative goes red only when BOTH are neutralized.
 activationSources :: PlayerId -> GameState -> [ObjectId]
 activationSources pid gs = activationSourcesGiven (Projection.controlGrants gs) Map.empty pid gs
 
