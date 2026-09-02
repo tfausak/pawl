@@ -51,6 +51,10 @@ blackCreature =
       -- IsInZone cases below tell a matching zone from a non-matching one off one
       -- view.
       Filter.zone = Just Zone.Battlefield,
+      -- CR 601.2a: a permanent on the battlefield is not a spell being cast, so
+      -- the WasCastFrom cases below build their own view rather than reuse this
+      -- one -- and here the field is the Nothing every uncast object carries.
+      Filter.castFrom = Nothing,
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -104,6 +108,7 @@ devoidBigCreature =
       Filter.controller = Nothing,
       Filter.owner = Nothing,
       Filter.zone = Nothing,
+      Filter.castFrom = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -206,6 +211,12 @@ other = Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 1)) Nothing
 
 noPerspective :: Filter.Context
 noPerspective = Filter.contextFor Teams.none Nothing Nothing
+
+-- A SPELL on the stack that was cast out of a graveyard -- `blackCreature` with
+-- the two zone axes pulled apart, which is the whole of what the WasCastFrom
+-- cases need and what no other view here can show.
+castFromGraveyard :: Filter.View
+castFromGraveyard = blackCreature {Filter.zone = Just Zone.Stack, Filter.castFrom = Just Zone.Graveyard}
 
 -- The player candidate every "vacuously false" case below is asked about.
 aPlayer :: Filter.View
@@ -1413,6 +1424,38 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.IsInZone Zone.Hand))) "player"
       Spec.assertBool s (not (Filter.matches self devoidBigCreature (Filter.Type.IsInZone Zone.Hand))) "and so is a view with no zone recorded"
+
+  -- CR 601.2a. The gameplay-level proof is Pawl.CastSpec's Aven Interrupter group
+  -- and Pawl.ConjureSpec's Patrician Geist one -- a spell taxed and discounted at
+  -- CR 601.2f by where it was cast from; these cases pin the atom itself.
+  Spec.describe s "WasCastFrom" $ do
+    Spec.it s "matches the zone the candidate was cast from and no other" $ do
+      Spec.assertBool s (Filter.matches self castFromGraveyard (Filter.Type.WasCastFrom Zone.Graveyard)) "the view's own cast-from zone"
+      Spec.assertBool s (not (Filter.matches self castFromGraveyard (Filter.Type.WasCastFrom Zone.Exile))) "and not a different one"
+
+    -- The whole reason the atom exists, on one view: the spell IS on the stack
+    -- (CR 601.2a has moved it) and was cast FROM a graveyard, so IsInZone and
+    -- WasCastFrom answer opposite ways about the same two zones. A board where
+    -- the two agreed would satisfy either reading.
+    Spec.it s "reads a different axis from IsInZone" $ do
+      Spec.assertBool s (not (Filter.matches self castFromGraveyard (Filter.Type.IsInZone Zone.Graveyard))) "the spell is not in the graveyard it came from"
+      Spec.assertBool s (Filter.matches self castFromGraveyard (Filter.Type.IsInZone Zone.Stack)) "it is on the stack"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.WasCastFrom Zone.Battlefield))) "and a permanent sitting in a zone was cast from none"
+
+    -- Aven Interrupter's own spelling, and the pair is what makes it
+    -- discriminating: the Or must be true of the exile view and false of a hand
+    -- one, off views differing in the cast-from zone alone.
+    Spec.it s "an Or is how 'from graveyards or from exile' is written" $ do
+      let orFilter = Filter.Type.Or [Filter.Type.WasCastFrom Zone.Graveyard, Filter.Type.WasCastFrom Zone.Exile]
+      Spec.assertBool s (Filter.matches self (castFromGraveyard {Filter.castFrom = Just Zone.Exile}) orFilter) "a spell cast from exile"
+      Spec.assertBool s (not (Filter.matches self (castFromGraveyard {Filter.castFrom = Just Zone.Hand}) orFilter)) "and not one cast from a hand"
+
+    -- Vacuously False with nothing to ask: a player is not an object (CR 109.1)
+    -- and an object that was never cast carries no answer (CR 400.7 leaves the
+    -- field Nothing), so `Not` is vacuously TRUE for both.
+    Spec.it s "a player candidate and an uncast object are vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.WasCastFrom Zone.Graveyard))) "player"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.WasCastFrom Zone.Graveyard))) "and a permanent nothing cast"
 
   Spec.describe s "IsToken" $ do
     Spec.it s "matches a view whose object is a token" $ do

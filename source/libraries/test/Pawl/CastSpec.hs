@@ -690,6 +690,7 @@ handInPlay printing board =
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
+            Object.castFrom = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -4728,14 +4729,14 @@ offeredTo pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
 -- cost.) / Spells your opponents cast from graveyards or from exile cost {2}
 -- more to cast."
 --
--- Not implemented: the third sentence. Nothing in Pawl.Types.Filter reads the
--- zone a spell was cast FROM, and IsInZone -- which reads the current one -- is
--- priced against the stack by the time CR 601.2f asks, so writing it would give
--- the card a gate and a payment that disagree (#2363). The omission takes a tax
--- OFF pawl's opponents, which leaves the card weaker than printed for the player
--- who controls it.
+-- The third sentence is Filter.WasCastFrom, one atom under an Or, and it is
+-- deliberately not Filter.IsInZone: that atom reads the zone the object is in
+-- NOW, which CR 601.2a has made the stack by the time CR 601.2f prices the
+-- spell, so a card written with it would have a gate and a payment that
+-- disagree (#2363). The two cases below assert the OFFER and the mana TAPPED on
+-- one board for exactly that reason.
 --
--- It is the effect DSL's road out of the stack into exile: a Pool.Spells target
+-- The first sentence is the effect DSL's road out of the stack into exile: a Pool.Spells target
 -- slot feeding Effect.MoveToZone with a zone of Exile. The two nearest things
 -- data/cards had before it reach neither end of that -- reprieve.json is the
 -- same slot into Hand, and CR 724.1b's Time Stop sweep reaches exile with no
@@ -4784,6 +4785,36 @@ avenNamed :: Printing.Printing -> Zone.Zone -> PlayerId.PlayerId -> GameState.Ga
 avenNamed printing zone pid gs =
   length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing)) (Game.zoneMembers zone pid gs))
 
+-- Take every permanent of that name off the battlefield without routing it
+-- anywhere, so a case can price the same cast with and without the Bird's static
+-- ability gathered. Not a zone change: nothing here is a CR 400.7 move, and no
+-- case using it reads a graveyard.
+--
+-- BY NAME rather than by id, for `avenNamed` above's reason: the incarnation that
+-- reaches the battlefield is not the one the hand held.
+avenRemoved :: Printing.Printing -> GameState.GameState -> GameState.GameState
+avenRemoved printing gs =
+  let gone = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing)) (Set.toList (GameState.battlefield gs))
+   in gs
+        { GameState.battlefield = foldr Set.delete (GameState.battlefield gs) gone,
+          GameState.objects = foldr Map.delete (GameState.objects gs) gone
+        }
+
+avenTaxBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+avenTaxBoard plains island thinkTwice islands =
+  let gs0 = S.landsFor island S.bob islands (S.landsInPlay plains 3)
+      (yardId, gs1) = S.addGraveyardCard thinkTwice S.bob gs0
+      (handId, gs2) = S.addHandCard thinkTwice S.bob gs1
+      -- CR 104.3c: Think Twice draws, and an empty library would lose bob the
+      -- game out from under every assertion.
+      (_, gs3) = S.addLibraryCard island S.bob gs2
+   in (yardId, handId, gs3)
+
 avenInterrupterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
   -- The headline road: bob's spell is on the stack, alice flashes the Bird in,
@@ -4807,9 +4838,15 @@ avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
               GameState.phase = Phase.PrecombatMain,
               GameState.priority = Just S.bob
             }
+        -- The Bird taxes the very card it plotted -- "spells your opponents cast
+        -- from graveyards or from exile" names no exception for its own -- so
+        -- the plot permission has to be shown on a board without it. The pair
+        -- differs in that one permanent.
+        birdGone = avenRemoved aven later
         -- The control that says the permission came from the plot stamp rather
-        -- than from the card merely being in exile.
-        unplotted = later {GameState.objects = Map.map (\o -> o {Object.plotted = Nothing}) (GameState.objects later)}
+        -- than from the card merely being in exile. Off `birdGone`, so it and
+        -- the positive differ in the stamp alone.
+        unplotted = birdGone {GameState.objects = Map.map (\o -> o {Object.plotted = Nothing}) (GameState.objects birdGone)}
     -- CR 702.8a, without which the whole case is unreachable: a creature with no
     -- flash could not be cast with bob's spell waiting on the stack, and there is
     -- no other moment at which a spell is there to target.
@@ -4824,7 +4861,8 @@ avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
       [exiledId] -> do
         -- Every land bob has is tapped for the Piker, so a permission that
         -- granted nothing and one that waived no cost both fail this.
-        Spec.assertBool s (S.castable S.bob exiledId later) "CR 702.170d bob casts it from exile on a later turn, with all three of his lands still tapped"
+        Spec.assertBool s (S.castable S.bob exiledId birdGone) "CR 702.170d bob casts it from exile on a later turn, with all three of his lands still tapped"
+        Spec.assertBool s (not (S.castable S.bob exiledId later)) "and not while the Bird is still out: its own third sentence taxes the cast {2} and every land bob has is tapped"
         Spec.assertBool s (not (S.castable S.bob exiledId unplotted)) "the control: the same card in the same exile, unplotted, is castable by nobody"
         Spec.assertEqWith
           s
@@ -4898,3 +4936,42 @@ avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
     Spec.assertEqWith s "the Piker is in bob's exile rather than his graveyard" (avenNamed piker Zone.Exile S.bob exiled, avenNamed piker Zone.Graveyard S.bob exiled) (1, 0)
     Spec.assertEqWith s "where the countered one went to his graveyard rather than exile" (avenNamed piker Zone.Exile S.bob countered, avenNamed piker Zone.Graveyard S.bob countered) (0, 1)
     Spec.assertEqWith s "and the record agrees: a countering happened on the one board and not on the other" (wasCountered countered, wasCountered exiled) (True, False)
+  -- The third sentence, on the zone the Bird itself never puts anything in: CR
+  -- 702.34a's flashback cast out of a GRAVEYARD. Think Twice ({1}{U} Instant,
+  -- "Draw a card." / "Flashback {2}{U}") is the spell, and the two zones it can
+  -- be cast from off one board are what make the tax discriminating -- the hand
+  -- copy is the same card, the same caster and the same mana, differing from the
+  -- graveyard copy in the zone alone.
+  --
+  -- MANA TAPPED rather than a castability flag, and both rather than either:
+  -- #2363's whole content is that a cost filter reading the wrong zone leaves
+  -- Pawl.Engine.Cast.castable and Pawl.Engine.Cast.castSpell pricing one cast
+  -- differently, so a case asserting only the offer would pass on an engine that
+  -- taxed nobody at payment time, and one asserting only the payment would pass
+  -- on an engine that never offered the cast at all.
+  Spec.it s "CR 601.2f the third sentence taxes an opponent's cast from a graveyard and leaves their cast from hand alone" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    aven <- S.printingOf s registry "Aven Interrupter"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (yardId, handId, open) = avenTaxBoard plains island thinkTwice 5
+        taxed = snd (S.addCreature aven S.alice open)
+        tappedAfter gs oid = S.tappedCount S.bob (S.runPure S.identityAnswer gs (S.cast S.bob oid))
+        -- Four Islands is one short of the taxed flashback and one over the
+        -- untaxed one, which is where the OFFER and the payment have to agree.
+        (shortYardId, _, shortOpen) = avenTaxBoard plains island thinkTwice 4
+        shortTaxed = snd (S.addCreature aven S.alice shortOpen)
+    Spec.assertEqWith s "CR 702.34a the flashback cost is {2}{U}, so bob taps three Islands with no Bird out" (tappedAfter open yardId) 3
+    Spec.assertEqWith s "CR 601.2f the Bird adds {2} to that same cast, so the same board taps five" (tappedAfter taxed yardId) 5
+    Spec.assertEqWith s "and the sentence names no hand: the {1}{U} cast from bob's hand still taps two with the Bird out" (tappedAfter taxed handId) 2
+    Spec.assertBool s (S.castable S.bob shortYardId shortOpen) "the gate agrees with the payment: on four Islands the untaxed flashback is offered"
+    Spec.assertBool s (not (S.castable S.bob shortYardId shortTaxed)) "and with the Bird out the same four Islands cannot pay it, so it is not offered"
+
+-- Three Islands and one Think Twice in bob's graveyard, one in his hand, with
+-- alice on Plains she never spends -- the Bird is added by the case, so the
+-- taxed and untaxed boards differ in that permanent alone. `islands` is bob's
+-- untapped mana, which is what separates the offer cases from the payment ones.
+--
+-- Two seats is enough here where Pawl.CastSpec's Drannith Magistrate group
+-- wants three: "your opponents" and "each player" are not being told apart,
+-- only a taxed zone from an untaxed one.

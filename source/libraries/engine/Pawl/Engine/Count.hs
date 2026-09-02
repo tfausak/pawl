@@ -348,6 +348,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasCountersOfAnyKind -> predicate
   Filter.Type.HasNonManaActivatedAbility -> predicate
   Filter.Type.IsInZone _ -> predicate
+  Filter.Type.WasCastFrom _ -> predicate
   where
     recur = bakePerspective viewOf context gs candidate
 
@@ -711,6 +712,9 @@ viewOfSnapshot mController isToken counters snapshot =
       -- the object it was taken of has since moved or ceased to exist, so IsInZone
       -- is vacuously False against one.
       Filter.zone = Nothing,
+      -- CR 601.2a: a snapshot records characteristics and no zone at all, so it
+      -- cannot say where a cast came from either -- `zone` above's reason.
+      Filter.castFrom = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,

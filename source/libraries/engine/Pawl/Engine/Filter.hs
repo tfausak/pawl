@@ -123,6 +123,18 @@ data View = MkView
     -- an object of nothing -- so IsInZone is vacuously False there, the posture
     -- `controller` and `identity` already take.
     zone :: Maybe Zone.Zone,
+    -- CR 601.2a: which zone the candidate was moved to the stack FROM when it was
+    -- cast -- what WasCastFrom reads, off Pawl.Types.Object.castFrom.
+    --
+    -- A SECOND field beside `zone` above rather than a reading of it, and CR
+    -- 400.7 is the whole reason: the spell is a new object with no memory of the
+    -- zone it left, so nothing derives this from the board. `zone` answers Stack
+    -- for every spell CR 601.2f prices.
+    --
+    -- Nothing for everything that was never cast -- a card at rest, a token, an
+    -- ability on the stack -- and for everything with no OBJECT behind it at all,
+    -- so WasCastFrom is vacuously False there, `zone` above's posture.
+    castFrom :: Maybe Zone.Zone,
     -- Which object this view is OF. Nothing for a printed card off the
     -- battlefield, which is not an object -- so IsSource is vacuously False
     -- there, the same posture power and controller already take.
@@ -572,6 +584,8 @@ playerView pid =
       owner = Nothing,
       -- CR 400.1 puts OBJECTS in zones; a player is in none of them (CR 109.1).
       zone = Nothing,
+      -- CR 601.2a casts an OBJECT; a player was never cast either.
+      castFrom = Nothing,
       identity = Nothing,
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
@@ -1354,6 +1368,11 @@ matches context view predicate = case predicate of
   -- it answer CR 601.2's "from where it is" at a cast gate, which runs before CR
   -- 601.2a's move to the stack.
   Filter.IsInZone z -> zone view == Just z
+  -- CR 601.2a off Object.castFrom, which is a STAMP rather than a live read: the
+  -- spell it describes has already left the zone named here, so unlike IsInZone
+  -- above this atom goes on answering the same way for as long as the spell is on
+  -- the stack -- which is what lets CR 601.2f price it (#2363).
+  Filter.WasCastFrom z -> castFrom view == Just z
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
   -- CR 701.54a ends the designation when another creature takes it, and the next
@@ -1517,6 +1536,9 @@ rewrite pairs predicate = case predicate of
   -- word inside it for Artificial Evolution to reach.
   Filter.HasNonManaActivatedAbility -> predicate
   Filter.IsInZone _ -> predicate
+  -- Untouched for IsInZone's reason: CR 612.1 swaps a subtype, a colour or a card
+  -- type word, and a zone name is none of the three.
+  Filter.WasCastFrom _ -> predicate
   -- Rewritten THROUGH the kind, for the reason rewriteCounterKind gives.
   Filter.HasCounters kind -> Filter.HasCounters (rewriteCounterKind pairs kind)
   -- Left standing where the atom above is rewritten: CR 612.1 swaps WORDS, and a
@@ -1937,6 +1959,7 @@ bakeBound players predicate = case predicate of
   Filter.HasCountersOfAnyKind -> predicate
   Filter.HasNonManaActivatedAbility -> predicate
   Filter.IsInZone _ -> predicate
+  Filter.WasCastFrom _ -> predicate
 
 -- The mana-value LITERALS a Filter compares against: every `n` in a
 -- ManaValueAtMost atom inside it, at any depth.
@@ -2051,6 +2074,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasCountersOfAnyKind -> []
   Filter.HasNonManaActivatedAbility -> []
   Filter.IsInZone _ -> []
+  Filter.WasCastFrom _ -> []
 
 -- CR 701.23b vs CR 701.23d: does this predicate state a QUALITY? A search whose
 -- filter states one may find fewer cards than it asks for, or none, even when the
@@ -2170,6 +2194,11 @@ statesAQuality predicate = case predicate of
   -- names a zone is looking for cards with a stated quality, so CR 701.23b's
   -- shortfall applies rather than CR 701.23d's "must find".
   Filter.IsInZone _ -> True
+  -- CR 400.1 again, for the atom above's reason: naming the zone a card was cast
+  -- from states a quality, so CR 701.23b's shortfall applies. Unreachable from a
+  -- search in practice -- a card in a library was never cast -- and stated rather
+  -- than left to a wildcard because there is no wildcard here.
+  Filter.WasCastFrom _ -> True
 
 -- Every slot NAME a Filter carries, as one traversal: `boundSlots` below READS
 -- them and `renameBound` REWRITES them. One walk rather than two, because the two

@@ -88,6 +88,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.phyrexianLifePaid = 0,
           Object.manaSpent = Mana.MkMana [],
           Object.announcedX = Nothing,
+          Object.castFrom = Nothing,
           Object.detainedUntil = Set.empty,
           Object.goadedBy = Set.empty,
           Object.doesNotUntapNext = False,
@@ -186,6 +187,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                   }
               ],
           Object.announcedX = Just 20,
+          Object.castFrom = Just Zone.Graveyard,
           Object.detainedUntil = Set.singleton (PlayerId.MkPlayerId 21),
           Object.goadedBy = Set.singleton (PlayerId.MkPlayerId 22),
           Object.doesNotUntapNext = True,
@@ -215,7 +217,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
-          <> ",\"announcedX\":20,\"detainedUntil\":[21],\"goadedBy\":[22]"
+          <> ",\"announcedX\":20,\"castFrom\":{\"type\":\"Graveyard\"}"
+          <> ",\"detainedUntil\":[21],\"goadedBy\":[22]"
           <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]} "
       )
   Spec.it s "has a schema" $
