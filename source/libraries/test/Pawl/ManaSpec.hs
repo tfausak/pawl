@@ -2188,8 +2188,8 @@ nextColor p = case p of
           candidates
   _ -> pure (S.identityAnswer p)
 
--- CR 601.2g before CR 601.2h, for the pool's one mana ability whose activation
--- cost holds MANA: Transmogrant Altar, "{B}, {T}, Sacrifice a creature: Add
+-- CR 601.2g before CR 601.2h, on a mana ability whose activation cost holds
+-- MANA: Transmogrant Altar, "{B}, {T}, Sacrifice a creature: Add
 -- {C}{C}{C}" ({3} Artifact). CR 602.2b routes an activation cost through rule
 -- 601.2b-i, so the mana window opens BEFORE the cost is paid, and the creature
 -- the cost eats is still there to be tapped for mana first.
@@ -2527,6 +2527,82 @@ ignusBoard ignus mountain =
   let (ignusId, g1) = S.addCreature ignus S.alice (Setup.emptyGame S.bothPlayers)
       (_, g2) = S.addCreature mountain S.alice g1
    in (ignusId, g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- CR 118.13a on a MANA ability's own activation cost. A mana ability is an
+-- activated ability (CR 605.1a) and CR 602.2b sends its activation cost through
+-- CR 601.2b, so a symbol payable in several ways is the PLAYER's to announce as
+-- the ability is activated -- not the fixed order Mana.resolutions would
+-- otherwise settle it in.
+--
+-- Mystic Gate is the producer: "{T}: Add {C}" and "{W/U}, {T}: Add {W}{W},
+-- {W}{U}, or {U}{U}" (Land). Both halves of the {W/U} are payable out of the
+-- seeded pool and they leave DIFFERENT pools behind, which is what makes the
+-- announcement observable at all.
+--
+-- ONE board, two runs differing only in the answer to CR 601.2b's question, so
+-- neither the seeded pool nor the yield can be what separates them. The Gate is
+-- the only permanent, so CR 601.2g's window inside the payment has nothing to
+-- offer (CR 605.3c takes the Gate itself off it) and the {W/U} is paid out of
+-- what is floating.
+mysticGateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mysticGateSpec s registry = Spec.describe s "Mystic Gate" $ do
+  Spec.it s "CR 118.13a the player announces the {W/U} in a mana ability's own activation cost" $ do
+    gate <- S.printingOf s registry "Mystic Gate"
+    let board = gateBoard gate
+        run half = S.runPureWith (takesGate [whiteType, blueType] (Just half)) (snd board) (Cost.tapForMana (fst board))
+        (paidWhite, afterWhite) = run whiteType
+        (paidBlue, afterBlue) = run blueType
+    Spec.assertEqWith s "the white half announced, so the blue unit is what is still floating beside the {W}{U}" (poolTypes S.alice afterWhite) [blueType, whiteType, blueType]
+    Spec.assertEqWith s "the blue half announced, and the white unit is left instead" (poolTypes S.alice afterBlue) [whiteType, whiteType, blueType]
+    Spec.assertEqWith s "CR 602.2b both activations really paid" (paidWhite, paidBlue) (True, True)
+
+  -- The elision side of the same invariant, on the SAME card: the Gate's other
+  -- ability is "{T}: Add {C}", whose cost holds no symbol payable two ways, so CR
+  -- 118.13a leaves nothing to ask. Two runs off one board again, differing only
+  -- in which yield is taken.
+  Spec.it s "CR 118.13a and asks nothing of a mana ability whose cost prints no such symbol" $ do
+    gate <- S.printingOf s registry "Mystic Gate"
+    let board = gateBoard gate
+        counting :: [ManaType.ManaType] -> Prompt.Prompt r -> State.State Int r
+        counting wanted p = case p of
+          Prompt.AnnounceHybridHalf {} -> do
+            State.modify' (+ 1)
+            pure (takesGate wanted (Just whiteType) p)
+          _ -> pure (takesGate wanted (Just whiteType) p)
+        asked wanted = State.execState (Engine.runGame (counting wanted) (snd board) (Cost.tapForMana (fst board))) (0 :: Int)
+    Spec.assertEqWith s "CR 118.6 the {C} route's cost has no mana part, so nothing is announced" (asked [ManaType.Colorless]) 0
+    Spec.assertEqWith s "and the {W/U} route on the same board is asked once" (asked [whiteType, blueType]) 1
+
+-- alice with one Mystic Gate and one white and one blue mana floating, and
+-- nothing else anywhere. The pool is SEEDED rather than tapped for, so the {W/U}
+-- is paid without CR 601.2g's window choosing a source -- what is under test is
+-- the announcement, and a second land would make the source prompt the thing that
+-- decided which colour went.
+gateBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+gateBoard gate =
+  let (gateId, g1) = S.addCreature gate S.alice (Setup.emptyGame S.bothPlayers)
+      unit manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
+   in (gateId, Mana.addMana S.alice [unit whiteType, unit blueType] g1)
+
+whiteType :: ManaType.ManaType
+whiteType = ManaType.Colored Color.White
+
+blueType :: ManaType.ManaType
+blueType = ManaType.Colored Color.Blue
+
+-- Takes the Gate's route whose YIELD is `wanted` and announces `half` for its
+-- {W/U}. FILTERED, NOT BUILT: the yield is picked out of the offered options, so
+-- an answer the source does not offer cannot mint mana, and the announcement is
+-- pinned to one half rather than searched for -- an answerer that looked for a
+-- payable half would repair the very choice this proves.
+takesGate :: [ManaType.ManaType] -> Maybe ManaType.ManaType -> Prompt.Prompt r -> r
+takesGate wanted half p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates ->
+    let typesOf option = case ManaOption.yield option of
+          Mana.Type.MkMana units -> fmap ManaUnit.manaType units
+     in Maybe.fromMaybe (NonEmpty.head candidates) (List.find ((==) wanted . typesOf) (NonEmpty.toList candidates))
+  Prompt.AnnounceHybridHalf _ _ _ _ offers -> Maybe.fromMaybe (NonEmpty.head offers) (List.find (\o -> Just o == half) (NonEmpty.toList offers))
+  _ -> S.identityAnswer p
 
 -- Takes the Ignus's mana ability at the FIRST priority prompt and passes at every
 -- later one, takesAltarOnce's guard and for its reason: an activation that failed
@@ -4673,6 +4749,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
   grinningIgnusSpec s registry
+  mysticGateSpec s registry
   activationAdjustmentSpec s registry
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
@@ -5365,12 +5442,12 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
 
   -- What CR 118.13a's announcement leaves behind. Both halves are payable
   -- out of this pool and they leave DIFFERENT pools behind, so the choice
-  -- is observable and `spend` makes it: it takes the fewest units. A cast,
-  -- an activation, a CR 118.12 pay gate, a special action and a combat toll no
-  -- longer reach this, because `announce` has settled every {2/X} before
-  -- payment -- what still does is a mana ability's own activation cost
-  -- (#2909), which is why this calls `spend` directly.
-  Spec.it s "CR 601.2b with nothing announced, spend takes a {2/R}'s one-mana half (#2909)" $
+  -- is observable and `spend` makes it: it takes the fewest units. No gameplay
+  -- road reaches it any more -- a cast, an activation, a CR 118.12 pay gate, a
+  -- special action, a combat toll and a mana ability's own activation cost all
+  -- settle every {2/X} through `announce` first -- so this calls `spend`
+  -- directly, as a fence under the rule Mana.resolutions still states.
+  Spec.it s "CR 601.2b with nothing announced, spend takes a {2/R}'s one-mana half" $
     let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
         colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
      in Spec.assertEqWith
@@ -5598,8 +5675,8 @@ atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.a
 --
 -- TWO PATHS, and which one a case takes decides who chooses. A case calling
 -- Cost.payMana directly pays an UNANNOUNCED cost, where the least-life rule still
--- decides -- what the engine's own remaining unannounced payment looks like
--- (#2909); a case going through Cast.castSpell announces first, under CR
+-- decides -- a fence under that rule rather than a gameplay road, no engine path
+-- leaving a Phyrexian symbol unannounced; a case going through Cast.castSpell announces first, under CR
 -- 118.13a, and the player decides. The CR 118.13a cases at the end of this group
 -- are the second path.
 phyrexianSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -5611,7 +5688,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- It also pins what Cost.payMana does with an UNANNOUNCED cost, which is
   -- what this and the four cases after it exercise: they call Cost.payMana
   -- directly, so no announcement has happened and the least-life
-  -- rule still decides, which here means none (#2909). A cast goes through
+  -- rule still decides, which here means none. A cast goes through
   -- Cast.castSpell instead and asks -- see the CR 118.13a cases at the end of
   -- this group.
   Spec.it s "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
@@ -5774,7 +5851,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
   -- than failing the payment, which is the same MORE PERMISSIVE posture
   -- Cost.payMana's haddock takes towards a mis-tapped colour. Reached only
-  -- because this calls Cost.payMana directly, with nothing announced (#2909).
+  -- because this calls Cost.payMana directly, with nothing announced.
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
@@ -6518,8 +6595,8 @@ sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
     Spec.assertEqWith s "neither cost life" (S.lifeOf S.alice afterGreen, S.lifeOf S.alice afterBlue) (Just 20, Just 20)
 
   -- Pawl.Engine.Mana.waysOf's three rows, read directly off an UNANNOUNCED
-  -- cost -- the path a mana ability's own activation cost still takes
-  -- (#2909), and the only one that asks this function what the symbol
+  -- cost -- no gameplay road leaves one unannounced, so this is the only
+  -- reading that asks this function what the symbol
   -- costs rather than what CR 601.2b left behind. The Phyrexian group's
   -- least-life case one group up is the same reading for the monocoloured
   -- symbol.
