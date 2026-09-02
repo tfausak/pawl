@@ -3318,6 +3318,45 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- Ordered last on purpose, since a row count sitting first absorbs every
     -- mutation of the arm that builds the rows and reports itself instead.
     Spec.assertEqWith s "and the resolution installed ONE shield, holding 3" (shieldsLeft shielded) [3]
+  -- The other half of collapsing a batch to one record: a trigger scoped to ONE
+  -- of the recipients still reads its own share. Selfless Squire ({3}{W} Creature
+  -- -- Human Soldier 1/1, "Whenever damage that would be dealt to you is
+  -- prevented, put that many +1/+1 counters on this creature") is that trigger,
+  -- and Divine Deflection's shield is the one in data/cards/ that can span a
+  -- player and a permanent at once, so this pair is the only board in the pool
+  -- where "that many" and "the whole application" differ.
+  --
+  -- The Squire is put onto the battlefield DIRECTLY, so its own enters trigger
+  -- never installs a second shield to confuse the two: the only prevention here
+  -- is the Deflection's.
+  --
+  -- The allocation is the creature's 2 first and alice's last 1 second, so her
+  -- share is 1 of the 3 -- distinct from the total, from the 2 the creature took
+  -- and from the 5 aimed at her, so no two readings land on the same board.
+  Spec.it s "CR 615.13 a trigger scoped to one recipient reads its own share of the application" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    squirePrinting <- S.printingOf s registry "Selfless Squire"
+    let base = S.landsInPlay plains 4
+        (mine, g1) = S.addCreature jedit S.alice base
+        (squire, g2) = S.addCreature squirePrinting S.alice g1
+        (_, g3) = S.addCreature jedit S.bob g2
+        (blocked, g4) = S.addCreature piker S.bob g3
+        (unshielded, spellId) = S.handOne deflection g4
+        shielded = castAndResolve (castDeflection 3 S.bob) unshielded spellId
+        after = S.runCombat (deflectionCombat mine blocked [Recipient.ToCreature mine, Recipient.ToPlayer S.alice]) (bobAttacks shielded)
+    Spec.assertEqWith s "setup: the Squire is on the battlefield as a 1/1" (S.powerToughnessOf squire shielded) (Just (1, 1))
+    -- The board the counters are read against: the shield stopped 2 on her
+    -- creature and 1 of the 5 aimed at her.
+    Spec.assertEqWith s "the creature's 2 never happens" (S.damageOf mine after) (Just 0)
+    Spec.assertEqWith s "and 1 of alice's 5 is prevented" (S.lifeOf S.alice after) (Just 16)
+    -- The discriminating assertion: HER share, not the application's total. A
+    -- reading that handed the trigger everything the shield stopped would make
+    -- this a 4/4.
+    Spec.assertEqWith s "so the Squire counts alice's 1, not the whole application's 3" (countersOn CounterKind.PlusOnePlusOne squire after) 1
+    Spec.assertEqWith s "leaving the 1/1 a 2/2" (S.powerToughnessOf squire after) (Just (2, 2))
   -- CR 608.2f: one instruction naming objects AND players is ONE action, so its
   -- damage is one batch. Molten Disaster ({X}{R}{R} Sorcery, "Kicker {R}. If this
   -- spell was kicked, it has split second. Molten Disaster deals X damage to each
