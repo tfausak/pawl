@@ -4030,8 +4030,17 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- by the bestow ability are evaluated to determine if it can be cast". That gate
 -- runs one step ahead of rule 601.2a's move, on the card where it lies, so
 -- Pawl.Engine.Cast.proposedFor stamps a candidate-local copy of the board there
--- and this walk is what makes the stamp visible. The library is absent because
--- nothing can cast from it (#2360).
+-- and this walk is what makes the stamp visible.
+--
+-- Not implemented: the library, which castZones leaves out and this walk
+-- therefore does not reach. Casting from it is not impossible -- Panglacial
+-- Wurm's CR 601.3 exception is Pawl.Engine.Cast.castableWhileSearching, scoped
+-- to a search in progress -- so the gap is card-driven rather than
+-- rules-enforced: no bestow card in data/cards/ carries that permission, so a
+-- stamp this walk cannot see would skip CR 702.103d with nothing red (#2920). The
+-- OTHER library route needs no arm at all -- rule 702.103d's own Garruk's Horde
+-- example says a bestow card cast off the top of a library is cast as a creature
+-- spell and cannot be cast bestowed; see #2360.
 --
 -- A card in one of those zones takes its OWN timestamp here, where the stack
 -- incarnation takes the new and later one CR 613.7d gives it at the move. The two
@@ -5238,8 +5247,15 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- "only" rather than a proved behaviour. What IS proved is the empty-set limb,
 -- by Pawl.ZoneReplacementSpec's Rest in Peace pair.
 replacementsOf :: Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
-replacementsOf zone oid gs =
-  let pc = project oid gs
+replacementsOf = replacementsOfGiven Map.empty
+
+-- The same rows off a board the CALLER has already projected. replacementsAffecting
+-- is why it exists: its walk asks this of every battlefield permanent, and a fresh
+-- `project` apiece was one gather per permanent; see #435. projectGiven is the snapshot
+-- argument, and the empty map above is its own fallback.
+replacementsOfGiven :: Map ObjectId ProjectedCharacteristics -> Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
+replacementsOfGiven pcs zone oid gs =
+  let pc = projectGiven pcs oid gs
       -- CR 113.6b first and CR 604.2 second: which zone the row functions from,
       -- then whether its clause holds there (printedRowLives argues the board
       -- that reads against).
@@ -5571,7 +5587,13 @@ replacementsAffecting gs =
           -- exists to skip, so any board holding a granting ability is gathered
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
-      forOne zone oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOf zone oid gs)
+      -- ONE whole-board projection for the whole walk rather than one gather per
+      -- permanent -- see #435 -- and a THUNK: the short-circuit below is what decides
+      -- whether any of it is forced, so a board carrying no replacement effect
+      -- still pays nothing. Same answers, for the reason at projectGiven -- this
+      -- and replacementsOfGiven are pure functions of the same GameState.
+      pcs = projectAll gs
+      forOne zone oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOfGiven pcs zone oid gs)
       -- The grantors standing where `baseHas` cannot see them, asked BOTH of
       -- baseHas's grantor disjuncts again: a stored effect and an off-battlefield
       -- static ability write the same two modifications a permanent's static
