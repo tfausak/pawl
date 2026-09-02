@@ -825,9 +825,9 @@ data Context = MkContext
     -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
     -- fold, trigger matching, a cost paid with nothing announced, combat
-    -- declarations, duration expiry
-    -- -- but it was NOT honest of every in-resolution caller: four of them build a
-    -- bare contextFor while a resolution's bindings do exist (#2141), and
+    -- declarations, duration expiry -- but it was NOT honest of every
+    -- in-resolution caller: four of them build a bare contextFor while a
+    -- resolution's bindings do exist (#2141), and
     -- Pawl.Engine.Projection.freezeQuantities was a fifth until it took its
     -- context from the caller.
     --
