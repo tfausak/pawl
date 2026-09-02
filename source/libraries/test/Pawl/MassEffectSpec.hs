@@ -3622,8 +3622,8 @@ calderaBreakerAnswer angel giant p = case p of
   _ -> S.identityAnswer p
 
 -- ObjectRef.EachCardInYourLibrary with a STATED filter, the sweep levelerSpec
--- above takes bare: CR 400.12's zone narrowed by characteristics rather than
--- taken whole.
+-- above takes bare: CR 109.2a's "card" beside the name of a zone, where the bare
+-- form is CR 400.12's instruction to the zone itself.
 --
 -- Caldera Breaker {3}{R}{R}{R} Artifact Creature -- Golem 6/6 (Alchemy: Ixalan,
 -- Oracle text fetched from Scryfall 2026-09-02) is the producer: "When Caldera
@@ -3691,7 +3691,7 @@ calderaBreakerSpec s registry =
    in Spec.describe s "Caldera Breaker" $ do
         -- The headline, gameplay-level first: the three Mountains leave and the
         -- three nonland cards stay, IN THE ORDER THEY WERE IN.
-        Spec.it s "CR 400.12 only the matching cards leave the library, in place" $ do
+        Spec.it s "CR 109.2a only the matching cards leave the library, in place" $ do
           staged <- printings
           let after = cast staged
           Spec.assertEqWith

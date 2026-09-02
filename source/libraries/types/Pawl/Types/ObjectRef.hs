@@ -95,7 +95,9 @@ data ObjectRef
     -- 701.20a) that shows the hand, which Ignorant Bliss does not and does not
     -- need. ChosenCardInHand below does carry a Filter, and that is not this
     -- arm's question either: one card chosen out of a hand tells nobody which of
-    -- the others matched.
+    -- the others matched. Nor is EachCardInYourLibrary's stated Filter: that arm
+    -- reaches only its own controller's zone, whose ORDER no player may see (CR
+    -- 401.2), so the matches leaving tells nobody anything about what stayed.
     --
     -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
@@ -115,10 +117,11 @@ data ObjectRef
     -- answers the CR 400.2 visibility question there.
     EachCardInHand EachCardInHand.EachCardInHand
   | -- | Every card in the resolving controller's library that the optional Filter
-    -- matches -- Leveler's "exile all cards from your library" bare, Caldera
-    -- Breaker's "exile all Mountain cards from your library" stated (CR 400.12).
-    -- EachCardInYourHand's arm over CR 400.1's other hidden zone, and only the
-    -- resolving controller's for its reasons (CR 400.2, CR 109.5).
+    -- matches -- Leveler's "exile all cards from your library" bare (CR 400.12's
+    -- instruction to a zone), Caldera Breaker's "exile all Mountain cards from
+    -- your library" stated (CR 109.2a, the word "card" beside the name of a
+    -- zone). EachCardInYourHand's arm over CR 400.1's other hidden zone, and only
+    -- the resolving controller's for its reasons (CR 400.2, CR 109.5).
     --
     -- The Filter is OPTIONAL for EachCardExiledWithSource's reason:
     -- Pawl.Types.Filter has no tautological arm, so "all cards from your library"
