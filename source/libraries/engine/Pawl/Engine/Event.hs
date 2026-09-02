@@ -3355,16 +3355,14 @@ resolvePlayerCounters cause pid kind n = do
 -- CR 119.3 / 119.4 / 119.5 / 120.4c: settle how much life a player actually
 -- loses, and answer with the settled amount. The one funnel every cause goes
 -- through -- Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing
--- step, Pawl.Engine.Resolve's Effect.LoseLife and downward Effect.SetLifeTotal
--- arms, and payLife above -- so a row cannot reach one road and miss another.
+-- step, Pawl.Engine.Resolve's Effect.LoseLife arm and its changeLifeByDelta (the
+-- downward side of a set, an exchange and a redistribution alike), and payLife
+-- above -- so a row cannot reach one road and miss another.
 --
 -- The SETTLED amount may be larger than what came in, not only smaller: a
 -- Pawl.Types.LifeLossRewrite may be a scaling. It is 0 for a CANCELLED event too
 -- -- CR 614.6's "it never happens" -- which a caller cannot tell from a loss
 -- rewritten to nothing, and need not: either way no life moves.
---
--- Not implemented: CR 701.12c's exchange and CR 119.7's redistribution do not come
--- through here (#2544).
 --
 -- It does not WRITE the life total, unlike resolveUntap and the counter funnels
 -- above: every caller already owns that write, and the damage one has to fold its
