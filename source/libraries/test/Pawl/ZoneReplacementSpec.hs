@@ -2,9 +2,10 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Pawl.Engine.Projection.replacementsAffecting over CR 113.6b: which zone a
--- card's PRINTED replacement row functions from, and what the four walks past
--- the battlefield and the command zone gather. The CR 616.1 loop those rows are
--- fed to is Pawl.ReplacementSpec.
+-- card's PRINTED replacement row functions from, and what the walks past the
+-- battlefield and the command zone gather. The CR 616.1 loop those rows are fed
+-- to is Pawl.ReplacementSpec. The command zone's own walk is
+-- Pawl.CommanderSpec's, which is where a board with a commander on it is built.
 module Pawl.ZoneReplacementSpec where
 
 import qualified Data.List as List
@@ -123,6 +124,67 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice (binned inGraveyard))) 0
     Spec.assertEqWith s "CR 113.6's default: the same enchantment on the battlefield exiles it instead" (length (Game.zoneMembers Zone.Exile S.alice (binned onBattlefield))) 1
     Spec.assertEqWith s "so that graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (binned onBattlefield))) 0
+  -- The DEFAULT the case above has none of: CR 113.6's first sentence functions
+  -- an instant's or a sorcery's abilities while the object is on the stack, so a
+  -- row that states no zone is gathered there and nowhere else. The stack walk
+  -- asked CR 113.6b's stated set alone until this case; see #2590.
+  --
+  -- Synthetic Fading Counsel is "{1}{U} Instant, you gain 2 life. If this spell
+  -- would be put into a graveyard, exile it instead." SYNTHETIC because no
+  -- printing has the shape: Scryfall's "(t:instant or t:sorcery) o:/would be (put
+  -- into|exiled|countered)/ o:~ -o:'you may cast' -o:'that spell'", 2026-09-01,
+  -- returns Nexus of Fate alone, and Nexus states every zone -- so the stated set
+  -- would decide it and the default would change nothing. The rules shape is
+  -- printed all the same: rule 702.27a's buyback is "put this spell into its
+  -- owner's hand instead of into that player's graveyard as it resolves" and
+  -- says in so many words that it functions while the spell is on the stack.
+  -- pawl has no buyback.
+  --
+  -- CR 608.2n's trip to the graveyard is the observer, driven through a real cast
+  -- and a real resolution rather than the zone-change funnel: the card has to be
+  -- on the stack as its own move is proposed, and resolving is how it gets there.
+  Spec.it s "CR 113.6 an instant's row stating no zone functions from the stack" $ do
+    island <- S.printingOf s registry "Island"
+    counsel <- S.printingOf s registry "Synthetic Fading Counsel"
+    let (counselId, gs1) = S.addHandCard counsel S.alice (S.landsInPlay island 2)
+        gs =
+          gs1
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice counselId)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "CR 614.6 the resolved spell is in exile" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
+    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
+    -- After the two above, for the Nexus case's reason: an uncast spell would
+    -- leave both zones empty and pass the second on its own.
+    Spec.assertEqWith s "the spell really was cast" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "and really did resolve" (length (GameState.stack resolved)) 0
+  -- The other half of that default, as a pair of boards differing in one thing:
+  -- CR 113.6's first sentence reaches an INSTANT OR SORCERY spell, and a
+  -- permanent spell's abilities are left functioning on the battlefield. Read off
+  -- the card types, which is the classification Pawl.Engine.Projection.fromSpell
+  -- already reads for a static ability.
+  --
+  -- Anafenza, the Foremost ({W}{B}{G} Legendary Creature -- Human Soldier, "If a
+  -- nontoken creature an opponent owns would die or a creature card not on the
+  -- battlefield would be put into an opponent's graveyard, exile that card
+  -- instead" -- checked against Scryfall, 2026-09-01) states no zone, so the
+  -- board that gathers her row and the board that does not are the same card in
+  -- two zones. bob's Piker is the victim on both, since her row is scoped to an
+  -- opponent's graveyard.
+  Spec.it s "CR 113.6 a creature spell's row stating no zone does not function from the stack" $ do
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        onStack = snd (S.spellOnStack anafenza S.alice base)
+        onBattlefield = snd (S.addCreature anafenza S.alice base)
+        binned st = S.runPure S.identityAnswer st (Event.changeZone pikerId Zone.Graveyard)
+    Spec.assertEqWith s "the SPELL replaces nothing: bob's creature reaches his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob (binned onStack))) 1
+    Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.bob (binned onStack))) 0
+    Spec.assertEqWith s "CR 113.6's default: the same card on the battlefield exiles it instead" (length (Game.zoneMembers Zone.Exile S.bob (binned onBattlefield))) 1
+    Spec.assertEqWith s "so that graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.bob (binned onBattlefield))) 0
   -- CR 701.24a: the redirect does not merely put the card into the library, it
   -- shuffles that library. A pair of boards differing in ONE thing -- which card
   -- alice discards -- because the discard funnel itself never shuffles, so a

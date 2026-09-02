@@ -572,6 +572,35 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 attackingCreature :: SlotName
 attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 
+-- CR 508.3d / 508.3e: the reserved slot under which the player who DECLARED the
+-- attackers is bound. Stamped by Pawl.Engine.Event.eventBindings off
+-- GameEvent.AttackersDeclared and GameEvent.BecameAttacked as the trigger is
+-- gathered.
+--
+-- "The attacking player" (Norn's Decree) and "that player" (Archnemesis) are the
+-- printed phrases; neither printing is writable yet (#2930, #2931), so what
+-- exercises the slot is data/cards/synthetic-marauders-toll.json and
+-- data/cards/synthetic-reprisal-ledger.json.
+--
+-- Distinct from `triggerPlayer`, and that is why it exists: under CR 508.3e both
+-- players are subjects at once, and that slot already carries the ATTACKED one
+-- (CR 508.1b's announcement). One name per role, so a payload naming the wrong
+-- player reads a dead slot instead of the other seat.
+--
+-- ONE name across both conditions rather than one per condition: rule 508.3d and
+-- rule 508.3e name the same player by the same phrase, and a card moved from one
+-- condition to the other would otherwise have to be rewritten.
+--
+-- Not the ACTIVE player under another name, though CR 506.2 makes them the same
+-- seat on every board pawl can build today: CR 508.1's declaration is what this
+-- reads, and Pawl.Engine.Event stamps it from the event rather than from
+-- GameState.activePlayer.
+--
+-- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
+-- "no card's targetSlots may name it" sweep as `attackingCreature`.
+attackingPlayer :: SlotName
+attackingPlayer = SlotName.MkSlotName (Text.pack "thatAttackingPlayer")
+
 -- CR 120.1: the reserved slot under which the OBJECT THAT DEALT the damage --
 -- its source -- is bound: Aragorn, Hornburg Hero's "double the number of +1/+1
 -- counters on IT". Stamped by Pawl.Engine.Event.eventBindings off the same
@@ -720,6 +749,10 @@ setBlockedCreature oid = Map.insert blockedCreature (toObject oid)
 -- Bind an object under the reserved attackingCreature slot (CR 506.5).
 setAttackingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setAttackingCreature oid = Map.insert attackingCreature (toObject oid)
+
+-- Bind a player under the reserved attackingPlayer slot (CR 508.3d / 508.3e).
+setAttackingPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
+setAttackingPlayer pid = Map.insert attackingPlayer (toPlayer pid)
 
 -- Bind an object under the reserved combatDamager slot (CR 510.2).
 setCombatDamager :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
