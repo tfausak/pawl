@@ -11340,18 +11340,24 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- the OWNER's: Warped Devotion's "whenever a permanent is returned to a
   -- player's hand, THAT PLAYER discards a card" names the owner, and
   -- PlayerRef.ControllerOfBound would name the wrong seat for a stolen permanent.
-  -- Read off the arrival (ZoneChange.object) rather than the departed id, which
-  -- CR 400.7 deleted; CR 108.3 keeps the owner the same across the move. The
-  -- lookup is total for a recorded event -- the funnel minted the arrival into
-  -- this state -- so the slot is bound for every match, which is what
-  -- eventBindingSlots' promise rests on; a hand-built event naming no object
-  -- binds the departed id alone.
+  --
+  -- Read off CR 608.2h's record of the DEPARTED id, not off the arrival, and CR
+  -- 108.3 makes the two the same answer: the owner is the one thing a zone change
+  -- cannot move. The arrival is what CR 111.7 and CR 704.5d take away -- a token
+  -- that reached a hand ceases to exist, and Engine.performSettle runs that
+  -- state-based action BEFORE placePendingTriggers, so by the time this runs the
+  -- arriving object is already deleted and a live lookup of it would leave the
+  -- slot unbound for exactly the case CR 111.7's parenthetical says must still
+  -- trigger. The departed id's record survives: the zone-change funnel files it
+  -- in the same write that deletes the object, and nothing prunes it. Proved by
+  -- Pawl.ZoneTriggerSpec's "CR 111.7 bob's Piker TOKEN under alice's control
+  -- still makes bob discard".
   --
   -- CR 400.7e's `became` is NOT bound: a hand is hidden (CR 400.2), the
   -- SelfLeavesTheBattlefield arm's guard, here settled by the condition itself.
   (TriggerCondition.PermanentReturnedToHand _, GameEvent.Moved m) ->
     let zc = Moved.change m
-        owner = fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
+        owner = fmap LastKnown.owner (Projection.lastKnownOf (ZoneChange.departed zc) gs)
      in Binding.setDepartedPermanent (ZoneChange.departed zc) (maybe Map.empty (`Binding.setTriggerPlayer` Map.empty) owner)
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
   -- entrant, and what it became is the permanent now on the battlefield --

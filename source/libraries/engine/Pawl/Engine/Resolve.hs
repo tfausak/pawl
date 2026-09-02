@@ -5123,10 +5123,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- and one instruction's flips are all of them.
     tally <- Foldable.foldlM flipOnce (0 :: Natural) [1 .. coins]
     State.modify' (bindAmountSlot source (FlipCoin.slot flipCoin) tally)
-    -- The flips that did NOT match, off the same coins: CR 705.2's "otherwise,
-    -- the player loses the flip" is the complement of the tally above, so the
-    -- two are bound from one set of flips rather than one being re-derived from
-    -- the count. Pawl.CoinSpec's Mutalith Vortex Beast group proves a lost flip
+    -- The flips that did NOT match, off the same coins. WHICH sentence of CR
+    -- 705.2 that is depends on the reading: for a win/lose flip it is
+    -- "otherwise, the player loses the flip", and for one that cares only about
+    -- the face it is the first sentence's tails, where no player wins or loses
+    -- at all. Either way it is the complement of the tally above, so the two are
+    -- bound from one set of flips rather than one being re-derived from the
+    -- count. Pawl.CoinSpec's Mutalith Vortex Beast group proves a lost flip
     -- reaches the loser and a won one does not.
     Foldable.for_ (FlipCoin.misses flipCoin) $ \misses ->
       State.modify' (bindAmountSlot source misses (coins - tally))
