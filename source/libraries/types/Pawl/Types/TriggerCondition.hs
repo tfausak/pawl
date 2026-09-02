@@ -395,8 +395,9 @@ data TriggerCondition
     -- creature" (gap #1837).
     SelfBecomesAttachedBy (Filter.Filter Keyword.Keyword)
   | -- | CR 603.12's reflexive triggered ability: "when you do" (The Fugitive
-    -- Doctor). Nullary, and it matches no GameEvent -- the arming clause runs
-    -- exactly when the action it hangs off was taken, so
+    -- Doctor). Nullary, and it matches no GameEvent -- the arm runs only when
+    -- the action it hangs off actually happened, CR 701.28e's ignored convert
+    -- being the one that does not (Pawl.Engine.Resolve.applyClauseEffects), so
     -- Pawl.Engine.Event.delayedPending fires it once at the next gather.
     --
     -- Not implemented: CR 603.12a's first sentence, "once for each of those
