@@ -923,8 +923,8 @@ conjureOntoBattlefield controller card count = do
 -- controls no resolving spell or ability once they have left, so the guard is
 -- reachable only by driving the funnel -- which is what Pawl.EventSpec's "CR
 -- 800.4d no emblem is created for a player who has left the game" does, as the
--- conjure and token cases beside it do. Gameplay reaches it the day an effect names a recipient
--- other than the resolving controller.
+-- conjure and token cases beside it do. Gameplay reaches it the day an effect
+-- names a recipient other than the resolving controller.
 createEmblem :: PlayerId -> Card -> Game (Maybe ObjectId)
 createEmblem pid card = do
   gs <- State.get
