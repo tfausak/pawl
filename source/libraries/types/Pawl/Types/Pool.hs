@@ -81,7 +81,8 @@ data Pool
     -- point: CR 400.1 makes exile a SHARED zone, so there is no per-player copy
     -- of it for a scope to select among. A CardsInExile PlayerScope would be
     -- filtering candidates by their OWNER while wearing a type that reads as
-    -- naming a zone; owner-filtering is a Filter's job if a card ever asks.
+    -- naming a zone; owner-filtering is a Filter's job, and Runic Repetition's
+    -- "you own" is where a card asks.
     --
     -- DISJOINT from every battlefield pool, and from CardsInGraveyard, for the
     -- reason that pool's own note gives: the candidates are CARDS in another

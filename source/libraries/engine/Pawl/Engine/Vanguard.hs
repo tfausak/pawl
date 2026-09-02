@@ -81,8 +81,11 @@ isVanguard oid gs = maybe False isVanguardFace (Game.faceOf oid gs)
 -- ONLY the unstated ones. CR 113.6b is a limb of rule 113.6's list beside 113.6p
 -- rather than under it, so a row that names the command zone functions there
 -- whatever the object is -- Grist, the Hunger Tide as a commander -- and every
--- caller asks this after the row's own stated set, never before it. Callers that
--- do not are elisions carrying an issue; see #2904.
+-- caller asks this after the ability's own stated set, never before it. The two
+-- that can are Pawl.Engine.Projection's static and replacement walks;
+-- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event's trigger walk
+-- read constructs carrying no stated set to ask (Pawl.Types.CombatRestriction
+-- and Pawl.Types.TriggeredAbility have no functionsFrom field).
 --
 -- A CLASSIFICATION and never an identity: the emblem arm reads
 -- Pawl.Types.Source's own tag and the vanguard arm reads the printed card type.
