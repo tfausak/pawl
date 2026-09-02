@@ -31,6 +31,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
@@ -862,7 +863,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         outerId = ObjectId.MkObjectId 9001
         parent =
           g2
-            { GameState.outsideObjects = Map.singleton outerId (OutsideObject.MkOutsideObject S.alice printingId)
+            { GameState.outsideObjects = Map.singleton outerId (OutsideObject.MkOutsideObject S.alice printingId Facing.FaceUp)
             }
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, crossedSub) = OutsideTheGame.bringInFrom S.alice outerId sub0
