@@ -10,6 +10,7 @@ import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Codec.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -108,7 +109,7 @@ codec =
       Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
       Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
       Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
-      Arm.nullary "PermanentSacrificed" TriggerCondition.PermanentSacrificed,
+      Arm.payload "PermanentSacrificed" PermanentSacrificed.codec TriggerCondition.PermanentSacrificed (\x -> case x of TriggerCondition.PermanentSacrificed y -> Just y; _ -> Nothing),
       Arm.payload "SagaFinalChapterTriggers" PlayerRelation.codec TriggerCondition.SagaFinalChapterTriggers (\x -> case x of TriggerCondition.SagaFinalChapterTriggers y -> Just y; _ -> Nothing),
       Arm.payload "PlayerBecomesMonarch" PlayerRelation.codec TriggerCondition.PlayerBecomesMonarch (\x -> case x of TriggerCondition.PlayerBecomesMonarch y -> Just y; _ -> Nothing),
       Arm.payload "LoseControlOfBound" SlotName.codec TriggerCondition.LoseControlOfBound (\x -> case x of TriggerCondition.LoseControlOfBound y -> Just y; _ -> Nothing),

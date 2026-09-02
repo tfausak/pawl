@@ -24,7 +24,7 @@ import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -766,7 +766,7 @@ data GameEvent
     -- (Pawl.Engine.Event.eventBindingSlots answers empty for the condition), the
     -- payload being what a card printing "whenever YOU sacrifice" or "sacrifice a
     -- creature ... return IT" would need.
-    PermanentSacrificed PermanentSacrificed.PermanentSacrificed
+    PermanentSacrificed PermanentWasSacrificed.PermanentWasSacrificed
   | -- | CR 603.3b: an ABILITY TRIGGERED. The one entry in this log that describes
     -- something the rules did rather than something that happened to the board,
     -- and it is here because rule 603.3b names it as a trigger event in as many

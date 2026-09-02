@@ -602,6 +602,8 @@ library codec
     Pawl.Codec.PermanentCandidateSpec
     Pawl.Codec.PermanentSacrificed
     Pawl.Codec.PermanentSacrificedSpec
+    Pawl.Codec.PermanentWasSacrificed
+    Pawl.Codec.PermanentWasSacrificedSpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasedOut
     Pawl.Codec.PhasedOutSpec
@@ -1615,6 +1617,7 @@ library types
     Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.PermanentCandidate
     Pawl.Types.PermanentSacrificed
+    Pawl.Types.PermanentWasSacrificed
     Pawl.Types.Phase
     Pawl.Types.PhasedOut
     Pawl.Types.PhasePattern

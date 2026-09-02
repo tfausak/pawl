@@ -100,6 +100,7 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -2204,9 +2205,11 @@ representativeEvents cond =
         -- the floor for a matching pair too, this arm binding nothing either way.
         TriggerCondition.SelfTrains -> one (GameEvent.Trained departed)
         -- CR 701.21a's own event, and the only one this condition admits. The
-        -- payload is arbitrary: the condition compares nothing, so any sacrifice
-        -- matches and the floor is the same for all of them.
-        TriggerCondition.PermanentSacrificed -> one (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed S.alice departed))
+        -- pair need not actually match -- `departed` is no artifact on the empty
+        -- board -- which is fine for what this pins: the arm binds the event's
+        -- player under every relation the condition admits, so the floor is the
+        -- same either way.
+        TriggerCondition.PermanentSacrificed {} -> one (GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed S.alice departed))
         -- CR 603.3b's own event, and the only one this condition admits. The
         -- pair does NOT actually match here -- `departed` projects as no Saga on
         -- the empty board Event.matchesTrigger is asked about -- which is fine
@@ -2388,7 +2391,13 @@ everyTriggerCondition =
     TriggerCondition.AttachedCreatureDies,
     TriggerCondition.AttachedCreatureBecomesTapped,
     TriggerCondition.SelfTrains,
-    TriggerCondition.PermanentSacrificed,
+    -- BOTH relations, on the PlayerAttacksWith trio's reasoning above: an
+    -- eventBindings arm that had cased on the relation and stamped nothing under
+    -- one of them would go unseen if only one were listed. Vengeful Tracker
+    -- prints the Opponent form and Mayhem Devil the AnyPlayer one.
+    TriggerCondition.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed PlayerRelation.You (Filter.Type.And [])),
+    TriggerCondition.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed PlayerRelation.Opponent (Filter.Type.And [])),
+    TriggerCondition.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed PlayerRelation.AnyPlayer (Filter.Type.And [])),
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
     -- BOTH relations, on the SpellCast pair's reasoning above: an eventBindings
     -- arm that had cased on the relation and stamped nothing under one of them
@@ -4666,7 +4675,7 @@ bystanderSpec s registry =
     Spec.it s "CR 603.10a the look-back families are the ones that rule lists" $ do
       Spec.assertBool s (Event.looksBack (TriggerCondition.PermanentDies (Filter.Type.And []))) "a dies trigger is a leaves-the-battlefield ability"
       Spec.assertBool s (Event.looksBack TriggerCondition.SelfLeavesTheBattlefield) "and so is the wider written form"
-      Spec.assertBool s (Event.looksBack TriggerCondition.PermanentSacrificed) "a sacrifice trigger is named outright"
+      Spec.assertBool s (Event.looksBack (TriggerCondition.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed PlayerRelation.AnyPlayer (Filter.Type.And [])))) "a sacrifice trigger is named outright"
       Spec.assertBool s (not (Event.looksBack TriggerCondition.SelfPutIntoGraveyardFromAnywhere)) "CR 603.6c says put-into-a-graveyard-from-anywhere is not one"
       Spec.assertBool s (not (Event.looksBack (TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And [])))) "and CR 708.8 leaves a turned-up permanent on the battlefield"
       -- CR 603.1b: one ability, several conditions -- it looks back if any of

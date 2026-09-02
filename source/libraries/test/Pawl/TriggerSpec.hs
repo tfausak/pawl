@@ -491,6 +491,22 @@ mayhemDevilSpec s registry =
                 }
             )
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      -- Alice's Vengeful Tracker, plus one TOKEN victim under `owner`. Three
+      -- seats, since a two-player board collapses "an opponent" onto the one seat
+      -- that is not CR 109.5's "you".
+      trackerBoard tracker victimCard owner =
+        let (_, withTracker) = S.addCreature tracker S.alice S.threePlayerGame
+            (victim, withVictim) = S.addToken victimCard owner withTracker
+         in ( victim,
+              withVictim
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      -- CR 701.21a's funnel, then the loop that gathers and resolves whatever it
+      -- fired. Event.destroy is driven the same way by the case below.
+      sacrificeThen pid oid = Event.sacrifice pid oid >> Engine.priorityLoop
    in Spec.describe s "PermanentSacrificed" $ do
         Spec.it s "CR 603.10a Mayhem Devil fires on a sacrifice, including its own controller's" $ do
           mayhemDevil <- S.printingOf s registry "Mayhem Devil"
@@ -523,6 +539,43 @@ mayhemDevilSpec s registry =
           Spec.assertEqWith s "the Piker really died" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
           Spec.assertEqWith s "and it landed in a graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
           Spec.assertEqWith s "CR 700.4: nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
+        -- Vengeful Tracker {1}{R} Creature -- Human Detective 2/2: "Whenever an
+        -- opponent sacrifices an artifact, this creature deals 2 damage to them."
+        -- The narrowed reading of the condition Mayhem Devil prints bare -- a
+        -- PlayerRelation over the sacrificing seat and a Filter over what was
+        -- sacrificed -- with that seat bound for the payload to name.
+        --
+        -- The victim is a TOKEN, which is what the look-back has to survive: CR
+        -- 111.7 and CR 704.5d make it cease to exist before the trigger is
+        -- gathered, and rule 111.7's own parenthetical says the ability triggers
+        -- anyway. A live read of the sacrificed object answers for a Treasure
+        -- spent for mana as though it had never been an artifact.
+        Spec.it s "CR 701.21a Vengeful Tracker damages the opponent who sacrificed an artifact" $ do
+          tracker <- S.printingOf s registry "Vengeful Tracker"
+          mindslaver <- S.cardOf s registry "Mindslaver"
+          let (victim, gs) = trackerBoard tracker mindslaver S.bob
+              after = S.runPure S.identityAnswer gs (sacrificeThen S.bob victim)
+          Spec.assertEqWith s "CR 701.21a: bob sacrificed an artifact, so bob takes the Tracker's 2" (lives after) (Just 20, Just 18, Just 20)
+          Spec.assertBool s (not (S.onBattlefield victim after)) "and the artifact really left the battlefield"
+        -- The RELATION falsifier, one atom from the case above: the same artifact
+        -- token under alice, whom CR 109.5 makes the ability's "you", so no
+        -- opponent sacrificed anything.
+        Spec.it s "CR 109.5 the Tracker's own controller is no opponent of theirs" $ do
+          tracker <- S.printingOf s registry "Vengeful Tracker"
+          mindslaver <- S.cardOf s registry "Mindslaver"
+          let (victim, gs) = trackerBoard tracker mindslaver S.alice
+              after = S.runPure S.identityAnswer gs (sacrificeThen S.alice victim)
+          Spec.assertEqWith s "CR 109.5: nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
+          Spec.assertBool s (not (S.onBattlefield victim after)) "though the artifact really left the battlefield"
+        -- The FILTER falsifier, one atom the other way: the same opponent, a
+        -- CREATURE token instead of an artifact one.
+        Spec.it s "CR 701.21a a creature is not the artifact the Tracker watches for" $ do
+          tracker <- S.printingOf s registry "Vengeful Tracker"
+          piker <- S.cardOf s registry "Goblin Piker"
+          let (victim, gs) = trackerBoard tracker piker S.bob
+              after = S.runPure S.identityAnswer gs (sacrificeThen S.bob victim)
+          Spec.assertEqWith s "CR 701.21a: nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
+          Spec.assertBool s (not (S.onBattlefield victim after)) "though the creature really left the battlefield"
 
 -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example

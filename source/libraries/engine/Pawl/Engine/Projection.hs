@@ -143,6 +143,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -3027,7 +3028,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.AttachedCreatureDies -> condition
   TriggerCondition.AttachedCreatureBecomesTapped -> condition
   TriggerCondition.SelfTrains -> condition
-  TriggerCondition.PermanentSacrificed -> condition
+  TriggerCondition.PermanentSacrificed payload -> TriggerCondition.PermanentSacrificed payload {PermanentSacrificed.filter = Filter.rewrite pairs (PermanentSacrificed.filter payload)}
   TriggerCondition.SagaFinalChapterTriggers _ -> condition
   -- CR 603.7's slot name is card data but not card TEXT, so no CR 612.1 swap
   -- reaches it; what the slot holds is read off the projection instead.

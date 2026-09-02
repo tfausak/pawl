@@ -43,7 +43,7 @@ import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -320,7 +320,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 6)))
+      (GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 6)))
       " {\"type\":\"PermanentSacrificed\",\"value\":{\"player\":0,\"permanent\":6}} "
   -- CR 603.3b: the ability's source (CR 113.7), its controller as it triggered
   -- (CR 603.3a) and the condition that says which ability it was.
