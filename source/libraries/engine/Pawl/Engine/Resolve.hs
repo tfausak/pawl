@@ -2303,9 +2303,10 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- ignored convert arms no reflexive", the case that proves it.
 --
 -- Not implemented: only the instruction IMMEDIATELY before the arm is asked
--- about, and an instruction that happens without recording a game event would
--- suppress an arm that follows it; no card in `data/cards/` writes either shape
--- (#3057).
+-- about, an instruction that happens without recording a game event would
+-- suppress an arm that follows it, and an Effect.ForEach body's instructions go
+-- through applyEffectWith directly and are not gated at all; no card in
+-- `data/cards/` writes any of the three shapes (#3057).
 applyClauseEffects ::
   ObjectId ->
   (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
