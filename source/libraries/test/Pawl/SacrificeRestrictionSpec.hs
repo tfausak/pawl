@@ -79,7 +79,7 @@ victimSlot = SlotName.MkSlotName (Text.pack "target")
 -- Which of alice's permanents she may sacrifice for "a creature" right now --
 -- the offer Prompt.ChooseSacrifices is built from, and the count CR 118.3 reads.
 offered :: GameState.GameState -> [ObjectId.ObjectId]
-offered = Replacement.sacrificeCandidates S.alice Nothing anyCreature
+offered = Replacement.sacrificeCandidates Map.empty S.alice Nothing anyCreature
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "SacrificeRestriction" $ do

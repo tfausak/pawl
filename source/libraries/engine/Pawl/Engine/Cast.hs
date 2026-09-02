@@ -1807,6 +1807,37 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   if not (Target.selectionLegal (Just pid) seed sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
                     then reject
                     else do
+                      -- CR 601.2c's choices, stamped on `sid` itself -- the
+                      -- incarnation CR 601.2a put on the stack, rather than
+                      -- whatever is on top of it now -- and stamped HERE, before
+                      -- CR 601.2f's total and CR 601.2h's payment, because a
+                      -- cost's criterion may name a target ("a creature other
+                      -- than the target", Synthetic Spiteful Rite) and
+                      -- Cost.announcedSlots reads them off this object.
+                      -- Activate.activateAbility stamps at the same step.
+                      -- Nothing is lost by stamping early: every rejection
+                      -- below rewinds to `before`, which never held them.
+                      --
+                      -- CR 109.5: "The words 'you' and 'your' on an object
+                      -- refer to the object's controller, its would-be
+                      -- controller (if a player is attempting to play, cast,
+                      -- or activate it)". `pid` is both here -- the caster is
+                      -- the spell's controller -- so the slot is stamped
+                      -- alongside the chosen targets, as
+                      -- Activate.activateAbility does for CR 109.5's
+                      -- activated-ability sentence and Engine.placeBorne for
+                      -- its triggered-ability one. Char's "and 2 damage to
+                      -- you" is what reads it (Pawl.CastSpec's Char case).
+                      State.modify'
+                        ( \g ->
+                            g
+                              { GameState.objects =
+                                  Map.adjust
+                                    (\o -> o {Object.bindings = Binding.setYou pid (Binding.fromChoices chosen mAmount chosenModes)})
+                                    sid
+                                    (GameState.objects g)
+                              }
+                        )
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian
                       -- symbols announced above, then the total cost. A criterion
                       -- is read against the spell's STACK incarnation, the
@@ -1898,30 +1929,6 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                           -- holds the trigger off the stack "until the spell has
                           -- finished being cast" anyway.
                           Event.becameTarget sid StackObjectKind.Spell pid chosen
-                          -- Stamped on `sid` itself, the incarnation CR 601.2a
-                          -- put on the stack, rather than on whatever is on top
-                          -- of it now.
-                          --
-                          -- CR 109.5: "The words 'you' and 'your' on an object
-                          -- refer to the object's controller, its would-be
-                          -- controller (if a player is attempting to play, cast,
-                          -- or activate it)". `pid` is both here -- the caster is
-                          -- the spell's controller -- so the slot is stamped
-                          -- alongside the chosen targets, as
-                          -- Activate.activateAbility does for CR 109.5's
-                          -- activated-ability sentence and Engine.placeBorne for
-                          -- its triggered-ability one. Char's "and 2 damage to
-                          -- you" is what reads it (Pawl.CastSpec's Char case).
-                          State.modify'
-                            ( \g ->
-                                g
-                                  { GameState.objects =
-                                      Map.adjust
-                                        (\o -> o {Object.bindings = Binding.setYou pid (Binding.fromChoices chosen mAmount chosenModes)})
-                                        sid
-                                        (GameState.objects g)
-                                  }
-                            )
                           Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid keywordsBefore castFor sid)
                           -- CR 903.8: the cast is now announced, so this is a
                           -- "previous time they cast it from the command zone"

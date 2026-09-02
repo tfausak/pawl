@@ -1160,13 +1160,20 @@ countersOn kind oid gs =
 -- own order, narrowed by the criterion and minus `oid` itself -- see
 -- canPayComponent's DiscardCards arm for why that exclusion is CR 601.2a.
 --
+-- `slots` is what the announcement bound (announcedSlots), which every pool
+-- below takes for the same reason: CR 601.2c chooses the targets before CR
+-- 601.2h pays, so a criterion may name one -- "a creature other than the
+-- target" -- and Filter.IsBound reads this map. Synthetic Spiteful Rite is the
+-- cast that proves it and Synthetic Spiteful Altar the activation
+-- (Pawl.CostSpec's "Synthetic Spiteful Rite" group).
+--
 -- Matched through the card's own CR 613 projection: rule 613.1 names no zone, so
 -- a card in a hand is folded exactly as a permanent is, and Putrid Raptor's
 -- "discard a Zombie card" morph cost is payable with a creature card printed as
 -- something else under Maskwood Nexus (Pawl.CostSpec's Putrid Raptor pair).
-discardCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-discardCandidates pid oid criterion gs =
-  let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
+discardCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+discardCandidates slots pid oid criterion gs =
+  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
       matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in filter (\candidate -> candidate /= oid && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
 
@@ -1181,7 +1188,7 @@ discardCandidates pid oid criterion gs =
 -- where the object the cost is on is a trigger or a spell already on the stack
 -- and so not in a hand at all -- and it is kept anyway so the two hand-reading
 -- pools cannot disagree about what a hand holds.
-putOntoBattlefieldCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+putOntoBattlefieldCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 putOntoBattlefieldCandidates = discardCandidates
 
 -- The cards this player may exile to pay an ExileCardsFromGraveyard component:
@@ -1196,9 +1203,9 @@ putOntoBattlefieldCandidates = discardCandidates
 --
 -- No `oid` exclusion, unlike discardCandidates above, and none is owed: CR
 -- 601.2a has put the spell being cast on the STACK.
-exileCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-exileCandidates pid criterion gs =
-  let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
+exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+exileCandidates slots pid criterion gs =
+  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
       matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
 
@@ -1209,9 +1216,9 @@ exileCandidates pid criterion gs =
 -- top and Game.insertIntoZone appends, the opposite end from a library. No
 -- prompt, and that is CR 404.2 rather than an elision: a graveyard's order is not
 -- the player's to change, so "the top creature card" names exactly one.
-topExileCandidate :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Maybe ObjectId
-topExileCandidate pid criterion gs =
-  Maybe.listToMaybe (reverse (exileCandidates pid criterion gs))
+topExileCandidate :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Maybe ObjectId
+topExileCandidate slots pid criterion gs =
+  Maybe.listToMaybe (reverse (exileCandidates slots pid criterion gs))
 
 -- The permanents this player may tap to pay a TapForTotalPower or TapPermanents
 -- component on `oid`: every battlefield object matching the criterion, ascending.
@@ -1222,9 +1229,9 @@ topExileCandidate pid criterion gs =
 -- perspective is the PAYER and the source is the permanent whose ability is being
 -- paid for -- without it a Vehicle that has already become a creature could crew
 -- itself.
-tapCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-tapCandidates pid oid criterion gs =
-  let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+tapCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+tapCandidates slots pid oid criterion gs =
+  let context = Filter.contextWithSlots (Game.teams gs) (Just pid) (Just oid) slots
       matches candidate =
         Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in List.sort (filter matches (Set.toList (GameState.battlefield gs)))
@@ -1239,7 +1246,7 @@ tapCandidates pid oid criterion gs =
 -- NOT narrowed to what the payer controls, `tapCandidates`' reading: a card
 -- that wants it prints it (Meloku the Clouded Mirror's criterion carries
 -- `ControlledBy You`).
-returnCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+returnCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 returnCandidates = tapCandidates
 
 -- The power a candidate contributes to CR 702.122a's total. Zero for a permanent
@@ -1269,12 +1276,15 @@ tapObject = Event.tap
 -- A `*This` arm whose own guard fails answers an EMPTY pool rather than Nothing,
 -- which keeps this in agreement with canPayComponent.
 --
+-- Every pool is read against `gateSlots`, canPayComponent's reading and for its
+-- reason.
+--
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
 claimOf :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
 claimOf pid oid component gs = case component of
   -- CR 701.21a: the permanents this player controls that match the criterion.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates gateSlots pid (Just oid) criterion gs)) n
   CostComponent.SacrificeThis ->
     claim
       (ClaimAxis.Removal Zone.Battlefield)
@@ -1306,7 +1316,7 @@ claimOf pid oid component gs = case component of
       )
       1
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
-    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates pid oid criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates gateSlots pid oid criterion gs)) n
   CostComponent.DiscardThis _ -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
   -- The same hand pool the two arms above claim, and on the same axis: what the
   -- payment spends is a card leaving the hand, and the battlefield end adds a
@@ -1314,12 +1324,12 @@ claimOf pid oid component gs = case component of
   -- every printing of this cost is a CR 118.12 offer, which `repeatsOf` never
   -- measures, so no board separates this from any other axis.
   CostComponent.PutCardFromHandOntoBattlefield criterion ->
-    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (putOntoBattlefieldCandidates pid oid criterion gs)) 1
+    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (putOntoBattlefieldCandidates gateSlots pid oid criterion gs)) 1
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates pid criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates gateSlots pid criterion gs)) n
   -- A pool of at most ONE, CR 404.2's order having picked it.
   CostComponent.ExileTopFromGraveyard criterion ->
-    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs))) 1
+    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate gateSlots pid criterion gs))) 1
   CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
   -- CR 701.17a spends cards out of the paying player's own library, so the pool
   -- is that library and the count is how many the mill takes -- the ZONE keying a
@@ -1357,7 +1367,7 @@ claimOf pid oid component gs = case component of
   -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
   -- untapped creatures exactly.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
-    | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates pid oid criterion gs)) 1
+    | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates gateSlots pid oid criterion gs)) 1
     | otherwise -> Nothing
   -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
   -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
@@ -1367,7 +1377,7 @@ claimOf pid oid component gs = case component of
   -- the PERMISSIVE reading where a criterion omits "untapped", unobservable
   -- since an already-tapped candidate spends no untapped-ness.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
-    claim ClaimAxis.Tapping (Set.fromList (tapCandidates pid oid criterion gs)) n
+    claim ClaimAxis.Tapping (Set.fromList (tapCandidates gateSlots pid oid criterion gs)) n
   -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis
   -- and not the tapping one: a permanent returned to hand is as gone from the
   -- battlefield as one sacrificed, so a cost that returns and a cost that
@@ -1378,7 +1388,7 @@ claimOf pid oid component gs = case component of
   -- Hall's condition groups a single claim and keying it ClaimAxis.Tapping
   -- instead leaves the suite green.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
-    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates pid oid criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates gateSlots pid oid criterion gs)) n
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
@@ -1957,7 +1967,7 @@ canPayComponent pid oid component gs = case component of
   -- component ALONE, PayLife's caveat -- two Sacrifice components of one cost can
   -- each find the same permanent here, and `jointlyPayable` asks them together.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    Natural.length (Replacement.sacrificeCandidates pid (Just oid) criterion gs) >= n
+    Natural.length (Replacement.sacrificeCandidates gateSlots pid (Just oid) criterion gs) >= n
   -- CR 702.122a: payable iff SOME subset of the candidates reaches the
   -- threshold, decided without enumerating one -- the greatest total any subset
   -- can reach is the sum of the candidates' POSITIVE powers, since adding one of
@@ -1965,7 +1975,7 @@ canPayComponent pid oid component gs = case component of
   -- rather than a bound, and `>=` because CR 702.122a says "or greater". A
   -- threshold of 0 is payable by the empty set, with no special case.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) ->
-    sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates pid oid criterion gs)) >= toInteger n
+    sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates gateSlots pid oid criterion gs)) >= toInteger n
   -- Sacrifice's arm read over tapping: the count is HOW MANY, so the question is
   -- a size and not a sum. "Untapped" is not asked here and is not missing -- CR
   -- 107.5's exclusion is not this component's, so a card that wants it prints it
@@ -1973,7 +1983,7 @@ canPayComponent pid oid component gs = case component of
   -- Sacrifice's caveat; ManaSpec's "one creature cannot pay for both Drums" is
   -- the test that `jointlyPayable` asks them together.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
-    Natural.length (tapCandidates pid oid criterion gs) >= n
+    Natural.length (tapCandidates gateSlots pid oid criterion gs) >= n
   -- CR 118.3: this player must have at least `n` permanents the criterion
   -- admits to return. TapPermanents' arm above over a different action, and
   -- WITHOUT CR 101.2's sacrifice prohibition for the reason ReturnThis' arm
@@ -1983,7 +1993,7 @@ canPayComponent pid oid component gs = case component of
   -- Pawl.CostSpec asks this function directly: relaxing this arm alone leaves
   -- the gate green, `jointlyPayable`'s empty pool refusing the same activation.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
-    Natural.length (returnCandidates pid oid criterion gs) >= n
+    Natural.length (returnCandidates gateSlots pid oid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards the
   -- criterion admits -- Magmatic Insight is uncastable out of a landless hand
   -- however many cards it holds.
@@ -1994,14 +2004,14 @@ canPayComponent pid oid component gs = case component of
   -- while the card is still in hand -- without it a hand of "Cathartic Reunion
   -- plus one other card" would offer the Reunion on the strength of itself.
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
-    Natural.length (discardCandidates pid oid criterion gs) >= n
+    Natural.length (discardCandidates gateSlots pid oid criterion gs) >= n
   -- CR 118.3: payable only if the hand holds a card the criterion admits. This
   -- is what keeps Hakbal of the Surging Soul's landless controller from being
   -- offered a cost they cannot pay -- CR 118.12's offer is gated on
   -- affordability by Resolve.payGatePaidBy, so an empty pool takes the "doesn't"
   -- branch with no prompt at all.
   CostComponent.PutCardFromHandOntoBattlefield criterion ->
-    not (null (putOntoBattlefieldCandidates pid oid criterion gs))
+    not (null (putOntoBattlefieldCandidates gateSlots pid oid criterion gs))
   -- CR 702.29a: payable only while the card is in the paying player's hand.
   -- Asked of the zone and the owner rather than of control, CR 108.4 giving a
   -- card in a hand no controller and CR 400.3 putting it in its OWNER's.
@@ -2020,11 +2030,11 @@ canPayComponent pid oid component gs = case component of
   -- rather than merely unpaid, which is what puts the additional cost INSIDE the
   -- total cost as CR 601.2f says. This component ALONE, Sacrifice's caveat.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-    Natural.length (exileCandidates pid criterion gs) >= n
+    Natural.length (exileCandidates gateSlots pid criterion gs) >= n
   -- CR 118.3 again: payable only if the graveyard holds a matching card at all,
   -- since the top one is then determined.
   CostComponent.ExileTopFromGraveyard criterion ->
-    Maybe.isJust (topExileCandidate pid criterion gs)
+    Maybe.isJust (topExileCandidate gateSlots pid criterion gs)
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters.
   CostComponent.PayEnergy n -> energyOf pid gs >= n
@@ -2083,6 +2093,34 @@ canPayComponent pid oid component gs = case component of
   -- unpayable" as the test.
   CostComponent.BlightX -> False
 
+-- CR 601.2c / 602.2b: what the announcement had bound by the time CR 601.2h pays
+-- -- the targets, and CR 601.2b's X -- read off the stack object `pay` is handed
+-- as `announced`, the one holder both Pawl.Engine.Cast and Pawl.Engine.Activate
+-- stamp before paying. Nothing for a payment with no announcement behind it.
+--
+-- Pawl.Engine.Binding.slotObjects rather than the raw bindings, so a batch slot
+-- is visible whole (CR 115.10a) -- the same map every resolution-time Context
+-- carries.
+announcedSlots :: Maybe ObjectId -> GameState -> Map.Map SlotName.SlotName (Set.Set ObjectId)
+announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
+  Nothing -> Map.empty
+  Just obj -> Binding.slotObjects (Object.bindings obj)
+
+-- The slot map a payability GATE reads: none. canPay, canPayComponent, claimOf
+-- and canPaySomeCompletionGiven are asked before CR 601.2c has chosen anything
+-- -- Pawl.Engine.Cast.payableCost and Pawl.Engine.Activate.aimingSomewhere both
+-- gate an offer -- and by the special actions and CR 118.12's resolution-time
+-- payment, whose costs no announcement binds a slot for (Pawl.CardSpec's
+-- SlotlessCostFramed).
+--
+-- Not implemented: a gate that reads the slots an aiming would bind, so a
+-- slot-reading criterion is judged the same way at the offer as at the
+-- payment. Filter.IsBound is False against this map, which over-admits a "not
+-- the target" criterion at the gate -- CR 601.2h's payment then refuses and
+-- rewinds -- and refuses a positive one the payment would accept (#2943).
+gateSlots :: Map.Map SlotName.SlotName (Set.Set ObjectId)
+gateSlots = Map.empty
+
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
 -- the PAYER's (payComponents below).
 --
@@ -2112,24 +2150,29 @@ canPayComponent pid oid component gs = case component of
 -- restrictions name one of the two subjects, so the two questions are different
 -- ones. Mana.spendableFor is what reads it.
 --
--- `record` is which object CR 400.7d's record of the mana spent goes onto, and is
--- a third question again: a cast names the spell, an activation names the CR
--- 602.2a ability object rather than the source `subject` carries, and every other
--- payment names nothing (`recordSpent` in payManaExcept).
+-- `announced` is the object the announcement put on the stack -- CR 601.2a's
+-- spell, or CR 602.2a's ability object rather than the source `subject` carries
+-- -- and nothing for every other payment. A third question again, read twice:
+-- it is where CR 400.7d's record of the mana spent goes (`recordSpent` in
+-- payManaExcept), and its Object.bindings are the targets CR 601.2c chose,
+-- which CR 601.2h's payment comes after -- so a component's criterion can name
+-- them (announcedSlots below). Both callers stamp the bindings before calling
+-- this: Pawl.Engine.Cast.castProposed and Pawl.Engine.Activate.activateAbility.
 pay :: PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay moment subject record spending pid oid cost = do
+pay moment subject announced spending pid oid cost = do
   before <- State.get
+  let slots = announcedSlots announced before
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure Payment.Unpaid
     -- CR 601.2g: payMana PROMPTS for which sources to activate, so it is monadic
     -- and restores the pre-payment state itself when it cannot be paid.
     Just manaCost -> do
-      paidMana <- payManaExcept Set.empty record subject spending pid manaCost
+      paidMana <- payManaExcept Set.empty announced subject spending pid manaCost
       if not paidMana
         then pure Payment.Unpaid
         else do
-          outcome <- payComponents moment pid oid (Cost.components cost)
+          outcome <- payComponents moment slots pid oid (Cost.components cost)
           case outcome of
             -- The components' bound slots ride out unchanged: the mana window
             -- above binds none, and a caller that has a binding environment to
@@ -2324,7 +2367,10 @@ payTagged pid charges = case charges of
   (oid, components) : rest -> do
     -- CR 508.1j / 509.1f: a toll is paid during the declaration, which is a
     -- turn-based action and not a resolution (PaymentMoment's own reason).
-    outcome <- payComponents PaymentMoment.OutsideResolution pid oid components
+    --
+    -- No slots: a declaration announces no targets (CR 508.1h, CR 509.1d), so
+    -- there is nothing for a toll's criterion to be bound to.
+    outcome <- payComponents PaymentMoment.OutsideResolution Map.empty pid oid components
     case outcome of
       Payment.Unpaid -> pure Payment.Unpaid
       Payment.Paid bound -> fmap (mergeBound bound) (payTagged pid rest)
@@ -2345,24 +2391,24 @@ payTagged pid charges = case charges of
 --
 -- FILTERED, NOT TRUSTED: Game.permute keeps the printed order for an answer that
 -- is not a permutation of the offered indices.
-payComponents :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payComponents moment pid oid components = do
+payComponents :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payComponents moment slots pid oid components = do
   let (second, first) = List.partition paidInSecondPass components
-  outcome <- payPass moment pid oid first
+  outcome <- payPass moment slots pid oid first
   case outcome of
     Payment.Unpaid -> pure Payment.Unpaid
-    Payment.Paid bound -> fmap (mergeBound bound) (payPass moment pid oid second)
+    Payment.Paid bound -> fmap (mergeBound bound) (payPass moment slots pid oid second)
 
 -- ONE of CR 601.2h's two passes: the payer orders it where the order is
 -- observable, then it is paid in that order.
-payPass :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payPass moment pid oid components =
+payPass :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payPass moment slots pid oid components =
   if orderObservable components
     then do
       gs <- State.get
       answer <- Game.choose (Prompt.OrderCostComponents (Decide.deciderFor pid gs) pid oid components)
-      payInOrder moment pid oid (Game.permute components answer)
-    else payInOrder moment pid oid components
+      payInOrder moment slots pid oid (Game.permute components answer)
+    else payInOrder moment slots pid oid components
 
 -- CR 601.2h: is this part paid in the SECOND pass -- "all costs that don't
 -- involve random elements or moving objects from the library to a public zone"
@@ -2407,14 +2453,14 @@ paidInSecondPass component = case component of
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
 
-payInOrder :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payInOrder moment pid oid components = case components of
+payInOrder :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payInOrder moment slots pid oid components = case components of
   [] -> pure bindsNothing
   component : rest -> do
-    outcome <- payComponent moment pid oid component
+    outcome <- payComponent moment slots pid oid component
     case outcome of
       Payment.Unpaid -> pure Payment.Unpaid
-      Payment.Paid bound -> fmap (mergeBound bound) (payInOrder moment pid oid rest)
+      Payment.Paid bound -> fmap (mergeBound bound) (payInOrder moment slots pid oid rest)
 
 -- The slots two components of one cost bound, in one map. Set-UNIONED per slot
 -- rather than left-biased: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a
@@ -2772,7 +2818,10 @@ payActivation inFlight pid oid cost = do
     Nothing -> pure False
   -- CR 602.2b sends this through CR 601.2h, so the payment is made while the
   -- ability is being ACTIVATED and no resolution is behind it.
-  outcome <- if paid then payComponents PaymentMoment.OutsideResolution pid oid (Cost.components cost) else pure Payment.Unpaid
+  --
+  -- No slots, by CR 605.1a rather than by this caller's position: a mana ability
+  -- "doesn't target", so its announcement binds nothing a criterion could read.
+  outcome <- if paid then payComponents PaymentMoment.OutsideResolution Map.empty pid oid (Cost.components cost) else pure Payment.Unpaid
   let settled = case outcome of
         Payment.Paid _ -> paid
         Payment.Unpaid -> False
@@ -2805,8 +2854,8 @@ chooseManaYield pid oid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
-payComponent :: PaymentMoment.PaymentMoment -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
-payComponent moment pid oid component = case component of
+payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
+payComponent moment slots pid oid component = case component of
   CostComponent.TapThis -> do
     tapObject oid
     pure bindsNothing
@@ -2874,7 +2923,7 @@ payComponent moment pid oid component = case component of
   -- no-op.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> do
     gs <- State.get
-    let candidates = Replacement.sacrificeCandidates pid (Just oid) criterion gs
+    let candidates = Replacement.sacrificeCandidates slots pid (Just oid) criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length candidates <= n
@@ -2911,7 +2960,7 @@ payComponent moment pid oid component = case component of
   -- that slot's own comment for why one name for both questions would go quiet.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do
     gs <- State.get
-    let candidates = tapCandidates pid oid criterion gs
+    let candidates = tapCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <- Game.choose (Prompt.ChooseTapsForTotalPower decider pid oid candidates n)
     let totalPower = sum (fmap (`tapPower` gs) (Set.toAscList chosen))
@@ -2935,7 +2984,7 @@ payComponent moment pid oid component = case component of
   -- rather than last known.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> do
     gs <- State.get
-    let candidates = tapCandidates pid oid criterion gs
+    let candidates = tapCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length candidates <= n
@@ -2960,7 +3009,7 @@ payComponent moment pid oid component = case component of
   -- 400.7) that last known information would have to answer for.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> do
     gs <- State.get
-    let candidates = returnCandidates pid oid criterion gs
+    let candidates = returnCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length candidates <= n
@@ -2988,7 +3037,7 @@ payComponent moment pid oid component = case component of
   -- for a rule 701.9a trigger to read.
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> do
     gs <- State.get
-    let held = discardCandidates pid oid criterion gs
+    let held = discardCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length held <= n
@@ -3035,7 +3084,7 @@ payComponent moment pid oid component = case component of
   -- owner the default already names.
   CostComponent.PutCardFromHandOntoBattlefield criterion -> do
     gs <- State.get
-    let held = putOntoBattlefieldCandidates pid oid criterion gs
+    let held = putOntoBattlefieldCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
     case held of
       [] -> pure Payment.Unpaid
@@ -3156,7 +3205,7 @@ payComponent moment pid oid component = case component of
   -- player was offered.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> do
     gs <- State.get
-    let candidates = exileCandidates pid criterion gs
+    let candidates = exileCandidates slots pid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length candidates <= n
@@ -3171,7 +3220,7 @@ payComponent moment pid oid component = case component of
   -- the graveyard holds no matching card, agreeing with canPayComponent above.
   CostComponent.ExileTopFromGraveyard criterion -> do
     gs <- State.get
-    case topExileCandidate pid criterion gs of
+    case topExileCandidate slots pid criterion gs of
       Nothing -> pure Payment.Unpaid
       Just candidate -> do
         Event.changeZone candidate Zone.Exile

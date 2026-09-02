@@ -6372,7 +6372,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- Replacement.sacrificeCandidates, which is what puts CR 101.2's
                   -- "can't be sacrificed" on this path: a prohibited permanent is
                   -- never the pick that satisfies the edict.
-                  let candidates = Replacement.sacrificeCandidates victim Nothing filter_ gs
+                  let candidates = Replacement.sacrificeCandidates (Filter.slotObjects context) victim Nothing filter_ gs
                       decider = Decide.deciderFor victim gs
                       -- `n > 0` above, so the clamp never decides anything here.
                       count = Integer.toNaturalSaturating n

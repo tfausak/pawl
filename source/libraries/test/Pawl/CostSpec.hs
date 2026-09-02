@@ -171,7 +171,7 @@ doorSpec s registry =
     Spec.it s "CR 701.9a paying DiscardThis puts that card in the graveyard" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (inHand, gs0) = S.addHandCard piker S.alice (Setup.emptyGame S.bothPlayers)
-          after = S.runPure S.identityAnswer gs0 (Cost.payComponent PaymentMoment.OutsideResolution S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary))
+          after = S.runPure S.identityAnswer gs0 (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary))
       Spec.assertEqWith s "the hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
       Spec.assertEqWith s "and the card is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     -- CR 118.6 vs CR 118.5a: the distinction the Maybe carries. Nothing is an
@@ -266,7 +266,7 @@ doorSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
-          after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent PaymentMoment.OutsideResolution S.alice oid (CostComponent.PayEnergy 2)))
+          after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice oid (CostComponent.PayEnergy 2)))
       Spec.assertEqWith s "one energy left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
     -- CR 118.12's counter-placing cost (CR 701.63a's endure). The gate is the
     -- permanent still being on the battlefield to take the counters, and NOT
@@ -631,6 +631,121 @@ altarsReapSpec s registry =
       Spec.assertBool s (S.castable S.alice twoReap two) "two Swamps: offered"
       let resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer two (S.cast S.alice twoReap)) Stack.resolveTop
       Spec.assertEqWith s "and both Swamps paid for it" (S.tappedCount S.alice resolved) 2
+
+-- Synthetic Spiteful Rite {B} Instant (data/cards/synthetic-spiteful-rite.json):
+-- "As an additional cost to cast this spell, sacrifice a creature other than the
+-- target. Destroy target creature." And its activation twin, Synthetic Spiteful
+-- Altar {1} Artifact (data/cards/synthetic-spiteful-altar.json): "{T}, Sacrifice
+-- a creature other than the target: Destroy target creature."
+--
+-- Synthetic because no printing's cost names its own target -- Scryfall
+-- o:"additional cost" o:"other than the target", 2026-09-01, no hit; the
+-- printing that would replace both is one whose additional or activation cost
+-- names the spell's or ability's target -- and nothing in the rules forbids one:
+-- CR 601.2c chooses the targets, CR 601.2h pays the cost, and CR 602.2b sends
+-- an activation through the same steps, so "the target" is bound by the time the
+-- cost asks. Pawl.Engine.Cost.pay reads the announced object's bindings for it
+-- (Cost.announcedSlots).
+--
+-- alice controls one Swamp, a Hill Giant and `pikers` Goblin Pikers, and the
+-- Rite or the Altar is placed by `place` -- S.addHandCard for the instant,
+-- S.addCreature for the artifact, which puts any printing onto the battlefield
+-- (Greed above takes the same road) -- with priority in her own precombat main
+-- phase. The Giant is the creature every case targets, so the Pikers are the
+-- only permanents the cost may take -- and the graveyard's NAMES say which kind
+-- died, which is what a count could not.
+spitefulBoard ::
+  (Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)) ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+spitefulBoard place swamp giant piker spiteful pikers =
+  let base = S.landsInPlay swamp 1
+      (giantId, withGiant) = S.addCreature giant S.alice base
+      addPiker g _ = snd (S.addCreature piker S.alice g)
+      withPikers = List.foldl' addPiker withGiant [1 .. pikers]
+      (spitefulId, gs) = place spiteful S.alice withPikers
+   in ( giantId,
+        spitefulId,
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Aims every target slot at `victim`, FILTERED out of the offered set rather
+-- than built (a hand-built recipient is a different one), and answers CR
+-- 701.21a's sacrifice prompt with the victim WHENEVER IT IS OFFERED, else with
+-- the first candidate. The victim is what a payment reading no slots offers, so
+-- an answerer that takes it whenever it can is the one that tells the two
+-- readings apart: under the rules the victim is never offered and the first
+-- Piker dies; under a slotless payment the Giant does.
+spitefulAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+spitefulAnswer victim p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((==) (Just victim) . Recipient.objectOf) offered) asked
+  Prompt.ChooseSacrifices _ _ _ offered _ ->
+    if List.elem victim offered
+      then Set.singleton victim
+      else Set.fromList (take 1 offered)
+  _ -> S.identityAnswer p
+
+spitefulSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spitefulSpec s registry =
+  Spec.describe s "Synthetic Spiteful Rite" $ do
+    -- Two Pikers, so CR 701.21a's prompt is a real choice and the exclusion is
+    -- read off an OFFER rather than off an elision.
+    Spec.it s "CR 601.2c / 601.2h the additional cost cannot take the target" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rite <- S.printingOf s registry "Synthetic Spiteful Rite"
+      let (giantId, riteId, gs) = spitefulBoard S.addHandCard swamp giant piker rite 2
+          cast = S.runPure (spitefulAnswer giantId) gs (S.cast S.alice riteId)
+      -- Ordered FIRST, and the assertion this case exists for: the targeted
+      -- Giant is still there after the cost was paid.
+      Spec.assertBool s (S.onBattlefield giantId cast) "the Giant the Rite targets was not what paid for it"
+      Spec.assertEqWith s "a Piker paid, and the Rite is on the stack rather than in the graveyard" (namesIn Zone.Graveyard cast) [CardName.MkCardName (Text.pack "Goblin Piker")]
+      Spec.assertEqWith s "the cast completed" (length (GameState.stack cast)) 1
+      -- The Giant then dies to the Rite's own effect, which is what says the
+      -- target the cost read is the target the spell resolved against.
+      let resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (not (S.onBattlefield giantId resolved)) "and the Rite destroyed it on resolution"
+    -- One Piker: the Giant excluded, the Piker is the whole offer, and where the
+    -- rules leave nothing to ask, don't prompt. A slotless payment would offer
+    -- two and ask.
+    Spec.it s "CR 701.21a with one other creature the sacrifice is elided" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rite <- S.printingOf s registry "Synthetic Spiteful Rite"
+      let (giantId, riteId, gs) = spitefulBoard S.addHandCard swamp giant piker rite 1
+          cast = S.runPure (spitefulAnswer giantId) gs (S.cast S.alice riteId)
+          asked = answersFor (spitefulAnswer giantId) gs (S.cast S.alice riteId)
+      Spec.assertBool s (S.onBattlefield giantId cast) "the Giant survives the cost"
+      Spec.assertEqWith s "the Piker paid" (namesIn Zone.Graveyard cast) [CardName.MkCardName (Text.pack "Goblin Piker")]
+      Spec.assertBool s (not (wasAskedToSacrifice asked)) "and nobody was asked"
+    -- CR 602.2b: an activation's cost is paid after its targets are chosen too,
+    -- and Pawl.Engine.Activate stamps them on the ability object -- the
+    -- `announced` Cost.pay reads -- rather than on the Altar. The same board
+    -- with the Altar on the battlefield in the Rite's place, and the same
+    -- answerer.
+    Spec.it s "CR 602.2b an activation cost cannot take the ability's target" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      altar <- S.printingOf s registry "Synthetic Spiteful Altar"
+      let (giantId, altarId, gs) = spitefulBoard S.addCreature swamp giant piker altar 2
+          activated = S.runPure (spitefulAnswer giantId) gs (Activate.activateAbility S.alice altarId (theAbility altar))
+      Spec.assertBool s (S.onBattlefield giantId activated) "the Giant the Altar targets was not what paid for it"
+      Spec.assertEqWith s "a Piker paid" (namesIn Zone.Graveyard activated) [CardName.MkCardName (Text.pack "Goblin Piker")]
+      Spec.assertEqWith s "the activation completed" (length (GameState.stack activated)) 1
+      Spec.assertEqWith s "and the Altar tapped for it" (S.tappedCount S.alice activated) 1
+      let resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+      Spec.assertBool s (not (S.onBattlefield giantId resolved)) "and the ability destroyed it on resolution"
 
 -- Headless Skaab {2}{U} Creature -- Zombie Warrior 3/6: "As an additional cost
 -- to cast this spell, exile a creature card from your graveyard. This creature
@@ -1750,6 +1865,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   hatredSpec s registry
   villageRitesSpec s registry
   altarsReapSpec s registry
+  spitefulSpec s registry
   headlessSkaabSpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry
@@ -2985,7 +3101,7 @@ millikinSpec s registry =
       let (millikinId, board) = millikinBoard millikin 3
           ability = theAbility millikin
           ((_, after), asked) = State.runState (Engine.runGame recordingOrders board (Activate.activateAbility S.alice millikinId ability)) []
-          sharedPass = State.execState (Engine.runGame recordingOrders board (Cost.payComponents PaymentMoment.OutsideResolution S.alice millikinId [CostComponent.TapThis, CostComponent.SacrificeThis])) []
+          sharedPass = State.execState (Engine.runGame recordingOrders board (Cost.payComponents PaymentMoment.OutsideResolution Map.empty S.alice millikinId [CostComponent.TapThis, CostComponent.SacrificeThis])) []
       Spec.assertEqWith s "CR 601.2h the payer was asked to order nothing" (length asked) 0
       Spec.assertEqWith s "CR 701.17a and both parts were still paid: one card is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
       Spec.assertEqWith s "CR 107.5 with Millikin tapped for the other part" (fmap Object.tapped (Game.lookupObject millikinId after)) (Just TapState.Tapped)
