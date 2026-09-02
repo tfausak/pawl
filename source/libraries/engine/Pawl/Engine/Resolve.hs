@@ -6319,9 +6319,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 702.179c: each named player's speed increases by this much. Its two
   -- readings -- a player who HAS speed goes up, a player with NONE has their
   -- speed BECOME the value -- are spelled separately, since DecreaseSpeed below
-  -- must not create a speed out of nothing. No cap: nothing in rule 702.179
-  -- bounds speed from above, and whether an effect may push past 4 is unsettled
-  -- (#809).
+  -- must not create a speed out of nothing. No cap, which is a PROJECT DECISION
+  -- and not a rule: nothing in rule 702.179 bounds speed from above, and nothing
+  -- permits exceeding 4 either, so pawl rules that an effect may push past it.
+  -- Pawl.Engine.Speed.maxSpeed carries the decision and CR 702.178a's side of it.
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
