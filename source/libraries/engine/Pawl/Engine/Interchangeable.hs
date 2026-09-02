@@ -107,7 +107,8 @@ representatives pcs gs candidates =
 --     tap game event nor a tap trigger condition, so nothing scans them because
 --     of a choice made here.
 --   * GameState.outsideObjects (CR 729.4) is keyed by ids belonging to a game
---     this one is nested inside, and its value is an owner and a printing; the
+--     this one is nested inside, and its value names no object -- an owner, a
+--     printing and a face-up/face-down status (CR 110.5); the
 --     id supplies of the two games are disjoint (Setup.funnelBack takes the max),
 --     so no key of it can be a candidate.
 --   * GameState.ambientAmounts is keyed by slot and valued at a number.
