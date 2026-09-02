@@ -3060,6 +3060,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.LoseControlOfBound _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.RingTemptsPlayer _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition

@@ -974,6 +974,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- at all, so none of the three holds a Count. CR 701.44b holds a Filter, and
   -- a Filter holds no Count for PermanentEnters' reason above.
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
@@ -4110,6 +4111,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing,
   -- so none of them holds a Filter.
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
@@ -4272,6 +4274,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.LoseControlOfBound slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []

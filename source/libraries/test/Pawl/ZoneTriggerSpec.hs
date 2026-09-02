@@ -2240,6 +2240,8 @@ representativeEvents cond =
         -- player would still agree with eventBindingSlots here if the two
         -- coincided.
         TriggerCondition.PlayerScries _ -> one (GameEvent.Scried S.bob)
+        -- CR 701.54d's own event, the PlayerScries arm's shape and reasoning.
+        TriggerCondition.RingTemptsPlayer _ -> one (GameEvent.RingTempted S.bob)
         -- CR 309.7's own event, and the only one this condition admits. bob
         -- rather than the perspective player, on the PlayerScries arm's reasoning.
         TriggerCondition.PlayerCompletesDungeon _ -> one (GameEvent.DungeonCompleted S.bob)
@@ -2425,7 +2427,9 @@ everyTriggerCondition =
     TriggerCondition.PermanentExplores (Filter.Type.And []),
     TriggerCondition.SelfExerted,
     TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And []),
-    TriggerCondition.Reflexive
+    TriggerCondition.Reflexive,
+    TriggerCondition.RingTemptsPlayer PlayerRelation.You,
+    TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent
   ]
 
 -- CR 603.6c's first written form read by a BYSTANDER -- Super Shredder {1}{B}

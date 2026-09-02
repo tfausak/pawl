@@ -48,6 +48,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -456,8 +457,12 @@ designate pid oid =
 -- posture. Creature-ness is the PROJECTED question (CR 613.1d), so an
 -- Opalescence'd enchantment is a legal choice.
 --
--- Not implemented: nothing records that a temptation happened, so CR 701.54d's
--- "Whenever the Ring tempts you" abilities cannot trigger (#708).
+-- CR 701.54d's GameEvent.RingTempted goes in beside the count, at the one place
+-- that raises it, so a temptation a "Whenever the Ring tempts you" ability sees
+-- and one the count remembers cannot come apart. Recorded outside the branch
+-- that designates, which is that rule's "even if some or all of those actions
+-- were impossible": Pawl.RingSpec's "CR 701.54d a temptation with no creature to
+-- choose still fires the trigger" proves it.
 tempt :: PlayerId -> Game ()
 tempt pid = do
   gs0 <- State.get
@@ -485,13 +490,15 @@ tempt pid = do
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
       designate pid chosen
   -- CR 701.54d: the temptation itself, which is what a count of temptations
-  -- counts.
+  -- counts and what a "Whenever the Ring tempts you" ability triggers on.
   State.modify'
     ( \g ->
-        g
-          { GameState.players =
-              Map.adjust (\p -> p {Player.ringTemptations = Player.ringTemptations p + 1}) pid (GameState.players g)
-          }
+        Event.recordEvent
+          (GameEvent.RingTempted pid)
+          g
+            { GameState.players =
+                Map.adjust (\p -> p {Player.ringTemptations = Player.ringTemptations p + 1}) pid (GameState.players g)
+            }
     )
   -- CR 701.54c's "as long as", re-read against the count this temptation just
   -- raised: the emblem gains a tier the moment its threshold is crossed.

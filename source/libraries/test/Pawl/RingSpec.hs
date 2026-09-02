@@ -33,6 +33,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -269,6 +270,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     Spec.assertEqWith s "nobody is a Ring-bearer" (markedFor S.alice after) []
     Spec.assertEqWith s "the emblem arrived anyway" (length (theRingsOf S.alice after)) 1
     Spec.assertEqWith s "and the temptation counted" (temptationsOf S.alice after) (Just 1)
+    -- The ABILITY-facing half of the same sentence, and the only reading of it a
+    -- creatureless board can carry: the event a "whenever the Ring tempts you"
+    -- trigger matches is recorded here too. It cannot be driven to a trigger on
+    -- this board, the pool's one observer (Nazgul) being a creature its own
+    -- controller would then have to choose.
+    Spec.assertBool s (elem (GameEvent.RingTempted S.alice) (S.eventsOf after)) "and it recorded the temptation all the same"
+
   -- CR 701.54c's "if a player doesn't have an emblem named The Ring". The count
   -- climbs while the emblem does not multiply, which is what makes the two separate
   -- pieces of state rather than one.
@@ -734,3 +742,32 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
         Spec.assertEqWith s "both attacked with the Ring-bearer untapped" (List.sort (declaredAttackers withBearer)) (List.sort mine)
         Spec.assertEqWith s "and the Elves attacked alone with it tapped" (declaredAttackers withoutBearer) [other]
       _ -> Spec.assertFailure s "fixture should have two creatures"
+  -- CR 701.54d's ability-facing half: "some abilities trigger 'Whenever the Ring
+  -- tempts you'". Nazgul is its own tempt source and its own observer, so one
+  -- printing drives the whole path -- the CR 603.6a entry trigger, the temptation
+  -- it performs, the GameEvent.RingTempted that records it, and the trigger that
+  -- reads it back.
+  --
+  -- TWO Nazgul and one Goblin Piker, which is what makes the counters
+  -- discriminating rather than merely present. Both Nazgul are on the battlefield
+  -- when the temptation happens, so CR 603.2 gives TWO triggers, and each puts one
+  -- counter on EACH Wraith: a 1/2 that ends 3/4 is a Wraith both triggers reached,
+  -- where a self-scoped effect would leave 2/3 and a single firing 2/3 as well.
+  -- The Piker is the Filter's negative -- a creature alice controls that is not a
+  -- Wraith -- and it also makes CR 701.54a's choice a real prompt.
+  Spec.it s "CR 701.54d a temptation fires every 'whenever the Ring tempts you' watching it" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    nazgul <- S.printingOf s registry "Nazgûl"
+    let (base, _) = S.handOne piker (S.landsInPlay island 0)
+        (bystander, g1) = S.addCreature piker S.alice base
+        (standing, g2) = S.addCreature nazgul S.alice g1
+        (entrant, g3) = S.entersWithTrigger nazgul S.alice g2
+        after = S.runPure S.identityAnswer g3 (Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 701.54d the entering Nazgul took a counter from each trigger" (S.powerToughnessOf entrant after) (Just (3, 4))
+    Spec.assertEqWith s "and so did the Nazgul that was already there" (S.powerToughnessOf standing after) (Just (3, 4))
+    Spec.assertEqWith s "while the Goblin Piker, no Wraith, took none" (S.powerToughnessOf bystander after) (Just (2, 1))
+    -- Anti-vacuity: the temptation really happened, so "the counters arrived" is
+    -- not "the entry trigger did something else".
+    Spec.assertEqWith s "alice was tempted once" (temptationsOf S.alice after) (Just 1)
+    Spec.assertEqWith s "and bob, who watched, was not tempted at all" (temptationsOf S.bob after) (Just 0)

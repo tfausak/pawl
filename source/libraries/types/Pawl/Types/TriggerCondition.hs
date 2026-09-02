@@ -405,4 +405,8 @@ data TriggerCondition
     -- this way") reaches -- that event is no payment and can occur several times
     -- in one resolution, where this fires once (#2121).
     Reflexive
+  | -- | CR 701.54d: "whenever the Ring tempts you" (Nazgul), against
+    -- GameEvent.RingTempted. Fires on the temptation itself, so one whose
+    -- CR 701.54a actions were all impossible fires it too.
+    RingTemptsPlayer PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

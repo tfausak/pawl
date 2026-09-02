@@ -124,7 +124,9 @@ codec =
       Arm.payload "PermanentExplores" filterCodec TriggerCondition.PermanentExplores (\x -> case x of TriggerCondition.PermanentExplores y -> Just y; _ -> Nothing),
       Arm.nullary "SelfExerted" TriggerCondition.SelfExerted,
       Arm.nullary "Reflexive" TriggerCondition.Reflexive,
-      Arm.payload "SelfBecomesAttachedBy" filterCodec TriggerCondition.SelfBecomesAttachedBy (\x -> case x of TriggerCondition.SelfBecomesAttachedBy y -> Just y; _ -> Nothing)
+      Arm.payload "SelfBecomesAttachedBy" filterCodec TriggerCondition.SelfBecomesAttachedBy (\x -> case x of TriggerCondition.SelfBecomesAttachedBy y -> Just y; _ -> Nothing),
+      -- CR 701.54d's "whenever the Ring tempts you", PlayerScries' shape above.
+      Arm.payload "RingTemptsPlayer" PlayerRelation.codec TriggerCondition.RingTemptsPlayer (\x -> case x of TriggerCondition.RingTemptsPlayer y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec

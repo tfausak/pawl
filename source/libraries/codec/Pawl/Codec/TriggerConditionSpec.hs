@@ -913,4 +913,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesAttachedBy (Filter.HasSubtype Subtype.Aura))
       " {\"type\":\"SelfBecomesAttachedBy\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}} "
+  -- CR 701.54d. Both relations, for PlayerScries' reason above.
+  Spec.it s "RingTemptsPlayer round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.RingTemptsPlayer PlayerRelation.You)
+      " {\"type\":\"RingTemptsPlayer\",\"value\":{\"type\":\"You\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent)
+      " {\"type\":\"RingTemptsPlayer\",\"value\":{\"type\":\"Opponent\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s TriggerCondition.codec
