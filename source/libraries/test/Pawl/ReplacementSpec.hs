@@ -66,6 +66,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
@@ -213,6 +214,26 @@ shieldsLeft gs =
         ReplacementEffect.DamageR (DamageR.MkDamageR _ (DamageRewrite.PreventNext n) _) -> Just n
         _ -> Nothing
    in Maybe.mapMaybe (remaining . ActiveReplacement.effect) (GameState.replacements gs)
+
+-- The damage CR 615.5's rider dealt to `pid`, ONE ENTRY PER EVENT rather than
+-- summed. What tells CR 615.13's one application apart from one application per
+-- recipient: both throw the same total back, and only the number of events
+-- differs.
+riderHits :: PlayerId.PlayerId -> GameState.GameState -> [Natural.Natural]
+riderHits pid gs =
+  [ DamageEvent.amount de
+  | de <- S.damageEventsOf gs,
+    DamageEvent.target de == Recipient.ToPlayer pid
+  ]
+
+-- The CR 615.13 records a board holds, in the order Pawl.Engine.Damage wrote
+-- them. One per applying instance, whatever the batch was addressed to.
+preventionsRecorded :: GameState.GameState -> [DamagePrevented.DamagePrevented]
+preventionsRecorded gs =
+  let pick event = case event of
+        GameEvent.DamagePrevented prevented -> Just prevented
+        _ -> Nothing
+   in Maybe.mapMaybe pick (S.eventsOf gs)
 
 -- Was CR 615.7's batch-order question raised at all? The elision half of every
 -- group below asserts the negative of this, so the boards that ask nothing are
@@ -2787,6 +2808,18 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     Spec.assertEqWith s "alice loses the whole 3, floor and all: 2 - 3 = -1" (S.lifeOf S.alice after) (Just (-1))
     Spec.assertEqWith s "and bob, controlling no creature, loses nothing" (S.lifeOf S.bob after) (Just 20)
 
+-- Fills every target slot with bob, the opponent whose life total the exchange
+-- cases below drive down. FILTERED rather than hand-built, so CR 608.2b's re-read
+-- at resolution keeps the recipient the prompt offered.
+exchangingWithBob :: Prompt.Prompt r -> r
+exchangingWithBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+  _ -> S.identityAnswer p
+  where
+    wanted r = case r of
+      Recipient.ToPlayer pid -> pid == S.bob
+      _ -> False
+
 -- CR 614.1a with CR 119.4 and CR 119.5: Bloodletter of Aclazotz ({1}{B}{B}{B}
 -- Creature -- Vampire Demon, 2/4, "Flying / If an opponent would lose life during
 -- your turn, they lose twice that much life instead. (Damage causes loss of
@@ -2794,8 +2827,9 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- against api.scryfall.com 2026-08-28).
 --
 -- The life-total replacement whose clause is NOT scoped to damage, which is what
--- makes CR 119.4's payment road and CR 119.5's set-a-total road observable at
--- all. Every FLOOR-shaped printing is scoped to damage instead: Scryfall
+-- makes the non-damage roads to a life loss observable at all: CR 119.4's
+-- payment, CR 119.5's set-a-total, CR 701.12c's exchange and CR 119.7's
+-- redistribution. Every FLOOR-shaped printing is scoped to damage instead: Scryfall
 -- o:"life total to less than", 2026-08-28, is eight cards -- Ali from Cairo,
 -- Angel of Grace, Angel's Grace, Elderscale Wurm, Fortune Thief, Serra the
 -- Benevolent, Sustaining Spirit, Worship -- and all eight print "DAMAGE that
@@ -2813,7 +2847,7 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- upward set and a self-set have to be read off one board to prove the row
 -- discriminates rather than that three boards differ.
 bloodletterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 / 119.5)" $ do
+bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 / 119.5 / 701.12c)" $ do
   -- CR 119.4's second sentence is the whole of this case: "If a player pays life,
   -- the payment is subtracted from their life total; in other words, the player
   -- loses that much life." A payment is a life loss, so a row watching life loss
@@ -2904,6 +2938,76 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     Spec.assertEqWith s "CR 119.5 bob's total becomes 0, a loss of 20, which the row doubles to 40" (S.lifeOf S.bob after) (Just (-20))
     Spec.assertEqWith s "alice's own loss of 19 down to her one creature is not an opponent's" (S.lifeOf S.alice after) (Just 1)
     Spec.assertEqWith s "carol's three creatures RAISE her, and a gain is no life loss to resize" (S.lifeOf S.carol after) (Just 3)
+  -- CR 701.12c: "each player gains or loses the amount of life necessary to equal
+  -- the other player's previous life total. Replacement effects may modify these
+  -- gains and losses". So an exchange is not a pair of assignments: its lowered
+  -- side is a life loss, and this row resizes it -- which leaves the two seats on
+  -- DIFFERENT totals, the outcome the rule's own sentence licenses.
+  --
+  -- Mirror Universe ({6} Artifact, "{T}, Sacrifice this artifact: Exchange life
+  -- totals with target opponent. Activate only during your upkeep." -- name, cost,
+  -- type line and Oracle text checked against api.scryfall.com 2026-09-02) is the
+  -- producer, on alice's own upkeep, which is where the row's clause looks too.
+  --
+  -- The two boards differ in ONE thing: which side of the exchange is the lower
+  -- total, and so which seat loses. alice's own loss is no opponent's and is not
+  -- resized, so the pair also rules out a row that doubles whatever it sees.
+  --
+  -- Every number is distinct -- 5, 22, 13, a difference of 17, a doubled 34 and
+  -- the -12 it lands on -- so the unreplaced reading (bob on alice's 5) and this
+  -- one cannot coincide.
+  Spec.it s "CR 701.12c an exchange's lowered side is a life loss the row resizes" $ do
+    mirror <- S.printingOf s registry "Mirror Universe"
+    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
+    let board aliceLife bobLife =
+          let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
+              (mirrorId, g2) = S.addCreature mirror S.alice g1
+              upkeep =
+                (atLife S.alice aliceLife (atLife S.bob bobLife (atLife S.carol 13 g2)))
+                  { GameState.activePlayer = S.alice,
+                    GameState.phase = Phase.Beginning BeginningStep.Upkeep
+                  }
+           in (mirrorId, upkeep)
+        exchange aliceLife bobLife =
+          let (mirrorId, gs) = board aliceLife bobLife
+           in S.runPure exchangingWithBob gs (Activate.activateAbility S.alice mirrorId (theAbility mirror) Monad.>> Stack.resolveTop)
+        bobLower = exchange 5 22
+        aliceLower = exchange 22 5
+    Spec.assertEqWith s "CR 701.12c bob's loss of 17 is doubled to 34: 22 - 34 = -12, not alice's 5" (S.lifeOf S.bob bobLower) (Just (-12))
+    Spec.assertEqWith s "CR 701.12c alice's side is a GAIN and is not resized: she takes bob's 22" (S.lifeOf S.alice bobLower) (Just 22)
+    Spec.assertEqWith s "carol, no side of it, keeps her 13" (S.lifeOf S.carol bobLower) (Just 13)
+    -- CR 109.5: the row is alice's, so its "your turn" is hers and the opponents
+    -- it names are hers -- and she is not her own opponent.
+    Spec.assertEqWith s "the same exchange the other way costs alice exactly her 17" (S.lifeOf S.alice aliceLower) (Just 5)
+    Spec.assertEqWith s "and bob, gaining, takes alice's 22" (S.lifeOf S.bob aliceLower) (Just 22)
+  -- CR 119.7 / 119.8 with CR 119.5: a redistribution hands out totals, and every
+  -- seat that lands lower loses "the necessary amount of life" -- the same
+  -- proposal a set makes, so the same row reaches it. Reverse the Sands ({6}{W}{W}
+  -- Sorcery, "Redistribute any number of players' life totals. (Each of those
+  -- players gets one life total back.)" -- name, cost, type line and Oracle text
+  -- checked against api.scryfall.com 2026-09-02).
+  --
+  -- The permutation is PINNED rather than searched, so no answerer can repair a
+  -- mutation by finding another legal one. It is a 3-cycle, which is what puts two
+  -- losers on one board: bob's, an opponent's, doubled, and alice's own, not.
+  --
+  -- Every number is distinct -- 20, 30, 12 before; 12, 10, 30 after -- and the
+  -- unreplaced reading leaves bob on alice's 20 rather than 10.
+  Spec.it s "CR 119.7 a redistribution's lowered total is a life loss the row resizes" $ do
+    plains <- S.printingOf s registry "Plains"
+    sands <- S.printingOf s registry "Reverse the Sands"
+    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
+    let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
+        (held, g2) = S.addHandCard sands S.alice g1
+        ready = inMainPhase S.alice (atLife S.alice 20 (atLife S.bob 30 (atLife S.carol 12 (S.landsFor plains S.alice 8 g2))))
+        assigning :: Prompt.Prompt r -> r
+        assigning p = case p of
+          Prompt.ChooseRedistribution {} -> Map.fromList [(S.alice, S.carol), (S.bob, S.alice), (S.carol, S.bob)]
+          _ -> S.identityAnswer p
+        after = S.runPure assigning ready (S.cast S.alice held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "CR 119.5 bob's loss of 10 down to alice's 20 is doubled: 30 - 20 = 10" (S.lifeOf S.bob after) (Just 10)
+    Spec.assertEqWith s "alice's own loss of 8 down to carol's 12 is not an opponent's" (S.lifeOf S.alice after) (Just 12)
+    Spec.assertEqWith s "carol takes bob's 30, and a gain is no life loss to resize" (S.lifeOf S.carol after) (Just 30)
 
 -- CR 614.11 / 121.6: Words of Worship ({2}{W} Enchantment, "{1}: The next time
 -- you would draw a card this turn, you gain 5 life instead" -- name, cost, type
@@ -3263,11 +3367,27 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- recipient would have prevented.
     Spec.assertEqWith s "so the rider deals exactly the 3 that was prevented" (S.lifeOf S.bob aliceFirst) (Just 17)
     -- The other allocation, which is the ruling's own example: the creature's 2
-    -- is prevented whole and the last 1 goes to alice, so the rider runs once per
-    -- recipient and deals 2 then 1. Same total, different board.
+    -- is prevented whole and the last 1 goes to alice. Same total, different
+    -- board.
     Spec.assertEqWith s "spent on the creature instead, its 2 never happens" (S.damageOf mine creatureFirst) (Just 0)
     Spec.assertEqWith s "and only 1 of alice's 5 is prevented" (S.lifeOf S.alice creatureFirst) (Just 16)
-    Spec.assertEqWith s "the rider still deals 3 in total, in two lots" (S.lifeOf S.bob creatureFirst) (Just 17)
+    Spec.assertEqWith s "the rider still deals 3 in total" (S.lifeOf S.bob creatureFirst) (Just 17)
+    -- CR 615.13's own unit, and the one thing on this board the life totals
+    -- cannot settle: the shield spanned TWO recipients here, and the rule counts
+    -- one application of one prevention effect however many of the simultaneous
+    -- events it was applied to. So the rider runs ONCE with the total rather than
+    -- once per recipient, which is a difference in the number of damage events
+    -- and not in their sum -- 3 either way, hence the count.
+    Spec.assertEqWith s "CR 615.13 the rider throws its 3 back in ONE event, not a 2 and a 1" (riderHits S.bob creatureFirst) [3]
+    Spec.assertEqWith s "and the allocation that spent the shield on one recipient throws one lot too" (riderHits S.bob aliceFirst) [3]
+    -- The record those triggers read, which the rider count is a consequence of:
+    -- ONE prevention carrying both recipients' shares, rather than one per
+    -- recipient. After the behaviour it explains, not before it.
+    Spec.assertEqWith
+      s
+      "and ONE prevention was recorded, holding each recipient's share"
+      (fmap DamagePrevented.amounts (preventionsRecorded creatureFirst))
+      [Map.fromList [(Recipient.ToCreature mine, 2), (Recipient.ToPlayer S.alice, 1)]]
     -- The fences. The shield covers what is dealt TO alice's side, never what she
     -- deals: her blocker's 5 kills the Piker either way. And the unshielded board
     -- differs in exactly the shield.
@@ -3281,6 +3401,45 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- Ordered last on purpose, since a row count sitting first absorbs every
     -- mutation of the arm that builds the rows and reports itself instead.
     Spec.assertEqWith s "and the resolution installed ONE shield, holding 3" (shieldsLeft shielded) [3]
+  -- The other half of collapsing a batch to one record: a trigger scoped to ONE
+  -- of the recipients still reads its own share. Selfless Squire ({3}{W} Creature
+  -- -- Human Soldier 1/1, "Whenever damage that would be dealt to you is
+  -- prevented, put that many +1/+1 counters on this creature") is that trigger,
+  -- and Divine Deflection's shield is the one in data/cards/ that can span a
+  -- player and a permanent at once, so this pair is the only board in the pool
+  -- where "that many" and "the whole application" differ.
+  --
+  -- The Squire is put onto the battlefield DIRECTLY, so its own enters trigger
+  -- never installs a second shield to confuse the two: the only prevention here
+  -- is the Deflection's.
+  --
+  -- The allocation is the creature's 2 first and alice's last 1 second, so her
+  -- share is 1 of the 3 -- distinct from the total, from the 2 the creature took
+  -- and from the 5 aimed at her, so no two readings land on the same board.
+  Spec.it s "CR 615.13 a trigger scoped to one recipient reads its own share of the application" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    deflection <- S.printingOf s registry "Divine Deflection"
+    squirePrinting <- S.printingOf s registry "Selfless Squire"
+    let base = S.landsInPlay plains 4
+        (mine, g1) = S.addCreature jedit S.alice base
+        (squire, g2) = S.addCreature squirePrinting S.alice g1
+        (_, g3) = S.addCreature jedit S.bob g2
+        (blocked, g4) = S.addCreature piker S.bob g3
+        (unshielded, spellId) = S.handOne deflection g4
+        shielded = castAndResolve (castDeflection 3 S.bob) unshielded spellId
+        after = S.runCombat (deflectionCombat mine blocked [Recipient.ToCreature mine, Recipient.ToPlayer S.alice]) (bobAttacks shielded)
+    Spec.assertEqWith s "setup: the Squire is on the battlefield as a 1/1" (S.powerToughnessOf squire shielded) (Just (1, 1))
+    -- The board the counters are read against: the shield stopped 2 on her
+    -- creature and 1 of the 5 aimed at her.
+    Spec.assertEqWith s "the creature's 2 never happens" (S.damageOf mine after) (Just 0)
+    Spec.assertEqWith s "and 1 of alice's 5 is prevented" (S.lifeOf S.alice after) (Just 16)
+    -- The discriminating assertion: HER share, not the application's total. A
+    -- reading that handed the trigger everything the shield stopped would make
+    -- this a 4/4.
+    Spec.assertEqWith s "so the Squire counts alice's 1, not the whole application's 3" (countersOn CounterKind.PlusOnePlusOne squire after) 1
+    Spec.assertEqWith s "leaving the 1/1 a 2/2" (S.powerToughnessOf squire after) (Just (2, 2))
   -- CR 608.2f: one instruction naming objects AND players is ONE action, so its
   -- damage is one batch. Molten Disaster ({X}{R}{R} Sorcery, "Kicker {R}. If this
   -- spell was kicked, it has split second. Molten Disaster deals X damage to each
