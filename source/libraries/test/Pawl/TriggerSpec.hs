@@ -23,10 +23,12 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -39,6 +41,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -1316,6 +1319,47 @@ delayedSpec s registry =
               Spec.assertEqWith s "only the second minted Wall is left" (walls after) [secondWall]
               Spec.assertBool s (Set.notMember firstWall (GameState.battlefield after)) "the first minted Wall was bound, and it is gone"
             other -> Spec.assertFailure s ("expected two Wall tokens, got " <> show (length other))
+        -- CR 116.2c's OTHER use, beside ending a continuous effect: the special
+        -- action is taken "usually to end a continuous effect or to stop a
+        -- delayed triggered ability from triggering". Synthetic Standing Bounty
+        -- {1}{U} Instant: "At the beginning of each end step, you gain 3 life.
+        -- You may pay {1} to end this effect." Synthetic because no printing
+        -- arms a delayed ability under a pay-to-end duration -- Scryfall
+        -- o:/doesn't trigger/ o:/you may pay/, 2026-09-02, no hit, and
+        -- o:/counter that ability/ o:/pay/ returns only Strict Proctor, whose
+        -- payment is a cost inside the trigger rather than CR 116.2c's action.
+        --
+        -- What it drives is CR 603.7b's stated duration meeting CR 611.2a's
+        -- pay-to-end one: Duration.UntilPaid arms to Expiry.WhenPaid on the
+        -- armed entry, Expiry.sourcedExpiries makes it findable, and the
+        -- payment deletes the entry itself rather than a continuous effect.
+        --
+        -- A PAIR of boards differing in exactly one thing -- whether alice took
+        -- the action -- both cut from the same board, so the unpaid leg is not
+        -- passing for want of mana. Three Islands: two for the {1}{U}, one left
+        -- for the {1}.
+        Spec.it s "CR 116.2c paying the stated cost stops the delayed ability from triggering" $ do
+          bounty <- S.printingOf s registry "Synthetic Standing Bounty"
+          island <- S.printingOf s registry "Island"
+          let (gs0, bountyId) = S.handOne bounty (S.landsInPlay island 3)
+              armed = resolveAll (S.runPure S.identityAnswer gs0 (S.cast S.alice bountyId))
+              ready = armed {GameState.priority = Just S.alice}
+          case fmap DelayedTrigger.source (Seq.lookup 0 (GameState.delayedTriggers ready)) of
+            Nothing -> Spec.assertFailure s "the spell should have armed one delayed ability"
+            Just source -> do
+              let paid = S.settleSba (S.runPure S.identityAnswer ready (EndEffect.endEffect S.alice source))
+                  atEndStep gs = resolveAll (settle (beginEndStep gs))
+              -- THE gameplay-level pair, ahead of every proxy below.
+              Spec.assertEqWith s "CR 116.2c: the paid board gains no life at the end step" (S.lifeOf S.alice (atEndStep paid)) (Just 20)
+              Spec.assertEqWith s "while the unpaid board gains 3" (S.lifeOf S.alice (atEndStep ready)) (Just 23)
+              -- Anti-vacuity: the two legs start from one life total, so the
+              -- reads above are the end step's doing.
+              Spec.assertEqWith s "both legs started at 20" (S.lifeOf S.alice ready) (Just 20)
+              -- The offer, which no printed permission grants: it rides the
+              -- armed entry's stored duration.
+              Spec.assertBool s (List.elem (Action.Type.EndEffect source) (Action.legalActions S.alice ready)) "CR 116.2c: alice is offered the payment while the entry is armed"
+              Spec.assertEqWith s "the resolution armed one entry" (Seq.length (GameState.delayedTriggers ready)) 1
+              Spec.assertEqWith s "and the payment deleted it" (Seq.length (GameState.delayedTriggers paid)) 0
 
 -- Thatcher Revolt {2}{R} Sorcery: "Create three 1/1 red Human creature tokens
 -- with haste. Sacrifice those tokens at the beginning of the next end step."
