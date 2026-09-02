@@ -2805,9 +2805,9 @@ permanentsReturnedToHandSpec s registry =
 warpedDevotionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 warpedDevotionSpec s registry =
   let -- alice's Warped Devotion and one Island; a Goblin Piker owned by `owner`,
-      -- under alice's control when `stolen`; three cards in alice's hand and one
-      -- in bob's -- distinct, and bob's two once the Piker lands make CR 701.9b's
-      -- choice a real prompt.
+      -- under alice's control when `stolen`; three cards in alice's hand, and
+      -- enough in bob's that CR 701.9b's choice is a real prompt once the Piker
+      -- has landed there (or not, on the token leg).
       -- `asToken` mints a CR 111.1 token copy of the Piker in place of the card.
       -- That is the leg where the returned object is GONE by the time the
       -- trigger is placed: Engine.performSettle runs CR 704.5d's state-based
