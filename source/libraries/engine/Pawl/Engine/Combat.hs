@@ -239,18 +239,24 @@ attackTargetKind target = case target of
 -- difference is CR 506.4c's creature: its planeswalker or battle removed from
 -- combat, it "continues to be an attacking creature, although it is not
 -- attacking any player, planeswalker, or battle. It may be blocked." Blocked by
--- WHOM is CR 802.2a: a rule referring to both an attacking creature and a
--- defending player means the controller of the planeswalker, or the protector of
--- the battle, that creature was attacking before the removal -- so the creature
--- stays on that one player's list and, by CR 802.4a, on nobody else's. Before
--- that reading it was folded onto every defending player's list, and CR 802.4b
--- judging each player's blocks alone then let two players block it at once.
+-- WHOM is CR 802.2a: "defending player" is one specific player, and for a
+-- creature removed from combat it is the controller of the planeswalker, or the
+-- protector of the battle, it was attacking before the removal. Rule 506.4c's
+-- creature is still attacking, so that sentence reaches it by extension rather
+-- than by its letter -- but it is the only seat the rules tie the creature to,
+-- and CR 802.4a bars every other defending player, so it stays on that one
+-- player's list alone. Folded onto every list instead, CR 802.4b's separate
+-- judgement of each player's blocks let two players block it at once.
 -- Pawl.CombatEffectSpec's "CR 802.4a" pair under SplitDefendingPlayer is the
 -- three-seat board that tells the readings apart.
 --
 -- A creature attacking a player who has left the game keeps naming that player,
 -- who defends nothing any more, so it is on no list: CR 800.4e drops its damage,
 -- not the attack, and rule 802.4a offers it to nobody else.
+--
+-- Not implemented: the seat BEFORE a removal by control change. Defender.playerOf
+-- reads the planeswalker's live controller and the battle's live protector, so a
+-- planeswalker stolen mid-combat puts its attacker on the thief's list (#2948).
 attackersOn :: PlayerId -> GameState -> [ObjectId]
 attackersOn pid gs =
   let recorded = Combat.attackers (GameState.combat gs)
