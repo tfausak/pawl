@@ -222,9 +222,12 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   -- is here because a commander is what puts a card in the command zone.
   --
   -- Synthetic Archival Warden is "{1}{W} Legendary Creature -- Human Advisor 2/2.
-  -- If a creature you control would be put into a graveyard from anywhere, put it
-  -- on the bottom of its owner's library instead. This ability functions only in
-  -- the command zone." SYNTHETIC because no printing states this zone on a
+  -- If a creature you own would be put into a graveyard from anywhere, put it on
+  -- the bottom of your library instead. This ability functions only in the
+  -- command zone." Owns rather than controls, which is what
+  -- Pawl.Types.ZoneChangePattern's `whoseObject` asks of a zone change (CR
+  -- 400.3), and Anafenza's own words for the same reason. SYNTHETIC because no
+  -- printing states this zone on a
   -- REPLACEMENT row: the corpus's only row naming it is Nexus of Fate's, an
   -- instant that can never be in a command zone, and Scryfall's "o:'in the
   -- command zone' (t:creature or t:planeswalker)", 2026-09-01, returns the seven
@@ -234,9 +237,9 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   --
   -- TWO boards, each carrying ONE of the two rows against The Walls of Ba Sing Se
   -- in the other seat, and alice's Goblin Piker dies on both. Which seat each row
-  -- has to sit in is forced by the row: the Warden's names a creature YOU
-  -- control, so it is alice's commander, and Anafenza, the Foremost's names an
-  -- opponent's, so she is bob's. Anafenza is the control because her row states
+  -- has to sit in is forced by the row: the Warden's names a creature YOU own, so
+  -- it is alice's commander, and Anafenza, the Foremost's names an opponent's, so
+  -- she is bob's. Anafenza is the control because her row states
   -- no zone: an engine that answered rule 113.6b by dropping rule 113.6p's gate
   -- rather than by splitting the zone would exile that Piker.
   --

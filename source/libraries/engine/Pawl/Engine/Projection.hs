@@ -5707,9 +5707,9 @@ replacementsAffecting gs =
           <> foldZoneCards GameState.library (statedFrom Zone.Library) gs
           <> concatMap (statedFrom Zone.Command) statingCommand
       -- The short-circuit guards the two walks that PROJECT, and nothing else:
-      -- `stated` reads printed faces behind mayStateZoneOfRow, so it costs what
-      -- gatherGiven's hidden walks cost and answers [] on a board with no such row
-      -- without any of the reads baseHas makes.
+      -- `stated` reads printed faces, behind mayStateZoneOfRow everywhere but the
+      -- stack, so it costs what gatherGiven's hidden walks cost and answers [] on
+      -- a board with no such row without any of the reads baseHas makes.
       onBoard =
         if not (any baseHas onBattlefield || elsewhereHas || any commandZoneHas inCommand)
           then []
