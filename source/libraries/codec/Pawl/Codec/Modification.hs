@@ -6,6 +6,7 @@ import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.SetBasePowerToughness as SetBasePowerToughness
@@ -34,6 +35,7 @@ codec abilityCodec =
       Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
       Arm.payload "LoseNamedAbility" AbilityName.codec Modification.LoseNamedAbility (\x -> case x of Modification.LoseNamedAbility y -> Just y; _ -> Nothing),
       Arm.payload "LoseKeyword" Keyword.codec Modification.LoseKeyword (\x -> case x of Modification.LoseKeyword y -> Just y; _ -> Nothing),
+      Arm.payload "LoseKeywordFamily" KeywordFamily.codec Modification.LoseKeywordFamily (\x -> case x of Modification.LoseKeywordFamily y -> Just y; _ -> Nothing),
       Arm.payload "SetBasePowerToughness" SetBasePowerToughness.codec Modification.SetBasePowerToughness (\x -> case x of Modification.SetBasePowerToughness y -> Just y; _ -> Nothing),
       Arm.payload "ModifyPowerToughness" ModifyPowerToughness.codec Modification.ModifyPowerToughness (\x -> case x of Modification.ModifyPowerToughness y -> Just y; _ -> Nothing),
       Arm.payload "SetLandSubtype" Subtype.codec Modification.SetLandSubtype (\x -> case x of Modification.SetLandSubtype y -> Just y; _ -> Nothing),

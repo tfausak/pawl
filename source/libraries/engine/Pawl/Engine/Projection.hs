@@ -233,6 +233,9 @@ layer m = case m of
   -- the same layer as the grant it undoes, so CR 613.7's timestamp is the only
   -- thing that decides which of the two the object ends up with.
   Modification.LoseKeyword _ -> Layer.Ability
+  -- CR 613.1f a fourth time: what a removal NAMES -- an instance, a family or
+  -- nothing at all -- changes its scope and never its layer.
+  Modification.LoseKeywordFamily _ -> Layer.Ability
   Modification.SetBasePowerToughness {} -> Layer.SetPT
   Modification.ModifyPowerToughness {} -> Layer.ModifyPT
   Modification.SetLandSubtype _ -> Layer.Type
@@ -359,6 +362,16 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- back, which is CR 613.7 and not this arm.
         Modification.LoseKeyword k ->
           pc {PC.keywords = Map.delete k (PC.keywords pc)}
+        -- CR 613.1f layer 6, scoped to CR 702.14a's generic term rather than to
+        -- one written instance: every key whose family matches goes, so
+        -- Hammerheim takes forestwalk and swampwalk off a Stalker Hag together.
+        -- A DELETE per key for the arm above's reason -- the clause takes the
+        -- ability away, not one instance of it.
+        --
+        -- Keyword.familyOf answers Nothing for a nullary keyword, which the Just
+        -- here keeps out: flying has no family, so no family removal reaches it.
+        Modification.LoseKeywordFamily f ->
+          pc {PC.keywords = Map.filterWithKey (\k _ -> Keyword.familyOf k /= Just f) (PC.keywords pc)}
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) ->
           pc
             { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
@@ -547,6 +560,7 @@ cardTypesAfter m types = case m of
   Modification.LoseAllAbilities -> types
   Modification.LoseNamedAbility _ -> types
   Modification.LoseKeyword _ -> types
+  Modification.LoseKeywordFamily _ -> types
   Modification.SetBasePowerToughness {} -> types
   Modification.ModifyPowerToughness {} -> types
   Modification.SwitchPowerToughness -> types
@@ -1722,6 +1736,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.LoseAllAbilities -> Just m
         Modification.LoseNamedAbility _ -> Just m
         Modification.LoseKeyword _ -> Just m
+        Modification.LoseKeywordFamily _ -> Just m
         Modification.SetLandSubtype _ -> Just m
         Modification.SetLandSubtypeToChosen -> Just m
         Modification.AddLandSubtype _ -> Just m
@@ -1758,6 +1773,8 @@ quantitiesOf m = case m of
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
   Modification.LoseKeyword _ -> []
+  -- Carries a KeywordFamily, which is payload-free and nests nothing at all.
+  Modification.LoseKeywordFamily _ -> []
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
@@ -1818,6 +1835,7 @@ setsLandSubtype m = case m of
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
+  Modification.LoseKeywordFamily _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
@@ -2061,6 +2079,11 @@ rewriteModification pairs m =
         -- keyword any card here removes, so this arm is a regression fence where
         -- the hacked Lord of Atlantis proves the grant above.
         Modification.LoseKeyword k -> Modification.LoseKeyword (Filter.rewriteKeyword [(from, to)] k)
+        -- Nothing to rewrite, and not for want of a descent: CR 612.1 swaps a
+        -- WORD, and a KeywordFamily holds none -- "all landwalk abilities" names
+        -- CR 702.14a's generic term, which has no land type in it. A Hack on
+        -- Hammerheim changes what its removal reaches not at all.
+        Modification.LoseKeywordFamily _ -> acc
         Modification.SwitchPowerToughness -> acc
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
         -- hacked Aspect of Wolf counts the new type. rewriteQuantity is the same
@@ -3797,6 +3820,10 @@ removesAbilities m = case m of
   -- keyword itself needs no gate here: it lives in the map this fold writes, and
   -- every reader downstream reads the fold's answer.
   Modification.LoseKeyword _ -> False
+  -- FALSE for the arm above's reason, widened: a family removal takes rule-702
+  -- keywords out of the projected map and leaves every other ability the object
+  -- has, so nothing gatherStatic generates is gated.
+  Modification.LoseKeywordFamily _ -> False
   Modification.GainKeyword _ -> False
   Modification.GainFlashbackAtManaCost -> False
   -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
@@ -4524,8 +4551,8 @@ affectedReadsPeers a = case a of
 
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
--- The arms that write Keywords: GainKeyword, LoseKeyword, GainEnchant and
--- LoseAllAbilities per CR 613.1f, both subtype-setting arms per CR 305.7, and
+-- The arms that write Keywords: GainKeyword, LoseKeyword, LoseKeywordFamily,
+-- GainEnchant and LoseAllAbilities per CR 613.1f, both subtype-setting arms per CR 305.7, and
 -- ChangeSubtypeWord per CR 612.1, a text change reaching the land type inside a
 -- landwalk keyword.
 --
@@ -4569,6 +4596,10 @@ modificationWrites m = case m of
   -- another effect's affected set depend on a keyword this arm took away, so
   -- Set.empty here leaves the suite green.
   Modification.LoseKeyword _ -> Set.singleton Keywords
+  -- The same write the arm above makes, over a family's worth of keys. A
+  -- REGRESSION FENCE rather than a proved behaviour: no board in the pool makes
+  -- another effect's affected set depend on a keyword this arm took away.
+  Modification.LoseKeywordFamily _ -> Set.singleton Keywords
   Modification.SetBasePowerToughness {} -> Set.singleton PowerA
   Modification.ModifyPowerToughness {} -> Set.singleton PowerA
   Modification.SwitchPowerToughness -> Set.singleton PowerA
@@ -4619,6 +4650,8 @@ modificationReads m = case m of
   Modification.LoseNamedAbility _ -> Set.empty
   -- Carries a Keyword, whose own Filter is read where the keyword is matched.
   Modification.LoseKeyword _ -> Set.empty
+  -- Carries a payload-free family, so there is no Filter here to read anything.
+  Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
   Modification.SetLandSubtype _ -> Set.empty
   Modification.SetLandSubtypeToChosen -> Set.empty
@@ -5859,8 +5892,9 @@ grantsKeywordWhere p m = case m of
   Modification.GainAbility _ -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
-  -- Takes a keyword AWAY, which is the opposite of what this asks.
+  -- Take keywords AWAY, which is the opposite of what this asks.
   Modification.LoseKeyword _ -> False
+  Modification.LoseKeywordFamily _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SetLandSubtype _ -> False
@@ -5920,6 +5954,7 @@ grantsMintingType m = case m of
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
   Modification.LoseKeyword _ -> False
+  Modification.LoseKeywordFamily _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SetLandSubtype _ -> False
@@ -5965,8 +6000,9 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 --
 -- `min` keeps `live - changed` total. It cannot bite today, and the mutation that
 -- removes it leaves the suite green: every layer-6 write to PC.keywords either
--- adds one instance, DELETES the whole key (Modification.LoseKeyword, which the
--- CR gives no way to spend one instance of) or empties the map, so a live count
+-- adds one instance, DELETES whole keys (Modification.LoseKeyword and
+-- Modification.LoseKeywordFamily, which the CR gives no way to spend one
+-- instance of) or empties the map, so a live count
 -- strictly between zero and the layer-3 count is unreachable, and a deleted key
 -- is not walked at all. It is arithmetic insurance, not a rule -- which surviving
 -- instance counts as the printed one is a question CR 702.135b leaves moot, the

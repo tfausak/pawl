@@ -1903,6 +1903,81 @@ withMenace oid gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
+-- Hammerheim's "{T}: Target creature loses all landwalk abilities until end of
+-- turn." (Oracle checked against Scryfall, 2026-09-02) activated at `victim` and
+-- resolved. Its FIRST ability is "{T}: Add {R}.", so the removal is the second of
+-- the two the projection hands out.
+--
+-- Projection.abilitiesOf rather than Activate.abilitiesFor: CR 605.3b keeps a
+-- mana ability off the activatable list, so the pair here is the printed pair.
+removingLandwalk :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
+removingLandwalk s hammerheimId victim board = case Projection.abilitiesOf hammerheimId board of
+  [_, remove] -> pure (S.runPure (namingTarget victim) board (Activate.activateAbility S.alice hammerheimId remove >> Stack.resolveTop))
+  abilities -> Spec.assertFailure s ("expected exactly two Hammerheim abilities, got " <> show (length abilities))
+
+-- The board CR 702.14a's family removal is read on. Alice attacks with a Stalker
+-- Hag ({B/G}{B/G}{B/G} Creature -- Hag 3/2, "Swampwalk, forestwalk", the pool's
+-- only creature printing TWO landwalks) and controls Hammerheim plus a Concordant
+-- Crossroads; bob defends with a Goblin Piker, a Swamp AND a Forest.
+--
+-- BOTH of bob's lands, which is what makes this a FAMILY case rather than a
+-- second spelling of Modification.LoseKeyword: with only one of them down, taking
+-- one written landwalk away would already free the block, and the board could not
+-- tell a removal that reached one instance from one that reached the family.
+--
+-- The Crossroads is the sibling keyword. "All creatures have haste" is a CR
+-- 613.6 static whose timestamp is the enchantment's own, so it is in place before
+-- the removal resolves and a CR 613.1f WIPE would take the Hag's haste with the
+-- landwalks; a family removal must leave it standing. Haste and not an evasion
+-- keyword deliberately: a granted flying would decide the block by itself and
+-- mask the case.
+--
+-- `activated` is the only difference between the two boards.
+hammerheimBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+hammerheimBoard s registry activated = do
+  stalkerHag <- S.printingOf s registry "Stalker Hag"
+  piker <- S.printingOf s registry "Goblin Piker"
+  swamp <- S.printingOf s registry "Swamp"
+  forest <- S.printingOf s registry "Forest"
+  crossroads <- S.printingOf s registry "Concordant Crossroads"
+  hammerheim <- S.printingOf s registry "Hammerheim"
+  let (gs0, ours, theirs) = attacking [stalkerHag] [piker]
+      (_, hasted) = S.addCreature crossroads S.alice (withLands [swamp, forest] gs0)
+      (hammerheimId, placed) = S.addCreature hammerheim S.alice hasted
+  case (ours, theirs) of
+    (hag : _, blocker : _) -> do
+      board <- if activated then removingLandwalk s hammerheimId hag placed else pure placed
+      pure (board, hag, blocker)
+    _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+-- CR 613.1f layer 6 scoped to CR 702.14a's GENERIC TERM: "loses all landwalk
+-- abilities" reaches every written [type]walk at once, which no removal naming an
+-- instance can do.
+landwalkFamilyRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+landwalkFamilyRemovalSpec s registry = Spec.describe s "LandwalkFamilyRemoval" $ do
+  Spec.it s "CR 702.14c an unhammered Stalker Hag walks over bob's Swamp and Forest" $ do
+    -- The control the case below is read against, and the anti-vacuity check on
+    -- it: the same board with the ability never activated, where both printed
+    -- landwalks stop the block.
+    (board, hag, blocker) <- hammerheimBoard s registry False
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton hag)) board)) "the block is illegal while both landwalks stand"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) hag board) "swampwalk as printed"
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.HasSubtype Subtype.Forest)) hag board) "forestwalk as printed"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Haste hag board) "and the Crossroads' haste"
+  Spec.it s "CR 613.1f Hammerheim takes BOTH landwalks and the Hag can be blocked" $ do
+    -- THE CASE. Bob's board never moves; the Hag's does. Both written landwalks
+    -- have to go for this declaration to be legal, since either one alone would
+    -- still find a land of its own on bob's side.
+    (board, hag, blocker) <- hammerheimBoard s registry True
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton hag)) board) "the block is legal once every landwalk is gone"
+    let after = S.runPure S.aggressiveAnswer board Combat.declareBlockers
+    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf hag after) (Set.singleton blocker)
+    -- THE FAMILY-NOT-WIPE half: CR 613.1f's removal is scoped to rule 702.14's
+    -- abilities, so haste -- a keyword of no family at all -- survives it.
+    Spec.assertBool s (Projection.hasKeyword Keyword.Haste hag board) "haste is no landwalk, so it survives"
+    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) hag board)) "swampwalk is gone"
+    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk (Filter.HasSubtype Subtype.Forest)) hag board)) "forestwalk is gone too"
+
 -- CR 509.1a: the defending player chooses ONE creature for each blocker to
 -- block, and an effect can raise that number. Foriysian Brigade {3}{W} 2/4,
 -- "This creature can block an additional creature each combat", is the pool's
@@ -4578,6 +4653,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   hasteSpec s registry
   evasionSpec s registry
   textChangedLandwalkSpec s registry
+  landwalkFamilyRemovalSpec s registry
   menaceSpec s registry
   blockPermissionSpec s registry
   blockRequirementSpec s registry
