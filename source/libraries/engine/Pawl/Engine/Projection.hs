@@ -5619,9 +5619,9 @@ replacementsAffecting gs =
       -- leaves functioning on the battlefield. Reading rule 113.6p's list is
       -- reading the rulebook, not an effect's identity. Pawl.VanguardSpec's "CR
       -- 902.7 a vanguard's replacement effect functions from the command zone" is
-      -- what proves the admitting half; the excluding half is a regression fence,
-      -- no card in data/cards/ putting a commander that prints a replacement row
-      -- into the command zone.
+      -- what proves the admitting half, and Pawl.CommanderSpec's Anafenza board
+      -- the excluding one: her row states no zone, so a commander in the zone
+      -- replaces nothing.
       --
       -- The gate disjunct is deliberately NOT folded into elsewhereGrants beside
       -- it: that function asks what a Modification WRITES, and it is shared
@@ -5639,8 +5639,8 @@ replacementsAffecting gs =
       -- everything else in the zone reaches `stated` through statesZoneOfRow
       -- alone. gatherGiven's fromCommandZone makes the same split with the same
       -- two tests. Pawl.CommanderSpec's "CR 113.6b a commander's replacement row
-      -- that states the command zone functions from there" proves both halves on
-      -- one board.
+      -- that states the command zone functions from there" proves both halves,
+      -- one board apiece.
       (inCommand, statingCommand) = List.partition (\oid -> Vanguard.functionsFromCommandZone oid gs) (Set.toList (GameState.command gs))
       commandZoneHas oid = case Game.faceOf oid gs of
         Nothing -> False

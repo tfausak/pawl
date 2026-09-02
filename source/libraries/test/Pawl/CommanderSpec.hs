@@ -232,25 +232,36 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   -- Jabari, The Ur-Dragon), whose stated-zone abilities are triggers and a cost
   -- reduction. So the CLAUSE is printed and only this event class is not.
   --
-  -- ONE board carrying BOTH commanders again, and the two rows are told apart by
-  -- their DESTINATIONS rather than by their victims: Anafenza, the Foremost's row
-  -- states no zone and reaches "an opponent" -- alice, from bob's seat -- so it
-  -- would exile the same Piker the Warden's row archives. The library assertion
-  -- is what the fix buys; the exile assertion is what stops the fix being "drop
-  -- the gate".
+  -- TWO boards, each carrying ONE of the two rows against The Walls of Ba Sing Se
+  -- in the other seat, and alice's Goblin Piker dies on both. Which seat each row
+  -- has to sit in is forced by the row: the Warden's names a creature YOU
+  -- control, so it is alice's commander, and Anafenza, the Foremost's names an
+  -- opponent's, so she is bob's. Anafenza is the control because her row states
+  -- no zone: an engine that answered rule 113.6b by dropping rule 113.6p's gate
+  -- rather than by splitting the zone would exile that Piker.
+  --
+  -- Both rows on ONE board would not show it. CR 616.1 lets the affected object's
+  -- controller apply one of them first, and the Warden's redirect changes the
+  -- destination the other is waiting for (CR 614.6), so the exile never happens
+  -- and the board answers the same either way -- which is what a mutation
+  -- dropping the gate proved before this case was split in two.
   Spec.it s "CR 113.6b a commander's replacement row that states the command zone functions from there" $ do
     mountain <- S.printingOf s registry "Mountain"
     warden <- S.printingOf s registry "Synthetic Archival Warden"
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    walls <- S.printingOf s registry "The Walls of Ba Sing Se"
     piker <- S.printingOf s registry "Goblin Piker"
     let deckFor c = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just c, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
-        seated = S.runPure S.identityAnswer (commanderBoard mountain warden 0) (Setup.createDeck S.bob (deckFor anafenza))
-        (pikerId, board) = S.addCreature piker S.alice seated
-        binned = S.runPure S.identityAnswer board (Event.changeZone pikerId Zone.Graveyard)
-    Spec.assertEqWith s "CR 113.6b the Warden's row functions from the command zone, so alice's creature is in her library" (length (Game.zoneMembers Zone.Library S.alice binned)) 1
-    Spec.assertEqWith s "and the graveyard the move aimed at is empty" (length (Game.zoneMembers Zone.Graveyard S.alice binned)) 0
-    Spec.assertEqWith s "CR 113.6p is still the other limb: bob's Anafenza states no zone, so nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice binned)) 0
-    Spec.assertEqWith s "setup: a commander in each command zone, and an empty library for the redirect to fill" (length (inCommandZone board), length (Game.zoneMembers Zone.Library S.alice board)) (2, 0)
+        stating = S.runPure S.identityAnswer (commanderBoard mountain warden 0) (Setup.createDeck S.bob (deckFor walls))
+        unstated = S.runPure S.identityAnswer (commanderBoard mountain walls 0) (Setup.createDeck S.bob (deckFor anafenza))
+        binned base =
+          let (pikerId, board) = S.addCreature piker S.alice base
+           in S.runPure S.identityAnswer board (Event.changeZone pikerId Zone.Graveyard)
+    Spec.assertEqWith s "CR 113.6b the Warden's row states this zone and functions from it, so alice's creature is in her library" (length (Game.zoneMembers Zone.Library S.alice (binned stating))) 1
+    Spec.assertEqWith s "and the graveyard the move aimed at is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (binned stating))) 0
+    Spec.assertEqWith s "CR 113.6p is still the other limb: bob's Anafenza states no zone, so alice's creature reaches her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice (binned unstated))) 1
+    Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice (binned unstated))) 0
+    Spec.assertEqWith s "setup: a commander in each command zone on both boards, and an empty library for the redirect to fill" (fmap (length . inCommandZone) [stating, unstated], length (Game.zoneMembers Zone.Library S.alice stating)) ([2, 2], 0)
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do
