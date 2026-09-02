@@ -1251,9 +1251,18 @@ tapCandidates slots pid oid criterion gs =
 -- source. The NAMES are what differ, so each cost's arm reads the pool under
 -- the action it takes.
 --
--- NOT narrowed to what the payer controls, `tapCandidates`' reading: a card
--- that wants it prints it (Meloku the Clouded Mirror's criterion carries
--- `ControlledBy You`).
+-- NOT narrowed to what the payer controls, `tapCandidates`' reading, and
+-- deliberately unlike Replacement.sacrificeCandidates' pool even though
+-- `claimOf` puts both on ClaimAxis.Removal Zone.Battlefield: that one narrows
+-- because CR 701.21a forbids sacrificing a permanent you don't control, and no
+-- rule says the same of returning one -- CR 118.1 asks only that the payer carry
+-- out the instruction. Narrowing here would enforce a restriction the CR does
+-- not state, so the criterion carries it where a card wants it (Meloku the
+-- Clouded Mirror's prints `ControlledBy You`). Scryfall
+-- `o:/[Rr]eturn (a|an|two|three|another) [^.:]+ to (its|their) owner.s hand:/
+-- -o:"you control"`, 2026-09-02, no hit, and the same query over "as an
+-- additional cost" none either: every printed return cost states it today, so
+-- the two pools coincide for every printing, `data/cards/` included.
 returnCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 returnCandidates = tapCandidates
 
