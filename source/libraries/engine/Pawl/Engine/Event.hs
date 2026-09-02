@@ -12985,6 +12985,12 @@ eventTriggers events gs =
       -- clause is not implemented (#2502) -- `enchantedObjectLeaves` below
       -- reads only its Aura half -- so filtering there would read the rule's
       -- first sentence without the exception that governs this arm.
+      -- The delayed map is the HOST's own face while `abilitiesOf` is the
+      -- PROJECTED list, so an ability granted by another object that arms a
+      -- delayed trigger the GRANTOR declared resolves to no name here and takes
+      -- CR 113.6's battlefield default. Nothing in data/cards/ grants an ability
+      -- that arms one; Pawl.Engine.Activate.abilitiesForGiven carries the same
+      -- pairing and the same note.
       battlefieldAbilitiesOf oid pc = filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
@@ -14769,8 +14775,11 @@ delayedPending grouped gs =
       -- events occurred earlier during the resolution of the spell or ability
       -- that created them" -- which is a question about the resolution that is
       -- over, not about this batch's log. Pawl.Engine.Resolve appends such an
-      -- entry only from the CR 118.12 pay-gate branch that actually ran, so the
-      -- entry's EXISTENCE is the affirmative answer and no event is needed. It
+      -- entry only where that question was answered yes -- from the CR 118.12
+      -- pay-gate branch that actually ran, and from
+      -- Resolve.applyClauseEffects, which skips the arm when the preceding
+      -- instruction recorded no event (CR 603.12, 701.28e) -- so the entry's
+      -- EXISTENCE is the affirmative answer and no event is needed. It
       -- therefore fires at the first gather after it was armed, which CR 603.3
       -- makes the next time a player would receive priority.
       --
