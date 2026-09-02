@@ -406,17 +406,16 @@ manaOptionsOfGiven pcs oid gs =
       -- the payments it belongs to. Pawl.Engine.ManaRider reads it off the
       -- payment CR 400.7d recorded, long after this.
       --
-      -- Not implemented: the retention the same instruction may carry
-      -- (Pawl.Types.ManaRetention). This is CR 605.3b's inline payment, and
-      -- Ordinary is stamped here whatever the addition says, so a mana ability
-      -- that said its mana is kept would be paid Ordinary while the same clause
-      -- on a stack-using ability works (#1808). Exact for data/cards/, where
-      -- every retaining printing is a static or a trigger.
+      -- CR 106.4's RETENTION is stamped the same way, off the same instruction:
+      -- an ability saying its mana is kept keeps it whether it was paid inline
+      -- here or resolved off the stack (Resolve's arm). Pawl.ManaSpec's
+      -- Synthetic Lasting Spring group is what proves this road, Shizuko,
+      -- Caller of Autumn the other.
       unitFor addition manaType =
         ManaUnit.MkManaUnit
           { ManaUnit.manaType = manaType,
             ManaUnit.tags = tags,
-            ManaUnit.retention = ManaRetention.Ordinary,
+            ManaUnit.retention = ManaAddition.retention addition,
             ManaUnit.restriction = ManaAddition.restriction addition,
             ManaUnit.rider = ManaAddition.rider addition
           }
