@@ -8976,7 +8976,7 @@ bindAmountSlot holder slot n gs =
 -- the class, so a replacement watching life loss reaches it and the SETTLED loss
 -- is what moves the total -- which is why a player may end up somewhere other
 -- than the total the effect named. An upward delta is a life GAIN and proposes
--- nothing here.
+-- nothing here (#3086).
 --
 -- The one road for every arm that arrives at a TOTAL rather than at an amount:
 -- Effect.SetLifeTotal, Effect.ExchangeLifeTotals and

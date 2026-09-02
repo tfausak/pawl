@@ -872,10 +872,13 @@ data Prompt r where
   -- both for ChooseOptional's reasons.
   --
   -- Asked ONCE per exclusive group, at whichever branch the resolution reaches
-  -- first, and answered by the controller alone: CR 608.2d's "the player" is
-  -- the one applying the effect. Asked BEFORE ChooseOptional, so a card
-  -- printing one "may" over an either-or raises one "may" and not one per
-  -- branch. Never elided.
+  -- first, and put to each player Pawl.Types.OrElse.chooser names, in CR 101.4's
+  -- order: Twiddle's is the resolving controller alone, and Worms of the Earth's
+  -- "any player may sacrifice two lands of their choice or have this enchantment
+  -- deal 5 damage to that player" is the whole table, one announcement each.
+  -- Asked BEFORE ChooseOptional, so a card printing one "may" over an either-or
+  -- raises one "may" and not one per branch, and the "may" goes only to the
+  -- seats that announced that branch. Never elided.
   --
   -- NOT ChooseModes. CR 700.2 makes a spell modal only for two or more options
   -- "in a bulleted list preceded by instructions for a player to choose", and

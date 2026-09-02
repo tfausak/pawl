@@ -95,8 +95,8 @@ data Clause card ability = MkClause
     -- exclusive with, so exactly one of the two happens. Twiddle's "you may tap
     -- or untap target artifact, creature, or land" is the witness -- the tap and
     -- the untap are two clauses of one mode reading one target slot, and the
-    -- controller announces which of them "while applying the effect". Nothing is
-    -- the unmarked case every other card in the corpus takes.
+    -- payload's chooser announces which of them "while applying the effect".
+    -- Nothing is the unmarked case every other card in the corpus takes.
     --
     -- NOT modality (CR 700.2), which needs "two or more options in a bulleted
     -- list preceded by instructions for a player to choose a number of those
@@ -157,10 +157,10 @@ data Clause card ability = MkClause
     -- printed order: `ifTaken` first (CR 608.2c's "If you do" prefixes the
     -- sentence, and a clause whose predecessor was declined is no question to
     -- ask), then `condition` (CR 701.46a prints its "if" ahead of the
-    -- instructions), then `orElse` (a branch the controller did not pick has no
-    -- "may" left to offer -- Twiddle prints one "may" over the pair, not one per
-    -- branch), then the "may", then this -- a declined clause has no instruction
-    -- left for a payment to qualify.
+    -- instructions), then `orElse` (a branch a player did not announce has no
+    -- "may" and no payment left to offer THEM -- Twiddle prints one "may" over
+    -- the pair, not one per branch), then the "may", then this -- a declined
+    -- clause has no instruction left for a payment to qualify.
     payGate :: Maybe PayGate.PayGate,
     effects :: Seq.Seq (Effect.Effect card ability)
   }

@@ -283,13 +283,12 @@ permanentSpellCase s registry = do
 -- Willow, Harmony ({3}{G}{G}) is the maker, whose enters trigger creates a 1/1
 -- green Forest Dryad LAND creature token.
 --
--- Not implemented, recorded here because a card's JSON carries no comment: Worms
--- of the Earth's third sentence, whose each-upkeep offer to every player is how
--- the printed card is destroyed, and Autumn Willow's third, which adds mana when
--- a land creature is tapped (#2865, #2866). Both omissions leave pawl's card
--- STRICTER than printed -- one keeps an enchantment its opponents could remove,
--- the other withholds mana from its controller -- so neither can flatter the
--- cases below.
+-- Not implemented, recorded here because a card's JSON carries no comment:
+-- Autumn Willow's third sentence, which adds mana when a land creature is tapped
+-- (#2866). That omission leaves pawl's card STRICTER than printed -- it
+-- withholds mana from its controller -- so it cannot flatter the cases below.
+-- Worms of the Earth carries its whole text box; its each-upkeep offer is
+-- Pawl.ResolveSpec's "an either-or announced by each player" group.
 tokenCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenCase s registry = do
   let -- The Willow enters WITH its CR 603.6a event, so settleForPriority finds

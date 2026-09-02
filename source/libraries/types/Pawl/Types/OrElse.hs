@@ -32,6 +32,10 @@ data OrElse = MkOrElse
     -- slot bound here would be invisible to those two, which read the bindings
     -- captured before the branch was announced.
     --
+    -- Not implemented: a chooser who wants neither branch still announces one
+    -- and declines the rider that follows it, so the decline is a second
+    -- question rather than a third answer to this one (#3088).
+    --
     -- Both halves of a pair must name the SAME chooser, the announcement being
     -- made once at whichever branch the resolution reaches first; Pawl.CardSpec
     -- holds the corpus to that alongside the symmetry.
