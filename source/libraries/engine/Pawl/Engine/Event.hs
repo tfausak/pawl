@@ -1566,7 +1566,8 @@ apply batch candidate event =
       EntryRewrite.ChoiceByCoinFlip entryFlip -> do
         before <- State.get
         let flipper = Projection.controllerOf oid before
-        (face, stated) <- Coin.flipCoin flipper
+        statements <- Coin.statementsFor flipper
+        (face, stated) <- Coin.flipOne statements
         let picked = case face of
               CoinFace.Heads -> EntryFlip.heads entryFlip
               CoinFace.Tails -> EntryFlip.tails entryFlip

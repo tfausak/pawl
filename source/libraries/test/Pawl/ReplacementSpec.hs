@@ -6940,8 +6940,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- THE BOARD carries a Tavern Scoundrel ("Whenever you win a coin flip, create
   -- two Treasure tokens") under the same seat, and it is the discrimination.
   -- The shortest wrong implementation of this rewrite is the road already built
-  -- -- Pawl.Engine.Resolve's Effect.FlipCoin arm -- which calls the coin first
-  -- and records the flip as WON when the call matches. The answerer below pins
+  -- -- Pawl.Engine.Resolve's Effect.FlipCoin arm under CoinReading.Wins, which
+  -- calls the coin first and records the flip as WON when the call matches. The answerer below pins
   -- both questions to the same face, so that road wins its flip and the
   -- Scoundrel mints two Treasures; the correct road asks no call, records no
   -- outcome -- nothing on this board states one under CR 705.3, which

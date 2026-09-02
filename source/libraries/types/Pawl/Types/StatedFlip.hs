@@ -24,10 +24,12 @@ data StatedFlip = MkStatedFlip
     -- comprehensive rule behind it -- Pawl.Types.TriggerFrequency says the same
     -- of the trigger side of that phrase.
     --
-    -- Spent on the first FLIP rather than on the first INSTRUCTION, which is the
-    -- same thing while every instruction flips one coin -- no effect can flip
-    -- more than one (gap #2870), and Edgar's ruling on a five-coin instruction is
-    -- what would tell them apart.
+    -- Spent on the first INSTRUCTION and not on the first FLIP, which is what
+    -- Edgar's ruling on a multi-coin instruction says ("Edgar's last ability
+    -- modifies that set of flips"). Pawl.Engine.Coin.statementsFor is where the
+    -- statements are read once for the whole instruction, and Pawl.CoinSpec's
+    -- "CR 705.3 a statement spent on an instruction reaches every coin of it"
+    -- proves the two apart over Flock of Rabid Sheep.
     firstEachTurn :: Bool
   }
   deriving (Eq, Ord, Show)
