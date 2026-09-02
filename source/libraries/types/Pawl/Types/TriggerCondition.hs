@@ -267,10 +267,10 @@ data TriggerCondition
     -- [kind] counters are put on one or more [permanents]", once for the batch.
     PermanentsGetCounters CounterPlacement.CounterPlacement
   | -- | The arm above read per permanent: "whenever one or more [kind] counters
-    -- are put on a [permanent]" (Wickersmith's Tools).
-    --
-    -- Not implemented: a slot for the permanent this condition names, which
-    -- Auntie Ool, Cursewretch's "if you control that creature" reads (#2342).
+    -- are put on a [permanent]" (Wickersmith's Tools). Naming one permanent, it
+    -- binds it -- Auntie Ool, Cursewretch's "that creature", under CR 400.7e's
+    -- `became` (Pawl.Engine.Event.eventBindingSlots) -- where the batch arm above
+    -- cannot.
     PermanentGetsCounters CounterPlacement.CounterPlacement
   | -- | CR 601.2i: "whenever you cast a [type] spell" (Young Pyromancer), the
     -- Filter read against the spell as it is on the stack.

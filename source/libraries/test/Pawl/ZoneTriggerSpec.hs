@@ -2105,8 +2105,9 @@ representativeEvents cond =
         -- and the floor is empty either way, a batch condition binding nothing.
         TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind _) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 1))
         -- Its per-permanent scope, on the same event: the two share a payload and a
-        -- matcher, and the floor is empty for this one too -- no slot for the
-        -- permanent it names (#2342).
+        -- matcher, and what parts them here is the floor -- this one names ONE
+        -- permanent, so `became` is stamped and claimed where the batch above
+        -- claims nothing.
         TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind _) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 1))
         -- CR 601.2i's own event, and the only one this condition admits. Both
         -- halves are bound whichever ids the event names -- the spell under

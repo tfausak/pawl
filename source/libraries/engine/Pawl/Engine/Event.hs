@@ -11377,6 +11377,34 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- 113.7a's source slot already names.
   (TriggerCondition.PermanentTurnedFaceUp _, GameEvent.TurnedFaceUp oid) ->
     Binding.setBecame oid Map.empty
+  -- CR 603.2's "that creature": the permanent the counters went on, which Auntie
+  -- Ool, Cursewretch draws off or drains for. The bearer is a bystander, exactly
+  -- as it is under the arm above -- Wickersmith's Tools is an artifact watching
+  -- creatures -- so the subject needs a name of its own.
+  --
+  -- THE SAME SLOT, the arm above's widening rather than a fresh one, and for its
+  -- reasons: putting counters on a permanent is no zone change (CR 122.1 puts a
+  -- marker on the object that is already there, and CR 400.7 mints nothing), so
+  -- what carries the reuse is that CR 400.7e's slot is the printed word "that
+  -- creature" -- the thing the EVENT names, which CR 113.7a's source is not --
+  -- and a fresh name would empty CR 603.1b's AnyOf intersection forever (#963).
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.CountersPut carries exactly one
+  -- CounterChange.object. Bound whatever the Filter admitted, for the
+  -- PermanentEnters arm's reason.
+  --
+  -- A DEAD ID IS POSSIBLE and is the payload's problem, `became`'s standing
+  -- posture: matchesTrigger admits the CR 704.5f victim a -1/-1 counter made
+  -- through Projection.viewWithLastKnown, so a creature that took the counters
+  -- and died before the CR 117.5 boundary still fires the trigger with this slot
+  -- naming an object that no longer exists.
+  --
+  -- Its BATCH sibling reaches the fallthrough instead and stamps nothing, which
+  -- is eventBindingSlots' answer for it: one PermanentsGetCounters trigger covers
+  -- a whole CR 704.3 batch, and one slot cannot name every permanent in it.
+  (TriggerCondition.PermanentGetsCounters _, GameEvent.CountersPut change) ->
+    Binding.setBecame (CounterChange.object change) Map.empty
   -- "That player": the discarder, which CR 701.9a makes one player and the event
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
   -- same reason -- a player the EVENT names, which CR 109.5's `you` cannot stand
@@ -12141,12 +12169,13 @@ eventBindingSlots cond = case cond of
   -- 2026-08-25), draws a card and names none of them; a printing whose payload
   -- said "it" would refute this, and the lint would reject it (#505).
   TriggerCondition.PermanentsGetCounters {} -> Set.empty
-  -- Nothing today, and NOT for the arm above's reason: this condition names one
-  -- permanent, so a slot for it would be honest. Wickersmith's Tools, the
-  -- printing that landed the constructor, reads nothing off the creature. Not
-  -- implemented: that slot, which Auntie Ool, Cursewretch's "if you control that
-  -- creature" reads (#2342).
-  TriggerCondition.PermanentGetsCounters {} -> Set.empty
+  -- CR 400.7e's slot in its widest reading, and NOT the arm above's answer: this
+  -- condition names one permanent, so the slot is honest. Auntie Ool,
+  -- Cursewretch's "draw a card if you control that creature. If you don't control
+  -- it, its controller loses 1 life" is what reads it; Wickersmith's Tools, the
+  -- printing that landed the constructor, reads nothing off the creature and is
+  -- unaffected by the slot being available.
+  TriggerCondition.PermanentGetsCounters {} -> Set.singleton Binding.became
   -- CR 709.5h names the permanent and the half, and CR 113.7a's source slot
   -- already names the permanent. The HALF is not bound: no printing says "that
   -- door", so there is nothing for a payload to read it as.
