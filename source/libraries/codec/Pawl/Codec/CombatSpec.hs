@@ -11,8 +11,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | An empty combat, which is what CR 511.3 leaves behind. Every case below
--- starts from this and moves one axis, so a literal never has to restate eight
--- fields to say something about the ninth.
+-- starts from this and moves one axis, so a literal never has to restate every
+-- other field to say something about one.
 empty :: Combat.Combat
 empty =
   Combat.MkCombat
@@ -20,6 +20,7 @@ empty =
       Combat.blockers = Map.empty,
       Combat.struckFirst = Nothing,
       Combat.joinedUnder = Map.empty,
+      Combat.attackedUnder = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
       Combat.declaredAttackedThisStep = Set.empty,
@@ -55,6 +56,9 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           Combat.blockers = Map.singleton (ObjectId.MkObjectId 3) (Set.singleton (ObjectId.MkObjectId 4)),
           Combat.struckFirst = Just (Set.singleton (ObjectId.MkObjectId 5)),
           Combat.joinedUnder = Map.singleton (ObjectId.MkObjectId 6) (PlayerId.MkPlayerId 7),
+          -- CR 802.2a, keyed by the ATTACKER where joinedUnder above is keyed by
+          -- the combatant, so distinct ids on both sides of the entry.
+          Combat.attackedUnder = Map.singleton (ObjectId.MkObjectId 14) (PlayerId.MkPlayerId 15),
           Combat.attacked = Set.singleton (AttackTarget.OfPlayer (PlayerId.MkPlayerId 2)),
           Combat.declaredAttacked = Set.singleton (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           Combat.declaredAttackedThisStep = Set.singleton (AttackTarget.OfBattle (ObjectId.MkObjectId 9)),
@@ -73,6 +77,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           <> ",\"blockers\":{\"3\":[4]}"
           <> ",\"struckFirst\":[5]"
           <> ",\"joinedUnder\":{\"6\":7}"
+          <> ",\"attackedUnder\":{\"14\":15}"
           <> ",\"attacked\":[{\"type\":\"OfPlayer\",\"value\":2}]"
           <> ",\"declaredAttacked\":[{\"type\":\"OfPlaneswalker\",\"value\":8}]"
           <> ",\"declaredAttackedThisStep\":[{\"type\":\"OfBattle\",\"value\":9}]"

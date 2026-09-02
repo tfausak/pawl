@@ -726,6 +726,9 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                     { Combat.Type.attackers = Map.singleton oid (AttackTarget.OfPlayer S.bob),
                       Combat.Type.blockers = Map.empty,
                       Combat.Type.struckFirst = Nothing,
+                      -- CR 802.2a: the seat each attack names, which is what a
+                      -- declaration would have recorded.
+                      Combat.Type.attackedUnder = Map.singleton oid S.bob,
                       Combat.Type.joinedUnder = Map.singleton oid S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
@@ -2705,6 +2708,64 @@ splitDefenderJaceBoard s registry bobsLand carolsLand = do
        in pure (S.runPure attackThePlaneswalker settled (Combat.declareAttackers S.alice), wraith, blocker, jaceId)
     _ -> Spec.assertFailure s "fixture should give alice a Wraith and carol a Jace and a blocker"
 
+-- CR 506.4 / CR 802.2a at three seats: alice attacks CAROL's Jace Beleren with a
+-- Bog Wraith, both opponents defend (CR 802.2, the default option), and BOB then
+-- takes the Jace mid-combat with an Aura Graft that moves carol's Confiscate onto
+-- him. That is CR 506.4's "if its controller ... changes", so the planeswalker is
+-- removed from combat and CR 506.4c leaves the Wraith attacking nothing -- and
+-- rule 802.2a's third sentence names the seat it had BEFORE the removal, carol.
+--
+-- Both seats DEFEND, which is what no live read can see through: the stolen Jace
+-- is still controlled by a defending player, so Combat.attackablePlaneswalkers
+-- still finds him and Combat.stillAttacked still says he is attacked. Only the
+-- seat recorded as the Wraith joined combat tells the two apart.
+--
+-- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so CR
+-- 702.14c is exactly an ability of an attacking creature that refers to a
+-- defending player and no other text is in play. `bobsLand` and `carolsLand` are
+-- the ONE thing the two cases below differ in, and the two readings of rule
+-- 802.2a invert between them: whichever seat holds the Swamp is the seat whose
+-- block is stopped.
+--
+-- Carol's own Bonesplitter is what the Confiscate starts on, so the Graft always
+-- MOVES it (CR 701.3b) and nothing about the board changes until it lands on
+-- Jace. Loyalty 5 against a 3/3 keeps CR 704.5i from burying him, which would
+-- answer through the departure clause instead of the control one.
+stolenByBobJaceBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  String ->
+  m (GameState.GameState, GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+stolenByBobJaceBoard s registry bobsLand carolsLand = do
+  bogWraith <- S.printingOf s registry "Bog Wraith"
+  piker <- S.printingOf s registry "Goblin Piker"
+  jace <- S.printingOf s registry "Jace Beleren"
+  bonesplitter <- S.printingOf s registry "Bonesplitter"
+  confiscate <- S.printingOf s registry "Confiscate"
+  graft <- S.printingOf s registry "Aura Graft"
+  island <- S.printingOf s registry "Island"
+  bobs <- S.printingOf s registry bobsLand
+  carols <- S.printingOf s registry carolsLand
+  let (gs0, ours, yours, hers) = S.threePlayerCombat [bogWraith] [piker, bobs] [jace, carols, bonesplitter, piker]
+  case (ours, yours, hers) of
+    ([wraith], [bobsBlocker, _], [jaceId, _, splitter, carolsBlocker]) -> do
+      let (auraId, gs1) = S.addCreature confiscate S.carol (S.landsFor island S.bob 3 gs0)
+          gs2 = S.addCounter CounterKind.Loyalty 5 jaceId (S.attachTo auraId (Recipient.ToObject splitter) gs1)
+          (spell, gs3) = S.addHandCard graft S.bob gs2
+          settled = S.runPure S.identityAnswer gs3 (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+          declared = S.runPure attackThePlaneswalker settled (Combat.declareAttackers S.alice)
+          -- CR 117.5's settle follows the resolution, graftOnto's reason: it is
+          -- where Combat.noteAttackingNothing samples rule 506.4.
+          stolen =
+            S.runPure (graftAnswer auraId jaceId) declared $ do
+              S.cast S.bob spell
+              Stack.resolveTop
+              Engine.settleForPriority
+      pure (declared, stolen, wraith, bobsBlocker, carolsBlocker, jaceId)
+    _ -> Spec.assertFailure s "fixture should give alice a Wraith, bob a blocker and a land, and carol a Jace, a land, a Bonesplitter and a blocker"
+
 -- CR 802.2a: with several defending players, "a defending player" is resolved per
 -- attacking creature from what that creature is attacking -- never off the head of
 -- the group. The planeswalker arm is what this proves; Pawl.BattleSpec's own
@@ -2763,6 +2824,45 @@ splitDefenderSpec s registry = Spec.describe s "SplitDefendingPlayer" $ do
     Spec.assertBool s (blockOf S.carol carols attacker gs) "CR 802.4a: carol's is legal, the Piker attacking a planeswalker she controls"
     Spec.assertBool s (S.onBattlefield jaceId gs) "Jace is still on the battlefield"
     Spec.assertEqWith s "and carol controls him" (Projection.controllerOf jaceId gs) (Just S.carol)
+  -- CR 802.2a's THIRD sentence at three seats: bob steals the attacked
+  -- planeswalker mid-combat, CR 506.4 removes it from combat, and the seat the
+  -- Wraith's swampwalk reads is the one carol held before the theft. An engine
+  -- reading the planeswalker's live controller answers bob and inverts both
+  -- cases; an engine that never notices the removal answers bob too, since bob
+  -- is a defending player who now controls the attacked planeswalker.
+  Spec.it s "CR 802.2a a planeswalker stolen mid-combat leaves its attacker reading the seat it was taken from" $ do
+    (declared, stolen, wraith, bobs, carols, jaceId) <- stolenByBobJaceBoard s registry "Island" "Swamp"
+    Spec.assertBool s (not (blockOf S.bob bobs wraith stolen)) "CR 802.4a: the Wraith is attacking neither bob nor a planeswalker he controlled when it joined combat, so his block is illegal however the theft left the board"
+    Spec.assertBool s (not (blockOf S.carol carols wraith stolen)) "CR 702.14c: carol's own Swamp stops her block, the Wraith still reading her seat"
+    Spec.assertEqWith s "CR 802.4a: and the Wraith is on carol's list alone" (fmap (\d -> Combat.attackersOn d stolen) [S.bob, S.carol]) [[], [wraith]]
+    -- The premises, after the gameplay assertions so neither can absorb a
+    -- mutation of them.
+    Spec.assertBool s (not (blockOf S.carol carols wraith declared)) "control: the same block is illegal before the theft, so the theft changed nothing about who may block"
+    Spec.assertEqWith s "CR 613.1b: bob controls Jace once the Graft has moved the Confiscate" (fmap (Projection.controllerOf jaceId) [declared, stolen]) [Just S.carol, Just S.bob]
+    Spec.assertBool s (Set.member jaceId (GameState.battlefield stolen)) "CR 506.4: he never left the battlefield, so this is the controller clause"
+    Spec.assertEqWith
+      s
+      "CR 506.4c: and it is still an attacking creature, its entry still naming Jace"
+      (Map.lookup wraith (Combat.Type.attackers (GameState.combat stolen)))
+      (Just (AttackTarget.OfPlaneswalker jaceId))
+    Spec.assertEqWith s "CR 802.2 both opponents defend, bob first" (Combat.Type.defenders (GameState.combat stolen)) [S.bob, S.carol]
+  Spec.it s "CR 702.14c and the same theft with the lands swapped leaves that block legal" $ do
+    -- THE FALSIFIER, differing in one thing: bob holds the Swamp and carol an
+    -- Island. An engine reading the thief's seat finds his Swamp and calls this
+    -- block illegal, which is the exact inverse of the case above.
+    (declared, stolen, wraith, _, carols, _) <- stolenByBobJaceBoard s registry "Swamp" "Island"
+    Spec.assertBool s (blockOf S.carol carols wraith stolen) "CR 702.14c: carol has no Swamp, so her block is legal however many bob holds"
+    Spec.assertBool s (blockOf S.carol carols wraith declared) "control: and it was legal before the theft too"
+  -- The same theft on the DAMAGE road: CR 506.4 took Jace out of combat, so by CR
+  -- 506.4c the Wraith is attacking nothing and CR 510.1b gives it nothing to
+  -- assign to. Nothing on the board NOW can say so -- bob is a defending player
+  -- and he controls the attacked planeswalker -- which is what
+  -- Combat.noteAttackingNothing's record of the seat answers.
+  Spec.it s "CR 510.1b the stolen planeswalker takes no combat damage from the creature that was attacking it" $ do
+    (declared, stolen, _, _, _, jaceId) <- stolenByBobJaceBoard s registry "Island" "Swamp"
+    let fight = runToEndOfCombatWith (pure . attackThePlaneswalker)
+    Spec.assertEqWith s "CR 506.4c: the theft left the Wraith attacking nothing, so Jace keeps all five loyalty" (S.counterOf CounterKind.Loyalty jaceId (fight stolen)) 5
+    Spec.assertEqWith s "control: with no Graft cast the same Wraith takes him to 2" (S.counterOf CounterKind.Loyalty jaceId (fight declared)) 2
   where
     blockOf pid blocker attacker = Combat.legalBlockDeclaration pid (Map.singleton blocker (Set.singleton attacker))
 

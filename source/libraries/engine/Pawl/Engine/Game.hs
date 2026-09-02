@@ -292,7 +292,12 @@ removeFromCombat oid gs =
             -- the attacker up in Combat.attackers first and this call has just
             -- deleted that entry. An object id is never reused, so a stale
             -- member can never be read again either.
-            Combat.attackingNothing = Set.delete oid (Combat.attackingNothing c)
+            Combat.attackingNothing = Set.delete oid (Combat.attackingNothing c),
+            -- CR 802.2a's seat belongs to an attack, so a creature that has left
+            -- combat has no place in that record either. Cleanliness rather than
+            -- a proven behavior, for the reason above: its one reader looks the
+            -- attacker up in Combat.attackers first.
+            Combat.attackedUnder = Map.delete oid (Combat.attackedUnder c)
           }
    in gs {GameState.combat = c1}
 
