@@ -1943,10 +1943,10 @@ lifeGainTriggerSpec s registry =
               Spec.assertEqWith s "bob's Pridemate did not -- losing life is not gaining it" (countersOn bobMate settled) (Just 0)
         -- The AMOUNT, which the two cases above never read: they count one
         -- event, not the size of it. Sphinx of the Revelation's "whenever you
-        -- gain life, you get that many {E}" spends CR 603.2's own binding for
-        -- it (Pawl.Engine.Binding.eventAmount), so a 4-power lifelink hit has to
+        -- gain life, you get that many {E}" reads it off the event through
+        -- Pawl.Engine.Binding.eventAmount, so a 4-power lifelink hit has to
         -- arrive as four counters and not as one.
-        Spec.it s "CR 119.9/603.2 whole card: the Sphinx's lifelink gain is worth that many energy counters" $ do
+        Spec.it s "CR 119.9/120.3f whole card: the Sphinx's lifelink gain is worth that many energy counters" $ do
           sphinx <- S.printingOf s registry "Sphinx of the Revelation"
           let (gs0, mine, _) = S.combatBoardOf [sphinx] []
           case mine of

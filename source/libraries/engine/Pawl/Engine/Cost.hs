@@ -719,7 +719,11 @@ componentDemandGrowsWithX component = case component of
   CostComponent.PayLifeX -> True
   -- CR 118.3 measures the announced amount against the energy counters the
   -- player has, so a big enough X refuses -- PayLifeX's arm above and for its
-  -- reason.
+  -- reason. `greatestPayableX` stops on the predicate either way and
+  -- Pawl.CardSpec's CR 101.1 sweep scopes to spell costs (#1985), so nothing
+  -- observes this answer at gameplay level; Pawl.CostSpec's "an unannounced
+  -- energy X is unpayable, and its demand grows with the value" is what states
+  -- it.
   CostComponent.PayEnergyX -> True
   -- FALSE, and that is CR 701.68b rather than an omission: the rule refuses a
   -- blight only where the player controls no creature, and names no number of

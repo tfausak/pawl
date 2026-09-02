@@ -2218,9 +2218,9 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
   Spec.it s "CR 107.3a/602.2b whole card: the Sphinx pays X energy and draws that many" $ do
     (sphinx, srcId, g1) <- sphinxBoard s registry 5
     let act = do Activate.activateAbility S.alice srcId (theAbility sphinx); Stack.resolveTop
-        after = snd (Engine.runGamePure (answerXAt 3 S.bob) g1 act)
-    Spec.assertEqWith s "two counters left, so the announced 3 was really spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
-    Spec.assertEqWith s "and alice drew the announced 3" (S.handSize S.alice after) 3
+        after = snd (Engine.runGamePure (answerXAt 2 S.bob) g1 act)
+    Spec.assertEqWith s "three counters left, so the announced 2 was really spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
+    Spec.assertEqWith s "and alice drew the announced 2 -- no count on this board coincides with it" (S.handSize S.alice after) 2
     Spec.assertEqWith s "the three lands and the Sphinx itself paid the rest" (S.tappedCount S.alice after) 4
     Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
 
@@ -2244,7 +2244,7 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     let after = snd (Engine.runGamePure (answerAboveBound S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility sphinx)))
     Spec.assertEqWith s "no counter spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
     Spec.assertEqWith s "nothing drawn" (S.handSize S.alice after) 0
-    Spec.assertEqWith s "no land or Sphinx tapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "no land and not the Sphinx is tapped" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
 
 -- Aims every target slot at one CREATURE. aimAt's counterpart for a board whose

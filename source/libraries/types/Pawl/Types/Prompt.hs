@@ -470,9 +470,9 @@ data Prompt r where
   -- permits is CR 101.1 and CR 101.2, refused by Cast's own gate.
   --
   -- Prompted before targets, and only when the cost declares an X -- a
-  -- ManaSymbol.Variable, a CostComponent.PayLifeX (Hatred), or a
-  -- CostComponent.BlightX (Soul Immolation); CR 107.3a is the general
-  -- statement.
+  -- ManaSymbol.Variable, a CostComponent.PayLifeX (Hatred), a
+  -- CostComponent.BlightX (Soul Immolation), or a CostComponent.PayEnergyX
+  -- (Sphinx of the Revelation); CR 107.3a is the general statement.
   ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.42a: whether this player entwines the modal spell they are
   -- casting. The Cost is what entwining adds on top of the candidate cost then
