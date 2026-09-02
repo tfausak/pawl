@@ -1589,10 +1589,10 @@ jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
 -- `data/cards/` is counted exactly one -- Bioshift's, Fate Transfer's and
 -- Resourceful Defense's `from`, Fall of the Hammer's `dealer`, and Synthetic
 -- Hammer Refrain's `dealer` per occurrence -- so for those the range is one size
--- and the product is a handful of re-derivations; Measured Refrain's gauge is
--- "up to two" and pays the subsets of size zero, one and two. A named slot
--- counted "any number" would pay every subset of its candidates, and no card in
--- the pool writes one.
+-- and the product is a handful of re-derivations; Measured Refrain's gauge, the
+-- pool's one bound-named slot, is "up to two" and pays the subsets of size zero,
+-- one and two. None of those is counted "any number", which is the count that
+-- would make this every subset of the slot's candidates.
 jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
   Map.null readers || any coherent assignments
