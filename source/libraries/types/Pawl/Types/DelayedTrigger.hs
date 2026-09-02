@@ -29,10 +29,11 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 -- that rule's default -- fire once, the next time the trigger event occurs -- and
 -- an entry carrying it is removed as it fires. Just an expiry keeps the entry
 -- armed through firing, and one of Pawl.Engine.Expiry's sweeps is what eventually
--- ends it (CR 514.2's cleanup, for Full Throttle's "this turn"). Firing and the
--- clock are not the only two ways an entry ends: an entry whose `window` names a
--- turn now behind us can no longer fire at all, and settleOnsets retires it
--- whatever its duration says.
+-- ends it (CR 514.2's cleanup, for Full Throttle's "this turn") -- or, for an
+-- Expiry.WhenPaid duration, CR 116.2c's payment (Synthetic Standing Bounty).
+-- Firing and the clock are not the only two ways an entry ends: an entry whose
+-- `window` names a turn now behind us can no longer fire at all, and
+-- settleOnsets retires it whatever its duration says.
 --
 -- Nothing rather than an Expiry arm meaning "once", because once-ness is not a
 -- duration: the rule words it as the ABSENCE of one, and an entry with no
