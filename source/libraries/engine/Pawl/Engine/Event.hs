@@ -919,11 +919,11 @@ conjureOntoBattlefield controller card count = do
 -- the project writes no export lists, so that name would be a public door past
 -- the check.
 --
--- Both roads in hand it the resolving controller, who by CR 800.4a controls no
--- resolving spell or ability once they have left, so the guard is reachable only
--- by driving the funnel -- which is what Pawl.EventSpec's "CR 800.4d no emblem is
--- created for a player who has left the game" does, as the conjure and token
--- cases beside it do. Gameplay reaches it the day an effect names a recipient
+-- Both roads into this funnel hand it the resolving controller, who by CR 800.4a
+-- controls no resolving spell or ability once they have left, so the guard is
+-- reachable only by driving the funnel -- which is what Pawl.EventSpec's "CR
+-- 800.4d no emblem is created for a player who has left the game" does, as the
+-- conjure and token cases beside it do. Gameplay reaches it the day an effect names a recipient
 -- other than the resolving controller.
 createEmblem :: PlayerId -> Card -> Game (Maybe ObjectId)
 createEmblem pid card = do
