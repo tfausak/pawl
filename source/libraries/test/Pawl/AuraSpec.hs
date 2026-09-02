@@ -2604,6 +2604,11 @@ cloudformBoard island piker cloudform =
 --
 -- CR 702.103c's copies hold by construction but no board in the pool mints one;
 -- see #2355.
+--
+-- The LAST case is the one board shape the paragraph above does not describe: no
+-- creature at all, and then one, because what it measures is whether CR 601.2c
+-- leaves the bestow candidate on offer. Which host the choice falls on is not its
+-- question -- the cases above own that -- so one creature is enough there.
 bestowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bestowSpec s registry = Spec.describe s "Bestow" $ do
   -- THE discriminating pair the issue asks for: the spell's own card types and
