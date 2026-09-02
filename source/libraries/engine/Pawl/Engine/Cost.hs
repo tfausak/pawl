@@ -805,7 +805,7 @@ announce subject spending pid oid total_ cost = case Cost.mana cost of
     -- The claims are read here rather than inside Mana.announce, which cannot
     -- reach claimOf -- this module imports that one, not the other way about.
     gs <- State.get
-    (announced, life, paidWithLife) <- Mana.announce subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
+    (announced, life, paidWithLife) <- Mana.announce subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost
     pure
       ( cost
           { Cost.mana = Just announced,
@@ -1284,15 +1284,16 @@ tapObject = Event.tap
 -- A `*This` arm whose own guard fails answers an EMPTY pool rather than Nothing,
 -- which keeps this in agreement with canPayComponent.
 --
--- Every pool is read against `gateSlots`, canPayComponent's reading and for its
--- reason.
+-- Every pool is read against `slots`, canPayComponent's reading and for its
+-- reason: CR 601.2c's bindings where the caller has them, and the empty map
+-- where no announcement is behind the payment at all.
 --
 -- EXHAUSTIVE with no wildcard, this module's posture, and -Werror makes it.
-claimOf :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
-claimOf pid oid component gs = case component of
+claimOf :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
+claimOf slots pid oid component gs = case component of
   -- CR 701.21a: the permanents this player controls that match the criterion.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates gateSlots pid (Just oid) criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs)) n
   CostComponent.SacrificeThis ->
     claim
       (ClaimAxis.Removal Zone.Battlefield)
@@ -1324,7 +1325,7 @@ claimOf pid oid component gs = case component of
       )
       1
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
-    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates gateSlots pid oid criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (discardCandidates slots pid oid criterion gs)) n
   CostComponent.DiscardThis _ -> claim (ClaimAxis.Removal Zone.Hand) (itself (isOwnedIn Zone.Hand)) 1
   -- The same hand pool the two arms above claim, and on the same axis: what the
   -- payment spends is a card leaving the hand, and the battlefield end adds a
@@ -1332,12 +1333,12 @@ claimOf pid oid component gs = case component of
   -- every printing of this cost is a CR 118.12 offer, which `repeatsOf` never
   -- measures, so no board separates this from any other axis.
   CostComponent.PutCardFromHandOntoBattlefield criterion ->
-    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (putOntoBattlefieldCandidates gateSlots pid oid criterion gs)) 1
+    claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (putOntoBattlefieldCandidates slots pid oid criterion gs)) 1
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates gateSlots pid criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (exileCandidates slots pid criterion gs)) n
   -- A pool of at most ONE, CR 404.2's order having picked it.
   CostComponent.ExileTopFromGraveyard criterion ->
-    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate gateSlots pid criterion gs))) 1
+    claim (ClaimAxis.Removal Zone.Graveyard) (Set.fromList (Maybe.maybeToList (topExileCandidate slots pid criterion gs))) 1
   CostComponent.ExileThisFromGraveyard -> claim (ClaimAxis.Removal Zone.Graveyard) (itself (isOwnedIn Zone.Graveyard)) 1
   -- CR 701.17a spends cards out of the paying player's own library, so the pool
   -- is that library and the count is how many the mill takes -- the ZONE keying a
@@ -1375,7 +1376,7 @@ claimOf pid oid component gs = case component of
   -- excludes them (Pawl.Engine.Keyword's crew), so a crew cost's pool is the
   -- untapped creatures exactly.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower threshold criterion)
-    | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates gateSlots pid oid criterion gs)) 1
+    | threshold > 0 -> claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) 1
     | otherwise -> Nothing
   -- CR 601.2f's "tapping permanents", on the TAPPING axis rather than a zone's,
   -- for the header's reason. ManaSpec's "a creature tapped for mana can still be
@@ -1385,7 +1386,7 @@ claimOf pid oid component gs = case component of
   -- the PERMISSIVE reading where a criterion omits "untapped", unobservable
   -- since an already-tapped candidate spends no untapped-ness.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
-    claim ClaimAxis.Tapping (Set.fromList (tapCandidates gateSlots pid oid criterion gs)) n
+    claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) n
   -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis
   -- and not the tapping one: a permanent returned to hand is as gone from the
   -- battlefield as one sacrificed, so a cost that returns and a cost that
@@ -1396,7 +1397,7 @@ claimOf pid oid component gs = case component of
   -- Hall's condition groups a single claim and keying it ClaimAxis.Tapping
   -- instead leaves the suite green.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
-    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates gateSlots pid oid criterion gs)) n
+    claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates slots pid oid criterion gs)) n
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
@@ -1429,15 +1430,15 @@ claimOf pid oid component gs = case component of
 -- Lord's "Sacrifice a Swamp and a Forest" beside one Bayou tells the two readings
 -- apart. Pawl.Engine.Claim.satisfiable carries the per-axis grouping and Hall's
 -- condition; this module's part is which components claim, and on which axis.
-jointlyPayable :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
-jointlyPayable pid oid components gs = Claim.satisfiable (claimsOf pid oid components gs)
+jointlyPayable :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
+jointlyPayable slots pid oid components gs = Claim.satisfiable (claimsOf slots pid oid components gs)
 
 -- Everything these components will spend out of a pool of objects, on whichever
 -- axis each spends it (Pawl.Types.ClaimAxis) -- what `jointlyPayable` asks
 -- Hall's condition of, and what the MANA side is handed to ask it of these
 -- claims and its sources' together.
-claimsOf :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> [Claim]
-claimsOf pid oid components gs = Maybe.mapMaybe (\component -> claimOf pid oid component gs) components
+claimsOf :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> [Claim]
+claimsOf slots pid oid components gs = Maybe.mapMaybe (\component -> claimOf slots pid oid component gs) components
 
 -- CR 118.3: a player can't pay a cost without the resources to pay it fully. The
 -- mana part AND every component, measured against the CURRENT state, before any
@@ -1451,6 +1452,12 @@ claimsOf pid oid components gs = Maybe.mapMaybe (\component -> claimOf pid oid c
 -- DIFFERENT spells each paying its own cost. Both are handed ACROSS the halves,
 -- since a Phyrexian Tower tapped for {B} has already eaten the creature Village
 -- Rites' additional cost then wants.
+--
+-- SLOTLESS, and exactly so rather than as a shortcut: every caller is a special
+-- action or CR 118.12's resolution-time payment, and no announcement stands
+-- behind either, so there is no binding a criterion could read (Pawl.CardSpec's
+-- SlotlessCostFramed). The gates that DO sit in front of an announcement take
+-- their slots as an argument (canPaySomeCompletion below).
 canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
@@ -1460,9 +1467,9 @@ canPay pid oid cost gs = case Cost.mana cost of
     -- resolution-time payment -- so the mana is spent as it is, and CR
     -- 106.6-restricted mana is no supply for any of them: neither of CR 106.6's
     -- two subjects is one of these payments (ForNeither).
-    Mana.canPayCommitting PaymentSubject.ForNeither (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
-      && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
-      && jointlyPayable pid oid (Cost.components cost) gs
+    Mana.canPayCommitting PaymentSubject.ForNeither (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost gs
+      && all (\component -> canPayComponent Map.empty pid oid component gs) (Cost.components cost)
+      && jointlyPayable Map.empty pid oid (Cost.components cost) gs
 
 -- How many times may this player activate this mana ability, right now, and what
 -- does one activation spend? CR 605.3b keeps a mana ability off the stack, so
@@ -1539,8 +1546,8 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         Mana.ForOffer -> manaPartPayable effects adjustments pid oid cost gs
         Mana.ForSupply -> Maybe.isJust (Cost.mana cost)
    in if payable
-        && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
-        && jointlyPayable pid oid (Cost.components cost) gs
+        && all (\component -> canPayComponent Map.empty pid oid component gs) (Cost.components cost)
+        && jointlyPayable Map.empty pid oid (Cost.components cost) gs
         && sicknessOkGiven pcs pid oid cost gs
         -- CR 701.35a's "its activated abilities can't be activated", which reaches a
         -- mana ability too. Here rather than in Mana.manaSourcesGiven, because this
@@ -1564,7 +1571,7 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
               -- every activation still has to find that mana again. Both readers
               -- hand this function the same cost, so both get the same count.
               Activations.times = repeatsOf pid oid cost gs,
-              Activations.claims = claimsOf pid oid (Cost.components cost) gs,
+              Activations.claims = claimsOf Map.empty pid oid (Cost.components cost) gs,
               Activations.life = lifeOwedBy (Cost.components cost)
             }
         else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
@@ -1623,7 +1630,7 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
             ManaSpending.AsProduced
             pid
             (lifeOwedBy (Cost.components cost))
-            (claimsOf pid oid (Cost.components cost) gs)
+            (claimsOf Map.empty pid oid (Cost.components cost) gs)
             totalled
             gs
       )
@@ -1667,7 +1674,7 @@ repeatsOf pid oid cost gs = case Cost.mana cost of
   _ -> 1
   where
     components = Cost.components cost
-    claims = claimsOf pid oid components gs
+    claims = claimsOf Map.empty pid oid components gs
     objectCeiling = if null claims then [] else [Claim.repeats claims]
     lifeCeiling = case lifeOwedBy components of
       0 -> []
@@ -1751,10 +1758,10 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- nothing double-counts and CR 118.3 makes it one demand with the components'.
 -- `total` answers MANY totals, one per CR 118.7e resolution, and this asks `any`
 -- of them: a cost this gate refuses has to be one NO half could have paid (#595).
-canPaySomeCompletion :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletion subject spending pid oid total_ cost gs =
+canPaySomeCompletion :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletion slots subject spending pid oid total_ cost gs =
   let pcs = Projection.projectAll gs
-   in canPaySomeCompletionGiven subject spending (supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ cost gs
+   in canPaySomeCompletionGiven slots subject spending (supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ cost gs
 
 -- The mana sources CR 605.3a OFFERS: every permanent this player could tap for
 -- mana right now, whatever that tap itself costs. ONE function pairing
@@ -1820,12 +1827,12 @@ stackedManaActivations effects measure pcs pid oid cost restrictions gs =
 -- above and nothing else. ONLY the mana half gets the pre-walked board -- the
 -- COMPONENTS are still asked through canPayComponent, whose Sacrifice and
 -- TapForTotalPower arms make per-object walks of their own (#1448).
-canPaySomeCompletionGiven :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletionGiven subject spending sources pcs pid oid total_ cost gs = case Cost.mana cost of
+canPaySomeCompletionGiven :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
-        claimed = claimsOf pid oid (Cost.components cost) gs
+        claimed = claimsOf slots pid oid (Cost.components cost) gs
         -- One player-effect gather for the whole question, shared by every
         -- source Mana.manaSuppliesGiven measures under it.
         --
@@ -1851,8 +1858,8 @@ canPaySomeCompletionGiven subject spending sources pcs pid oid total_ cost gs = 
             (\totalled -> Mana.canPayCommittingGiven subject hoisted spending sources pcs pid (outside + life) claimed totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
-          && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
-          && jointlyPayable pid oid (Cost.components cost) gs
+          && all (\component -> canPayComponent slots pid oid component gs) (Cost.components cost)
+          && jointlyPayable slots pid oid (Cost.components cost) gs
 
 -- CR 119.4's payments a cost owes OUTSIDE its mana part, added up -- what CR
 -- 118.3 makes the mana part's own life share a total with. Total, so a new
@@ -1928,8 +1935,11 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.ExileTopFromGraveyard _ -> 0
   CostComponent.MillCards _ -> 0
 
-canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
-canPayComponent pid oid component gs = case component of
+-- CR 118.3 for ONE component. `slots` is what CR 601.2c has bound, or would bind
+-- under the announcement the caller is measuring; every criterion below is read
+-- against it, so a gate and CR 601.2h's payment answer one question.
+canPayComponent :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
+canPayComponent slots pid oid component gs = case component of
   -- CR 107.5: a permanent that's already tapped can't be tapped again to pay the
   -- cost.
   CostComponent.TapThis -> case Game.lookupObject oid gs of
@@ -1975,7 +1985,7 @@ canPayComponent pid oid component gs = case component of
   -- component ALONE, PayLife's caveat -- two Sacrifice components of one cost can
   -- each find the same permanent here, and `jointlyPayable` asks them together.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
-    Natural.length (Replacement.sacrificeCandidates gateSlots pid (Just oid) criterion gs) >= n
+    Natural.length (Replacement.sacrificeCandidates slots pid (Just oid) criterion gs) >= n
   -- CR 702.122a: payable iff SOME subset of the candidates reaches the
   -- threshold, decided without enumerating one -- the greatest total any subset
   -- can reach is the sum of the candidates' POSITIVE powers, since adding one of
@@ -1983,7 +1993,7 @@ canPayComponent pid oid component gs = case component of
   -- rather than a bound, and `>=` because CR 702.122a says "or greater". A
   -- threshold of 0 is payable by the empty set, with no special case.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) ->
-    sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates gateSlots pid oid criterion gs)) >= toInteger n
+    sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates slots pid oid criterion gs)) >= toInteger n
   -- Sacrifice's arm read over tapping: the count is HOW MANY, so the question is
   -- a size and not a sum. "Untapped" is not asked here and is not missing -- CR
   -- 107.5's exclusion is not this component's, so a card that wants it prints it
@@ -1991,7 +2001,7 @@ canPayComponent pid oid component gs = case component of
   -- Sacrifice's caveat; ManaSpec's "one creature cannot pay for both Drums" is
   -- the test that `jointlyPayable` asks them together.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
-    Natural.length (tapCandidates gateSlots pid oid criterion gs) >= n
+    Natural.length (tapCandidates slots pid oid criterion gs) >= n
   -- CR 118.3: this player must have at least `n` permanents the criterion
   -- admits to return. TapPermanents' arm above over a different action, and
   -- WITHOUT CR 101.2's sacrifice prohibition for the reason ReturnThis' arm
@@ -2001,7 +2011,7 @@ canPayComponent pid oid component gs = case component of
   -- Pawl.CostSpec asks this function directly: relaxing this arm alone leaves
   -- the gate green, `jointlyPayable`'s empty pool refusing the same activation.
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
-    Natural.length (returnCandidates gateSlots pid oid criterion gs) >= n
+    Natural.length (returnCandidates slots pid oid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards the
   -- criterion admits -- Magmatic Insight is uncastable out of a landless hand
   -- however many cards it holds.
@@ -2012,14 +2022,14 @@ canPayComponent pid oid component gs = case component of
   -- while the card is still in hand -- without it a hand of "Cathartic Reunion
   -- plus one other card" would offer the Reunion on the strength of itself.
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
-    Natural.length (discardCandidates gateSlots pid oid criterion gs) >= n
+    Natural.length (discardCandidates slots pid oid criterion gs) >= n
   -- CR 118.3: payable only if the hand holds a card the criterion admits. This
   -- is what keeps Hakbal of the Surging Soul's landless controller from being
   -- offered a cost they cannot pay -- CR 118.12's offer is gated on
   -- affordability by Resolve.payGatePaidBy, so an empty pool takes the "doesn't"
   -- branch with no prompt at all.
   CostComponent.PutCardFromHandOntoBattlefield criterion ->
-    not (null (putOntoBattlefieldCandidates gateSlots pid oid criterion gs))
+    not (null (putOntoBattlefieldCandidates slots pid oid criterion gs))
   -- CR 702.29a: payable only while the card is in the paying player's hand.
   -- Asked of the zone and the owner rather than of control, CR 108.4 giving a
   -- card in a hand no controller and CR 400.3 putting it in its OWNER's.
@@ -2038,11 +2048,11 @@ canPayComponent pid oid component gs = case component of
   -- rather than merely unpaid, which is what puts the additional cost INSIDE the
   -- total cost as CR 601.2f says. This component ALONE, Sacrifice's caveat.
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
-    Natural.length (exileCandidates gateSlots pid criterion gs) >= n
+    Natural.length (exileCandidates slots pid criterion gs) >= n
   -- CR 118.3 again: payable only if the graveyard holds a matching card at all,
   -- since the top one is then determined.
   CostComponent.ExileTopFromGraveyard criterion ->
-    Maybe.isJust (topExileCandidate gateSlots pid criterion gs)
+    Maybe.isJust (topExileCandidate slots pid criterion gs)
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters.
   CostComponent.PayEnergy n -> energyOf pid gs >= n
@@ -2113,20 +2123,48 @@ announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
   Nothing -> Map.empty
   Just obj -> Binding.slotObjects (Object.bindings obj)
 
--- The slot map a payability GATE reads: none. canPay, canPayComponent, claimOf
--- and canPaySomeCompletionGiven are asked before CR 601.2c has chosen anything
--- -- Pawl.Engine.Cast.payableCost and Pawl.Engine.Activate.aimingSomewhere both
--- gate an offer -- and by the special actions and CR 118.12's resolution-time
--- payment, whose costs no announcement binds a slot for (Pawl.CardSpec's
--- SlotlessCostFramed).
+-- Does this cost's payability DEPEND on what CR 601.2c binds? A criterion that
+-- names no slot answers the same against every slot map, so a gate measuring
+-- such a cost may read the empty one and be exact; one that names a slot may
+-- not, and its gate owes the lookahead over the announcements still open
+-- (Pawl.Engine.Cast.payableCostAt, Pawl.Engine.Activate.aimingSomewhere).
 --
--- Not implemented: a gate that reads the slots an aiming would bind, so a
--- slot-reading criterion is judged the same way at the offer as at the
--- payment. Filter.IsBound is False against this map, which over-admits a "not
--- the target" criterion at the gate -- CR 601.2h's payment then refuses and
--- rewinds -- and refuses a positive one the payment would accept (#2943).
-gateSlots :: Map.Map SlotName.SlotName (Set.Set ObjectId)
-gateSlots = Map.empty
+-- The classification is a Filter's, never a component's identity: every
+-- criterion a component carries goes through Filter.boundSlots.
+readsBoundSlot :: Cost Keyword.Type.Keyword -> Bool
+readsBoundSlot = not . all (Set.null . Set.unions . fmap Filter.boundSlots . criteriaOf) . Cost.components
+
+-- Every criterion a cost component carries, as the Filters a slot name could
+-- hide in. EXHAUSTIVE with no wildcard, claimOf's posture: a new component with
+-- a criterion has to answer here or the gate above stops seeing it.
+criteriaOf :: CostComponent.CostComponent Keyword.Type.Keyword -> [Filter.Type.Filter Keyword.Type.Keyword]
+criteriaOf component = case component of
+  CostComponent.Sacrifice sacrifice -> [Sacrifice.whichPermanents sacrifice]
+  CostComponent.TapForTotalPower tap -> [TapForTotalPower.whichPermanents tap]
+  CostComponent.TapPermanents tap -> [TapPermanents.whichPermanents tap]
+  CostComponent.ReturnPermanents ret -> [ReturnPermanents.whichPermanents ret]
+  CostComponent.DiscardCards discard -> [DiscardCards.whichCards discard]
+  CostComponent.PutCardFromHandOntoBattlefield criterion -> [criterion]
+  CostComponent.ExileCardsFromGraveyard exile -> [ExileCardsFromGraveyard.whichCards exile]
+  CostComponent.ExileTopFromGraveyard criterion -> [criterion]
+  -- The rest carry no criterion at all: each names either the source object or
+  -- a bare amount.
+  CostComponent.TapThis -> []
+  CostComponent.UntapThis -> []
+  CostComponent.SacrificeThis -> []
+  CostComponent.ReturnThis -> []
+  CostComponent.PayLife _ -> []
+  CostComponent.PayLifeX -> []
+  CostComponent.DiscardThis _ -> []
+  CostComponent.PayEnergy _ -> []
+  CostComponent.AddLoyaltyToThis _ -> []
+  CostComponent.RemoveLoyaltyFromThis _ -> []
+  CostComponent.RemovePlusOneCountersFromThis _ -> []
+  CostComponent.PutPlusOneCountersOnThis _ -> []
+  CostComponent.Blight _ -> []
+  CostComponent.BlightX -> []
+  CostComponent.ExileThisFromGraveyard -> []
+  CostComponent.MillCards _ -> []
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
 -- the PAYER's (payComponents below).
@@ -2319,7 +2357,7 @@ announceToll pid charges = go [] 0 charges
           -- toll still needs, and what earlier answers have already spent.
           let others = concatMap symbolsOf done <> concatMap symbolsOf rest
               total_ mana = [ManaCost.MkManaCost (ManaCost.unwrap mana <> others)]
-              claimed = concatMap (\(t, c) -> claimsOf pid t (Cost.components c) gs) charges
+              claimed = concatMap (\(t, c) -> claimsOf Map.empty pid t (Cost.components c) gs) charges
           (settled, life, _) <-
             Mana.announce
               PaymentSubject.ForNeither
