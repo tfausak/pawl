@@ -33,6 +33,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -64,6 +65,7 @@ import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
@@ -1716,13 +1718,36 @@ concedeAnswer p = case p of
   Prompt.Concede _ -> Concession.Concedes
   _ -> S.identityAnswer p
 
+-- Pawl.Cards.redDeck's seven printings at a quarter of the size, mirrored: four
+-- Mountains, two each of Goblin Piker and Bird Maiden, one of each other spell.
+-- A play-lands-only game of it decks out (CR 704.5b) in a dozen turns rather
+-- than a hundred, and every case below records one such game and replays it,
+-- which is what keeps them clear of CI's per-case budget: the 60-card mirror
+-- ran them at 6-13s against 15s, see #2947. What the cases claim is about the
+-- round trip, not the game's length, and the transcript still carries CR
+-- 103.3's shuffles, CR 103.5's mulligan decisions, CR 117's action choices and
+-- CR 514.1's cleanup discards -- the spell count is what keeps a hand over
+-- seven, so trimming it below the land count loses the discards.
+shortRed :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
+shortRed s registry = do
+  let fetch = S.printingOf s registry
+  mountain <- fetch "Mountain"
+  piker <- fetch "Goblin Piker"
+  birdMaiden <- fetch "Bird Maiden"
+  bolt <- fetch "Lightning Bolt"
+  blaze <- fetch "Blaze"
+  dragonFodder <- fetch "Dragon Fodder"
+  chaosCharm <- fetch "Chaos Charm"
+  let deck = Deck.fromCards (Map.fromList [(mountain, 4), (piker, 2), (birdMaiden, 2), (bolt, 1), (blaze, 1), (dragonFodder, 1), (chaosCharm, 1)])
+  pure (Setup.mirror deck S.bothPlayers)
+
 -- The starting state, the game program, and a transcript recorded with
 -- playLandAnswer (whose choices differ from Replay's exhausted-transcript
 -- fallback, keeping the assertions below honest: the transcript has to
 -- actually carry the decisions).
 recordedGame :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, Game.Type.Game Result.Result, GameState.GameState, [Response.Response])
 recordedGame s registry = do
-  matchup <- S.redRed (S.printingOf s registry)
+  matchup <- shortRed s registry
   let start = Setup.emptyGame (fmap fst matchup)
       game = Engine.playFrom matchup
       ((_, recorded), transcript) = Replay.record S.playLandAnswer start game
