@@ -1058,9 +1058,9 @@ repeatedExtraTurnSpec s registry = Spec.describe s "RepeatedExtraTurn" $ do
     -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
     -- mutation. Heads, tails, heads, heads, tails: THREE is a reading no other
     -- implementation produces -- one turn regardless gives [alice, bob, ...],
-    -- the coin COUNT gives five of alice's turns, and the tally of flips WON
-    -- under Replay.defaultAnswer's call of heads would give the same three
-    -- only by coincidence, which the tails-called control below rules out.
+    -- the coin COUNT gives five of alice's turns. A tally of flips WON would
+    -- agree here, since Replay.defaultAnswer calls heads; that the -7 asks no
+    -- call at all is Pawl.CoinSpec's "Odds asks no call" case's business.
     -- Read by running the turns, since CR 500.7 is about who takes them.
     let (after, flips) = useMinusSeven [CoinFace.Heads, CoinFace.Tails, CoinFace.Heads, CoinFace.Heads, CoinFace.Tails] ral oid gs
     Spec.assertEqWith
