@@ -4096,6 +4096,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
   -- Filter -- rule 702.25a's "without flanking".
   TriggerCondition.SelfBecomesBlockedBy f -> unframed [f]
+  -- The same rule read by a BYSTANDER, whose Filter is over the ATTACKER instead
+  -- -- CR 701.54c's "your Ring-bearer".
   TriggerCondition.PermanentBecomesBlockedBy f -> unframed [f]
   -- The same rule's attacking-side form, whose Filter is a predicate over the
   -- blockers -- Serra Inquisitors' "black".

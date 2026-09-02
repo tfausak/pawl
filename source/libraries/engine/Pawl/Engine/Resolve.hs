@@ -3458,15 +3458,6 @@ recipientSeat gs recipient = case recipient of
   Recipient.ToPlayer pid -> Just pid
   _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerWithLastKnown oid gs
 
--- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING
--- stack object's live bindings rather than out of `chosen`, which projects CR
--- 601.2c's targets only. Live is what lets a later effect of the same resolution
--- name what an earlier Create minted.
---
--- A Just here wins over the slot's target, which would skip a CR 608.2b
--- re-validation. One Binding can carry both fields, but a Pawl.CardSpec lint
--- ("no delayed ability declares a target slot under a name its card defines")
--- rules the case out, so this arm never actually chooses.
 -- CR 701.21a: the permanent's OWN controller sacrifices it, which is the only
 -- player that rule lets sacrifice anything -- "a player can't sacrifice ...
 -- something that's a permanent they don't control". Read live rather than at the
@@ -3489,6 +3480,15 @@ sacrificeByController oid = do
   gs <- State.get
   Monad.forM_ (Projection.controllerOf oid gs) (\pid -> Event.sacrifice pid oid)
 
+-- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING
+-- stack object's live bindings rather than out of `chosen`, which projects CR
+-- 601.2c's targets only. Live is what lets a later effect of the same resolution
+-- name what an earlier Create minted.
+--
+-- A Just here wins over the slot's target, which would skip a CR 608.2b
+-- re-validation. One Binding can carry both fields, but a Pawl.CardSpec lint
+-- ("no delayed ability declares a target slot under a name its card defines")
+-- rules the case out, so this arm never actually chooses.
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
 slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
 

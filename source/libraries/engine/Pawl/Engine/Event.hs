@@ -5134,7 +5134,10 @@ sacrifice pid oid = do
       -- rather than trusted from each caller -- the callers are a cost payment, a
       -- trigger's own source, `apply`'s CR 614.1c as-enters sacrifice, and an
       -- edict whose victim a player NAMED, and only the last of those could ever
-      -- be wrong.
+      -- be wrong. Resolve's Effect.Sacrifice road asks the same question of the
+      -- permanent before it gets here (Resolve.sacrificeByController), since a
+      -- printed "its controller sacrifices it" names a player this arm could only
+      -- refuse.
       Zone.Battlefield
         | Projection.controllerOf oid gs /= Just pid -> pure ()
         -- CR 101.2: "if a rule or effect allows or directs something to happen,
