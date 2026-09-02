@@ -1,4 +1,6 @@
--- Covers Pawl.Engine.Setup and Pawl.Types.Deck: setup, deck composition, opening hands.
+-- Covers Pawl.Engine.Setup and Pawl.Types.Deck: setup, deck composition, opening
+-- hands, and the two funnels that rebuild a game's object pool -- CR 727's
+-- restart and CR 729's subgame teardown.
 module Pawl.SetupSpec where
 
 import qualified Data.Foldable as Foldable
@@ -9,6 +11,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -18,6 +21,7 @@ import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -41,17 +45,20 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OutsideObject as OutsideObject
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -367,6 +374,33 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     Spec.assertEqWith s "the battlefield is empty after the rebuild" (Set.null (GameState.battlefield after)) True
     Spec.assertEqWith s "every rebuilt object is owned by alice or bob (ownership preserved)" (all (\o -> Object.owner o == S.alice || Object.owner o == S.bob) (Map.elems (GameState.objects after))) True
 
+  -- CR 727.2 carries CARDS into the restarted game, and CR 108.2 makes each half
+  -- of a melded permanent one: "one object represented by two cards" (CR
+  -- 701.42a). So the permanent itself must not come back and both of its cards
+  -- must, which is CR 712.21's split read at a funnel that is not a zone change.
+  --
+  -- alice's five Mountains ride along as the discriminator on the other side: a
+  -- rebuild that dropped every object would satisfy the "no melded permanent
+  -- survives" assertion on its own.
+  Spec.it s "CR 727.2/712.21 a restart carries both cards of a melded permanent into the new game" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (meldedId, board) = meldedBoard (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        components = componentsOn meldedId board
+        after = snd (Engine.runGamePure S.identityAnswer board (Setup.restartGame S.performer Set.empty S.alice))
+        -- CR 103.5's opening draw runs inside the restart, so a card that came
+        -- back is in the library or the hand and which one is the shuffle's
+        -- business rather than this rule's.
+        hers = Game.zoneMembers Zone.Library S.alice after <> Game.zoneMembers Zone.Hand S.alice after
+        sources = sourcesOf hers after
+    -- Setup, read off the board going IN, so nothing here can absorb a mutation
+    -- of the funnel under test.
+    Spec.assertEqWith s "setup: the pair really melded into one permanent representing two cards" (length components) 2
+    Spec.assertEqWith s "CR 727.2/712.21 both cards representing the melded permanent are in alice's rebuilt game" (filter (\p -> elem (Source.OfCard p) sources) components) components
+    Spec.assertEqWith s "and no object left in the new game is represented by two cards: the permanent is no card at all (CR 108.2)" (all (null . Game.componentsOf . Object.source) (Map.elems (GameState.objects after))) True
+    Spec.assertEqWith s "alice's five Mountains came back beside them" (length hers) 7
+
   Spec.it s "CR 400.7: startGameFromCards puts each card into the library as a NEW object, with no per-incarnation state" $ do
     -- Every one of alice's and bob's 8 owned cards carries the full set of
     -- per-incarnation state -- a chosen colour, a chosen land type, a chosen
@@ -387,6 +421,37 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- would pass no matter what startGameFromCards does.
     Spec.assertEqWith s "the pool going in genuinely carried per-incarnation state" (not (all forgotten (Map.elems (GameState.objects g2)))) True
     Spec.assertEqWith s "every rebuilt object forgot its previous existence" (all forgotten (Map.elems (GameState.objects after))) True
+
+  -- CR 903.9c is the shape the restart's own rule 903.6 needs for a melded
+  -- commander: "that permanent and each component representing it that isn't a
+  -- commander are put into the appropriate zone, and the card that represents it
+  -- and is a commander is put into the command zone". Nothing extra implements
+  -- it -- the split runs before startGameFromCards reads the pool, so
+  -- Commander.isCommander recognises the component card and the existing CR
+  -- 903.6 hold-back does the rest.
+  --
+  -- A PAIR of restarts differing in the designation alone, so the command zone's
+  -- one card cannot be read as something a restart does to any melded permanent.
+  Spec.it s "CR 903.6/903.9c a restarted Commander game puts the melded commander's own card into the command zone and its partner into the deck" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (meldedId, board) = meldedBoard (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        components = componentsOn meldedId board
+        designating printingId gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just printingId}) S.alice (GameState.players gs)}
+        restarted gs = snd (Engine.runGamePure S.identityAnswer gs (Setup.restartGame S.performer Set.empty S.alice))
+        deckOf gs = Game.zoneMembers Zone.Library S.alice gs <> Game.zoneMembers Zone.Hand S.alice gs
+    case components of
+      [first, second] -> do
+        let designated = restarted (designating first board)
+            control = restarted board
+        Spec.assertEqWith s "CR 903.9c the command zone holds the component card alice designated, and only it" (sourcesOf (Set.toAscList (GameState.command designated)) designated) [Source.OfCard first]
+        Spec.assertEqWith s "CR 903.6 its partner is in her deck instead" (elem (Source.OfCard second) (sourcesOf (deckOf designated) designated)) True
+        Spec.assertEqWith s "and the designated card is not also in her deck" (elem (Source.OfCard first) (sourcesOf (deckOf designated) designated)) False
+        -- The control leg: the same board, the same restart, no designation.
+        Spec.assertEqWith s "with neither half designated the command zone stays empty (CR 903.6)" (Set.toAscList (GameState.command control)) []
+        Spec.assertEqWith s "and both cards are in her deck" (filter (\c -> elem (Source.OfCard c) (sourcesOf (deckOf control) control)) components) components
+      _ -> Spec.assertFailure s "the Hanweir pair should meld into a permanent representing two cards"
 
   Spec.it s "CR 727.1a: the starting player is the restart's controller, at the head of the turn order" $ do
     -- Two restarts of the same board, controlled by different players: the
@@ -523,6 +588,46 @@ poolToLibrary pid gs =
           GameState.library = Map.insert pid (Seq.fromList mine) (GameState.library gs)
         }
 
+-- The name printed on Hanweir Battlements' combined back face, which is what the
+-- permanent that pair melds into answers to (CR 712.8g).
+townshipName :: CardName.CardName
+townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
+
+-- alice's Hanweir Battlements and Hanweir Garrison put onto `base` with the five
+-- Mountains that pay for it, and the Battlements' printed melding ability
+-- activated and resolved: the melded permanent's id, and the board it stands on.
+-- The real activation rather than the Meld opcode, so what the two cases below
+-- hand these funnels is a board the game can reach.
+--
+-- Duplicated from Pawl.MeldSpec's `meldedThrough` rather than hoisted into
+-- Pawl.Support, which rebuilds every spec in the tree.
+meldedBoard :: GameState.GameState -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (Maybe ObjectId.ObjectId, GameState.GameState)
+meldedBoard base battlements garrison mountain =
+  let (battlementsId, g1) = S.addCreature battlements S.alice base
+      (_, g2) = S.addCreature garrison S.alice g1
+      board =
+        (S.landsFor mountain S.alice 5 g2)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+   in case Projection.abilitiesOf battlementsId board of
+        [_, _, melding] ->
+          let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice battlementsId melding; Stack.resolveTop)
+              township = filter (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just townshipName) (Game.zoneMembers Zone.Battlefield S.alice after)
+           in (Maybe.listToMaybe township, after)
+        _ -> (Nothing, board)
+
+-- The printings representing `oid` on `gs`, which for a melded permanent is CR
+-- 701.42a's two cards and for anything else is nothing.
+componentsOn :: Maybe ObjectId.ObjectId -> GameState.GameState -> [PrintingId.PrintingId]
+componentsOn oid gs = foldMap (Foldable.toList . Game.componentsOf . Object.source) (oid >>= (`Game.lookupObject` gs))
+
+-- What each of `oids` is made of on `gs`, for an assertion that a component card
+-- came back as an ordinary card object of its own.
+sourcesOf :: [ObjectId.ObjectId] -> GameState.GameState -> [Source.Source]
+sourcesOf oids gs = Maybe.mapMaybe (fmap Object.source . (`Game.lookupObject` gs)) oids
+
 subgameSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 729.2: subgameStateFrom takes ONLY library cards; battlefield/hand do not enter" $ do
@@ -592,6 +697,29 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "no object id collides (object count = survivors + returned cards)" (battlefieldSurvivors + libCount S.alice + libCount S.bob) (Map.size (GameState.objects after))
     Spec.assertEqWith s "the subgame genuinely minted fresh ids (drawCard's changeZone, CR 400.7)" (GameState.nextObjectId finalSub > GameState.nextObjectId sub0) True
     Spec.assertEqWith s "the id supply advanced to exactly the subgame high-water mark" (GameState.nextObjectId after) (GameState.nextObjectId finalSub)
+
+  -- CR 729.5's funnel is the second place a melded permanent has to be read as
+  -- CR 108.2's two cards: "each player takes all traditional cards they own that
+  -- are in the subgame ... puts them into their main-game library". The subgame
+  -- ends with the permanent on its battlefield, so CR 729.5c's command-zone
+  -- exception cannot reach it and both cards go to the library.
+  Spec.it s "CR 729.5/712.21 a subgame ending with a melded permanent returns both of its cards to the main-game library" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let parent = Setup.emptyGame S.bothPlayers
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (meldedId, finalSub) = meldedBoard sub0 battlements garrison mountain
+        components = componentsOn meldedId finalSub
+        after = Setup.funnelBack finalSub parent
+        hers = Game.zoneMembers Zone.Library S.alice after
+        sources = sourcesOf hers after
+    Spec.assertEqWith s "setup: the subgame really ended with one permanent representing two cards" (length components) 2
+    Spec.assertEqWith s "CR 729.5/712.21 both cards representing the melded permanent are in alice's main-game library" (filter (\p -> elem (Source.OfCard p) sources) components) components
+    Spec.assertEqWith s "and no object left in either game is represented by two cards: the permanent is no card at all (CR 108.2)" (all (null . Game.componentsOf . Object.source) (Map.elems (GameState.objects after))) True
+    Spec.assertEqWith s "alice's five Mountains came back beside them" (length hers) 7
+    Spec.assertEqWith s "no returned object collides with either game's ids" (Map.size (GameState.objects after)) (length hers)
+    Spec.assertEqWith s "the split minted its ids above the merged supply" (GameState.nextObjectId after > GameState.nextObjectId finalSub) True
 
   -- The gate's whole reason to exist (Pawl.Engine.Departure's continuesAfterDeparture
   -- doc comment): a two-player subgame's departure is caught by CR 104.2a
