@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Binding as Binding.Type
 import Pawl.Types.Card (Card)
@@ -1093,9 +1094,32 @@ legalSetsGiven pcs grants pools perspective unannounced seed source slots gs =
       -- answers. Map.union is left-biased, so a target slot's own answer wins over
       -- a seed entry that happened to share its name.
       independent = fmap (answer seed) slots
-      dependent = fmap (answer (Map.union (fmap Binding.toRecipients independent) seed)) (Map.filter (dependsOnSlot . TargetSlot.pool) slots)
+      dependent = fmap (answer (Map.union (fmap Binding.toRecipients independent) seed)) (Map.filter (secondPass (Map.keysSet slots)) slots)
    in -- Map.union is left-biased, so the second pass wins wherever it answered.
       Map.union dependent independent
+
+-- Which slots the second pass re-answers. The POOL's dependency is one half; the
+-- CR 202.3 computed BOUND's is the other, and it is here for the pool's reason
+-- rather than for jointlyJudged's: a bound naming a sibling slot is unreadable
+-- against the seed alone, and an unreadable bound leaves ManaValueAtMostAmount
+-- vacuously False, so the first pass would offer such a slot NOTHING at all.
+-- Re-answering it against the union is the widening every other dependent slot
+-- gets, and jointlyJudged below is where the announcement is narrowed back.
+--
+-- The FILTER's dependency is deliberately not here -- see jointlyJudged, whose
+-- own note says why "another" cannot be handed the union.
+secondPass :: Set SlotName -> TargetSlot -> Bool
+secondPass declared slot =
+  dependsOnSlot (TargetSlot.pool slot)
+    || boundNamesSibling declared slot
+
+-- Does this slot's CR 202.3 computed bound read one of the announcement's OWN
+-- slots? Quantity.allSlots is the reading half of the rename CR 700.2d applies to
+-- the same field (Pawl.Engine.Modal.instanceScope), so a bound this reports is a
+-- bound that follows its mode's occurrence.
+boundNamesSibling :: Set SlotName -> TargetSlot -> Bool
+boundNamesSibling declared slot =
+  not (Set.disjoint declared (foldMap QuantitySlot.allSlots (TargetSlot.amount slot)))
 
 -- Must this slot's answer be judged against what its SIBLING slots were answered
 -- with (CR 601.2c)? Two ways one slot depends on another, and they are the pool's
@@ -1128,6 +1152,11 @@ jointlyJudged :: Set SlotName -> TargetSlot -> Bool
 jointlyJudged declared slot =
   dependsOnSlot (TargetSlot.pool slot)
     || not (Set.disjoint declared (foldMap Filter.boundSlots (TargetSlot.filter slot)))
+    -- The third read of a sibling slot, beside the pool's and the filter's: CR
+    -- 202.3's computed bound. legalSetsGiven's second pass answers such a slot
+    -- against the UNION of what the named slot could take, which for a bound is a
+    -- widening -- so this is where the announcement's own choice narrows it back.
+    || boundNamesSibling declared slot
 
 -- Does this pool's candidate set depend on what another target slot is answered
 -- with (CR 601.2c)? A ZoneScope's InSlot is the one axis that does, wherever

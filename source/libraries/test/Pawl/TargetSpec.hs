@@ -319,6 +319,32 @@ aimingRefrain dealer victim dealerTwo victimTwo p = case p of
       asked
   _ -> S.identityAnswer p
 
+-- CR 700.2d's whole announcement for Synthetic Measured Refrain with its
+-- destroy mode chosen twice: occurrence 0 fills `gauge` with TWO creatures and
+-- `victim` with one, occurrence 1 fills `gauge#1` with one and `victim#1` with
+-- one. Pinned per slot name and FILTERED out of the offered set, aimingRefrain's
+-- shape and for its reason.
+--
+-- Occurrence 0's gauge takes two and occurrence 1's takes one, which is the whole
+-- of what separates the two bounds: the slot is "up to two", so the two
+-- occurrences of one mode measure 2 and 1.
+aimingMeasured :: [ObjectId.ObjectId] -> ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingMeasured gauges victim gaugeTwo victimTwo p = case p of
+  Prompt.ChooseModes {} -> Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 0]
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let named name = slot == SlotName.MkSlotName (Text.pack name)
+              wanted
+                | named "gauge" = gauges
+                | named "victim" = [victim]
+                | named "gauge#1" = [gaugeTwo]
+                | otherwise = [victimTwo]
+           in Set.filter (maybe False (`elem` wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
+
 -- CR 601.2c's whole announcement for Bioshift: `giverId` in the `from` slot and
 -- `takerId` in the `to` slot, aimingHammer's shape and FILTERED for its reason.
 --
@@ -2088,6 +2114,83 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
       (slotNamed "victim#1")
       (Set.fromList (fmap Recipient.ToCreature [firstDealerId, secondDealerId, wallId]))
     Spec.assertEqWith s "and its dealer slot only alice's two" (slotNamed "dealer#1") (Set.fromList (fmap Recipient.ToCreature [firstDealerId, secondDealerId]))
+
+  -- The case above puts CR 601.2c's "another" -- a FILTER's read of a sibling
+  -- slot -- on a repeated mode. This is the slot's THIRD read of one, CR 202.3's
+  -- computed bound, which has to follow the occurrence exactly as the key, the
+  -- pool and the filter do: read under its printed name from occurrence 1 it
+  -- measures occurrence 0's slot, and a creature occurrence 1 could not afford
+  -- becomes a legal victim. Weaker than printed, in the caster's favour.
+  --
+  -- Synthetic Measured Refrain {2}{B} Instant
+  -- (data/cards/synthetic-measured-refrain.json): "Choose two. You may choose the
+  -- same mode more than once. -- Tap up to two target creatures you control, then
+  -- destroy target creature with mana value less than or equal to the number of
+  -- those creatures. -- Draw a card." SYNTHETIC because the two printed sets do
+  -- not intersect: Scryfall o:"choose the same mode more than once", 2026-08-31,
+  -- returns 22 cards, and no mode of any of them prints a target slot with a
+  -- computed bound.
+  --
+  -- CR 400.7j's fold over a bound slot is the bound, rather than
+  -- Quantity.AgainstSlot's power read, because the OFFER hands a dependent slot
+  -- the UNION of what the slot it names could take (legalSetsGiven): a fold over
+  -- three candidates answers 3, where a read that insists on ONE object
+  -- (Binding.onlyOne) answers nothing at all and empties the slot. The union is a
+  -- widening and selectionLegal is where the announcement is narrowed.
+  --
+  -- TWO RUNS off one board, differing in exactly one thing -- which creature fills
+  -- occurrence 1's victim slot -- with the same {2}{B} paid off the same three
+  -- Swamps, the same modes chosen and the same three Pikers in the two gauge
+  -- slots. The legal run is what keeps the rejected one from passing off a spell
+  -- that never worked.
+  --
+  -- THREE Goblin Pikers for alice rather than three printings: occurrence 0's
+  -- gauge and occurrence 1's are then indistinguishable except by slot and by how
+  -- many each holds, so a bound that measured the first is the only reading that
+  -- separates the runs.
+  Spec.it s "CR 700.2d a repeated mode's computed bound measures its own occurrence's sibling slot" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    refrain <- S.printingOf s registry "Synthetic Measured Refrain"
+    let (gaugeA, g1) = S.addCreature piker S.alice (S.landsInPlay swamp 3)
+        (gaugeB, g2) = S.addCreature piker S.alice g1
+        (gaugeC, g3) = S.addCreature piker S.alice g2
+        (victimId, g4) = S.addCreature piker S.bob g3
+        (dearId, g5) = S.addCreature piker S.bob g4
+        (cheapId, g6) = S.addCreature rats S.bob g5
+        (board, refrainId) = S.handOne refrain g6
+        run victimTwo =
+          let answer = aimingMeasured [gaugeA, gaugeB] victimId gaugeC victimTwo
+              cast = S.runPure answer board (S.cast S.alice refrainId)
+           in (cast, S.runPure answer cast Stack.resolveTop)
+        (castAtDear, atDear) = run dearId
+        (_, atCheap) = run cheapId
+        onBattlefield gs oid = elem oid (Game.zoneMembers Zone.Battlefield S.bob gs)
+        slots = Modal.modesTargetSlots (Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 0]) (Face.spell (S.combinedFace refrain))
+        offered = Target.legalSets (Just S.alice) Map.empty S.noSource slots board
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+    -- The behaviour first: occurrence 1's gauge slot holds ONE creature, so a
+    -- mana value 2 victim is not an announcement the rule allows, CR 601.2e
+    -- returns the game to before the proposal, and occurrence 0's destruction
+    -- never happens either.
+    Spec.assertBool s (onBattlefield atDear dearId) "occurrence 1 naming a mana value 2 creature against its own one-creature gauge, that creature survives: the cast is reversed (CR 601.2e)"
+    Spec.assertBool s (onBattlefield atDear victimId) "and occurrence 0's own victim, which its two-creature gauge did afford, survives with it"
+    Spec.assertBool s (not (onBattlefield atCheap victimId)) "naming the mana value 1 Rats for occurrence 1 instead, occurrence 0's victim is destroyed"
+    Spec.assertBool s (not (onBattlefield atCheap cheapId)) "and the Rats with it"
+    -- The proxies after: a cast that never happened would leave both creatures
+    -- standing too.
+    Spec.assertEqWith s "the reversed cast left nothing on the stack" (length (GameState.stack castAtDear)) 0
+    Spec.assertBool s (elem refrainId (Game.zoneMembers Zone.Hand S.alice castAtDear)) "and the spell is back in alice's hand"
+    -- The union posture, last and for the case above's reason: occurrence 1's
+    -- victim slot is still OFFERED the dearer creature at CR 601.2c, measured
+    -- against all three creatures its gauge slot could take, so the first
+    -- assertion is a joint-check rejection rather than a slot the rename emptied.
+    Spec.assertEqWith
+      s
+      "occurrence 1's victim slot is offered every creature, its own bound measured against the whole of what its gauge could take"
+      (slotNamed "victim#1")
+      (Set.fromList (fmap Recipient.ToCreature [gaugeA, gaugeB, gaugeC, victimId, dearId, cheapId]))
 
   -- CR 601.2c's sibling-slot reading in its POSITIVE form, where the case above is
   -- the negative one: "another" excludes what a sibling slot holds, and "with the

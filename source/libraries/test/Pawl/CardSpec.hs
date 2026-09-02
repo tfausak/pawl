@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 -- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
 -- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Engine.Condition may
 -- later be imported and must not collide.
@@ -1928,7 +1929,7 @@ modalCountsOffend modal =
 -- ask all three.
 modalReadsAnnouncedX :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 modalReadsAnnouncedX =
-  any (\slot -> TargetSlot.count slot == SlotCount.AnnouncedX || any (Set.member Binding.variableX . Quantity.slots) (TargetSlot.amount slot))
+  any (\slot -> TargetSlot.count slot == SlotCount.AnnouncedX || any (Set.member Binding.variableX . QuantitySlot.slots) (TargetSlot.amount slot))
     . Modal.allTargetSlots
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
@@ -2838,9 +2839,9 @@ reservedSlots =
 powerToughnessSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 powerToughnessSlots card =
   Set.unions
-    [ maybe Set.empty (Quantity.slots . Power.unwrap) (Face.power card),
-      maybe Set.empty (Quantity.slots . Toughness.unwrap) (Face.toughness card),
-      maybe Set.empty Quantity.slots (Face.characteristicPT card)
+    [ maybe Set.empty (QuantitySlot.slots . Power.unwrap) (Face.power card),
+      maybe Set.empty (QuantitySlot.slots . Toughness.unwrap) (Face.toughness card),
+      maybe Set.empty QuantitySlot.slots (Face.characteristicPT card)
     ]
 
 -- Every face a card MINTS, transitively: the faces of every token (CR 111.1)
@@ -6675,7 +6676,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- cannot see this one either.
         entryCountersReadX c =
           or
-            [ Set.member Binding.variableX (Quantity.slots q)
+            [ Set.member Binding.variableX (QuantitySlot.slots q)
             | ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters wc)) <- fmap PrintedReplacement.effect (Face.replacementEffects c),
               q <- Map.elems (WithCounters.counters wc)
             ]
@@ -7341,7 +7342,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- filter's: CR 202.3's computed bound (Resolve.targetSlotSlots). A bound may
   -- name CR 603.2's "that player" through a PlayerRef buried INSIDE the number --
   -- "with mana value X or less, where X is the amount of life that player gained
-  -- this turn" -- and Quantity.slots does not report that read, only
+  -- this turn" -- and QuantitySlot.slots does not report that read, only
   -- Quantity.nestedRefs does. Without it the pairing is invisible and a card could
   -- bound a slot by a player its condition never binds, which is the dead bound
   -- the fold exists to catch.
@@ -7370,7 +7371,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [bounded you])))
       "where a bound naming no slot at all is accepted"
-    -- And the OTHER read Quantity.slots does not report: CR 400.7j's fold, which
+    -- And the OTHER read QuantitySlot.slots does not report: CR 400.7j's fold, which
     -- names a slot outright rather than through a reference. Asserted on the map
     -- itself, there being no trigger condition that binds an ordinary target slot
     -- for the lint to accept it against.
@@ -8089,7 +8090,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- set, so it is no risk and no fence for the others either.
         --
         -- Not implemented: a PlayerRef NESTED IN a quantity -- Quantity's own
-        -- ControllerOfBound arm -- which Quantity.slots answers empty for, so the
+        -- ControllerOfBound arm -- which QuantitySlot.slots answers empty for, so the
         -- quantity leg cannot report it and nothing else looks there (#1079).
         --
         -- The condition of a DELAYED ability is a singular reader too, and it is
@@ -8263,7 +8264,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- number? A presence probe over the traversal rather than over the arm,
         -- since an effectQuantities answering [] everywhere would leave the leg
         -- silently inert.
-        readsSlotInNumber effect = not (all (Set.null . Quantity.slots) (effectQuantities effect))
+        readsSlotInNumber effect = not (all (Set.null . QuantitySlot.slots) (effectQuantities effect))
         -- A face whose first clause binds the group and whose second carries the
         -- clause-level PlayerRef on trial. Built as a FACE rather than as an
         -- effect list because the walk from a face to its clauses is the half
@@ -8409,7 +8410,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (clashes [destruction, counting (against destroyedSlot)]) "a singular read inside a number is caught"
     Spec.assertBool s (not (clashes [destruction, counting (against elsewhereSlot)])) "a singular read inside a number of another slot is left alone"
     -- The same atom under a NEST, which is the half a top-level number cannot
-    -- prove: a Quantity.slots answering the empty set for Negate would pass both
+    -- prove: a QuantitySlot.slots answering the empty set for Negate would pass both
     -- assertions above.
     Spec.assertBool s (clashes [destruction, counting (Quantity.Type.Negate (against destroyedSlot))]) "a singular read nested inside a number is caught"
     -- The OTHER slot-naming arm of a number, on the same board: Quantity.InSlot

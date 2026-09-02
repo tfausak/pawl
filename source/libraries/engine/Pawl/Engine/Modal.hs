@@ -1,8 +1,10 @@
 -- Mode-scoped structural reads over a Modal payload (CR 700.2), shared by the
 -- spell (Face.spell) and both ability types. Parametric in `card`, and its only
--- engine import is Pawl.Engine.Filter, which reaches no further than
--- Pawl.Engine.Keyword and Pawl.Engine.Binding -- so there is no cycle, and
--- Pawl.Engine.Card imports THIS.
+-- engine imports are Pawl.Engine.Filter and Pawl.Engine.QuantitySlot, neither of
+-- which reaches further than Pawl.Engine.Keyword and Pawl.Engine.Binding -- so
+-- there is no cycle, and Pawl.Engine.Card imports THIS. Pawl.Engine.Quantity
+-- itself is out of reach: it reads a board, so it sits above Pawl.Engine.Game,
+-- which imports Pawl.Engine.Card.
 module Pawl.Engine.Modal where
 
 import qualified Data.Foldable as Foldable
@@ -16,6 +18,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import Pawl.Types.Effect (Effect)
@@ -177,9 +180,10 @@ modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (
 -- instance's effects, which still read the printed names.
 --
 -- The KEYS are not the whole rename: a slot's pool may itself name a sibling slot
--- (Pawl.Types.ZoneScope's InSlot, Dwell on the Past's "their graveyard") and
--- so may its FILTER (Pawl.Types.Filter's IsBound, Fall of the Hammer's "another
--- target creature"), and both are the printed name too. Renaming the keys alone
+-- (Pawl.Types.ZoneScope's InSlot, Dwell on the Past's "their graveyard"), so may
+-- its FILTER (Pawl.Types.Filter's IsBound, Fall of the Hammer's "another
+-- target creature"), and so may its CR 202.3 computed bound
+-- (Pawl.Types.Quantity), and all three are the printed name too. Renaming the keys alone
 -- would leave occurrence 1 pointing at occurrence 0's slot, so CR 700.2d's
 -- "different targets may be chosen" would silently read the first occurrence's
 -- answer. instanceScope below is that half.
@@ -214,18 +218,20 @@ ownSlot mi declared slot = if Set.member slot declared then instanceSlot mi slot
 
 -- CR 700.2d applied to the slot NAMES a target slot carries, so everything the
 -- slot points at follows its mode's occurrence exactly as the key does: the
--- pool's ZoneScope.InSlot, and the sibling slots the FILTER reads
--- (Filter.IsBound and the atoms beside it, which Pawl.Engine.Filter.renameBound
--- and boundSlots share one walk over). `rename` is ownSlot above, so a name the
--- mode does not declare passes through.
+-- pool's ZoneScope.InSlot, the sibling slots the FILTER reads (Filter.IsBound and
+-- the atoms beside it, which Pawl.Engine.Filter.renameBound and boundSlots share
+-- one walk over), and the CR 202.3 computed bound the slot's `amount` carries
+-- (Pawl.Engine.QuantitySlot.renameSlots, paired with that module's `slots` the
+-- same way). Those three fields are the whole of what a TargetSlot names: `count` is a
+-- number or CR 601.2b's announced X, and neither is a slot.
 --
--- Not implemented: the CR 202.3 bound a slot's `amount` carries may itself name a
--- slot (Quantity.InSlot) and is not renamed here (gap #2825).
+-- `rename` is ownSlot above, so a name the mode does not declare passes through.
 instanceScope :: (SlotName -> SlotName) -> TargetSlot -> TargetSlot
 instanceScope rename slot =
   slot
     { TargetSlot.pool = instancePool rename (TargetSlot.pool slot),
-      TargetSlot.filter = fmap (Filter.renameBound rename) (TargetSlot.filter slot)
+      TargetSlot.filter = fmap (Filter.renameBound rename) (TargetSlot.filter slot),
+      TargetSlot.amount = fmap (QuantitySlot.renameSlots rename) (TargetSlot.amount slot)
     }
 
 -- instanceScope's rename over the pool itself: the two arms carrying a
