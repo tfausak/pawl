@@ -2883,6 +2883,42 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     -- escapes -- which is what keeps the cast above from being offered and then
     -- rejected.
     Spec.assertBool s (S.castable S.alice spellId stormed) "CR 702.103d: the bestow card is still offered under Aether Storm"
+  -- CR 702.103d's TARGET half, through CR 601.2c: the bestow candidate is the
+  -- one that has to find a creature to enchant, and the printed one is not. Two
+  -- boards differing in exactly one permanent, and ONE answerer across both --
+  -- the one that names the BESTOW cost -- so what changes is which candidate CR
+  -- 601.2b had left for it to name.
+  Spec.it s "CR 702.103d / 601.2c: with no creature to enchant only the printed candidate is offered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    let (bare, spellId) = S.handOne rollicker (S.landsInPlay mountain 4)
+        (host, hosted) = S.addCreature mammoth S.alice bare
+        castThere gs = S.runPure (bestowing host) gs (S.cast S.alice spellId)
+    -- THE gameplay-level pair, first. With nothing to enchant there is no
+    -- {1}{R} candidate to name, so CR 601.2b settles on the printed {R} and a
+    -- creature spell reaches the stack -- where the whole cast used to unwind at
+    -- CR 601.2e and leave the stack empty (#2911).
+    Spec.assertEqWith
+      s
+      "CR 601.2c: with no creature in play the Rollicker reaches the stack as a creature spell"
+      (fmap (\oid -> Projection.cardTypesOf oid (castThere bare)) (topOfStack (castThere bare)))
+      (Just (Set.fromList [CardType.Creature, CardType.Enchantment]))
+    Spec.assertEqWith
+      s
+      "and with one to enchant the same answerer takes the bestow cost and leaves an Aura spell"
+      (fmap (\oid -> Projection.cardTypesOf oid (castThere hosted)) (topOfStack (castThere hosted)))
+      (Just (Set.singleton CardType.Enchantment))
+    -- Paid in tapped Mountains, which is what tells an announcement that settled
+    -- on the printed cost from one that rewound: {R} is one land, {1}{R} is two,
+    -- and a rejected cast taps none.
+    Spec.assertEqWith s "and the printed {R} is what was paid for it" (S.tappedCount S.alice (castThere bare)) 1
+    Spec.assertEqWith s "against {1}{R} for the bestowed cast" (S.tappedCount S.alice (castThere hosted)) 2
+    -- The cast itself is still OFFERED on the creature-less board, which is what
+    -- makes the pair a fact about the candidate rather than about the action: CR
+    -- 601.2c closed the bestow half alone.
+    Spec.assertBool s (S.castable S.alice spellId bare) "CR 601.3: the Rollicker is castable with no creature in play"
+    Spec.assertBool s (S.castable S.alice spellId hosted) "control: and with one, off the same four Mountains"
 
 -- The spell CR 601.2a put on the stack -- the incarnation every assertion above
 -- reads, since CR 400.7 makes it a different object from the card in the hand.

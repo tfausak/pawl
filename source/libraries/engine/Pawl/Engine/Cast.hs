@@ -224,12 +224,19 @@ flashOn oid face gs =
 -- that argument: the slots come from `proposedFace`, and `castable` hands this a
 -- state with that same half stamped onto the OBJECT (asProposed), so a filter
 -- that reads the spell's own characteristics reads the half being cast too.
+--
+-- CR 303.4a's enchant slot comes off the OBJECT's projection rather than off the
+-- printed face, which is Card.modesTargetSlotsGiven's reading one step earlier:
+-- CR 702.103b grants "enchant creature" to a spell cast bestowed, so the slot CR
+-- 601.2c will judge exists only on the board that announcement produces
+-- (`proposedFor`). Read printed, a bestow candidate is fillable on a board with
+-- no creature at all and CR 601.2e then takes the whole cast back (#2911).
 targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
     let modal = Face.spell face
-     in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs) (Modal.Type.selection modal)
+     in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) modal gs) (Modal.Type.selection modal)
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -544,6 +551,26 @@ proposedFor oid castFor gs = if castBestowed castFor then stampBestowed oid gs e
 candidateAllowed :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
 candidateAllowed pid oid name proposed candidate =
   not (PlayerEffect.prohibitsCasting pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed))
+
+-- CR 601.2c asked of ONE candidate, on the same board rule 702.103d judges it on:
+-- a bestowed Nyxborn Rollicker is an Aura spell with enchant creature, so it is
+-- announceable only where a creature is, while its printed cast targets nothing
+-- and is announceable on an empty board.
+--
+-- CR 700.2a is the shape this follows -- "if one of the modes would be illegal
+-- (due to an inability to choose legal targets, for example), that mode can't be
+-- chosen" -- one announcement over, at CR 601.2b's cost rather than at its modes.
+-- Neither is a choice made for the player: an announcement CR 601.2e would take
+-- straight back is not an option, and withholding it is what keeps the engine
+-- from offering a cast and then rejecting it.
+--
+-- Not part of `candidateAllowed` above, because the two are not asked at the same
+-- moments: CR 601.2f's additional costs (kicker, entwine) land between them and
+-- can add target slots, so a candidate's fillability is re-derived at CR 601.2c
+-- proper (Cast.castProposed) against what the whole announcement chose.
+candidateFillable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
+candidateFillable pid oid name proposed candidate =
+  targetable pid oid name (proposedFor oid (CandidateCost.keyword candidate) proposed)
 
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
@@ -946,12 +973,13 @@ castable pid oid name facing gs =
       -- half's own -- the two coincide for every face-up cast, since
       -- `proposedFace` resolved that half by this very name.
       proposedName = maybe name Face.name (proposedFace oid name proposed)
-      -- CR 601.3 and CR 601.2b, asked TOGETHER and per candidate, because CR
-      -- 702.103d makes them one question: a candidate is one this player may
-      -- announce when the board its own choice produces neither prohibits it nor
-      -- leaves it unpayable, and a cast is castable when SOME candidate is. Split
-      -- into two independent `any`s, an unpayable bestow route and a prohibited
-      -- printed one would together offer a cast neither of them allows.
+      -- CR 601.3, CR 601.2c and CR 601.2b, asked TOGETHER and per candidate,
+      -- because CR 702.103d makes them one question: a candidate is one this
+      -- player may announce when the board its own choice produces neither
+      -- prohibits it, nor leaves a target slot unfillable, nor leaves it
+      -- unpayable -- and a cast is castable when SOME candidate is. Split into
+      -- independent `any`s, an unpayable bestow route and a prohibited printed one
+      -- would together offer a cast neither of them allows.
       --
       -- CR 601.3's prohibition names a quality of the spell (Null Chamber by
       -- name, Damping Engine by Filter), and both readings go through
@@ -964,6 +992,7 @@ castable pid oid name facing gs =
       -- nothing rule 702.103b writes is a thing rule 118.14's rider reads.
       candidateOk candidate =
         candidateAllowed pid oid proposedName proposed candidate
+          && candidateFillable pid oid name proposed candidate
           && payableCost (spendingFor pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
    in timingOk pid oid name proposed
         && inCastableZone pid oid name proposed
@@ -977,10 +1006,6 @@ castable pid oid name facing gs =
         -- Gated HERE, upstream of Action.legalActions, because the engine never
         -- offers an illegal action and then rejects it.
         && any candidateOk (Cost.candidateCostsFor name oid proposed)
-        -- Not implemented: CR 601.2c is asked of the printed spell, so a bestow
-        -- candidate offered on a board with no creature to enchant is offered and
-        -- then rejected at the target step (#2911).
-        && targetable pid oid name proposed
 
 -- Every cast this player may propose right now, in castZones' order, as the
 -- (object, half, facing) triples Action.Cast is built from. `castable` re-checks
@@ -1208,24 +1233,26 @@ castableWhenOffered pid oid name candidates proposed =
   -- one can resolve ABOVE the split-second spell and offer a cast while it is
   -- still there.
   not (SplitSecond.inForce proposed)
-    -- CR 601.3's prohibit half and CR 601.2b's affordability, asked per candidate
-    -- for `castable`'s reason and through its predicate: CR 702.103d judges a
-    -- bestow announcement on the Aura it makes of the spell, and an offer that
-    -- hands in the card's own list (CR 118.9's absent) carries that candidate.
+    -- CR 601.3's prohibit half, CR 601.2c's fillability and CR 601.2b's
+    -- affordability, asked per candidate for `castable`'s reason and through its
+    -- predicates: CR 702.103d judges a bestow announcement on the Aura it makes of
+    -- the spell, and an offer that hands in the card's own list (CR 118.9's
+    -- absent) carries that candidate.
     --
     -- A REGRESSION FENCE on this path rather than a proved behaviour: no board in
-    -- the pool puts a CastOffer, a bestow card and a prohibition together, so
-    -- reverting the per-candidate reading here leaves the suite green. `castable`
-    -- is where the same predicate is proved.
+    -- the pool puts a CastOffer together with a bestow card and either a
+    -- prohibition or an empty battlefield, so reverting the per-candidate reading
+    -- here leaves the suite green. `castable` and `castSpellWith` are where the
+    -- same two predicates are proved.
     && any
       ( \candidate ->
           candidateAllowed pid oid name proposed candidate
+            && candidateFillable pid oid name proposed candidate
             && payableCost (spendingFor pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
       )
       candidates
     && printedRestrictionsOk pid oid name proposed
     && legendaryRestrictionOk pid oid name proposed
-    && targetable pid oid name proposed
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them
 -- the chance to cast a castable-while-searching card from it, before any card is
@@ -1354,21 +1381,27 @@ castSpellWith applied pid oid name facing = do
           -- payment is made; a cost `applied` from another effect (CR 118.9)
           -- carries none, because no keyword offered it.
           --
-          -- FILTERED by CR 601.3 one candidate at a time, the same predicate the
-          -- gate above passed: CR 702.103d judges each announcement on the
-          -- characteristics its own choice gives the spell, so a prohibition that
-          -- reaches only some of them must narrow what CR 601.2b offers rather
-          -- than refuse the cast. Asked HERE, one step ahead of rule 601.2a's
-          -- move, because that is where prohibitsCasting can be asked at all --
-          -- its sorcery-speed arm reads an empty stack, which this spell would
-          -- otherwise be standing on.
+          -- FILTERED by CR 601.3 and CR 601.2c one candidate at a time, the same
+          -- predicates the gate above passed: CR 702.103d judges each announcement
+          -- on the characteristics its own choice gives the spell, so a
+          -- prohibition or an unfillable enchant slot that reaches only some of
+          -- them must narrow what CR 601.2b offers rather than refuse the cast.
+          -- This is the narrowing the player SEES -- Prompt.ChooseCost is built
+          -- from this list -- and it is what keeps a bestow cast on a board with
+          -- no creature from being offered and then rejected (#2911).
+          --
+          -- Asked HERE, one step ahead of rule 601.2a's move, because that is
+          -- where both questions have an answer: prohibitsCasting's sorcery-speed
+          -- arm reads an empty stack, which this spell would otherwise be standing
+          -- on, and `targetable` measures the slots before the move for the reason
+          -- its own haddock gives.
           --
           -- A no-op for every cast the pool can otherwise propose: with no
           -- bestow candidate every board is the same board, so the filter keeps
           -- all of them or the gate above kept none.
           candidates =
             filter
-              (candidateAllowed pid oid (Face.name face) proposed)
+              (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
                   (maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied)
