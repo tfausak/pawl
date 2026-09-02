@@ -580,7 +580,7 @@ namesFor mObj card = case mObj of
 -- The object still HAS its card (Object.source), and faceUpFaceOf below is how
 -- CR 702.37e reads the morph cost off it. Nothing hides the card from a reader
 -- that goes looking, so CR 708.5's "you can't look at face-down permanents
--- controlled by another player" is unimplemented (#682).
+-- controlled by another player" is unimplemented (#1412).
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceOf oid gs = faceOfObject gs =<< lookupObject oid gs
 

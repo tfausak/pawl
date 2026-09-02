@@ -647,7 +647,9 @@ candidateFillable pid oid name proposed candidate =
 --
 -- The library is deliberately absent: Panglacial Wurm's permission is scoped to
 -- a search in progress (castableWhileSearching) rather than to the whole game,
--- so it is not a zone a player may simply cast from.
+-- so it is not a zone a player may simply cast from. Not implemented: a standing
+-- permission to cast from the top of the library (Garruk's Horde), which would
+-- put the library in this list (#2360).
 castZones :: [Zone.Zone]
 castZones = [Zone.Hand, Zone.Graveyard, Zone.Exile, Zone.Command]
 

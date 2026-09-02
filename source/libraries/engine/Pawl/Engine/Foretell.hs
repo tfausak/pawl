@@ -139,7 +139,7 @@ foretellable pid gs = filter (\oid -> canForetell pid oid gs) (Game.zoneMembers 
 -- Pawl.Engine.Exile.pileOf. Not implemented: that rule's ORDERING of one
 -- player's several foretold cards. It hides nothing, because pawl conceals
 -- nothing from an answerer -- Pawl.Types.Asked hands over the whole GameState
--- (#682).
+-- (#1412).
 foretell :: PlayerId -> ObjectId -> Game ()
 foretell pid oid = do
   before <- State.get

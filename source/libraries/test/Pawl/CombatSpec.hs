@@ -775,8 +775,9 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     Spec.assertEqWith s "and nothing was tapped" (S.tappedCount S.alice after) 0
   Spec.it s "CR 509.1 only the defending player is asked to declare blockers" $ do
     -- CR 509.1's first sentence names THE defending player, singular. CR 802.4
-    -- is the rule that has several of them declare in APNAP order, and it needs
-    -- an option pawl cannot express (#175).
+    -- has several of them declare in APNAP order, which Combat.declareBlockers
+    -- does by looping over Defender.defendingPlayers; this board records carol as
+    -- the only defender, so that loop has one seat to ask.
     piker <- S.printingOf s registry "Goblin Piker"
     let (board, mine, bobs, carols) = S.threePlayerCombat [piker] [piker] [piker]
         attackMap = case mine of
