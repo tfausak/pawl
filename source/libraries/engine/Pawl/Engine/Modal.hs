@@ -192,29 +192,48 @@ instanceTargetSlots mi m = maybe Map.empty (modeInstanceTargetSlots mi) (modeAtI
 -- re-check's map disagreeing about which slot belongs to which occurrence is
 -- exactly the defect; see #2806.
 modeInstanceTargetSlots :: ModeInstance.ModeInstance -> Mode.Mode card ability -> Map SlotName TargetSlot
-modeInstanceTargetSlots mi mode = Map.mapKeys (instanceSlot mi) (fmap (instanceScope mi) (Mode.targetSlots mode))
+modeInstanceTargetSlots mi mode =
+  let declared = Map.keysSet (Mode.targetSlots mode)
+   in Map.mapKeys (instanceSlot mi) (fmap (instanceScope (ownSlot mi declared)) (Mode.targetSlots mode))
+
+-- CR 700.2d's rename NARROWED to the names the mode itself declares, which is the
+-- whole of what an occurrence copies: those are the keys instanceSlot suffixes, so
+-- a reference to one must follow it. Every other name a slot points at belongs to
+-- someone else's namespace -- CR 603.2's event bindings ("that player", printed-
+-- named on the ability object however many times the mode was chosen), CR 113.7's
+-- source, "you" -- and renaming one would leave an atom no environment is keyed by.
+--
+-- This is what makes the ORDER of the rename and CR 603.2's bake irrelevant, which
+-- is the defect it fixes: Pawl.Engine.Engine.placeBorne bakes then renames and
+-- Pawl.Engine.Resolve.resolveModesWith renames then bakes, and the two agree only
+-- because neither step now touches what the other reads. Proved by
+-- Pawl.ModalSpec's "CR 700.2d a repeated mode on a trigger keeps reading the
+-- trigger's own bound player".
+ownSlot :: ModeInstance.ModeInstance -> Set SlotName -> SlotName -> SlotName
+ownSlot mi declared slot = if Set.member slot declared then instanceSlot mi slot else slot
 
 -- CR 700.2d applied to the slot NAMES a target slot carries, so everything the
 -- slot points at follows its mode's occurrence exactly as the key does: the
 -- pool's ZoneScope.InSlot, and the sibling slots the FILTER reads
 -- (Filter.IsBound and the atoms beside it, which Pawl.Engine.Filter.renameBound
--- and boundSlots share one walk over).
+-- and boundSlots share one walk over). `rename` is ownSlot above, so a name the
+-- mode does not declare passes through.
 --
 -- Not implemented: the CR 202.3 bound a slot's `amount` carries may itself name a
 -- slot (Quantity.InSlot) and is not renamed here (gap #2825).
-instanceScope :: ModeInstance.ModeInstance -> TargetSlot -> TargetSlot
-instanceScope mi slot =
+instanceScope :: (SlotName -> SlotName) -> TargetSlot -> TargetSlot
+instanceScope rename slot =
   slot
-    { TargetSlot.pool = instancePool mi (TargetSlot.pool slot),
-      TargetSlot.filter = fmap (Filter.renameBound (instanceSlot mi)) (TargetSlot.filter slot)
+    { TargetSlot.pool = instancePool rename (TargetSlot.pool slot),
+      TargetSlot.filter = fmap (Filter.renameBound rename) (TargetSlot.filter slot)
     }
 
 -- instanceScope's rename over the pool itself: the two arms carrying a
 -- ZoneScope, and every other pool unchanged.
-instancePool :: ModeInstance.ModeInstance -> Pool.Pool -> Pool.Pool
-instancePool mi pool = case pool of
-  Pool.CardsInGraveyard scope -> Pool.CardsInGraveyard (instanceZoneScope mi scope)
-  Pool.CreaturesAndCardsInGraveyard scope -> Pool.CreaturesAndCardsInGraveyard (instanceZoneScope mi scope)
+instancePool :: (SlotName -> SlotName) -> Pool.Pool -> Pool.Pool
+instancePool rename pool = case pool of
+  Pool.CardsInGraveyard scope -> Pool.CardsInGraveyard (instanceZoneScope rename scope)
+  Pool.CreaturesAndCardsInGraveyard scope -> Pool.CreaturesAndCardsInGraveyard (instanceZoneScope rename scope)
   Pool.Creatures -> pool
   Pool.Players -> pool
   Pool.AnyTarget -> pool
@@ -226,11 +245,11 @@ instancePool mi pool = case pool of
   Pool.CardsInExile -> pool
 
 -- CR 109.5's Scoped arm names no slot and is untouched; InSlot's is the printed
--- name instanceSlot rewrites.
-instanceZoneScope :: ModeInstance.ModeInstance -> ZoneScope.ZoneScope -> ZoneScope.ZoneScope
-instanceZoneScope mi scope = case scope of
+-- name `rename` rewrites.
+instanceZoneScope :: (SlotName -> SlotName) -> ZoneScope.ZoneScope -> ZoneScope.ZoneScope
+instanceZoneScope rename scope = case scope of
   ZoneScope.Scoped _ -> scope
-  ZoneScope.InSlot slot -> ZoneScope.InSlot (instanceSlot mi slot)
+  ZoneScope.InSlot slot -> ZoneScope.InSlot (rename slot)
 
 -- CR 700.2d: the binding-shaped environment ONE chosen instance's effects read.
 -- Three parts, and each is a rule rather than a convenience:
