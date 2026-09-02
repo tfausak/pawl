@@ -13023,8 +13023,9 @@ eventTriggers events gs =
       -- and takes them all, while `laterGroups` and `sameGroup` read a permanent
       -- that was standing on the battlefield when the event happened and so take
       -- only the ones CR 113.6m leaves functioning there. It takes the departing
-      -- id as well as the characteristics, CR 113.6m's final sentence needing the
-      -- card's delayed-ability declarations and LastKnown carrying no face (#654).
+      -- id as well as the characteristics: CR 113.6m's final sentence reads the
+      -- card's CR 603.7 declarations, which are not characteristics and so are
+      -- reached through Game.delayedAbilitiesOf off the id.
       departedFrom pick event = case event of
         GameEvent.Moved (Moved.MkMoved zc _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
@@ -13751,9 +13752,10 @@ eventTriggers events gs =
 -- where its trigger can never do anything.
 --
 -- The `unless` clause governs that sentence too, and is read the same way: the
--- Aura half by `enchantedObjectLeaves` above this fold, the trigger-condition half
--- not at all (#2502). A Sand Golem armed a delayed return would be pinned to the
--- graveyard by the same gap.
+-- Aura half by `enchantedObjectLeaves` above this fold, the trigger-condition
+-- half not at all (#2502) -- so an ability whose own condition is what put the
+-- card in the graveyard is pinned there whether its return is immediate or
+-- delayed. No card in the pool writes either shape.
 zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
 zoneFunctionedFrom delayed ability =
   if enchantedObjectLeaves (TriggeredAbility.condition ability)
