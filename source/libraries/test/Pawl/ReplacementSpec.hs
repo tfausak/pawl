@@ -66,6 +66,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
@@ -213,6 +214,26 @@ shieldsLeft gs =
         ReplacementEffect.DamageR (DamageR.MkDamageR _ (DamageRewrite.PreventNext n) _) -> Just n
         _ -> Nothing
    in Maybe.mapMaybe (remaining . ActiveReplacement.effect) (GameState.replacements gs)
+
+-- The damage CR 615.5's rider dealt to `pid`, ONE ENTRY PER EVENT rather than
+-- summed. What tells CR 615.13's one application apart from one application per
+-- recipient: both throw the same total back, and only the number of events
+-- differs.
+riderHits :: PlayerId.PlayerId -> GameState.GameState -> [Natural.Natural]
+riderHits pid gs =
+  [ DamageEvent.amount de
+  | de <- S.damageEventsOf gs,
+    DamageEvent.target de == Recipient.ToPlayer pid
+  ]
+
+-- The CR 615.13 records a board holds, in the order Pawl.Engine.Damage wrote
+-- them. One per applying instance, whatever the batch was addressed to.
+preventionsRecorded :: GameState.GameState -> [DamagePrevented.DamagePrevented]
+preventionsRecorded gs =
+  let pick event = case event of
+        GameEvent.DamagePrevented prevented -> Just prevented
+        _ -> Nothing
+   in Maybe.mapMaybe pick (S.eventsOf gs)
 
 -- Was CR 615.7's batch-order question raised at all? The elision half of every
 -- group below asserts the negative of this, so the boards that ask nothing are
@@ -3263,11 +3284,27 @@ divineDeflectionSpec s registry = Spec.describe s "Divine Deflection (CR 615.7)"
     -- recipient would have prevented.
     Spec.assertEqWith s "so the rider deals exactly the 3 that was prevented" (S.lifeOf S.bob aliceFirst) (Just 17)
     -- The other allocation, which is the ruling's own example: the creature's 2
-    -- is prevented whole and the last 1 goes to alice, so the rider runs once per
-    -- recipient and deals 2 then 1. Same total, different board.
+    -- is prevented whole and the last 1 goes to alice. Same total, different
+    -- board.
     Spec.assertEqWith s "spent on the creature instead, its 2 never happens" (S.damageOf mine creatureFirst) (Just 0)
     Spec.assertEqWith s "and only 1 of alice's 5 is prevented" (S.lifeOf S.alice creatureFirst) (Just 16)
-    Spec.assertEqWith s "the rider still deals 3 in total, in two lots" (S.lifeOf S.bob creatureFirst) (Just 17)
+    Spec.assertEqWith s "the rider still deals 3 in total" (S.lifeOf S.bob creatureFirst) (Just 17)
+    -- CR 615.13's own unit, and the one thing on this board the life totals
+    -- cannot settle: the shield spanned TWO recipients here, and the rule counts
+    -- one application of one prevention effect however many of the simultaneous
+    -- events it was applied to. So the rider runs ONCE with the total rather than
+    -- once per recipient, which is a difference in the number of damage events
+    -- and not in their sum -- 3 either way, hence the count.
+    Spec.assertEqWith s "CR 615.13 the rider throws its 3 back in ONE event, not a 2 and a 1" (riderHits S.bob creatureFirst) [3]
+    Spec.assertEqWith s "and the allocation that spent the shield on one recipient throws one lot too" (riderHits S.bob aliceFirst) [3]
+    -- The record those triggers read, which the rider count is a consequence of:
+    -- ONE prevention carrying both recipients' shares, rather than one per
+    -- recipient. After the behaviour it explains, not before it.
+    Spec.assertEqWith
+      s
+      "and ONE prevention was recorded, holding each recipient's share"
+      (fmap DamagePrevented.amounts (preventionsRecorded creatureFirst))
+      [Map.fromList [(Recipient.ToCreature mine, 2), (Recipient.ToPlayer S.alice, 1)]]
     -- The fences. The shield covers what is dealt TO alice's side, never what she
     -- deals: her blocker's 5 kills the Piker either way. And the unshielded board
     -- differs in exactly the shield.

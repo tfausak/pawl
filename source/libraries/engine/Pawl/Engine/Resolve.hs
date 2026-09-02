@@ -6862,7 +6862,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- nobody for a described shield, and one per named recipient otherwise.
         rows = if Maybe.isJust whatRecipient then [Nothing] else fmap Just recipients
         -- CR 615.5's additional effect. With no amount to count down, "this way"
-        -- is what THIS application prevented, which Prevention.amount carries.
+        -- is what THIS application prevented, which Prevention.amounts carries.
         rider =
           if Seq.null riderEffects
             then Nothing
@@ -8671,8 +8671,10 @@ runPreventionRiders = do
 -- One queued prevention's additional effect; nothing runs unless the prevention
 -- carries a rider.
 --
--- CR 615.5's "amount of damage that was prevented" is a Quantity.InSlot read of
--- the reserved Binding.eventAmount slot, published through
+-- CR 615.5's "amount of damage that was prevented" is the SUM over the
+-- recipients this one application covered, rule 615.13 counting the application
+-- and not the recipients (Divine Deflection throws one lot of 3, not a 2 and a
+-- 1). A Quantity.InSlot read of the reserved Binding.eventAmount slot, published through
 -- GameState.ambientAmounts rather than bound onto an object, because the shielded
 -- recipient may be a PLAYER. Restored rather than cleared, so this cannot clobber
 -- an outer amount.
@@ -8683,7 +8685,7 @@ runPreventionRiders = do
 runPreventionRider :: Prevention.Prevention -> Game ()
 runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \rider -> do
   was <- State.gets GameState.ambientAmounts
-  State.modify' (\gs -> gs {GameState.ambientAmounts = Map.insert Binding.eventAmount (Prevention.amount prevention) was})
+  State.modify' (\gs -> gs {GameState.ambientAmounts = Map.insert Binding.eventAmount (sum (Prevention.amounts prevention)) was})
   let targets = PreventionRider.targets rider
       src = PreventionRider.source rider
   Foldable.traverse_
