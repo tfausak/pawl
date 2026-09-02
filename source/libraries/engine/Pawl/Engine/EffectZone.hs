@@ -63,6 +63,13 @@ import Pawl.Types.Zone (Zone)
 -- Effect being first-order). Every caller supplies the map off the same card the
 -- ability is read from, which is where Pawl.Engine.Resolve.declaredDelayedAbility
 -- resolves the name at run time.
+--
+-- Not implemented: rule 702's own delayed abilities
+-- (Pawl.Engine.Keyword.mintedDelayedAbilities), which Resolve falls back to and
+-- no caller unions in here, so an arm naming one reads as a name no face
+-- declares. Inert as that roster stands -- decayed's is a sacrifice, which every
+-- arm below answers Nothing for -- and a minted ability that MOVED its object
+-- out of a zone is what would want the union (#3083).
 zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Zone
 zoneFunctionedFrom delayed effect = case effect of
   -- Only an InSlot naming the reserved source slot can be "the object it's on".
@@ -201,7 +208,7 @@ zoneFunctionedFrom delayed effect = case effect of
   -- Nothing for a name no face declares, which is a card-data error rather than a
   -- rules question: Pawl.CardSpec's D4 dataflow lint rejects such a card, and the
   -- answer here is the same Nothing the arm gave before.
-  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) ->
+  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger {ArmDelayedTrigger.name = name}) ->
     case Map.lookup name delayed of
       Nothing -> Nothing
       Just ability -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom Map.empty) (Modal.allEffects (TriggeredAbility.modal ability)))
