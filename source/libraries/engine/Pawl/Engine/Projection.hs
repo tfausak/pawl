@@ -885,6 +885,9 @@ viewOfCard face =
           -- CR 400.1 / 109.1: a printed card being matched by a search is not an
           -- object, so there is no zone for IsInZone to read either.
           Filter.zone = Nothing,
+          -- CR 601.2a: a printed FACE was never cast, so WasCastFrom is vacuously
+          -- False against it -- `zone` above's reason.
+          Filter.castFrom = Nothing,
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
@@ -1066,6 +1069,12 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- 109.3 counts no zone among the characteristics, so no projection carries
       -- one. Nothing for an id naming nothing (CR 608.2h, #1069).
       Filter.zone = fmap Object.zone (Game.lookupObject oid gs),
+      -- CR 601.2a off the OBJECT beside its zone, and for that field's reason
+      -- squared: no projection carries a zone, and CR 400.7 leaves the spell no
+      -- memory of the one it came from either, so Pawl.Engine.Cast's two stamps
+      -- are the only place the answer exists. Nothing for an id naming nothing
+      -- and for every object that was never cast.
+      Filter.castFrom = Game.lookupObject oid gs >>= Object.castFrom,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3).
@@ -4336,6 +4345,9 @@ filterReads f = case f of
   -- CR 400.1 / 109.3: a zone is not a characteristic, so no Modification writes
   -- one and no layer's ordering turns on this atom.
   Filter.Type.IsInZone _ -> Set.empty
+  -- CR 601.2a / 109.3: the zone a spell was cast from is no more a characteristic
+  -- than the zone it is in, so no Modification writes one.
+  Filter.Type.WasCastFrom _ -> Set.empty
   -- Reads nothing: CR 701.54b keeps the ring-bearer designation off the copiable
   -- values, so no Modification writes Object.ringBearerFor.
   Filter.Type.IsRingBearer -> Set.empty
@@ -4449,6 +4461,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsExiledFaceDown -> False
   Filter.Type.Transformed -> False
   Filter.Type.IsInZone _ -> False
+  Filter.Type.WasCastFrom _ -> False
   Filter.Type.IsRingBearer -> False
   Filter.Type.HasDesignation _ -> False
   Filter.Type.HasCounters _ -> False

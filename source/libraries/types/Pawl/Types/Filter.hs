@@ -1165,6 +1165,24 @@ data Filter keyword
     -- 109.1 makes an object of nothing -- the posture ControlledBy and IsSource
     -- already take.
     IsInZone Zone.Zone
+  | -- | CR 601.2a: which zone the candidate SPELL was moved to the stack from --
+    -- Aven Interrupter's "spells your opponents cast from graveyards or from
+    -- exile", Patrician Geist's "spells you cast from your graveyard".
+    --
+    -- NOT IsInZone above, and the two can never stand in for each other. That
+    -- atom reads where the object is NOW, which CR 601.2a has already made the
+    -- stack by the time CR 601.2f prices the spell; this one reads the zone the
+    -- cast came out of, which Pawl.Types.Object.castFrom remembers precisely
+    -- because CR 400.7 leaves the spell no memory of it. Writing a cost filter
+    -- with IsInZone gave a card a gate and a payment that disagreed (#2363).
+    --
+    -- NAMES A ZONE AND NOT WHOSE, IsInZone's posture verbatim: "from your
+    -- graveyard" is an OwnedBy conjunct beside this atom, which CR 400.3 makes
+    -- exact for the three per-player zones.
+    --
+    -- Vacuously False for everything that was never cast -- a card at rest, a
+    -- token, an ability on the stack -- since Object.castFrom is Nothing there.
+    WasCastFrom Zone.Zone
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

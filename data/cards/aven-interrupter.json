@@ -34,6 +34,36 @@
         }
       ],
       "name": "Aven Interrupter",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "IncreaseSpellCost",
+            "value": {
+              "amount": 2,
+              "whichSpells": {
+                "type": "Or",
+                "value": [
+                  {
+                    "type": "WasCastFrom",
+                    "value": {
+                      "type": "Graveyard"
+                    }
+                  },
+                  {
+                    "type": "WasCastFrom",
+                    "value": {
+                      "type": "Exile"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "scope": {
+            "type": "Opponents"
+          }
+        }
+      ],
       "power": {
         "type": "Literal",
         "value": 2

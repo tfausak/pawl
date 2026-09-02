@@ -416,6 +416,20 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.Not (Filter.IsInZone Zone.Hand))
       " {\"type\":\"Not\",\"value\":{\"type\":\"IsInZone\",\"value\":{\"type\":\"Hand\"}}} "
+  Spec.it s "WasCastFrom Graveyard" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.WasCastFrom Zone.Graveyard)
+      " {\"type\":\"WasCastFrom\",\"value\":{\"type\":\"Graveyard\"}} "
+  -- Aven Interrupter's own spelling: "from graveyards or from exile" is two of
+  -- these under an Or, where the atom above stands alone on Patrician Geist.
+  Spec.it s "Or [WasCastFrom Graveyard, WasCastFrom Exile]" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.Or [Filter.WasCastFrom Zone.Graveyard, Filter.WasCastFrom Zone.Exile])
+      " {\"type\":\"Or\",\"value\":[{\"type\":\"WasCastFrom\",\"value\":{\"type\":\"Graveyard\"}},{\"type\":\"WasCastFrom\",\"value\":{\"type\":\"Exile\"}}]} "
   Spec.it s "HasDesignation Renowned" $
     Common.assertCodec
       s
