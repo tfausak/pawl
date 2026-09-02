@@ -3529,9 +3529,14 @@ boundedFuseXSpec s registry = Spec.describe s "BoundedFuseX" $ do
     sphere <- S.printingOf s registry "Chromatic Sphere"
     blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
     let (spellId, board) = boundedBoard mountain plains piker sphere blaze 1
-        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.alice spellId bountyName Facing.FaceUp; Stack.resolveTop)
+        castAt n = S.runPure (answerBoundedX n) board (do Cast.castSpell S.alice spellId bountyName Facing.FaceUp; Stack.resolveTop)
+        after = castAt 2
+        within = castAt 1
     Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "and the card is still in her hand" (S.handSize S.alice after) 1
+    -- The same board and the same half, one lower: the refusal above is the
+    -- ceiling and not the mana, the timing or a missing action.
+    Spec.assertEqWith s "an X of one is within the ceiling and gains one" (S.lifeOf S.alice within) (Just 21)
 
 -- Victor Mancha, Runaway {5} Legendary Artifact Creature -- Human Hero 4/4:
 -- "When Victor Mancha enters, exile target card from your graveyard. You may
