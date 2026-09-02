@@ -5212,8 +5212,15 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- "only" rather than a proved behaviour. What IS proved is the empty-set limb,
 -- by Pawl.ZoneReplacementSpec's Rest in Peace pair.
 replacementsOf :: Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
-replacementsOf zone oid gs =
-  let pc = project oid gs
+replacementsOf = replacementsOfGiven Map.empty
+
+-- The same rows off a board the CALLER has already projected. replacementsAffecting
+-- is why it exists: its walk asks this of every battlefield permanent, and a fresh
+-- `project` apiece is one gather per permanent (#435). projectGiven is the snapshot
+-- argument, and the empty map above is its own fallback.
+replacementsOfGiven :: Map ObjectId ProjectedCharacteristics -> Zone.Zone -> ObjectId -> GameState -> [(ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)))]
+replacementsOfGiven pcs zone oid gs =
+  let pc = projectGiven pcs oid gs
       -- CR 113.6b first and CR 604.2 second: which zone the row functions from,
       -- then whether its clause holds there (printedRowLives argues the board
       -- that reads against).
@@ -5545,7 +5552,13 @@ replacementsAffecting gs =
           -- exists to skip, so any board holding a granting ability is gathered
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
-      forOne zone oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOf zone oid gs)
+      -- ONE whole-board projection for the whole walk rather than one gather per
+      -- permanent (#435), and a THUNK: the short-circuit below is what decides
+      -- whether any of it is forced, so a board carrying no replacement effect
+      -- still pays nothing. Same answers, for the reason at projectGiven -- this
+      -- and replacementsOfGiven are pure functions of the same GameState.
+      pcs = projectAll gs
+      forOne zone oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOfGiven pcs zone oid gs)
       -- The grantors standing where `baseHas` cannot see them, asked BOTH of
       -- baseHas's grantor disjuncts again: a stored effect and an off-battlefield
       -- static ability write the same two modifications a permanent's static

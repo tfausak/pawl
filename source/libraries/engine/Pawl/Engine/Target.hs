@@ -1033,7 +1033,22 @@ stillLegal perspective bindings source recipient slot gs =
 -- question stillLegal asks, minus rule 702's targeting restrictions. See
 -- admittedRecipients for why an attached Aura is not asked a targeting question.
 stillAdmitted :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
-stillAdmitted perspective source recipient slot gs = Set.member recipient (admittedRecipients perspective source slot gs)
+stillAdmitted perspective source recipient slot gs =
+  let pcs = Projection.projectAll gs
+   in stillAdmittedGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective source recipient slot gs
+
+-- The same membership given a board the CALLER has already walked, which is what
+-- admittedGiven's own note argues: `pcs`, `grants` and `pools` are one whole-board
+-- projection, one control-grant walk and one set of base pools, and threading them
+-- in changes no answer because caller and callee are pure functions of the same
+-- GameState (Projection.projectGiven).
+--
+-- Pawl.Engine.Sba.stillLegalEnchant is the caller this exists for: its CR 704.3
+-- pre-pass has already taken all three, and letting the filtered-enchant
+-- fallthrough rebuild them is one fresh gather per Aura per pass (#430).
+stillAdmittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
+stillAdmittedGiven pcs grants pools perspective source recipient slot gs =
+  Set.member recipient (admittedGiven pcs grants pools perspective False Map.empty source slot gs)
 
 -- One legal set per named slot; casting prompts with exactly this map. `source`
 -- is the object the targeting is relative to -- the spell object at cast, the
