@@ -71,18 +71,17 @@ to agents as written. What it doesn't say:
   uncommitted changes, which no stash and no reflog can recover once a stray
   edit is "reverted".
 
-- That file sets `semaphore: True`, so concurrent `cabal` runs in different
-  worktrees share one GHC job semaphore --- builds are one at a time. A killed
-  run corrupts it (a `pkill`, or a tool timeout reaping a backgrounded `cabal`);
-  the symptom is `semWait: invalid argument`, and `cabal test --no-semaphore
-  -j4` gets through. Never `pkill -f 'cabal test'` --- it reaches other agents'
-  worktrees. Match your own worktree path, or wait --- but waiting is not a
-  strategy for THIS: cabal prints that line and then HANGS instead of exiting,
-  so a run stuck with no output for many minutes is the same fault, and the
-  flags are the only way out. Piping `cabal` into `head` --- or anything else
-  that closes the pipe early --- deadlocks it on SIGPIPE while it still HOLDS
-  the semaphore, which stalls every other worktree until that PID is killed.
-  Redirect to a file and read the file.
+- That file no longer sets `semaphore: True`. Concurrent `cabal` runs are
+  serialised by `script/with-build-lock.sh` instead (two builds at a time,
+  machine-wide; the machine has 8 GB), so prefix every `cabal` call with it.
+  The GHC job semaphore was dropped on 2026-09-02: a killed run corrupted it
+  (`semWait: invalid argument`) and cabal then HUNG rather than exiting, which
+  stalled every other worktree; with the lock capping builds at two on eight
+  cores, `jobs: 4` per build needs no sharing. Never `pkill -f 'cabal test'`
+  --- it reaches other agents' worktrees; kill your own PID. Piping `cabal`
+  into `head` --- or anything else that closes the pipe early --- deadlocks
+  it on SIGPIPE while it still holds a lock slot. Redirect to a file and read
+  the file.
 
 - Derive against `origin/main`, not the working checkout, which drifts:
   `git fetch`, then `git show origin/main:<path>` or a worktree cut from it.
