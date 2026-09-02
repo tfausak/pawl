@@ -370,7 +370,7 @@ attackerAssignment gs contested (attacker, target) = case Projection.powerOf att
             -- planeswalker burned off the battlefield (CR 506.4).
             attacked = combatRecipient gs attacker target
             -- CR 508.5 / CR 310.9d, shared with the landwalk reading in
-            -- Defender.playerOf so the two cannot drift. Read once, for CR
+            -- Defender.defenderOfAttack so the two cannot drift. Read once, for CR
             -- 702.19c's third recipient below and for CR 702.22j's chooser.
             defending = Defender.defenderOfAttack Projection.controllerWithLastKnown attacker target gs
             -- CR 702.19b: the trample-through recipient is whatever the creature

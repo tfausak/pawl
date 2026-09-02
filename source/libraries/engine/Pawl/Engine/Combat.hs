@@ -299,6 +299,11 @@ stillAttacked oid gs =
 -- The list also asks who protects the battle, so a protector moved to a third
 -- player mid-combat (CR 310.9f) reads here as removed from combat, which is what
 -- rule 506.4 says. Not implemented: any effect that moves a designation (#853).
+--
+-- Not implemented: rule 506.4's CONTROLLER clause for a battle, whose protector a
+-- control change leaves where it was, so this list still finds it (#2965). The
+-- planeswalker twin above reads that clause off Pawl.Types.Combat's attackedUnder,
+-- which for a battle records the protector and cannot see it.
 stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs =
   List.any (\defender -> List.elem oid (attackableBattles defender gs)) (Defender.defendingPlayers gs)
