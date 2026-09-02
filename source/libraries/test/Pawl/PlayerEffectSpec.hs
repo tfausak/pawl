@@ -15,6 +15,10 @@
 -- 118.7e-g describes and no card prints. Khabál
 -- Ghoul, Withered Wretch and Sol Ring are the costs the last two are aimed at.
 --
+-- Patrician Geist is the reduction side's zone axis: CR 601.2a's zone a spell was
+-- CAST FROM, which Filter.WasCastFrom reads and which no other card in this
+-- module names.
+--
 -- Blossoming Calm and Synthetic Conditional Silence are the stored carrier's
 -- other two durations (CR 611.2a's "until your next turn", CR 611.2b's "for as
 -- long as"), the second synthetic for the reason its own group states.
@@ -85,6 +89,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -160,6 +165,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -220,7 +226,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell board)) "not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced board)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "a offered"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "b offered"
 
@@ -234,7 +240,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell afterFirst) "alice is now prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced afterFirst) "alice is now prohibited"
       Spec.assertEqWith
         s
         "no cast is offered at all"
@@ -247,7 +253,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell afterFirst)) "bob is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced afterFirst)) "bob is not prohibited"
 
     -- Engine.handoffTurn clears the event log at the turn handoff, so
     -- "this turn" (castsThisTurn's fold over the log) is exactly the
@@ -265,7 +271,7 @@ ruleOfLawSpec s registry =
                 GameState.priority = Just S.alice
               }
       Spec.assertEqWith s "alice is active again" (GameState.activePlayer nextOwnTurn) S.alice
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell nextOwnTurn)) "not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced nextOwnTurn)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
 
     -- Ruling: "If you cast a spell that was countered, you can't cast
@@ -281,7 +287,7 @@ ruleOfLawSpec s registry =
         top : _ -> do
           let countered = S.runPure S.identityAnswer cast (Event.counter S.noSource S.bob top)
           Spec.assertEqWith s "the stack is empty again" (GameState.stack countered) []
-          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell countered) "still prohibited"
+          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced countered) "still prohibited"
 
     -- The effect is RE-DERIVED from the battlefield on every read, so there
     -- is no stored state to unwind when its source leaves.
@@ -292,8 +298,8 @@ ruleOfLawSpec s registry =
           (rol, onBoard) = S.addCreature ruleOfLaw S.alice plain
           castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))] onBoard
           gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell castOne) "prohibited while it stands"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell gone)) "not prohibited once it is gone"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced castOne) "prohibited while it stands"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced gone)) "not prohibited once it is gone"
       Spec.assertBool s (elem (Action.Type.Cast z (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice gone)) "and a cast is offered again"
 
     -- CR 601.3's prohibit half applies to EVERY cast, including a
@@ -993,6 +999,95 @@ medallionSpec s registry =
         (Just (ManaCost.MkManaCost [blue]))
       Spec.assertBool s (S.castable S.alice unsummon gs) "so one Island is enough"
 
+-- alice on `n` untapped Islands with one Think Twice in her graveyard and one in
+-- her hand -- the same card in the two zones the case tells apart, so the boards
+-- it compares differ in the zone and in nothing else. The Patrician Geist is
+-- added by each case rather than here, so it is the only other difference any
+-- board below carries.
+--
+-- Her library is stocked because Think Twice draws and CR 104.3c would lose her
+-- the game out from under the assertions.
+geistBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+geistBoard island thinkTwice n =
+  let (yardId, gs1) = S.addGraveyardCard thinkTwice S.alice (S.landsInPlay island n)
+      (handId, gs2) = S.addHandCard thinkTwice S.alice gs1
+      (_, gs3) = S.addLibraryCard island S.alice gs2
+   in ( yardId,
+        handId,
+        gs3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Patrician Geist {2}{U} Creature -- Spirit Knight 2/2 (MID 69): "Flying / Other
+-- Spirits you control get +1/+1. / Spells you cast from your graveyard cost {1}
+-- less to cast." Oracle text verified against Scryfall.
+--
+-- The third sentence is the point: it is the reduction half of the CR 601.2a
+-- cast-from-zone atom Aven Interrupter taxes with (Pawl.CastSpec), spelled
+-- `And [WasCastFrom Graveyard, OwnedBy You]`.
+--
+-- The OwnedBy conjunct is a REGRESSION FENCE rather than a proven behaviour, and
+-- CR 400.3 is what makes it exact: a card in a graveyard is in its owner's, so
+-- "your graveyard" is the spell's owner being the caster. Nothing discriminates
+-- it today -- Pawl.Engine.Cast.zoneCandidates reads a graveyard through
+-- Game.zoneMembers, which is per-player, so no board lets one player cast out of
+-- another's. Dropping the conjunct leaves the suite green.
+--
+-- Think Twice ({1}{U} Instant, "Draw a card." / "Flashback {2}{U}") is the spell,
+-- for the reason Pawl.CastSpec's tax group gives: the two zones it can be cast
+-- from off one board are what make the reduction discriminating.
+patricianGeistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+patricianGeistSpec s registry =
+  Spec.describe s "PatricianGeist" $ do
+    -- MANA TAPPED, not a cost read: #2363's content is that a cost filter over
+    -- the wrong zone leaves Pawl.Engine.Cast.castable and Pawl.Engine.Cast
+    -- .castSpell pricing one cast differently, so the payment is where the
+    -- reduction has to show.
+    Spec.it s "CR 601.2f a flashback cast out of her own graveyard costs {1} less, and her cast from hand does not" $ do
+      island <- S.printingOf s registry "Island"
+      geist <- S.printingOf s registry "Patrician Geist"
+      thinkTwice <- S.printingOf s registry "Think Twice"
+      let (yardId, handId, open) = geistBoard island thinkTwice 5
+          withGeist = snd (S.addCreature geist S.alice open)
+          -- The Geist is itself a permanent alice controls, so only her LANDS
+          -- may be counted: it enters untapped and stays that way.
+          tappedAfter gs oid = S.tappedCount S.alice (S.runPure S.identityAnswer gs (S.cast S.alice oid))
+      Spec.assertEqWith s "CR 702.34a the flashback cost is {2}{U}, so three Islands with no Geist out" (tappedAfter open yardId) 3
+      Spec.assertEqWith s "and two with it, CR 118.7a taking the reduction off the generic component alone" (tappedAfter withGeist yardId) 2
+      Spec.assertEqWith s "the sentence names her graveyard and not her hand: the {1}{U} hand cast taps two either way" (tappedAfter open handId, tappedAfter withGeist handId) (2, 2)
+
+    -- Two Islands is exactly the amount that tells the two prices apart, the
+    -- shape the Medallion's gate case above takes -- and it is the half #2363
+    -- says a wrong reader gets wrong in the opposite direction from the payment.
+    Spec.it s "CR 601.2f the reduction is observable at the castability gate too" $ do
+      island <- S.printingOf s registry "Island"
+      geist <- S.printingOf s registry "Patrician Geist"
+      thinkTwice <- S.printingOf s registry "Think Twice"
+      let (yardId, _, open) = geistBoard island thinkTwice 2
+          withGeist = snd (S.addCreature geist S.alice open)
+      Spec.assertBool s (S.castable S.alice yardId withGeist) "castable for {1}{U} with two Islands"
+      Spec.assertBool s (not (S.castable S.alice yardId open)) "and not for {2}{U} without the Geist"
+
+    -- CR 611.1 / 109.5 again, the Medallion's own negative one zone over: the You
+    -- scope is the effect's controller, so bob's flashback out of bob's graveyard
+    -- pays full price off the same board.
+    Spec.it s "CR 109.5 the You scope does not discount an opponent's cast from their own graveyard" $ do
+      island <- S.printingOf s registry "Island"
+      geist <- S.printingOf s registry "Patrician Geist"
+      thinkTwice <- S.printingOf s registry "Think Twice"
+      let (_, _, open) = geistBoard island thinkTwice 5
+          withGeist = snd (S.addCreature geist S.alice open)
+          (bobYard, seated) = S.addGraveyardCard thinkTwice S.bob (S.landsFor island S.bob 5 withGeist)
+          (_, stocked) = S.addLibraryCard island S.bob seated
+      Spec.assertEqWith
+        s
+        "bob taps three for the same flashback alice would pay two for"
+        (S.tappedCount S.bob (S.runPure S.identityAnswer stocked (S.cast S.bob bobYard)))
+        3
+
 -- Humility {2}{W}{W} Enchantment: "All creatures lose all abilities and have
 -- base power and toughness 1/1." CR 604.2: a static ability's continuous effect
 -- is active only "as long as the permanent with the ability remains on the
@@ -1082,11 +1177,11 @@ humilitySpec s registry =
           castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))]
       Spec.assertBool
         s
-        (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell (castOne withHumility))
+        (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced (castOne withHumility))
         "control: Humility alone does not reach an enchantment"
       Spec.assertBool
         s
-        (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell (castOne withOpalescence)))
+        (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced (castOne withOpalescence)))
         "once animated, Rule of Law loses the ability and the limit lifts"
 
 -- alice controls a Sapphire Medallion and two untapped Islands, with Divination
@@ -2464,15 +2559,15 @@ storedSpec s registry =
 
     Spec.it s "CR 611.1 a stored effect applies through its scope" $
       do
-        Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell silenced) "bob is prohibited"
-        Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell silenced)) "alice is not"
+        Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced silenced) "bob is prohibited"
+        Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced silenced)) "alice is not"
 
     Spec.it s "CR 514.2 the cleanup sweep drops an AtCleanup player effect" $
       let after = Expiry.dropAtCleanup silenced
        in do
             Spec.assertEqWith s "one stored before" (length (GameState.playerEffects silenced)) 1
             Spec.assertEqWith s "none after" (GameState.playerEffects after) []
-            Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after)) "and bob may cast again"
+            Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced after)) "and bob may cast again"
 
     Spec.it s "CR 514.2 the cleanup sweep keeps a Never player effect" $
       let forever = S.addPlayerEffect Expiry.Type.Never (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice base
@@ -2503,10 +2598,10 @@ storedSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, conditional) = storedConditional piker
           (changed, swept) = Engine.runGamePure S.identityAnswer conditional Expiry.sweepConditional
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell conditional) "still prohibited while the source stands"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced conditional) "still prohibited while the source stands"
       Spec.assertBool s (not changed) "the sweep reports no change"
       Spec.assertEqWith s "still stored" (length (GameState.playerEffects swept)) 1
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell swept) "still prohibited after a no-op sweep"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced swept) "still prohibited after a no-op sweep"
 
     Spec.it s "CR 611.2b the conditional sweep deletes a player effect whose condition has failed" $ do
       piker <- S.printingOf s registry "Goblin Piker"
@@ -2515,7 +2610,7 @@ storedSpec s registry =
           (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
       Spec.assertBool s changed "the sweep reports a change"
       Spec.assertEqWith s "deleted, not masked" (GameState.playerEffects swept) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell swept)) "no longer prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced swept)) "no longer prohibited"
 
 -- The board is BOB's turn on purpose: the "only casting is stopped" ruling
 -- names playing a land and activating an ability, and both are only
@@ -2622,7 +2717,7 @@ silenceSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects after)) 1
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced after) "bob is prohibited"
       Spec.assertEqWith
         s
         "and no cast is offered"
@@ -2638,7 +2733,7 @@ silenceSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, silence2Id, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell after)) "alice is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced after)) "alice is not prohibited"
       Spec.assertBool s (S.castable S.alice silence2Id after) "and may cast her second Silence"
 
     -- Ruling: "The only thing Silence stops is casting spells. Your
@@ -2663,7 +2758,7 @@ silenceSpec s registry =
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
           ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
       Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell ended)) "bob may cast again"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced ended)) "bob may cast again"
 
     -- CR 806.1: in a free-for-all the players compete as individuals, so the
     -- card's your-opponents is EVERY other player, not the next seat. This is
@@ -2696,15 +2791,15 @@ silenceSpec s registry =
       -- THE DISCRIMINATOR. carol is the far seat: an Opponents scope resolved as
       -- "the next player in turn order" prohibits bob and leaves carol free, and
       -- that is the reading the doc comments claimed was in here.
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell resolved) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell resolved) "carol is prohibited too"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced resolved) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell VariableChoice.Announced resolved) "carol is prohibited too"
       Spec.assertEqWith
         s
         "and nothing is offered to either, even on their own main phase"
         (filter isCast (Action.legalActions S.bob resolvedBobsTurn) <> filter isCast (Action.legalActions S.carol resolvedCarolsTurn))
         []
       -- CR 109.5: the scope is resolved off the effect's controller.
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell resolved)) "alice is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced resolved)) "alice is not prohibited"
 
 -- CR 601.2c: the three-seat Cease-Fire board. alice has three Plains and the
 -- Cease-Fire; all three seats have two Mountains, a Goblin Piker in hand and two
@@ -3118,9 +3213,9 @@ conditionalSilenceSpec s registry =
       case fmap ActivePlayerEffect.expiry (GameState.playerEffects resolved) of
         [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
         other -> Spec.assertFailure s ("expected one conditional player effect, got " <> show other)
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell resolved) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell resolved) "carol is prohibited too"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell resolved)) "alice is not"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced resolved) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell VariableChoice.Announced resolved) "carol is prohibited too"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced resolved)) "alice is not"
       Spec.assertEqWith s "and nothing is offered to either" (conditionalSilenceCasts S.bob resolved <> conditionalSilenceCasts S.carol resolved) []
 
     -- THE POSITIVE HALF of the sweep. Without it, "deletes when the condition
@@ -3154,7 +3249,7 @@ conditionalSilenceSpec s registry =
           settled = S.runPure S.identityAnswer stolen Engine.settleForPriority
       Spec.assertEqWith s "one stored before the Swamp moved" (length (GameState.playerEffects resolved)) 1
       Spec.assertEqWith s "none after" (GameState.playerEffects settled) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell settled)) "bob is no longer prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced settled)) "bob is no longer prohibited"
       Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "and his Piker is offered again"
 
     -- CR 611.2b's first sentence: a duration that never STARTS means the effect
@@ -3299,9 +3394,9 @@ hackedSilenceSpec s registry =
       let (hushId, hackId, _, _, _, _, before) = hackedSilenceBoard island hush magicalHack mountain piker
           after = hackedSilenceAfter True hushId hackId before
       Spec.assertEqWith s "nothing is offered to either opponent" (conditionalSilenceCasts S.bob after <> conditionalSilenceCasts S.carol after) []
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell after) "carol is prohibited too"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell after)) "alice is not"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell VariableChoice.Announced after) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell VariableChoice.Announced after) "carol is prohibited too"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced after)) "alice is not"
       Spec.assertEqWith s "and both spells resolved" (length (GameState.stack after)) 0
       case fmap ActivePlayerEffect.expiry (GameState.playerEffects after) of
         [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
@@ -3776,7 +3871,7 @@ nullChamberSpec s registry =
           casts = Action.legalActions S.bob
       Spec.assertBool s (elem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts before)) "bob may cast his Bolt before the Chamber lands"
       Spec.assertBool s (notElem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts after)) "and may not once it has"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId (S.printingName lightningBolt) after) "bob is prohibited by alice's name"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId (S.printingName lightningBolt) VariableChoice.Announced after) "bob is prohibited by alice's name"
       Spec.assertBool s (elem (bobsBarrens, Nothing) (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
       Spec.assertBool s (notElem (bobsBarrens, Nothing) (Action.playableLands S.bob after)) "and not once it has"
 
@@ -3815,7 +3910,7 @@ nullChamberSpec s registry =
           picks pid = if pid == S.alice then S.printingName cancel else S.printingName piker
           after = castChamber S.bob picks board oid
           (pikerId, gs) = S.addHandCard piker S.alice after
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) gs) "alice is prohibited by bob's name"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced gs) "alice is prohibited by bob's name"
       Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gs)) "and no cast is offered"
 
     -- CR 305.1: playing a land is a SPECIAL ACTION that never uses the stack, so
@@ -3866,8 +3961,8 @@ nullChamberSpec s registry =
         Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
         Just chamber -> do
           let gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [chamber])
-          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) gs) "prohibited while it stands"
-          Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) gone)) "not prohibited once it is gone"
+          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced gs) "prohibited while it stands"
+          Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced gone)) "not prohibited once it is gone"
           Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gone)) "and the cast is offered again"
           Spec.assertBool s (elem (barrensId, Nothing) (Action.playableLands S.alice gone)) "and the land may be played again"
 
@@ -4313,7 +4408,7 @@ conjurersBanSpec s registry =
       Spec.assertBool s (elem castPiker (Action.legalActions S.alice before)) "alice may cast her Piker before the Ban resolves"
       Spec.assertBool s (notElem castPiker (Action.legalActions S.alice after)) "and may not once it has"
       Spec.assertBool s (elem castBolt (Action.legalActions S.alice after)) "the unnamed Bolt still is offered"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) after) "and the prohibition is the named one"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) VariableChoice.Announced after) "and the prohibition is the named one"
       -- The carrier, asserted AFTER the behaviour: nothing this card makes is a
       -- permanent, so both rows are CR 611.2c stored ones.
       Spec.assertEqWith s "two stored rows" (length (GameState.playerEffects after)) 2
@@ -5440,6 +5535,21 @@ voidWinnowerBoard mountain piker bolt disaster extra =
         (List.foldl' put gs4 extra) {GameState.phase = Phase.PrecombatMain}
       )
 
+-- CR 107.3b's board: bob holds a Molten Disaster and controls Omniscience, so
+-- the grant's {0} is among his candidates; `lands` Mountains of his decide
+-- whether the printed {X}{R}{R} is another. alice's `extra` go onto her
+-- battlefield beside her nine Mountains, the Winnower or nothing.
+--
+-- Returns (bob's Disaster, board).
+omniscientBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+omniscientBoard mountain disaster omniscience lands extra =
+  let base = S.landsInPlay mountain 9
+      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. lands]
+      withGrant = snd (S.addCreature omniscience S.bob withBobsLands)
+      (bobsDisaster, gs) = S.addHandCard disaster S.bob withGrant
+      put g printing = snd (S.addCreature printing S.alice g)
+   in (bobsDisaster, (List.foldl' put gs extra) {GameState.phase = Phase.PrecombatMain})
+
 -- Whatever that player may do, asked in their own precombat main phase with an
 -- empty stack -- so a sorcery, a creature spell and an instant are all inside CR
 -- 307.1's window and timing is never the reason one is missing.
@@ -5496,8 +5606,46 @@ voidWinnowerSpec s registry =
       let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster []
           cheap = Filter.Type.ManaValueAtMost 5
       Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
-      Spec.assertBool s (PlayerEffect.choiceCouldEscape Nothing cheap bobsDisaster board) "and a large enough X takes it out"
-      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape Nothing cheap bobsPiker board)) "while the fixed spell beside it has no choice to make"
+      Spec.assertBool s (PlayerEffect.choiceCouldEscape Nothing cheap bobsDisaster VariableChoice.Announced board) "and a large enough X takes it out"
+      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape Nothing cheap bobsPiker VariableChoice.Announced board)) "while the fixed spell beside it has no choice to make"
+
+    -- CR 107.3b puts a floor under that search: a spell cast "without paying its
+    -- mana cost" has 0 as its only legal X, so the choice CR 601.3a lets bob
+    -- consider is not his to make and the mana value the prohibition judges is
+    -- the printed one. Omniscience is bob's, the Winnower alice's, and bob has no
+    -- lands, so the grant's {0} is the only candidate he can announce.
+    --
+    -- THREE boards off one builder, each one thing apart from its neighbour:
+    -- the Winnower gone shows the free cast is otherwise offered, and nine
+    -- Mountains under the Winnower show the printed {X}{R}{R} still escapes --
+    -- the clamp reaches the free candidate and not the search itself.
+    Spec.it s "CR 107.3b a free cast fixes X at 0, so the {X} spell is refused as even" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      omniscience <- S.printingOf s registry "Omniscience"
+      winnower <- S.printingOf s registry "Void Winnower"
+      let (refused, board) = omniscientBoard mountain disaster omniscience 0 [winnower]
+          (offered, bare) = omniscientBoard mountain disaster omniscience 0 []
+          (escaping, funded) = omniscientBoard mountain disaster omniscience 9 [winnower]
+          -- An X of 3 wherever one is asked, so a cast that reached CR 601.2b's
+          -- announcement would show in the life totals; the grant's {0} names
+          -- no X, so a free Disaster deals nothing.
+          answering :: Prompt.Prompt r -> r
+          answering p = case p of
+            Prompt.ChooseCost _ _ _ candidates ->
+              Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost [])) . Cost.Type.mana) candidates)
+            Prompt.ChooseX {} -> 3
+            _ -> S.identityAnswer p
+          resolvedFree = S.runPure answering (S.runPure answering bare (S.cast S.bob offered)) Stack.resolveTop
+          resolvedFunded = S.runPure answering (S.runPure answering funded (S.cast S.bob escaping)) Stack.resolveTop
+      Spec.assertBool s (not (any (S.isCastOf refused) (askedOf S.bob board))) "the free {X} spell is refused under the Winnower"
+      Spec.assertBool s (not (S.castable S.bob refused board)) "and is not castable"
+      Spec.assertBool s (any (S.isCastOf offered) (askedOf S.bob bare)) "with the Winnower gone the free cast is offered"
+      Spec.assertEqWith s "and resolves at X = 0: alice takes nothing" (S.lifeOf S.alice resolvedFree) (Just 20)
+      Spec.assertEqWith s "and neither does bob" (S.lifeOf S.bob resolvedFree) (Just 20)
+      Spec.assertBool s (any (S.isCastOf escaping) (askedOf S.bob funded)) "with nine Mountains the printed cost is still offered under the Winnower"
+      Spec.assertEqWith s "and only the printed cost: the grant's even route is withheld, so the Disaster is cast at X = 3 and alice takes 3" (S.lifeOf S.alice resolvedFunded) (Just 17)
+      Spec.assertEqWith s "and so does bob" (S.lifeOf S.bob resolvedFunded) (Just 17)
 
 -- CR 601.2f / 602.2b: the MANA half of a cost increase, at the activation
 -- moment. Oppressive Rays -- "{W} Enchantment -- Aura. Enchant creature.
@@ -5594,6 +5742,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   adjustmentSpec s
   thaliaSpec s registry
   medallionSpec s registry
+  patricianGeistSpec s registry
   humilitySpec s registry
   titaniasSongSpec s registry
   edgewalkerSpec s registry

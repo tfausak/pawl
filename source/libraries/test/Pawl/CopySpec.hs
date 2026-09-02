@@ -47,7 +47,9 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -63,7 +65,9 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -73,6 +77,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -1090,6 +1096,7 @@ handAppend printing pid gs =
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.Type.MkMana [],
             Object.announcedX = Nothing,
+            Object.castFrom = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -1767,3 +1774,191 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertBool s (S.onBattlefield copy2 final) "so CR 704.5v does not put it into the graveyard"
         Spec.assertEqWith s "the first copy entered with five too, while the original was out" (S.counterOf CounterKind.Defense copy1 withOriginal) 5
         Spec.assertEqWith s "and no printed battle is left on the battlefield for the second entry" (length (printedOnBattlefield "Invasion of Dominaria" gone)) 0
+
+-- CR 707.10f / 608.3f: a copy of a PERMANENT spell resolves into a token
+-- permanent. Lithoform Engine's third ability ("{4}, {T}: Copy target permanent
+-- spell you control") is the pool's producer; its first ability, copying an
+-- ability, is omitted, which leaves pawl's card stricter than printed (#2208).
+--
+-- alice holds Nyxborn Rollicker -- data/cards/'s bestow card -- with the Engine
+-- on the battlefield, so ONE board reaches both the creature-spell copy (CR
+-- 707.10f) and the bestowed-Aura-spell copy (CR 702.103c, whose copy "is also a
+-- bestowed Aura spell"). Seven Mountains: {1}{R} for the bestow cost, {4} for
+-- the Engine, {R} for the Lightning Bolt the last case casts in response, so no
+-- leg fails for mana.
+--
+-- TWO creatures to enchant, War Mammoth (3/3) and Goblin Piker (2/1), so CR
+-- 601.2c's host is a choice and the copy carrying that choice (CR 707.10's "all
+-- decisions made for it") is visible on the host it pumps and not on the other.
+lithoformBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, ObjectId, ObjectId, ObjectId, GameState.GameState)
+lithoformBoard mountain engine piker mammoth rollicker bolt =
+  let base = S.landsInPlay mountain 7
+      (engineId, gs1) = S.addCreature engine S.alice base
+      (bystander, gs2) = S.addCreature piker S.alice gs1
+      (host, gs3) = S.addCreature mammoth S.alice gs2
+      (gs4, spellId) = S.handOne rollicker gs3
+      (boltId, board) = S.addHandCard bolt S.alice gs4
+   in (engineId, bystander, host, spellId, boltId, board)
+
+-- CR 601.2b's announcement answered by NAMING a cost, and CR 601.2c's target by
+-- FILTERING the offered set -- pinTarget's reason. Pawl.AuraSpec's castingFor,
+-- duplicated rather than hoisted.
+castingRollicker :: [ManaSymbol.ManaSymbol] -> ObjectId -> Prompt.Prompt r -> r
+castingRollicker wanted host p = case p of
+  Prompt.ChooseCost _ _ _ candidates ->
+    Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just host) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+bestowingRollicker, printedRollicker :: ObjectId -> Prompt.Prompt r -> r
+bestowingRollicker = castingRollicker [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
+printedRollicker = castingRollicker [ManaSymbol.OfType (ManaType.Colored Color.Red)]
+
+-- Every permanent named Nyxborn Rollicker alice has on the battlefield -- by
+-- NAME rather than by Source, so a copy that never became a token and one that
+-- became the wrong thing are both found and then told apart by Game.isToken.
+rollickersOn :: Printing.Printing -> GameState.GameState -> [ObjectId]
+rollickersOn printing gs =
+  filter
+    (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing))
+    (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+-- alice casts the Rollicker (`casting` decides bestowed or printed), then -- CR
+-- 117.3c, still holding priority -- activates the Engine's {4} ability at it and
+-- resolves the ability. Returns the board with [copy, Rollicker] on the stack.
+--
+-- The {4} ability is picked by its cost rather than by index, so a reordering of
+-- the card file cannot silently aim the {3} one at a creature spell and have the
+-- activation refuse for want of a target.
+copyRollicker :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> ObjectId -> GameState.GameState -> Maybe GameState.GameState
+copyRollicker casting engineId spellId board =
+  let cast = S.runPure casting board (S.cast S.alice spellId)
+      ready = cast {GameState.priority = Just S.alice}
+   in do
+        spell <- topOfStack cast
+        ability <- List.find ((== Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) . Cost.Type.mana . ActivatedAbility.cost) (Projection.abilitiesOf engineId ready)
+        let activated = S.runPure (pinTarget (Recipient.ToObject spell)) ready (Activate.activateAbility S.alice engineId ability)
+        pure (resolveOne S.identityAnswer activated)
+
+permanentCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+permanentCopySpec s registry =
+  let boardOf = do
+        mountain <- S.printingOf s registry "Mountain"
+        engine <- S.printingOf s registry "Lithoform Engine"
+        piker <- S.printingOf s registry "Goblin Piker"
+        mammoth <- S.printingOf s registry "War Mammoth"
+        rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        pure (rollicker, lithoformBoard mountain engine piker mammoth rollicker bolt)
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        -- CR 707.10f end to end: the copy resolves and a TOKEN Rollicker stands on
+        -- the battlefield before the card's own spell has resolved, then the card
+        -- beside it. The token read is first: an engine that dropped the copy
+        -- reads no Rollicker at all, one that filed it as a card reads a
+        -- non-token, and one that let CR 704.5e remove it reads nothing after
+        -- settling -- resolveOne settles.
+        Spec.it s "CR 707.10f a copy of a creature spell resolves as a token creature beside the card" $ do
+          (rollicker, (engineId, _, host, spellId, _, board)) <- boardOf
+          case copyRollicker (printedRollicker host) engineId spellId board of
+            Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
+            Just copied -> do
+              let afterCopy = resolveOne S.identityAnswer copied
+                  afterBoth = resolveOne S.identityAnswer afterCopy
+              Spec.assertEqWith
+                s
+                "CR 707.10f: the copy resolved into ONE Rollicker, and it is a token"
+                (fmap (\oid -> Game.isToken oid afterCopy) (rollickersOn rollicker afterCopy))
+                [True]
+              Spec.assertEqWith
+                s
+                "CR 111.13: with the spell's characteristics, a 1/1"
+                (fmap (\oid -> S.powerToughnessOf oid afterCopy) (rollickersOn rollicker afterCopy))
+                [Just (1, 1)]
+              Spec.assertEqWith
+                s
+                "CR 707.10: under the copying effect's controller"
+                (fmap (\oid -> Projection.controllerOf oid afterCopy) (rollickersOn rollicker afterCopy))
+                [Just S.alice]
+              Spec.assertEqWith
+                s
+                "CR 608.3a: the card then resolves beside it, one token and one card"
+                (List.sort (fmap (\oid -> Game.isToken oid afterBoth) (rollickersOn rollicker afterBoth)))
+                [False, True]
+              Spec.assertEqWith
+                s
+                "and neither reached a graveyard"
+                (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid afterBoth)) (Game.zoneMembers Zone.Graveyard S.alice afterBoth))
+                []
+              Spec.assertEqWith s "and the stack is empty" (length (GameState.stack afterBoth)) 0
+        -- CR 702.103c: the copy of a bestowed Aura spell is a bestowed Aura
+        -- spell, so CR 608.3c puts it onto the battlefield attached -- to the
+        -- host the ORIGINAL chose, since CR 707.10 copies its target and the
+        -- Engine's third ability chooses no new ones. The board is the case
+        -- above's, differing in ONE thing: the cost CR 601.2b's announcement
+        -- settled on.
+        --
+        -- The host's power is the gameplay-level read and comes first: 4/4 after
+        -- the copy alone is the token pumping it, 5/5 after both is the card
+        -- pumping it too, and the bystander at 2/1 is the choice having been
+        -- carried rather than re-made.
+        Spec.it s "CR 702.103c a copy of a bestowed Rollicker resolves as a token Aura attached to the same host" $ do
+          (rollicker, (engineId, bystander, host, spellId, _, board)) <- boardOf
+          case copyRollicker (bestowingRollicker host) engineId spellId board of
+            Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
+            Just copied -> do
+              let afterCopy = resolveOne S.identityAnswer copied
+                  afterBoth = resolveOne S.identityAnswer afterCopy
+              Spec.assertEqWith s "CR 702.103b: the token Aura pumps the host to 4/4" (S.powerToughnessOf host afterCopy) (Just (4, 4))
+              Spec.assertEqWith s "and the card's Aura makes it 5/5" (S.powerToughnessOf host afterBoth) (Just (5, 5))
+              Spec.assertEqWith s "and the creature nobody chose is untouched" (S.powerToughnessOf bystander afterBoth) (Just (2, 1))
+              Spec.assertEqWith
+                s
+                "CR 303.4: the token entered attached to the host"
+                (fmap (\oid -> Object.attachedTo =<< Game.lookupObject oid afterCopy) (rollickersOn rollicker afterCopy))
+                [Just (Recipient.ToCreature host)]
+              Spec.assertEqWith
+                s
+                "CR 702.103b: and it is an Enchantment, not a Creature"
+                (fmap (\oid -> Projection.cardTypesOf oid afterCopy) (rollickersOn rollicker afterCopy))
+                [Set.singleton CardType.Enchantment]
+              Spec.assertEqWith
+                s
+                "an Aura, with CR 205.1a having taken Satyr"
+                (fmap (\oid -> Projection.subtypesOf oid afterCopy) (rollickersOn rollicker afterCopy))
+                [Set.singleton Subtype.Aura]
+              Spec.assertEqWith
+                s
+                "CR 707.10f: and a token"
+                (fmap (\oid -> Game.isToken oid afterCopy) (rollickersOn rollicker afterCopy))
+                [True]
+        -- CR 702.103e on the COPY: its host is killed in response, so as the copy
+        -- begins resolving it ceases to be bestowed and resolves as a creature
+        -- spell -- a token creature, attached to nothing. The board is the case
+        -- above's plus one Bolt at the host after the ability has resolved.
+        Spec.it s "CR 702.103e a bestowed copy whose host died resolves as a token creature" $ do
+          (rollicker, (engineId, bystander, host, spellId, boltId, board)) <- boardOf
+          case copyRollicker (bestowingRollicker host) engineId spellId board of
+            Nothing -> Spec.assertFailure s "the Rollicker never reached the stack, or the Engine offered no {4} ability"
+            Just copied -> do
+              let bolted = S.runPure (pinTarget (Recipient.ToCreature host)) copied {GameState.priority = Just S.alice} (S.cast S.alice boltId)
+                  -- The Bolt, then the copy, then the Rollicker itself.
+                  hostDead = resolveOne S.identityAnswer bolted
+                  afterCopy = resolveOne S.identityAnswer hostDead
+                  afterBoth = resolveOne S.identityAnswer afterCopy
+              Spec.assertEqWith s "the Bolt killed the host" (Game.lookupObject host hostDead) Nothing
+              Spec.assertEqWith
+                s
+                "CR 702.103e: the copy resolved as a creature token, attached to nothing"
+                (fmap (\oid -> (Game.isToken oid afterCopy, Projection.cardTypesOf oid afterCopy, Object.attachedTo =<< Game.lookupObject oid afterCopy)) (rollickersOn rollicker afterCopy))
+                [(True, Set.fromList [CardType.Creature, CardType.Enchantment], Nothing)]
+              Spec.assertEqWith
+                s
+                "keeping Satyr, since it is a creature again"
+                (fmap (\oid -> Projection.subtypesOf oid afterCopy) (rollickersOn rollicker afterCopy))
+                [Set.singleton Subtype.Satyr]
+              Spec.assertEqWith s "and the bystander was never enchanted" (S.powerToughnessOf bystander afterBoth) (Just (2, 1))
+              Spec.assertEqWith
+                s
+                "CR 608.3b: the card resolved as a creature beside it"
+                (List.sort (fmap (\oid -> Game.isToken oid afterBoth) (rollickersOn rollicker afterBoth)))
+                [False, True]

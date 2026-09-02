@@ -1898,6 +1898,11 @@ representativeEvents cond =
         -- The same event read by a bystander, and the only one this condition
         -- admits.
         TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> one combatDamage
+        -- The same one event, and NOT because the batch reading matches nothing:
+        -- Event.matchesTrigger answers alike for both (its batch arm delegates to
+        -- the singular's), CR 603.2c's once-per-step scoping living in
+        -- Event.eventTriggers instead -- PermanentsDie's posture below.
+        TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> one combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
         -- CR 702.179d's own event. Like the monarch's condition above it, this
         -- one is matched by Pawl.Engine.Speed.inherentPending rather than by
@@ -2268,6 +2273,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
+    TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,

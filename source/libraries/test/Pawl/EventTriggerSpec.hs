@@ -2530,14 +2530,13 @@ communalVigilSpec s registry =
 -- WHY A SYNTHETIC. Three printings arm a delayed ability on a batch condition --
 -- Forth Eorlingas! ("whenever one or more creatures you control deal combat
 -- damage to one or more players this turn"), Aphelia, Viper Whisperer and
--- Garruk, Curse Breaker -- and every one of them watches batched COMBAT DAMAGE
--- or a batched ATTACK, which pawl has no TriggerCondition for: the neighbouring
--- constructors PermanentDealsCombatDamageToPlayer and PlayerAttacksWith are both
--- singular and both answer False to Event.batchScoped (#2389). On the LIFE axis
--- the query is Scryfall o:/one or more [^.]*gain(s)? life/, 2026-08-26, which
--- matches Path of Bravery alone -- its "one or more" counts attacking creatures.
--- So no printing pawl can express reaches this, and Forth Eorlingas! is the card
--- that refutes the synthetic the moment #2389 lands.
+-- Garruk, Curse Breaker -- and when this group was written every one of them
+-- watched batched COMBAT DAMAGE or a batched ATTACK, which pawl then had no
+-- TriggerCondition for. On the LIFE axis the query is Scryfall o:/one or more
+-- [^.]*gain(s)? life/, 2026-08-26, which matches Path of Bravery alone -- its
+-- "one or more" counts attacking creatures. Batched combat damage IS a condition
+-- now (TriggerCondition.PermanentsDealCombatDamageToPlayer), so Forth Eorlingas!
+-- is the card that refutes the synthetic; replacing it is #2940.
 --
 -- The PAYLOAD is slot-free on purpose, and the corpus lint "every slot a delayed
 -- ability reads is bound by its card" would reject one that read an EVENT slot:
