@@ -7841,6 +7841,73 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameTapped _ -> False
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
+  -- CR 509.3d read by a BYSTANDER: the Filter is asked of the ATTACKER, where
+  -- the arm above asks it of the blocker and compares the attacker against the
+  -- bearer. CR 701.54c's three-temptation tier is the caller, and its Filter is
+  -- Pawl.Engine.Ring.yourRingBearer -- the emblem is not in the event at all, so
+  -- nothing here compares an id to the bearer.
+  --
+  -- BecameBlocking.putOntoBattlefield is not read, for the arm above's reason:
+  -- rule 509.3d's third sentence admits a creature put onto the battlefield
+  -- blocking.
+  --
+  -- No arm on GameEvent.AttackerBlocked, which is CR 509.3c's grouped event:
+  -- rule 701.54c sacrifices "the blocking creature", one per blocker, and the
+  -- grouped event names none of them.
+  TriggerCondition.PermanentBecomesBlockedBy f -> case event of
+    GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker}) ->
+      case Projection.viewWithLastKnown attacker gs attacker of
+        Nothing -> False
+        Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+    GameEvent.BlocksDeclared {} -> False
+    -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
+    -- blockers into one trigger.
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
   -- CR 509.3e read from the attacking side: the bearer became blocked, by at
   -- least one creature the Filter admits. The GROUPED event, which is the printed
   -- "one or more" -- the arm above fires once per blocker, and two admitted
@@ -11287,6 +11354,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.PermanentBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
@@ -11859,6 +11927,11 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- source, so it gets no second name.
   (TriggerCondition.SelfBecomesBlockedBy _, GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker})) ->
     Binding.setBlockingCreature blocker Map.empty
+  -- CR 701.54c's "the blocking creature", off the same field and under the same
+  -- name. The bystander form: the ATTACKER is not the bearer here, and it gets no
+  -- slot, rule 701.54c naming it only as "your Ring-bearer" in the condition.
+  (TriggerCondition.PermanentBecomesBlockedBy _, GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker})) ->
+    Binding.setBlockingCreature blocker Map.empty
   -- CR 509.3b's "that creature": the ATTACKER on the very same declaration, which
   -- Loyal Sentry's payload destroys. The mirror of the arm above, and
   -- unconditional for the same reason; here it is the BLOCKER that is the bearer
@@ -12306,6 +12379,7 @@ eventBindingSlots cond = case cond of
   -- Guaranteed rather than conditional -- every such event carries both ids, and
   -- matchesTrigger has already pinned the attacker to the bearer.
   TriggerCondition.SelfBecomesBlockedBy _ -> Set.singleton Binding.blockingCreature
+  TriggerCondition.PermanentBecomesBlockedBy _ -> Set.singleton Binding.blockingCreature
   -- CR 509.3e names a SET of blockers rather than one, and no reader in the
   -- pool reaches into it: Serra Inquisitors' payload names only itself.
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> Set.empty
@@ -12776,6 +12850,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.PermanentBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
@@ -12940,6 +13015,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.PermanentBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
@@ -14163,6 +14239,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.SelfBlocksOneOrMore _ -> battlefield
   TriggerCondition.SelfBecomesBlocked -> battlefield
   TriggerCondition.SelfBecomesBlockedBy _ -> battlefield
+  TriggerCondition.PermanentBecomesBlockedBy _ -> battlefield
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> battlefield
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> battlefield
   TriggerCondition.SelfAttacksUnblocked -> battlefield
@@ -14459,6 +14536,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.PermanentBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
@@ -14657,6 +14735,7 @@ stateTriggers gs
               TriggerCondition.SelfBlocksOneOrMore _ -> False
               TriggerCondition.SelfBecomesBlocked -> False
               TriggerCondition.SelfBecomesBlockedBy _ -> False
+              TriggerCondition.PermanentBecomesBlockedBy _ -> False
               TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
               TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
               TriggerCondition.SelfAttacksUnblocked -> False

@@ -949,6 +949,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 509.3d's Filter is a predicate over the blocker, and holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.SelfBecomesBlockedBy _ -> []
+  TriggerCondition.PermanentBecomesBlockedBy _ -> []
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
   -- CR 509.3e's bystander form counts BLOCKERS rather than objects a Count
   -- names, and its PlayerRelation is no Count either.
@@ -4086,6 +4087,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
   -- Filter -- rule 702.25a's "without flanking".
   TriggerCondition.SelfBecomesBlockedBy f -> unframed [f]
+  TriggerCondition.PermanentBecomesBlockedBy f -> unframed [f]
   -- The same rule's attacking-side form, whose Filter is a predicate over the
   -- blockers -- Serra Inquisitors' "black".
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> unframed [f]
@@ -4220,6 +4222,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfBlocksOneOrMore _ -> []
   TriggerCondition.SelfBecomesBlocked -> []
   TriggerCondition.SelfBecomesBlockedBy _ -> []
+  TriggerCondition.PermanentBecomesBlockedBy _ -> []
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
   TriggerCondition.CreatureBecomesBlockedByAtLeast _ -> []
   TriggerCondition.SelfAttacksUnblocked -> []

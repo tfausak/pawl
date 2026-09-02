@@ -409,4 +409,16 @@ data TriggerCondition
     -- GameEvent.RingTempted. Fires on the temptation itself, so one whose
     -- CR 701.54a actions were all impossible fires it too.
     RingTemptsPlayer PlayerRelation.PlayerRelation
+  | -- | CR 509.3d read by a BYSTANDER on the attacking side: "whenever your
+    -- Ring-bearer becomes blocked by a creature" (CR 701.54c's three-temptation
+    -- tier). The Filter is over the ATTACKER, where SelfBecomesBlockedBy's is
+    -- over the blocker and its attacker is the bearer; the blocker is bound
+    -- under Pawl.Engine.Binding.blockingCreature, which is what lets the payload
+    -- say "the blocking creature's controller sacrifices IT".
+    --
+    -- Unfiltered on the blocking side, rule 701.54c printing "a creature".
+    --
+    -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
+    -- creature to block, records no event (#1146).
+    PermanentBecomesBlockedBy (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

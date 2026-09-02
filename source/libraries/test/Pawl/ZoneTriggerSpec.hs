@@ -1999,6 +1999,7 @@ representativeEvents cond =
         -- round: this condition's bearer is the ATTACKER, and the blocker is what
         -- it binds.
         TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
+        TriggerCondition.PermanentBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
         -- The GROUPED attacking-side event, which is what makes this one fire
         -- once where the arm above fires per blocker. carol on SelfBecomesBlocked's
         -- reasoning -- and this one binds that player nothing, which is the
@@ -2429,7 +2430,8 @@ everyTriggerCondition =
     TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And []),
     TriggerCondition.Reflexive,
     TriggerCondition.RingTemptsPlayer PlayerRelation.You,
-    TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent
+    TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent,
+    TriggerCondition.PermanentBecomesBlockedBy (Filter.Type.And [])
   ]
 
 -- CR 603.6c's first written form read by a BYSTANDER -- Super Shredder {1}{B}

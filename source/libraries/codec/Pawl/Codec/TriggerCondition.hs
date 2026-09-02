@@ -126,7 +126,10 @@ codec =
       Arm.nullary "Reflexive" TriggerCondition.Reflexive,
       Arm.payload "SelfBecomesAttachedBy" filterCodec TriggerCondition.SelfBecomesAttachedBy (\x -> case x of TriggerCondition.SelfBecomesAttachedBy y -> Just y; _ -> Nothing),
       -- CR 701.54d's "whenever the Ring tempts you", PlayerScries' shape above.
-      Arm.payload "RingTemptsPlayer" PlayerRelation.codec TriggerCondition.RingTemptsPlayer (\x -> case x of TriggerCondition.RingTemptsPlayer y -> Just y; _ -> Nothing)
+      Arm.payload "RingTemptsPlayer" PlayerRelation.codec TriggerCondition.RingTemptsPlayer (\x -> case x of TriggerCondition.RingTemptsPlayer y -> Just y; _ -> Nothing),
+      -- CR 509.3d from the attacking side's bystander, SelfBecomesBlockedBy's
+      -- shape above with the Filter over the attacker instead.
+      Arm.payload "PermanentBecomesBlockedBy" filterCodec TriggerCondition.PermanentBecomesBlockedBy (\x -> case x of TriggerCondition.PermanentBecomesBlockedBy y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec

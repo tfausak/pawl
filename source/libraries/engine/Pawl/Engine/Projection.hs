@@ -3020,6 +3020,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfBlocksOneOrMore f -> TriggerCondition.SelfBlocksOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlocked -> condition
   TriggerCondition.SelfBecomesBlockedBy f -> TriggerCondition.SelfBecomesBlockedBy (Filter.rewrite pairs f)
+  TriggerCondition.PermanentBecomesBlockedBy f -> TriggerCondition.PermanentBecomesBlockedBy (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> condition
   TriggerCondition.SelfAttacksUnblocked -> condition

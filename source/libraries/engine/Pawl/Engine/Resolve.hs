@@ -3417,6 +3417,28 @@ recipientSeat gs recipient = case recipient of
 -- re-validation. One Binding can carry both fields, but a Pawl.CardSpec lint
 -- ("no delayed ability declares a target slot under a name its card defines")
 -- rules the case out, so this arm never actually chooses.
+-- CR 701.21a: the permanent's OWN controller sacrifices it, which is the only
+-- player that rule lets sacrifice anything -- "a player can't sacrifice ...
+-- something that's a permanent they don't control". Read live rather than at the
+-- moment the instruction was written, so a permanent that changed hands in
+-- between is sacrificed by whoever holds it now (CR 613.1b's layer 2).
+--
+-- Read HERE rather than left to Event.sacrifice's guard, which only refuses:
+-- rule 701.54c's "the blocking creature's controller sacrifices it" is a printed
+-- template naming a player who is not the effect's controller, and passing the
+-- effect's controller made it a silent no-op. Every other caller of the funnel --
+-- a cost payment, a CR 614.1c as-enters sacrifice, an edict whose victim a player
+-- NAMED -- keeps naming its own player, since each of those already asks the
+-- question its own rule asks. Pawl.RingSpec's "CR 701.54c three temptations
+-- sacrifice the creature that blocked the Ring-bearer" is what proves this arm.
+--
+-- Nothing to do for an object that is gone or has no controller (CR 400.7): the
+-- funnel answers the same way for both.
+sacrificeByController :: ObjectId -> Game ()
+sacrificeByController oid = do
+  gs <- State.get
+  Monad.forM_ (Projection.controllerOf oid gs) (\pid -> Event.sacrifice pid oid)
+
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
 slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
 
@@ -5276,14 +5298,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     bound <- State.gets (slotGroup slot resolving)
     case bound of
       -- One at a time rather than as one event (#757).
-      Just victims -> Monad.mapM_ (Event.sacrifice controller) victims
+      Just victims -> Monad.mapM_ sacrificeByController victims
       Nothing -> case legalOne slot legal of
         Just recipient -> case Recipient.objectOf recipient of
           Nothing -> pure () -- a player recipient cannot be sacrificed
           -- CR 701.21: through the single funnel, which is NOT Event.destroy (CR
-          -- 701.21a). The sacrificing player is this effect's controller; the
-          -- funnel's CR 701.21a guard makes any other case a no-op.
-          Just target -> Event.sacrifice controller target
+          -- 701.21a).
+          Just target -> sacrificeByController target
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> pure ()
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) ->

@@ -34,12 +34,15 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Discard as Discard
@@ -59,7 +62,9 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
@@ -71,10 +76,12 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 
@@ -111,14 +118,14 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- emblem's card at every temptation, which is why the count needs to reach no
 -- reader but this one.
 --
--- Not implemented: the three-temptation ability (#706). It needs a
--- TriggerCondition arm that does not exist -- one that FILTERS the attacking
--- creature and BINDS the blocking one, where TriggerCondition.SelfBecomesBlockedBy
--- is self-scoped and CreatureBecomesBlockedByAtLeast keys on the attacked player
--- and a blocker count -- plus CR 603.7's delayed "at end of combat" sacrifice. The
--- scan that gathers the other two gathers it too once it exists:
--- Event.eventTriggers' `inCommand` source offers every triggered ability of an
--- emblem, unfiltered.
+-- Every tier is gathered from the command zone by one scan: Event.eventTriggers'
+-- `inCommand` source offers every triggered ability of an emblem, unfiltered.
+--
+-- The three-temptation tier alone also declares a CR 603.7 delayed ability, and it
+-- is gated on the same threshold rather than declared unconditionally. The count
+-- never falls, so an entry one temptation armed is still declared at every later
+-- re-mint, and the invariant that every declared name is armed and every armed
+-- name declared holds tier by tier.
 theRingEmblem :: Natural.Natural -> Card.Card
 theRingEmblem temptations =
   Card.MkCard
@@ -150,8 +157,12 @@ theRingEmblem temptations =
               -- printed order is the one a reader can check.
               Face.triggeredAbilities =
                 [theRingLootsOnAttack | temptations >= 2]
+                  <> [theRingSacrificesTheBlocker | temptations >= 3]
                   <> [theRingDrainsOnCombatDamage | temptations >= 4],
-              Face.delayedAbilities = Map.empty,
+              Face.delayedAbilities =
+                if temptations >= 3
+                  then Map.singleton theRingBlockerSacrificeName theRingBlockerSacrifice
+                  else Map.empty,
               Face.rooms = Seq.empty,
               Face.dungeonEntryQuality = Nothing,
               Face.castingPermissions = [],
@@ -272,6 +283,95 @@ theRingLootsOnAttack =
                 CountedDiscard.discarded = Nothing
               }
         )
+
+-- CR 701.54c's three-temptation sentence names the delayed ability it creates.
+-- Face.delayedAbilities files it under this name and Effect.ArmDelayedTrigger arms
+-- it by the same one.
+theRingBlockerSacrificeName :: AbilityName.AbilityName
+theRingBlockerSacrificeName = AbilityName.MkAbilityName (Text.pack "sacrifice the blocking creature")
+
+-- | CR 701.54c's three-temptation sentence: "Whenever your Ring-bearer becomes
+-- blocked by a creature, the blocking creature's controller sacrifices it at end
+-- of combat." Minted here rather than carried in card data for
+-- theRingIsLegendary's reason.
+--
+-- TriggerCondition.PermanentBecomesBlockedBy is a BYSTANDER condition, as
+-- theRingDrainsOnCombatDamage's is: the emblem is neither the blocked creature nor
+-- the blocker, so the Filter is what "your Ring-bearer" comes to and it is the
+-- shared `yourRingBearer` above, read against the ATTACKER with the trigger's
+-- controller as CR 109.5's perspective. TriggerCondition.SelfBecomesBlockedBy
+-- could not have carried it -- that condition compares the attacker against the
+-- bearer, and CR 114.3 leaves an emblem nothing to attack with.
+--
+-- CR 509.3d's arity is one trigger per BLOCKER, which is rule 701.54c's own: "the
+-- blocking creature's controller sacrifices IT" names one creature, so two
+-- blockers are two sacrifices. The blocker reaches the payload through
+-- Binding.blockingCreature, which Event.eventBindings stamps off the same event.
+--
+-- The sacrifice is DELAYED (CR 603.7): rule 701.54c says "at end of combat", so
+-- this trigger's whole effect is to arm theRingBlockerSacrifice below. CR 603.7e
+-- gives that ability this one's controller and source, and CR 603.7c's captured
+-- environment is what carries the blocker across to it.
+--
+-- No intervening "if" (CR 603.4) and TriggerLimit.Unlimited, for
+-- theRingDrainsOnCombatDamage's reasons.
+theRingSacrificesTheBlocker :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
+theRingSacrificesTheBlocker =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.PermanentBecomesBlockedBy yourRingBearer,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+  where
+    effect =
+      Effect.ArmDelayedTrigger
+        ArmDelayedTrigger.MkArmDelayedTrigger
+          { ArmDelayedTrigger.name = theRingBlockerSacrificeName,
+            -- CR 603.7a's floor: the ability watches for the end of combat from
+            -- the moment it is created, rule 701.54c naming no later turn.
+            ArmDelayedTrigger.onset = Onset.Immediately,
+            -- CR 603.7b's default, spelled as the absence that rule words it as:
+            -- "at end of combat" states no duration, so it fires once.
+            ArmDelayedTrigger.duration = Nothing
+          }
+
+-- | CR 603.7 / 701.54c: the delayed half of the sentence above -- at end of
+-- combat, the blocking creature is sacrificed.
+--
+-- Effect.Sacrifice and not Effect.Destroy: rule 701.54c says sacrifices, so CR
+-- 701.21a consults neither indestructible nor a regeneration shield, and the
+-- permanent's own CONTROLLER is who does it -- that rule's "the blocking
+-- creature's controller". Nothing here names that player, the opcode reading the
+-- controller off the permanent, so a blocker that changed hands between the block
+-- and the end of combat is sacrificed by whoever holds it then.
+--
+-- TurnScope.EachTurn rather than ControllersTurn, on Pawl.Types.TurnScope's own
+-- reading of a delayed ability keyed to the NEXT occurrence of its event: rule
+-- 701.54c says "at end of combat" and names no player's turn, and CR 603.7b's
+-- once-ness comes from the delayed store rather than from the scope.
+--
+-- The slot is Binding.blockingCreature, the same reserved name
+-- Event.eventBindings stamps for the condition above.
+theRingBlockerSacrifice :: TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
+theRingBlockerSacrifice =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition =
+        TriggerCondition.StepBegins
+          StepBegins.MkStepBegins
+            { StepBegins.phase = Phase.Combat CombatStep.EndOfCombat,
+              StepBegins.scope = TurnScope.EachTurn
+            },
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice Binding.blockingCreature)))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
 
 -- | CR 701.54c's four-temptation sentence: "Whenever your Ring-bearer deals combat
 -- damage to a player, each opponent loses 3 life." Minted here rather than carried

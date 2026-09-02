@@ -21,6 +21,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -31,16 +32,19 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
 
@@ -183,6 +187,33 @@ drainThrough gs =
     S.aggressiveAnswer
     (intoCombat gs)
     (Combat.declareBlockers >> Damage.dealCombatDamage >> Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+
+-- Drive a main-phase board into combat, declare blockers, then step into the end
+-- of combat step, resolving the whole stack at each stop.
+--
+-- NO COMBAT DAMAGE, deliberately: CR 701.54c's three-temptation tier is the only
+-- thing on these boards that can remove a blocker, so a blocker that is gone was
+-- sacrificed rather than destroyed by CR 510.2's damage.
+--
+-- The end of combat step is entered the way Pawl.MassEffectSpec's Come Back Wrong
+-- case enters an end step -- the phase and the CR 603.2b event the delayed ability
+-- watches for, written together, since nothing here runs the turn's own schedule.
+--
+-- Two settle-and-resolve rounds per stop, for lootThrough's reason.
+sacrificeThrough :: GameState.GameState -> GameState.GameState
+sacrificeThrough gs =
+  let resolveAll = Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority
+      endOfCombat = Phase.Combat CombatStep.EndOfCombat
+      blocked = S.runPure S.aggressiveAnswer (intoCombat gs) (Combat.declareBlockers >> resolveAll)
+      entered = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endOfCombat S.alice)) (blocked {GameState.phase = endOfCombat})
+   in S.runPure S.aggressiveAnswer entered resolveAll
+
+-- The creatures blocking, off the same Combat record CR 509.1g's event is written
+-- from -- the anti-vacuity read for the case below, which turns on a block having
+-- actually been declared. Combat.blockers is keyed by ATTACKER (CR 509.2), so the
+-- blockers are its values.
+declaredBlockers :: GameState.GameState -> [ObjectId]
+declaredBlockers gs = List.sort (concatMap Set.toList (Map.elems (Combat.Type.blockers (GameState.combat gs))))
 
 -- Answers CR 701.9b's discard with `wanted`, delegating everything else to
 -- S.aggressiveAnswer.
@@ -771,3 +802,47 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     -- not "the entry trigger did something else".
     Spec.assertEqWith s "alice was tempted once" (temptationsOf S.alice after) (Just 1)
     Spec.assertEqWith s "and bob, who watched, was not tempted at all" (temptationsOf S.bob after) (Just 0)
+  -- CR 701.54c's three-temptation sentence, at gameplay level: "Whenever your
+  -- Ring-bearer becomes blocked by a creature, the blocking creature's controller
+  -- sacrifices it at end of combat."
+  --
+  -- A PAIR of boards differing in exactly one thing -- how many of the same three
+  -- Birthday Escapes were cast. Everything else is shared: the same Piker
+  -- designated, the same Wall of Stone declared blocking it, the same drive
+  -- through combat.
+  --
+  -- Wall of Stone (0/8 Defender) is the blocker because the tier it must survive
+  -- to disprove is a different one: CR 701.54c's base tier forbids a blocker with
+  -- GREATER power, and 0 is under the Piker's 2, so the block is legal on both
+  -- boards and neither leg can pass because the declaration was refused.
+  Spec.it s "CR 701.54c three temptations sacrifice the creature that blocked the Ring-bearer" $ do
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wall <- S.printingOf s registry "Wall of Stone"
+    let (spells, mine, theirs, board) = ringCombatBoard island escape piker 3 [piker] [wall]
+        -- CR 104.3c: the two-temptation tier loots as the Ring-bearer attacks, and
+        -- both legs pay it, so alice needs a card to draw beyond the three the
+        -- Escapes themselves take. A decked alice loses the game before the end of
+        -- combat step, and a game with a result places no triggers at all.
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) board [1 .. (2 :: Int)]
+    case (mine, theirs) of
+      ([bearer], [blocker]) -> do
+        let thrice = sacrificeThrough (castEscapes S.identityAnswer 3 spells stocked)
+            twice = sacrificeThrough (castEscapes S.identityAnswer 2 spells stocked)
+        Spec.assertEqWith
+          s
+          "CR 701.54c the blocker is sacrificed at three temptations and not at two"
+          (S.onBattlefield blocker thrice, S.onBattlefield blocker twice)
+          (False, True)
+        Spec.assertEqWith s "and its controller put it into its owner's graveyard" (graveyardNames S.bob thrice) [S.printingName wall]
+        Spec.assertEqWith s "where the two-temptation board buried nothing of bob's" (graveyardNames S.bob twice) []
+        -- Anti-vacuity: both boards really declared the block, and the Ring-bearer
+        -- really is the Piker, so "nothing was sacrificed" is not "nothing blocked".
+        Spec.assertEqWith s "both boards declared the Wall blocking" (declaredBlockers thrice, declaredBlockers twice) ([blocker], [blocker])
+        Spec.assertEqWith s "the Piker is the Ring-bearer on both" (markedFor S.alice thrice, markedFor S.alice twice) ([bearer], [bearer])
+        Spec.assertEqWith s "and the counts are the two the tier sits between" (temptationsOf S.alice thrice, temptationsOf S.alice twice) (Just 3, Just 2)
+        -- CR 701.54c names the BLOCKING creature, not the Ring-bearer: an arm that
+        -- read the event's two ids the other way round would sacrifice this one.
+        Spec.assertBool s (S.onBattlefield bearer thrice) "and the Ring-bearer itself survived"
+      _ -> Spec.assertFailure s "fixture should have one creature a side"
