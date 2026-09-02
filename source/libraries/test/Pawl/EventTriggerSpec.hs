@@ -2697,10 +2697,10 @@ lifelinkGainEventsSpec s registry =
             (mate, staged) = S.addCreature pridemate S.alice withVigil
         pure (mate, S.runCombat S.aggressiveAnswer staged)
       -- The same board with two Goblin Pikers, {1}{R} 2/1, in the way: they both
-      -- block the one Child, which divides its 2 power one apiece. A 1-toughness
-      -- blocker is what makes that division legal at all -- CR 510.1c lets the
-      -- second blocker be assigned to only once the first has lethal damage --
-      -- so both die, and the case reads the damage EVENTS rather than the marks.
+      -- block the one Child, which divides its 2 power one apiece -- CR 510.1c's
+      -- division is free. A Piker's 1 toughness makes each half lethal, so both
+      -- leave the battlefield and the case reads the damage EVENTS rather than
+      -- the marks they would otherwise carry.
       doubleBlockBoard = do
         child <- S.printingOf s registry "Child of Night"
         piker <- S.printingOf s registry "Goblin Piker"
