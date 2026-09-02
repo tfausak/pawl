@@ -573,7 +573,8 @@ repeated :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 repeated n cost = foldr plus (Cost.MkCost (fmap (const (ManaCost.MkManaCost [])) (Cost.mana cost)) []) (List.genericReplicate n cost)
 
 -- CR 601.2b: substitute the chosen value of X everywhere in this cost -- the mana
--- part's ManaSymbol.Variable, and the components' CostComponent.PayLifeX. BOTH
+-- part's ManaSymbol.Variable, and the components' CostComponent.PayLifeX and its
+-- siblings. BOTH
 -- halves, CR 107.3a giving one announced value to the whole cost, so Hatred's X
 -- is the same X whichever half it sits in (CR 107.3i).
 substituteX :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
@@ -588,6 +589,7 @@ substituteX x cost =
 substituteXInComponent :: Natural -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 substituteXInComponent x component = case component of
   CostComponent.PayLifeX -> CostComponent.PayLife x
+  CostComponent.PayEnergyX -> CostComponent.PayEnergy x
   CostComponent.PayLife _ -> component
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
@@ -642,6 +644,7 @@ manaHasVariable cost = case Cost.mana cost of
 componentHasVariable :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 componentHasVariable component = case component of
   CostComponent.PayLifeX -> True
+  CostComponent.PayEnergyX -> True
   CostComponent.PayLife _ -> False
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
@@ -714,6 +717,14 @@ componentDemandGrowsWithX component = case component of
   -- CR 119.4: payable only out of a life total at least that large, so a big
   -- enough X refuses.
   CostComponent.PayLifeX -> True
+  -- CR 118.3 measures the announced amount against the energy counters the
+  -- player has, so a big enough X refuses -- PayLifeX's arm above and for its
+  -- reason. `greatestPayableX` stops on the predicate either way and
+  -- Pawl.CardSpec's CR 101.1 sweep scopes to spell costs (#1985), so nothing
+  -- observes this answer at gameplay level; Pawl.CostSpec's "an unannounced
+  -- energy X is unpayable, and its demand grows with the value" is what states
+  -- it.
+  CostComponent.PayEnergyX -> True
   -- FALSE, and that is CR 701.68b rather than an omission: the rule refuses a
   -- blight only where the player controls no creature, and names no number of
   -- counters that is too many. So a Soul Immolation announcement is refused by
@@ -977,6 +988,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ReturnThis -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
+  CostComponent.PayEnergyX -> Nothing
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.TapForTotalPower {} -> Nothing
   CostComponent.TapPermanents {} -> Nothing
@@ -1054,6 +1066,7 @@ zoneOfComponent component = case component of
   CostComponent.SacrificeThis -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
+  CostComponent.PayEnergyX -> Nothing
   CostComponent.Sacrifice {} -> Nothing
   -- These tap permanents that stay on the battlefield, so nothing moves out of
   -- any zone and CR 113.6's default stands.
@@ -1137,6 +1150,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.ReturnThis -> False
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
+  CostComponent.PayEnergyX -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
@@ -1409,6 +1423,7 @@ claimOf slots pid oid component gs = case component of
     claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates slots pid oid criterion gs)) n
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
+  CostComponent.PayEnergyX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
@@ -1723,6 +1738,8 @@ uncountedCeiling component = case component of
   -- paid even once (`canPayComponent`). Unreachable, since `manaActivations`
   -- asks canPayComponent of every component before reaching `repeatsOf`.
   CostComponent.PayLifeX -> Just 0
+  -- Zero, PayLifeX's answer above and for its reason.
+  CostComponent.PayEnergyX -> Just 0
   CostComponent.TapThis -> Just 1
   CostComponent.UntapThis -> Just 1
   CostComponent.TapForTotalPower {} -> Just 1
@@ -1881,6 +1898,7 @@ lifeOwedByComponent component = case component of
   -- 0, an unannounced X naming no amount to owe. Not a claim that this component
   -- is free: `canPayComponent` refuses it outright.
   CostComponent.PayLifeX -> 0
+  CostComponent.PayEnergyX -> 0
   CostComponent.TapThis -> 0
   CostComponent.UntapThis -> 0
   CostComponent.SacrificeThis -> 0
@@ -1922,6 +1940,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.PayLife _ -> 0
   CostComponent.PayLifeX -> 0
+  CostComponent.PayEnergyX -> 0
   CostComponent.TapThis -> 0
   CostComponent.UntapThis -> 0
   CostComponent.SacrificeThis -> 0
@@ -1989,6 +2008,10 @@ canPayComponent slots pid oid component gs = case component of
   -- either cast path, both of which substitute before they measure or pay; a
   -- fence, with Pawl.CostSpec's "an unannounced X is unpayable" as the test.
   CostComponent.PayLifeX -> False
+  -- CR 601.2b again: unpayable until the activating player announces a value,
+  -- PayLifeX's arm above and for its reason. Unreachable from the activation
+  -- path, which substitutes before it measures or pays.
+  CostComponent.PayEnergyX -> False
   -- CR 701.21a: this player must control at least `n` matching permanents. This
   -- component ALONE, PayLife's caveat -- two Sacrifice components of one cost can
   -- each find the same permanent here, and `jointlyPayable` asks them together.
@@ -2163,6 +2186,7 @@ criteriaOf component = case component of
   CostComponent.ReturnThis -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayLifeX -> []
+  CostComponent.PayEnergyX -> []
   CostComponent.DiscardThis _ -> []
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
@@ -2498,6 +2522,7 @@ paidInSecondPass component = case component of
   CostComponent.TapPermanents {} -> False
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
+  CostComponent.PayEnergyX -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
@@ -2598,6 +2623,7 @@ orderSensitive component = case component of
   CostComponent.MillCards _ -> True
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
+  CostComponent.PayEnergyX -> False
   CostComponent.PayEnergy _ -> False
 
 -- CR 601.2g: if the total cost includes a mana payment, the player then has a
@@ -2971,6 +2997,9 @@ payComponent moment slots pid oid component = case component of
   -- Unpayable, `canPayComponent`'s answer and for its reason. Unpaid rather than
   -- a guessed 0, which CR 601.2h turns into the reversal of the whole casting.
   CostComponent.PayLifeX -> pure Payment.Unpaid
+  -- Unpayable, `canPayComponent`'s answer and for its reason -- PayLifeX's arm
+  -- above, verbatim.
+  CostComponent.PayEnergyX -> pure Payment.Unpaid
   -- CR 701.17a: the top `n` cards of the PAYING player's own library (CR 400.3),
   -- moved to their graveyard. `canPayComponent` above has already refused a cost
   -- milling more than the library holds (CR 701.17b), so the take is exact rather

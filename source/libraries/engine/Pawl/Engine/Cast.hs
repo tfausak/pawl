@@ -375,6 +375,14 @@ castAimable pid oid gs = case Game.faceOf oid gs of
 --     cannot move either, so the same argument runs a second time. Hatred is the
 --     card whose X reaches a cost only this way.
 --
+--   * as ENERGY (Cost.substituteXInComponent again, a CostComponent.PayEnergyX
+--     becoming a PayEnergy). CR 118.3's >= against a counter total X cannot
+--     move, so the life argument runs verbatim. Sphinx of the Revelation is the
+--     card whose X reaches a cost only this way, and it does so from an
+--     ACTIVATION cost, which is Activate.affordableX's climb rather than this
+--     one; the monotonicity argument is shared because substituteXInComponent
+--     is.
+--
 --   * as a BLIGHT (Cost.substituteXInComponent again, a CostComponent.BlightX
 --     becoming a Blight). Monotone VACUOUSLY, CR 701.68b refusing a blight only
 --     where the player controls no creature and naming no number of counters

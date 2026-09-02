@@ -112,6 +112,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.PayEnergy 2)
       " {\"type\":\"PayEnergy\",\"value\":2} "
+  -- CR 107.3a's X in the arm above, nullary on the wire for PayLifeX's reason:
+  -- the announcement supplies the number, so the card states none.
+  Spec.it s "PayEnergyX" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.PayEnergyX
+      " {\"type\":\"PayEnergyX\"} "
   -- CR 606.4's two halves.
   Spec.it s "AddLoyaltyToThis" $
     Common.assertCodec

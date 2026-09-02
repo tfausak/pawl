@@ -1884,6 +1884,25 @@ hatredSpec s registry =
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.Blight 99) gs) "and so is an announced 99, CR 701.68b naming no number that is too many"
       Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.BlightX])) "it is a CR 107.3 variable"
       Spec.assertBool s (not (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.BlightX]))) "whose demand never grows, so only CR 101.1 can refuse a value"
+    -- The third substrate, and the classification that separates it from the
+    -- blight above: CR 118.3 measures an announced "Pay X {E}" against the
+    -- counters the player has, so the demand DOES grow and
+    -- Cost.greatestPayableX's climb needs no ceiling to stop. Asserted here
+    -- because nothing else reads the answer -- Pawl.CardSpec's CR 101.1 sweep
+    -- scopes to spell costs, an activated ability's X getting no ceiling from
+    -- the face (#1985) -- so this is a stated classification rather than
+    -- gameplay-visible behaviour.
+    Spec.it s "CR 118.3 an unannounced energy X is unpayable, and its demand grows with the value" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let (_, _, gs0) = hatredBoard swamp piker hatred 20
+          gs = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource CostComponent.PayEnergyX gs)) "unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayEnergy 2) gs) "an announced 2 is payable off two counters"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice S.noSource (CostComponent.PayEnergy 3) gs)) "and an announced 3 is not"
+      Spec.assertBool s (Cost.hasVariable (Cost.Type.MkCost Nothing [CostComponent.PayEnergyX])) "it is a CR 107.3 variable"
+      Spec.assertBool s (Cost.demandGrowsWithX (Cost.Type.MkCost Nothing [CostComponent.PayEnergyX])) "whose demand grows, so the board itself refuses a big enough value"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do

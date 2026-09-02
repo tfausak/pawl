@@ -268,14 +268,22 @@ data CostComponent keyword
     -- not a general PayPlayerCounters -- energy is the only player counter ever
     -- spent as a cost. A Natural, not a Quantity, for PayLife's reason.
     --
-    -- NOT the arm for either variable amount, and the two are different rules.
-    -- CR 107.14's "you may pay any amount of {E}" names its amount as the spell
-    -- RESOLVES (Harnessed Lightning), which is Effect.PayAnyEnergy and not a cost
-    -- at all -- CR 118.1's "necessary to take another action" is what it fails.
-    -- Not implemented: "Pay X {E}" as an ACTIVATION cost, CR 107.3a's X announced
-    -- at CR 601.2b through CR 602.2b, which is PayLifeX's shape rather than a
-    -- Quantity here (Chthonian Nightmare, HELIOS One) (#1921).
+    -- NOT the arm for CR 107.14's other amount, and the two are different rules.
+    -- "You may pay any amount of {E}" names its amount as the spell RESOLVES
+    -- (Harnessed Lightning), which is Effect.PayAnyEnergy and not a cost at all
+    -- -- CR 118.1's "necessary to take another action" is what it fails. The
+    -- announced X is PayEnergyX below.
     PayEnergy Natural.Natural
+  | -- | CR 107.3a's X as an amount of ENERGY: "Pay X {E}", announced by the
+    -- activating player at CR 601.2b through CR 602.2b (Sphinx of the
+    -- Revelation). PayLifeX's shape one player counter over, and a separate
+    -- constructor rather than a Quantity in PayEnergy above for that
+    -- constructor's stated reason.
+    --
+    -- Its demand GROWS with X, unlike BlightX below: CR 118.3 measures the
+    -- announced amount against the counters the player has, so
+    -- Pawl.Engine.Cost.greatestPayableX terminates without CR 101.1's ceiling.
+    PayEnergyX
   | -- | CR 606.4: put this many loyalty counters on the permanent the cost is on
     -- -- Jace Beleren's `+2`. It carries no recipient, and takes the "This"
     -- suffix SacrificeThis and DiscardThis take, because a loyalty symbol names
