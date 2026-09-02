@@ -746,10 +746,6 @@ subgameStateFrom starter parent =
       -- GROW; applyCrossings shrinks it once that game has ended, dropping the
       -- entries it hands one level further out.
       --
-      -- Not implemented: an object's face-down status is not carried, so a
-      -- face-down main-game permanent is offered by its PRINTED face rather than
-      -- by CR 708.2's characteristics (#2467).
-      --
       -- This reach is deliberately NOT scoped away from the parent's STACK: a
       -- wish can name the very spell that is resolving it, which CR 729.4 offers
       -- and CR 729.5 then finishes resolving "even if it was created by a spell
@@ -761,11 +757,21 @@ subgameStateFrom starter parent =
         Map.union
           (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))
           (GameState.outsideObjects parent)
+      -- CR 110.5's face-up/face-down status rides along with the printing, and
+      -- is the one thing about the parent's object that does. It is not an
+      -- effect or a definition, so CR 729.1b does not reach it: CR 708.2 makes
+      -- the listed characteristics the object's own COPIABLE VALUES, which
+      -- travel with the object the way CR 108.3's ownership does.
+      -- Pawl.Engine.OutsideTheGame.eligible is what reads it, and
+      -- Pawl.OutsideTheGameSpec's "CR 708.2/729.4 a manifested main-game sorcery
+      -- is offered to a subgame's wish as a creature and not as a sorcery" is
+      -- the proof.
+      --
       -- Not implemented: a melded permanent, which this answers Nothing for. One
       -- OutsideObject names one printing, so recording it would have to drop a
       -- component (#2489).
       asOutside obj = case Object.source obj of
-        Source.OfCard printingId -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId)
+        Source.OfCard printingId -> Just (OutsideObject.MkOutsideObject (Object.owner obj) printingId (Object.facing obj))
         _ -> Nothing
    in parent
         { GameState.objects = movedObjects,
