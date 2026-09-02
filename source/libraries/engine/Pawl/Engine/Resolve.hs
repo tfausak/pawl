@@ -8873,9 +8873,6 @@ bindAmountSlot holder slot n gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
--- CR 701.23: do to a found card what the search said -- a move for every
--- destination and, for one of them, a CR 701.20a reveal first, through the CR
--- 400.7 funnel either way.
 -- CR 119.5 / 701.12c: move a player's life total by a delta. A DOWNWARD delta is
 -- a life loss and goes through Event.resolveLifeLoss first, CR 614.1's funnel for
 -- the class, so a replacement watching life loss reaches it and the SETTLED loss
@@ -8894,6 +8891,9 @@ changeLifeByDelta pid delta =
       Event.changeLife pid (negate (toInteger settled))
     else Event.changeLife pid delta
 
+-- CR 701.23: do to a found card what the search said -- a move for every
+-- destination and, for one of them, a CR 701.20a reveal first, through the CR
+-- 400.7 funnel either way.
 putFound :: PlayerId -> ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
 putFound searcher source destination cardId = case destination of
   -- Nature's Lore's "put that card onto the battlefield": the plain move, with

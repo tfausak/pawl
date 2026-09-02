@@ -2787,6 +2787,18 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     Spec.assertEqWith s "alice loses the whole 3, floor and all: 2 - 3 = -1" (S.lifeOf S.alice after) (Just (-1))
     Spec.assertEqWith s "and bob, controlling no creature, loses nothing" (S.lifeOf S.bob after) (Just 20)
 
+-- Fills every target slot with bob, the opponent whose life total the exchange
+-- cases below drive down. FILTERED rather than hand-built, so CR 608.2b's re-read
+-- at resolution keeps the recipient the prompt offered.
+exchangingWithBob :: Prompt.Prompt r -> r
+exchangingWithBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+  _ -> S.identityAnswer p
+  where
+    wanted r = case r of
+      Recipient.ToPlayer pid -> pid == S.bob
+      _ -> False
+
 -- CR 614.1a with CR 119.4 and CR 119.5: Bloodletter of Aclazotz ({1}{B}{B}{B}
 -- Creature -- Vampire Demon, 2/4, "Flying / If an opponent would lose life during
 -- your turn, they lose twice that much life instead. (Damage causes loss of
@@ -2794,8 +2806,9 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- against api.scryfall.com 2026-08-28).
 --
 -- The life-total replacement whose clause is NOT scoped to damage, which is what
--- makes CR 119.4's payment road and CR 119.5's set-a-total road observable at
--- all. Every FLOOR-shaped printing is scoped to damage instead: Scryfall
+-- makes the non-damage roads to a life loss observable at all: CR 119.4's
+-- payment, CR 119.5's set-a-total, CR 701.12c's exchange and CR 119.7's
+-- redistribution. Every FLOOR-shaped printing is scoped to damage instead: Scryfall
 -- o:"life total to less than", 2026-08-28, is eight cards -- Ali from Cairo,
 -- Angel of Grace, Angel's Grace, Elderscale Wurm, Fortune Thief, Serra the
 -- Benevolent, Sustaining Spirit, Worship -- and all eight print "DAMAGE that
@@ -2812,18 +2825,6 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
 -- where one of the two players holds both roles, and because a downward set, an
 -- upward set and a self-set have to be read off one board to prove the row
 -- discriminates rather than that three boards differ.
--- Fills every target slot with bob, the opponent whose life total the exchange
--- cases below drive down. FILTERED rather than hand-built, so CR 608.2b's re-read
--- at resolution keeps the recipient the prompt offered.
-exchangingWithBob :: Prompt.Prompt r -> r
-exchangingWithBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
-  _ -> S.identityAnswer p
-  where
-    wanted r = case r of
-      Recipient.ToPlayer pid -> pid == S.bob
-      _ -> False
-
 bloodletterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 / 119.5 / 701.12c)" $ do
   -- CR 119.4's second sentence is the whole of this case: "If a player pays life,
@@ -2954,7 +2955,8 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     Spec.assertEqWith s "CR 701.12c bob's loss of 17 is doubled to 34: 22 - 34 = -12, not alice's 5" (S.lifeOf S.bob bobLower) (Just (-12))
     Spec.assertEqWith s "CR 701.12c alice's side is a GAIN and is not resized: she takes bob's 22" (S.lifeOf S.alice bobLower) (Just 22)
     Spec.assertEqWith s "carol, no side of it, keeps her 13" (S.lifeOf S.carol bobLower) (Just 13)
-    -- CR 109.5: the row's "an opponent" is read against alice, who is not her own.
+    -- CR 109.5: the row is alice's, so its "your turn" is hers and the opponents
+    -- it names are hers -- and she is not her own opponent.
     Spec.assertEqWith s "the same exchange the other way costs alice exactly her 17" (S.lifeOf S.alice aliceLower) (Just 5)
     Spec.assertEqWith s "and bob, gaining, takes alice's 22" (S.lifeOf S.bob aliceLower) (Just 22)
   -- CR 119.7 / 119.8 with CR 119.5: a redistribution hands out totals, and every
