@@ -166,6 +166,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
@@ -2460,8 +2461,14 @@ rewriteEffect pairs effect = case effect of
     Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) ->
     Effect.ForbidBlock (ForbidBlock.MkForbidBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
-  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration ref) ->
-    Effect.ForbidAttack (ForbidAttack.MkForbidAttack (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
+  -- CR 612.1 reaches the creatures' words on either arm -- a Named ref's Filters
+  -- and a Matching class's -- and not the AimedAt: a PlayerScope prints no word
+  -- a text-changing effect reaches, and the kinds are CR 506.3's list.
+  Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected aimedAt) ->
+    let rewritten = case affected of
+          RestrictedCreatures.Named ref -> RestrictedCreatures.Named (rewriteObjectRef pairs ref)
+          RestrictedCreatures.Matching f -> RestrictedCreatures.Matching (Filter.rewrite pairs f)
+     in Effect.ForbidAttack (ForbidAttack.MkForbidAttack (rewriteDuration pairs duration) rewritten aimedAt)
   -- CR 612.1 reaches the OBJECT axis's ref and not its player: a word swap
   -- changes card text, and the defender clause of Alluring Siren's sentence is
   -- "you" rather than any word a Filter could name.
