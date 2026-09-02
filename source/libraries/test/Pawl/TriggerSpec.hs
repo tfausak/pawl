@@ -1025,8 +1025,9 @@ spinesplitterSpec s registry =
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
 -- delayed ability -- "it" must survive the resolution that armed it. Synthetic
--- Deferred Rally joins it for the one shape Tidal Wave cannot reach: a delayed
--- ability with an intervening "if".
+-- Deferred Rally and Synthetic Standing Bounty join it for two shapes Tidal Wave
+-- cannot reach: a delayed ability with an intervening "if", and one whose stated
+-- duration is CR 116.2c's pay-to-end.
 delayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 delayedSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
@@ -1329,10 +1330,14 @@ delayedSpec s registry =
         -- o:/counter that ability/ o:/pay/ returns only Strict Proctor, whose
         -- payment is a cost inside the trigger rather than CR 116.2c's action.
         --
-        -- What it drives is CR 603.7b's stated duration meeting CR 611.2a's
-        -- pay-to-end one: Duration.UntilPaid arms to Expiry.WhenPaid on the
-        -- armed entry, Expiry.sourcedExpiries makes it findable, and the
-        -- payment deletes the entry itself rather than a continuous effect.
+        -- What it drives is CR 603.7b's stated duration being a pay-to-end one:
+        -- Duration.UntilPaid arms to Expiry.WhenPaid on the armed ENTRY,
+        -- Expiry.sourcedExpiries makes it findable, and the payment deletes the
+        -- entry itself rather than a continuous effect. A duration is also what
+        -- makes the offer reachable at all -- CR 603.7b's default is no stated
+        -- duration, which stores no expiry for CR 116.2c to name -- so the entry
+        -- stays armed through a firing and the pair below is read at the FIRST
+        -- end step, before that difference could show.
         --
         -- A PAIR of boards differing in exactly one thing -- whether alice took
         -- the action -- both cut from the same board, so the unpaid leg is not

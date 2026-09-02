@@ -181,9 +181,9 @@ data Action
     --
     -- What it COSTS is not a choice: the effect named the price when it was
     -- stored (Expiry.WhenPaid), so Pawl.Engine.EndEffect reads it off the stored
-    -- effect rather than the player naming it. WHO may take it is the player who
-    -- ACTIVATED the ability that stored the effect (CR 109.5's "you", for an
-    -- activated ability), answered by Pawl.Engine.EndEffect.canEnd off the seat
-    -- baked into the stored effect.
+    -- effect rather than the player naming it. WHO may take it is CR 109.5's
+    -- "you" for whatever stored the effect -- the ability's activator, or the
+    -- spell's controller -- answered by Pawl.Engine.EndEffect.canEnd off the
+    -- seat baked into the stored effect.
     EndEffect ObjectId.ObjectId
   deriving (Eq, Ord, Show)
