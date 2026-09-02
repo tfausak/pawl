@@ -1032,22 +1032,17 @@ stillLegal perspective bindings source recipient slot gs =
 -- CR 303.4c: is `recipient` still one the slot ADMITS -- the same membership
 -- question stillLegal asks, minus rule 702's targeting restrictions. See
 -- admittedRecipients for why an attached Aura is not asked a targeting question.
-stillAdmitted :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
-stillAdmitted perspective source recipient slot gs =
-  let pcs = Projection.projectAll gs
-   in stillAdmittedGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective source recipient slot gs
-
--- The same membership given a board the CALLER has already walked, which is what
--- admittedGiven's own note argues: `pcs`, `grants` and `pools` are one whole-board
--- projection, one control-grant walk and one set of base pools, and threading them
--- in changes no answer because caller and callee are pure functions of the same
--- GameState (Projection.projectGiven).
 --
--- Pawl.Engine.Sba.stillLegalEnchant is the caller this exists for: its CR 704.3
--- pre-pass has already taken all three, and letting the filtered-enchant
--- fallthrough rebuild them is one fresh gather per Aura per pass (#430).
-stillAdmittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
-stillAdmittedGiven pcs grants pools perspective source recipient slot gs =
+-- Takes the board the CALLER has already walked, where stillLegal above takes its
+-- own, and has no wrapper that walks one because its only caller holds all three:
+-- `pcs`, `grants` and `pools` are one whole-board projection, one control-grant
+-- walk and one set of base pools, and Pawl.Engine.Sba.stillLegalEnchant's CR
+-- 704.3 pre-pass has them in hand. Letting this rebuild them was one fresh gather
+-- per filtered Aura per state-based-action pass (#430). It changes no answer, for
+-- the reason at Projection.projectGiven: caller and callee are pure functions of
+-- the same GameState.
+stillAdmitted :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
+stillAdmitted pcs grants pools perspective source recipient slot gs =
   Set.member recipient (admittedGiven pcs grants pools perspective False Map.empty source slot gs)
 
 -- One legal set per named slot; casting prompts with exactly this map. `source`

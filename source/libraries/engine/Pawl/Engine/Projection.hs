@@ -4037,7 +4037,10 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- Wurm's CR 601.3 exception is Pawl.Engine.Cast.castableWhileSearching, scoped
 -- to a search in progress -- so the gap is card-driven rather than
 -- rules-enforced: no bestow card in data/cards/ carries that permission, so a
--- stamp this walk cannot see would skip CR 702.103d with nothing red (#2920).
+-- stamp this walk cannot see would skip CR 702.103d with nothing red (#2920). The
+-- OTHER library route needs no arm at all -- rule 702.103d's own Garruk's Horde
+-- example says a bestow card cast off the top of a library is cast as a creature
+-- spell and cannot be cast bestowed; see #2360.
 --
 -- A card in one of those zones takes its OWN timestamp here, where the stack
 -- incarnation takes the new and later one CR 613.7d gives it at the move. The two

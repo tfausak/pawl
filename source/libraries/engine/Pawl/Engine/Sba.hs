@@ -311,14 +311,14 @@ isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 -- every other Aura, with no player-only branch.
 --
 -- The third clause goes through stillLegalEnchant below rather than calling
--- Target.stillAdmitted directly, so that the common enchant slot is answered off
--- `pcs` -- the SAME pre-pass Projection.projectAll performStateBasedActions
--- computed once for every other CR 704.3 classification. Calling stillAdmitted
--- here instead means a fresh `gather` PER Aura, which is the O(permanents^3)
--- shape Projection.hs's `liveGiven` comment warns about, one level down. (A slot
--- carrying a Filter takes that function's fallthrough, which is
--- Target.stillAdmittedGiven against the same three pre-pass walks rather than
--- three fresh ones.)
+-- Target.stillAdmitted directly, so that the common enchant slot is answered by a
+-- Map.lookup on `pcs` -- the SAME pre-pass Projection.projectAll
+-- performStateBasedActions computed once for every other CR 704.3 classification
+-- -- rather than by building a slot's whole candidate set. A slot carrying a
+-- Filter does reach stillAdmitted, by that function's fallthrough, and reads the
+-- same pre-pass board there: what neither path may do is `gather` PER Aura, which
+-- is the O(permanents^3) shape Projection.hs's `liveGiven` comment warns about,
+-- one level down.
 --
 -- CR 303.4d's first clause -- an Aura can't enchant itself -- is the `oid == self`
 -- arm. Unreachable in this pool, written anyway because it costs one comparison.
@@ -406,7 +406,7 @@ fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
 -- target`, when it exists, IS `Projection.project target gs`, and a missing key
 -- means what creatureRecipients' own battlefield scan would have missed it for.
 --
--- Any OTHER shape falls through to the general Target.stillAdmittedGiven, which
+-- Any OTHER shape falls through to the general Target.stillAdmitted, which
 -- reuses the SAME pool and Filter Cast/Resolve already judge, rather than
 -- assuming the Creatures-with-no-Filter shape holds regardless. Two producers
 -- need it: Setessan Training's "Enchant creature you control" carries a Filter
@@ -446,7 +446,7 @@ stillLegalEnchant pcs grants pools gs source slot recipient = case (slot, recipi
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   -- The Aura is on the battlefield when this SBA asks, so its controller is
   -- live -- the CR 608.2b case this perspective exists for cannot arise here.
-  _ -> Target.stillAdmittedGiven pcs grants pools (Projection.controllerOfGiven grants Set.empty source gs) source recipient slot gs
+  _ -> Target.stillAdmitted pcs grants pools (Projection.controllerOfGiven grants Set.empty source gs) source recipient slot gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the
