@@ -127,6 +127,14 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- such second gate: Reassembling Skeleton's "{1}{B}: Return this card from
   -- your graveyard to the battlefield" is payable by a Skeleton standing on the
   -- battlefield, and only this filter stops it being offered there.
+  --
+  -- The delayed map is the HOST's own face while the abilities are the PROJECTED
+  -- ones, so an ability granted by another object that arms a delayed trigger the
+  -- GRANTOR declared resolves to no name here and takes CR 113.6's battlefield
+  -- default. Nothing in data/cards/ grants an ability that arms one; the CR
+  -- 113.6m readings that matter -- Reassembling Skeleton, Prized Amalgam -- are
+  -- all a card's own text. Pawl.Engine.Event.battlefieldAbilitiesOf carries the
+  -- same pairing and the same note.
   Just Zone.Battlefield -> filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
   -- CR 113.6j: the MINTED abilities rule 702 gives the printed keywords, plus the
   -- card's own AUTHORED ones that name the hand. The two are disjoint by

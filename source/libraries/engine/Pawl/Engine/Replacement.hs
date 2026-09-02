@@ -2204,17 +2204,19 @@ preventionBy inert candidate before after = case (ReplacementCandidate.effect ca
                       -- read off the event as PROPOSED for the recipient's
                       -- reason below.
                       Prevention.source = DamageEvent.source de,
-                      -- The recipient of the event as PROPOSED, which is the
-                      -- reading CR 615.13 asks for: its ability watches "damage
-                      -- that WOULD be dealt [and] is prevented". Damage CAN now
-                      -- be redirected (DamageRewrite.Redirect), and the two
-                      -- readings still never diverge, because a redirect
-                      -- prevents nothing (CR 615.1a) -- `prevents` refuses it
-                      -- above, so no redirect ever reaches here.
-                      Prevention.recipient = DamageEvent.target de,
+                      -- ONE ENTRY, this event's own: the recipient of the event
+                      -- as PROPOSED, which is the reading CR 615.13 asks for --
+                      -- its ability watches "damage that WOULD be dealt [and] is
+                      -- prevented". Damage CAN now be redirected
+                      -- (DamageRewrite.Redirect), and the two readings still
+                      -- never diverge, because a redirect prevents nothing (CR
+                      -- 615.1a) -- `prevents` refuses it above, so no redirect
+                      -- ever reaches here. `groupPreventions` is what widens the
+                      -- map, one batch at a time.
+                      --
                       -- Zero on the CR 615.12 path, which `applyInertly` makes
                       -- exact: it hands the event back whole, so `now` is `was`.
-                      Prevention.amount = was - now,
+                      Prevention.amounts = Map.singleton (DamageEvent.target de) (was - now),
                       -- CR 615.5's additional effect, carried out of the loop
                       -- so a caller that CAN run effects finds it. Copied, not
                       -- inspected: this module never asks what the rider is.
@@ -2257,18 +2259,21 @@ printedBy candidate = case candidate of
     ReplacementProvenance.Printed -> Just (PermanentCandidate.source permanent)
 
 -- CR 615.13: collapse a batch's per-event preventions to one entry per applying
--- instance per recipient, carrying the total that instance prevented.
+-- INSTANCE, carrying what that instance prevented for each recipient.
 --
--- Keyed on the RECIPIENT as well as the instance, which is narrower than the
--- rule's own unit -- 615.13 counts one application of one prevention effect,
--- whoever the simultaneous events were addressed to. Not implemented: a
--- prevention effect covering SEVERAL recipients that reaches two of them in one
--- batch reports two preventions where the rule describes one (#688). Divine
--- Deflection is the producer that reaches it -- one shield over a player and the
--- permanents they control -- so a batch that spends its pool across both runs CR
--- 615.5's rider twice, once per recipient, rather than once with the total. The
--- TOTAL dealt is the same either way, which is why Pawl.ReplacementSpec's group
--- can assert the rider's damage without settling this.
+-- Keyed on the instance alone, which is the rule's own unit: 615.13 counts one
+-- application of one prevention effect "to one or more simultaneous damage
+-- events", whoever those events were addressed to. Divine Deflection is the
+-- producer that tells the two readings apart -- one shield over a player and the
+-- permanents they control -- and a batch spending its pool across both runs CR
+-- 615.5's rider ONCE with the total, which Pawl.ReplacementSpec's "the rider
+-- deals its 3 in ONE event" proves by counting the rider's damage events rather
+-- than summing them.
+--
+-- The recipients survive as the KEYS of the collapsed amount rather than as part
+-- of the key, because a trigger scoped to one of them still has to read its own
+-- share -- Selfless Squire's "damage that would be dealt to you", where the same
+-- shield also covered a permanent.
 --
 -- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
 -- these triggers are offered in -- is canonical rather than gather-dependent.
@@ -2297,10 +2302,10 @@ printedBy candidate = case candidate of
 -- design call the issue is left open for.
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
-  let merge (a1, s1, r1) (a2, _, _) = (a1 + a2, s1, r1)
-      keyed = Map.fromListWith merge [((Prevention.by p, Prevention.recipient p), (Prevention.amount p, Prevention.source p, Prevention.rider p)) | p <- ps]
-      rebuild ((by, recipient), (amount, source, rider)) =
-        Prevention.MkPrevention {Prevention.by = by, Prevention.source = source, Prevention.recipient = recipient, Prevention.amount = amount, Prevention.rider = rider}
+  let merge (a1, s1, r1) (a2, _, _) = (Map.unionWith (+) a1 a2, s1, r1)
+      keyed = Map.fromListWith merge [(Prevention.by p, (Prevention.amounts p, Prevention.source p, Prevention.rider p)) | p <- ps]
+      rebuild (by, (amounts, source, rider)) =
+        Prevention.MkPrevention {Prevention.by = by, Prevention.source = source, Prevention.amounts = amounts, Prevention.rider = rider}
    in fmap rebuild (Map.toAscList keyed)
 
 -- CR 615.7: when two or more applicable sources would deal damage to a shielded

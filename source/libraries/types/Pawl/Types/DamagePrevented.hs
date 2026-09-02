@@ -1,12 +1,14 @@
 module Pawl.Types.DamagePrevented where
 
+import qualified Data.Map as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Recipient as Recipient
 
--- | CR 615.1: how much damage a prevention shield stopped, who it was headed
--- for, what would have dealt it, and WHICH prevention effect stopped it.
+-- | CR 615.1: how much damage a prevention shield stopped, who each part of it
+-- was headed for, what would have dealt it, and WHICH prevention effect stopped
+-- it.
 --
 -- `by` is the applying instance's CR 614.5 identity, copied off
 -- Pawl.Types.Prevention rather than derived: it is the same key
@@ -28,10 +30,15 @@ import qualified Pawl.Types.Recipient as Recipient
 -- single CR 615.13 batch reports only one of them here, because
 -- Pawl.Engine.Replacement.groupPreventions collapses that batch to one entry
 -- (#2287).
+--
+-- `amounts` is CR 615.13's one application, PER RECIPIENT: the rule counts one
+-- prevention however many simultaneous events it was applied to, so this event
+-- is recorded once and carries the whole map. A trigger scoped to a recipient
+-- reads its own entry (Selfless Squire's "damage that would be dealt to you"),
+-- and one scoped to the instance sums it (Phyrexian Vindicator's "that much").
 data DamagePrevented = MkDamagePrevented
   { by :: CandidateId.CandidateId,
     source :: ObjectId.ObjectId,
-    recipient :: Recipient.Recipient,
-    amount :: Natural.Natural
+    amounts :: Map.Map Recipient.Recipient Natural.Natural
   }
   deriving (Eq, Ord, Show)
