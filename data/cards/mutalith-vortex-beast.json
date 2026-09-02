@@ -1,0 +1,146 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Trample"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Mutalith Vortex Beast",
+      "power": {
+        "type": "Literal",
+        "value": 6
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 6
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ForEach",
+                        "value": {
+                          "body": [
+                            {
+                              "type": "FlipCoin",
+                              "value": {
+                                "misses": "lost",
+                                "slot": "won"
+                              }
+                            },
+                            {
+                              "type": "Draw",
+                              "value": {
+                                "player": {
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                "quantity": {
+                                  "type": "InSlot",
+                                  "value": "won"
+                                }
+                              }
+                            },
+                            {
+                              "type": "DealDamage",
+                              "value": {
+                                "parts": [
+                                  {
+                                    "quantity": {
+                                      "type": "Plus",
+                                      "value": {
+                                        "left": {
+                                          "type": "InSlot",
+                                          "value": "lost"
+                                        },
+                                        "right": {
+                                          "type": "Plus",
+                                          "value": {
+                                            "left": {
+                                              "type": "InSlot",
+                                              "value": "lost"
+                                            },
+                                            "right": {
+                                              "type": "InSlot",
+                                              "value": "lost"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "ref": {
+                                      "type": "InSlot",
+                                      "value": "opponent"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ],
+                          "ref": {
+                            "type": "EachOpponent"
+                          },
+                          "slot": "opponent"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Beast"
+          },
+          {
+            "type": "Mutant"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
