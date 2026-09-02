@@ -1013,7 +1013,7 @@ snatch victim p = case p of
 -- its controller changes, ..." -- and a creature so removed "stops being an
 -- attacking, blocking, blocked, and/or unblocked creature".
 --
--- Ray of Command is the pool's producer for the control-change clause: {3}{U},
+-- Ray of Command is this group's producer for the control-change clause: {3}{U},
 -- INSTANT, "Untap target creature an opponent controls and gain control of it
 -- until end of turn. That creature gains haste until end of turn." Act of Treason
 -- has the same three effects and cannot reach this window at all, because it is a

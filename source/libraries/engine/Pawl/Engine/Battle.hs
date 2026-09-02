@@ -193,10 +193,11 @@ protectorCandidates teams pc controller playing
 -- creatures are currently attacking that battle"; CR 704.5y, a protector who
 -- can't be one, carries no rider at all. Rule 704 governs where it disagrees with
 -- 310.11's shorter statement, since 310.11's own last sentence defers to it
--- ("This is a state-based action (see rule 704)"). The disagreement is reachable:
--- 704.5y needs a control-change effect that can name a battle, and Zealous
--- Conscripts is one -- Target.permanentRecipients is the whole battlefield, so a
--- battle is a legal recipient for its GainControl (#853).
+-- ("This is a state-based action (see rule 704)"). The disagreement is reachable
+-- in a real game, and Pawl.BattleSpec's "CR 704.5y whole cards: a protector who
+-- steals the battle stops being its protector" is the board: the designated
+-- protector takes the battle with Zealous Conscripts, whose GainControl draws
+-- from Pool.Permanents.
 --
 -- `attacked` is Battle.isBeingAttacked at the call. The rider suspends the
 -- re-choice rather than cancelling it: Gatherer's ruling is that the controller

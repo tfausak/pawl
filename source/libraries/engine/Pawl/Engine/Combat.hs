@@ -299,7 +299,7 @@ stillAttacked oid gs =
 --
 -- The list also asks who protects the battle, so a protector moved to a third
 -- player mid-combat (CR 310.9f) reads here as removed from combat, which is what
--- rule 506.4 says. Not implemented: any effect that moves a designation (#2979).
+-- rule 506.4 says. Not implemented: any effect that moves a designation (#2980).
 --
 -- Rule 506.4's CONTROLLER clause is NOT here, because this list cannot see it: a
 -- control change leaves the protector where it was, so every candidate list still

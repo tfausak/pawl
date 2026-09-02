@@ -105,7 +105,7 @@ playerOf controllerOf target gs = case target of
 -- for precisely the creature that is no longer attacking it.
 --
 -- The PLANESWALKER arm alone. A battle's defending player is its protector (CR
--- 310.9d), and only CR 310.9f moves a designation, which no printing does (#853),
+-- 310.9d), and only CR 310.9f moves a designation, which no printing does (#2980),
 -- so its two tenses cannot come apart -- a battle whose CONTROLLER changes is
 -- removed from combat with its protector unmoved, and the live read is still rule
 -- 802.2a's answer. An attacked player is the seat itself.

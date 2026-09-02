@@ -39,6 +39,16 @@
 -- ability, and CR 310.7 / 704.5v's and CR 310.8 / 704.5w's state-based actions.
 -- Those are damageSpec and defeatSpec below.
 --
+-- Two thefts join them for rule 506.4's and rule 704.5y's control changes.
+-- Zealous Conscripts ({4}{R} Creature, an entry trigger that gains control of
+-- target permanent until end of turn) is what lets a battle's protector take the
+-- battle at sorcery speed; Word of Seizing ({3}{R}{R} Instant, split second,
+-- untap target permanent and gain control of it until end of turn) is what moves
+-- a controller after attackers are declared: the pool's other thefts are either
+-- sorcery-speed (Act of Treason, Zealous Conscripts) or filtered to a type a
+-- battle does not have -- Ray of Command to a creature, Aladdin to an artifact,
+-- Aura Graft to an Aura.
+--
 -- And CR 509.1a's third subject, "a battle they protect", which is a filter atom
 -- (Filter.IsAttackingBattle) rather than a rule of combat: filterSpec below, whose
 -- producer is the one SYNTHETIC card this file uses, Synthetic Bulwark Snare. That
@@ -227,7 +237,8 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
   -- unreachable there: a Siege's candidates are its controller's opponents still
   -- in the game, and a game in which its controller has no opponent left has
   -- already ended under CR 104.2a. Pawl.Engine.Sba routes an empty answer into
-  -- the put-into-graveyard batch whether or not a game can reach it (#853).
+  -- the put-into-graveyard batch all the same, and states the argument for both
+  -- branches of CR 310.9a.
   Spec.it s "CR 704.5x a Siege whose controller is alone has no candidate" $ do
     siege <- siegePC s registry
     Spec.assertEqWith s "nobody" (Battle.protectorCandidates Teams.none siege S.alice [S.alice]) []
@@ -626,6 +637,25 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertEqWith s "where the theft leg left it tapped for the spell" (fmap Object.tapped (Game.lookupObject land stolen)) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have one attacker and five Mountains"
     Spec.assertBool s (Projection.controllerOf battle gs == Just S.alice) "alice controlled the Siege before either leg"
+  Spec.it s "CR 508.4 the other road into combat records the same two seats" $ do
+    -- CR 506.4's comparand is written by both writers of `attackers`, and a
+    -- creature put onto the battlefield attacking never went through CR 508.1b.
+    -- Read off the RECORD and not off a board: the pool's producers of that road
+    -- are attack triggers (Hanweir Garrison), so the arriving creature and the
+    -- instant that would move the battle cannot be ordered against each other by
+    -- a pure answerer. The pair above is where the record is proved to matter.
+    (gs, battle, mine, _, _) <- battleCombatOf s registry S.carol S.carol ["Goblin Piker"] [] []
+    case mine of
+      [arrival] -> do
+        let after = S.runPure (attackTheBattle battle) gs (Combat.putOntoBattlefieldAttacking arrival)
+            combat = GameState.combat after
+        Spec.assertEqWith s "it is attacking the Siege" (Map.lookup arrival (Combat.Type.attackers combat)) (Just (AttackTarget.OfBattle battle))
+        -- The two records hold DIFFERENT seats, which is the whole reason there
+        -- are two: CR 310.9d makes the defending player the protector, and rule
+        -- 506.4's controller clause asks about alice.
+        Spec.assertEqWith s "CR 506.4: the battle's controller" (Map.lookup arrival (Combat.Type.attackedControlledBy combat)) (Just S.alice)
+        Spec.assertEqWith s "CR 802.2a: its protector, and not the same player" (Map.lookup arrival (Combat.Type.attackedUnder combat)) (Just S.carol)
+      _ -> Spec.assertFailure s "fixture should have exactly one creature"
 
 -- CR 509.1a's and CR 802.4a's THIRD subject -- "a battle they protect" -- through
 -- the filter atom that asks it, Filter.IsAttackingBattle. Rule 310 rather than

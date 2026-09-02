@@ -753,9 +753,10 @@ toCleanup answer gs = List.foldl' (\g _ -> S.runPure answer g Engine.runStep) gs
 -- Zealous Conscripts, {4}{R} Creature -- Human Warrior 3/3: "Haste. When this
 -- creature enters, gain control of target permanent until end of turn. Untap
 -- that permanent. It gains haste until end of turn." TARGET PERMANENT is what
--- makes it the producer -- Act of Treason and Ray of Command, the pool's other
--- two "until end of turn" thefts, can only name a creature, and the only card in
--- the pool that triggers on a discard is an enchantment.
+-- makes it the producer -- Act of Treason and Ray of Command can only name a
+-- creature, and the only card in the pool that triggers on a discard is an
+-- enchantment. Word of Seizing names a permanent too and would serve here as
+-- well; it is not a second producer this board needs.
 --
 -- Megrim, {2}{B} Enchantment: "Whenever an opponent discards a card, this
 -- enchantment deals 2 damage to that player." CR 109.5 fixes its "an opponent"
