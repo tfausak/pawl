@@ -309,6 +309,12 @@ payableCost = payableCostAt 0
 -- every step, so the gate's question is whether SOME aiming complies, exactly
 -- as Activate.aimingSomewhere asks it. A cost naming no slot answers the same
 -- under every aiming and skips the search.
+--
+-- Not implemented: Cost.readsBoundSlot is asked of the PRINTED cost, so a
+-- criterion arriving on a component CR 601.2f's adjustments add is not seen here
+-- and its cost skips the search (#2959), exactly as on the activation road. No
+-- cost adjustment in `data/cards/` adds a component with a criterion naming a
+-- slot.
 payableCostAt :: Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x spending pid oid gs cost =
   let adjustments = Cost.spellAdjustments pid oid gs
