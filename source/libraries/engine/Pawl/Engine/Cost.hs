@@ -1615,9 +1615,8 @@ manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsG
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
 -- manaActivations makes that could ask itself. Nothing is CR 118.6's unpayable
 -- cost -- an object with no mana cost -- and is `canPay`'s own first arm; an
--- EMPTY mana part is payable with no walk at all, which is every mana ability in
--- `data/cards/` but Transmogrant Altar and is what keeps a whole-board walk off
--- the tap-for-mana path.
+-- EMPTY mana part is payable with no walk at all, which is most of `data/cards/`
+-- and is what keeps a whole-board walk off the tap-for-mana path.
 --
 -- The life and the claims are the components', because CR 118.3's "fully"
 -- reaches across the two halves of one cost -- the same handoff `canPay` makes.
@@ -2623,12 +2622,15 @@ orderSensitive component = case component of
 -- question forever. What reaches it is a payment REFUSED and not one that was
 -- never payable, CR 118.3's gate keeping an unpayable option off the offer.
 --
--- The life budget only ever binds a cost NOTHING ANNOUNCED for, since a cast, an
--- activation, a CR 118.12 pay gate, a special action and a combat toll all run
--- `announce` first; what is left is a mana ability's own activation cost, where
--- pawl still chooses (#2909). Recomputed on EVERY pass, a tap being able to change
--- it -- a Birds of Paradise tapped for blue takes the mana way to an unannounced
--- {G/P} off the board, leaving CR 107.4f's 2 life.
+-- The life budget only ever binds a cost NOTHING ANNOUNCED for, and every road
+-- into this function now runs `announce` first: a cast, an activation, a CR
+-- 118.12 pay gate, a special action, a combat toll, and a mana ability's own
+-- activation cost. So no gameplay path reaches it with a Phyrexian symbol still
+-- in the cost, and it is a regression fence rather than live behaviour --
+-- Pawl.ManaSpec drives it by calling `payMana` directly. Recomputed on EVERY pass
+-- all the same, a tap being able to change it -- a Birds of Paradise tapped for
+-- blue takes the mana way to an unannounced {G/P} off the board, leaving CR
+-- 107.4f's 2 life.
 --
 -- The window in full. `inFlight` is the set of permanents whose mana ability is
 -- mid-activation, which is the one thing that has to bound the recursion CR
@@ -2825,12 +2827,23 @@ tapForManaWith inFlight oid = do
           -- `gs` is still current: chooseManaYield only prompts.
           let gathered = manaActivationAdjustments controller oid gs
               withComponents = plusComponents gathered (ManaOption.cost chosen)
+          -- CR 118.13a: a mana ability is an activated ability (CR 605.1a) and
+          -- CR 602.2b sends its activation cost through CR 601.2b, so a symbol
+          -- payable in several ways is announced as the ability is activated
+          -- rather than left to the payment. BEFORE announceReductions, which is
+          -- CR 601.2f -- Cast.castSpell's and Activate.activateAbility's order,
+          -- and rule 601.2b's own. Mystic Gate's "{W/U}, {T}" is what observes it
+          -- (Pawl.ManaSpec's Mystic Gate group).
+          --
+          -- The Phyrexian life record is DISCARDED, Activate's reason: rule
+          -- 702.150a reads what the player who CAST a spell announced.
+          (announcedCost, _) <- announce (PaymentSubject.Activating oid) ManaSpending.AsProduced controller oid (totalManas gathered) withComponents
           -- CR 118.7e's half of each hybrid symbol in a reduction, and CR
           -- 601.2f's order of several reductions -- both the payer's, and both
           -- elided by announceReductions wherever the answers cannot differ,
           -- which is every board `data/cards/` can build today.
-          announced <- announceReductions controller oid gs withComponents gathered
-          outcome <- payActivation inFlight controller oid (totalWith announced withComponents)
+          announced <- announceReductions controller oid gs announcedCost gathered
+          outcome <- payActivation inFlight controller oid (totalWith announced announcedCost)
           case outcome of
             Payment.Unpaid -> pure False
             -- CR 605.3b: a mana ability's cost binds nothing this path could
@@ -2851,8 +2864,8 @@ tapForManaWith inFlight oid = do
 --
 -- The EMPTY mana part still short-circuits, and CR 601.2g is why as well as
 -- speed: the window is conditioned on the total cost including a mana payment,
--- so a cost with none opens none. That is every mana ability in `data/cards/`
--- but this one, and this is on the path of every tap for mana.
+-- so a cost with none opens none. That is most of `data/cards/`, and this is on
+-- the path of every tap for mana.
 --
 -- The recursion CR 602.2b makes of that window is bounded by the in-flight set
 -- this function adds to (CR 605.3c), not by the order.
@@ -3355,8 +3368,9 @@ applyAdjustments adjustments cost =
         ManaSymbol.Hybrid {} -> 0
         -- A monocolored hybrid's {2} half IS generic mana once CR 601.2b's
         -- nonhybrid equivalent names it, and a symbol still spelled {2/R} is one
-        -- CR 601.2b has NOT named -- Flame Javelin's own ruling. What still
-        -- arrives unannounced is a mana ability's own activation cost (#2909).
+        -- CR 601.2b has NOT named -- Flame Javelin's own ruling. Every road into
+        -- this function now totals a cost CR 601.2b has already completed, so the
+        -- arm is a total function's and not a live case.
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 107.4f makes this a COLOURED symbol whose other half is life.
         ManaSymbol.Phyrexian _ -> 0
@@ -3421,8 +3435,8 @@ applyAdjustments adjustments cost =
         ManaSymbol.OfType manaType -> Just manaType
         -- CR 107.4e names TWO types, and a symbol still spelled {G/U} here is one
         -- CR 601.2b has not named -- Mana.announce leaves an OfType behind when
-        -- it does. What still arrives unannounced is a mana ability's own
-        -- activation cost (#2909).
+        -- it does. Every road into this function now totals a cost CR 601.2b has
+        -- already completed, so the arm is a total function's and not a live case.
         ManaSymbol.Hybrid {} -> Nothing
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- EXACT rather than an elision: the symbol is necessarily UNANNOUNCED, CR
