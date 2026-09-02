@@ -1385,8 +1385,12 @@ enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 -- empty for every non-Aura. ONE slot however many instances of enchant the
 -- face has, since CR 303.4a gives an Aura spell a single target and CR 702.5c
 -- makes the instances narrow it together (enchantTargetSlot below). Merged into
--- the two functions above, and passed to Target.fillableModes by Pawl.Engine.Cast
--- so castability accounts for it.
+-- the two functions above, and passed to Target.fillableModes by the two gates in
+-- Pawl.Engine.Cast that ask once for the whole spell rather than once per CR
+-- 601.2b candidate -- entwineOffer and castProposed's mode gate, both of which run
+-- before stampBestowed, so no bestow announcement is visible to either and the
+-- printed reading is the only one there is. CR 601.2c's castability gate does ask
+-- per candidate, and takes the projected reading below.
 enchantSlotMap :: Face.Face Card.Card -> Map SlotName TargetSlot
 enchantSlotMap = enchantSlotMapGiven . Face.enchant
 
@@ -1433,10 +1437,12 @@ enchantTargetSlot = foldEnchant . Face.enchant
 -- reaches. Pawl.Engine.Projection seeds ProjectedCharacteristics.enchant from
 -- Face.enchant and appends grants to it, so a projected object's list is what
 -- Pawl.Engine.Attach and Pawl.Engine.Sba fold. The cast and resolve paths take
--- the projected list too, through modesTargetSlotsGiven above: CR 702.103b's
--- bestow grants "enchant creature" to a spell ON THE STACK, which is exactly what
--- CR 601.2c and CR 608.2b then judge. enchantSlotMap's printed reading is what is
--- left for a caller holding a face and no object.
+-- the projected list too -- through modesTargetSlotsGiven above at CR 601.2c's
+-- prompt and CR 608.2b's re-check, and through enchantSlotMapGiven at the
+-- castability gate one step earlier (Pawl.Engine.Cast.targetable): CR 702.103b's
+-- bestow grants "enchant creature" to a spell cast bestowed, which is exactly what
+-- all three then judge. enchantSlotMap's printed reading is what is left for the
+-- two gates that ask once for the whole spell; see there.
 foldEnchant :: [TargetSlot] -> Maybe TargetSlot
 foldEnchant slots = case slots of
   [] -> Nothing
