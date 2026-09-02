@@ -218,7 +218,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   -- Pawl.Engine.Projection.replacementsAffecting gathered by object rather than
   -- by row until this case: rule 113.6p's list filtered the zone before any row's
   -- stated set was asked, so a commander's row naming the command zone was
-  -- dropped (#2904). Pawl.ZoneReplacementSpec has the other four zones; this one
+  -- dropped; see #2904. Pawl.ZoneReplacementSpec has the other four zones, and this one
   -- is here because a commander is what puts a card in the command zone.
   --
   -- Synthetic Archival Warden is "{1}{W} Legendary Creature -- Human Advisor 2/2.

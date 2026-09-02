@@ -127,7 +127,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- The DEFAULT the case above has none of: CR 113.6's first sentence functions
   -- an instant's or a sorcery's abilities while the object is on the stack, so a
   -- row that states no zone is gathered there and nowhere else. The stack walk
-  -- asked CR 113.6b's stated set alone until this case (#2590).
+  -- asked CR 113.6b's stated set alone until this case; see #2590.
   --
   -- Synthetic Fading Counsel is "{1}{U} Instant, you gain 2 life. If this spell
   -- would be put into a graveyard, exile it instead." SYNTHETIC because no
