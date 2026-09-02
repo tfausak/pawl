@@ -311,12 +311,14 @@ isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 -- every other Aura, with no player-only branch.
 --
 -- The third clause goes through stillLegalEnchant below rather than calling
--- Target.stillAdmitted directly, so that the common enchant slot is answered off
--- `pcs` -- the SAME pre-pass Projection.projectAll performStateBasedActions
--- computed once for every other CR 704.3 classification. Calling stillAdmitted
--- here instead means a fresh `gather` PER Aura, which is the O(permanents^3)
--- shape Projection.hs's `liveGiven` comment warns about, one level down. (A slot
--- carrying a Filter still reaches stillAdmitted by that function's fallthrough.)
+-- Target.stillAdmitted directly, so that the common enchant slot is answered by a
+-- Map.lookup on `pcs` -- the SAME pre-pass Projection.projectAll
+-- performStateBasedActions computed once for every other CR 704.3 classification
+-- -- rather than by building a slot's whole candidate set. A slot carrying a
+-- Filter does reach stillAdmitted, by that function's fallthrough, and reads the
+-- same pre-pass board there: what neither path may do is `gather` PER Aura, which
+-- is the O(permanents^3) shape Projection.hs's `liveGiven` comment warns about,
+-- one level down.
 --
 -- CR 303.4d's first clause -- an Aura can't enchant itself -- is the `oid == self`
 -- arm. Unreachable in this pool, written anyway because it costs one comparison.
@@ -332,8 +334,8 @@ isBestowed gs oid = maybe False Object.bestowed (Game.lookupObject oid gs)
 -- performStateBasedActions subtracts it rather than this predicate: a bestowed
 -- Aura matching here becomes unattached and ceases to be bestowed instead of
 -- being buried.
-fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
-fallsOff pcs gs oid = case Map.lookup oid pcs of
+fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> GameState -> ObjectId -> Bool
+fallsOff pcs grants pools gs oid = case Map.lookup oid pcs of
   Nothing -> False
   Just pc -> case Card.foldEnchant (PC.enchant pc) of
     Nothing -> False
@@ -343,7 +345,7 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
         Nothing -> True
         Just recipient ->
           Recipient.objectOf recipient == Just oid
-            || not (stillLegalEnchant pcs gs oid slot recipient)
+            || not (stillLegalEnchant pcs grants pools gs oid slot recipient)
             -- CR 303.4c's "and other applicable effects", which the enchant
             -- slot above cannot see: the HOST's own prohibition on what may
             -- enchant it (CR 303.4's last sentence, CR 101.2), read through
@@ -404,18 +406,22 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- target`, when it exists, IS `Projection.project target gs`, and a missing key
 -- means what creatureRecipients' own battlefield scan would have missed it for.
 --
--- Any OTHER shape falls through to the general, slower Target.stillAdmitted,
--- which reuses the SAME pool and Filter Cast/Resolve already judge, rather than
+-- Any OTHER shape falls through to the general Target.stillAdmitted, which
+-- reuses the SAME pool and Filter Cast/Resolve already judge, rather than
 -- assuming the Creatures-with-no-Filter shape holds regardless. Two producers
 -- need it: Setessan Training's "Enchant creature you control" carries a Filter
--- whose ControlledBy You conjunct is unanswerable from `pcs` -- CR 109.5 makes
--- that "you" the AURA's controller (CR 702.5a), so the answer changes when an
--- opponent steals the enchanted creature -- and CR 702.5d's enchant-player Auras
--- carry a Pool.Players slot. A CR 702.5c conjunction of several instances is a
--- third: Filter.And is a Filter, so it lands here too. The fallthrough pays the per-Aura re-projection the
--- reduction exists to avoid, but only for those. Serving a filtered slot off
--- `pcs` would mean answering Filter.matches against the pre-pass projection
--- instead of a fresh one, which is #430.
+-- whose ControlledBy You conjunct the lookup above cannot answer -- CR 109.5
+-- makes that "you" the AURA's controller (CR 702.5a), so the answer changes when
+-- an opponent steals the enchanted creature -- and CR 702.5d's enchant-player
+-- Auras carry a Pool.Players slot. A CR 702.5c conjunction of several instances
+-- is a third: Filter.And is a Filter, so it lands here too.
+--
+-- The fallthrough is answered against the pass's OWN `pcs`, control grants and
+-- base pools, not against three it rebuilds: same answer, because caller and
+-- callee are pure functions of one GameState (Projection.projectGiven), and one
+-- gather for the pass instead of one per filtered Aura. Pawl.AuraSpec's "CR
+-- 704.5m whole cards: Control Magic steals the enchanted creature" is what
+-- proves the shared board still sees the control change.
 --
 -- That fallback is general in its recipient TAG as well as in its pool and
 -- filter, which is the whole reason Object.attachedTo stores a Recipient: the tag
@@ -428,8 +434,8 @@ fallsOff pcs gs oid = case Map.lookup oid pcs of
 -- naming CR 202.3's computed bound is one whose Filter reads it, and this arm is
 -- the no-Filter shape. Nothing prints such an enchant ability, so the arm is
 -- matched rather than widened.
-stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSlot.TargetSlot -> Recipient.Recipient -> Bool
-stillLegalEnchant pcs gs source slot recipient = case (slot, recipient) of
+stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> GameState -> ObjectId -> TargetSlot.TargetSlot -> Recipient.Recipient -> Bool
+stillLegalEnchant pcs grants pools gs source slot recipient = case (slot, recipient) of
   (TargetSlot.MkTargetSlot Pool.Creatures Nothing count Nothing, Recipient.ToCreature target) | count == SlotCount.Printed TargetCount.one ->
     case Map.lookup target pcs of
       Nothing -> False
@@ -440,7 +446,7 @@ stillLegalEnchant pcs gs source slot recipient = case (slot, recipient) of
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   -- The Aura is on the battlefield when this SBA asks, so its controller is
   -- live -- the CR 608.2b case this perspective exists for cannot arise here.
-  _ -> Target.stillAdmitted (Projection.controllerOf source gs) source recipient slot gs
+  _ -> Target.stillAdmitted pcs grants pools (Projection.controllerOfGiven grants Set.empty source gs) source recipient slot gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the
@@ -613,6 +619,13 @@ performStateBasedActions = Event.simultaneously $ do
       -- are simultaneous. Project the whole board once (one gather) and judge each
       -- object against it, rather than re-projecting per object.
       pcs = Projection.projectAll gs
+      -- The other two whole-board walks the pass shares, beside `pcs` and for the
+      -- same CR 704.3 reason: the filtered-enchant fallthrough in fallsOff below
+      -- took a fresh gather, control-grant walk and base-pool build PER Aura --
+      -- see #430. Both stay THUNKS -- a board with no filtered Aura on it forces
+      -- neither -- which is the posture Target.legalRecipientsGiven argues for.
+      grants = Projection.controlGrants gs
+      pools = Target.poolsGiven pcs gs
       classify oid = case Map.lookup oid pcs of
         Nothing -> Nothing
         Just pc
@@ -643,7 +656,7 @@ performStateBasedActions = Event.simultaneously $ do
       -- ability no longer admits. Judged against the SAME pre-pass pcs/gs as
       -- every other classification above -- see fallsOff's Haddock for why an
       -- Aura whose creature dies THIS pass survives it and falls off the next.
-      unattachedAuras = filter (\oid -> fallsOff pcs gs oid && not (isBestowed gs oid)) onBattlefield
+      unattachedAuras = filter (\oid -> fallsOff pcs grants pools gs oid && not (isBestowed gs oid)) onBattlefield
       -- CR 702.103f: a bestowed Aura that becomes unattached, or is attached to
       -- an illegal object or player, "ceases to be bestowed" instead -- "an
       -- exception to rule 704.5m", which is why this is subtracted from
@@ -655,7 +668,7 @@ performStateBasedActions = Event.simultaneously $ do
       -- a bestowed permanent whose host dies THIS pass unbestows on the next --
       -- fallsOff's own timing, and the rule's, since the Aura is still legally
       -- attached until the pass that sees the host gone.
-      unbestowing = filter (\oid -> fallsOff pcs gs oid && isBestowed gs oid) onBattlefield
+      unbestowing = filter (\oid -> fallsOff pcs grants pools gs oid && isBestowed gs oid) onBattlefield
       -- CR 704.5n and CR 704.5p: computed from the same pre-pass state, for the
       -- same reason. One list because they share an action -- detach, stay on
       -- the battlefield -- and differ only in why the attachment is illegal.
