@@ -1868,16 +1868,16 @@ leavesBattlefieldSpec s registry =
 -- new TriggerCondition fails to compile here. The other half, the list below, is
 -- hand-kept and cannot be forced; add the new constructor there too.
 --
--- The arrival id every Moved event here carries, shared with the pin so that the
--- state it hands Event.eventBindings can hold a card under that id: the
--- PermanentReturnedToHand arm reads CR 400.3's owner off the arrival.
-representativeArrival :: ObjectId.ObjectId
-representativeArrival = ObjectId.MkObjectId 2
+-- The departing id every Moved event here carries, shared with the pin so that
+-- the state it hands Event.eventBindings can file CR 608.2h's record under it.
+-- Nothing is ever stocked under the ARRIVING id, deliberately: see the pin.
+representativeDeparted :: ObjectId.ObjectId
+representativeDeparted = ObjectId.MkObjectId 1
 
 representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty GameEvent.GameEvent
 representativeEvents cond =
-  let departed = ObjectId.MkObjectId 1
-      arrived = representativeArrival
+  let departed = representativeDeparted
+      arrived = ObjectId.MkObjectId 2
       moved from to = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
       combatDamage =
         GameEvent.DamageDealt
@@ -2064,8 +2064,8 @@ representativeEvents cond =
         -- The one destination the arm above's three events narrow to, and the
         -- only event this condition admits at all: CR 400.2 makes a hand hidden,
         -- so CR 400.7e withholds the arrival; what the floor holds is the
-        -- departed permanent and CR 400.3's owner, read off `arrived` in the
-        -- pin's state.
+        -- departed permanent and CR 400.3's owner, read off CR 608.2h's record
+        -- of `departed` in the pin's state.
         TriggerCondition.PermanentReturnedToHand _ -> one (moved Zone.Battlefield Zone.Hand)
         -- The same one event, and NOT because the batch reading matches nothing:
         -- Event.matchesTrigger answers alike for both (its batch arm delegates to
@@ -2806,18 +2806,26 @@ permanentsReturnedToHandSpec s registry =
 warpedDevotionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 warpedDevotionSpec s registry =
   let -- alice's Warped Devotion and one Island; a Goblin Piker owned by `owner`,
-      -- under alice's control when `stolen`; three cards in alice's hand and one
-      -- in bob's -- distinct, and bob's two once the Piker lands make CR 701.9b's
-      -- choice a real prompt.
-      board owner stolen = do
+      -- under alice's control when `stolen`; three cards in alice's hand, and
+      -- enough in bob's that CR 701.9b's choice is a real prompt once the Piker
+      -- has landed there (or not, on the token leg).
+      -- `asToken` mints a CR 111.1 token copy of the Piker in place of the card.
+      -- That is the leg where the returned object is GONE by the time the
+      -- trigger is placed: Engine.performSettle runs CR 704.5d's state-based
+      -- action before placePendingTriggers.
+      board owner stolen asToken = do
         devotion <- S.printingOf s registry "Warped Devotion"
         piker <- S.printingOf s registry "Goblin Piker"
+        pikerCard <- S.cardOf s registry "Goblin Piker"
         island <- S.printingOf s registry "Island"
         let (_, g1) = S.addCreature devotion S.alice (S.landsInPlay island 1)
-            (pikerId, g2) = S.addCreature piker owner g1
+            (pikerId, g2) = (if asToken then S.addToken pikerCard else S.addCreature piker) owner g1
             g3 = if stolen then S.giveControl pikerId S.alice g2 else g2
             g4 = List.foldl' (\gs _ -> snd (S.addHandCard island S.alice gs)) g3 [1 .. 3 :: Int]
-            g5 = snd (S.addHandCard island S.bob g4)
+            -- Two for bob on the token leg, one on the card leg: CR 701.9b's
+            -- choice is a real prompt either way, since the returned CARD joins
+            -- bob's hand before he discards and the token does not.
+            g5 = List.foldl' (\gs _ -> snd (S.addHandCard island S.bob gs)) g4 [1 .. if asToken then 2 else 1 :: Int]
         pure (pikerId, g5)
       returnByHand oid gs =
         let gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Hand)
@@ -2826,7 +2834,7 @@ warpedDevotionSpec s registry =
       graveyardSize pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
    in Spec.describe s "Warped Devotion" $ do
         Spec.it s "CR 400.3 bob's Piker under alice's control returned to hand makes BOB discard" $ do
-          (pikerId, gs) <- board S.bob True
+          (pikerId, gs) <- board S.bob True False
           let after = returnByHand pikerId gs
           Spec.assertEqWith s "bob discarded" (graveyardSize S.bob after) 1
           Spec.assertEqWith s "and alice, its controller, did not" (graveyardSize S.alice after) 0
@@ -2834,14 +2842,32 @@ warpedDevotionSpec s registry =
           Spec.assertEqWith s "alice's hand is untouched" (S.handSize S.alice after) 3
           Spec.assertEqWith s "the Piker really was alice's to control" (Projection.controllerOf pikerId gs) (Just S.alice)
         Spec.it s "CR 400.3 alice's own Piker, on the board that differs in its owner alone, makes alice discard" $ do
-          (pikerId, gs) <- board S.alice True
+          (pikerId, gs) <- board S.alice True False
           let after = returnByHand pikerId gs
           Spec.assertEqWith s "alice discarded" (graveyardSize S.alice after) 1
           Spec.assertEqWith s "and bob did not" (graveyardSize S.bob after) 0
+        -- CR 111.7's parenthetical -- "if a token changes zones, applicable
+        -- triggered abilities will trigger before the token ceases to exist" --
+        -- against the order Engine.performSettle actually runs in: CR 704.5d's
+        -- state-based action deletes the token BEFORE placePendingTriggers, so
+        -- the object the move minted in bob's hand is already gone when
+        -- Event.eventBindings computes `thatPlayer`. Reading CR 400.3's owner
+        -- off that arrival leaves the slot unbound and the discard silently
+        -- empty; CR 608.2h's record of the departed id is what still answers.
+        --
+        -- One difference from the first case: the Piker is a token. Same owner,
+        -- same theft, same bounce.
+        Spec.it s "CR 111.7 bob's Piker TOKEN under alice's control still makes bob discard" $ do
+          (pikerId, gs) <- board S.bob True True
+          let after = returnByHand pikerId gs
+          Spec.assertEqWith s "bob discarded" (graveyardSize S.bob after) 1
+          Spec.assertEqWith s "and alice, its controller, did not" (graveyardSize S.alice after) 0
+          Spec.assertEqWith s "bob is left with one of his two, the token having ceased rather than joined them" (S.handSize S.bob after) 1
+          Spec.assertBool s (not (Set.member pikerId (GameState.battlefield after))) "the token left the battlefield"
         -- The whole card through a real spell: alice casts Unsummon at the Piker
         -- bob both owns and controls, targeted by id.
         Spec.it s "CR 603.2 whole card: Unsummon on bob's Piker makes bob discard" $ do
-          (pikerId, gs) <- board S.bob False
+          (pikerId, gs) <- board S.bob False False
           unsummon <- S.printingOf s registry "Unsummon"
           let (withSpell, spellId) = S.handOne unsummon gs
               answer :: Prompt.Prompt r -> r
@@ -2859,7 +2885,7 @@ warpedDevotionSpec s registry =
         -- thatPlayer, the departed id under thatDepartedPermanent, and no
         -- `became` -- CR 400.7e withholds it for a hand (CR 400.2).
         Spec.it s "CR 603.10a eventBindings binds the owner and the departed permanent, and withholds became" $ do
-          (pikerId, gs) <- board S.bob True
+          (pikerId, gs) <- board S.bob True False
           let gone = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Hand)
               moves =
                 Maybe.mapMaybe
@@ -3033,14 +3059,28 @@ becameSlotSpec s registry =
         Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for EVERY event a condition admits" $ do
           piker <- S.printingOf s registry "Goblin Piker"
           let bearerBecame = Just (ObjectId.MkObjectId 3)
-              -- The state for the one arm that reads one: PermanentReturnedToHand
-              -- looks CR 400.3's owner up off the arrival, so representativeArrival
-              -- names a card alice owns here. Every other arm is pure over the
-              -- event and reads nothing from it.
-              (minted, stocked) = S.addHandCard piker S.alice (Setup.emptyGame S.bothPlayers)
-              pinState = case Map.lookup minted (GameState.objects stocked) of
-                Just obj -> stocked {GameState.objects = Map.insert representativeArrival obj (GameState.objects stocked)}
-                Nothing -> stocked
+              -- The state for the one arm that reads one. PermanentReturnedToHand
+              -- looks CR 400.3's owner up off CR 608.2h's record of the DEPARTED
+              -- id, and GameState.objects is left EMPTY here on purpose: CR 111.7
+              -- and CR 704.5d delete a token that has reached a hand, and
+              -- Engine.performSettle runs that state-based action before
+              -- placePendingTriggers, so on a real board the arriving object can
+              -- already be gone when eventBindings runs. An arm that bound a slot
+              -- off a live Game.lookupObject would be partial in play, and a
+              -- pinState holding the arrival would let it pass here anyway.
+              --
+              -- The record is the ZONE-CHANGE FUNNEL's own, lifted off a real
+              -- bounce and re-filed under the id representativeEvents uses, so the
+              -- pin cannot be satisfied by a record shaped to suit it. Nothing
+              -- lands under the departed id in `objects`, which is what
+              -- Projection.lastKnownOf's liveness guard requires.
+              (pikerId, placed) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+              bounced = S.runPure S.identityAnswer placed (Event.changeZone pikerId Zone.Hand)
+              empty = Setup.emptyGame S.bothPlayers
+              pinState = case Map.lookup pikerId (GameState.lastKnown bounced) of
+                Just lk -> empty {GameState.lastKnown = Map.singleton representativeDeparted lk}
+                Nothing -> empty
+          Spec.assertBool s (not (Map.null (GameState.lastKnown pinState))) "the funnel filed a last-known record for the bounced Piker"
           mapM_
             ( \cond ->
                 let stamped = fmap (Map.keysSet . Event.eventBindings pinState bearerBecame cond) (representativeEvents cond)
