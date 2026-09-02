@@ -2570,7 +2570,7 @@ mysticGateSpec s registry = Spec.describe s "Mystic Gate" $ do
             pure (takesGate wanted (Just whiteType) p)
           _ -> pure (takesGate wanted (Just whiteType) p)
         asked wanted = State.execState (Engine.runGame (counting wanted) (snd board) (Cost.tapForMana (fst board))) (0 :: Int)
-    Spec.assertEqWith s "CR 118.6 the {C} route's cost has no mana part, so nothing is announced" (asked [ManaType.Colorless]) 0
+    Spec.assertEqWith s "CR 118.13a the {C} route's cost prints no symbol payable two ways, so nothing is announced" (asked [ManaType.Colorless]) 0
     Spec.assertEqWith s "and the {W/U} route on the same board is asked once" (asked [whiteType, blueType]) 1
 
 -- alice with one Mystic Gate and one white and one blue mana floating, and

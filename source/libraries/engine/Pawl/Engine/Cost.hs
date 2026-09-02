@@ -2833,7 +2833,7 @@ tapForManaWith inFlight oid = do
           -- rather than left to the payment. BEFORE announceReductions, which is
           -- CR 601.2f -- Cast.castSpell's and Activate.activateAbility's order,
           -- and rule 601.2b's own. Mystic Gate's "{W/U}, {T}" is what observes it
-          -- (Pawl.ManaSpec's "CR 118.13a the {W/U} is announced").
+          -- (Pawl.ManaSpec's Mystic Gate group).
           --
           -- The Phyrexian life record is DISCARDED, Activate's reason: rule
           -- 702.150a reads what the player who CAST a spell announced.
