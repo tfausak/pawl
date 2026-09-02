@@ -4336,11 +4336,15 @@ chooseNewTargetsFor controller copyId = do
         Monad.when wellFormed $ do
           -- CR 406.4's draw, run on the ANSWER: a pile the player named becomes
           -- the card randomness picked out of it before any target is recorded.
-          drawn <-
-            Map.traverseWithKey
-              (\slot picked -> Target.drawFromPiles (Just controller) (Map.findWithDefault Set.empty slot fresh) picked)
-              answer
-          Monad.when (Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
+          drawn <- traverse (Target.drawFromPiles (Just controller)) answer
+          -- CR 707.10c: "if the player chooses to change some or all of the
+          -- targets, the new targets must be legal". Asked of the DRAWN answer
+          -- and not of the raw one, because rule 406.4 draws from the whole pile
+          -- -- the card it names can be one this slot refuses, and a pile is
+          -- never a target that was left unchanged. An unchanged target is
+          -- admitted whatever it is, which is the rule's own first sentence.
+          let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
+          Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
             let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
             State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 

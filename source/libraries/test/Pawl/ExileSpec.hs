@@ -5,10 +5,10 @@
 -- CR 406.4's two halves over Pawl.Engine.Target's Pool.CardsInExile arm -- the
 -- permission Pawl.Engine.Exile.mayLookAt answers, the pile
 -- Pawl.Engine.Exile.pileOf sorts a card into and Pawl.Engine.Target's piledOffer
--- offers instead, and the draw drawFromPiles takes out of it, elided at a
--- one-card pile, filtered back against the pile and asked with Game.ask rather
--- than Game.choose (CR 104.4b) -- and ObjectRef.EachCardInYourHand as
--- Pawl.Engine.Resolve sweeps it.
+-- offers instead, and the draw drawFromPiles takes out of it, taken over the
+-- WHOLE pile, elided at a one-card pile, filtered back against the pile and asked
+-- with Game.ask rather than Game.choose (CR 104.4b) -- and
+-- ObjectRef.EachCardInYourHand as Pawl.Engine.Resolve sweeps it.
 --
 -- CR 406.4's separate piles are read off the same Ignorant Bliss: one casting
 -- makes one pile of what it hid, two castings make two, and which pile a chooser
@@ -20,7 +20,9 @@
 -- it exiled; foretell (CR 702.143a) grants the owner one, so she may. Synthetic
 -- Blind Reclamation's unqualified "target exiled card" is what reads the
 -- difference back out, and Riftsweeper's printed "face-up exiled card" is the
--- third reading -- a card whose own words refuse what rule 406.4 offers.
+-- third reading -- a card whose own words refuse what rule 406.4 offers. Runic
+-- Repetition is the fourth: a restriction a pile only half satisfies, which is
+-- what the draw runs over the whole pile for.
 --
 -- Each group shares ONE board across its readings, which is the point: exile
 -- holds the same cards either way, and only how they got there differs.
@@ -64,6 +66,7 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Face-down exile" $ do
   foretold s registry
+  runicRepetition s registry
   Spec.describe s "Ignorant Bliss" $ do
     -- CR 406.3a and CR 406.4's first half, read through the pool that offers
     -- exiled cards as targets. The board is deliberately one board: alice's two
@@ -210,17 +213,15 @@ spec s registry = Spec.describe s "Face-down exile" $ do
     -- the field either way.
     Spec.it s "CR 104.4b the draw out of a pile is not an optional action" $ do
       exiled <- castBliss s registry
-      reclamation <- S.printingOf s registry "Synthetic Blind Reclamation"
-      case (S.spellTargetSlot reclamation, pilesIn exiled) of
-        (Just theSlot, [pile]) -> do
+      case pilesIn exiled of
+        [pile] -> do
           let board = exiled {GameState.lastChoice = Timestamp.MkTimestamp 0}
-              legal = Target.legalRecipients (Just S.alice) S.noSource theSlot board
-              (drawn, after) = S.runPureWith throughPile board (Target.drawFromPiles (Just S.alice) legal (Set.singleton (Recipient.ToPile pile)))
+              (drawn, after) = S.runPureWith throughPile board (Target.drawFromPiles (Just S.alice) (Set.singleton (Recipient.ToPile pile)))
           case membersOfPile board pile of
             [_, second] -> Spec.assertEqWith s "the draw was honoured, naming the last card of the pile" (Set.toList drawn) [Recipient.ToObject second]
             _ -> Spec.assertFailure s "the casting should hide two cards in one pile"
           Spec.assertEqWith s "and nobody was recorded as having been offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
-        _ -> Spec.assertFailure s "one casting should make one pile, and Synthetic Blind Reclamation print one target slot"
+        _ -> Spec.assertFailure s "one casting should make one pile"
     -- The same gate from the other side, on a board differing in ONE thing: the
     -- two cards reach exile FACE UP instead, by the same route every other test
     -- puts a card there. Same printings, same seats, same zone, same count -- so a
@@ -354,6 +355,102 @@ foretoldBoard s registry = do
         [only] -> only
         _ -> S.noSource
   pure (downId, upId, aliceSpell, bobSpell, board)
+
+-- CR 406.4's draw runs over the WHOLE pile, and the spell's own restriction is
+-- judged on the card the draw named rather than before it: Runic Repetition
+-- {2}{U} -- "return target exiled card with flashback you own to your hand"
+-- (Oracle text checked 2026-09-01) -- over a pile Ignorant Bliss made out of a
+-- hand holding one card with flashback and one without.
+--
+-- The pile is still OFFERED, CR 601.2c wanting an announcement that can be legal
+-- and this pile holding a card that is; what no longer narrows is the pile the
+-- draw runs over. So the draw can name the Goblin Piker, and a spell whose one
+-- target is illegal was never cast (CR 601.2e).
+--
+-- ONE board, cast twice with the same answerer but for the draw, so the only
+-- thing that can account for the two outcomes is which card came out of the pile.
+runicRepetition :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+runicRepetition s registry = Spec.describe s "Runic Repetition" $ do
+  Spec.it s "CR 406.4 the draw reaches a card the spell's own restriction refuses, and CR 601.2e reverses the casting" $ do
+    think <- S.printingOf s registry "Think Twice"
+    repetition <- S.printingOf s registry "Runic Repetition"
+    (hasFlashback, hasNone, spellId, board) <- flashbackPileBoard s registry
+    case (hasFlashback, hasNone, S.spellTargetSlot repetition) of
+      (Just wanted, Just refused, Just theSlot) -> do
+        let castDrawing oid = resolveAll (S.runPure (drawing oid) board (S.cast S.alice spellId))
+        Spec.assertEqWith
+          s
+          "the draw named the card with no flashback, so the casting was reversed and the sorcery is back in alice's hand"
+          (namesIn Zone.Hand S.alice (castDrawing refused))
+          (Set.singleton (S.printingName repetition))
+        Spec.assertEqWith
+          s
+          "and the same board whose draw named the flashback card returns that card to her hand instead"
+          (namesIn Zone.Hand S.alice (castDrawing wanted))
+          (Set.singleton (S.printingName think))
+        -- Proxies, AFTER the behaviour so none of them can absorb a mutation:
+        -- the reversed casting took nothing out of exile, the honoured one took
+        -- one card, and what alice announced was the pile -- which is the pile
+        -- being offered at all despite holding a card the slot refuses.
+        Spec.assertEqWith s "the reversed casting left both cards of the pile in exile" (Set.size (GameState.exile (castDrawing refused))) 2
+        Spec.assertEqWith s "and the honoured one took exactly the card the draw named" (Set.size (GameState.exile (castDrawing wanted))) 1
+        Spec.assertEqWith
+          s
+          "alice was offered the pile and no card of it by name"
+          (offerTo S.alice theSlot board)
+          (Set.fromList (fmap Recipient.ToPile (pilesIn board)))
+      _ -> Spec.assertFailure s "the casting should hide a card with flashback and a card without, and Runic Repetition print one target slot"
+
+-- alice casts Ignorant Bliss with Think Twice (flashback {2}{U}) and Goblin Piker
+-- in hand, so ONE pile holds a card Runic Repetition's slot admits and a card it
+-- refuses. Five lands, which is the {1}{R} the Bliss costs and the {2}{U} left
+-- over for the sorcery, and her library is stocked so CR 104.3c never fires.
+--
+-- Returns the exiled Think Twice, the exiled Goblin Piker and her copy of Runic
+-- Repetition, still in hand -- added AFTER the Bliss resolved, the spell being
+-- one of the cards that hand would otherwise have hidden.
+flashbackPileBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (Maybe ObjectId.ObjectId, Maybe ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+flashbackPileBoard s registry = do
+  bliss <- S.printingOf s registry "Ignorant Bliss"
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  think <- S.printingOf s registry "Think Twice"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sentry <- S.printingOf s registry "Ogre Sentry"
+  repetition <- S.printingOf s registry "Runic Repetition"
+  let (g1, blissId) = S.handOne bliss (S.landsFor island S.alice 3 (S.landsInPlay mountain 2))
+      (_, g2) = S.addHandCard think S.alice g1
+      (_, g3) = S.addHandCard piker S.alice g2
+      (_, g4) = S.addLibraryCard sentry S.alice g3
+      blissed = resolveAll (S.runPure S.identityAnswer g4 (S.cast S.alice blissId))
+      (spellId, g5) = S.addHandCard repetition S.alice blissed
+      board =
+        g5
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      -- Read off the board rather than assumed: CR 400.7 mints a fresh
+      -- incarnation as each card is exiled, so the ids the hand held are gone.
+      idOf printing =
+        Maybe.listToMaybe
+          [ oid
+          | oid <- faceDownExiled board,
+            namesOf [oid] board == Set.singleton (S.printingName printing)
+          ]
+   in pure (idOf think, idOf piker, spellId, board)
+
+-- throughPile, with CR 406.4's draw answered by the card NAMED rather than by
+-- position. The answer is filtered back against the pile the engine offers, so
+-- naming a card the draw was never offered cannot smuggle one in.
+drawing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+drawing oid p = case p of
+  Prompt.RandomObject _ -> oid
+  _ -> throughPile p
 
 -- What CR 601.2c would put in front of this player: the slot's legal set with CR
 -- 406.4's substitution taken over it, which is the pair Pawl.Engine.Target's
