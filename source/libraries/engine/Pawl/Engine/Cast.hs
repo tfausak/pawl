@@ -61,7 +61,9 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.Supertype as Supertype
@@ -299,10 +301,41 @@ payableCost = payableCostAt 0
 -- before it is measured (Cost.plusComponents). Drought's "Sacrifice a Swamp" is
 -- therefore a reason this gate can answer False, and the cost it measures is the
 -- cost castSpell will pay.
+--
+-- CR 601.2c's targets do not exist at any moment this gate is asked -- every
+-- caller sits at CR 601.3 or inside CR 601.2b -- and a cost whose criterion NAMES one cannot be measured without them
+-- (Cost.readsBoundSlot). Such a cost is asked of every announcement still open
+-- instead -- CR 601.2 makes a casting legal when the player can comply with
+-- every step, so the gate's question is whether SOME aiming complies, exactly
+-- as Activate.aimingSomewhere asks it. A cost naming no slot answers the same
+-- under every aiming and skips the search.
 payableCostAt :: Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x spending pid oid gs cost =
   let adjustments = Cost.spellAdjustments pid oid gs
-   in Cost.canPaySomeCompletion (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+      substituted = Cost.substituteX x cost
+      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.plusComponents adjustments substituted) gs
+   in if Cost.readsBoundSlot substituted
+        then any (any ask . Target.aimings) (castAimable pid oid gs)
+        else ask Map.empty
+
+-- What CR 601.2c could still bind for this proposal, one slot map per fillable
+-- mode: Activate.candidateSlotsGiven's cast-side twin, and one mode at a time
+-- for its reason. Read off the SAME board and the same slots `targetable` above
+-- measures, including CR 702.103b's enchant slot, so the gate that offers the
+-- cast and the gate that prices it cannot disagree about what could be aimed at.
+--
+-- CR 601.2b's seed is empty, matching `targetable`: the X is not announced at
+-- any of the moments this is read.
+castAimable :: PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set ObjectId)]
+castAimable pid oid gs = case Game.faceOf oid gs of
+  Nothing -> []
+  Just face ->
+    let modal = Face.spell face
+        enchant = Card.enchantSlotMapGiven (Projection.enchantOf oid gs)
+        slotsOf mi = Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal)
+        objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
+        setsOf slots = Target.legalSets (Just pid) Map.empty oid slots gs
+     in fmap (fmap objectsOf . setsOf . slotsOf) (Set.toList (Target.fillableModes (Just pid) Map.empty oid enchant modal gs))
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with

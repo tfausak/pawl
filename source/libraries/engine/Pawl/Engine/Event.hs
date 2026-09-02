@@ -11340,18 +11340,24 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- the OWNER's: Warped Devotion's "whenever a permanent is returned to a
   -- player's hand, THAT PLAYER discards a card" names the owner, and
   -- PlayerRef.ControllerOfBound would name the wrong seat for a stolen permanent.
-  -- Read off the arrival (ZoneChange.object) rather than the departed id, which
-  -- CR 400.7 deleted; CR 108.3 keeps the owner the same across the move. The
-  -- lookup is total for a recorded event -- the funnel minted the arrival into
-  -- this state -- so the slot is bound for every match, which is what
-  -- eventBindingSlots' promise rests on; a hand-built event naming no object
-  -- binds the departed id alone.
+  --
+  -- Read off CR 608.2h's record of the DEPARTED id, not off the arrival, and CR
+  -- 108.3 makes the two the same answer: the owner is the one thing a zone change
+  -- cannot move. The arrival is what CR 111.7 and CR 704.5d take away -- a token
+  -- that reached a hand ceases to exist, and Engine.performSettle runs that
+  -- state-based action BEFORE placePendingTriggers, so by the time this runs the
+  -- arriving object is already deleted and a live lookup of it would leave the
+  -- slot unbound for exactly the case CR 111.7's parenthetical says must still
+  -- trigger. The departed id's record survives: the zone-change funnel files it
+  -- in the same write that deletes the object, and nothing prunes it. Proved by
+  -- Pawl.ZoneTriggerSpec's "CR 111.7 bob's Piker TOKEN under alice's control
+  -- still makes bob discard".
   --
   -- CR 400.7e's `became` is NOT bound: a hand is hidden (CR 400.2), the
   -- SelfLeavesTheBattlefield arm's guard, here settled by the condition itself.
   (TriggerCondition.PermanentReturnedToHand _, GameEvent.Moved m) ->
     let zc = Moved.change m
-        owner = fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
+        owner = fmap LastKnown.owner (Projection.lastKnownOf (ZoneChange.departed zc) gs)
      in Binding.setDepartedPermanent (ZoneChange.departed zc) (maybe Map.empty (`Binding.setTriggerPlayer` Map.empty) owner)
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
   -- entrant, and what it became is the permanent now on the battlefield --
@@ -11401,6 +11407,36 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- 113.7a's source slot already names.
   (TriggerCondition.PermanentTurnedFaceUp _, GameEvent.TurnedFaceUp oid) ->
     Binding.setBecame oid Map.empty
+  -- CR 603.2's "that creature": the permanent the counters went on, which Auntie
+  -- Ool, Cursewretch draws off or drains for. The bearer is a bystander, exactly
+  -- as it is under the arm above -- Wickersmith's Tools is an artifact watching
+  -- creatures -- so the subject needs a name of its own.
+  --
+  -- THE SAME SLOT, the arm above's widening rather than a fresh one, and for its
+  -- reasons: putting counters on a permanent is no zone change (CR 122.1 puts a
+  -- marker on the object that is already there, and CR 400.7 mints nothing), so
+  -- what carries the reuse is that CR 400.7e's slot is the printed word "that
+  -- creature" -- the thing the EVENT names, which CR 113.7a's source is not --
+  -- and, as the arm above says, a fresh name would empty CR 603.1b's AnyOf
+  -- intersection forever.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.CountersPut carries exactly one
+  -- CounterChange.object. Bound whatever the Filter admitted, for the
+  -- PermanentEnters arm's reason.
+  --
+  -- A DEAD ID IS POSSIBLE and is the payload's problem, `became`'s standing
+  -- posture: matchesTrigger admits the CR 704.5f victim a -1/-1 counter made
+  -- through Projection.viewWithLastKnown, so a creature that took the counters
+  -- and died before the CR 117.5 boundary still fires the trigger with this slot
+  -- naming an object that no longer exists.
+  --
+  -- Its BATCH sibling reaches the fallthrough instead and stamps nothing, which
+  -- is eventBindingSlots' answer for it: CR 603.2c's batch reading fires one
+  -- PermanentsGetCounters trigger for placements across several permanents, and
+  -- one slot cannot name them all.
+  (TriggerCondition.PermanentGetsCounters _, GameEvent.CountersPut change) ->
+    Binding.setBecame (CounterChange.object change) Map.empty
   -- "That player": the discarder, which CR 701.9a makes one player and the event
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
   -- same reason -- a player the EVENT names, which CR 109.5's `you` cannot stand
@@ -11762,8 +11798,8 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
 --
 -- ONE arrival is bound exactly as it always was -- Binding.toObject, a recipient
 -- -- so every ordinary move produces the byte-identical binding it did before
--- this rule landed, and none of the pool's eight readers of the slot can tell
--- the difference. TWO OR MORE are bound as a GROUP (Binding.toObjects), which is
+-- this rule landed, and no reader of the slot in data/cards/ can tell the
+-- difference. TWO OR MORE are bound as a GROUP (Binding.toObjects), which is
 -- the shape Pawl.Types.Binding documents for "every object one instruction
 -- produced or acted on" and which Pawl.Engine.Resolve.objectRefObjects reads
 -- ahead of the recipient path for ObjectRef.InSlot.
@@ -12097,9 +12133,11 @@ eventBindingSlots cond = case cond of
   -- CR 603.10a's departed permanent, the arm above's reason, and beside it the
   -- player whose hand it reached -- CR 400.3's OWNER, which Warped Devotion's
   -- "that player discards a card" reads. Both guaranteed given a match: the one
-  -- event this condition admits is a zone change, whose arrival is a card in a
-  -- hand with an owner. CR 400.7e's `became` is withheld, the hand being hidden
-  -- (CR 400.2).
+  -- event this condition admits is a zone change out of the battlefield, and the
+  -- funnel files CR 608.2h's record of the departing id in the same write that
+  -- deletes it. NOT off the arrival, which CR 704.5d can have already taken away
+  -- (a token); eventBindings' own arm has the whole of that. CR 400.7e's
+  -- `became` is withheld, the hand being hidden (CR 400.2).
   TriggerCondition.PermanentReturnedToHand _ -> Set.fromList [Binding.departedPermanent, Binding.triggerPlayer]
   -- Empty where the arm above binds two, and NECESSARILY so, PermanentsDie's
   -- reason one event family over: the batch may return several permanents to
@@ -12171,12 +12209,13 @@ eventBindingSlots cond = case cond of
   -- 2026-08-25), draws a card and names none of them; a printing whose payload
   -- said "it" would refute this, and the lint would reject it (#505).
   TriggerCondition.PermanentsGetCounters {} -> Set.empty
-  -- Nothing today, and NOT for the arm above's reason: this condition names one
-  -- permanent, so a slot for it would be honest. Wickersmith's Tools, the
-  -- printing that landed the constructor, reads nothing off the creature. Not
-  -- implemented: that slot, which Auntie Ool, Cursewretch's "if you control that
-  -- creature" reads (#2342).
-  TriggerCondition.PermanentGetsCounters {} -> Set.empty
+  -- CR 400.7e's slot in its widest reading, and NOT the arm above's answer: this
+  -- condition names one permanent, so the slot is honest. Auntie Ool,
+  -- Cursewretch's "draw a card if you control that creature. If you don't control
+  -- it, its controller loses 1 life" is what reads it; Wickersmith's Tools, the
+  -- printing that landed the constructor, reads nothing off the creature and is
+  -- unaffected by the slot being available.
+  TriggerCondition.PermanentGetsCounters {} -> Set.singleton Binding.became
   -- CR 709.5h names the permanent and the half, and CR 113.7a's source slot
   -- already names the permanent. The HALF is not bound: no printing says "that
   -- door", so there is nothing for a payload to read it as.

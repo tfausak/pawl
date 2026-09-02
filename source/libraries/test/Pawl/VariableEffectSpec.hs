@@ -805,9 +805,10 @@ blightSimultaneitySpec s registry =
 -- (Its name, cost, type line and oracle text checked against Scryfall.)
 --
 -- WHY THIS PRINTING and not Auntie Ool, Cursewretch, the other card of the
--- wording: the Auntie reads "that creature" back off the trigger, and no slot
--- names it (#2342). The Tools carry no rider at all, so the charge counters on
--- them are a clean count of how many times the ability fired.
+-- wording: the Auntie reads "that creature" back off the trigger, so what it
+-- does depends on who controls the subject. The Tools carry no rider at all, so
+-- the charge counters on them are a clean count of how many times the ability
+-- fired.
 --
 -- The -1/-1 COUNTERS are the same under either reading of the trigger, which is
 -- why what the cases read is the count on the Tools: two for a two-creature

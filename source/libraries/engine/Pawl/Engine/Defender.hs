@@ -9,6 +9,7 @@
 -- of them.
 module Pawl.Engine.Defender where
 
+import qualified Control.Applicative as Applicative
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Battle as Battle
@@ -59,9 +60,12 @@ defendingPlayers = Combat.defenders . GameState.combat
 -- object itself would answer nobody, and reading its owner the wrong seat.
 -- Pawl.CombatEffectSpec's LastKnownDefendingPlayer group is those two falsifiers.
 --
--- CR 506.4 is why one lookup serves both of CR 802.2a's tenses: a planeswalker
--- whose controller changes is removed from combat, so "controls" and "controlled
--- before it was removed" cannot disagree while the creature is still attacking it.
+-- CR 506.4 is why the lookup serves CR 802.2a's PRESENT tense on its own: a
+-- planeswalker whose controller changes is removed from combat, so "controls" and
+-- "controlled before it was removed" cannot disagree while the creature is still
+-- attacking it. Once they can -- which is exactly once the removal has happened --
+-- rule 802.2a's third sentence is the answer, and playerOfAttacker below is where
+-- it is read, that seat being recorded per ATTACKER.
 --
 -- Nothing means the target names no player: no defending player at all (outside
 -- combat), or a battle mid-repair with no designation (CR 310.11).
@@ -87,11 +91,38 @@ playerOf controllerOf target gs = case target of
     | otherwise -> Battle.lastKnownProtectorOf oid gs
 
 -- The same rule, asked of the attacking CREATURE rather than of what it attacks
--- -- which is the shape every caller outside Pawl.Engine.Damage wants, rule 508.5
--- being phrased about a creature. Nothing when the object is not attacking at
--- all, which is the honest answer: a creature that is not an attacker has no
+-- -- which is the shape every caller but the declaration's own event wants, rule
+-- 508.5 being phrased about a creature. Nothing when the object is not attacking
+-- at all, which is the honest answer: a creature that is not an attacker has no
 -- defending player.
+--
+-- CR 802.2a's THIRD sentence lives here rather than in playerOf, because the seat
+-- it names -- "the controller of the planeswalker that creature was attacking
+-- before it was removed from combat" -- is recorded per attacker
+-- (Pawl.Types.Combat's attackedUnder) and playerOf sees only the target. CR 506.4
+-- is what makes the record answer both tenses at once: it removes the planeswalker
+-- the moment its controller changes, so the recorded seat and the live one differ
+-- for precisely the creature that is no longer attacking it.
+--
+-- The PLANESWALKER arm alone. A battle's defending player is its protector (CR
+-- 310.9d), and only CR 310.9f moves a designation, which no printing does (#853),
+-- so its two tenses cannot come apart -- a battle whose CONTROLLER changes is
+-- removed from combat with its protector unmoved, and the live read is still rule
+-- 802.2a's answer. An attacked player is the seat itself.
+--
+-- playerOf's own live arms answer for an attacker with no recorded seat: a combat
+-- record built by hand rather than declared. In a running game both writers of
+-- Combat.attackers record one.
 playerOfAttacker :: (ObjectId -> GameState -> Maybe PlayerId) -> ObjectId -> GameState -> Maybe PlayerId
 playerOfAttacker controllerOf attacker gs =
-  (\target -> playerOf controllerOf target gs)
+  (\target -> defenderOfAttack controllerOf attacker target gs)
     =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
+
+-- playerOfAttacker with the target already in hand, for a caller walking
+-- Combat.attackers' own entries (Pawl.Engine.Damage).
+defenderOfAttack :: (ObjectId -> GameState -> Maybe PlayerId) -> ObjectId -> AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
+defenderOfAttack controllerOf attacker target gs = case target of
+  AttackTarget.OfPlaneswalker {} ->
+    Map.lookup attacker (Combat.attackedUnder (GameState.combat gs))
+      Applicative.<|> playerOf controllerOf target gs
+  _ -> playerOf controllerOf target gs

@@ -12,7 +12,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Combat as Combat
 
--- | Three maps keyed by an ObjectId, which is a Natural newtype, so they take
+-- | Four maps keyed by an ObjectId, which is a Natural newtype, so they take
 -- 'Common.naturalMap': a JSON object keyed by the decimal id rather than an array
 -- of entries, which is what keeps a written-out combat diffable.
 --
@@ -32,6 +32,7 @@ codec = Fields.object $ do
   blockers <- Fields.defaulted "blockers" Map.empty (Common.naturalMap ObjectId.codec (Common.set ObjectId.codec)) Combat.blockers
   struckFirst <- Fields.required "struckFirst" (Common.maybe (Common.set ObjectId.codec)) Combat.struckFirst
   joinedUnder <- Fields.defaulted "joinedUnder" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) Combat.joinedUnder
+  attackedUnder <- Fields.defaulted "attackedUnder" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) Combat.attackedUnder
   attacked <- Fields.defaulted "attacked" Set.empty (Common.set AttackTarget.codec) Combat.attacked
   declaredAttacked <- Fields.defaulted "declaredAttacked" Set.empty (Common.set AttackTarget.codec) Combat.declaredAttacked
   declaredAttackedThisStep <- Fields.defaulted "declaredAttackedThisStep" Set.empty (Common.set AttackTarget.codec) Combat.declaredAttackedThisStep
@@ -46,6 +47,7 @@ codec = Fields.object $ do
         Combat.blockers = blockers,
         Combat.struckFirst = struckFirst,
         Combat.joinedUnder = joinedUnder,
+        Combat.attackedUnder = attackedUnder,
         Combat.attacked = attacked,
         Combat.declaredAttacked = declaredAttacked,
         Combat.declaredAttackedThisStep = declaredAttackedThisStep,

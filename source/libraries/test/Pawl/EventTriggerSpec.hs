@@ -1057,6 +1057,106 @@ counterTriggerSpec s registry =
           Spec.assertEqWith s "four untapped permanents before" (untapped gs) 4
           Spec.assertEqWith s "two after, so only two Islands were tapped" (untapped cast) 2
 
+-- CR 603.2's binding half of a per-permanent counter trigger: the ability names
+-- the permanent the counters went on, and that permanent is neither the bearer
+-- nor, in general, anything the bearer's controller controls.
+--
+--   * Auntie Ool, Cursewretch {1}{B}{R}{G} 4/4 Legendary Creature -- Goblin
+--     Warlock (data/cards/auntie-ool-cursewretch.json): "Ward--Blight 2.
+--     Whenever one or more -1/-1 counters are put on a creature, draw a card if
+--     you control that creature. If you don't control it, its controller loses 1
+--     life." Transcribed whole; the ward goes unexercised here, no spell in this
+--     fixture targeting her.
+--
+--   * Soul Snuffers {2}{B}{B} 3/3 Creature -- Elemental Shaman
+--     (data/cards/soul-snuffers.json): "When this creature enters, put a -1/-1
+--     counter on each creature." One written instruction, one settled placement
+--     per creature, so one trigger per creature -- which is what gives the case
+--     five subjects across three seats out of one resolution.
+--
+--   * Wall of Stone {1}{R}{R} 0/8, one per seat in the first case: the subject
+--     that survives its counter by a mile, so CR 704.5f takes nothing off the
+--     board before the bindings are read.
+--
+--   * Goblin Piker {1}{R} 2/1, the second case's subject: the other side of that
+--     same rule, dead at the CR 117.5 scan that places the trigger.
+--
+-- (Every name, cost, type line, P/T and oracle text checked against Scryfall.)
+--
+-- THREE SEATS, because the card's two branches collapse onto one at two: with a
+-- single opponent, "its controller" and "the seat that is not you" name the same
+-- player, so a life loss aimed at the trigger's own controller's opponent would
+-- be indistinguishable from one aimed at the subject's controller. carol's Wall
+-- is what separates them.
+--
+-- WHAT A WRONG BINDING WOULD SHOW. Binding nothing (the state before this unit)
+-- leaves the count at zero for every subject, so alice draws nothing and the
+-- life loss reaches nobody; binding the bearer or its controller makes all five
+-- subjects "yours", so alice draws five and no seat loses life.
+auntieOolSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+auntieOolSpec s registry =
+  let -- Settle and resolve until the stack is empty: the Snuffers' enter trigger
+      -- places the counters, and the five Auntie Ool triggers only reach the
+      -- stack at the CR 117.5 scan after it.
+      resolveEverything gs =
+        let settled = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in if null (GameState.stack settled)
+              then settled
+              else resolveEverything (S.runPure S.identityAnswer settled Stack.resolveTop)
+   in Spec.describe s "Auntie Ool, Cursewretch" $ do
+        Spec.it s "CR 603.2 the counter trigger names the subject's controller, not the bearer's" $ do
+          ool <- S.printingOf s registry "Auntie Ool, Cursewretch"
+          snuffers <- S.printingOf s registry "Soul Snuffers"
+          wall <- S.printingOf s registry "Wall of Stone"
+          swamp <- S.printingOf s registry "Swamp"
+          let (oolId, g1) = S.addCreature ool S.alice S.threePlayerGame
+              (aliceWall, g2) = S.addCreature wall S.alice g1
+              (bobWall, g3) = S.addCreature wall S.bob g2
+              (carolWall, g4) = S.addCreature wall S.carol g3
+              -- Five cards, where three are drawn: CR 104.3c decks nobody, and a
+              -- library that ran out would end the case before its assertions.
+              stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 .. (5 :: Int)]
+              (snuffersId, entered) = S.entersWithTrigger snuffers S.alice stocked
+              after = resolveEverything entered
+          Spec.assertEqWith s "bob, whose Wall took a counter he controls, lost 1 life" (S.lifeOf S.bob after) (Just 19)
+          Spec.assertEqWith s "carol likewise, the seat neither the bearer's nor bob's" (S.lifeOf S.carol after) (Just 19)
+          Spec.assertEqWith s "alice, who controls three of the five subjects, lost none" (S.lifeOf S.alice after) (Just 20)
+          Spec.assertEqWith s "and drew one card for each subject she controlled" (S.handSize S.alice after) 3
+          -- The preconditions the four readings above rest on: five creatures each
+          -- took exactly one -1/-1 counter, and alice's hand was empty to begin
+          -- with, so the three cards are draws rather than a stocked fixture.
+          Spec.assertEqWith s "alice's hand was empty before" (S.handSize S.alice entered) 0
+          Spec.assertEqWith
+            s
+            "every creature took exactly one -1/-1 counter"
+            (fmap (\oid -> S.counterOf CounterKind.MinusOneMinusOne oid after) [oolId, aliceWall, bobWall, carolWall, snuffersId])
+            [1, 1, 1, 1, 1]
+          Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+        -- The same reading where the subject is GONE by the time the ability
+        -- resolves: Goblin Piker is a 2/1, so its own -1/-1 counter takes it to
+        -- 1/0 and CR 704.5f puts it in bob's graveyard at the very CR 117.5 scan
+        -- that places the trigger. `became` names a dead id there, and the card
+        -- still has to find bob -- which is CR 608.2h's last known information,
+        -- reached through Pawl.Engine.Resolve's PlayerRef.ControllerOfBound.
+        --
+        -- The case above cannot show this: every subject there survives, so a
+        -- reader that answered nothing for a dead id would pass it.
+        Spec.it s "CR 608.2h the subject that died to its own counter still names its controller" $ do
+          ool <- S.printingOf s registry "Auntie Ool, Cursewretch"
+          snuffers <- S.printingOf s registry "Soul Snuffers"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          let (_, g1) = S.addCreature ool S.alice S.threePlayerGame
+              (pikerId, g2) = S.addCreature piker S.bob g1
+              stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g2 [1 .. (5 :: Int)]
+              (_, entered) = S.entersWithTrigger snuffers S.alice stocked
+              after = resolveEverything entered
+          Spec.assertEqWith s "bob lost the life for a Piker that no longer exists" (S.lifeOf S.bob after) (Just 19)
+          Spec.assertEqWith s "carol, who controlled no subject, lost none" (S.lifeOf S.carol after) (Just 20)
+          Spec.assertEqWith s "alice drew for the two subjects that were hers" (S.handSize S.alice after) 2
+          -- The precondition the reading rests on: the Piker really is gone.
+          Spec.assertEqWith s "the Piker left the battlefield" (Game.lookupObject pikerId after) Nothing
+
 -- CR 601.2i's second sentence -- "any abilities that trigger when a spell is
 -- cast or put onto the stack trigger at this time" -- which is the whole trigger
 -- event TriggerCondition.SpellCast matches.
@@ -6184,6 +6284,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   miracleSpec s registry
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
+  auntieOolSpec s registry
   lifeGainTriggerSpec s registry
   abilitiesWhenTriggeredSpec s registry
   lifeGainAmountSpec s registry
