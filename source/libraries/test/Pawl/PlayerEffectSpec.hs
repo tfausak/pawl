@@ -15,9 +15,9 @@
 -- 118.7e-g describes and no card prints. Khabál
 -- Ghoul, Withered Wretch and Sol Ring are the costs the last two are aimed at.
 --
--- Patrician Geist is the reduction side's other axis, added beside those four:
--- CR 601.2a's zone a spell was CAST FROM, which Filter.WasCastFrom reads and no
--- other card here names.
+-- Patrician Geist is the reduction side's zone axis: CR 601.2a's zone a spell was
+-- CAST FROM, which Filter.WasCastFrom reads and which no other card in this
+-- module names.
 --
 -- Blossoming Calm and Synthetic Conditional Silence are the stored carrier's
 -- other two durations (CR 611.2a's "until your next turn", CR 611.2b's "for as
@@ -999,8 +999,9 @@ medallionSpec s registry =
 
 -- alice on `n` untapped Islands with one Think Twice in her graveyard and one in
 -- her hand -- the same card in the two zones the case tells apart, so the boards
--- it compares differ in the zone and in nothing else. `withGeist` adds the
--- Patrician Geist, which is the only other difference any case here makes.
+-- it compares differ in the zone and in nothing else. The Patrician Geist is
+-- added by each case rather than here, so it is the only other difference any
+-- board below carries.
 --
 -- Her library is stocked because Think Twice draws and CR 104.3c would lose her
 -- the game out from under the assertions.

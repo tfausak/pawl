@@ -4736,8 +4736,8 @@ offeredTo pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
 -- disagree (#2363). The two cases below assert the OFFER and the mana TAPPED on
 -- one board for exactly that reason.
 --
--- The first sentence is the effect DSL's road out of the stack into exile: a Pool.Spells target
--- slot feeding Effect.MoveToZone with a zone of Exile. The two nearest things
+-- The first sentence is the effect DSL's road out of the stack into exile: a
+-- Pool.Spells target slot feeding Effect.MoveToZone with a zone of Exile. The two nearest things
 -- data/cards had before it reach neither end of that -- reprieve.json is the
 -- same slot into Hand, and CR 724.1b's Time Stop sweep reaches exile with no
 -- slot and no target. The group is here rather than beside Kellan Joins Up's
@@ -4800,6 +4800,15 @@ avenRemoved printing gs =
           GameState.objects = foldr Map.delete (GameState.objects gs) gone
         }
 
+-- `islands` untapped Islands for bob, one Think Twice in his graveyard and one
+-- in his hand, with alice on Plains she never spends. The Bird is added by the
+-- case rather than here, so the taxed and untaxed boards differ in that
+-- permanent alone, and bob's mana is what separates the offer cases from the
+-- payment ones.
+--
+-- Two seats where the Drannith Magistrate group above wants three: nothing here
+-- tells "your opponents" from "each player", only a taxed zone from an untaxed
+-- one.
 avenTaxBoard ::
   Printing.Printing ->
   Printing.Printing ->
@@ -4966,12 +4975,3 @@ avenInterrupterSpec s registry = Spec.describe s "Aven Interrupter" $ do
     Spec.assertEqWith s "and the sentence names no hand: the {1}{U} cast from bob's hand still taps two with the Bird out" (tappedAfter taxed handId) 2
     Spec.assertBool s (S.castable S.bob shortYardId shortOpen) "the gate agrees with the payment: on four Islands the untaxed flashback is offered"
     Spec.assertBool s (not (S.castable S.bob shortYardId shortTaxed)) "and with the Bird out the same four Islands cannot pay it, so it is not offered"
-
--- Three Islands and one Think Twice in bob's graveyard, one in his hand, with
--- alice on Plains she never spends -- the Bird is added by the case, so the
--- taxed and untaxed boards differ in that permanent alone. `islands` is bob's
--- untapped mana, which is what separates the offer cases from the payment ones.
---
--- Two seats is enough here where Pawl.CastSpec's Drannith Magistrate group
--- wants three: "your opponents" and "each player" are not being told apart,
--- only a taxed zone from an untaxed one.

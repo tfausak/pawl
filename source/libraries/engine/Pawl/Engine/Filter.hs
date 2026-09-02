@@ -2194,10 +2194,10 @@ statesAQuality predicate = case predicate of
   -- names a zone is looking for cards with a stated quality, so CR 701.23b's
   -- shortfall applies rather than CR 701.23d's "must find".
   Filter.IsInZone _ -> True
-  -- CR 400.1 again, for the atom above's reason: naming the zone a card was cast
-  -- from states a quality, so CR 701.23b's shortfall applies. Unreachable from a
-  -- search in practice -- a card in a library was never cast -- and stated rather
-  -- than left to a wildcard because there is no wildcard here.
+  -- CR 601.2a states a quality exactly as the zone atom above does, so CR
+  -- 701.23b's shortfall applies rather than CR 701.23d's "must find". Unreachable
+  -- from a search in practice -- a card sitting in a library was never cast -- and
+  -- stated rather than left to a wildcard because there is no wildcard here.
   Filter.WasCastFrom _ -> True
 
 -- Every slot NAME a Filter carries, as one traversal: `boundSlots` below READS

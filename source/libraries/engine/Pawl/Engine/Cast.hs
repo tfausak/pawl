@@ -938,11 +938,13 @@ restrictionMet pid gs restriction = case restriction of
 -- gate's price and the payment's from diverging -- which they did while the only
 -- reader was Filter.IsInZone, whose answer the move changes (#2363).
 --
--- The object's own ZONE still differs, and no adjustment reads that: Filter.zone
--- says Graveyard at the gate and Stack at the payment, while Projection
--- .viewOfObject applies no zone gate either way -- projectGiven falls through to
--- the full layer fold off the battlefield (see Pawl.Types.Affected's
--- MatchingAnywhere).
+-- The object's own ZONE still differs -- Filter.zone says Graveyard at the gate
+-- and Stack at the payment -- and no card in data/cards reads it from a cost
+-- position, the four that spell IsInZone at all being the CR 601.3 prohibitions
+-- (Grafdigger's Cage, Drannith Magistrate, Lier and Synthetic Entry
+-- Interdiction), which are asked before the move. Projection.viewOfObject applies
+-- no zone gate either way -- projectGiven falls through to the full layer fold
+-- off the battlefield (see Pawl.Types.Affected's MatchingAnywhere).
 --
 -- CR 708.4 rides the same stamp: a cast proposed face down is measured against
 -- the face-down characteristics, and the rule puts that turning-over BEFORE the

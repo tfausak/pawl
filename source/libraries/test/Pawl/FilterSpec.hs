@@ -1426,8 +1426,9 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches self devoidBigCreature (Filter.Type.IsInZone Zone.Hand))) "and so is a view with no zone recorded"
 
   -- CR 601.2a. The gameplay-level proof is Pawl.CastSpec's Aven Interrupter group
-  -- and Pawl.ConjureSpec's Patrician Geist one -- a spell taxed and discounted at
-  -- CR 601.2f by where it was cast from; these cases pin the atom itself.
+  -- and Pawl.PlayerEffectSpec's Patrician Geist one -- a spell taxed and one
+  -- discounted at CR 601.2f by where it was cast from; these cases pin the atom
+  -- itself.
   Spec.describe s "WasCastFrom" $ do
     Spec.it s "matches the zone the candidate was cast from and no other" $ do
       Spec.assertBool s (Filter.matches self castFromGraveyard (Filter.Type.WasCastFrom Zone.Graveyard)) "the view's own cast-from zone"
