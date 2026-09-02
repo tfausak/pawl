@@ -904,6 +904,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
@@ -3292,6 +3293,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.Transformed -> 0
   Filter.Type.HasNonManaActivatedAbility -> 0
   Filter.Type.IsInZone _ -> 0
+  Filter.Type.WasCastFrom _ -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.HasDesignation _ -> 0
 
@@ -4007,6 +4009,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Its watcher-scoped sibling carries one -- Tovolar's "a Wolf or Werewolf you
   -- control", which the card lint must sweep.
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> unframed [f]
+  -- CR 603.2c's batch reading of the same written form carries the same Filter,
+  -- swept the same way for PermanentsDie's reason: answering [] here would exempt
+  -- Pia Nalaar's "artifact creatures you control" from every corpus filter lint.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> unframed [f]
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
@@ -4156,6 +4162,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.SelfIsDealtDamage -> []
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfCycled -> []
@@ -4357,6 +4364,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasCountersOfAnyKind -> []
   Filter.Type.HasNonManaActivatedAbility -> []
   Filter.Type.IsInZone _ -> []
+  Filter.Type.WasCastFrom _ -> []
   Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Or fs -> concatMap filterSlotsReadSingly fs
   Filter.Type.Not f -> filterSlotsReadSingly f

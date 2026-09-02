@@ -51,6 +51,10 @@ data TriggerCondition
   | -- | CR 603.2 / 509-510 read by a bystander: a permanent the Filter admits
     -- dealt combat damage to a player (Tovolar, Dire Overlord).
     PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
+  | -- | CR 603.2c's batch reading of the arm above: "whenever one or more
+    -- artifact creatures you control deal combat damage to a player" (Pia
+    -- Nalaar, Chief Mechanic), once for the whole CR 510.2 step.
+    PermanentsDealCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
   | -- | CR 725.2: a creature dealt combat damage to the monarch. Borne by no
     -- card; matched only via Pawl.Engine.Monarch.inherentMatch.
     CreatureDealtCombatDamageToMonarch

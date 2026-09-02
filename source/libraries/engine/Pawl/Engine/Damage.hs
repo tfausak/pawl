@@ -1424,7 +1424,18 @@ dealCombatDamage = do
       pure False
 
 -- Gather this wave's damage under `assigns` and apply it.
+--
+-- ONE Pawl.Types.EventGroup for the whole wave, which is CR 510.2 in as many
+-- words: "all combat damage that's been assigned is dealt simultaneously". CR
+-- 603.2c's batch conditions are what a board can read that with --
+-- TriggerCondition.PermanentsDealCombatDamageToPlayer fires once for the step
+-- where its per-damager twin fires once per event, and Pawl.Engine.Event's
+-- batchScoped is that fork. The life loss, life gain and counter removals
+-- applyDamage records ride inside the bracket too: CR 120.3's results of the
+-- damage, simultaneous with it. Per WAVE and not per combat: CR 510.4's second
+-- combat damage step is a second step, so a double striker that connects in both
+-- is two occurrences.
 dealWave :: (ObjectId -> Bool) -> Game ()
 dealWave assigns = do
   assignment <- gatherCombatDamage assigns
-  applyDamage assignment
+  Event.simultaneously (applyDamage assignment)

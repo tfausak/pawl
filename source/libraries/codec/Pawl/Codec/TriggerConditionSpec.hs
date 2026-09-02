@@ -94,6 +94,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.ControlledBy PlayerRelation.You))
       " {\"type\":\"PermanentDealsCombatDamageToPlayer\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
+  -- CR 603.2c's batch reading of that same form, carrying the same Filter -- so a
+  -- separate tag is the only thing that keeps Pia Nalaar's once-per-step card and
+  -- Tovolar's once-per-damager card apart on the wire.
+  Spec.it s "PermanentsDealCombatDamageToPlayer round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.And [Filter.HasCardType CardType.Artifact, Filter.ControlledBy PlayerRelation.You]))
+      " {\"type\":\"PermanentsDealCombatDamageToPlayer\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
   -- CR 725.2: a creature dealt combat damage to the monarch.
   Spec.it s "CreatureDealtCombatDamageToMonarch" $
     Common.assertCodec

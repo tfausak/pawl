@@ -15,6 +15,10 @@
 -- 118.7e-g describes and no card prints. Khabál
 -- Ghoul, Withered Wretch and Sol Ring are the costs the last two are aimed at.
 --
+-- Patrician Geist is the reduction side's zone axis: CR 601.2a's zone a spell was
+-- CAST FROM, which Filter.WasCastFrom reads and which no other card in this
+-- module names.
+--
 -- Blossoming Calm and Synthetic Conditional Silence are the stored carrier's
 -- other two durations (CR 611.2a's "until your next turn", CR 611.2b's "for as
 -- long as"), the second synthetic for the reason its own group states.
@@ -994,6 +998,95 @@ medallionSpec s registry =
         (totalManaCost S.alice unsummon (ManaCost.MkManaCost [blue]) gs)
         (Just (ManaCost.MkManaCost [blue]))
       Spec.assertBool s (S.castable S.alice unsummon gs) "so one Island is enough"
+
+-- alice on `n` untapped Islands with one Think Twice in her graveyard and one in
+-- her hand -- the same card in the two zones the case tells apart, so the boards
+-- it compares differ in the zone and in nothing else. The Patrician Geist is
+-- added by each case rather than here, so it is the only other difference any
+-- board below carries.
+--
+-- Her library is stocked because Think Twice draws and CR 104.3c would lose her
+-- the game out from under the assertions.
+geistBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+geistBoard island thinkTwice n =
+  let (yardId, gs1) = S.addGraveyardCard thinkTwice S.alice (S.landsInPlay island n)
+      (handId, gs2) = S.addHandCard thinkTwice S.alice gs1
+      (_, gs3) = S.addLibraryCard island S.alice gs2
+   in ( yardId,
+        handId,
+        gs3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Patrician Geist {2}{U} Creature -- Spirit Knight 2/2 (MID 69): "Flying / Other
+-- Spirits you control get +1/+1. / Spells you cast from your graveyard cost {1}
+-- less to cast." Oracle text verified against Scryfall.
+--
+-- The third sentence is the point: it is the reduction half of the CR 601.2a
+-- cast-from-zone atom Aven Interrupter taxes with (Pawl.CastSpec), spelled
+-- `And [WasCastFrom Graveyard, OwnedBy You]`.
+--
+-- The OwnedBy conjunct is a REGRESSION FENCE rather than a proven behaviour, and
+-- CR 400.3 is what makes it exact: a card in a graveyard is in its owner's, so
+-- "your graveyard" is the spell's owner being the caster. Nothing discriminates
+-- it today -- Pawl.Engine.Cast.zoneCandidates reads a graveyard through
+-- Game.zoneMembers, which is per-player, so no board lets one player cast out of
+-- another's. Dropping the conjunct leaves the suite green.
+--
+-- Think Twice ({1}{U} Instant, "Draw a card." / "Flashback {2}{U}") is the spell,
+-- for the reason Pawl.CastSpec's tax group gives: the two zones it can be cast
+-- from off one board are what make the reduction discriminating.
+patricianGeistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+patricianGeistSpec s registry =
+  Spec.describe s "PatricianGeist" $ do
+    -- MANA TAPPED, not a cost read: #2363's content is that a cost filter over
+    -- the wrong zone leaves Pawl.Engine.Cast.castable and Pawl.Engine.Cast
+    -- .castSpell pricing one cast differently, so the payment is where the
+    -- reduction has to show.
+    Spec.it s "CR 601.2f a flashback cast out of her own graveyard costs {1} less, and her cast from hand does not" $ do
+      island <- S.printingOf s registry "Island"
+      geist <- S.printingOf s registry "Patrician Geist"
+      thinkTwice <- S.printingOf s registry "Think Twice"
+      let (yardId, handId, open) = geistBoard island thinkTwice 5
+          withGeist = snd (S.addCreature geist S.alice open)
+          -- The Geist is itself a permanent alice controls, so only her LANDS
+          -- may be counted: it enters untapped and stays that way.
+          tappedAfter gs oid = S.tappedCount S.alice (S.runPure S.identityAnswer gs (S.cast S.alice oid))
+      Spec.assertEqWith s "CR 702.34a the flashback cost is {2}{U}, so three Islands with no Geist out" (tappedAfter open yardId) 3
+      Spec.assertEqWith s "and two with it, CR 118.7a taking the reduction off the generic component alone" (tappedAfter withGeist yardId) 2
+      Spec.assertEqWith s "the sentence names her graveyard and not her hand: the {1}{U} hand cast taps two either way" (tappedAfter open handId, tappedAfter withGeist handId) (2, 2)
+
+    -- Two Islands is exactly the amount that tells the two prices apart, the
+    -- shape the Medallion's gate case above takes -- and it is the half #2363
+    -- says a wrong reader gets wrong in the opposite direction from the payment.
+    Spec.it s "CR 601.2f the reduction is observable at the castability gate too" $ do
+      island <- S.printingOf s registry "Island"
+      geist <- S.printingOf s registry "Patrician Geist"
+      thinkTwice <- S.printingOf s registry "Think Twice"
+      let (yardId, _, open) = geistBoard island thinkTwice 2
+          withGeist = snd (S.addCreature geist S.alice open)
+      Spec.assertBool s (S.castable S.alice yardId withGeist) "castable for {1}{U} with two Islands"
+      Spec.assertBool s (not (S.castable S.alice yardId open)) "and not for {2}{U} without the Geist"
+
+    -- CR 611.1 / 109.5 again, the Medallion's own negative one zone over: the You
+    -- scope is the effect's controller, so bob's flashback out of bob's graveyard
+    -- pays full price off the same board.
+    Spec.it s "CR 109.5 the You scope does not discount an opponent's cast from their own graveyard" $ do
+      island <- S.printingOf s registry "Island"
+      geist <- S.printingOf s registry "Patrician Geist"
+      thinkTwice <- S.printingOf s registry "Think Twice"
+      let (_, _, open) = geistBoard island thinkTwice 5
+          withGeist = snd (S.addCreature geist S.alice open)
+          (bobYard, seated) = S.addGraveyardCard thinkTwice S.bob (S.landsFor island S.bob 5 withGeist)
+          (_, stocked) = S.addLibraryCard island S.bob seated
+      Spec.assertEqWith
+        s
+        "bob taps three for the same flashback alice would pay two for"
+        (S.tappedCount S.bob (S.runPure S.identityAnswer stocked (S.cast S.bob bobYard)))
+        3
 
 -- Humility {2}{W}{W} Enchantment: "All creatures lose all abilities and have
 -- base power and toughness 1/1." CR 604.2: a static ability's continuous effect
@@ -5649,6 +5742,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   adjustmentSpec s
   thaliaSpec s registry
   medallionSpec s registry
+  patricianGeistSpec s registry
   humilitySpec s registry
   titaniasSongSpec s registry
   edgewalkerSpec s registry

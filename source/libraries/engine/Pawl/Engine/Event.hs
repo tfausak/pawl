@@ -296,9 +296,10 @@ battlefieldCandidates gs =
 -- The group is spent on exit whether or not the body recorded anything, so a
 -- bracket leaves a gap rather than leaking its group to the next event.
 --
--- Not bracketed: CR 510.2's combat damage, CR 701.21's fold over a bound group
--- (#757), token creation and CR 508.1's attacker declaration, so the events each
--- records are read as a sequence (see #441).
+-- Not bracketed: CR 701.21's fold over a bound group (#757), token creation and
+-- CR 508.1's attacker declaration, so the events each records are read as a
+-- sequence (see #441). CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
+-- brackets each combat damage step.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
@@ -786,6 +787,7 @@ mintCard pid under printingId dest position gs =
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
+            Object.castFrom = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -949,6 +951,7 @@ createEmblem pid card = do
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
+            Object.castFrom = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
@@ -5258,6 +5261,7 @@ createTokens controller card copy n tapped entering = do
                     Object.phyrexianLifePaid = 0,
                     Object.manaSpent = Mana.MkMana [],
                     Object.announcedX = Nothing,
+                    Object.castFrom = Nothing,
                     Object.detainedUntil = Set.empty,
                     Object.goadedBy = Set.empty,
                     Object.doesNotUntapNext = False,
@@ -5442,6 +5446,7 @@ meld controller victims resultCard = do
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,
+                Object.castFrom = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
@@ -8346,6 +8351,13 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- is deliberate, not a missing dedup: the arm and the dedup are two halves of one
   -- rule, and matchesTrigger alone is not the whole of it.
   TriggerCondition.PermanentsDie f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentDies f) event
+  -- CR 603.2c's batch reading of PermanentDealsCombatDamageToPlayer (Pia Nalaar,
+  -- Chief Mechanic's "whenever ONE OR MORE artifact creatures you control deal
+  -- combat damage to a player"), delegated for PermanentsDie's reason: which
+  -- damage events this condition admits is the singular arm's answer, filter,
+  -- kind and recipient alike, and firing once for the CR 510.2 step is
+  -- `batchScoped` below plus eventTriggers' dedup, never this arm.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer f) event
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
   -- ZoneChange.departed for that arm's reason (CR 603.10a), against the host id
@@ -11045,6 +11057,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
@@ -11879,6 +11892,14 @@ eventBindingSlots cond = case cond of
   -- card" reads -- the same slot the self-scoped arm above stamps. Guaranteed
   -- given a match: matchesTrigger admits only a player recipient here.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.fromList [Binding.combatDamager, Binding.eventAmount, Binding.triggerPlayer]
+  -- Empty where the arm above binds three, and NECESSARILY so, PermanentsDie's
+  -- reason one event family over: the trigger event is a whole CR 510.2 step,
+  -- which may hold several damagers, amounts and damaged players, and one slot
+  -- cannot name them all. Pia Nalaar, Chief Mechanic's payload names none of
+  -- them. Not implemented: a slot for the damagers' CONTROLLER, which Norn's
+  -- Decree's "that opponent" reads and which IS one seat per step, CR 508.1
+  -- letting only the active player declare attackers (#2930).
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.empty
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.
@@ -11952,8 +11973,10 @@ eventBindingSlots cond = case cond of
   -- Unconditional, as this classification has to be: every
   -- GameEvent.AttackersDeclared carries a PlayerId.
   TriggerCondition.PlayerAttacks _ -> Set.singleton Binding.attackingPlayer
-  -- The arm above's reason verbatim: rule 508.3c's subject is a player and the
-  -- Filter names a SET of creatures, so there is nothing to point at either.
+  -- The creatures are not bound, for the arm above's reason: rule 508.3c's
+  -- Filter names a SET of them. Not implemented: the declaring player, which the
+  -- same GameEvent.AttackersDeclared carries and the arm above stamps as
+  -- Binding.attackingPlayer -- Total War's "that player" reads it (#2937).
   TriggerCondition.PlayerAttacksWith {} -> Set.empty
   -- BOTH of rule 508.3e's players: the attacked one under the reserved "that
   -- player" slot, which Seifer, Balamb Rival's "that player controls" reads, and
@@ -12435,6 +12458,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
@@ -12577,6 +12601,13 @@ batchScoped condition = case condition of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
+  -- A True beside PermanentsDie: CR 510.2 deals every combat damage of a step
+  -- simultaneously, Pawl.Engine.Damage.dealWave brackets the step as one
+  -- Pawl.Types.EventGroup, and "one or more artifact creatures ... deal combat
+  -- damage" (Pia Nalaar, Chief Mechanic) names that whole group as its trigger
+  -- event, which occurs once -- where the arm above is CR 603.2c's second
+  -- sentence and fires once per damager.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> True
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
@@ -13783,6 +13814,9 @@ zonesTriggeredFrom cond = case cond of
   -- be the one damaged.
   TriggerCondition.SelfIsDealtDamage -> battlefield
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> battlefield
+  -- The batch reading watches from the battlefield too, and for the arm above's
+  -- reason: its bearer is a bystander.
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> battlefield
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> battlefield
   TriggerCondition.OpponentLostLifeDuringYourTurn -> battlefield
   -- CR 302.6 / 508.1a: only a permanent on the battlefield can be declared as an
@@ -14053,6 +14087,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
+  TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
@@ -14272,6 +14307,7 @@ stateTriggers gs
               TriggerCondition.SelfDealsCombatDamageToPlayer -> False
               TriggerCondition.SelfIsDealtDamage -> False
               TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
+              TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
               TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
               TriggerCondition.OpponentLostLifeDuringYourTurn -> False
               TriggerCondition.SelfAttacks _ -> False

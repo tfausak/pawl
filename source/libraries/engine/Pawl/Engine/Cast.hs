@@ -506,6 +506,21 @@ stampBestowed sid gs =
         Map.adjust (\o -> o {Object.bestowed = True}) sid (GameState.objects gs)
     }
 
+-- CR 601.2a: record on the spell the zone it was moved to the stack from, which
+-- CR 400.7 otherwise leaves it no memory of. `asProposed` wrote the same value
+-- onto the card before the move, for the gate; this is the write CR 601.2f's
+-- pricing and every later reader see (Filter.WasCastFrom).
+--
+-- stampBestowed's shape above: an idempotent write of a field no layer computes.
+-- Nothing means the id was unknown before the move, and a cast whose origin
+-- nothing recorded taxes and discounts nobody.
+stampCastFrom :: ObjectId -> Maybe Zone.Zone -> GameState -> GameState
+stampCastFrom sid castFrom gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.castFrom = castFrom}) sid (GameState.objects gs)
+    }
+
 -- CR 702.103a: was this the bestow candidate? Asked of the keyword that offered
 -- the cost CR 601.2b's announcement settled on (Cast.castProposed's `castFor`),
 -- which is the record Pawl.Types.CandidateCost exists to keep.
@@ -920,11 +935,21 @@ restrictionMet pid gs restriction = case restriction of
 -- object is minted (CR 400.7), no CR 616.1 replacement loop runs, and nothing
 -- prompts.
 --
--- What the offer's state and the real stack incarnation still differ in is the
--- object's ZONE, and no cost adjustment reads one: Pawl.Engine.Filter's View
--- carries no zone axis, and Projection.viewOfObject applies no zone gate --
--- projectGiven falls through to the full layer fold off the battlefield (see
--- Pawl.Types.Affected's MatchingAnywhere).
+-- CR 601.2a's move is what the offer's state and the real stack incarnation still
+-- differ in, so the zone the cast comes FROM is written here as well: this is the
+-- last moment it can be read off the card, and a cost adjustment does read it
+-- (Filter.WasCastFrom, Aven Interrupter). `stampCastFrom` writes the same value
+-- onto the incarnation the move mints, and the two agreeing is what keeps the
+-- gate's price and the payment's from diverging -- which they did while the only
+-- reader was Filter.IsInZone, whose answer the move changes (#2363).
+--
+-- The object's own ZONE still differs -- Filter.zone says Graveyard at the gate
+-- and Stack at the payment -- and no card in data/cards reads it from a cost
+-- position, the four that spell IsInZone at all being the CR 601.3 prohibitions
+-- (Grafdigger's Cage, Drannith Magistrate, Lier and Synthetic Entry
+-- Interdiction), which are asked before the move. Projection.viewOfObject applies
+-- no zone gate either way -- projectGiven falls through to the full layer fold
+-- off the battlefield (see Pawl.Types.Affected's MatchingAnywhere).
 --
 -- CR 708.4 rides the same stamp: a cast proposed face down is measured against
 -- the face-down characteristics, and the rule puts that turning-over BEFORE the
@@ -934,7 +959,7 @@ restrictionMet pid gs restriction = case restriction of
 -- ordinary proposal passes.
 asProposed :: ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> GameState
 asProposed oid name facing gs =
-  gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name, Object.facing = facing}) oid (GameState.objects gs)}
+  gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name, Object.facing = facing, Object.castFrom = Just (Object.zone o)}) oid (GameState.objects gs)}
 
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least
@@ -1466,6 +1491,12 @@ castSpellWith applied pid oid name facing = do
           -- spell rather than the card. CR 601.2e's rejection puts `before` back,
           -- which puts the old name back with it.
           State.modify' (followIntoSpell (Game.lookupObject oid before >>= Object.playableFromExile) oid sid)
+          -- CR 601.2a, carried across the move that forgets it (CR 400.7) and
+          -- BEFORE castProposed, which prices the spell at CR 601.2f: the tax
+          -- Aven Interrupter puts on a spell cast from a graveyard is read off
+          -- this field, and the gate above priced the same cast off the copy
+          -- `asProposed` stamped.
+          State.modify' (stampCastFrom sid castFrom)
           castProposed spending pid sid face castFrom keywordsBefore candidates before
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
