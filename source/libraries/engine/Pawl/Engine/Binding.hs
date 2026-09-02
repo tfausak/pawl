@@ -200,6 +200,12 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- names, and Pawl.Engine.Resolve never learns which condition placed the ability
 -- it is reading a slot for.
 --
+-- CR 122.1's counter placement is the same shape and the same slot -- Auntie
+-- Ool, Cursewretch's "that creature" -- a marker going onto a permanent being no
+-- zone change either. It differs from the face-up pair in one way: CR 704.5f can
+-- have killed the subject before the CR 117.5 boundary, so the id here is dead
+-- as often as a departure's is.
+--
 -- A FOURTH, and the one case where the id does not come off the triggering event
 -- at all: CR 400.7f's "the new object that each Aura enchanting that permanent
 -- became in its owner's graveyard", where the event is the HOST's death and this
