@@ -84,6 +84,7 @@ import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.CoinFaceSpec
 import qualified Pawl.Codec.CoinFlippedSpec
+import qualified Pawl.Codec.CoinReadingSpec
 import qualified Pawl.Codec.ColorSpec
 import qualified Pawl.Codec.CombatRestrictionSpec
 import qualified Pawl.Codec.CombatSpec
@@ -650,6 +651,7 @@ spec s registry = do
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
   Pawl.Codec.CoinFaceSpec.spec s
+  Pawl.Codec.CoinReadingSpec.spec s
   Pawl.Codec.CoinFlippedSpec.spec s
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s

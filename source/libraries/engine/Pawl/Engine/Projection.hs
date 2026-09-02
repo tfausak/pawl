@@ -94,6 +94,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -2482,7 +2483,9 @@ rewriteEffect pairs effect = case effect of
   -- CR 706.1's number of sides is a numeral rather than a computed count; the
   -- modifier added to the result is the Quantity, PutCounters' descent above.
   Effect.RollDie x -> Effect.RollDie x {RollDie.modifier = fmap (rewriteQuantity pairs) (RollDie.modifier x)}
-  Effect.FlipCoin {} -> effect
+  -- The number of coins is the Quantity, PutCounters' descent above; the reading
+  -- and the slot name no word rule 612 can swap.
+  Effect.FlipCoin x -> Effect.FlipCoin x {FlipCoin.count = rewriteQuantity pairs (FlipCoin.count x)}
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
@@ -4022,13 +4025,30 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- and a spell whose type line the effect has not reached is one CR 601.2c would
 -- have judged as a creature spell.
 --
+-- AND THE ZONES A CAST IS PROPOSED FROM (Pawl.Engine.Cast.castZones), which is CR
+-- 702.103d: "when casting a spell bestowed, only its characteristics as modified
+-- by the bestow ability are evaluated to determine if it can be cast". That gate
+-- runs one step ahead of rule 601.2a's move, on the card where it lies, so
+-- Pawl.Engine.Cast.proposedFor stamps a candidate-local copy of the board there
+-- and this walk is what makes the stamp visible. The library is absent because
+-- nothing can cast from it (#2360).
+--
+-- A card in one of those zones takes its OWN timestamp here, where the stack
+-- incarnation takes the new and later one CR 613.7d gives it at the move. The two
+-- orders differ only against another layer-4 card-type effect reaching a card
+-- outside the battlefield, which no gate in the engine and no assertion in the
+-- suite distinguishes.
+--
 -- CR 613.7a: rule 702.103a makes bestow a STATIC ability, so the effect it
 -- generates takes the timestamp of the object that ability is on -- and takes a
 -- new one when that object does, which is what CR 608.3c's move gives the
 -- permanent. So Object.timestamp is the reading the rule asks for rather than a
 -- convenience, and designationGathered below reads it for the same reason.
 bestowGathered :: GameState -> [Gathered]
-bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) <> GameState.stack gs)
+bestowGathered gs =
+  concatMap fromObject (Set.toList (GameState.battlefield gs) <> GameState.stack gs <> Set.toList (GameState.exile gs) <> Set.toList (GameState.command gs))
+    <> foldZoneCards GameState.hand fromObject gs
+    <> foldZoneCards GameState.graveyard fromObject gs
   where
     fromObject oid = case Game.lookupObject oid gs of
       Just obj
@@ -4057,6 +4077,12 @@ bestowGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs) 
 -- The card need not carry bestow and this asks nothing about whether the cost is
 -- payable: the caller owns both questions, this one only says what the choice
 -- would do.
+--
+-- The OTHER route to the same three modifications is the stamp -- Object.bestowed
+-- through bestowGathered above, which Pawl.Engine.Cast.proposedFor writes onto a
+-- candidate-local copy of the board for CR 702.103d's gate. That one is available
+-- only where a candidate has been named; this one is not, which is the whole of
+-- why both exist.
 --
 -- Applied ON TOP of the finished projection rather than inside CR 613's fold,
 -- which is timestamp order rather than a shortcut past it: rule 702.103b's effect

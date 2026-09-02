@@ -3,10 +3,11 @@
 --
 -- Its own module rather than a function in Pawl.Engine.Resolve, because there are
 -- two writers and neither can hold the funnel: Resolve's Effect.FlipCoin arm is
--- CR 705.2's win/lose flip (Winter Sky), and Pawl.Engine.Event's
--- EntryRewrite.ChoiceByCoinFlip arm is CR 705.2's first-sentence one (Molten
--- Sentry), which is an entry replacement and so cannot live in Resolve. One
--- road is what keeps rule 705.3 from having to be written twice.
+-- CR 705's flip as an EFFECT, either of rule 705.2's two kinds (Winter Sky,
+-- Odds), and Pawl.Engine.Event's EntryRewrite.ChoiceByCoinFlip arm is the flip
+-- made as a permanent enters (Molten Sentry), which is an entry replacement and
+-- so cannot live in Resolve. One road is what keeps rule 705.3 from having to be
+-- written twice.
 --
 -- Rule 705.2's COMPARISON is not here: matching the call against the face
 -- belongs to the effect that asked for a call. This module answers only the two
@@ -30,8 +31,26 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.StatedFlip as StatedFlip
 
--- | CR 705.1's flip, asked of the INTERPRETER: nobody decides how a coin lands,
--- so this goes through Game.ask and never Game.choose.
+-- | The CR 705.3 statements in force for one INSTRUCTION's worth of flips, read
+-- once before any of its coins is flipped.
+--
+-- Read once and not per coin, because Edgar, King of Figaro's "the first time
+-- you flip one or more coins each turn" is spent on the first INSTRUCTION rather
+-- than on the first flip: its ruling says such an ability "modifies that set of
+-- flips" when an effect tells you to flip multiple coins at once. Proved by
+-- Pawl.CoinSpec's "CR 705.3 a statement spent on an instruction reaches every
+-- coin of it".
+--
+-- Takes a Maybe seat because the entry road's flipper comes from
+-- Projection.controllerOf, which is a Maybe. No seat means no statement can
+-- apply -- rule 705.3's statements are all about a particular player.
+statementsFor :: Maybe PlayerId -> Game [StatedFlip.StatedFlip]
+statementsFor mFlipper = do
+  gs <- State.get
+  pure (foldMap (\pid -> statedFor pid gs) mFlipper)
+
+-- | CR 705.1's flip of ONE coin, asked of the INTERPRETER: nobody decides how a
+-- coin lands, so this goes through Game.ask and never Game.choose.
 --
 -- Answers what CR 705.3 lets an effect state about the flip: the face to use --
 -- the actual one when no effect states another -- and whether the flipper is
@@ -44,27 +63,22 @@ import qualified Pawl.Types.StatedFlip as StatedFlip
 -- says to ignore the actual result, not to skip the flip, and an interpreter
 -- replaying a transcript must be asked the same questions either way.
 --
--- Takes a Maybe seat because the entry road's flipper comes from
--- Projection.controllerOf, which is a Maybe. No seat means no statement can
--- apply -- rule 705.3's statements are all about a particular player.
---
 -- Not implemented: CR 614's replacement over the flip, which Krark's Thumb wants
 -- (#2253). The fence is HERE and not in a caller: this is the one road, so a
 -- replacement is wired in once, and a fence sitting in Pawl.Engine.Resolve's
 -- Effect.FlipCoin arm alone read as though the entry road were replaceable.
-flipCoin :: Maybe PlayerId -> Game (CoinFace.CoinFace, Bool)
-flipCoin mFlipper = do
-  gs <- State.get
+flipOne :: [StatedFlip.StatedFlip] -> Game (CoinFace.CoinFace, Bool)
+flipOne stated = do
   actual <- Game.ask Prompt.FlipCoin
-  let stated = foldMap (\pid -> statedFor pid gs) mFlipper
   pure (Maybe.fromMaybe actual (statedFace stated), any StatedFlip.wins stated)
 
--- | The CR 705.3 statements that apply to a flip `pid` is about to make: every
--- statement in force, less the ones Edgar's "the FIRST time you flip one or more
--- coins each turn" has already been spent on.
+-- | The CR 705.3 statements that apply to the flips `pid` is about to make:
+-- every statement in force, less the ones Edgar's "the FIRST time you flip one
+-- or more coins each turn" has already been spent on.
 --
--- Read BEFORE the flip is recorded, which is what makes the count below the
--- flips that came earlier in the turn rather than this one.
+-- Read BEFORE any of the instruction's flips is recorded, which is what makes
+-- the count below the flips that came earlier in the turn rather than the ones
+-- this instruction is about to make.
 statedFor :: PlayerId -> GameState -> [StatedFlip.StatedFlip]
 statedFor pid gs =
   let spent = flipsThisTurn pid gs > 0
