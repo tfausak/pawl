@@ -1,10 +1,12 @@
 module Pawl.Types.Clause where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Sequence as Seq
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
 
 -- | CR 608.2e's own unit: one of the "multiple steps or actions, denoted by
@@ -39,6 +41,13 @@ data Clause card ability = MkClause
     -- Pawl.Types.PayGate.offeredAt already names, and why it is read against the
     -- clauses of THIS mode instance (CR 700.2d).
     --
+    -- NAMES SEVERAL, satisfied by ANY of them: Worms of the Earth's "if a
+    -- player does either, destroy this enchantment" hangs one destruction off
+    -- both halves of an `orElse` pair, and the sentence prints one destruction
+    -- however many players took either branch. A NonEmpty INSIDE the Maybe and
+    -- not a collection alone, because the Maybe is already the unmarked case and
+    -- an empty one would be a second spelling of it.
+    --
     -- Keyed on the ANSWER the named clause's own riders produced -- did its
     -- instructions run -- and never on the board afterwards, which is PayGate's
     -- posture (CR 118.12's "regardless of what events actually occurred")
@@ -61,7 +70,7 @@ data Clause card ability = MkClause
     -- STATE, with customers outliving the resolution -- a "for as long as"
     -- duration, a static ability's "as long as" -- where a clause ordinal names
     -- nothing.
-    ifTaken :: Maybe ClauseIndex.ClauseIndex,
+    ifTaken :: Maybe (NonEmpty.NonEmpty ClauseIndex.ClauseIndex),
     -- | CR 701.46a's "if this permanent has no +1/+1 counters on it" -- a gate on
     -- THIS clause's effects rather than on the whole ability, which is why the
     -- rider rides the same carrier CR 603.5's "may" does. CR 701.37a's
@@ -95,6 +104,11 @@ data Clause card ability = MkClause
     -- prints no list and no "choose one", so a Pawl.Types.Modal payload would
     -- announce this choice a whole cast too early.
     --
+    -- The payload also says WHO announces the branch (Pawl.Types.OrElse), which
+    -- is not always the resolving controller: Worms of the Earth's "any player
+    -- may sacrifice two lands of their choice or have this enchantment deal 5
+    -- damage to that player" asks the whole table.
+    --
     -- Named by CR 608.2e's ordinal, the way `ifTaken` names one, and for that
     -- rider's reason: a branch carrying its own effect list would have to sit
     -- inside a Pawl.Types.Effect, which is first-order and non-recursive by
@@ -104,7 +118,7 @@ data Clause card ability = MkClause
     -- cardBranchesAreAsymmetric is what holds the corpus to it.
     --
     -- Binary rather than n-ary because nothing in print offers three branches
-    -- this way; widening means a Set here and a longer offer in
+    -- this way; widening means a Set in Pawl.Types.OrElse and a longer offer in
     -- Pawl.Types.Prompt.ChooseClause, and no change to where the question is
     -- asked.
     --
@@ -113,7 +127,7 @@ data Clause card ability = MkClause
     -- either-or, and Keys to the House's "lock or unlock a door of target Room
     -- you control" is an either-or with no "may" -- the pool's one mandatory
     -- branch pair, proved at Pawl.RoomSpec's CR 709.5g case.
-    orElse :: Maybe ClauseIndex.ClauseIndex,
+    orElse :: Maybe OrElse.OrElse,
     -- | CR 603.5's printed "may", covering this clause's effects, and WHO it
     -- asks -- see Pawl.Types.Optionality for why the rider rides a carrier
     -- rather than wrapping each effect and why the asker rides the rider, and

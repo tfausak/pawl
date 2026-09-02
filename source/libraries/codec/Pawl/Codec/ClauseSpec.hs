@@ -1,5 +1,6 @@
 module Pawl.Codec.ClauseSpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Clause as Clause
@@ -20,6 +21,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
@@ -48,10 +50,11 @@ toJson = Codec.encode codec
 fromJson :: Value.Value -> Either Text.Text (Clause.Clause Text.Text Text.Text)
 fromJson = Codec.decode codec
 
--- One constructor, so seven cases: a populated clause, CR 603.5's `optionality`
+-- One constructor, so eight cases: a populated clause, CR 603.5's `optionality`
 -- flag when present, CR 118.12's `payGate` when present, CR 701.46a's
--- `condition` gate when present, CR 608.2c's `ifTaken` when present, CR 608.2d's
--- `orElse` branch when present, and every field defaulted at once.
+-- `condition` gate when present, CR 608.2c's `ifTaken` naming one clause and
+-- naming two, CR 608.2d's `orElse` branch when present, and every field
+-- defaulted at once.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Clause" $ do
   Spec.it s "MkClause with one effect" $
@@ -77,8 +80,18 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause (Just (ClauseIndex.MkClauseIndex 1)) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
-      " {\"ifTaken\":1} "
+      (Clause.MkClause (Just (pure (ClauseIndex.MkClauseIndex 1))) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
+      " {\"ifTaken\":[1]} "
+  -- CR 608.2d / 608.2c: Worms of the Earth's "if a player does either" hangs one
+  -- clause off both halves of an either-or pair, so the key holds every ordinal
+  -- it names.
+  Spec.it s "a clause hanging off either of two writes both ordinals" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Clause.MkClause (Just (ClauseIndex.MkClauseIndex 0 NonEmpty.:| [ClauseIndex.MkClauseIndex 1])) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
+      " {\"ifTaken\":[0,1]} "
   -- CR 608.2d: Twiddle's tap names the untap it is exclusive with, and the key is
   -- emitted only when there is one. A DIFFERENT key from ifTaken, though both
   -- hold a bare ordinal: one clause may hang off an earlier one and branch
@@ -88,8 +101,8 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause Nothing Nothing (Just (ClauseIndex.MkClauseIndex 1)) Optionality.Mandatory Nothing Seq.empty)
-      " {\"orElse\":1} "
+      (Clause.MkClause Nothing Nothing (Just (OrElse.MkOrElse (ClauseIndex.MkClauseIndex 1) (PlayerRef.Relative PlayerRelation.You))) Optionality.Mandatory Nothing Seq.empty)
+      " {\"orElse\":{\"sibling\":1}} "
   -- CR 118.12a: Mana Leak's "unless its controller pays {3}" is what the
   -- payGate key encodes, and it is emitted only when there is one.
   Spec.it s "a clause carrying a resolution cost writes the key" $
