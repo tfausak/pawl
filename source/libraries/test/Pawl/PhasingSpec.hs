@@ -586,6 +586,10 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
   -- Labelled separately because the split changes who CR 702.26a's "that player"
   -- is: bob controls the permanent with phasing, so it is bob's untap step that
   -- moves anything at all here.
+  --
+  -- The two rows here store DIFFERENT players, which is what lets rule 702.26a's
+  -- schedule and rule 702.26g's ride-along disagree at all, and why the CR 702.26h
+  -- case below defers to this one for the return schedules.
   Spec.it s "CR 702.26g an indirectly phased-out Aura does not phase in on its own controller's schedule" $ do
     crocodile <- S.printingOf s registry "Sandbar Crocodile"
     pacifism <- S.printingOf s registry "Pacifism"
@@ -594,10 +598,14 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
         alices = untapStep S.alice gone
         bobs = untapStep S.bob alices
     Spec.assertEqWith s "bob's untap step took both" (fmap (`onBattlefield` gone) [crocId, auraId]) [False, False]
-    Spec.assertEqWith s "the Aura phased out under alice, who controls it" (Phasing.phasedOutStatus auraId gone) (Just (PhasedOut.Indirectly S.alice))
+    -- The SCHEDULE assertions come before the row one, and the order is the
+    -- point: a sweep that wrote a direct row for the Aura is a phase-in defect,
+    -- so it has to be a phase-in assertion that falls. With the row read first,
+    -- the row assertion absorbed the mutation and the schedule went unproved.
     Spec.assertEqWith s "alice's untap step brings back neither" (fmap (`onBattlefield` alices) [crocId, auraId]) [False, False]
     Spec.assertEqWith s "and bob's brings back both" (fmap (`onBattlefield` bobs) [crocId, auraId]) [True, True]
     Spec.assertEqWith s "with the Aura still on the Crocodile" (attachedHostOf auraId bobs) (Just (Recipient.ToCreature crocId))
+    Spec.assertEqWith s "the Aura phased out under alice, who controls it" (Phasing.phasedOutStatus auraId gone) (Just (PhasedOut.Indirectly S.alice))
   -- CR 702.26j: "abilities that trigger when a permanent becomes attached or
   -- unattached from an object or player don't trigger when that permanent phases
   -- in or out." Asserted as the stronger fact that the phasing event appends
@@ -1016,8 +1024,12 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
   -- is why: rule 702.26a phases a direct row back at its own stored player's untap
   -- step while an indirect row rides its host back, and Clever Concealment's "you
   -- control" makes both rows store alice and both hosts alice's, so the two
-  -- readings return together on every board it can build. Separating them needs a
-  -- phase-out spanning two controllers' attached permanents (gap #1822).
+  -- readings return together on every board it can build. The Indirect group's
+  -- "CR 702.26g an indirectly phased-out Aura does not phase in on its own
+  -- controller's schedule" is what proves them apart instead -- alice's Pacifism
+  -- on BOB's Crocodile, where the two rows store different players -- and its
+  -- "alice's untap step brings back neither" is the assertion that falls if an
+  -- indirect row is ever put on rule 702.26a's schedule.
   Spec.it s "CR 702.26h an object named AND dragged phases out indirectly" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
