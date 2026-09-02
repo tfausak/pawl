@@ -169,7 +169,7 @@ discardTriggerSpec s registry =
           (_, withAlicesCard) = S.addHandCard piker S.alice base
           (_, gs0) = S.addHandCard piker S.bob withAlicesCard
           gs = gs0 {GameState.priority = Just S.alice}
-          discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution pid S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
+          discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution Map.empty pid S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
           byAlice = discardBy S.alice
           byBob = discardBy S.bob
           settle g = S.runPure S.identityAnswer g Engine.priorityLoop
@@ -290,7 +290,7 @@ cyclesTriggerSpec s registry =
       let (marmosetId, _, gs) = marmosetBoard marmoset mauler forest piker S.alice
           -- The Mauler is the only card in alice's hand, so CR 701.9b has
           -- nothing to ask and the same card leaves by the other door.
-          discarded = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
+          discarded = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
           placed = S.runPure S.identityAnswer discarded Engine.settleForPriority
       Spec.assertEqWith s "the Mauler really did reach alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice discarded)) 1
       Spec.assertEqWith s "nothing was put on the stack" (GameState.stack placed) []
@@ -304,7 +304,7 @@ foodTokenName = CardName.MkCardName (Text.pack "Food Token")
 -- CR 601.2f's discard-as-a-cost, the door every non-cycling discard in the pool
 -- goes through, asked for one card with no criterion.
 discardOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-discardOne answer gs = S.runPure answer gs (Cost.payComponent PaymentMoment.OutsideResolution S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
+discardOne answer gs = S.runPure answer gs (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
 
 -- Which of alice's cards CR 701.9b's choice discards, PINNED -- and filtered out
 -- of the set the prompt offered rather than built, so a mutation cannot be
@@ -2006,7 +2006,7 @@ lifeGainAmountSpec s registry =
           Spec.assertEqWith
             s
             "thatMuch is the gain and thatPlayer is the gainer"
-            (Event.eventBindings Nothing (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 7)))
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 7)))
             (Binding.setTriggerPlayer S.bob (Map.singleton Binding.eventAmount (Binding.toAmount 7)))
 
 -- CR 119.9's event read for its PLAYER, which neither group above can ask for:
@@ -2513,6 +2513,75 @@ communalVigilSpec s registry =
           Spec.assertEqWith s "she held one after the first" (S.handSize S.alice after) 1
           Spec.assertEqWith s "every seat is 8 up over the two batches" (fmap (\pid -> S.lifeOf pid again) [S.alice, S.bob, S.carol]) [Just 28, Just 28, Just 28]
           Spec.assertEqWith s "and the second batch was one event group" (length (List.nub (gainsIn again))) 1
+
+-- CR 702.15e against the CR 510.2 bracket: two lifelink attackers connecting in
+-- one combat damage step deal ONE damage event and cause TWO life gain events,
+-- so a batch reader of the gains fires twice in the same step where a batch
+-- reader of the damage fires once. Pawl.Engine.Damage.dealWave brackets the
+-- wave as one Pawl.Types.EventGroup, and Pawl.Engine.Damage.recordLifelinkGains
+-- lands the gains AFTER the bracket closes, one group apiece; a bracket wide
+-- enough to take the gains in fused them, which is what the step read as for a
+-- while (related to #2814).
+--
+-- Synthetic Communal Vigil is the batch reader, and communalVigilSpec above says
+-- why a synthetic. Child of Night {1}{B} Creature -- Vampire 2/1, lifelink, is
+-- the source, twice over. Every life total is the same under either reading, so
+-- what the cases read is how many CARDS the Vigil drew. Ajani's Pridemate stands
+-- beside it as the per-occurrence control: "whenever you gain life" is CR 119.9's
+-- per-source reading and takes a counter per gain under either grouping.
+lifelinkGainEventsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lifelinkGainEventsSpec s registry =
+  let groupsOf pick gs =
+        Maybe.mapMaybe
+          (\logged -> if pick (LoggedEvent.event logged) then Just (LoggedEvent.group logged) else Nothing)
+          (Foldable.toList (GameState.events gs))
+      gainGroups =
+        groupsOf
+          ( \event -> case event of
+              GameEvent.LifeGained _ -> True
+              _ -> False
+          )
+      combatDamageGroups =
+        groupsOf
+          ( \event -> case event of
+              GameEvent.DamageDealt ev -> DamageEvent.kind ev == DamageKind.Combat
+              _ -> False
+          )
+      -- alice attacks with `mine` into an empty board, the Vigil and the
+      -- Pridemate out and six Plains in her library, so the Vigil can draw for
+      -- every reading without CR 104.3c deciding a case for it. The Pridemate
+      -- attacks too under S.aggressiveAnswer and has no lifelink, so it adds two
+      -- to bob's loss and nothing to the gains.
+      board mine = do
+        ours <- mapM (S.printingOf s registry) mine
+        plains <- S.printingOf s registry "Plains"
+        vigil <- S.printingOf s registry "Synthetic Communal Vigil"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        let (gs, _, _) = S.combatBoardOf ours []
+            stocked = foldr (\_ g -> snd (S.addLibraryCard plains S.alice g)) gs [1 .. 6 :: Int]
+            withVigil = snd (S.addCreature vigil S.alice stocked)
+            (mate, staged) = S.addCreature pridemate S.alice withVigil
+        pure (mate, S.runCombat S.aggressiveAnswer staged)
+   in Spec.describe s "CR 702.15e lifelink gains beside the combat damage bracket" $ do
+        -- The proving case: two lifelink sources connect at once, and the Vigil
+        -- draws TWO -- 1 is the fused reading, 0 is silence.
+        Spec.it s "CR 702.15e two lifelink attackers connecting at once are two life gain events" $ do
+          (mate, after) <- board ["Child of Night", "Child of Night"]
+          Spec.assertEqWith s "the Vigil drew once per lifelink source" (S.handSize S.alice after) 2
+          Spec.assertEqWith s "alice gained 2 twice" (S.lifeOf S.alice after) (Just 24)
+          Spec.assertEqWith s "bob took all three attackers" (S.lifeOf S.bob after) (Just 14)
+          Spec.assertEqWith s "CR 702.15e: two gains, two event groups" (length (gainGroups after), length (List.nub (gainGroups after))) (2, 2)
+          Spec.assertEqWith s "CR 510.2: the three damage events stayed one event group" (length (List.nub (combatDamageGroups after))) 1
+          Spec.assertEqWith s "and the Pridemate took a counter per gain" (S.counterOf CounterKind.PlusOnePlusOne mate after) 2
+        -- The board that differs in one lifelink source: one gain is one event
+        -- under either reading, so this is the floor rather than a discrimination.
+        Spec.it s "CR 119.9 one lifelink attacker connecting is one life gain event" $ do
+          (mate, after) <- board ["Child of Night"]
+          Spec.assertEqWith s "the Vigil drew once" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "alice gained 2" (S.lifeOf S.alice after) (Just 22)
+          Spec.assertEqWith s "bob took both attackers" (S.lifeOf S.bob after) (Just 16)
+          Spec.assertEqWith s "one gain, one group" (length (gainGroups after), length (List.nub (gainGroups after))) (1, 1)
+          Spec.assertEqWith s "and the Pridemate took one counter" (S.counterOf CounterKind.PlusOnePlusOne mate after) 1
 
 -- CR 603.2c's FIRST sentence on the CR 603.7 DELAYED path, which the two groups
 -- above cannot reach between them: Synthetic Communal Vigil proves the batch
@@ -3119,7 +3188,7 @@ lifeLossTriggerSpec s registry =
           Spec.assertEqWith
             s
             "thatMuch is the loss and thatPlayer is who lost it"
-            (Event.eventBindings Nothing (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 7)))
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 7)))
             (Map.fromList [(Binding.eventAmount, Binding.toAmount 7), (Binding.triggerPlayer, Binding.toPlayer S.bob)])
         -- The loser is bound under the OTHER relation too, and that is a claim
         -- about the event rather than about the relation: CR 603.2's environment
@@ -3130,7 +3199,7 @@ lifeLossTriggerSpec s registry =
           Spec.assertEqWith
             s
             "thatPlayer names the loser whichever relation matched"
-            (Event.eventBindings Nothing (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost (LifeChange.MkLifeChange S.alice 3)))
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost (LifeChange.MkLifeChange S.alice 3)))
             (Map.fromList [(Binding.eventAmount, Binding.toAmount 3), (Binding.triggerPlayer, Binding.toPlayer S.alice)])
 
 -- CR 603.2's other half of a life-loss event: the PLAYER it named, not only the
@@ -6054,6 +6123,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   singularCureSpec s registry
   apnapDelayedSpec s registry
   communalVigilSpec s registry
+  lifelinkGainEventsSpec s registry
   forthEorlingasSpec s registry
   communalRelapseSpec s registry
   enrageSpec s registry

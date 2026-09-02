@@ -21,7 +21,8 @@ spec s = Spec.describe s "Pawl.Codec.FlipCoin" $ do
       FlipCoin.MkFlipCoin
         { FlipCoin.count = Quantity.Literal 1,
           FlipCoin.reading = CoinReading.Wins,
-          FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip")
+          FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip"),
+          FlipCoin.misses = Nothing
         }
       " {\"slot\":\"flip\"} "
   Spec.it s "several coins read for their faces" $
@@ -31,7 +32,20 @@ spec s = Spec.describe s "Pawl.Codec.FlipCoin" $ do
       FlipCoin.MkFlipCoin
         { FlipCoin.count = Quantity.Literal 5,
           FlipCoin.reading = CoinReading.Heads,
-          FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip")
+          FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip"),
+          FlipCoin.misses = Nothing
         }
       " {\"count\":{\"type\":\"Literal\",\"value\":5},\"reading\":{\"type\":\"Heads\"},\"slot\":\"flip\"} "
+  -- Both tallies of one instruction (Mutalith Vortex Beast).
+  Spec.it s "a flip read for its wins and its losses" $
+    Common.assertCodec
+      s
+      FlipCoin.codec
+      FlipCoin.MkFlipCoin
+        { FlipCoin.count = Quantity.Literal 1,
+          FlipCoin.reading = CoinReading.Wins,
+          FlipCoin.slot = SlotName.MkSlotName (Text.pack "won"),
+          FlipCoin.misses = Just (SlotName.MkSlotName (Text.pack "lost"))
+        }
+      " {\"misses\":\"lost\",\"slot\":\"won\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s FlipCoin.codec

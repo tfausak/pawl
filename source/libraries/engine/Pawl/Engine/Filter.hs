@@ -816,15 +816,18 @@ data Context = MkContext
     -- clause) and Pawl.Engine.Replacement.candidateContext are the producers --
     -- the last of them off the snapshot ActiveReplacement.slots holds, the
     -- resolution that installed the row being over -- and all four go through
-    -- contextWithSlots below.
+    -- contextWithSlots below. Pawl.Engine.Cost's candidate pools are a fifth
+    -- producer, off the announced stack object's bindings (Cost.announcedSlots):
+    -- CR 601.2c chooses the targets before CR 601.2h pays.
     --
     -- Outside those, contextFor leaves it empty, and every atom that reads it
     -- (IsBound, SameNameAsBound, IsControllerOfBound, ControlledByBound,
     -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
-    -- fold, trigger matching, cost payment, combat declarations, duration expiry
-    -- -- but it was NOT honest of every in-resolution caller: four of them build a
-    -- bare contextFor while a resolution's bindings do exist (#2141), and
+    -- fold, trigger matching, a cost paid with nothing announced, combat
+    -- declarations, duration expiry -- but it was NOT honest of every
+    -- in-resolution caller: four of them build a bare contextFor while a
+    -- resolution's bindings do exist (#2141), and
     -- Pawl.Engine.Projection.freezeQuantities was a fifth until it took its
     -- context from the caller.
     --
@@ -1401,7 +1404,7 @@ matches context view predicate = case predicate of
   -- CR 601.2a off Object.castFrom, which is a STAMP rather than a live read: the
   -- spell it describes has already left the zone named here, so unlike IsInZone
   -- above this atom goes on answering the same way for as long as the spell is on
-  -- the stack -- which is what lets CR 601.2f price it (#2363).
+  -- the stack -- which is what lets CR 601.2f price it; see #2363.
   Filter.WasCastFrom z -> castFrom view == Just z
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:

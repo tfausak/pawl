@@ -299,7 +299,9 @@ battlefieldCandidates gs =
 -- Not bracketed: CR 701.21's fold over a bound group (#757), token creation and
 -- CR 508.1's attacker declaration, so the events each records are read as a
 -- sequence (see #441). CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
--- brackets each combat damage step.
+-- brackets each combat damage step -- the damage and its CR 120.3 results, with
+-- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
+-- each source's gain an event of its own.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
@@ -1924,7 +1926,7 @@ apply batch candidate event =
             -- which is channel 3 of applyReplacementsIn's note and not this
             -- exclusion.
             let entering oid2 = oid2 == oid || Set.member oid2 batch
-                offered = filter (not . entering) (Replacement.sacrificeCandidates controller (Just oid) criterion gs)
+                offered = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
             chosen <-
               -- Where the rules leave nothing to ask, don't prompt: with no
               -- candidate the empty set is the only answer. ONE candidate is
@@ -8636,8 +8638,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
-  -- CR 603.6c's family with the DESTINATION pinned: the arm above's match,
-  -- narrowed to the one zone this condition names. CR 110.1 is what makes the
+  -- CR 603.2c's batch reading of PermanentReturnedToHand (Tameshi, Reality
+  -- Architect's "whenever ONE OR MORE noncreature permanents are returned to
+  -- hand"), delegated for PermanentsDie's reason: which moves this condition
+  -- admits is the arm below's answer, and firing once for the batch is
+  -- `batchScoped` below plus eventTriggers' dedup, never this arm.
+  TriggerCondition.PermanentsReturnedToHand f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentReturnedToHand f) event
+  -- CR 603.6c's family with the DESTINATION pinned: PermanentLeavesTheBattlefield's
+  -- match above, narrowed to the one zone this condition names. CR 110.1 is what makes the
   -- origin implicit -- a permanent is on the battlefield, so "returned to hand"
   -- is battlefield-to-hand and admits no other pair.
   --
@@ -8647,8 +8655,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- hand. Without the look-back "you control" would be asked of a card in a
   -- hand, which CR 108.4 gives no controller.
   --
-  -- CR 603.6c's leaving-the-game form is declined, unlike the arm above: a
-  -- permanent that leaves the game reaches no zone at all, so it is not
+  -- CR 603.6c's leaving-the-game form is declined, unlike PermanentLeavesTheBattlefield's
+  -- arm: a permanent that leaves the game reaches no zone at all, so it is not
   -- returned to anyone's hand.
   TriggerCondition.PermanentReturnedToHand f ->
     let admits departed = case Projection.viewWithLastKnown departed gs departed of
@@ -11102,6 +11110,7 @@ reactsToAbilityTriggering cond = case cond of
   -- The destination-pinned reading of that same form: a zone change is not
   -- another ability triggering either.
   TriggerCondition.PermanentReturnedToHand _ -> False
+  TriggerCondition.PermanentsReturnedToHand _ -> False
   -- CR 702.55b watches a death, not another ability triggering.
   TriggerCondition.HauntedCreatureDies -> False
   -- CR 701.6a's countering is a spell or ability DOING something, not one
@@ -11175,8 +11184,8 @@ reactsToAbilityTriggering cond = case cond of
 -- unioned in at the call site so that eventBindingSlots below stays the single
 -- statement of which slots a condition makes available, which is what the card
 -- lint reads.
-eventBindings :: Maybe ObjectId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
-eventBindings bearerBecame cond event = case (cond, event) of
+eventBindings :: GameState -> Maybe ObjectId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
+eventBindings gs bearerBecame cond event = case (cond, event) of
   -- CR 603.2b's "that player": the active player, on whose turn the step began.
   -- Shizuko, Caller of Autumn's "at the beginning of each player's upkeep, THAT
   -- PLAYER adds {G}{G}{G}" is the reader, and the seat it names is nobody the
@@ -11327,6 +11336,23 @@ eventBindings bearerBecame cond event = case (cond, event) of
   -- three of its events.
   (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.LeftTheGame oid) ->
     Binding.setDepartedPermanent oid Map.empty
+  -- The arm above with the destination pinned to a hand, which CR 400.3 makes
+  -- the OWNER's: Warped Devotion's "whenever a permanent is returned to a
+  -- player's hand, THAT PLAYER discards a card" names the owner, and
+  -- PlayerRef.ControllerOfBound would name the wrong seat for a stolen permanent.
+  -- Read off the arrival (ZoneChange.object) rather than the departed id, which
+  -- CR 400.7 deleted; CR 108.3 keeps the owner the same across the move. The
+  -- lookup is total for a recorded event -- the funnel minted the arrival into
+  -- this state -- so the slot is bound for every match, which is what
+  -- eventBindingSlots' promise rests on; a hand-built event naming no object
+  -- binds the departed id alone.
+  --
+  -- CR 400.7e's `became` is NOT bound: a hand is hidden (CR 400.2), the
+  -- SelfLeavesTheBattlefield arm's guard, here settled by the condition itself.
+  (TriggerCondition.PermanentReturnedToHand _, GameEvent.Moved m) ->
+    let zc = Moved.change m
+        owner = fmap Object.owner (Game.lookupObject (ZoneChange.object zc) gs)
+     in Binding.setDepartedPermanent (ZoneChange.departed zc) (maybe Map.empty (`Binding.setTriggerPlayer` Map.empty) owner)
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
   -- entrant, and what it became is the permanent now on the battlefield --
   -- ZoneChange.object, the field the SelfDies arm reads for the same reason.
@@ -12068,12 +12094,18 @@ eventBindingSlots cond = case cond of
   -- change carries ZoneChange.departed and a departure from the game carries the
   -- id itself -- which is what lets Resourceful Defense read "it".
   TriggerCondition.PermanentLeavesTheBattlefield _ -> Set.singleton Binding.departedPermanent
-  -- Nothing, unlike the arm above, and by decision rather than by oversight:
-  -- no printed payload under this condition points at the returned permanent
-  -- or at the player whose hand it reached, so eventBindings has no arm for it
-  -- at all. Warped Devotion's "that player discards a card" is what would earn
-  -- a slot.
-  TriggerCondition.PermanentReturnedToHand _ -> Set.empty
+  -- CR 603.10a's departed permanent, the arm above's reason, and beside it the
+  -- player whose hand it reached -- CR 400.3's OWNER, which Warped Devotion's
+  -- "that player discards a card" reads. Both guaranteed given a match: the one
+  -- event this condition admits is a zone change, whose arrival is a card in a
+  -- hand with an owner. CR 400.7e's `became` is withheld, the hand being hidden
+  -- (CR 400.2).
+  TriggerCondition.PermanentReturnedToHand _ -> Set.fromList [Binding.departedPermanent, Binding.triggerPlayer]
+  -- Empty where the arm above binds two, and NECESSARILY so, PermanentsDie's
+  -- reason one event family over: the batch may return several permanents to
+  -- several owners' hands, and one slot cannot name them all. Tameshi, Reality
+  -- Architect's payload names none of them.
+  TriggerCondition.PermanentsReturnedToHand _ -> Set.empty
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card: rule 702.55b's
   -- ability speaks about the creature it HAUNTS and never about the card that
   -- creature became, so no printing of haunt names the arrival. eventBindings has
@@ -12395,6 +12427,9 @@ looksBack condition = case condition of
   -- also an ability that triggers when an object all players can see is put
   -- into a hand.
   TriggerCondition.PermanentReturnedToHand _ -> True
+  -- The batch reading is in the same family, PermanentsDie's reason: a bearer
+  -- swept up in its own batch still sees the group-mates returned beside it.
+  TriggerCondition.PermanentsReturnedToHand _ -> True
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
@@ -12575,9 +12610,14 @@ batchScoped condition = case condition of
   TriggerCondition.PermanentsDie _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
-  -- Per-permanent too: CR 603.2c's batch reading of this event is the printed
-  -- "one or more ... are returned", which no condition spells yet (#2682).
+  -- Per-permanent too: Justice, Vance Astrovik's "whenever another nonland
+  -- permanent you control is returned" is CR 603.2c's second sentence.
   TriggerCondition.PermanentReturnedToHand _ -> False
+  -- A True beside PermanentsDie: CR 608.2f's sweep returns every permanent as
+  -- one action, Pawl.Engine.Resolve brackets it as one Pawl.Types.EventGroup,
+  -- and "one or more noncreature permanents are returned to hand" (Tameshi,
+  -- Reality Architect) names that whole group as its trigger event.
+  TriggerCondition.PermanentsReturnedToHand _ -> True
   TriggerCondition.AttachedCreatureDies -> False
   -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
   -- occurrence; no printing of that event says "one or more".
@@ -13494,7 +13534,7 @@ eventTriggers events gs =
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (Map.lookup oid becameInGraveyard) (TriggeredAbility.condition ab) event) Nothing
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) (TriggeredAbility.condition ab) event) Nothing
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -13906,6 +13946,7 @@ zonesTriggeredFrom cond = case cond of
   -- The same answer for the same reason: the bearer is a bystander that never
   -- left the battlefield.
   TriggerCondition.PermanentReturnedToHand _ -> battlefield
+  TriggerCondition.PermanentsReturnedToHand _ -> battlefield
   -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
   -- abilities of cards with haunt that refer to the haunted creature can trigger
   -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
@@ -14140,6 +14181,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   TriggerCondition.PermanentReturnedToHand _ -> False
+  TriggerCondition.PermanentsReturnedToHand _ -> False
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
@@ -14342,6 +14384,7 @@ stateTriggers gs
               TriggerCondition.SelfLeavesTheBattlefield -> False
               TriggerCondition.PermanentLeavesTheBattlefield _ -> False
               TriggerCondition.PermanentReturnedToHand _ -> False
+              TriggerCondition.PermanentsReturnedToHand _ -> False
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False
@@ -14577,7 +14620,7 @@ delayedPending grouped gs =
           -- delayed entry watches, not for a bearer's own departure, and the
           -- entry's captured environment (CR 603.7c) is where what it knows about
           -- its own object comes from.
-          (Map.union (eventBindings Nothing (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
+          (Map.union (eventBindings gs Nothing (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
           -- CR 603.7a: what tells the ability this becomes apart from one its
           -- source simply has, once it is on the stack.
           (Just (DelayedTrigger.createdAt entry))

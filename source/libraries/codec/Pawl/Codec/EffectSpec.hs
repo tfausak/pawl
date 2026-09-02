@@ -1627,7 +1627,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.FlipCoin FlipCoin.MkFlipCoin {FlipCoin.count = Quantity.Literal 1, FlipCoin.reading = CoinReading.Wins, FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip")})
+      (Effect.FlipCoin FlipCoin.MkFlipCoin {FlipCoin.count = Quantity.Literal 1, FlipCoin.reading = CoinReading.Wins, FlipCoin.slot = SlotName.MkSlotName (Text.pack "flip"), FlipCoin.misses = Nothing})
       " {\"type\":\"FlipCoin\",\"value\":{\"slot\":\"flip\"}} "
   Spec.it s "ExileHandThenDraw" $
     Common.assertJsonCodec

@@ -1765,9 +1765,10 @@ boundSlots effect = case effect of
   -- CR 706.4: the number the die came up, for a later effect of this resolution
   -- to read as Quantity.InSlot.
   Effect.RollDie rollDie -> Set.singleton (RollDie.slot rollDie)
-  -- CR 705.2: 1 if the flipping player won the flip and 0 if they lost, for a
-  -- later effect of this resolution to read as Quantity.InSlot.
-  Effect.FlipCoin flipCoin -> Set.singleton (FlipCoin.slot flipCoin)
+  -- CR 705.2: how many of the instruction's flips the flipping player won (or
+  -- how many coins came up heads), and, where the card reads it, how many they
+  -- lost, for a later effect of this resolution to read as Quantity.InSlot.
+  Effect.FlipCoin flipCoin -> Set.singleton (FlipCoin.slot flipCoin) <> foldMap Set.singleton (FlipCoin.misses flipCoin)
   -- Three slots CR 701.8's destruction may define: how many permanents it
   -- ACTUALLY destroyed, for a later "for each ... destroyed this way"; the cards
   -- it put into a graveyard, for a later clause that NAMES them (CR 400.7's
@@ -5123,6 +5124,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- and one instruction's flips are all of them.
     tally <- Foldable.foldlM flipOnce (0 :: Natural) [1 .. coins]
     State.modify' (bindAmountSlot source (FlipCoin.slot flipCoin) tally)
+    -- The flips that did NOT match, off the same coins: CR 705.2's "otherwise,
+    -- the player loses the flip" is the complement of the tally above, so the
+    -- two are bound from one set of flips rather than one being re-derived from
+    -- the count. Pawl.CoinSpec's Mutalith Vortex Beast group proves a lost flip
+    -- reaches the loser and a won one does not.
+    Foldable.for_ (FlipCoin.misses flipCoin) $ \misses ->
+      State.modify' (bindAmountSlot source misses (coins - tally))
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of
@@ -6380,7 +6388,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- Replacement.sacrificeCandidates, which is what puts CR 101.2's
                   -- "can't be sacrificed" on this path: a prohibited permanent is
                   -- never the pick that satisfies the edict.
-                  let candidates = Replacement.sacrificeCandidates victim Nothing filter_ gs
+                  let candidates = Replacement.sacrificeCandidates (Filter.slotObjects context) victim Nothing filter_ gs
                       decider = Decide.deciderFor victim gs
                       -- `n > 0` above, so the clamp never decides anything here.
                       count = Integer.toNaturalSaturating n

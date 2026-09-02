@@ -417,6 +417,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentReturnedToHand (Filter.And [Filter.Not Filter.IsSource, Filter.ControlledBy PlayerRelation.You]))
       " {\"type\":\"PermanentReturnedToHand\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]}} "
+  -- CR 603.2c's batch reading of that same form, carrying the same Filter -- so
+  -- a separate tag is the only thing that keeps Tameshi, Reality Architect's
+  -- once-per-batch card and Justice's once-per-permanent card apart on the wire.
+  Spec.it s "PermanentsReturnedToHand round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentsReturnedToHand (Filter.Not (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"PermanentsReturnedToHand\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- CR 700.4's death read off the enchanted permanent. Nullary: the link it
   -- matches on is board state, HauntedCreatureDies' reason.
   Spec.it s "AttachedCreatureDies" $

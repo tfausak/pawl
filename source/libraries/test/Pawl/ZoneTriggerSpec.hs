@@ -214,7 +214,7 @@ cyclingTriggerSpec s registry =
           gs = g1 {GameState.priority = Just S.alice}
           -- The same card, the same graveyard, one component over: a cost that
           -- discards a card of the player's choice rather than this one.
-          discarded = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
+          discarded = S.runPure S.identityAnswer gs (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
           after = S.runPure S.identityAnswer discarded Engine.settleForPriority
       Spec.assertEqWith s "the Aven really did reach the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice discarded)) 1
       Spec.assertEqWith s "nothing was put on the stack" (GameState.stack after) []
@@ -1804,7 +1804,7 @@ leavesBattlefieldSpec s registry =
         Spec.it s "CR 400.2 eventBindings binds became for every PUBLIC destination and for no hidden one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              leftFor to = Event.eventBindings Nothing TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
+              leftFor to = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
               bound = Map.singleton Binding.became (Binding.toObject arrived)
           Spec.assertEqWith s "a graveyard is public" (leftFor Zone.Graveyard) bound
           Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
@@ -1867,10 +1867,17 @@ leavesBattlefieldSpec s registry =
 -- Exhaustive with no wildcard, which is half of what keeps the pin honest -- a
 -- new TriggerCondition fails to compile here. The other half, the list below, is
 -- hand-kept and cannot be forced; add the new constructor there too.
+--
+-- The arrival id every Moved event here carries, shared with the pin so that the
+-- state it hands Event.eventBindings can hold a card under that id: the
+-- PermanentReturnedToHand arm reads CR 400.3's owner off the arrival.
+representativeArrival :: ObjectId.ObjectId
+representativeArrival = ObjectId.MkObjectId 2
+
 representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty GameEvent.GameEvent
 representativeEvents cond =
   let departed = ObjectId.MkObjectId 1
-      arrived = ObjectId.MkObjectId 2
+      arrived = representativeArrival
       moved from to = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
       combatDamage =
         GameEvent.DamageDealt
@@ -2056,8 +2063,15 @@ representativeEvents cond =
           moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
         -- The one destination the arm above's three events narrow to, and the
         -- only event this condition admits at all: CR 400.2 makes a hand hidden,
-        -- so CR 400.7e withholds the arrival and the floor is empty.
+        -- so CR 400.7e withholds the arrival; what the floor holds is the
+        -- departed permanent and CR 400.3's owner, read off `arrived` in the
+        -- pin's state.
         TriggerCondition.PermanentReturnedToHand _ -> one (moved Zone.Battlefield Zone.Hand)
+        -- The same one event, and NOT because the batch reading matches nothing:
+        -- Event.matchesTrigger answers alike for both (its batch arm delegates to
+        -- the singular's), CR 603.2c's once-per-batch scoping living in
+        -- Event.eventTriggers instead -- PermanentsDie's posture below.
+        TriggerCondition.PermanentsReturnedToHand _ -> one (moved Zone.Battlefield Zone.Hand)
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -2315,6 +2329,7 @@ everyTriggerCondition =
     TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.PermanentLeavesTheBattlefield Filter.Type.IsSource,
     TriggerCondition.PermanentReturnedToHand Filter.Type.IsSource,
+    TriggerCondition.PermanentsReturnedToHand Filter.Type.IsSource,
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
@@ -2651,6 +2666,216 @@ permanentReturnedToHandSpec s registry =
           Spec.assertEqWith s "and Evacuation really emptied the battlefield of creatures" (Set.size (Set.filter (`Projection.isCreatureOf` settled) (GameState.battlefield settled))) 0
           Spec.assertEqWith s "two Pikers were on the board to be returned" (length pikerIds) 2
 
+-- CR 603.2c's FIRST sentence on the event the group above proves the second
+-- for: "whenever ONE OR MORE noncreature permanents are returned to hand" fires
+-- once for the batch however many moved --
+-- TriggerCondition.PermanentsReturnedToHand, beside PermanentReturnedToHand the
+-- way PermanentsDie stands beside PermanentDies.
+--
+-- Tameshi, Reality Architect {2}{U} Legendary Creature -- Moonfolk Wizard 2/3 is
+-- the card (data/cards/tameshi-reality-architect.json): "Whenever one or more
+-- noncreature permanents are returned to hand, draw a card. This ability
+-- triggers only once each turn. {X}{W}, Return a land you control to its
+-- owner's hand: Return target artifact or enchantment card with mana value X or
+-- less from your graveyard to the battlefield. Activate only as a sorcery."
+-- Name, cost, type line and Oracle text checked against Scryfall 2026-09-02.
+-- Not implemented: the activated ability -- its target's "mana value X or less"
+-- is a slot bound reading the announced X, which Pawl.Engine.Activate's
+-- targeting road cannot hand a slot (#2672); the bound dropped would leave the
+-- card WEAKER than printed, so the whole ability is omitted, which leaves it
+-- STRICTER. Retract {U} Instant, "Return all artifacts you control to their
+-- owner's hand" (data/cards/retract.json, same check), is the one effect
+-- returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve brackets as one
+-- Pawl.Types.EventGroup.
+--
+-- WHY A SYNTHETIC BESIDE THE PRINTING. Tameshi's "triggers only once each turn"
+-- makes the batch reading indistinguishable from the per-permanent one on any
+-- board: two triggers with the second declined by the limit and one trigger
+-- leave the same game. Scryfall o:"one or more" o:"returned to", 2026-09-02,
+-- matches Tameshi alone, and o:/whenever one or more [^.]* hands?/ adds no
+-- other returned-to-hand printing; a printing of Tameshi's condition without
+-- the rider is the card that refutes Synthetic Return Ledger {1}{U}
+-- Enchantment, "Whenever one or more noncreature permanents are returned to
+-- hand, draw a card" (data/cards/synthetic-return-ledger.json) -- CR 603.2c's
+-- first sentence, which nothing in the CR forbids printing bare.
+--
+-- The discrimination is alice's hand once Retract has returned two artifacts:
+-- four cards (both artifacts, Tameshi's one draw and the Ledger's one) is the
+-- batch reading, five is the per-permanent one -- the Ledger drawing twice
+-- where Tameshi's limit hides the second -- and two is silence. Justice, Vance
+-- Astrovik stands on the same board reading the same event the singular way and
+-- grows by two -- the two readings side by side off one event group, which the
+-- group count pins as the precondition the way permanentsDieSpec does.
+permanentsReturnedToHandSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+permanentsReturnedToHandSpec s registry =
+  let -- alice: Tameshi, the Ledger, Justice, Sol Ring, Bonesplitter and a Goblin
+      -- Piker on the battlefield, one Island for Retract, Retract alone in hand,
+      -- and a library to draw from.
+      board = do
+        tameshi <- S.printingOf s registry "Tameshi, Reality Architect"
+        ledger <- S.printingOf s registry "Synthetic Return Ledger"
+        justice <- S.printingOf s registry "Justice, Vance Astrovik"
+        solRing <- S.printingOf s registry "Sol Ring"
+        bonesplitter <- S.printingOf s registry "Bonesplitter"
+        piker <- S.printingOf s registry "Goblin Piker"
+        island <- S.printingOf s registry "Island"
+        retract <- S.printingOf s registry "Retract"
+        let (tameshiId, g0) = S.addCreature tameshi S.alice (S.landsInPlay island 1)
+            (_, g1) = S.addCreature ledger S.alice g0
+            (justiceId, g2) = S.addCreature justice S.alice g1
+            (solRingId, g3) = S.addCreature solRing S.alice g2
+            (bonesplitterId, g4) = S.addCreature bonesplitter S.alice g3
+            (pikerId, g5) = S.addCreature piker S.alice g4
+            stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard island S.alice gs)) g5 [1 .. 3 :: Int]
+            (withRetract, retractId) = S.handOne retract stocked
+        pure (tameshiId, justiceId, solRingId, bonesplitterId, pikerId, retractId, withRetract)
+      resolveWholeStack gs =
+        if null (GameState.stack gs)
+          then gs
+          else resolveWholeStack (S.runPure S.identityAnswer gs Stack.resolveTop)
+      -- Move one permanent to hand by hand, let CR 117.5's scan place what
+      -- triggered, and resolve the whole stack.
+      returnByHand oid gs =
+        let gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Hand)
+         in resolveWholeStack (S.runPure S.identityAnswer gone Engine.settleForPriority)
+      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
+      -- The distinct EventGroups the log's battlefield-to-hand moves carry.
+      returnGroups gs =
+        List.nub
+          ( Maybe.mapMaybe
+              ( \logged -> case LoggedEvent.event logged of
+                  GameEvent.Moved (Moved.MkMoved zc _ _) | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand -> Just (LoggedEvent.group logged)
+                  _ -> Nothing
+              )
+              (Foldable.toList (GameState.events gs))
+          )
+   in Spec.describe s "PermanentsReturnedToHand" $ do
+        -- The proving case: Retract returns two artifacts as one event group.
+        Spec.it s "CR 603.2c Retract returning two artifacts draws one card each for Tameshi and the Ledger, and grows Justice twice" $ do
+          (_, justiceId, _, _, _, retractId, withRetract) <- board
+          let cast = S.runPure S.identityAnswer withRetract (S.cast S.alice retractId)
+              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+              settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+              after = resolveWholeStack settled
+          Spec.assertEqWith s "alice holds the two artifacts and ONE draw each from Tameshi and the Ledger, not two from the Ledger" (S.handSize S.alice after) 4
+          Spec.assertEqWith s "Justice grew once per artifact, the singular reading of the same event" (sizeOf justiceId after) (Just 4, Just 4)
+          Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (length (returnGroups settled)) 1
+          Spec.assertEqWith s "four triggers reached the stack: Tameshi's and the Ledger's once each, Justice's twice" (length (GameState.stack settled)) 4
+          Spec.assertEqWith s "alice's hand was Retract alone before" (S.handSize S.alice withRetract) 1
+        -- The printed "noncreature", the condition's own Filter: one board, two
+        -- permanents returned one at a time, and only the artifact draws.
+        Spec.it s "CR 603.2c a creature returned to hand draws nothing where an artifact does" $ do
+          (_, _, solRingId, _, pikerId, _, withRetract) <- board
+          Spec.assertEqWith s "the Piker's return leaves alice with Retract and the Piker" (S.handSize S.alice (returnByHand pikerId withRetract)) 2
+          Spec.assertEqWith s "the Sol Ring's, on the same board, adds Tameshi's draw and the Ledger's" (S.handSize S.alice (returnByHand solRingId withRetract)) 4
+        -- The printed "only once each turn", Pawl.Types.TriggerLimit's
+        -- OncePerTurn on Tameshi's condition: a second batch in the same turn is a
+        -- second trigger event (permanentsDieSpec's point), which the Ledger
+        -- answers again and Tameshi's limit declines.
+        Spec.it s "CR 603.2c a second batch in the same turn draws for the Ledger and not for Tameshi" $ do
+          (_, _, solRingId, bonesplitterId, _, _, withRetract) <- board
+          let first = returnByHand solRingId withRetract
+          Spec.assertEqWith s "the second return adds the Bonesplitter and the Ledger's draw, not Tameshi's" (S.handSize S.alice (returnByHand bonesplitterId first)) 6
+          Spec.assertEqWith s "the first drew for both" (S.handSize S.alice first) 4
+        -- CR 603.10a: a leaves-the-battlefield ability looks back, so Tameshi
+        -- swept up in the same batch as the Sol Ring still sees it go and still
+        -- draws -- Event.looksBack's batch arm, PermanentsDie's own Example in
+        -- that rule. Bracketed by hand, the narrowest path that makes the two
+        -- returns one event group.
+        Spec.it s "CR 603.10a Tameshi returned in the same batch as an artifact still draws" $ do
+          (tameshiId, _, solRingId, _, _, _, withRetract) <- board
+          let gone = S.runPure S.identityAnswer withRetract (Event.simultaneously (Event.changeZone tameshiId Zone.Hand >> Event.changeZone solRingId Zone.Hand))
+              after = resolveWholeStack (S.runPure S.identityAnswer gone Engine.settleForPriority)
+          Spec.assertEqWith s "alice holds Retract, Tameshi, the Sol Ring, Tameshi's draw and the Ledger's" (S.handSize S.alice after) 5
+          Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (length (returnGroups gone)) 1
+
+-- What PermanentReturnedToHand's bindings are FOR -- Warped Devotion {2}{B}
+-- Enchantment, "Whenever a permanent is returned to a player's hand, that
+-- player discards a card" (data/cards/warped-devotion.json; name, cost, type
+-- line and Oracle text checked against Scryfall 2026-09-02). "That player" is
+-- Binding.triggerPlayer, which Event.eventBindings stamps with the returned
+-- permanent's OWNER: CR 400.3 sends it to its owner's hand whoever controlled
+-- it, and a stolen permanent is what tells the owner apart from CR 109.5's
+-- controller.
+--
+-- The discrimination is WHOSE graveyard grows. bob's Piker under alice's
+-- control goes back to bob's hand and bob discards; a controller reading
+-- (PlayerRef.ControllerOfBound) would have alice discard, and the board that
+-- differs in the Piker's owner alone shows alice discarding for her own.
+warpedDevotionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+warpedDevotionSpec s registry =
+  let -- alice's Warped Devotion and one Island; a Goblin Piker owned by `owner`,
+      -- under alice's control when `stolen`; three cards in alice's hand and one
+      -- in bob's -- distinct, and bob's two once the Piker lands make CR 701.9b's
+      -- choice a real prompt.
+      board owner stolen = do
+        devotion <- S.printingOf s registry "Warped Devotion"
+        piker <- S.printingOf s registry "Goblin Piker"
+        island <- S.printingOf s registry "Island"
+        let (_, g1) = S.addCreature devotion S.alice (S.landsInPlay island 1)
+            (pikerId, g2) = S.addCreature piker owner g1
+            g3 = if stolen then S.giveControl pikerId S.alice g2 else g2
+            g4 = List.foldl' (\gs _ -> snd (S.addHandCard island S.alice gs)) g3 [1 .. 3 :: Int]
+            g5 = snd (S.addHandCard island S.bob g4)
+        pure (pikerId, g5)
+      returnByHand oid gs =
+        let gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Hand)
+            settled = S.runPure S.identityAnswer gone Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Stack.resolveTop
+      graveyardSize pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+   in Spec.describe s "Warped Devotion" $ do
+        Spec.it s "CR 400.3 bob's Piker under alice's control returned to hand makes BOB discard" $ do
+          (pikerId, gs) <- board S.bob True
+          let after = returnByHand pikerId gs
+          Spec.assertEqWith s "bob discarded" (graveyardSize S.bob after) 1
+          Spec.assertEqWith s "and alice, its controller, did not" (graveyardSize S.alice after) 0
+          Spec.assertEqWith s "bob kept one of his card and the Piker" (S.handSize S.bob after) 1
+          Spec.assertEqWith s "alice's hand is untouched" (S.handSize S.alice after) 3
+          Spec.assertEqWith s "the Piker really was alice's to control" (Projection.controllerOf pikerId gs) (Just S.alice)
+        Spec.it s "CR 400.3 alice's own Piker, on the board that differs in its owner alone, makes alice discard" $ do
+          (pikerId, gs) <- board S.alice True
+          let after = returnByHand pikerId gs
+          Spec.assertEqWith s "alice discarded" (graveyardSize S.alice after) 1
+          Spec.assertEqWith s "and bob did not" (graveyardSize S.bob after) 0
+        -- The whole card through a real spell: alice casts Unsummon at the Piker
+        -- bob both owns and controls, targeted by id.
+        Spec.it s "CR 603.2 whole card: Unsummon on bob's Piker makes bob discard" $ do
+          (pikerId, gs) <- board S.bob False
+          unsummon <- S.printingOf s registry "Unsummon"
+          let (withSpell, spellId) = S.handOne unsummon gs
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just pikerId) . Recipient.objectOf) . snd) sets
+                _ -> S.identityAnswer p
+              cast = S.runPure answer withSpell (S.cast S.alice spellId)
+              resolved = S.runPure answer cast Stack.resolveTop
+              settled = S.runPure answer resolved Engine.settleForPriority
+              after = S.runPure answer settled Stack.resolveTop
+          Spec.assertEqWith s "bob discarded" (graveyardSize S.bob after) 1
+          Spec.assertEqWith s "alice's graveyard holds Unsummon alone" (graveyardSize S.alice after) 1
+          Spec.assertEqWith s "the Piker left the battlefield" (Game.lookupObject pikerId settled) Nothing
+        -- The bindings themselves, off the recorded event: the owner under
+        -- thatPlayer, the departed id under thatDepartedPermanent, and no
+        -- `became` -- CR 400.7e withholds it for a hand (CR 400.2).
+        Spec.it s "CR 603.10a eventBindings binds the owner and the departed permanent, and withholds became" $ do
+          (pikerId, gs) <- board S.bob True
+          let gone = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Hand)
+              moves =
+                Maybe.mapMaybe
+                  ( \logged -> case LoggedEvent.event logged of
+                      ev@(GameEvent.Moved (Moved.MkMoved zc _ _)) | ZoneChange.departed zc == pikerId -> Just ev
+                      _ -> Nothing
+                  )
+                  (Foldable.toList (GameState.events gone))
+          case moves of
+            [ev] ->
+              Spec.assertEqWith
+                s
+                "the owner and the departed permanent, nothing else"
+                (Event.eventBindings gone Nothing (TriggerCondition.PermanentReturnedToHand (Filter.Type.And [])) ev)
+                (Map.fromList [(Binding.triggerPlayer, Binding.toPlayer S.bob), (Binding.departedPermanent, Binding.toObject pikerId)])
+            other -> Spec.assertFailure s ("expected one move of the Piker, got " <> show (length other))
+
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
 -- to the card that left the battlefield checks for it only in the first zone
 -- that it went to" -- said positively by CR 400.7e: "Abilities that trigger when
@@ -2741,14 +2966,14 @@ becameSlotSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings Nothing TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
+          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
         -- A condition that is not a look-back gets no such slot: Narcomoeba's
         -- bearer IS the arriving card, so binding it again would be a second
         -- name for the same object.
         Spec.it s "CR 113.6k a library-to-graveyard trigger binds nothing" $ do
           let oid = ObjectId.MkObjectId 1
               milled = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "no became slot" (Event.eventBindings Nothing TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
+          Spec.assertEqWith s "no became slot" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
         -- CR 400.7f's arm, the one place the slot comes from something other than
         -- the event: the BEARER's own arrival, which eventTriggers computes off
         -- the batch. Pinned in isolation so the rule is stated once here and once
@@ -2763,7 +2988,7 @@ becameSlotSpec s registry =
           Spec.assertEqWith
             s
             "became names the Aura's incarnation, not the host's"
-            (Event.eventBindings (Just bearerArrived) TriggerCondition.AttachedCreatureDies hostDied)
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) (Just bearerArrived) TriggerCondition.AttachedCreatureDies hostDied)
             (Map.fromList [(Binding.became, Binding.toObject bearerArrived), (Binding.departedPermanent, Binding.toObject departed)])
           -- CR 303.4b's half stands alone where the bearer reached no graveyard:
           -- the host's departure is the EVENT's datum and CR 704.5n's Equipment
@@ -2772,7 +2997,7 @@ becameSlotSpec s registry =
           Spec.assertEqWith
             s
             "and the host alone where the bearer reached no graveyard"
-            (Event.eventBindings Nothing TriggerCondition.AttachedCreatureDies hostDied)
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing TriggerCondition.AttachedCreatureDies hostDied)
             (Map.singleton Binding.departedPermanent (Binding.toObject departed))
         -- The pin on Event.eventBindingSlots, the per-CONDITION slot set the
         -- card lint asks (CardSpec's "every slot a triggered ability reads is
@@ -2805,10 +3030,19 @@ becameSlotSpec s registry =
         -- Holding it Nothing instead would pin the OTHER reading, under which no
         -- card could read `became` there at all.
         Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for EVERY event a condition admits" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
           let bearerBecame = Just (ObjectId.MkObjectId 3)
+              -- The state for the one arm that reads one: PermanentReturnedToHand
+              -- looks CR 400.3's owner up off the arrival, so representativeArrival
+              -- names a card alice owns here. Every other arm is pure over the
+              -- event and reads nothing from it.
+              (minted, stocked) = S.addHandCard piker S.alice (Setup.emptyGame S.bothPlayers)
+              pinState = case Map.lookup minted (GameState.objects stocked) of
+                Just obj -> stocked {GameState.objects = Map.insert representativeArrival obj (GameState.objects stocked)}
+                Nothing -> stocked
           mapM_
             ( \cond ->
-                let stamped = fmap (Map.keysSet . Event.eventBindings bearerBecame cond) (representativeEvents cond)
+                let stamped = fmap (Map.keysSet . Event.eventBindings pinState bearerBecame cond) (representativeEvents cond)
                  in Spec.assertEqWith s ("the slots bound for " <> show cond) (Event.eventBindingSlots cond) (foldr Set.intersection (NonEmpty.head stamped) (NonEmpty.tail stamped))
             )
             everyTriggerCondition
@@ -2892,7 +3126,7 @@ promiseOfTomorrowSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings Nothing (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
+          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
 
 -- CR 607.2a's linked pair read from the SECOND ability, which is the half
 -- promiseOfTomorrowSpec above could not reach: "At the beginning of each end
@@ -4671,7 +4905,7 @@ aetherFlashSpec s registry =
           let castCard = ObjectId.MkObjectId 1
               entered = ObjectId.MkObjectId 2
               entry = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings Nothing (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
+          Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
         -- CR 603.6a's "EACH TIME an event puts one or more permanents onto
         -- the battlefield" met with a per-entrant payload: Dragon Fodder
         -- ({1}{R} Sorcery, "create two 1/1 red Goblin creature tokens") makes
@@ -5027,6 +5261,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   leavesBattlefieldSpec s registry
   permanentLeavesTheBattlefieldSpec s registry
   permanentReturnedToHandSpec s registry
+  permanentsReturnedToHandSpec s registry
+  warpedDevotionSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
   promiseOfTomorrowReturnSpec s registry
