@@ -299,7 +299,9 @@ battlefieldCandidates gs =
 -- Not bracketed: CR 701.21's fold over a bound group (#757), token creation and
 -- CR 508.1's attacker declaration, so the events each records are read as a
 -- sequence (see #441). CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
--- brackets each combat damage step.
+-- brackets each combat damage step -- the damage and its CR 120.3 results, with
+-- lifelink's gains recorded after the bracket closes, since CR 702.15e makes
+-- each source's gain an event of its own.
 simultaneously :: Game a -> Game a
 simultaneously body = do
   State.modify' openEventGroup
