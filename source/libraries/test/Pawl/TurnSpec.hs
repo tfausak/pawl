@@ -23,6 +23,7 @@ import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -40,6 +41,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -61,6 +63,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
@@ -989,8 +992,93 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
           S.runPure
             S.identityAnswer
             gs
-            (Resolve.applyEffect source source S.bob Map.empty Map.empty (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn PlayerRef.EachPlayer Set.empty)))
+            (Resolve.applyEffect source source S.bob Map.empty Map.empty (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.EachPlayer, TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Literal 1}))
     Spec.assertEqWith s "added in APNAP order, so taken in reverse" (takersOf after) [S.alice, S.bob]
+
+-- alice in her precombat main phase with priority, three Islands and a Mountain
+-- (exactly Ral Zarek's {2}{U}{R}), Ral cast through the ordinary path so his
+-- four loyalty counters come from CR 306.5b, and three more put on by fixture
+-- so the -7 is payable. Both libraries stocked, for warpBoard's reason.
+ralBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, GameState.GameState)
+ralBoard island mountain ral piker =
+  let lands = S.landsFor mountain S.alice 1 (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers))
+      stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
+      (withHand, handId) = S.handOne ral (stock (stock lands S.alice) S.bob)
+      positioned =
+        withHand
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      after = S.runPure S.identityAnswer positioned (do S.cast S.alice handId; Stack.resolveTop)
+      named oid = fmap Face.name (Game.faceOf oid after) == Just (CardName.MkCardName (Text.pack "Ral Zarek"))
+      ralId = case filter named (Set.toList (GameState.battlefield after)) of
+        oid : _ -> oid
+        [] -> S.noSource
+   in (ralId, S.addCounter CounterKind.Loyalty 3 ralId after)
+
+-- Pins every coin of the -7 BY INDEX, which a pure answerer cannot do -- five
+-- faces are five structurally identical prompts -- and counts the flips. The
+-- fallback past the end is tails, so a run that flipped more coins than the
+-- case pinned cannot inflate the tally. No Prompt.CallCoin arm: the -7 reads
+-- the face (CR 705.2's first sentence), so none is asked.
+pinnedFaces :: [CoinFace.CoinFace] -> Prompt.Prompt r -> State.State Int r
+pinnedFaces faces p = case p of
+  Prompt.FlipCoin -> do
+    i <- State.get
+    State.put (i + 1)
+    pure (Maybe.fromMaybe CoinFace.Tails (Maybe.listToMaybe (drop i faces)))
+  _ -> pure (S.identityAnswer p)
+
+-- Activate Ral's -7 (his third printed ability) and let it resolve, returning
+-- the board and how many coins the engine flipped.
+useMinusSeven :: [CoinFace.CoinFace] -> Printing.Printing -> ObjectId -> GameState.GameState -> (GameState.GameState, Int)
+useMinusSeven faces ral oid gs = case drop 2 (Face.activatedAbilities (S.combinedFace ral)) of
+  ability : _ ->
+    let ((_, after), flips) = State.runState (Engine.runGame (pinnedFaces faces) gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)) 0
+     in (after, flips)
+  [] -> (gs, 0)
+
+-- CR 500.7's "multiple extra turns" from ONE effect whose count is bound
+-- earlier in the same ability: Ral Zarek ({2}{U}{R} Legendary Planeswalker --
+-- Ral, loyalty 4; -7: "Flip five coins. Take an extra turn after this one for
+-- each coin that comes up heads." Oracle text read at api.scryfall.com
+-- 2026-09-02).
+repeatedExtraTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+repeatedExtraTurnSpec s registry = Spec.describe s "RepeatedExtraTurn" $ do
+  let boardOf = do
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        ral <- S.printingOf s registry "Ral Zarek"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (ral, ralBoard island mountain ral piker)
+  Spec.it s "CR 500.7 whole card: Ral Zarek's -7 gives one extra turn per coin that came up heads" $ do
+    (ral, (oid, gs)) <- boardOf
+    Spec.assertEqWith s "the fixture left Ral at seven loyalty" (S.counterOf CounterKind.Loyalty oid gs) 7
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation. Heads, tails, heads, heads, tails: THREE is a reading no other
+    -- implementation produces -- one turn regardless gives [alice, bob, ...],
+    -- the coin COUNT gives five of alice's turns. A tally of flips WON would
+    -- agree here, since Replay.defaultAnswer calls heads; that the -7 asks no
+    -- call at all is Pawl.CoinSpec's "Odds asks no call" case's business.
+    -- Read by running the turns, since CR 500.7 is about who takes them.
+    let (after, flips) = useMinusSeven [CoinFace.Heads, CoinFace.Tails, CoinFace.Heads, CoinFace.Heads, CoinFace.Tails] ral oid gs
+    Spec.assertEqWith
+      s
+      "CR 500.7: three heads, so alice takes three extra turns before bob's ordinary one"
+      (turnTakers 5 after)
+      [S.alice, S.alice, S.alice, S.bob, S.alice]
+    -- Supporting, and after the assertion they could otherwise absorb.
+    Spec.assertEqWith s "three turns pending, all alice's" (takersOf after) [S.alice, S.alice, S.alice]
+    Spec.assertEqWith s "CR 705.1: the -7 flipped five coins" flips 5
+  Spec.it s "CR 500.7 the pair: five tails give no extra turn at all" $ do
+    (ral, (oid, gs)) <- boardOf
+    -- The same board and the same ability with every coin the other way up: a
+    -- count of zero adds nothing, and the seating order hands off to bob.
+    let (after, flips) = useMinusSeven [CoinFace.Tails, CoinFace.Tails, CoinFace.Tails, CoinFace.Tails, CoinFace.Tails] ral oid gs
+    Spec.assertEqWith s "CR 500.7: no heads, so bob's turn follows as usual" (turnTakers 2 after) [S.bob, S.alice]
+    Spec.assertEqWith s "nothing pending" (takersOf after) []
+    Spec.assertEqWith s "CR 705.1: the -7 still flipped five coins" flips 5
 
 -- alice in her precombat main phase with priority, eight untapped Islands
 -- (Savor the Moment's {1}{U}{U} plus Time Warp's {3}{U}{U}, so both can be cast
@@ -1611,6 +1699,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   skipSpec s registry
   extraPhaseSpec s registry
   extraTurnSpec s registry
+  repeatedExtraTurnSpec s registry
   turnScopedSkipSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry

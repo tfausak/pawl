@@ -786,7 +786,7 @@ effectPlayerRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> [ref]
+  Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _) -> [caster]
@@ -1032,7 +1032,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
   -- And a DEFINITION too, on top of the slots the coin count reads.
   Effect.FlipCoin flipCoin -> quantitySlots (FlipCoin.count flipCoin)
-  Effect.TakeExtraTurn {} -> Map.empty
+  -- The slots the turn count reads (Ral Zarek's tally of heads).
+  Effect.TakeExtraTurn takeExtraTurn -> quantitySlots (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> Map.empty
   -- The arm above's library read, reported at the head; nothing is shuffled into
   -- it, so there is no ref beside it either.
@@ -1494,7 +1495,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> True
   Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
+  Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
@@ -1656,7 +1657,8 @@ readsX = any effectReadsX
       -- The number of coins is an ordinary Quantity, so it may be the X the
       -- caster announced (Flock of Rabid Sheep's "flip X coins").
       Effect.FlipCoin flipCoin -> Quantity.readsX (FlipCoin.count flipCoin)
-      Effect.TakeExtraTurn {} -> False
+      -- The number of turns is an ordinary Quantity too.
+      Effect.TakeExtraTurn takeExtraTurn -> Quantity.readsX (TakeExtraTurn.count takeExtraTurn)
       Effect.ShuffleIntoLibrary {} -> False
       Effect.Shuffle {} -> False
       Effect.OfferCast {} -> False
@@ -8596,9 +8598,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
                         GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
                       }
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref skips) -> do
+  Effect.TakeExtraTurn takeExtraTurn -> do
     gs <- State.get
-    let named = playerRefPlayers legal controller gs ref
+    let viewOf = effectViewOf source legal gs
+        context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
+        -- How many extra turns each named player is given, read ONCE: Ral
+        -- Zarek's "for each coin that comes up heads" is the tally the flip
+        -- before it bound. CR 107.2's posture for a quantity that cannot be
+        -- evaluated: no turns at all.
+        turns = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source (TakeExtraTurn.count takeExtraTurn)))
+        named = playerRefPlayers legal controller gs (TakeExtraTurn.player takeExtraTurn)
         -- CR 500.7: extra turns are added one at a time in APNAP order (CR
         -- 101.4). apnapOrder supplies the ORDER and `named` the MEMBERSHIP, so a
         -- departed player gets no turn; one named through a TARGET slot can still
@@ -8613,8 +8622,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 500.11 / 113.7: the skips ride ALONG on each entry, naming that turn and
     -- no other; Engine.takeNextTurn installs them as the turn begins (see
     -- Pawl.Types.ExtraTurn).
-    let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
-    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
+    --
+    -- CR 500.7: "if a player is given multiple extra turns, the extra turns are
+    -- added one at a time" -- `turns` rounds, each pushing one turn per taker in
+    -- APNAP order. Whether the rounds nest inside the APNAP walk or around it is
+    -- observable only for an effect giving SEVERAL players SEVERAL turns each,
+    -- which no card in data/cards/ prints; Ral Zarek names one player.
+    let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = TakeExtraTurn.skips takeExtraTurn}
+        pushRound ts = List.foldl' (\acc pid -> entry pid : acc) ts takers
+    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts _ -> pushRound ts) (GameState.extraTurns g) [1 .. turns]})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).

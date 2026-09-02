@@ -181,6 +181,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -2502,7 +2503,9 @@ rewriteEffect pairs effect = case effect of
   -- The number of coins is the Quantity, PutCounters' descent above; the reading
   -- and the slot name no word rule 612 can swap.
   Effect.FlipCoin x -> Effect.FlipCoin x {FlipCoin.count = rewriteQuantity pairs (FlipCoin.count x)}
-  Effect.TakeExtraTurn {} -> effect
+  -- The number of turns is the Quantity, FlipCoin's descent above; the
+  -- PlayerRef and the skips no word rule 612 can swap.
+  Effect.TakeExtraTurn x -> Effect.TakeExtraTurn x {TakeExtraTurn.count = rewriteQuantity pairs (TakeExtraTurn.count x)}
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect

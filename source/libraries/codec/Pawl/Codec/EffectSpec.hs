@@ -1749,19 +1749,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Set.empty))
+      (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")), TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Literal 1})
       " {\"type\":\"TakeExtraTurn\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"target\"},\"skips\":[]}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (PlayerRef.Relative PlayerRelation.You) (Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))))
+      (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.Relative PlayerRelation.You, TakeExtraTurn.skips = Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)), TakeExtraTurn.count = Quantity.Literal 1})
       " {\"type\":\"TakeExtraTurn\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"skips\":[{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Untap\"}}}]}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn PlayerRef.EachPlayer (Set.fromList [PhaseSelector.Step (Phase.Beginning BeginningStep.Untap), PhaseSelector.CombatPhase])))
+      (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.EachPlayer, TakeExtraTurn.skips = Set.fromList [PhaseSelector.Step (Phase.Beginning BeginningStep.Untap), PhaseSelector.CombatPhase], TakeExtraTurn.count = Quantity.Literal 1})
       " {\"type\":\"TakeExtraTurn\",\"value\":{\"player\":{\"type\":\"EachPlayer\"},\"skips\":[{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Untap\"}}},{\"type\":\"CombatPhase\"}]}} "
 
 -- The stand-in a parametricity test hands over in place of a real card codec:

@@ -617,7 +617,7 @@ playerRefPositions =
     ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
     ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
     ("blight", Effect.Blight (playerQuantity "bl"), [plantedPlayer "bl"]),
-    ("take-extra-turn", Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (plantedPlayer "te") Set.empty), [plantedPlayer "te"]),
+    ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
     ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
     ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
     ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (SlotName.MkSlotName (Text.pack "oc")) (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"])
@@ -1179,7 +1179,8 @@ ownCounts effect = case effect of
   Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
   -- CR 705.1's number of coins is a Quantity, so its Counts are reachable here.
   Effect.FlipCoin flipCoin -> quantityCounts (FlipCoin.count flipCoin)
-  Effect.TakeExtraTurn {} -> []
+  -- CR 500.7's number of turns is a Quantity, so its Counts are reachable here.
+  Effect.TakeExtraTurn takeExtraTurn -> quantityCounts (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
@@ -1324,7 +1325,7 @@ ownQuantities effect = case effect of
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie rollDie -> Maybe.maybeToList (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
-  Effect.TakeExtraTurn {} -> []
+  Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.count takeExtraTurn]
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferCast {} -> []
@@ -5380,7 +5381,8 @@ effectFilters effect = case effect of
   Effect.RollDie rollDie -> frame Unframed (foldMap quantityFilters (RollDie.modifier rollDie))
   -- CR 705.1's number of coins is a Quantity, so its filters are reachable here.
   Effect.FlipCoin flipCoin -> frame Unframed (quantityFilters (FlipCoin.count flipCoin))
-  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
+  -- CR 500.7's number of turns is a Quantity, so its filters are reachable here.
+  Effect.TakeExtraTurn takeExtraTurn -> frame Unframed (quantityFilters (TakeExtraTurn.count takeExtraTurn))
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
