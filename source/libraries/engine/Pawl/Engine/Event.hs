@@ -11615,9 +11615,9 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- CR 615.13's "that much" once more, off the same event and into the same
   -- reserved slot: the Vindicator deals what its own prevention stopped. The
   -- WHOLE record here where the arm above takes the player share, this condition
-  -- being scoped to the applying instance and saying nothing about whom the
-  -- damage was addressed to. The
-  -- recipient is not bound alongside it for the arm above's reason -- the payload
+  -- being scoped to the applying instance rather than to a recipient.
+  --
+  -- The recipient is not bound alongside it for the arm above's reason -- the payload
   -- acts on a target it chooses, never on whoever the prevented damage was
   -- addressed to.
   (TriggerCondition.SelfPreventsDamage _, GameEvent.DamagePrevented prevented) ->
@@ -12985,6 +12985,7 @@ eventTriggers events gs =
       -- clause is not implemented (#2502) -- `enchantedObjectLeaves` below
       -- reads only its Aura half -- so filtering there would read the rule's
       -- first sentence without the exception that governs this arm.
+      --
       -- The delayed map is the HOST's own face while `abilitiesOf` is the
       -- PROJECTED list, so an ability granted by another object that arms a
       -- delayed trigger the GRANTOR declared resolves to no name here and takes
