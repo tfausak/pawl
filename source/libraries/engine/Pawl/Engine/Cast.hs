@@ -941,7 +941,7 @@ restrictionMet pid gs restriction = case restriction of
 -- (Filter.WasCastFrom, Aven Interrupter). `stampCastFrom` writes the same value
 -- onto the incarnation the move mints, and the two agreeing is what keeps the
 -- gate's price and the payment's from diverging -- which they did while the only
--- reader was Filter.IsInZone, whose answer the move changes (#2363).
+-- reader was Filter.IsInZone, whose answer the move changes; see #2363.
 --
 -- The object's own ZONE still differs -- Filter.zone says Graveyard at the gate
 -- and Stack at the payment -- and no card in data/cards reads it from a cost

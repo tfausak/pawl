@@ -768,7 +768,7 @@ data Object = MkObject
     -- a new one "with no memory of, or relation to, its previous existence", so
     -- the zone it left is not a fact any projection can recover. Object.zone
     -- answers Stack for every spell CR 601.2f prices, which is what makes
-    -- Filter.IsInZone the wrong reader here (#2363).
+    -- Filter.IsInZone the wrong reader here; see #2363.
     --
     -- Written TWICE for one cast, at the two moments CR 601.2 gives the question
     -- an answer, both in Pawl.Engine.Cast: onto the pre-move card by `asProposed`,

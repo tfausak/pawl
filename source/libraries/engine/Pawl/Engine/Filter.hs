@@ -1371,7 +1371,7 @@ matches context view predicate = case predicate of
   -- CR 601.2a off Object.castFrom, which is a STAMP rather than a live read: the
   -- spell it describes has already left the zone named here, so unlike IsInZone
   -- above this atom goes on answering the same way for as long as the spell is on
-  -- the stack -- which is what lets CR 601.2f price it (#2363).
+  -- the stack -- which is what lets CR 601.2f price it; see #2363.
   Filter.WasCastFrom z -> castFrom view == Just z
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
