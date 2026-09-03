@@ -3551,7 +3551,7 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
     Spec.assertEqWith s "into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
 
-  -- CR 118.3 on ExileThis, and the sharpest of the three: the Executioner's
+  -- CR 118.3 on ExileThis, and the sharpest of the four: the Executioner's
   -- ability exiles a creature, so the refusal is visible on a permanent the cost
   -- never touches.
   Spec.it s "CR 118.3 the Altar eats the Executioner before its own exile is paid" $ do
