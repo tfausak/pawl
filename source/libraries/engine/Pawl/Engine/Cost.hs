@@ -2271,20 +2271,28 @@ criteriaOf component = case component of
 -- Reached only from CR 118.12's payment, which is the one whose caller unwinds
 -- nothing of its own -- `pay` below says why.
 --
--- ALL OR NOTHING, where the rule's "any" admits a subset (#3134). That is also
--- what keeps its "unless" clause -- mana from a reversed ability spent on
+-- ALL OR NOTHING, where the rule's "any" admits a subset (gap #3134). That is
+-- also what keeps its "unless" clause -- mana from a reversed ability spent on
 -- another that was not -- true by construction: a nested activation is inside
 -- `closed` and inside `before` alike, so it goes back with its parent or stays
 -- with it.
+--
+-- The CANCELLATION HAPPENS FIRST, before the question: rule 733.1 reverses the
+-- action and cancels the payments flat, and only its last-but-one sentence
+-- offers the mana abilities back. So the payer is asked against `closed`, where
+-- nothing of the cost has been paid, rather than against the half-paid state the
+-- refusal left -- which is what Pawl.Engine.Game.ask hands the answerer. It also
+-- keeps CR 104.4b's stamp: `Game.choose` writes GameState.lastChoice, and
+-- declining now puts back nothing that could discard it.
 reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> Game ()
 reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
   Nothing -> State.put before
   Just sources -> do
-    gs <- State.get
-    answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid gs) pid sources)
-    State.put $ case answer of
-      OptionalDecision.Exercises -> before
-      OptionalDecision.Declines -> closed
+    State.put closed
+    answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid closed) pid sources)
+    case answer of
+      OptionalDecision.Exercises -> State.put before
+      OptionalDecision.Declines -> pure ()
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
 -- the PAYER's (payComponents below).
@@ -2319,7 +2327,7 @@ reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
 -- not exclude -- Pawl.Engine.ManaAbility.movesLibraryCard answers False of
 -- Effect.Shuffle and Effect.Reveal, so a mana ability could carry one and a
 -- reversal here would undo it. No printing in `data/cards/` prints a mana
--- ability that shuffles a library or reveals a card from one (#3119).
+-- ability that shuffles a library or reveals a card from one (#3142).
 --
 -- `moment` is which of CR 601.2h and CR 118.12 this payment is (see
 -- Pawl.Types.PaymentMoment). Taken from the CALLER and never derived, since the

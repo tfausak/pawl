@@ -376,8 +376,9 @@ data Object = MkObject
     -- where CR 733.1 lets the payer keep what the mana window did, so a rejected
     -- cast records nothing. An ACTIVATION's units land on the ability object and
     -- never on its source -- Pawl.ManaSpec's "CR 400.7d an activation's record
-    -- goes on the ability object, not on its source" is the proof. Carried across the one move CR 400.7d admits,
-    -- `kicked`'s route, which is what Berg Strider's clause needs.
+    -- goes on the ability object, not on its source" is the proof. Carried
+    -- across the one move CR 400.7d admits, `kicked`'s route, which is what Berg
+    -- Strider's clause needs.
     manaSpent :: Mana.Mana,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this
     -- permanent, which is the value of X for the permanent's
