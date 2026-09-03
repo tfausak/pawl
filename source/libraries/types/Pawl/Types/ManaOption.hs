@@ -11,7 +11,7 @@ import qualified Pawl.Types.Mana as Mana
 -- | CR 106.12: ONE way to tap a permanent for mana -- the cost CR 602.2b makes
 -- that activation pay, paired with the whole yield it adds.
 --
--- THREE halves, strictly: the RIDER the ability prints about when it may be
+-- FOUR parts, strictly. The RIDER the ability prints about when it may be
 -- activated (CR 602.5) rides along with the cost, because CR 605.3b gives a mana
 -- ability no stack window for Pawl.Engine.Activate to gate it in and
 -- Pawl.Engine.Cost.manaActivations is where CR 605.3a's two windows both ask
@@ -19,7 +19,7 @@ import qualified Pawl.Types.Mana as Mana
 -- says nothing about timing, and CR 305.6's intrinsic ability has a cost with no
 -- ability to have printed a rider at all.
 --
--- Both of the other halves, because either alone loses a distinction the player is entitled
+-- The cost and the yield both, because either alone loses a distinction the player is entitled
 -- to make. The yield alone cannot separate an Urborg'd Mana Confluence's free
 -- {B} from the {B} it charges 1 life for (#1117); the cost alone cannot separate
 -- Birds of Paradise's five colours (CR 105.4).

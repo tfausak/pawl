@@ -1418,6 +1418,48 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
         (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (Cost.tapForMana S.manaPerformer solRingId)) 0) 0
 
+  -- CR 405.6c: "if a mana ability both produces mana and has another effect, the
+  -- mana is produced and the other effect happens immediately". Ancient Tomb
+  -- ("{T}: Add {C}{C}. This land deals 2 damage to you") is the pool's one mana
+  -- ability with a clause beyond its mana, and CR 605.3b is what makes that
+  -- clause the payment path's business rather than a resolution's: the ability
+  -- never goes on the stack, so nothing above Pawl.Engine.Cost would run it.
+  Spec.it s "CR 405.6c Ancient Tomb charges its damage for the mana it makes" $ do
+    ancientTomb <- S.printingOf s registry "Ancient Tomb"
+    sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
+    let resolved = castOffBoard S.identityAnswer [ancientTomb] sapphireMedallion
+    Spec.assertEqWith s "alice took 2 for the mana" (S.lifeOf S.alice resolved) (Just 18)
+    Spec.assertEqWith s "and only alice, CR 109.5's you being the activator" (S.lifeOf S.bob resolved) (Just 20)
+    Spec.assertEqWith s "the Medallion was still cast off it" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Sapphire Medallion") S.alice resolved) 1
+
+  -- The IMMEDIATELY half of CR 405.6c, which is what rules out queueing the
+  -- clause for a caller above the payment. At 2 life the damage empties alice
+  -- before CR 601.2g's window asks again, and CR 119.4 then refuses Mana
+  -- Confluence's "Pay 1 life", so the cost goes unpaid; one life more and the
+  -- same board pays the same {3} the same way.
+  Spec.it s "CR 405.6c the damage lands before the rest of the mana window" $ do
+    ancientTomb <- S.printingOf s registry "Ancient Tomb"
+    manaConfluence <- S.printingOf s registry "Mana Confluence"
+    let (_, withConfluence) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+        (tombId, board) = S.addCreature ancientTomb S.alice withConfluence
+        cost = ManaCost.MkManaCost [ManaSymbol.Generic 3]
+        attempt life = fst (S.runPureWith (prefersSource tombId) (atLife life board) (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice cost))
+    Spec.assertBool s (not (attempt 2)) "at 2 life the Confluence can no longer be paid"
+    Spec.assertBool s (attempt 3) "at 3 life the same board pays"
+
+  -- CR 605.1a is unmoved by the clause: what the ability PRODUCES is still its
+  -- mana additions alone (Pawl.Engine.ManaAbility.manaProduced), so Ancient Tomb
+  -- is a mana source, its activation uses no stack, and the two colorless are
+  -- the whole of what it adds.
+  Spec.it s "CR 605.1a Ancient Tomb's damage leaves it a mana ability" $ do
+    ancientTomb <- S.printingOf s registry "Ancient Tomb"
+    let (tombId, board) = S.addCreature ancientTomb S.alice (Setup.emptyGame S.bothPlayers)
+        after = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer tombId)
+    Spec.assertEqWith s "the yield is two colorless and nothing else" (tappedFor S.identityAnswer tombId board) [ManaType.Colorless, ManaType.Colorless]
+    Spec.assertBool s (elem tombId (Mana.manaSources Cost.manaActivations S.alice board)) "and it is a mana source"
+    Spec.assertEqWith s "the activation used no stack (CR 605.3b)" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "while the damage was still dealt" (S.lifeOf S.alice after) (Just 18)
+
 -- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
 -- other source's prompt to S.identityAnswer, which takes the head. A payment off
 -- several two-yield sources needs a different answer from each, and the prompt

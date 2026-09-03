@@ -2655,12 +2655,15 @@ triggeredAbilityOffends ability =
 --     Nothing there. Admitting it would exempt a read that silently no-ops,
 --     which is the failure this lint exists to catch.
 --
--- SCOPE: the abilities that reach Activate. CR 605.3b's mana abilities do not --
--- one "doesn't go on the stack, so it can't be targeted, countered, or otherwise
--- responded to. Rather, it resolves immediately after it is activated" -- and
--- pawl's mana path pays a route's cost and lifts its AddMana effects out, so
--- NOTHING is bound for one and none of its other effects runs (#1118). No mana
--- ability in the pool reads a slot, so applying the same
+-- SCOPE: the abilities that reach Activate. CR 605.3b's mana abilities take
+-- another road -- one "doesn't go on the stack, so it can't be targeted,
+-- countered, or otherwise responded to. Rather, it resolves immediately after it
+-- is activated" -- so Cost.tapForManaWith pays the route's cost, adds the mana
+-- and runs the rest through Resolve.performManaAbility (CR 405.6c). That binds
+-- Binding.triggerSource and Binding.you and nothing else: the payment's own
+-- bound slots are dropped, there being no ability object to write them onto. The
+-- exemptions this lint grants beyond those two are therefore wider than a mana
+-- ability gets, and no mana ability in the pool reads one, so applying the same
 -- available side to one is uniformity rather than a claim.
 activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 activatedAbilityOffends ability =
