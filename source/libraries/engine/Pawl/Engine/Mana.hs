@@ -256,7 +256,10 @@ producedTypes oid gs production = case production of
 -- one mana of any color" would route both manas at once, which is weaker than
 -- printed. Gemstone Caverns says that sentence as two abilities whose
 -- ActivatedAbility.conditions are complements instead -- a gate abilitiesGiven
--- does apply, with the board in hand (#1924).
+-- does apply, with the board in hand (#1924). The fourth element below is
+-- flattened by the same call and carries the same limit: a non-mana clause
+-- gated by a condition, or one its controller may decline, would run
+-- unconditionally. No mana ability in `data/cards/` prints one.
 --
 -- The FOURTH element is CR 405.6c's other half: what the selection says beyond
 -- its mana. Split by the same classification the rest of the mana path runs on

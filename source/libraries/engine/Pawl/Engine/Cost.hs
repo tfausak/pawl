@@ -2286,6 +2286,9 @@ criteriaOf component = case component of
 -- which CR 601.2h's payment comes after -- so a component's criterion can name
 -- them (announcedSlots below). Both callers stamp the bindings before calling
 -- this: Pawl.Engine.Cast.castProposed and Pawl.Engine.Activate.activateAbility.
+--
+-- `perform` is CR 405.6c's executor, carried down to the mana window for a mana
+-- ability that has an effect beyond its mana (Pawl.Types.ManaAbilityPerformer).
 pay :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay perform moment subject announced spending pid oid cost = do
   before <- State.get
