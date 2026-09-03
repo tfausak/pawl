@@ -1307,6 +1307,7 @@ library test
     Pawl.SpecialActionSpec
     Pawl.SpeedSpec
     Pawl.SplitSecondSpec
+    Pawl.StationSpec
     Pawl.Support
     Pawl.TargetSpec
     Pawl.TeamSpec

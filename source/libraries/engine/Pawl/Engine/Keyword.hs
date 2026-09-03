@@ -47,6 +47,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.Cycling as Cycling
@@ -119,6 +120,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
+import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -291,6 +293,8 @@ abilitiesFor keyword count = case keyword of
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
   Keyword.Exert -> []
+  -- CR 702.184a is an ACTIVATED ability; battlefieldAbilitiesFor mints it.
+  Keyword.Station -> []
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
 -- owner's hand. Named for the ZONE rather than for cycling, because that is the
@@ -407,6 +411,10 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  -- CR 702.184a's ability is on a PERMANENT (CR 721.1's station card is an
+  -- artifact), so it belongs to battlefieldAbilitiesFor and not to this hand
+  -- roster.
+  Keyword.Station -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -622,6 +630,9 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  -- CR 702.184a states a whole self-contained ability, so one per instance,
+  -- crew's reading above.
+  Keyword.Station -> List.genericReplicate count station
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -683,6 +694,82 @@ crew n =
             (Modification.AddCardType cardType)
             (ObjectRef.InSlot Binding.triggerSource)
         )
+
+-- CR 702.184a's whole ability, crew's neighbour above and levelUp's below.
+--
+-- THE COST taps exactly ONE creature, so CostComponent.TapPermanents rather than
+-- crew's TapForTotalPower: rule 702.184a fixes the count and reads the tapped
+-- creature's power afterwards, where crew's number is a threshold on an aggregate
+-- and fixes no count. That is also what makes the power readable at all --
+-- TapPermanents binds Binding.tappedPermanent and TapForTotalPower binds nothing
+-- (#915). `Not IsSource` is rule 702.184a's own "another", and load-bearing for
+-- crew's reason one rule over: a Spacecraft past CR 721.2b's threshold is a
+-- creature and could otherwise station itself.
+--
+-- The tap symbol is not in the cost, so CR 302.6 does not reach this ability: a
+-- Spacecraft that arrived this turn may be stationed, and a creature that arrived
+-- this turn may be tapped to do it.
+--
+-- THE EFFECT reads the tapped creature's power through Quantity.AgainstSlot on
+-- that reserved slot, Unerring Sling's read. CR 608.2h's CURRENT information, the
+-- permanent being tapped rather than moved. The counters land on the source, named
+-- through Binding.triggerSource and never TARGETED (CR 115.10a), crew's posture.
+--
+-- CounterKind.Named, because CR 122.1 letters charge counters nowhere: no rule
+-- reads the tally, only CR 721.2's own striations do, through
+-- Quantity.ObjectCounters. The spelling has to agree with what a station card
+-- writes, which is why chargeCounter below is shared rather than inlined.
+--
+-- CR 602.5d is the timing clause and the ONLY restriction. The condition is
+-- Nothing because CR 721.4 says so outright: the ability is present at all times
+-- and may be activated at any number of charge counters.
+--
+-- Not implemented: CR 702.184c's static abilities that make a station ability read
+-- a characteristic other than the tapped creature's power (#3127).
+station :: ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+station =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost =
+        Cost.MkCost
+          { -- CR 118.5, crew's note above: no mana part is `Just` an empty one
+            -- and not the Nothing that means unpayable.
+            Cost.mana = Just (ManaCost.MkManaCost []),
+            Cost.components = [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 criterion)]
+          },
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton load))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.activator = Activator.Controller,
+      ActivatedAbility.condition = Nothing,
+      -- Nothing on every keyword-minted ability: no clause of a card refers to
+      -- one, CR 702's own text being what mints it.
+      ActivatedAbility.name = Nothing
+    }
+  where
+    criterion =
+      Filter.And
+        [ Filter.HasCardType CardType.Creature,
+          Filter.Not Filter.IsTapped,
+          Filter.ControlledBy PlayerRelation.You,
+          Filter.Not Filter.IsSource
+        ]
+    load =
+      Effect.PutCounters
+        ( PutCounters.MkPutCounters
+            (CounterKind.Named chargeCounter)
+            (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.tappedPermanent Quantity.Power))
+            (ObjectRef.InSlot Binding.triggerSource)
+        )
+
+-- CR 122.1's charge counter, spelled as a station card spells it. Not reserved by
+-- Pawl.Codec.CounterName, and deliberately so: CR 122.1 makes counters of the same
+-- name interchangeable, so `station`'s minted counters and the ones a striation
+-- counts through Quantity.ObjectCounters have to land on one Object.counters key.
+-- data/cards/lumen-class-frigate.json writes this same string.
+chargeCounter :: CounterName.CounterName
+chargeCounter = CounterName.UnsafeMkCounterName (Text.pack "charge")
 
 -- CR 702.87a's whole ability, outlast's twin below.
 --
@@ -992,6 +1079,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  -- CR 702.184a permits no casting; the station card is cast for its own cost.
+  Keyword.Station -> []
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -1565,6 +1654,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  -- CR 702.184a replaces nothing: it is an activated ability.
+  Keyword.Station -> []
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -1724,6 +1815,9 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Undying -> []
   Keyword.Changeling -> []
   Keyword.Reinforce {} -> []
+  -- CR 702.184a restricts no attack or block; CR 721.2b's threshold is what
+  -- decides whether the permanent is a creature at all.
+  Keyword.Station -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -1879,6 +1973,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Undying -> []
   Keyword.Changeling -> []
   Keyword.Reinforce {} -> []
+  -- CR 702.184a attaches nothing.
+  Keyword.Station -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability of an object whose keywords
 -- are `counts`, as a family designator -- the classification
@@ -2036,6 +2132,7 @@ familyOf keyword = case keyword of
   Keyword.Exert -> Nothing
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing
+  Keyword.Station -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.

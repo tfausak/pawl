@@ -3640,6 +3640,10 @@ keywordFilters keyword = keywordFramed $ case keyword of
   -- written into the ability Pawl.Engine.Keyword.frenzy mints.
   Keyword.Frenzy _ -> []
   Keyword.Toxic _ -> []
+  -- CR 702.184a is payload-free: the "another untapped creature you control" the
+  -- cost taps is written into the ability Pawl.Engine.Keyword.station mints, not
+  -- into the keyword.
+  Keyword.Station -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]

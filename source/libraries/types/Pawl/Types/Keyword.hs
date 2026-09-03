@@ -390,6 +390,14 @@ data Keyword
     -- into an Aura with enchant creature is minted from this constructor rather
     -- than printed.
     Bestow (Cost.Cost Keyword)
+  | -- | 702.184a: "Tap another untapped creature you control: Put a number of
+    -- charge counters on this permanent equal to the tapped creature's power.
+    -- Activate only as a sorcery."
+    --
+    -- Not implemented: CR 702.184c's static abilities that make a station
+    -- ability read a characteristic other than the tapped creature's power
+    -- (Tapestry Warden) (#3127).
+    Station
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

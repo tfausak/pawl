@@ -927,5 +927,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Exert
       " {\"type\":\"Exert\"} "
+  -- CR 702.184a. Nullary: rule 702.184a states the whole ability, so a station
+  -- card prints no parameter for it.
+  Spec.it s "Station" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Station
+      " {\"type\":\"Station\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec

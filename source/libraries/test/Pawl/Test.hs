@@ -505,6 +505,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
 import qualified Pawl.SplitSecondSpec
+import qualified Pawl.StationSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
 import qualified Pawl.TransformSpec
@@ -1087,6 +1088,7 @@ spec s registry = do
   Pawl.SpecialActionSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
   Pawl.SplitSecondSpec.spec s registry
+  Pawl.StationSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TeamSpec.spec s registry
   Pawl.TransformSpec.spec s registry
