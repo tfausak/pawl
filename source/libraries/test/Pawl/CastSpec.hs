@@ -2268,6 +2268,105 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     Spec.assertBool s (PlayerEffect.cantBeCountered S.bob bobs protected) "an opponent's spell is uncounterable while Lier is out"
     Spec.assertBool s (not (PlayerEffect.cantBeCountered S.bob bobs' unprotected)) "and counterable without it"
 
+-- Synthetic Mirror of the Fallen {U}{U} Sorcery
+-- (data/cards/synthetic-mirror-of-the-fallen.json): "Target card in your
+-- graveyard becomes a copy of target card in an opponent's graveyard."
+--
+-- SYNTHETIC because no printing turns a card in a graveyard into a copy of
+-- anything. Scryfall `o:/copy of/ o:graveyard -t:token`, 2026-08-29: every hit
+-- copies FROM a graveyard card into a token, a permanent or an entering creature
+-- (Body Double, Dimir Doppelganger, Lazav, Shifting Woodland, Feldon), none onto
+-- one; the card that would refute it reads "target card in a graveyard becomes a
+-- copy of ...". Rule 707 bars no zone -- CR 707.1's object is a "spell,
+-- permanent, or card" -- and CR 400.7 is not in play, nothing here changing zone.
+--
+-- BOTH SLOTS name graveyard cards, where a permanent would read more naturally
+-- as the original: Lier is the pool's only granter of
+-- Modification.GainFlashbackAtManaCost and its static ability reaches instant and
+-- sorcery cards only (CR 702.34a), so a subject that copied a CREATURE would lose
+-- the grant and the board could show nothing at all. Opposite graveyards (CR
+-- 400.1) rather than an "another target card" restriction, since that is what
+-- keeps one slot from naming the other's card.
+--
+-- Acidic Soil {2}{R} and Lightning Bolt {R} differ in AMOUNT and not only in
+-- colour, which is what the one untapped Mountain left after the Mirror is cast
+-- discriminates: it pays the copied cost and cannot pay the printed one.
+--
+-- Not implemented: CR 707.2's copiable RULES TEXT when the copy is CAST. The
+-- flashback cast below resolves Acidic Soil's own damage clause rather than
+-- Lightning Bolt's, because Pawl.Engine.Resolve.resolveSpellWith reads the
+-- printed face's modes (#3098). The COST is this group's subject and is
+-- unaffected by that.
+mirrorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+mirrorBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  mountain <- S.printingOf s registry "Mountain"
+  soil <- S.printingOf s registry "Acidic Soil"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  lier <- S.printingOf s registry "Lier, Disciple of the Drowned"
+  mirror <- S.printingOf s registry "Synthetic Mirror of the Fallen"
+  -- TWO Islands and ONE Mountain: the Islands are exactly the Mirror's {U}{U}
+  -- and the Mountain is exactly Lightning Bolt's {R}, so the flashback cast that
+  -- follows has one land to pay with. Three lands altogether is also what Acidic
+  -- Soil's own clause counts when it resolves.
+  let lands = S.landsFor island S.alice 2 (S.landsInPlay mountain 1)
+      (_, seated) = S.addCreature lier S.alice lands
+      (subject, withSubject) = S.addGraveyardCard soil S.alice seated
+      (original, withOriginal) = S.addGraveyardCard bolt S.bob withSubject
+      (inHand, held) = S.addHandCard mirror S.alice withOriginal
+  pure (aliceOnTurn held, inHand, subject, original)
+
+-- Both of the Mirror's slots, FILTERED from the offered set rather than built, so
+-- CR 608.2b's re-read at resolution finds the recipient the engine offered. One
+-- predicate for both because the pools are disjoint: alice's graveyard holds only
+-- the subject and bob's only the original.
+mirrorAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+mirrorAnswer subject original p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap (Set.filter (\r -> r == Recipient.ToObject subject || r == Recipient.ToObject original) . snd) sets
+  _ -> S.identityAnswer p
+
+mirrorOfTheFallenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+mirrorOfTheFallenSpec s registry = Spec.describe s "MirrorOfTheFallen" $ do
+  Spec.it s "CR 707.2 a graveyard card that is a copy is priced at the copy's mana cost" $ do
+    soil <- S.printingOf s registry "Acidic Soil"
+    mountain <- S.printingOf s registry "Mountain"
+    (board, inHand, subject, original) <- mirrorBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = mirrorAnswer subject original
+        printed = ManaCost.MkManaCost [ManaSymbol.Generic 2, theRed]
+        copied = ManaCost.MkManaCost [theRed]
+        onStack = S.runPure answer board (S.cast S.alice inHand)
+        copiedBoard = S.runPure answer onStack Stack.resolveTop
+        resolved = S.runPure answer (S.runPure answer copiedBoard (S.cast S.alice subject)) Stack.resolveTop
+        soilsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName soil)) (Game.zoneMembers zone S.alice gs))
+    -- The preconditions, read off boards the copy has not reached, so none of
+    -- them can absorb a mutation of the arm under test.
+    Spec.assertEqWith s "alice has exactly one Mountain, the Mirror's {U}{U} having spent both Islands" (S.countOnBattlefieldByName (S.printingName mountain) S.alice onStack) 1
+    -- The discriminating twin, and it is the SAME board one resolution earlier:
+    -- same lands, same seats, same graveyards, the Mirror already paid for. One
+    -- thing differs, and it is whether the copy has happened.
+    Spec.assertEqWith
+      s
+      "with the Mirror still on the stack the grant prices the card at its own printed {2}{R}"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName soil) subject onStack))
+      [Just printed]
+    -- Gameplay level, and FIRST among the reads of `resolved`: one Mountain
+    -- cannot pay {2}{R}, so under the printed reading there is no cast at all and
+    -- alice stays at 20.
+    Spec.assertEqWith s "the copied {R} paid for the flashback cast, and Acidic Soil dealt her 3 for her three lands" (S.lifeOf S.alice resolved) (Just 17)
+    Spec.assertEqWith s "and CR 702.34a exiled the card as it resolved" (soilsIn Zone.Exile resolved) 1
+    Spec.assertEqWith s "so it is not back in her graveyard" (soilsIn Zone.Graveyard resolved) 0
+    -- Supporting, and AFTER the three above so it cannot absorb the mutation.
+    Spec.assertEqWith
+      s
+      "CR 707.2: once it is a copy, the only flashback cost offered is Lightning Bolt's {R}"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName soil) subject copiedBoard))
+      [Just copied]
+    -- CR 707.2b: the original is untouched -- bob's Lightning Bolt is still in
+    -- his graveyard, so nothing above turned on the copy having consumed it.
+    Spec.assertEqWith s "and bob's Lightning Bolt is still in his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+
 -- Harness the Storm {2}{R} Enchantment (data/cards/harness-the-storm.json):
 -- "Whenever you cast an instant or sorcery spell from your hand, you may cast
 -- target card with the same name as that spell from your graveyard."
@@ -4185,6 +4284,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   graveRecitalSpec s registry
   fugitiveDoctorSpec s registry
   lierSpec s registry
+  mirrorOfTheFallenSpec s registry
   harnessTheStormSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry

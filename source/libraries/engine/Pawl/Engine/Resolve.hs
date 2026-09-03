@@ -6743,8 +6743,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       _ -> pure ()
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef) ->
     State.modify' $ \gs ->
-      -- CR 707.4: each named subject becomes a copy of the named original while
-      -- staying on the battlefield. Both sides are enumerated ONCE off the same
+      -- CR 707.1: each named subject becomes a copy of the named original, in
+      -- whatever zone it already sits -- CR 707.4's "while remaining on the
+      -- battlefield" for a permanent, and Synthetic Mirror of the Fallen's card
+      -- in a graveyard otherwise, no zone change happening either way (CR
+      -- 400.7). Both sides are enumerated ONCE off the same
       -- `gs` (CR 608.2f), so an illegal slot, a player recipient and a set that
       -- matched nothing all arrive empty and copy nothing. ONE original: CR 707.2
       -- copies the values of "the original object", singular.

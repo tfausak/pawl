@@ -14,6 +14,9 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -45,6 +48,7 @@ testCharacteristics =
       PC.supertypes = Set.singleton Supertype.Legendary,
       PC.keywords = Map.singleton Keyword.Flying 1,
       PC.colors = Set.singleton Color.Blue,
+      PC.manaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Blue)]),
       PC.manaValue = Just 3,
       PC.power = Just 1,
       PC.toughness = Just 2,
@@ -68,7 +72,9 @@ testCharacteristics =
 testCharacteristicsJson :: String
 testCharacteristicsJson =
   "{\"names\":[\"Test Creature\"],\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"key\":{\"type\":\"Flying\"},\"value\":1}],"
-    <> "\"colors\":[{\"type\":\"Blue\"}],\"manaValue\":3,\"power\":1,\"toughness\":2,"
+    <> "\"colors\":[{\"type\":\"Blue\"}],"
+    <> "\"manaCost\":[{\"type\":\"Generic\",\"value\":2},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}}],"
+    <> "\"manaValue\":3,\"power\":1,\"toughness\":2,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]}],"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}}],"
@@ -86,6 +92,7 @@ minimalCharacteristics =
       PC.supertypes = Set.empty,
       PC.keywords = Map.empty,
       PC.colors = Set.empty,
+      PC.manaCost = Nothing,
       PC.manaValue = Nothing,
       PC.power = Nothing,
       PC.toughness = Nothing,
