@@ -34,10 +34,12 @@
                       {
                         "type": "CopyStackObject",
                         "value": {
-                          "newTargets": true,
                           "ref": {
                             "type": "InSlot",
                             "value": "ability"
+                          },
+                          "targets": {
+                            "type": "ChosenByController"
                           }
                         }
                       }

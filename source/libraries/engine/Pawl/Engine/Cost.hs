@@ -1369,9 +1369,10 @@ claimOf slots pid oid component gs = case component of
   -- CR 101.2's prohibition, ReturnThis' reading above and for its reason; the
   -- two answers have to agree.
   --
-  -- A FENCE and not proven behaviour, ReturnThis' note above: Brittle Effigy is
-  -- the one card printing this component, its cost states a non-empty mana part,
-  -- so `repeatsOf` settles at 1 before any axis matters.
+  -- A FENCE and not proven behaviour, ReturnThis' note above: every printing of
+  -- this component in `data/cards/` -- Brittle Effigy, Hanged Executioner --
+  -- states a non-empty mana part, so `repeatsOf` settles at 1 before any axis
+  -- matters.
   CostComponent.ExileThis ->
     claim
       (ClaimAxis.Removal Zone.Battlefield)
@@ -2271,20 +2272,28 @@ criteriaOf component = case component of
 -- Reached only from CR 118.12's payment, which is the one whose caller unwinds
 -- nothing of its own -- `pay` below says why.
 --
--- ALL OR NOTHING, where the rule's "any" admits a subset (#3134). That is also
--- what keeps its "unless" clause -- mana from a reversed ability spent on
+-- ALL OR NOTHING, where the rule's "any" admits a subset (gap #3134). That is
+-- also what keeps its "unless" clause -- mana from a reversed ability spent on
 -- another that was not -- true by construction: a nested activation is inside
 -- `closed` and inside `before` alike, so it goes back with its parent or stays
 -- with it.
+--
+-- The CANCELLATION HAPPENS FIRST, before the question: rule 733.1 reverses the
+-- action and cancels the payments flat, and only its last-but-one sentence
+-- offers the mana abilities back. So the payer is asked against `closed`, where
+-- nothing of the cost has been paid, rather than against the half-paid state the
+-- refusal left -- which is what Pawl.Engine.Game.ask hands the answerer. It also
+-- keeps CR 104.4b's stamp: `Game.choose` writes GameState.lastChoice, and
+-- declining now puts back nothing that could discard it.
 reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> Game ()
 reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
   Nothing -> State.put before
   Just sources -> do
-    gs <- State.get
-    answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid gs) pid sources)
-    State.put $ case answer of
-      OptionalDecision.Exercises -> before
-      OptionalDecision.Declines -> closed
+    State.put closed
+    answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid closed) pid sources)
+    case answer of
+      OptionalDecision.Exercises -> State.put before
+      OptionalDecision.Declines -> pure ()
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
 -- the PAYER's (payComponents below).
@@ -2319,7 +2328,7 @@ reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
 -- not exclude -- Pawl.Engine.ManaAbility.movesLibraryCard answers False of
 -- Effect.Shuffle and Effect.Reveal, so a mana ability could carry one and a
 -- reversal here would undo it. No printing in `data/cards/` prints a mana
--- ability that shuffles a library or reveals a card from one (#3119).
+-- ability that shuffles a library or reveals a card from one (#3142).
 --
 -- `moment` is which of CR 601.2h and CR 118.12 this payment is (see
 -- Pawl.Types.PaymentMoment). Taken from the CALLER and never derived, since the
@@ -3153,32 +3162,53 @@ payComponent moment slots pid oid component = case component of
   -- The payment is still MADE when CR 122.1d takes the untap, which is the rule
   -- rather than a shortcut: CR 614.6 replaces the EVENT the paying produces, and
   -- CR 601.2h's "partial payments are not allowed" is about what the player
-  -- performs, not about what the event turns into.
+  -- performs, not about what the event turns into. That is a replaced event and
+  -- not an unpayable part, so it is the guard below that has to be able to tell
+  -- them apart -- CR 122.1d leaves the permanent on the battlefield and tapped,
+  -- which `canPayComponent` calls payable.
+  --
+  -- CR 118.3 asked AGAIN here, TapThis' reason above with CR 107.6 in place of
+  -- CR 107.5. Pawl.CostSpec's "CR 118.3 the Altar eats the Sentry before its own
+  -- {Q} is paid" is the proof.
   CostComponent.UntapThis -> do
-    Event.untap oid
-    pure bindsNothing
+    gs <- State.get
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.untap oid
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- Through Event.sacrifice, the CR 701.21 funnel, and never a direct zone poke:
   -- a cost payment is a game event, so dies-triggers, replacement effects and the
   -- turn history all see it.
   --
-  -- Not implemented: CR 118.3 asked again here, as TapThis above asks it. An
-  -- earlier part of the CR 601.2h order, or a mana ability activated in the CR
-  -- 605.3a window, can already have moved this permanent, and the funnel then does
-  -- nothing while this answers Paid. The same paragraph stands over ExileThis and
-  -- ReturnThis below (#3118).
+  -- CR 118.3 asked AGAIN here, TapThis' reason above: an earlier part of the CR
+  -- 601.2h order, or a mana ability activated in the CR 605.3a window, can
+  -- already have moved this permanent, and the funnel would then do nothing
+  -- while this answered Paid. Pawl.CostSpec's "CR 118.3 the Altar eats the
+  -- Replica before its own sacrifice is paid" is the proof.
   CostComponent.SacrificeThis -> do
-    -- CR 701.21a's "a permanent they don't control" guard lives in the funnel;
-    -- `pid` is the player paying, who for "sacrifice this" is its controller.
-    Event.sacrifice pid oid
-    pure bindsNothing
+    gs <- State.get
+    -- CR 701.21a's "a permanent they don't control" guard lives in the funnel as
+    -- well as in `canPayComponent`; `pid` is the player paying, who for
+    -- "sacrifice this" is its controller.
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.sacrifice pid oid
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- Through Event.changeZone, the CR 400.7 funnel, and never a direct zone poke,
   -- SacrificeThis' call above and for its reason. CR 400.3 is what makes the bare
   -- Zone.Hand right: an object that would go to a hand other than its owner's
   -- goes to its owner's, so the funnel already spells the printed "its owner's".
-  -- SacrificeThis' CR 118.3 elision above covers this arm too (#3118).
+  -- CR 118.3 asked again, SacrificeThis' reason above; Pawl.CostSpec's "CR 118.3
+  -- the Altar eats the Ignus before its own return is paid" is the proof.
   CostComponent.ReturnThis -> do
-    Event.changeZone oid Zone.Hand
-    pure bindsNothing
+    gs <- State.get
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.changeZone oid Zone.Hand
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- CR 119.4: the payment is subtracted from the life total, shared with CR
   -- 107.4f's Phyrexian symbol as the payability check above is -- and ASKED
   -- AGAIN here, because not every component reached the gate: a component a
@@ -3503,11 +3533,16 @@ payComponent moment slots pid oid component = case component of
     Event.changeZone oid Zone.Exile
     pure bindsNothing
   -- CR 406.2's move off the BATTLEFIELD, through the same funnel and with no
-  -- prompt for the same reason: the cost names this permanent. SacrificeThis'
-  -- CR 118.3 elision above covers this arm too (#3118).
+  -- prompt for the same reason: the cost names this permanent. CR 118.3 asked
+  -- again, SacrificeThis' reason above; Pawl.CostSpec's "CR 118.3 the Altar eats
+  -- the Executioner before its own exile is paid" is the proof.
   CostComponent.ExileThis -> do
-    Event.changeZone oid Zone.Exile
-    pure bindsNothing
+    gs <- State.get
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.changeZone oid Zone.Exile
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- CR 406.2's move again, for CHOSEN cards: the payer picks which, so this is a
   -- prompt. Elided only when forced, Sacrifice's elision.
   --
