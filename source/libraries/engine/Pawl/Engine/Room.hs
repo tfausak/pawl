@@ -182,7 +182,13 @@ unlock perform pid oid half = do
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (unlockCostOf face)
         payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
-          Payment.Unpaid -> State.put before
+          -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a
+          -- mana ability tapped in the window this payment opened may have
+          -- shuffled or revealed, and this reject-not-repair restore must not
+          -- undo that too.
+          Payment.Unpaid -> do
+            gs <- State.get
+            State.put (Cost.keepingLibraryActions gs before)
           -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action
           -- resolves nothing whose effects could read a slot.
           -- CR 709.5e names the actor itself: the player who paid the unlock

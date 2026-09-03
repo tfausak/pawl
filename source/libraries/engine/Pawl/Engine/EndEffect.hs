@@ -101,5 +101,11 @@ endEffect pid oid = do
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (PaidExpiry.cost offer)
       payment <- Cost.pay Resolve.performManaAbility PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
-        Payment.Unpaid -> State.put before
+        -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a mana
+        -- ability tapped in the window this payment opened may have shuffled
+        -- or revealed, and this reject-not-repair restore must not undo that
+        -- too.
+        Payment.Unpaid -> do
+          gs <- State.get
+          State.put (Cost.keepingLibraryActions gs before)
         Payment.Paid _ -> State.modify' (Expiry.dropWhenPaidBy oid)

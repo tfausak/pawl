@@ -1058,4 +1058,10 @@ activateAbility pid srcId ability = do
                   -- After the payment for Cast.castSpell's reason: everything
                   -- above can still restore `before` and unwind the activation.
                   Event.becameTarget abilId StackObjectKind.Ability pid chosen
-                Payment.Unpaid -> State.put before
+                -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason:
+                -- a mana ability tapped in the window this payment opened may
+                -- have shuffled or revealed, and this reject-not-repair
+                -- restore must not undo that too.
+                Payment.Unpaid -> do
+                  failedGs <- State.get
+                  State.put (Cost.keepingLibraryActions failedGs before)

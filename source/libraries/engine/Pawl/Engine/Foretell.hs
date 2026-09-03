@@ -153,7 +153,13 @@ foretell pid oid = do
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure actionCost
       payment <- Cost.pay Resolve.performManaAbility PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
-        Payment.Unpaid -> State.put before
+        -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a mana
+        -- ability tapped in the window this payment opened may have shuffled
+        -- or revealed, and this reject-not-repair restore must not undo that
+        -- too.
+        Payment.Unpaid -> do
+          gs <- State.get
+          State.put (Cost.keepingLibraryActions gs before)
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and
         -- resolves nothing, and the later cast pays its own cost.
         Payment.Paid _ -> do
