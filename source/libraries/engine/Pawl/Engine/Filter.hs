@@ -1812,6 +1812,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Exert -> keyword
   Keyword.Type.Persist -> keyword
   Keyword.Type.Undying -> keyword
+  -- CR 702.184a's ability names "creature" and "charge counters", both the rules'
+  -- own vocabulary; the criterion is written in Pawl.Engine.Keyword rather than
+  -- on the card, so CR 612.2 has no printed word here to swap.
+  Keyword.Type.Station -> keyword
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

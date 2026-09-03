@@ -14,7 +14,11 @@ import qualified Data.Text as Text
 -- interchangeability sentence, and the door that maintains it is
 -- Pawl.Codec.CounterName.make -- it lives there rather than here because it
 -- must consult every Pawl.Types.CounterKind constructor's spelling, and that
--- module imports this one. Ord is load-bearing for the same reason
+-- module imports this one. Card data reaches this type only through that door.
+-- Pawl.Engine.Keyword.chargeCounter is the one spelling the ENGINE mints,
+-- rule 702.184a naming its counter in the rulebook rather than on a card, and it
+-- takes the bare constructor: the codec is not on that road at all.
+-- Ord is load-bearing for the same reason
 -- 'Pawl.Types.CounterKind.CounterKind''s is: this ends up inside a Map key.
 --
 -- NOT normalized -- no case folding, no slugging. CR 122.1 says nothing about
