@@ -3159,10 +3159,11 @@ becameSlotSpec s registry =
         -- The BEARER ARRIVAL argument is held constant at a present one, and is
         -- not a second dimension of the intersection: it is CR 400.7f's datum
         -- rather than a shape the event can take, and eventBindingSlots'
-        -- AttachedCreatureDies arm carries the argument that CR 704.5m makes it
-        -- present for every bearer a printing can put under that condition.
-        -- Holding it Nothing instead would pin the OTHER reading, under which no
-        -- card could read `became` there at all.
+        -- AttachedCreatureDies arm claims the slot on CR 704.5m's Aura, whose
+        -- arrival is present for every event that condition admits. Holding it
+        -- Nothing instead would pin the OTHER reading, under which no card could
+        -- read `became` there at all -- and CR 704.5n's Equipment bearer, which
+        -- has no arrival, is the over-claim that arm's own comment records.
         Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for EVERY event a condition admits" $ do
           piker <- S.printingOf s registry "Goblin Piker"
           let bearerBecame = Just (ObjectId.MkObjectId 3)
@@ -5206,9 +5207,9 @@ kindredSpec s registry =
 --
 -- CR 700.4 is what makes the printed "dies" one of the departures the clause
 -- names; CR 603.10a is what lets the trigger see a host that has already left;
--- and CR 608.2h's Pawl.Types.LastKnown.attachedTo is what lets the MATCH see the
--- link, CR 704.5m having taken the Aura off the battlefield in the same
--- CR 117.5 batch.
+-- and CR 608.2h's Pawl.Types.LastKnown.attached -- the HOST's record of what was
+-- attached to it -- is what lets the MATCH see the link, CR 704.5m having taken
+-- the Aura off the battlefield in the same CR 117.5 batch.
 --
 -- AND CR 400.7f is what lets the PAYLOAD act. Its effect moves "this card" out
 -- of the graveyard, and CR 113.7a's source slot carries the battlefield id CR
@@ -5277,9 +5278,9 @@ screamsFromWithinSpec s registry =
           Spec.assertEqWith s "and CR 704.5m really took the Aura off the battlefield" (Game.lookupObject aura after) Nothing
           Spec.assertEqWith
             s
-            "so the trigger was gathered off CR 608.2h last known information"
-            (fmap LastKnown.attachedTo (Map.lookup aura (GameState.lastKnown after)))
-            (Just (Just (Recipient.ToCreature enchanted)))
+            "so the trigger was gathered off the HOST's CR 608.2h record of what was attached to it"
+            (fmap LastKnown.attached (Map.lookup enchanted (GameState.lastKnown after)))
+            (Just (Set.singleton aura))
         -- CR 603.10a's own case, and the leg that makes `looksBack`'s arm
         -- load-bearing: the Aura leaves the battlefield in the SAME event group
         -- as its host -- a wrath -- so the live board holds neither, and the
@@ -5371,7 +5372,8 @@ screamsFromWithinSpec s registry =
 --
 -- CR 704.5n rather than CR 704.5m is what keeps the Equipment on the battlefield
 -- when its host dies, so its ability is read there, by `eventTriggers`'
--- `battlefieldAbilitiesOf` filter, off the live projection.
+-- `battlefieldAbilitiesOf` filter, off the live projection. That the CONDITION
+-- would match is skullclampSpec's, on the printing that reaches it.
 widowedBladeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 widowedBladeSpec s registry =
   let board = do
@@ -5385,13 +5387,11 @@ widowedBladeSpec s registry =
         pure (host, equipment, blade, S.attach equipment host g4)
       kill victim gs = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim] >> Engine.settleForPriority)
    in Spec.describe s "WidowedBlade" $ do
-        -- The gameplay board, and a REGRESSION FENCE rather than a proof:
-        -- granting this Equipment the Aura exception leaves the stack empty all
-        -- the same, because the condition never matches for a surviving
-        -- Equipment bearer (#3144) and the match is asked before CR 113.6m's
-        -- filter can matter. The leg below is what proves the gate; this one
-        -- says the board really is the one CR 113.6m is about, and becomes
-        -- discriminating the day #3144 lands.
+        -- The gameplay board, and the leg that proves the gate: the condition
+        -- DOES match for a surviving Equipment bearer -- skullclampSpec below is
+        -- that behaviour on its own card -- so what keeps the stack empty here
+        -- is CR 113.6m alone, and granting this Equipment the Aura exception
+        -- puts the trigger on it. The leg below is the same gate one level down.
         Spec.it s "CR 113.6m an Equipment gets no Aura exception, so its ability never triggers from the battlefield" $ do
           (host, equipment, _, gs) <- board
           let after = kill host gs
@@ -5410,6 +5410,87 @@ widowedBladeSpec s registry =
           Spec.assertEqWith s "as an Equipment the ability functions only in the graveyard" (zonesWith (TypeLine.subtypes (Face.typeLine face))) [Just Zone.Graveyard]
           Spec.assertEqWith s "as an Aura the exception applies and it names no zone" (zonesWith (Set.insert Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) [Nothing]
           Spec.assertBool s (not (Set.member Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) "and the printed card really is no Aura"
+
+-- CR 603.10a's look-back at an attachment, on the EQUIPMENT side. Skullclamp
+-- {1} Artifact -- Equipment, "Equipped creature gets +1/-1. / Whenever equipped
+-- creature dies, draw two cards. / Equip {1}", is the printing. (Name, cost,
+-- type line and oracle text checked against Scryfall.)
+--
+-- CR 303.4m makes "equipped creature" the same attachment link and the same
+-- TriggerCondition.AttachedCreatureDies an Aura's "enchanted creature dies"
+-- uses; CR 704.5n makes it a different QUESTION. The Equipment becomes
+-- unattached and REMAINS on the battlefield in the same CR 117.5 batch that
+-- buried its host, so at the moment triggers are placed there is neither a live
+-- link to read nor a CR 608.2h record of the Equipment -- it never ceased. The
+-- reading that survives is the host's own record of what was attached to it
+-- (Pawl.Types.LastKnown.attached), which is what CR 603.10a asks for: the
+-- appearance of the objects immediately prior to the event.
+--
+-- Three legs. The pair differs in exactly one thing -- WHICH of alice's two
+-- creatures is destroyed -- so the negative cannot pass for want of a trigger
+-- event or of a card to draw; the third is the board this card is famous for,
+-- where nothing is destroyed at all and the Equipment's own +1/-1 does it.
+--
+-- alice's library is stocked so that CR 104.3c decks nobody before the
+-- assertions run, and Hill Giant is the host rather than the Piker because a
+-- 3/3 equipped is a 4/2 and survives to be killed on purpose.
+skullclampSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+skullclampSpec s registry =
+  let board = do
+        clamp <- S.printingOf s registry "Skullclamp"
+        hillGiant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (host, g1) = S.addCreature hillGiant S.alice (Setup.emptyGame S.bothPlayers)
+            (bystander, g2) = S.addCreature piker S.alice g1
+            (equipment, g3) = S.addCreature clamp S.alice g2
+        pure (host, bystander, equipment, S.attach equipment host (stock hillGiant g3))
+      -- Three cards, one more than the trigger draws, so an empty library is
+      -- never what the hand size is reporting.
+      stock printing gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing S.alice g)) gs [1 :: Int, 2, 3]
+      -- CR 117.5's own settle: the SBA pass buries the victim and detaches the
+      -- Equipment, and the trigger is put on the stack after it.
+      kill victim gs = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim] >> Engine.settleForPriority)
+      settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolve gs = S.runPure S.identityAnswer gs Stack.resolveTop
+   in Spec.describe s "Skullclamp" $ do
+        -- The proving leg. The discriminating quantity is alice's hand: the
+        -- trigger draws two, and a matcher that cannot see the attachment places
+        -- no trigger and draws nothing.
+        Spec.it s "CR 603.10a an Equipment's dies trigger fires though CR 704.5n left it standing" $ do
+          (host, _, equipment, gs) <- board
+          let placed = kill host gs
+              after = resolve placed
+          Spec.assertEqWith s "CR 603.10a alice drew two cards" (S.handSize S.alice after) 2
+          -- The preconditions the assertion rests on, AFTER it so none of them
+          -- can absorb a mutation aimed at the look-back.
+          Spec.assertEqWith s "the equipped Hill Giant really died" (Game.lookupObject host after) Nothing
+          Spec.assertEqWith s "CR 704.5n left the Equipment on the battlefield with its link cleared" (fmap Object.attachedTo (Game.lookupObject equipment after)) (Just Nothing)
+          Spec.assertEqWith s "so the Equipment filed no record of its own" (Map.lookup equipment (GameState.lastKnown after)) Nothing
+          Spec.assertEqWith s "the host's record is the one that names it" (fmap LastKnown.attached (Map.lookup host (GameState.lastKnown after))) (Just (Set.singleton equipment))
+          Spec.assertEqWith s "alice held nothing before the trigger resolved" (S.handSize S.alice placed) 0
+          Spec.assertEqWith s "and the trigger really was on the stack" (length (GameState.stack placed)) 1
+        -- The negative, one creature over: the same board, the same removal, the
+        -- same library -- and a permanent the Equipment was never attached to.
+        Spec.it s "CR 303.4m another creature of the same controller dying is not the equipped creature dying" $ do
+          (_, bystander, _, gs) <- board
+          let placed = kill bystander gs
+          Spec.assertEqWith s "no trigger is placed" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "so alice draws nothing" (S.handSize S.alice placed) 0
+          Spec.assertEqWith s "and the Goblin Piker really died" (Game.lookupObject bystander placed) Nothing
+        -- Skullclamp's own board, with no removal in it: CR 613.4c's layer 7c
+        -- makes the equipped 2/1 Piker a 3/0 and CR 704.5f buries it, which is
+        -- the same look-back reached through the card's static half.
+        Spec.it s "CR 704.5f the printed +1/-1 kills the equipped creature and the trigger still fires" $ do
+          clamp <- S.printingOf s registry "Skullclamp"
+          hillGiant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (host, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+              (equipment, g2) = S.addCreature clamp S.alice g1
+              placed = settle (S.attach equipment host (stock hillGiant g2))
+              after = resolve placed
+          Spec.assertEqWith s "CR 704.5f alice drew two cards off the toughness her own Equipment took away" (S.handSize S.alice after) 2
+          Spec.assertEqWith s "the 3/0 Goblin Piker really died" (Game.lookupObject host after) Nothing
+          Spec.assertBool s (Maybe.isJust (Game.lookupObject equipment after)) "and CR 704.5n left the Equipment behind"
 
 -- CR 113.6m's FINAL sentence, over a whole card: "the same is true if the effect
 -- of that ability creates a delayed triggered ability whose effect moves the
@@ -5608,6 +5689,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   hauntSpec s registry
   screamsFromWithinSpec s registry
   widowedBladeSpec s registry
+  skullclampSpec s registry
   prizedAmalgamSpec s registry
   banewaspAfflictionSpec s registry
   strippedTriggerSpec s registry

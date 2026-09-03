@@ -1028,7 +1028,9 @@ applyCrossings finalSub parent =
                 (Object.source obj)
                 (Object.counters obj)
                 (Event.copiedSnapshot oid g)
-                (Object.attachedTo obj)
+                -- CR 303.4b / 301.5a with the arrow turned round, taken
+                -- while the answer still exists (CR 603.10a).
+                (Game.attachments oid g)
                 (Object.chosenNames obj)
                 (Game.isBlocking oid g)
                 -- CR 310.9a, read straight off the object like the owner above:

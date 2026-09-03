@@ -5,9 +5,9 @@ module Pawl.Codec.LastKnown where
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
-import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.Source as Source
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -24,7 +24,7 @@ codec = Fields.object $ do
   source <- Fields.required "source" Source.codec LastKnown.source
   counters <- Fields.required "counters" (Common.multiset (CounterKind.codec Keyword.codec)) LastKnown.counters
   copiable <- Fields.required "copiable" ProjectedCharacteristics.codec LastKnown.copiable
-  attachedTo <- Fields.required "attachedTo" (Common.maybe Recipient.codec) LastKnown.attachedTo
+  attached <- Fields.required "attached" (Common.set ObjectId.codec) LastKnown.attached
   chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
   blocking <- Fields.required "blocking" Common.boolean LastKnown.blocking
   protector <- Fields.required "protector" (Common.maybe PlayerId.codec) LastKnown.protector
@@ -36,7 +36,7 @@ codec = Fields.object $ do
         LastKnown.source = source,
         LastKnown.counters = counters,
         LastKnown.copiable = copiable,
-        LastKnown.attachedTo = attachedTo,
+        LastKnown.attached = attached,
         LastKnown.chosenNames = chosenNames,
         LastKnown.blocking = blocking,
         LastKnown.protector = protector

@@ -6,9 +6,9 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 
 -- | CR 608.2h: what an object WAS, filed under the id it had while it existed.
@@ -90,25 +90,26 @@ data LastKnown = MkLastKnown
     -- and not whether the object was ITSELF a copy (CR 707.2's "as modified by
     -- other copy effects").
     copiable :: !ProjectedCharacteristics.ProjectedCharacteristics,
-    -- | CR 303.4b / CR 301.5a: what it was attached to as it left -- the same
-    -- Object.attachedTo the live object carried. What "enchanted creature" and
-    -- "equipped creature" mean for an Aura or an Equipment that is itself
-    -- already gone.
+    -- | CR 303.4b / CR 301.5a: the permanents that were attached TO it as it
+    -- left -- Object.attachedTo with the arrow turned round, swept off the
+    -- battlefield by Pawl.Engine.Game.attachments as the object ceased. What
+    -- "enchanted creature" and "equipped creature" mean once the creature is
+    -- gone.
     --
-    -- Not a characteristic either (CR 109.3's list has no attachment), and not
-    -- recoverable from anything above, so it sits beside the projection for
-    -- `controller`'s reason. CR 704.5m takes an AURA off the battlefield in the
-    -- very SBA batch that killed its host, so a live read of the link is
-    -- unavailable exactly when the rules still ask for it --
-    -- Pawl.Types.TriggerCondition.AttachedCreatureDies is the reader.
+    -- Not a characteristic either (CR 109.3 names "what an Aura enchants" as an
+    -- example of what is not one), and not recoverable from anything above, so
+    -- it sits beside the projection for `controller`'s reason.
     --
-    -- Not implemented: the same question for an EQUIPMENT, which CR 704.5n
-    -- merely detaches, so it survives the batch with no entry here and no live
-    -- link either (#3144).
+    -- CR 603.10a's look-back for TriggerCondition.AttachedCreatureDies, its one
+    -- reader, and off the HOST rather than the bearer because that is the only
+    -- side the answer survives on: the SBA batch that kills the host buries an
+    -- Aura (CR 704.5m) and clears an Equipment's link (CR 704.5n) before CR
+    -- 117.5 places any trigger, and the Equipment, still standing, files no
+    -- record of its own. Proved by Pawl.ZoneTriggerSpec's Skullclamp and
+    -- ScreamsFromWithin groups.
     --
-    -- Nothing for an object that was attached to nothing, which is every object
-    -- that is not an Aura, an Equipment or a Fortification.
-    attachedTo :: !(Maybe Recipient.Recipient),
+    -- Empty for everything nothing was attached to, which is most objects.
+    attached :: !(Set.Set ObjectId.ObjectId),
     -- | CR 201.4: the card names that had been chosen for it -- the same
     -- Object.chosenNames the live object carried. What CR 608.2h answers for a
     -- CR 611.2c effect whose source chose a name and then left the zone it was

@@ -4328,7 +4328,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- `snapshot` is, and the copy binding and face it reads live
                         -- on `obj`, which is about to cease. No third board walk --
                         -- it reads that binding or the printed face and stops.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the
@@ -5715,7 +5715,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
@@ -8789,37 +8789,28 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PermanentsDealCombatDamageToPlayer f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer f) event
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
-  -- ZoneChange.departed for that arm's reason (CR 603.10a), against the host id
-  -- Object.attachedTo records.
+  -- ZoneChange.departed for that arm's reason (CR 603.10a).
   --
-  -- The host is read through Recipient.objectOf, AttachedCreatureMentors' route
-  -- for CR 303.4's other destination: an Aura enchanting a PLAYER has no host id
-  -- to compare and answers False, as does one attached to nothing.
+  -- CR 603.10a's look-back, and the ONE reading of the link: the deceased's own
+  -- CR 608.2h record of what was attached to it, filed by the zone-change funnel
+  -- from the pre-move board. Neither reading off the BEARER survives to the CR
+  -- 117.5 boundary -- CR 704.5m buries an Aura in the same SBA batch, and CR
+  -- 704.5n clears an Equipment's Object.attachedTo in it -- so the host is where
+  -- the attachment as of the event still exists, for both bearer shapes at once.
+  -- Pawl.Types.LastKnown.attached is the field; CR 303.4m is what makes an
+  -- Equipment's "equipped creature" the same link an Aura's "enchanted creature"
+  -- is.
   --
   -- No characteristic of the deceased is read, unlike PermanentDies -- the
   -- attachment link already says which permanent this is about, so there is
-  -- nothing for last known information to answer.
+  -- nothing more for last known information to answer.
   --
-  -- LAST KNOWN INFORMATION where the bearer is gone (CR 608.2h), which is
-  -- AttachedCreatureMentors' one point of departure and is load-bearing rather
-  -- than defensive: CR 704.5m takes the Aura off the battlefield in the very SBA
-  -- batch that buried its host, and CR 117.5 places triggers only after that
-  -- batch settles, so by the time this is asked the live link is ALWAYS gone.
-  --
-  -- Not implemented: an EQUIPMENT bearer, which CR 704.5n leaves standing. The
-  -- live read ahead of the fallback was meant for it, but CR 704.5n has already
-  -- cleared Object.attachedTo by the time CR 117.5 places triggers, and a
-  -- surviving bearer has no last-known entry -- so neither read finds the link
-  -- and the trigger never matches. CR 603.10a's look-back at the attachment as of
-  -- the event is what would answer, and matchesTrigger takes only the post-batch
-  -- GameState (#3144).
+  -- Empty for a departure the funnel never filed, which no event this arm admits
+  -- can be: a battlefield-to-graveyard move is the funnel's own.
   TriggerCondition.AttachedCreatureDies -> case event of
     GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
-          let hostOfBearer = case Game.lookupObject bearer gs of
-                Just obj -> Object.attachedTo obj
-                Nothing -> LastKnown.attachedTo =<< Map.lookup bearer (GameState.lastKnown gs)
-           in (Recipient.objectOf =<< hostOfBearer) == Just (ZoneChange.departed zc)
+          maybe False (Set.member bearer . LastKnown.attached) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -8880,14 +8871,15 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- and rule 701.26a's "only untapped permanents can be tapped" makes a repeat tap
   -- no event at all. So this arm asks only whose tap it was.
   --
-  -- The host is read through Recipient.objectOf, AttachedCreatureDies' route for
-  -- CR 303.4's other destination: an Aura enchanting a PLAYER has no host id to
-  -- compare and answers False, as does one attached to nothing.
+  -- The host is read through Recipient.objectOf, AttachedCreatureMentors' route
+  -- for CR 303.4's other destination: an Aura enchanting a PLAYER has no host id
+  -- to compare and answers False, as does one attached to nothing.
   --
-  -- LIVE only, where AttachedCreatureDies falls back on CR 608.2h last known
-  -- information. That fallback is load-bearing there because CR 704.5m buries the
-  -- Aura in the same SBA batch as its host; here the host is still standing -- it
-  -- has just become tapped -- so the link is on the board to be read.
+  -- LIVE and off the BEARER, where AttachedCreatureDies reads CR 608.2h's record
+  -- of the deceased instead. That look-back is load-bearing there because the
+  -- same SBA batch that kills the host takes the link away (CR 704.5m, CR
+  -- 704.5n); here the host is still standing -- it has just become tapped -- so
+  -- the link is on the board to be read.
   TriggerCondition.AttachedCreatureBecomesTapped -> case event of
     GameEvent.BecameTapped tapped ->
       let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
@@ -12999,19 +12991,23 @@ eventBindingSlots cond = case cond of
   -- the same observation from the other side -- by the time the condition is
   -- asked, the live attachment is ALWAYS gone.
   --
-  -- Two shapes escape it, and neither is a hole this classification has to widen
-  -- for. An EQUIPMENT bearer stays on the battlefield under CR 704.5n, so no
-  -- `became` is minted for it -- but CR 113.6m's exception is the Aura's alone,
-  -- so an Equipment ability that moves itself out of a zone is pinned to that
-  -- zone and its condition is never asked from the battlefield at all
-  -- (data/cards/synthetic-widowed-blade.json is the case, proved in
-  -- Pawl.ZoneTriggerSpec). An effect that sends the Aura somewhere other
-  -- than its owner's graveyard in the same batch puts it where CR 400.7f cannot
-  -- look -- and there the rule's own answer is that the ability finds nothing, so
-  -- the payload moving nothing is correct rather than the silent no-op this lint
+  -- Two shapes escape it. An effect that sends the Aura somewhere other than its
+  -- owner's graveyard in the same batch puts it where CR 400.7f cannot look --
+  -- and there the rule's own answer is that the ability finds nothing, so the
+  -- payload moving nothing is correct rather than the silent no-op this lint
   -- exists to catch. That is what separates this arm from
   -- SelfLeavesTheBattlefield's floor, where a BOUNCE is an ordinary printed
   -- destination and the slot's absence is an ordinary printed case (#505).
+  --
+  -- Not implemented: the EQUIPMENT bearer, which CR 704.5n leaves standing, so
+  -- CR 400.7f mints no incarnation for it and this floor over-claims. Its
+  -- condition really is asked from the battlefield (Skullclamp,
+  -- data/cards/skullclamp.json), and the classification is per CONDITION and
+  -- cannot see the bearer's subtypes. Nothing in the pool reads the slot there:
+  -- Skullclamp's payload names none, and an Equipment ability that moved ITSELF
+  -- out of a zone would be pinned to that zone by CR 113.6m, whose exception is
+  -- the Aura's alone (data/cards/synthetic-widowed-blade.json, proved in
+  -- Pawl.ZoneTriggerSpec) (#3153).
   TriggerCondition.AttachedCreatureDies -> Set.fromList [Binding.became, Binding.departedPermanent]
   -- Empty, and for the opposite reason to the arm above: nothing MOVED, so there
   -- is no arrival for a payload to find. The tapped permanent is still the one
@@ -14633,12 +14629,13 @@ zonesTriggeredFrom cond = case cond of
   -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
   -- is for a condition that cannot trigger from the battlefield at all.
   TriggerCondition.AttachedCreatureMentors -> battlefield
-  -- CR 113.6's default from the Aura's side: CR 303.4's Aura is itself a
-  -- permanent on the battlefield, so its bearer watches from there, and CR
+  -- CR 113.6's default from the bearer's side, Aura or Equipment alike (CR
+  -- 303.4m): an Aura is itself a permanent on the battlefield and CR 704.5n
+  -- leaves an Equipment standing on it, so the bearer watches from there, and CR
   -- 113.6k's exception -- for a condition that cannot trigger from the
   -- battlefield at all -- does not apply. What DOES apply is CR 113.6m's Aura
   -- clause, read by zoneFunctionedFrom above, which is why this arm is reached
-  -- for Screams from Within at all.
+  -- for Screams from Within and Skullclamp but not for Synthetic Widowed Blade.
   TriggerCondition.AttachedCreatureDies -> battlefield
   -- The same default for the same reason, and more plainly: an Aura enchanting a
   -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
