@@ -675,6 +675,67 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "bob's discarded swamp is in exile" (namesIn Zone.Exile S.bob after) [Just (S.printingName swamp)]
     Spec.assertEqWith s "and bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
+  -- The exclusion CR 400.7j states: a redirect into a HIDDEN zone (CR 400.2)
+  -- leaves the discarded card unfindable, and CR 701.9c makes its characteristics
+  -- undefined there, so the rider must NOT fire. Wheel of Sun and Moon,
+  -- {G/W}{G/W} Enchantment -- Aura: "Enchant player. If a card would be put into
+  -- enchanted player's graveyard from anywhere, instead that card is revealed and
+  -- put on the bottom of that player's library." Pawl.Engine.Count's
+  -- findableAfterMove is the funnel.
+  --
+  -- The Rest in Peace leg above with the one permanent swapped: the Wheel is
+  -- alice's, enchanting bob, so the discard lands in bob's library while Psychic
+  -- Miasma -- alice's card -- still heads for alice's graveyard untouched. Bob's
+  -- library is stocked first, so "the bottom" is a position and not the whole
+  -- library. Dropping the hidden-zone test in findableAfterMove returns the spell
+  -- to alice's hand; the first assertion is what reddens.
+  Spec.it s "CR 400.7j a land discarded into a library does not return Psychic Miasma" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    miasma <- S.printingOf s registry "Psychic Miasma"
+    wheel <- S.printingOf s registry "Wheel of Sun and Moon"
+    let base = S.landsInPlay swamp 3
+        (wheelId, withWheel) = S.addCreature wheel S.alice base
+        enchanting = S.attachTo wheelId (Recipient.ToPlayer S.bob) withWheel
+        (_, stocked) = S.addLibraryCard piker S.bob enchanting
+        withHand = handCards swamp S.bob 1 stocked
+        (gs, spellId) = S.handOne miasma withHand
+        cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "psychic miasma stayed in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "and reached no hand" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "bob's discarded swamp is on the bottom of his library" (namesIn Zone.Library S.bob after) [Just (S.printingName piker), Just (S.printingName swamp)]
+    Spec.assertEqWith s "and bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
+    Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
+  -- The Wheel's own relation, CR 303.4b's enchanted player
+  -- (ControllerRelation.EnchantedPlayers, judged by Replacement.relationHolds),
+  -- as the whole card: cast at bob, then one card of each seat's headed for its
+  -- owner's graveyard. THREE seats, because two cannot part the relation from
+  -- its siblings: alice controls the Wheel, so Yours would take her card, and
+  -- carol is her opponent, so Opponents would take carol's. Bob's library is
+  -- stocked so the bottom is a position; the reveal (CR 701.20a) is asserted off
+  -- the log, and is bob's, who holds the card.
+  Spec.it s "CR 303.4b / 614.1a Wheel of Sun and Moon reroutes only the enchanted player's cards" $ do
+    forest <- S.printingOf s registry "Forest"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wheel <- S.printingOf s registry "Wheel of Sun and Moon"
+    let lands = S.landsFor forest S.alice 2 S.threePlayerGame
+        (staged, spellId) = S.handOne wheel lands
+        cast = snd (Engine.runGamePure atBobAnswer staged (S.cast S.alice spellId))
+        resolved = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
+        (_, stocked) = S.addLibraryCard piker S.bob resolved
+        (bobs, g1) = S.addHandCard swamp S.bob stocked
+        (alices, g2) = S.addHandCard swamp S.alice g1
+        (carols, g3) = S.addHandCard swamp S.carol g2
+        after = S.runPure S.identityAnswer g3 (mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) [bobs, alices, carols])
+        enchanting = [Object.attachedTo o | o <- Map.elems (GameState.objects after), Object.zone o == Zone.Battlefield, Maybe.isJust (Object.attachedTo o)]
+    Spec.assertEqWith s "bob's card went to the bottom of bob's library" (namesIn Zone.Library S.bob after) [Just (S.printingName piker), Just (S.printingName swamp)]
+    Spec.assertEqWith s "and not to bob's graveyard" (namesIn Zone.Graveyard S.bob after) []
+    Spec.assertEqWith s "alice's own card reached her graveyard -- she is not the enchanted player" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName swamp)]
+    Spec.assertEqWith s "carol's card reached her graveyard -- an opponent is not the enchanted player" (namesIn Zone.Graveyard S.carol after) [Just (S.printingName swamp)]
+    Spec.assertEqWith s "bob revealed the card on its way" (S.revealsOf after) [(S.bob, Set.singleton (S.printingName swamp))]
+    Spec.assertEqWith s "the Wheel is attached to bob" enchanting [Just (Recipient.ToPlayer S.bob)]
   -- CR 701.9's OTHER arity: Tinybones Joins Up's "any number of target players
   -- each discard a card", where the slot names three seats rather than Mind
   -- Rot's one. CR 101.4 is the ordering rule -- its own worked example is a
