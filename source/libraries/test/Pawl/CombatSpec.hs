@@ -158,13 +158,13 @@ declareSpec s registry = Spec.describe s "Declare" $ do
   Spec.it s "CR 508.1f declaring an attacker taps it" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 1
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "one attacker" (declaredAttackers after) mine
     Spec.assertEqWith s "tapped" (S.tappedCount S.alice after) 1
   Spec.it s "CR 508.1 attackers attack the defending player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 1
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
       oid : _ ->
@@ -181,14 +181,14 @@ declareSpec s registry = Spec.describe s "Declare" $ do
         liar p = case p of
           Prompt.DeclareAttackers {} -> theirs
           _ -> S.aggressiveAnswer p
-        after = snd (Engine.runGamePure liar gs (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure liar gs (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "nothing attacks" (declaredAttackers after) []
   Spec.it s "CR 509.1 a blocker is recorded against the attacker it blocks" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = S.combatBoard piker 1 1
         steps = do
-          Combat.declareAttackers S.alice
-          Combat.declareBlockers
+          Combat.declareAttackers S.manaPerformer S.alice
+          Combat.declareBlockers S.manaPerformer
         after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -198,8 +198,8 @@ declareSpec s registry = Spec.describe s "Declare" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoard piker 1 0
         steps = do
-          Combat.declareAttackers S.alice
-          Combat.declareBlockers
+          Combat.declareAttackers S.manaPerformer S.alice
+          Combat.declareBlockers S.manaPerformer
         after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -209,7 +209,7 @@ declareSpec s registry = Spec.describe s "Declare" $ do
     -- asking a question with exactly one answer.
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 0 1
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "nothing attacks" (declaredAttackers after) []
   -- The end-to-end summoning sickness scenario the spec names: a creature
   -- that just arrived cannot attack, and the SAME creature can once its
@@ -219,13 +219,13 @@ declareSpec s registry = Spec.describe s "Declare" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 1
         arrived = justArrived gs
-        sameTurn = snd (Engine.runGamePure S.aggressiveAnswer arrived (Combat.declareAttackers S.alice))
+        sameTurn = snd (Engine.runGamePure S.aggressiveAnswer arrived (Combat.declareAttackers S.manaPerformer S.alice))
         nextTurn =
           snd
             . Engine.runGamePure S.aggressiveAnswer arrived
             $ do
               Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)
-              Combat.declareAttackers S.alice
+              Combat.declareAttackers S.manaPerformer S.alice
     Spec.assertEqWith s "cannot attack the turn it arrives" (declaredAttackers sameTurn) []
     Spec.assertEqWith s "can attack after untapping" (length (declaredAttackers nextTurn)) 1
 
@@ -310,7 +310,7 @@ recordingBlockers p = case p of
 -- flips it to put the accumulators first.
 runRecordingBlockers :: GameState.GameState -> (([PlayerId.PlayerId], [ObjectId.ObjectId]), GameState.GameState)
 runRecordingBlockers gs =
-  let (after, seen) = State.runState (fmap snd (Engine.runGame recordingBlockers gs Combat.declareBlockers)) ([], [])
+  let (after, seen) = State.runState (fmap snd (Engine.runGame recordingBlockers gs (Combat.declareBlockers S.manaPerformer))) ([], [])
    in (seen, after)
 
 -- CR 802: the attack multiple players option, which every game pawl starts uses
@@ -352,7 +352,7 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
                 Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer (aimed oid)) (NonEmpty.toList options))
               _ -> S.aggressiveAnswer p
             settled = S.runPure S.identityAnswer staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-            declared = S.runPure declaring settled (Combat.declareAttackers S.alice)
+            declared = S.runPure declaring settled (Combat.declareAttackers S.manaPerformer S.alice)
         -- CR 802.2: nobody was chosen and BOTH opponents defend, in APNAP order.
         Spec.assertEqWith s "CR 802.2 both opponents are defending players" (Combat.Type.defenders (GameState.combat declared)) [S.bob, S.carol]
         -- CR 802.3: one declaration, two victims.
@@ -372,7 +372,7 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
               _ -> pure (S.identityAnswer p)
             (blocked, asked) =
               State.runState
-                (fmap snd (Engine.runGame blocking declared Combat.declareBlockers))
+                (fmap snd (Engine.runGame blocking declared (Combat.declareBlockers S.manaPerformer)))
                 []
         Spec.assertEqWith
           s
@@ -426,7 +426,7 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
     let (board, _, _, _) = S.threePlayerCombat [piker] [guard] [guard]
         askedWhenAttacking who =
           let settled = S.runPure S.identityAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-              declared = S.runPure (S.attackTo who) settled (Combat.declareAttackers S.alice)
+              declared = S.runPure (S.attackTo who) settled (Combat.declareAttackers S.manaPerformer S.alice)
            in fst (fst (runRecordingBlockers declared))
     Spec.assertEqWith s "CR 802.4 only bob, the one being attacked, is asked" (askedWhenAttacking S.bob) [S.bob]
     Spec.assertEqWith s "and only carol on the same board with the attack aimed at her" (askedWhenAttacking S.carol) [S.carol]
@@ -454,7 +454,7 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
                 Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer (aimed oid)) (NonEmpty.toList options))
               _ -> S.aggressiveAnswer p
             settled = S.runPure S.identityAnswer staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-            declared = S.runPure declaring settled (Combat.declareAttackers S.alice)
+            declared = S.runPure declaring settled (Combat.declareAttackers S.manaPerformer S.alice)
             (aura, withAura) = S.addCreature lure S.alice declared
             lured = S.attach aura atBob1 withAura
         -- THE GAMEPLAY ASSERTION, and first so nothing ahead of it can absorb a
@@ -496,7 +496,7 @@ attackLeftRightSpec s registry = Spec.describe s "AttackLeftRight" $ do
         declaredWith option =
           let staged = S.attackOption (Just option) board
               settled = S.runPure (S.attackTo S.carol) staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.alice)
+           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.manaPerformer S.alice)
         left = declaredWith AttackOption.Leftward
         right = declaredWith AttackOption.Rightward
     Spec.assertEqWith
@@ -537,7 +537,7 @@ attackLeftRightSpec s registry = Spec.describe s "AttackLeftRight" $ do
         declaredWith option gs =
           let staged = S.attackOption (Just option) gs
               settled = S.runPure (S.attackTo S.carol) staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.alice)
+           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith
       s
       "CR 803.1a nothing attacks when the seat to alice's left is empty"
@@ -751,7 +751,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
               GameState.combat = (GameState.combat board) {Combat.Type.defenders = [S.carol]}
             }
-        after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)
+        after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith s "both of alice's creatures attack" (length mine) 2
     -- Discriminating: under the head-of-list behaviour this phase replaces,
     -- every value here is OfPlayer bob, because bob is the first candidate.
@@ -769,7 +769,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (board, mine, _, _) = S.threePlayerCombat [piker] [piker] [piker]
         ready = board {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
-        after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)
+        after = S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith s "alice really had a legal attacker" (fmap (\oid -> Combat.canAttack S.alice oid ready) mine) [True]
     Spec.assertEqWith s "nobody attacked" (Combat.Type.attackers (GameState.combat after)) Map.empty
     Spec.assertEqWith s "and nothing was tapped" (S.tappedCount S.alice after) 0
@@ -841,19 +841,19 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     goblinChariot <- S.printingOf s registry "Goblin Chariot"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [goblinChariot] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "attacks" (length (declaredAttackers after)) 1
   Spec.it s "CR 302.6 the same creature without haste cannot" $ do
     -- The control. Goblin Chariot and Goblin Piker are both 2/2-ish Goblin
     -- Warriors; the ONLY difference the engine can see is the keyword.
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "cannot attack" (declaredAttackers after) []
   Spec.it s "CR 702.10b haste is not needed once the creature has settled" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "attacks" (declaredAttackers after) mine
   -- The same contrast one layer up: haste GRANTED by a static ability rather
   -- than printed. Concordant Crossroads says "All creatures have haste", so
@@ -864,7 +864,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
         (_, enchanted) = S.addCreature crossroads S.alice (justArrived gs)
-        after = snd (Engine.runGamePure S.aggressiveAnswer enchanted (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer enchanted (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
   -- CR 113.6b, the zone half of the same contrast. Anger's ability states where
   -- it functions -- "as long as this card is in your graveyard and you control a
@@ -880,7 +880,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
         (_, withMountain) = S.addCreature mountain S.alice (justArrived gs)
         (_, buried) = S.addGraveyardCard anger S.alice withMountain
-        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
   -- CR 113.6b's "only": on the battlefield the very same printed ability grants
   -- nothing, so the Piker is stuck. Anger itself has printed haste and attacks
@@ -893,7 +893,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
         (_, withMountain) = S.addCreature mountain S.alice (justArrived gs)
         (_, onBattlefield) = S.addCreature anger S.alice withMountain
-        after = snd (Engine.runGamePure S.aggressiveAnswer onBattlefield (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer onBattlefield (Combat.declareAttackers S.manaPerformer S.alice))
     case mine of
       [pikerId] -> Spec.assertBool s (notElem pikerId (declaredAttackers after)) "the Piker still cannot attack"
       _ -> Spec.assertFailure s "fixture should have one creature"
@@ -904,7 +904,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] [piker]
         (_, buried) = S.addGraveyardCard anger S.alice (justArrived gs)
-        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "cannot attack" (declaredAttackers after) []
   Spec.it s "CR 702.10b a hasty creature and a sick one, in the same declaration" $ do
     -- Both sick; only the Chariot may attack. A blanket "sickness ignored"
@@ -912,7 +912,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     goblinChariot <- S.printingOf s registry "Goblin Chariot"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [goblinChariot, piker] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.alice))
+        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.manaPerformer S.alice))
     case mine of
       [chariot, _] -> Spec.assertEqWith s "only the chariot" (declaredAttackers after) [chariot]
       _ -> Spec.assertFailure s "fixture should have two creatures"
@@ -960,7 +960,7 @@ controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $
 attacking :: [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 attacking mine theirs =
   let (gs, ours, yours) = S.combatBoardOf mine theirs
-      after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.alice))
+      after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
    in (after, ours, yours)
 
 -- CR 702.36: grant fear to `oid` with a stored continuous effect. No card in the
@@ -1142,8 +1142,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [birdMaiden] [nimbleBirdsticker, piker]
         steps = do
-          Combat.declareAttackers S.alice
-          Combat.declareBlockers
+          Combat.declareAttackers S.manaPerformer S.alice
+          Combat.declareBlockers S.manaPerformer
         after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
     case Map.keys (Combat.Type.attackers (GameState.combat after)) of
       [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -1155,8 +1155,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
     let (gs, _, theirs) = S.combatBoardOf [birdMaiden] [nimbleBirdsticker]
         steps = do
-          Combat.declareAttackers S.alice
-          Combat.declareBlockers
+          Combat.declareAttackers S.manaPerformer S.alice
+          Combat.declareBlockers S.manaPerformer
         after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
     case Map.keys (Combat.Type.attackers (GameState.combat after)) of
       [] -> Spec.assertFailure s "fixture should have an attacker"
@@ -1488,7 +1488,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     case (mine, theirs) of
       (a : _, b : _) -> do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
@@ -1537,7 +1537,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     case (mine, theirs) of
       (a : _, b : _) -> do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
@@ -1555,7 +1555,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     case (mine, theirs) of
       (a : _, b : _) -> do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
@@ -1595,7 +1595,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     case (mine, theirs) of
       (a : _, b : _) -> do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
@@ -1635,7 +1635,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         let (glovesId, board) = S.addCreature gloves S.alice (withLands [swamp] gs0)
             armed = S.attach glovesId a board
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) armed) "legal"
-        let after = S.runPure S.aggressiveAnswer armed Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer armed (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
@@ -1652,7 +1652,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     case (mine, theirs) of
       (a : _, b : _) -> do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
@@ -1701,7 +1701,7 @@ hackedLandwalkBoard s registry mine hackTarget hacked from to defendersLand = do
       board = case (hacked, hackTarget ours) of
         (True, Just t) -> castHackAt hackId t from to gs3
         _ -> gs3
-      attacked = snd (Engine.runGamePure S.aggressiveAnswer board (Combat.declareAttackers S.alice))
+      attacked = snd (Engine.runGamePure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice))
   case (ours, theirs) of
     (a : _, b : _) -> pure (attacked, a, b)
     _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
@@ -1765,7 +1765,7 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     -- rewrite that walks past a Modification.GainKeyword.
     (onIsland, warrior, blocker) <- lordBoard True "Island"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton warrior)) onIsland) "an Island no longer stops the block"
-    let after = S.runPure S.aggressiveAnswer onIsland Combat.declareBlockers
+    let after = S.runPure S.aggressiveAnswer onIsland (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf warrior after) (Set.singleton blocker)
     Spec.assertEqWith s "the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
     (onSwamp, warrior', blocker') <- lordBoard True "Swamp"
@@ -1791,7 +1791,7 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     -- Warrior that had wrongly picked up swampwalk would make this one illegal.
     (onSwamp, warrior', blocker') <- lordBoardAt theWarrior True "Swamp"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton warrior')) onSwamp) "and a Swamp still does not"
-    let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
+    let after = S.runPure S.aggressiveAnswer onSwamp (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "the block sticks" (Combat.blockersOf warrior' after) (Set.singleton blocker')
   -- The PRINTED half, one carrier over: Bog Wraith ("Creature -- Wraith 3/3,
   -- Swampwalk" and nothing else) has the keyword on its own type line rather
@@ -1810,7 +1810,7 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
   Spec.it s "CR 612.1 a hacked Bog Wraith walks on ISLANDS" $ do
     (onSwamp, wraith, blocker) <- wraithBoard True "Swamp"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton wraith)) onSwamp) "a Swamp no longer stops the block"
-    let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
+    let after = S.runPure S.aggressiveAnswer onSwamp (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf wraith after) (Set.singleton blocker)
     (onIsland, wraith', blocker') <- wraithBoard True "Island"
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton wraith')) onIsland)) "an Island stops it now"
@@ -1835,7 +1835,7 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
   Spec.it s "CR 612.1 a hacked Goblin Scouts mints SWAMPwalkers instead" $ do
     (onMountain, scout, blocker) <- scoutBoard True "Mountain"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton scout)) onMountain) "a Mountain no longer stops the block"
-    let after = S.runPure S.aggressiveAnswer onMountain Combat.declareBlockers
+    let after = S.runPure S.aggressiveAnswer onMountain (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf scout after) (Set.singleton blocker)
     -- CR 612.2 held to the one word: Magical Hack swaps land types, so the
     -- token's creature types and its derived name are untouched.
@@ -1882,7 +1882,7 @@ goblinScoutsBoard s registry hacked defendersLand = do
       swapped = if hacked then castHackAt hackId spellId Subtype.Mountain Subtype.Swamp onStack else onStack
       minted = S.runPure S.identityAnswer swapped Stack.resolveTop
       settled = S.runPure S.identityAnswer minted (Engine.settleAll S.alice)
-      attacked = S.runPure S.aggressiveAnswer settled (Combat.declareAttackers S.alice)
+      attacked = S.runPure S.aggressiveAnswer settled (Combat.declareAttackers S.manaPerformer S.alice)
   case (S.tokensOf attacked, theirs) of
     (a : _, b : _) -> pure (attacked, a, b)
     _ -> Spec.assertFailure s "fixture should have minted a Scout and left a blocker"
@@ -1972,7 +1972,7 @@ landwalkFamilyRemovalSpec s registry = Spec.describe s "LandwalkFamilyRemoval" $
     -- still find a land of its own on bob's side.
     (board, hag, blocker) <- hammerheimBoard s registry True
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton hag)) board) "the block is legal once every landwalk is gone"
-    let after = S.runPure S.aggressiveAnswer board Combat.declareBlockers
+    let after = S.runPure S.aggressiveAnswer board (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf hag after) (Set.singleton blocker)
     -- THE FAMILY-NOT-WIPE half: CR 613.1f's removal is scoped to rule 702.14's
     -- abilities, so haste -- a keyword of no family at all -- survives it.
@@ -2063,7 +2063,7 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
     let (gs, mine, theirs) = attacking [piker, piker, piker] [palaceGuard]
     case (mine, theirs) of
       ([first, second, third], [guard]) -> do
-        let after = S.runPure (blockAll [first, second, third]) gs Combat.declareBlockers
+        let after = S.runPure (blockAll [first, second, third]) gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith
           s
           "one blocker, three blocked attackers"
@@ -2259,7 +2259,7 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
     let (gs, mine, theirs) = attacking [piker, piker] [brigade]
     case (mine, theirs) of
       ([first, second], [b]) -> do
-        let after = S.runPure (blockAll [first, second]) gs Combat.declareBlockers
+        let after = S.runPure (blockAll [first, second]) gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith
           s
           "one blocker, two blocked attackers"
@@ -2354,8 +2354,8 @@ divisionChooser attackers gs =
    in snd
         ( State.runState
             ( fmap snd . Engine.runGame record gs $ do
-                Combat.declareAttackers S.alice
-                Combat.declareBlockers
+                Combat.declareAttackers S.manaPerformer S.alice
+                Combat.declareBlockers S.manaPerformer
                 Damage.dealCombatDamage
             )
             []
@@ -2395,7 +2395,7 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     case (mine, theirs) of
       (a : _, [b, c]) -> do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(b, Set.singleton a), (c, Set.singleton a)]) gs) "legal"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "both block" (Combat.blockersOf a after) (Set.fromList [b, c])
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
   Spec.it s "CR 702.111b declining to block a menace attacker is legal, on the very board where one blocker is not" $ do
@@ -2415,7 +2415,7 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
         -- blocks with everything, which here is the illegal single block, so
         -- declareBlockers falls back to the forced declaration -- which is the
         -- empty one, not "block with two" and not a repaired partial block.
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.111b a whole combat: one Piker cannot stop the Brute, two can" $ do
@@ -2482,7 +2482,7 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     -- attacker (CR 508.1f) and a tapped creature fails CR 508.1a for a reason
     -- that has nothing to do with menace.
     let (before, mine, theirs) = S.combatBoardOf [boggartBrute] [boggartBrute]
-        gs = snd (Engine.runGamePure S.aggressiveAnswer before (Combat.declareAttackers S.alice))
+        gs = snd (Engine.runGamePure S.aggressiveAnswer before (Combat.declareAttackers S.manaPerformer S.alice))
     case (mine, theirs) of
       (a : _, b : _) -> do
         Spec.assertBool s (Combat.canAttack S.alice a before) "a menace creature may attack"
@@ -2544,7 +2544,7 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     let (gs, mine, theirs) = attacking [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) -> do
-        let blocked = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let blocked = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
             after = withMenace a blocked
         Spec.assertBool s (Projection.hasKeyword Keyword.Menace a after) "the attacker now has menace"
         Spec.assertEqWith s "and is still blocked by the one creature" (Combat.blockersOf a after) (Set.singleton b)
@@ -3248,7 +3248,7 @@ suspectBoard s registry suspected ahead behind = do
       (suspect, gsA) = S.addCreature suspected S.bob (withPermanents S.bob ahead gs0)
       (other, gsB) = S.addCreature piker S.bob gsA
       gs2 = withPermanents S.bob (behind <> [island, island]) gsB
-      declared = S.runPure S.aggressiveAnswer gs2 (Combat.declareAttackers S.alice)
+      declared = S.runPure S.aggressiveAnswer gs2 (Combat.declareAttackers S.manaPerformer S.alice)
       (victim, gs3) = S.spellOnStack piker S.alice declared
       (doubtId, gs4) = S.addHandCard doubt S.bob gs3
       resolved = S.runPure (suspecting suspect) gs4 (S.cast S.bob doubtId >> Stack.resolveTop >> Engine.settleForPriority)
@@ -4070,7 +4070,7 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
     piker <- S.printingOf s registry "Goblin Piker"
     (printed0, _, _, _) <- frenzy [piker] False Subtype.Island Subtype.Swamp
     (hacked0, swampId, sourceId, theirs) <- frenzy [piker] True Subtype.Island Subtype.Swamp
-    let declare g = snd (Engine.runGamePure S.aggressiveAnswer g (Combat.declareAttackers S.alice))
+    let declare g = snd (Engine.runGamePure S.aggressiveAnswer g (Combat.declareAttackers S.manaPerformer S.alice))
         printed = declare printed0
         hacked = declare hacked0
     case theirs of
@@ -4165,7 +4165,7 @@ declaringAttackers gs =
       { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
         GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
       }
-    (Combat.declareAttackers S.alice)
+    (Combat.declareAttackers S.manaPerformer S.alice)
 
 -- CR 122.1b: a keyword counter grants its keyword, so a creature carrying a
 -- decayed counter has rule 702.147a's "This creature can't block" -- and the
@@ -4276,14 +4276,14 @@ storedBlockRestrictionSpec s registry = Spec.describe s "StoredBlockRestriction"
   Spec.it s "CR 509.1b the creature Zirda named cannot block, and its twin still does" $ do
     (attacker, victim, twin, resolved) <- zirdaResolved s registry (\_ v _ -> v)
     let declaring = declaringAttackers resolved
-        after = S.runPure S.aggressiveAnswer declaring Combat.declareBlockers
+        after = S.runPure S.aggressiveAnswer declaring (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "only the twin ended up blocking" (Combat.blockersOf attacker after) (Set.singleton twin)
     Spec.assertBool s (not (Combat.canBlock S.bob victim declaring)) "and the named creature is off CR 509.1a's candidate list"
     Spec.assertEqWith s "one restriction was stored, over the creature named" (fmap ActiveBlockProhibition.object (GameState.blockProhibitions resolved)) [victim]
   -- The pair's other half: the same activation, aimed at alice's attacker.
   Spec.it s "CR 509.1b aimed elsewhere, both of bob's twins block" $ do
     (attacker, victim, twin, resolved) <- zirdaResolved s registry (\a _ _ -> a)
-    let after = S.runPure S.aggressiveAnswer (declaringAttackers resolved) Combat.declareBlockers
+    let after = S.runPure S.aggressiveAnswer (declaringAttackers resolved) (Combat.declareBlockers S.manaPerformer)
     Spec.assertEqWith s "both twins blocked" (Combat.blockersOf attacker after) (Set.fromList [victim, twin])
     Spec.assertEqWith s "and the restriction was stored all the same, over the attacker" (fmap ActiveBlockProhibition.object (GameState.blockProhibitions resolved)) [attacker]
   -- CR 514.2 / 611.2a: "this turn" arms Expiry.AtCleanup, so the cleanup sweep

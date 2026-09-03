@@ -1337,7 +1337,7 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
     -- and stock cannot be the difference between the two casts below, and the
     -- {1}{W} is proved by what is left untapped rather than by what was affordable.
     let (board, oid) = S.handOne ratchet (S.landsInPlay plains 3)
-        castAs name = S.runPure S.identityAnswer board (Cast.castSpell S.alice oid name Facing.FaceUp)
+        castAs name = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice oid name Facing.FaceUp)
         resolveAs name = S.runPure S.identityAnswer (castAs name) Stack.resolveTop
         -- The Ratchet permanent among alice's lands, found by the card behind it
         -- rather than by a name, since which name it answers to is the thing
@@ -1736,7 +1736,7 @@ suspectedRangerBoard piker ranger humility forest =
       (other, gs2) = S.addCreature piker S.bob gs1
       gs3 = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs2 [forest, forest]
       gs4 = S.withHumility humility (suspecting suspect gs3)
-      declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.alice)
+      declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.manaPerformer S.alice)
       attacker = case mine of
         a : _ -> a
         [] -> S.noSource

@@ -162,8 +162,8 @@ objectSpec s registry = Spec.describe s "Object" $ do
   Spec.it s "CR 701.15b whole cards: the goaded creature is sent at carol, not at carol's Jace" $ do
     (goaded, _, _, carolWalker, resolved) <- homunculusBoard s registry OptionalDecision.Exercises
     (_, _, _, controlWalker, declined) <- homunculusBoard s registry OptionalDecision.Declines
-    let after = S.runPure (announcing carolWalker) (attacking S.carol resolved) (Combat.declareAttackers S.alice)
-        without = S.runPure (announcing controlWalker) (attacking S.carol declined) (Combat.declareAttackers S.alice)
+    let after = S.runPure (announcing carolWalker) (attacking S.carol resolved) (Combat.declareAttackers S.manaPerformer S.alice)
+        without = S.runPure (announcing controlWalker) (attacking S.carol declined) (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith s "CR 701.15b the goaded creature attacks carol, not the Jace it was announced against" (announced after goaded) (Just (AttackTarget.OfPlayer S.carol))
     -- The SAME interpreter and the same board bar the "may", so the redirect is
     -- rule 701.15b and not a rule about announcements.

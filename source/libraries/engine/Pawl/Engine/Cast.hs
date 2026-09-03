@@ -49,6 +49,7 @@ import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
@@ -1341,8 +1342,8 @@ castableWhenOffered pid oid name candidates proposed =
 -- a card from the library, so castableWhileSearching shrinks and the loop
 -- terminates. castSpell is the re-entrant call -- casting mid-resolution, the
 -- whole point.
-castWhileSearching :: PlayerId -> Game ()
-castWhileSearching pid = do
+castWhileSearching :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> Game ()
+castWhileSearching perform pid = do
   gs <- State.get
   case castableWhileSearching pid gs of
     [] -> pure ()
@@ -1359,8 +1360,8 @@ castWhileSearching pid = do
           Monad.when (elem (oid, name) options) $ do
             -- Face up: castableWhileSearching offers no face-down cast, for the
             -- reason its `proposed` note gives.
-            castSpell pid oid name Facing.FaceUp
-            castWhileSearching pid
+            castSpell perform pid oid name Facing.FaceUp
+            castWhileSearching perform pid
 
 -- CR 601.2's own order, walked in it: 601.2a moves the card to the stack FIRST,
 -- then 601.2b chooses the modes and the cost and announces X and the Phyrexian
@@ -1407,8 +1408,8 @@ castWhileSearching pid = do
 -- for CR 709.3's reason one rule over: CR 708.4 puts the turning-over BEFORE the
 -- object is put onto the stack, so it cannot be a prompt inside the
 -- announcement.
-castSpell :: PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpell = castSpellWith Nothing
+castSpell :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpell perform = castSpellWith perform Nothing
 
 -- castSpell with CR 118.9's other source of an alternative cost: one "applied to
 -- it from another effect" rather than listed in the spell's own text. Just c
@@ -1424,8 +1425,8 @@ castSpell = castSpellWith Nothing
 -- Nothing about the offer is re-checked here: `castSpellWith` casts, and whether
 -- the cast may be offered at all is `castableWhenOffered`'s question, asked by
 -- the caller that made the offer.
-castSpellWith :: Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpellWith applied pid oid name facing = do
+castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpellWith perform applied pid oid name facing = do
   before <- State.get
   -- The state the GATE measured, which is `before` with CR 709.3's half and CR
   -- 708.4's facing stamped on. Read from rather than written to the game: the
@@ -1547,7 +1548,7 @@ castSpellWith applied pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed spending pid sid face castFrom keywordsBefore candidates before
+          castProposed perform spending pid sid face castFrom keywordsBefore candidates before
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
@@ -1587,8 +1588,8 @@ followIntoSpell permission old new gs = case permission of
 -- `spending` is CR 118.14's permission as it stood before the move, and it is
 -- taken as a VALUE for the reason `candidates` and `keywordsBefore` are: the
 -- object it was a fact about no longer exists.
-castProposed :: ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [CandidateCost.CandidateCost] -> GameState -> Game ()
-castProposed spending pid sid face castFrom keywordsBefore candidateCosts before = do
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [CandidateCost.CandidateCost] -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom keywordsBefore candidateCosts before = do
   gs <- State.get
   let candidates = fmap CandidateCost.cost candidateCosts
       decider = Decide.deciderFor pid gs
@@ -1982,7 +1983,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                       let lateCost = Cost.plusComponents adjustments announcedAtX
                           announcedSuffix = Cost.Type.components announcedCost List.\\ Cost.Type.components (Cost.plusComponents gathered announcedAtX)
                           paidCost = Cost.totalWith adjustments announcedCost {Cost.Type.components = Cost.Type.components lateCost <> announcedSuffix}
-                      payment <- Cost.pay PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid paidCost
+                      payment <- Cost.pay perform PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed

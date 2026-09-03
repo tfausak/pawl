@@ -116,7 +116,7 @@ spec s registry = Spec.describe s "Meld" $ do
   Spec.it s "CR 712.8d a meld card on the battlefield has its front face's characteristics: Hanweir Battlements taps for {C}" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     let (battlementsId, gs) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Cost.tapForMana battlementsId)
+        after = S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer battlementsId)
     Spec.assertEqWith
       s
       "pool"

@@ -1483,7 +1483,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
 -- a basic land with one mana ability and one colour, so CR 605.3a's activation
 -- asks nothing that S.identityAnswer has to choose between.
 tapAll :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
-tapAll oids gs = List.foldl' (\g oid -> S.runPure S.identityAnswer g (Cost.tapForMana oid)) gs oids
+tapAll oids gs = List.foldl' (\g oid -> S.runPure S.identityAnswer g (Cost.tapForMana S.manaPerformer oid)) gs oids
 
 -- Empyrial Armor ({1}{W}{W} Enchantment -- Aura), whole text: "Enchant creature.
 -- Enchanted creature gets +1/+1 for each card in your hand." Oracle text verified

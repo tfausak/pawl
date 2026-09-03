@@ -1933,8 +1933,8 @@ trampleSpec s registry =
 killBlockerMidCombat :: ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 killBlockerMidCombat victim answer gs =
   S.runPure answer gs $ do
-    Combat.declareAttackers S.alice
-    Combat.declareBlockers
+    Combat.declareAttackers S.manaPerformer S.alice
+    Combat.declareBlockers S.manaPerformer
     Event.destroy Regenerability.Regenerable [victim]
     Monad.void Damage.dealCombatDamage
 
@@ -2032,8 +2032,8 @@ boltBlockerMidCombat blocks bolt blocker gs =
         _ -> S.aggressiveAnswer p
       declared =
         S.runPure aimedAtBlocker gs $ do
-          Combat.declareAttackers S.alice
-          Combat.declareBlockers
+          Combat.declareAttackers S.manaPerformer S.alice
+          Combat.declareBlockers S.manaPerformer
           S.cast S.alice bolt
           Monad.void Stack.resolveTop
    in S.runPure S.aggressiveAnswer (S.settleSba declared) (Monad.void Damage.dealCombatDamage)
@@ -2114,8 +2114,8 @@ blockedStaysBlockedSpec s registry =
 killAttackerMidCombat :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 killAttackerMidCombat victim gs =
   S.runPure S.aggressiveAnswer gs $ do
-    Combat.declareAttackers S.alice
-    Combat.declareBlockers
+    Combat.declareAttackers S.manaPerformer S.alice
+    Combat.declareBlockers S.manaPerformer
     Event.destroy Regenerability.Regenerable [victim]
     Monad.void Damage.dealCombatDamage
 
