@@ -406,7 +406,7 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope _) -> zoneScopeSlots scope
   -- EachCardInYourHand's answer over the other hidden per-player zone: the
   -- seat is CR 109.5's "you", so no slot names it.
-  ObjectRef.EachCardInYourLibrary -> Map.empty
+  ObjectRef.EachCardInYourLibrary _ -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachOnStack _ -> Map.empty
@@ -466,7 +466,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ _) -> []
   ObjectRef.EachCardInYourHand -> []
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
-  ObjectRef.EachCardInYourLibrary -> []
+  ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachOnStack _ -> []
@@ -500,7 +500,7 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ _) -> []
   ObjectRef.EachCardInYourHand -> []
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
-  ObjectRef.EachCardInYourLibrary -> []
+  ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachOnStack _ -> []
@@ -3116,14 +3116,24 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- CR 400.1's other hidden per-player zone, and only the RESOLVING
   -- CONTROLLER's, so no scope to fold over and no APNAP order to impose --
   -- EachCardInYourHand's answer above. CR 400.12 is what makes "from your
-  -- library" name every card in it. In the library's own order, top card
-  -- first, which CR 401.2 keeps players from looking at or changing; nothing
-  -- here reads it, and the whole zone leaves at once either way.
+  -- library" name every card in it, and CR 109.2a is what a stated Filter reads
+  -- -- Caldera Breaker's "all Mountain cards". In the library's own
+  -- order, top card first, which CR 401.2 keeps players from looking at or
+  -- changing; the narrowing does not reorder, and the cards that did not match
+  -- stay where they were.
   --
-  -- NOT a search (CR 701.23a) and so no shuffle (CR 701.24): Leveler names no
-  -- description and offers no choice, so CR 701.23b's "isn't required to
-  -- find" and CR 701.23f's search triggers have nothing to reach.
-  ObjectRef.EachCardInYourLibrary -> Game.zoneMembers Zone.Library controller gs
+  -- NOT a search (CR 701.23a) and so no shuffle (CR 701.24): neither producer's
+  -- text says "search" or "find", so CR 701.23b's "isn't required to find" and
+  -- CR 701.23f's search triggers have nothing to reach. A stated characteristic
+  -- does not make it one -- rule 701.23b governs a player who is SEARCHING, and
+  -- nothing here asks anyone to.
+  ObjectRef.EachCardInYourLibrary mFilter ->
+    let inLibrary = Game.zoneMembers Zone.Library controller gs
+     in case mFilter of
+          Nothing -> inLibrary
+          Just filter_ ->
+            let context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
+             in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) inLibrary
   -- CR 607.2a's linked set: the cards GameState.exiledWith files against this
   -- effect's SOURCE. The relation, not a zone sweep, is the membership test, so a
   -- card exiled by a second copy of the same printing is not named; a stated
@@ -3372,7 +3382,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInGraveyard {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInHand {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
-  ObjectRef.EachCardInYourLibrary -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardInYourLibrary _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -4169,8 +4179,8 @@ matchingFromAmong legal resolving controller source gs filter_ members =
 -- members of a GROUP an earlier clause of this resolution bound rather than a
 -- zone's contents, which is the whole difference from the zone-keyed choices --
 -- and the reason a batch CR 701.20a's reveal or CR 701.20e's look left in the
--- LIBRARY is reachable at all (CR 701.20b), a library still having no filtered
--- sweep (gap #2416).
+-- LIBRARY is reachable at all (CR 701.20b), a library's filtered sweep naming
+-- every match in the whole zone rather than that handful.
 --
 -- ONE function rather than one per opcode, because it is ONE choice: Carth the
 -- Lion's "you may reveal a planeswalker card from among them and put it into
@@ -5585,7 +5595,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- arms above's answer over CR 400.1's other hidden per-player zone.
               -- A resolving spell is on the stack (CR 608.1), not in the library,
               -- so Paradigm Shift does not sweep itself.
-              ObjectRef.EachCardInYourLibrary -> do
+              ObjectRef.EachCardInYourLibrary _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
               -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR
