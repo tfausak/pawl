@@ -5233,6 +5233,10 @@ projectDeciding admits cands = forObject
                 -- projection breaks a timestamp tie the same way. `oid` is here
                 -- as well as on the battlefield: CR 604.3 makes a CDA function in
                 -- every zone.
+                --
+                -- Not implemented: the range is `reachable`, which at this
+                -- sublayer is the battlefield alone, so a count cannot read a
+                -- power a CDA defines on a card in another zone (#3109).
                 definingUnits =
                   [ definingUnitOf o (Object.timestamp obj) cda
                   | (o, (p, _)) <- Map.toAscList (Map.insert oid (seeded, decided) otherBoards),
