@@ -3314,6 +3314,48 @@ brittleEffigySpec s registry = Spec.describe s "Brittle Effigy" $ do
         ((_, after), asked) = State.runState (Engine.runGame (recordingOrdersTargeting pikerId) gs (Activate.activateAbility S.alice effigyId (theAbility effigy))) []
     Spec.assertEqWith s "one ordering prompt, over both parts" (fmap length asked) [2]
     Spec.assertBool s (not (S.onBattlefield effigyId after)) "and the exile half was still paid"
+  -- CR 118.3 with CR 601.2h: the order the payer announced is theirs, but every
+  -- part of it still has to be payable, and the exile leaves no permanent on the
+  -- battlefield for {T} to turn sideways. So the payment is refused whole (CR
+  -- 601.2h's "partial payments are not allowed") and the announcement reverses.
+  --
+  -- A PAIR differing in exactly one thing -- the permutation the answerer names
+  -- -- so the refusal cannot be an unaffordable cost, an illegal target or a
+  -- missing activation. The gameplay assertion is FIRST and reads the board past
+  -- the resolution: the ability whose cost went unpaid never reached the stack,
+  -- so the creature it would have exiled is still there.
+  Spec.it s "CR 118.3 exiling the Effigy first leaves no permanent to tap" $ do
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (effigyId, _, pikerId, gs) = brittleEffigyBoard effigy plains giant piker
+        after = S.runPure (orderingBy CostComponent.ExileThis pikerId) gs (Activate.activateAbility S.alice effigyId (theAbility effigy) >> Stack.resolveTop)
+    Spec.assertBool s (S.onBattlefield pikerId after) "the targeted Piker was never exiled"
+    Spec.assertBool s (S.onBattlefield effigyId after) "the Effigy is back on the battlefield"
+    Spec.assertEqWith s "with nothing in its owner's exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    Spec.assertEqWith s "and nothing on the stack" (length (GameState.stack after)) 0
+  -- The other half of the pair: the SAME board and the same answerer, naming the
+  -- tap first, pays in full and resolves.
+  Spec.it s "CR 601.2h tapping first pays the same cost in full" $ do
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (effigyId, _, pikerId, gs) = brittleEffigyBoard effigy plains giant piker
+        after = S.runPure (orderingBy CostComponent.TapThis pikerId) gs (Activate.activateAbility S.alice effigyId (theAbility effigy) >> Stack.resolveTop)
+    Spec.assertBool s (not (S.onBattlefield pikerId after)) "the targeted Piker was exiled"
+    Spec.assertBool s (not (S.onBattlefield effigyId after)) "and the Effigy paid its own half"
+    Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
+
+-- CR 601.2h's order, pinned to the part that goes FIRST rather than to an index,
+-- so the two cases above differ in that part alone whatever order the card
+-- prints. A stable sort over the offered components, and a target to name beside
+-- it, recordingOrdersTargeting's reason.
+orderingBy :: CostComponent.CostComponent Keyword.Keyword -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+orderingBy first victim p = case p of
+  Prompt.OrderCostComponents _ _ _ components -> fmap snd (List.sortOn fst (zip (fmap (/= first) components) [0 :: Natural.Natural ..]))
+  _ -> targeting victim p
 
 -- recordingOrders with a target to name: CR 601.2c's target prompt and CR
 -- 601.2h's ordering prompt both come up while Brittle Effigy's ability is
