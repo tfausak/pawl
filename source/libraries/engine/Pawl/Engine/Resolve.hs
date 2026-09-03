@@ -2348,11 +2348,20 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- Medic's two trigger instances are Pawl.TransformSpec's "CR 701.28e / 603.12 an
 -- ignored convert arms no reflexive", the case that proves it.
 --
+-- Effect.ForEach's body (below) runs its instructions through this SAME fold,
+-- reset per member rather than carried across members: Nihiloor's "for each
+-- opponent, tap up to one untapped creature you control. When you do, gain
+-- control ..." is Pawl.ResolveSpec's "CR 608.2f / 603.12 a reflexive armed
+-- inside a ForEach reads only that member's own instruction", the case that
+-- proves it.
+--
 -- Not implemented: only the instruction IMMEDIATELY before the arm is asked
--- about, an instruction that happens without recording a game event would
--- suppress an arm that follows it, and an Effect.ForEach body's instructions go
--- through applyEffectWith directly and are not gated at all; no card in
--- `data/cards/` writes any of the three shapes (#3057).
+-- about, not whichever earlier instruction the reflexive's own wording names
+-- ("do A. do B. when you do A" would read B's outcome instead); no card in
+-- `data/cards/` writes an arm that is not second in its clause or its ForEach
+-- body (#3057). "Happened" is read as "recorded a game event", which misses an
+-- effect that mutates the board without one -- Effect.Detain and Effect.Goad
+-- are two -- and would wrongly suppress an arm that follows it (#3165).
 applyClauseEffects ::
   ObjectId ->
   (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
@@ -6144,10 +6153,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             }
     Monad.forM_ members $ \member -> do
       State.modify' rescope
-      -- CR 608.2c: the body's instructions in written order, per member.
-      Monad.forM_ body $ \eff -> do
-        defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
-        applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
+      -- CR 608.2c: the body's instructions in written order, per member, through
+      -- the SAME fold a clause's own instructions run through -- CR 603.12's
+      -- "happened" is a question about THIS member's iteration, so it resets at
+      -- each member rather than carrying over from the previous one. Nihiloor's
+      -- "for each opponent, tap up to one untapped creature you control. When you
+      -- do, ..." is the shape: the reflexive is that opponent's own tap, not the
+      -- previous opponent's.
+      applyClauseEffects
+        source
+        ( \eff -> do
+            defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
+            applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
+        )
+        (Foldable.toList body)
     State.modify' rescope
   Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get
