@@ -2792,9 +2792,8 @@ permanentReturnedToHandSpec s registry =
 -- whole card: Tameshi at X=1 returns the mana value 1 artifact card" is what
 -- proves the value reaches it. Retract {U} Instant, "Return all artifacts you
 -- control to their owner's hand" (data/cards/retract.json, same check), is the
--- one effect
--- returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve brackets as one
--- Pawl.Types.EventGroup.
+-- one effect returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve
+-- brackets as one Pawl.Types.EventGroup.
 --
 -- WHY A SYNTHETIC BESIDE THE PRINTING. Tameshi's "triggers only once each turn"
 -- makes the batch reading indistinguishable from the per-permanent one on any

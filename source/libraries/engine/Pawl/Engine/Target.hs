@@ -161,7 +161,8 @@ legalRecipients perspective source slot gs =
 -- (Filter.boundUnannounced). True at the call sites that ask AHEAD of the
 -- announcement -- fillableModesGiven's, which is where the argument for it lives,
 -- and Pawl.Engine.Activate's two pre-X maps (candidateSlotsGiven and
--- activateAbility's lookahead); False everywhere else, which leaves such a bound
+-- activateAbility's lookahead), plus Pawl.Engine.Cast.castAimable, which is the
+-- cast road's twin of those; False everywhere else, which leaves such a bound
 -- vacuously False. That is right at CR 601.2c and CR 608.2b, where the
 -- announcement is made and answers it.
 legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
@@ -1098,8 +1099,8 @@ aimings slots =
 --
 -- `unannounced` is legalSetsGiven's own, forwarded: False at CR 601.2c and CR
 -- 608.2b, where the announcement is made and answers a computed bound, and True
--- only for a caller looking ahead of it -- Pawl.Engine.Activate's pre-X map,
--- which is measured before the ChooseX it feeds.
+-- only for a caller looking ahead of it -- Pawl.Engine.Activate's pre-X map and
+-- Pawl.Engine.Cast.castAimable, each measured before the ChooseX it feeds.
 legalSets :: Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
 legalSets perspective unannounced seed source slots gs =
   let pcs = Projection.projectAll gs
