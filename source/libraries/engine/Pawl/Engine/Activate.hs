@@ -843,6 +843,13 @@ activateAbility pid srcId ability = do
           -- recipient the announcement could still reach. candidateSlotsGiven's
           -- call is the same one, for the reason its own note gives.
           --
+          -- NO GAMEPLAY OBSERVER today, and the flag is kept anyway because CR
+          -- 601.2b has not happened yet where it is read: this map is consulted
+          -- only by a cost that READS A BOUND SLOT (aimingSomewhere's slotReading),
+          -- and no ability in `data/cards/` has both such a cost and a slot with a
+          -- computed bound -- the whole suite stays green with this True flipped to
+          -- False.
+          --
           -- The map CR 601.2c is ANSWERED from is the second one below, taken once
           -- the X exists.
           unannouncedSets = Target.legalSets (Just pid) True Map.empty srcId slots gs
@@ -881,6 +888,11 @@ activateAbility pid srcId ability = do
           --
           -- The SAME seed reaches Target.selectionLegal's joint check below, so a
           -- slot offered against the announced X is not re-judged against no X.
+          --
+          -- `unannounced` is False because the announcement is MADE; it changes
+          -- nothing while the seed carries the value, which is what makes flipping
+          -- it here leave the suite green (Filter.boundUnannounced answers only
+          -- where the seed cannot supply the number).
           seed = Binding.fromChoices Map.empty mAmount Seq.empty
           sets = Target.legalSets (Just pid) False seed srcId slots gs
           aimable = [fmap recipientObjects sets]

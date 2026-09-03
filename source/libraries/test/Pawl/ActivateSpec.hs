@@ -4158,12 +4158,12 @@ abilityCeilingSpec s registry = Spec.describe s "AbilityCeilingAndBoundSlot" $ d
     giant <- S.printingOf s registry "Hill Giant"
     let act = do Activate.activateAbility S.alice srcId (theAbility nightmare); Stack.resolveTop
         after = snd (Engine.runGamePure (answerBlightXTargeting 3 pikerId tyrantId) g1 act)
-    Spec.assertBool s (Activate.activatable S.alice srcId (theAbility nightmare) g1) "the ability is offered before any X exists"
     Spec.assertEqWith s "the mana value 3 creature card is on the battlefield, so the announced 3 reached the slot's bound" (S.countOnBattlefieldByName (S.printingName tyrant) S.alice after) 1
     Spec.assertEqWith s "and the mana value 4 one the bound excluded is all that is left in the graveyard" (graveyardNames S.alice after) [S.printingName giant]
     Spec.assertEqWith s "the cost's blight put the announced 3 counters on the Piker" (S.counterOf CounterKind.MinusOneMinusOne pikerId after) 3
     Spec.assertBool s (not (S.onBattlefield srcId after)) "and its other half returned the Nightmare to hand"
     Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
+    Spec.assertBool s (Activate.activatable S.alice srcId (theAbility nightmare) g1) "the ability is offered before any X exists"
 
   -- The ceiling is READ, and read off the board: the tallest creature alice
   -- controls is what bounds the prompt, and nothing else on either board is 3 or
