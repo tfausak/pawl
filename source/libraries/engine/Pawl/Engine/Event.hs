@@ -8564,7 +8564,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- 603.10: a permanent put into a graveyard does not exist on the battlefield
   -- immediately after the event that put it there, so it is not among the
   -- objects checked. eventTriggers offers it all the same -- `leftBattlefield`
-  -- is CR 603.10a's unfiltered look-back, which this condition is no part of --
+  -- is CR 603.10a's look-back, unrestricted by this condition's own exclusion --
   -- and `Not IsSource` cannot do the excluding, CR 400.7 having minted the
   -- graveyard card a fresh id that the bearer's own id never equals.
   TriggerCondition.CardPutIntoGraveyard f ->
@@ -13623,22 +13623,29 @@ eventTriggers events gs =
       -- the graveyard. The mirror of the filter
       -- Pawl.Engine.Activate.abilitiesForGiven puts on its battlefield arm.
       --
-      -- Applied to BOTH readings that say "this permanent was on the
-      -- battlefield": the live `onBattlefield` set, and the two group-scoped
-      -- unions below (`laterGroups` and `sameGroup`), which recover a permanent
-      -- that WAS on the battlefield at this event and has left by the CR 117.5
-      -- boundary. Last known information (CR 608.2h) is how that permanent is
-      -- read, not a statement about which zone it is being read IN, so the zone
-      -- CR 113.6m compares against is the battlefield either way.
+      -- Applied to every reading that says "this permanent was on the
+      -- battlefield": the live `onBattlefield` set, the two group-scoped unions
+      -- below (`laterGroups` and `sameGroup`), which recover a permanent that WAS
+      -- on the battlefield at this event and has left by the CR 117.5 boundary,
+      -- and `leftBattlefield` -- CR 603.10a's look-back at the permanent THIS
+      -- event removed. Last known information (CR 608.2h) is how a departed
+      -- permanent is read, not a statement about which zone it is being read IN,
+      -- so the zone CR 113.6m compares against is the battlefield either way.
       --
-      -- NOT applied to `leftBattlefield` -- CR 603.10a's look-back at the
-      -- permanent THIS event removed. That is the same shape asking a different
-      -- question, and CR 113.6m answers it differently: the rule's own "unless
-      -- its trigger condition ... specifies that the object is put into that
-      -- zone" exempts the dies triggers that arm serves, and THAT half of the
-      -- clause is not implemented (#2502) -- `enchantedObjectLeaves` below
-      -- reads only its Aura half -- so filtering there would read the rule's
-      -- first sentence without the exception that governs this arm.
+      -- Safe for `leftBattlefield` because `zoneFunctionedFrom`'s
+      -- `conditionPutsSelfInto` reads the rule's own exception: a dies trigger
+      -- whose effect names the graveyard it just died into is exempted back to
+      -- the battlefield default, the same way `enchantedObjectLeaves` exempts an
+      -- Aura's own death trigger. Endless Cockroaches ("when this creature dies,
+      -- return it to its owner's hand") is the shape the rule means, though its
+      -- own payload never reaches the exception today: its effect names
+      -- Binding.became rather than the reserved source slot, so
+      -- Pawl.Engine.EffectZone.zoneFunctionedFrom already answers Nothing for it
+      -- (Pawl.ZoneTriggerSpec's `becameSlotSpec` proves the trigger fires either
+      -- way). Synthetic Grave Reflex's delayed-trigger pair (CR 113.6m's final
+      -- sentence, #2500) is what reaches the exception instead, its own payload
+      -- naming the reserved slot: `Pawl.ZoneTriggerSpec.graveReflexSpec` proves a
+      -- mutation dropping the exception empties this event's own candidate list.
       --
       -- The delayed map is the HOST's own face while `abilitiesOf` is the
       -- PROJECTED list, so an ability granted by another object that arms a
@@ -13704,16 +13711,15 @@ eventTriggers events gs =
       -- which files no last known information. That hole is the two group-scoped
       -- unions' too.
       --
-      -- Parameterized by which of the departed permanent's abilities to offer,
-      -- because the two callers below want different sets out of one recovery:
-      -- `leftBattlefield` is CR 603.10a's look-back at the event's own departure
-      -- and takes them all, while `laterGroups` and `sameGroup` read a permanent
-      -- that was standing on the battlefield when the event happened and so take
-      -- only the ones CR 113.6m leaves functioning there. It takes the departing
-      -- id as well as the characteristics: CR 113.6m's final sentence reads the
-      -- card's CR 603.7 declarations, which are not characteristics and so are
-      -- reached through Game.delayedAbilitiesOf off the id.
-      departedFrom pick event = case event of
+      -- Every caller below wants the SAME set out of one recovery now: the
+      -- abilities CR 113.6m leaves functioning on the battlefield, whether the
+      -- permanent recovered stood there through the event (`laterGroups`,
+      -- `sameGroup`) or was taken off BY it (`leftBattlefield`, CR 603.10a's
+      -- look-back). It takes the departing id as well as the characteristics: CR
+      -- 113.6m's final sentence reads the card's CR 603.7 declarations, which are
+      -- not characteristics and so are reached through Game.delayedAbilitiesOf
+      -- off the id.
+      departedFrom event = case event of
         GameEvent.Moved (Moved.MkMoved zc _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
@@ -13721,7 +13727,7 @@ eventTriggers events gs =
                 Just lk ->
                   Map.singleton
                     (ZoneChange.departed zc)
-                    (LastKnown.controller lk, pick (ZoneChange.departed zc) (LastKnown.characteristics lk))
+                    (LastKnown.controller lk, battlefieldAbilitiesOf (ZoneChange.departed zc) (LastKnown.characteristics lk))
         -- CR 800.4a's removal, recovered the same way and from the same record:
         -- the permanent is not on the battlefield at the CR 117.5 boundary
         -- because it is not in the game at all, so last known information is the
@@ -13730,7 +13736,7 @@ eventTriggers events gs =
         -- no other source.
         GameEvent.LeftTheGame oid -> case Map.lookup oid (GameState.lastKnown gs) of
           Nothing -> Map.empty
-          Just lk -> Map.singleton oid (LastKnown.controller lk, pick oid (LastKnown.characteristics lk))
+          Just lk -> Map.singleton oid (LastKnown.controller lk, battlefieldAbilitiesOf oid (LastKnown.characteristics lk))
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
@@ -13780,10 +13786,10 @@ eventTriggers events gs =
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
         GameEvent.BecameAttached {} -> Map.empty
-      -- CR 603.10a's look-back at the permanent this event removed: every
-      -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
-      -- above gives.
-      leftBattlefield = departedFrom (const abilitiesOf)
+      -- CR 603.10a's look-back at the permanent this event removed: the
+      -- abilities it had that functioned on the battlefield, `battlefieldAbilitiesOf`
+      -- above's filter and `conditionPutsSelfInto`'s exception both applying.
+      leftBattlefield = departedFrom
       -- CR 400.7f's own datum, and the one thing `eventBindings` is told that it
       -- could not read off the event it was handed: for each permanent this batch
       -- put from the battlefield into a graveyard, the id it BECAME there.
@@ -13816,7 +13822,7 @@ eventTriggers events gs =
       -- The batch cut into its CR 704.3 / CR 608.2f events, by the one reading of
       -- simultaneity delayedPending shares (`eventGroups` above).
       groups = eventGroups events
-      departuresIn block = Map.unions (fmap (departedFrom battlefieldAbilitiesOf . LoggedEvent.event) block)
+      departuresIn block = Map.unions (fmap (departedFrom . LoggedEvent.event) block)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents still on the
       -- battlefield when each event happened that have left by the CR 117.5
       -- boundary. Entry i is the union of `leftBattlefield` over the events at a
@@ -13845,14 +13851,14 @@ eventTriggers events gs =
       -- comes first. What is left for this binding is the group the sample does not
       -- name, where last known information is the only reading there is.
       --
-      -- CR 113.6m applies here and not to `leftBattlefield`: this permanent WAS
-      -- on the battlefield when the event happened, so one of its abilities that
-      -- functions only in a graveyard was no more watching then than it is now.
-      -- The behaviour's proving case is Squee, Goblin Nabob leaving the battlefield
-      -- after an upkeep began in the same batch, in Pawl.TriggerSpec's
-      -- `bystanderZoneSpec` -- which reaches the same answer through the sample
-      -- above, that being the reading that wins. The filter is kept identical here
-      -- so the two cannot disagree on the fallback path.
+      -- CR 113.6m applies here the same way it applies to `leftBattlefield` now:
+      -- this permanent WAS on the battlefield when the event happened, so one of
+      -- its abilities that functions only in a graveyard was no more watching
+      -- then than it is now. The behaviour's proving case is Squee, Goblin Nabob
+      -- leaving the battlefield after an upkeep began in the same batch, in
+      -- Pawl.TriggerSpec's `bystanderZoneSpec` -- which reaches the same answer
+      -- through the sample above, that being the reading that wins. The filter is
+      -- kept identical here so the two cannot disagree on the fallback path.
       laterGroups = drop 1 (List.scanr (Map.union . departuresIn) Map.empty groups)
       -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
       -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
@@ -13901,8 +13907,8 @@ eventTriggers events gs =
       -- one part of a resolution must not see creatures buried by a LATER part,
       -- which is a different group and so absent from this entry.
       --
-      -- Not filtered against the entry above: an id departs at exactly one group,
-      -- so the two maps are disjoint, and `leftBattlefield`'s unfiltered offer of
+      -- Not deduplicated against the entry above: an id departs at exactly one
+      -- group, so the two maps are disjoint, and `leftBattlefield`'s own offer of
       -- the event's own departure wins over this one by Map.unions' left bias.
       sameGroup = fmap (Map.map (fmap (filter (looksBack . TriggeredAbility.condition))) . departuresIn) groups
       -- CR 702.29c: the card that was just cycled, wherever it landed. The
@@ -14464,16 +14470,17 @@ eventTriggers events gs =
 --
 -- The `unless` clause governs that sentence too, and is read the same way: the
 -- Aura half by `enchantedObjectLeaves` above this fold, the trigger-condition
--- half not at all (#2502) -- so an ability whose own condition is what put the
--- card in the graveyard is pinned there whether its return is immediate or
--- delayed. No card in the pool writes either shape.
+-- half by `conditionPutsSelfInto` below -- so an ability whose own condition is
+-- what put the card in the zone its (possibly delayed) effect names is not
+-- pinned there, whether its return is immediate or delayed.
 zoneFunctionedFrom :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
 zoneFunctionedFrom subtypes delayed ability =
-  if Set.member Subtype.Aura subtypes && enchantedObjectLeaves (TriggeredAbility.condition ability)
-    then Nothing
-    else
-      Maybe.listToMaybe
-        (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom delayed) (Modal.allEffects (TriggeredAbility.modal ability)))
+  let condition = TriggeredAbility.condition ability
+   in if Set.member Subtype.Aura subtypes && enchantedObjectLeaves condition
+        then Nothing
+        else case Maybe.listToMaybe (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom delayed) (Modal.allEffects (TriggeredAbility.modal ability))) of
+          Nothing -> Nothing
+          Just zone -> if conditionPutsSelfInto condition zone then Nothing else Just zone
 
 -- CR 113.6m's Aura clause, asked of a trigger condition: does it specify "that
 -- the object it enchants leaves the battlefield"? CR 700.4 makes a death one, so
@@ -14503,6 +14510,42 @@ enchantedObjectLeaves condition = case condition of
   -- where it was, so CR 113.6m's Aura clause has nothing to exempt.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
   TriggerCondition.AnyOf conditions -> any enchantedObjectLeaves conditions
+  _ -> False
+
+-- CR 113.6m's general clause, asked of a trigger condition and the zone a fold
+-- pinned: does the condition specify that the OBJECT THE ABILITY IS ON is put
+-- into that zone? Endless Cockroaches, "when this creature dies, return it to
+-- its owner's hand" -- dying is what puts it in the graveyard, so an effect that
+-- named the graveyard would be exempted right back to the battlefield default.
+--
+-- Self-scoped conditions only: the rule's "its trigger condition" is the
+-- ability's OWN watcher, distinct from the Aura disjunct beside it, which is
+-- about a DIFFERENT object (the thing enchanted). `AttachedCreatureDies` answers
+-- False here for that reason -- the enchanted creature dying does not put the
+-- Aura itself anywhere.
+--
+-- A ZONE argument rather than a bare predicate, because the rule compares the
+-- condition against the effect's OWN zone: `SelfDies` only ever puts the object
+-- in the graveyard, so it answers True for that zone and False for any other a
+-- (card-data-error) effect might have named.
+--
+-- The `_` is a decision, `enchantedObjectLeaves`'s reason: every condition not
+-- named here says nothing about the object's own arrival anywhere, so the rule's
+-- main sentence stands.
+conditionPutsSelfInto :: TriggerCondition -> Zone -> Bool
+conditionPutsSelfInto condition zone = case condition of
+  -- CR 700.4's "dies": the object is put in the graveyard, nowhere else.
+  TriggerCondition.SelfDies -> zone == Zone.Graveyard
+  -- CR 603.6c's unnarrowed departure: any destination satisfies it.
+  TriggerCondition.SelfLeavesTheBattlefield -> True
+  -- CR 701.9a: discarding puts the object in the graveyard.
+  TriggerCondition.SelfDiscarded -> zone == Zone.Graveyard
+  -- CR 702.29c: cycling discards the object, same destination.
+  TriggerCondition.SelfCycled -> zone == Zone.Graveyard
+  -- CR 603.6's graveyard-arrival forms, either origin.
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> zone == Zone.Graveyard
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> zone == Zone.Graveyard
+  TriggerCondition.AnyOf conditions -> any (`conditionPutsSelfInto` zone) conditions
   _ -> False
 
 -- CR 113.6, asked of one zone and one triggered ability: does it function from
