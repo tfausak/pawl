@@ -17,6 +17,7 @@ module Pawl.CostSpec where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1953,6 +1954,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   hanweirBattlementsSpec s registry
   ashnodsAltarSpec s registry
   reversalSpec s registry
+  shufflingReversalSpec s registry
+  reversalRigSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -3737,3 +3740,120 @@ reversalSpec s registry = Spec.describe s "Reversal" $ do
     Spec.assertEqWith s "nothing of bob's was tapped" (S.tappedCount S.bob after) 0
     Spec.assertEqWith s "nothing is floating" (poolSize S.bob after) 0
     Spec.assertEqWith s "CR 118.12a and the Piker is countered all the same" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+
+-- pid's library, top to bottom, as a plain list -- read directly off
+-- GameState.library rather than through a zone helper, so the assertion below
+-- is about the ORDER and not just the membership.
+libraryOrder :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+libraryOrder pid gs = Foldable.toList (Map.findWithDefault mempty pid (GameState.library gs))
+
+-- reversalBoard's twin: Synthetic Shuffling Tomb (data/cards/synthetic-shuffling-tomb.json)
+-- stands in for Ancient Tomb, Ancient Tomb's "{T}: Add {C}{C}" with the damage
+-- swapped for CR 733.1's other carve-out, "Shuffle your library." Bob's library
+-- is stocked with two distinct cards first so a shuffle is observable in its
+-- order.
+shufflingReversalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+shufflingReversalBoard island shufflingTomb manaLeak piker bottomCard topCard =
+  let stocked = snd (S.addLibraryCard topCard S.bob (snd (S.addLibraryCard bottomCard S.bob (S.landsInPlay island 2))))
+      (tombId, withTomb) = S.addCreature shufflingTomb S.bob stocked
+      (_, withBob) = S.addCreature island S.bob withTomb
+      (_, onStack) = S.spellOnStack piker S.bob withBob
+      (gs, leakId) = S.handOne manaLeak onStack
+   in (tombId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
+
+-- attemptLeak's twin, adding a REVERSED answer to Prompt.Shuffle so the Tomb's
+-- own shuffle is observable in bob's library order (DungeonSpec's and
+-- TargetSpec's convention, for the same reason -- Game.honourShuffle accepts
+-- any permutation of what was offered).
+attemptLeakShuffling :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
+attemptLeakShuffling decision tombId cast =
+  let ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
+   in (after, asked)
+  where
+    answerer :: Prompt.Prompt r -> State.State Int r
+    answerer p = case p of
+      Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
+      Prompt.ChooseManaSource _ player candidates
+        | player == S.bob -> pure (if elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
+      Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
+        State.modify' (+ 1)
+        pure decision
+      Prompt.Shuffle ids -> pure (reverse ids)
+      _ -> pure (S.identityAnswer p)
+
+-- CR 733.1's last sentence at CR 118.12's moment: reversing bob's illegal
+-- payment does not undo the shuffle the mana ability he activated performed,
+-- proving Pawl.Engine.Cost.reverseIllegal's Exercises arm.
+shufflingReversalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+shufflingReversalSpec s registry = Spec.describe s "Reversal keeps a shuffle" $ do
+  Spec.it s "CR 733.1 reversing the payment does not undo the Tomb's own shuffle" $ do
+    island <- S.printingOf s registry "Island"
+    shufflingTomb <- S.printingOf s registry "Synthetic Shuffling Tomb"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (tombId, cast) = shufflingReversalBoard island shufflingTomb manaLeak piker hillGiant blindSpot
+        original = libraryOrder S.bob cast
+        (after, asked) = attemptLeakShuffling OptionalDecision.Exercises tombId cast
+    Spec.assertEqWith s "bob was asked once whether to reverse it" asked 1
+    Spec.assertEqWith s "CR 733.1 nothing of bob's is floating, the mana reversed with the rest" (poolSize S.bob after) 0
+    Spec.assertEqWith s "the Tomb is untapped again" (S.tappedCount S.bob after) 0
+    Spec.assertBool s (length original >= 2) "the fixture stocked two cards, so a shuffle is observable"
+    Spec.assertEqWith s "CR 733.1's last sentence: the shuffle stands" (libraryOrder S.bob after) (reverse original)
+    Spec.assertBool s (libraryOrder S.bob after /= original) "which is not the pre-shuffle order the reversed mana still would be"
+    Spec.assertEqWith s "CR 118.12a the Piker is countered either way" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+
+-- Synthetic Reversal Rig (data/cards/synthetic-reversal-rig.json), "{1},
+-- Discard a card: Draw a card." -- adds no mana (CR 605.1a), so activating it
+-- goes through Pawl.Engine.Cost.pay's OutsideResolution moment directly rather
+-- than through reverseIllegal above, proving `pay`'s own comment.
+--
+-- alice holds TWO cards so Activate.payableCost's pre-gate sees a legal
+-- discard and opens the mana window at all (an empty hand is refused before
+-- the window ever runs, which SpringleafDrumSpec's posture and
+-- Activate.activatable's CR 605.3b elision both warn against skipping) --
+-- the discard is then refused AT the interactive prompt (`Prompt.ChooseDiscard`
+-- answered with the wrong count, `tappingNothing`'s reject-not-repair posture
+-- one component over) once the {1} half is already paid off the Synthetic
+-- Shuffling Tomb. CR 601.2h then reverses the whole activation, and CR 733.1's
+-- last sentence is what the Tomb's own shuffle stands under.
+rigBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+rigBoard shufflingTomb rig bottomCard topCard handFiller =
+  let stocked = snd (S.addLibraryCard topCard S.alice (snd (S.addLibraryCard bottomCard S.alice (Setup.emptyGame S.bothPlayers))))
+      (tombId, withTomb) = S.addCreature shufflingTomb S.alice stocked
+      (rigId, withRig) = S.addCreature rig S.alice withTomb
+      (_, withHand1) = S.addHandCard handFiller S.alice withRig
+      (_, withHand2) = S.addHandCard handFiller S.alice withHand1
+   in (tombId, rigId, withHand2 {GameState.priority = Just S.alice})
+
+reversalRigSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+reversalRigSpec s registry = Spec.describe s "Synthetic Reversal Rig" $ do
+  Spec.it s "CR 733.1 reversing an unpayable activation does not undo the mana ability's own shuffle" $ do
+    shufflingTomb <- S.printingOf s registry "Synthetic Shuffling Tomb"
+    rig <- S.printingOf s registry "Synthetic Reversal Rig"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (tombId, rigId, gs) = rigBoard shufflingTomb rig hillGiant blindSpot piker
+        original = libraryOrder S.alice gs
+        answerer :: Prompt.Prompt r -> State.State Int r
+        answerer p = case p of
+          Prompt.ChooseManaSource _ player candidates
+            | player == S.alice -> do
+                State.modify' (+ 1)
+                pure (if elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
+          Prompt.Shuffle ids -> pure (reverse ids)
+          -- Reject-not-repair: two cards were offered and none were chosen, so
+          -- CR 601.2h's ban on partial payment leaves the whole thing unpaid.
+          Prompt.ChooseDiscard {} -> pure []
+          _ -> pure (S.identityAnswer p)
+        ((_, after), asked) = State.runState (Engine.runGame answerer gs (Activate.activateAbility S.alice rigId (theAbility rig))) 0
+    Spec.assertEqWith s "alice was offered the Tomb as a mana source once" asked 1
+    Spec.assertEqWith s "CR 118.3 alice's pool is empty, the {1} reversed with the rest" (poolSize S.alice after) 0
+    Spec.assertBool s (not (isTapped tombId after)) "the Tomb is untapped again"
+    Spec.assertBool s (length original >= 2) "the fixture stocked two cards, so a shuffle is observable"
+    Spec.assertEqWith s "CR 733.1's last sentence: the shuffle stands" (libraryOrder S.alice after) (reverse original)
+    Spec.assertBool s (libraryOrder S.alice after /= original) "which is not the pre-shuffle order the reversed activation still would be"
+    Spec.assertEqWith s "nothing of alice's was discarded" (S.handSize S.alice after) 2
+    Spec.assertEqWith s "and the unpayable activation never reached the stack" (length (GameState.stack after)) 0

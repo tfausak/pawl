@@ -80,6 +80,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -2285,6 +2286,11 @@ criteriaOf component = case component of
 -- refusal left -- which is what Pawl.Engine.Game.ask hands the answerer. It also
 -- keeps CR 104.4b's stamp: `Game.choose` writes GameState.lastChoice, and
 -- declining now puts back nothing that could discard it.
+--
+-- Exercising the reversal restores through `keepingLibraryActions` rather than
+-- a bare State.put, CR 733.1's last sentence's reason: a shuffle or a reveal one
+-- of `activated`'s abilities performed stands even though the rest of it goes
+-- back.
 reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> Game ()
 reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
   Nothing -> State.put before
@@ -2292,8 +2298,35 @@ reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
     State.put closed
     answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid closed) pid sources)
     case answer of
-      OptionalDecision.Exercises -> State.put before
+      OptionalDecision.Exercises -> State.put (keepingLibraryActions closed before)
       OptionalDecision.Declines -> pure ()
+
+-- CR 733.1's last sentence: shuffling a library or revealing cards from one is
+-- never reversed, even where the mana ability that did it is. Neither writes
+-- more than one field of GameState -- Event.shuffleLibrary only `library`,
+-- Event.reveal only one GameEvent.Revealed entry onto `events` -- so restoring
+-- `snapshot` with those two fields taken from `since` (the state as the mana
+-- window closed, still carrying them) keeps every OTHER write reversed while
+-- these two stand.
+--
+-- `events` keeps only the REVEALED entries `since` gained past `snapshot`'s own
+-- length, not the whole suffix: a tap or a mana addition the window performed
+-- is exactly what the surrounding reversal DOES undo, and carrying its own log
+-- entry forward would misstate a board that no longer shows it happened.
+-- `nextEventGroup` rides at `since`'s value, since a carried-over entry may
+-- already hold a group `snapshot`'s own counter would otherwise repeat --
+-- GameState.events' groups are non-decreasing along the log.
+keepingLibraryActions :: GameState -> GameState -> GameState
+keepingLibraryActions since snapshot =
+  snapshot
+    { GameState.library = GameState.library since,
+      GameState.events = GameState.events snapshot <> Seq.filter isRevealed (Seq.drop (Seq.length (GameState.events snapshot)) (GameState.events since)),
+      GameState.nextEventGroup = GameState.nextEventGroup since
+    }
+  where
+    isRevealed logged = case LoggedEvent.event logged of
+      GameEvent.Revealed {} -> True
+      _ -> False
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
 -- the PAYER's (payComponents below).
@@ -2314,21 +2347,38 @@ reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
 -- partition is honoured at CR 118.12's moment alone -- see the Unpaid arm below
 -- for which callers cannot take it and why.
 --
--- Rule 733.1's other limb -- an action that moved cards to or from a library,
--- shuffled one or revealed from one may NOT be reversed -- needs no arm here,
--- and by two rules rather than by luck. The window holds mana abilities alone,
--- and CR 605.1a disqualifies an ability whose cost or effect moves a card to or
--- from a library (Pawl.Engine.ManaAbility.costMovesLibraryCard is the cost half),
--- so nothing in it can make such a move. The components can -- MillCards is the
--- one that does -- but CR 601.2h pays those in a SECOND pass (paidInSecondPass
--- below), and `payComponent`'s MillCards arm cannot refuse, so no failure can
--- follow one within this payment.
+-- Rule 733.1's MOVE limb -- an action that moved cards to or from a library may
+-- NOT be reversed -- needs no arm here, and by two rules rather than by luck.
+-- The window holds mana abilities alone, and CR 605.1a disqualifies an ability
+-- whose cost or effect moves a card to or from a library
+-- (Pawl.Engine.ManaAbility.costMovesLibraryCard is the cost half), so nothing
+-- in it can make such a move. The components can -- MillCards is the one that
+-- does -- but CR 601.2h pays those in a SECOND pass (paidInSecondPass below),
+-- and `payComponent`'s MillCards arm cannot refuse, so no failure can follow
+-- one within this payment.
 --
--- Not implemented: rule 733.1's SHUFFLE and REVEAL clauses, which CR 605.1a does
--- not exclude -- Pawl.Engine.ManaAbility.movesLibraryCard answers False of
--- Effect.Shuffle and Effect.Reveal, so a mana ability could carry one and a
--- reversal here would undo it. No printing in `data/cards/` prints a mana
--- ability that shuffles a library or reveals a card from one (#3142).
+-- Rule 733.1's SHUFFLE and REVEAL clauses, which CR 605.1a does NOT exclude --
+-- Pawl.Engine.ManaAbility.movesLibraryCard answers False of Effect.Shuffle and
+-- Effect.Reveal, so a mana ability may carry one -- are why `reverseIllegal`
+-- above restores through `keepingLibraryActions` rather than a bare State.put:
+-- CostSpec's "Reversal" group proves the library stands at CR 118.12's moment.
+-- The OutsideResolution arm below does the same for its OWN local `before`,
+-- but every current caller of this function restores a WIDER `before` of its
+-- own once this returns Unpaid (the next paragraph), which is what actually
+-- decides the OutsideResolution moment's answer -- CostSpec's "Synthetic
+-- Reversal Rig" group proves it there, at Pawl.Engine.Activate.activateAbility,
+-- and every sibling caller (Pawl.Engine.Cast.castProposed,
+-- Pawl.Engine.FaceDown.turnFaceUp and the rest of the special actions,
+-- Pawl.Engine.Combat's two toll sites) restores through `keepingLibraryActions`
+-- for the identical reason. This arm's own restore is redundant with theirs on
+-- every path the pool reaches today, and is kept as the same discipline for a
+-- caller that some day does not add one.
+--
+-- Not implemented at this OutsideResolution moment specifically: rule 733.1's
+-- own CHOICE of whether to keep a reversed mana ability, which every one of
+-- those callers still forces flat rather than asks -- `keepingLibraryActions`
+-- covers regardless of which way that unresolved choice eventually goes
+-- (#3119).
 --
 -- `moment` is which of CR 601.2h and CR 118.12 this payment is (see
 -- Pawl.Types.PaymentMoment). Taken from the CALLER and never derived, since the
@@ -2388,8 +2438,14 @@ pay perform moment subject announced spending pid oid cost = do
             -- unwinds its own older snapshot when this returns Unpaid, which
             -- would discard whatever the payer kept. So they are reversed whole,
             -- and the question is not raised where the answer could not stand
-            -- (#3119).
-            PaymentMoment.OutsideResolution -> State.put before
+            -- (#3119). The restore is still through `keepingLibraryActions`
+            -- rather than a bare State.put, the block comment above's reason --
+            -- every current caller redoes this same restore against its OWN
+            -- wider `before` once Unpaid reaches it, which is what an observer
+            -- actually sees.
+            PaymentMoment.OutsideResolution -> do
+              gs <- State.get
+              State.put (keepingLibraryActions gs before)
           pure Payment.Unpaid
 
 -- CR 508.1h-508.1j and CR 509.1d-509.1f: pay a COMBAT TOLL -- the costs to attack
@@ -2467,7 +2523,15 @@ payToll perform pid charges = do
           case outcome of
             Payment.Paid _ -> pure True
             Payment.Unpaid -> do
-              State.put before
+              -- `keepingLibraryActions`'s reason (Cost.pay): the mana window
+              -- `payMana` opened above may have shuffled or revealed before a
+              -- later tag refused. Redundant with, and for the same reason as,
+              -- Pawl.Engine.Combat's own restore over ITS wider `before` once a
+              -- False here reaches it -- that caller's is what an observer
+              -- actually sees (CombatEffectSpec has no shuffling toll to prove
+              -- this one directly).
+              gs <- State.get
+              State.put (keepingLibraryActions gs before)
               pure False
 
 -- Which way each of the toll's symbols payable in more than one way will be
@@ -2575,6 +2639,14 @@ tollOrderObservable charges = case filter (any orderSensitive . snd) charges of
 -- payToll's fold: each tag's components against the permanent that printed them,
 -- stopping at the first refusal. payInOrder's shape one level up, and the merge is
 -- that function's for its reason.
+--
+-- Not implemented: CR 733.1's OTHER library carve-out -- a card MillCards moved
+-- from a library to a graveyard is not reversed either -- for a tag whose own
+-- mill (`paidInSecondPass`) completes before a LATER tag in this fold refuses.
+-- `payToll`'s and Pawl.Engine.Combat's whole-state reverts undo that mill along
+-- with the rest; `keepingLibraryActions` does not cover it, a library-to-zone
+-- move touching more fields than a shuffle or a reveal does. No toll in
+-- `data/cards/` mills (#3162).
 payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Game Payment.Payment
 payTagged pid charges = case charges of
   [] -> pure bindsNothing
@@ -2816,7 +2888,16 @@ payManaExcept :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -
 payManaExcept perform inFlight record subject spending pid cost = do
   before <- State.get
   (paid, _) <- payManaWindow perform inFlight record subject spending pid cost
-  Monad.unless paid (State.put before)
+  -- `keepingLibraryActions`'s reason (Cost.pay): the window this call opened
+  -- may have shuffled or revealed before its own mana came up short. Every
+  -- caller of this function -- `payMana` inside `payToll` above,
+  -- `payActivation` below for a mana ability's own cost -- restores a WIDER
+  -- `before` of its own once False reaches it, which is what an observer
+  -- actually sees; this restore is the same discipline kept for a caller
+  -- that calls this directly.
+  Monad.unless paid $ do
+    gs <- State.get
+    State.put (keepingLibraryActions gs before)
   pure paid
 
 -- payManaExcept's window, handing back what CR 733.1 needs to reverse it: the
