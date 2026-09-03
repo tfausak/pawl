@@ -5675,13 +5675,13 @@ banewaspAfflictionSpec s registry =
 -- 603.10a's look-back at the very event that removes a bearer -- exists to
 -- read correctly.
 --
--- Synthetic Grave Reflex {1}{B} Creature -- Insect 1/1, "When this creature
--- dies, return this card from your graveyard to your hand at the beginning of
--- the next end step" (data/cards/synthetic-grave-reflex.json). No printing
--- combines a dies trigger with a delayed graveyard return this way -- Scryfall
--- `o:"when this creature dies" o:"return this card from your graveyard"
--- o:"beginning of the next end step"`, 2026-09-03, no hit -- and nothing in
--- the CR forbids the shape.
+-- Ivory Gargoyle {4}{W} Creature -- Gargoyle 2/2, "Flying. When this creature
+-- dies, return it to the battlefield under its owner's control at the beginning
+-- of the next end step and you skip your next draw step. {4}{W}: Exile this
+-- creature." (data/cards/ivory-gargoyle.json, checked against Scryfall) is the
+-- printing: a dies trigger arming a delayed return whose payload names the
+-- graveyard as the card's origin. The Scarab God is the same shape returning to
+-- hand.
 --
 -- Endless Cockroaches cannot prove this: its own effect moves Binding.became
 -- rather than the reserved source slot, so Pawl.Engine.EffectZone.zoneFunctionedFrom
@@ -5706,17 +5706,17 @@ banewaspAfflictionSpec s registry =
 -- correct printing would need the delayed ability's own source rebound to the
 -- graveyard incarnation, which is a second gap this unit does not fix (#3173).
 -- The two legs below stop where that gap starts.
-graveReflexSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-graveReflexSpec s registry =
+ivoryGargoyleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ivoryGargoyleSpec s registry =
   let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
       resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
       -- Kill the creature, settle CR 117.5 so the SBA pass places the dies
       -- trigger.
       kill victim gs = settle (S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim]))
-   in Spec.describe s "GraveReflex" $ do
+   in Spec.describe s "IvoryGargoyle" $ do
         Spec.it s "CR 113.6m a dies-armed delayed graveyard return still fires from the battlefield" $ do
-          reflex <- S.printingOf s registry "Synthetic Grave Reflex"
-          let (victim, g1) = S.addCreature reflex S.alice (Setup.emptyGame S.bothPlayers)
+          gargoyle <- S.printingOf s registry "Ivory Gargoyle"
+          let (victim, g1) = S.addCreature gargoyle S.alice (Setup.emptyGame S.bothPlayers)
               placed = kill victim g1
           Spec.assertEqWith s "CR 113.6m the dies trigger reached the stack" (length (GameState.stack placed)) 1
           -- The precondition the assertion above rests on, AFTER it so it
@@ -5728,8 +5728,8 @@ graveReflexSpec s registry =
         -- exception the delayed effect's stated graveyard origin would pin the
         -- ability there; with it, SelfDies exempts the pin away.
         Spec.it s "CR 113.6m the ability's own effect names the graveyard, and SelfDies exempts it" $ do
-          reflex <- S.printingOf s registry "Synthetic Grave Reflex"
-          let face = S.combinedFace reflex
+          gargoyle <- S.printingOf s registry "Ivory Gargoyle"
+          let face = S.combinedFace gargoyle
           Spec.assertEqWith
             s
             "no zone is pinned once the exception is read"
@@ -5773,7 +5773,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   widowedBladeSpec s registry
   skullclampSpec s registry
   prizedAmalgamSpec s registry
-  graveReflexSpec s registry
+  ivoryGargoyleSpec s registry
   banewaspAfflictionSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry

@@ -674,7 +674,7 @@ snapshotView gs shape event = case event of
 -- CR 608.2h: who controlled the moving object and what KIND of object it was,
 -- read from the record the move funnel filed under the DEPARTED id as the object
 -- ceased -- the same pre-move state a Moved event's snapshot is taken against,
--- and the route Event.departedFrom already takes back from such an event (CR
+-- and the route Event.leftBattlefield already takes back from such an event (CR
 -- 400.7 makes that id name nothing else, ever).
 --
 -- No record only where nothing departed: Event.recordTokenEntry's

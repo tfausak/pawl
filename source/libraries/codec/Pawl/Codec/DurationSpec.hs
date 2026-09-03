@@ -80,4 +80,11 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       (Duration.UntilPaid (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []))
       " {\"type\":\"UntilPaid\",\"value\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}}]}} "
+  -- CR 611.2a / Scout's Warning: "the next ... this turn", ended by its own use.
+  Spec.it s "UntilUsed" $
+    Common.assertCodec
+      s
+      Duration.codec
+      Duration.UntilUsed
+      " {\"type\":\"UntilUsed\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Duration.codec

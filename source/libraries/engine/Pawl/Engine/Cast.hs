@@ -24,6 +24,7 @@ import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.Card as Card.Type
@@ -1522,6 +1523,11 @@ castSpellWith perform applied pid oid name facing = do
           -- none -- so every payability question below, which asks about `sid`,
           -- has to be handed the answer rather than look it up.
           spending = spendingFor pid oid before
+          -- CR 611.2a: the one-shot flash grants this cast would spend, asked of
+          -- the PROPOSED state -- the view the gate read, one step ahead of the
+          -- move that forgets the card -- and consumed by castProposed only once
+          -- the announcement has succeeded, so a rejection spends nothing.
+          spent = PlayerEffect.spentByCast pid oid proposed
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -1564,7 +1570,7 @@ castSpellWith perform applied pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed perform spending pid sid face castFrom keywordsBefore candidates before
+          castProposed perform spending pid sid face castFrom keywordsBefore candidates spent before
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
@@ -1604,8 +1610,12 @@ followIntoSpell permission old new gs = case permission of
 -- `spending` is CR 118.14's permission as it stood before the move, and it is
 -- taken as a VALUE for the reason `candidates` and `keywordsBefore` are: the
 -- object it was a fact about no longer exists.
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [CandidateCost.CandidateCost] -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom keywordsBefore candidateCosts before = do
+--
+-- `spent` is the one-shot flash grants the cast spends (CR 611.2a), asked of the
+-- pre-move state by castSpellWith for the reason the two above are, and dropped
+-- beside the CR 601.2i event below -- after the last step that can reject.
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom keywordsBefore candidateCosts spent before = do
   gs <- State.get
   let candidates = fmap CandidateCost.cost candidateCosts
       decider = Decide.deciderFor pid gs
@@ -2049,6 +2059,9 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
                           -- your hand" trigger reads it off the event, since CR
                           -- 400.7 left `sid` no memory of it.
                           State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g) castFrom)) g)
+                          -- CR 611.2a: the grants this cast spends, for the
+                          -- event's own reason -- nothing past this line rejects.
+                          State.modify' (PlayerEffect.consume spent)
                           -- CR 601.2c: each chosen object became a target of this
                           -- spell, which is what CR 702.21a's ward watches. Here
                           -- rather than beside `chosen` above for CR 601.2i's
