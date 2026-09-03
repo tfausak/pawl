@@ -5190,12 +5190,19 @@ kindredSpec s registry =
 -- printing that turns on it. (Name, cost, type line and oracle text checked
 -- against Scryfall.)
 --
--- Without the clause `Event.zoneFunctionedFrom` answers Graveyard off the
--- effect, `Event.functionsIn Zone.Battlefield` is False, and `eventTriggers`'
--- `battlefieldAbilitiesOf` filter drops the ability -- so the ability never
--- triggers at all and the Aura sits in the graveyard CR 704.5m put it in. With
--- the clause it answers Nothing, `zonesTriggeredFrom` gives the battlefield, and
--- the trigger goes on the stack.
+-- The card would break under a reading that pinned it to the graveyard:
+-- `Event.functionsIn Zone.Battlefield` would be False, `eventTriggers`'
+-- `battlefieldAbilitiesOf` filter would drop the ability, and the Aura would sit
+-- in the graveyard CR 704.5m put it in. With the clause `zoneFunctionedFrom`
+-- answers Nothing, `zonesTriggeredFrom` gives the battlefield, and the trigger
+-- goes on the stack.
+--
+-- The clause is not what CARRIES that here, though, and the legs below do not
+-- prove it: this card's payload names Binding.became rather than the trigger
+-- source, and Pawl.Engine.EffectZone.zoneFunctionedFrom reads a zone off no
+-- other slot, so the fold answers Nothing whichever way the clause goes. The
+-- clause is proved by `widowedBladeSpec` below instead, on the one card in the
+-- pool whose payload names its own source.
 --
 -- CR 700.4 is what makes the printed "dies" one of the departures the clause
 -- names; CR 603.10a is what lets the trigger see a host that has already left;

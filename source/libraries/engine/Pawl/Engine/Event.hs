@@ -14416,15 +14416,22 @@ eventTriggers events gs =
 --
 -- CR 113.6m's "unless" clause is read here in the one half a trigger condition
 -- can satisfy -- the Aura half, `enchantedObjectLeaves` below, gated on the
--- bearer being an Aura. Screams from Within's "when enchanted creature dies,
--- return this card from your graveyard to the battlefield" is the printing it
--- decides: without the clause the effect pins the ability to the graveyard,
--- where the condition can never be checked, and the card does nothing.
+-- bearer being an Aura. Without it an Aura whose payload names its own source
+-- ("when enchanted creature dies, return this card from your graveyard to the
+-- battlefield") would be pinned to the graveyard, where its condition can never
+-- be checked, and the card would do nothing.
 --
 -- The SUBTYPES are the rule's own "if the object is an Aura" (CR 205.3h puts
 -- Aura among the enchantment types), and are projected rather than printed
 -- wherever the caller has a projection -- an object that becomes an Aura in
 -- layer 4 is one for CR 113.6m's purposes too.
+--
+-- Screams from Within, the pool's Aura with that text, is NOT what the clause
+-- decides: CR 400.7 replaced its battlefield incarnation, so its payload names
+-- Binding.became and Pawl.Engine.EffectZone.zoneFunctionedFrom reads a zone off
+-- no slot but Binding.triggerSource -- the fold answers Nothing for it either
+-- way. data/cards/synthetic-widowed-blade.json is the card that tells the
+-- clause's two sides apart, and Pawl.ZoneTriggerSpec proves it.
 --
 -- The clause's "a previous part of its cost or effect specifies that the object
 -- is put into that zone" half belongs to the fold below rather than here, and
