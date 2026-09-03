@@ -150,15 +150,12 @@ data ObjectRef
     -- refers only to cards in the exile zone that were put there as a result of
     -- an instruction to exile them in the first ability."
     --
-    -- TWO READINGS, and the second is not rule 607.2a's. That rule wants an
-    -- ability printed on the object that exiles and a SECOND ability printed on
-    -- it that refers back, which is Hoarding Dragon. Hanweir Battlements' "exile
-    -- them, then meld them into Hanweir, the Writhing Township" is ONE ability
-    -- referring back to what its own earlier instruction exiled -- CR 400.7j
-    -- ("other parts of that effect can find that object") read in CR 608.2c's
-    -- written order. The relation GameState.exiledWith stores is the same for
-    -- both -- an instruction in an ability of this object put this card in exile
-    -- -- so the arm answers both wordings, and only the citation differs.
+    -- ONE READING, rule 607.2a's own: an ability that exiles and a SECOND ability
+    -- printed on the same object referring back, which is Hoarding Dragon. An
+    -- ability referring back to what its OWN earlier instruction exiled is CR
+    -- 400.7j read in CR 608.2c's written order and names the slot that
+    -- instruction bound instead -- Hanweir Battlements' "exile them, then meld
+    -- them", which SourceAndChosenPermanent below is what lets it write.
     --
     -- NO PLAYER: exile is a public zone (CR 400.2) and the set is defined by
     -- which object exiled the card, not by whose it is.
@@ -658,4 +655,28 @@ data ObjectRef
     -- cannot ask. Today Pawl.Types.Effect.MoveToZone's gather is the one that
     -- asks, which is Hanweir Battlements' exile.
     ChosenPermanent (Filter.Filter Keyword.Keyword)
+  | -- | The effect's SOURCE together with exactly one permanent the Filter
+    -- admits -- the "them" in Hanweir Battlements' "exile them, then meld them
+    -- into Hanweir, the Writhing Township" (CR 701.42a).
+    --
+    -- The arm above plus the source, and it exists because those two are ONE
+    -- instruction: CR 608.2f processes an action taken on multiple objects
+    -- simultaneously, so the pair reaches exile in one batch and one event, which
+    -- two Pawl.Types.Effect MoveToZone effects cannot do however they are ordered.
+    -- Proved by Pawl.MeldSpec's "CR 608.2f the pair leaves the battlefield in one
+    -- event".
+    --
+    -- The Filter names the COUNTERPART alone and never the source, so the CR
+    -- 608.2d choice, its candidates and its posture are exactly the arm above's
+    -- -- asked at two or more matches, elided at one, skipped at none. The source
+    -- is not chosen and is not filtered: the printed sentence names it outright.
+    -- A source that is not on the battlefield is not named, CR 101.3 leaving the
+    -- rest of the instruction to do as much as it can (CR 609.3).
+    --
+    -- Not a target and never one (CR 115.10a), the arm above's reason.
+    --
+    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
+    -- read, so objectRefObjects answers nothing for it; Pawl.Types.Effect's
+    -- MoveToZone gather is the one site that asks.
+    SourceAndChosenPermanent (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

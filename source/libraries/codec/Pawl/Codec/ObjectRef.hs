@@ -61,7 +61,8 @@ codec =
       Arm.payload "EachCardFromAmong" EachCardFromAmong.codec ObjectRef.EachCardFromAmong (\x -> case x of ObjectRef.EachCardFromAmong y -> Just y; _ -> Nothing),
       Arm.payload "RandomCardInHand" PlayerRef.codec ObjectRef.RandomCardInHand (\x -> case x of ObjectRef.RandomCardInHand y -> Just y; _ -> Nothing),
       Arm.payload "AnyNumberMatching" filterCodec ObjectRef.AnyNumberMatching (\x -> case x of ObjectRef.AnyNumberMatching y -> Just y; _ -> Nothing),
-      Arm.payload "ChosenPermanent" filterCodec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing)
+      Arm.payload "ChosenPermanent" filterCodec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
+      Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing)
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
