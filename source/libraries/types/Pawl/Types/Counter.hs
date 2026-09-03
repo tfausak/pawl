@@ -33,8 +33,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- permanent". Destroy's `permanents` shape, and the funnel's answer walked to
 -- its sources: a countered spell has none, and a source that has already left
 -- the battlefield is no permanent, so neither is in it. Absent for a countering
--- that never looks back this way, which is every one in the pool but the one
--- that does.
+-- that never looks back this way.
 data Counter = MkCounter
   { ref :: ObjectRef.ObjectRef,
     slot :: Maybe SlotName.SlotName,
