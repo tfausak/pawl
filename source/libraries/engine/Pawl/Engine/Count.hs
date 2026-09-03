@@ -10,6 +10,7 @@
 module Pawl.Engine.Count where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -42,6 +43,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Zone as Zone
@@ -133,22 +135,48 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
     aggregation = Count.Type.aggregation count
 
 -- CR 400.7j / CR 400.2: may a later part of the effect that moved this object
--- FIND it? Only where it landed in a public zone, which is what
--- Game.isHiddenZone classifies. CR 701.9c is why the hidden side cannot simply
--- be counted anyway: a card discarded into a hidden zone has every
--- characteristic undefined, so no Filter has an honest answer about it.
+-- FIND it? Where it landed in a public zone, which is what Game.isHiddenZone
+-- classifies, or where it was REVEALED on the way into a hidden one. CR 701.9c
+-- undefines a discarded card's characteristics only when it reaches the hidden
+-- zone "without being revealed", so a revealed redirect leaves every Filter an
+-- honest answer and an unrevealed one leaves none.
 --
--- Both sides are proven in Pawl.ZoneChangeSpec's Psychic Miasma legs: under
--- Rest in Peace the discarded land is read out of exile and the spell returns;
--- under Wheel of Sun and Moon it is put into the discarding player's library
--- and the spell stays in its graveyard.
+-- The reveal is read off the log: Pawl.Engine.Event.apply's ZoneChangeR arm
+-- reveals the DEPARTING id (CR 701.20a, shown in the zone it leaves), and the
+-- Moved entry the same change records pairs that id with the incarnation the
+-- binding holds, so the two are joined through Moved rather than by id.
+--
+-- Both public-zone legs and the revealed leg are proven in Pawl.ZoneChangeSpec's
+-- Psychic Miasma cases: under Rest in Peace the discarded land is read out of
+-- exile, and under Wheel of Sun and Moon it is revealed on its way to the bottom
+-- of the discarding player's library; the spell returns in both.
+--
+-- Not implemented: a card that reaches a hidden zone unrevealed. No card in the
+-- pool redirects a discard there without revealing it (Nexus of Fate, Progenitus
+-- and the Wheel all reveal), so the False below is a fence rather than a proof;
+-- Library of Leng is the producer (#2230).
 --
 -- False for an id with no object, which is one that has ceased to exist since
 -- the binding was written -- CR 111.7's token, whose exile leaves nothing.
 findableAfterMove :: GameState -> ObjectId -> Bool
 findableAfterMove gs oid = case Game.lookupObject oid gs of
   Nothing -> False
-  Just object -> not (Game.isHiddenZone (Object.zone object))
+  Just object -> not (Game.isHiddenZone (Object.zone object)) || revealedArriving gs oid
+
+-- Was the card revealed as it left the zone this incarnation arrived from?
+-- The Moved entry naming this id as its arrival gives the departed id; a
+-- Revealed entry naming that id is the reveal (CR 701.20a).
+revealedArriving :: GameState -> ObjectId -> Bool
+revealedArriving gs oid =
+  let events = fmap LoggedEvent.event (Foldable.toList (GameState.events gs))
+      departedIds = Maybe.mapMaybe departedAs events
+      departedAs event = case event of
+        GameEvent.Moved m | Foldable.elem oid (Moved.arrivals m) -> Just (ZoneChange.departed (Moved.change m))
+        _ -> Nothing
+      revealed event = case event of
+        GameEvent.Revealed r -> List.elem (Revealed.card r) departedIds
+        _ -> False
+   in any revealed events
 
 -- CR 109.1 / 120.1: THE player candidate's view -- Pawl.Engine.Filter.playerView
 -- with the one field a bare PlayerId cannot answer filled from the board.

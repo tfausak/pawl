@@ -675,21 +675,24 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "bob's discarded swamp is in exile" (namesIn Zone.Exile S.bob after) [Just (S.printingName swamp)]
     Spec.assertEqWith s "and bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
-  -- The exclusion CR 400.7j states: a redirect into a HIDDEN zone (CR 400.2)
-  -- leaves the discarded card unfindable, and CR 701.9c makes its characteristics
-  -- undefined there, so the rider must NOT fire. Wheel of Sun and Moon,
-  -- {G/W}{G/W} Enchantment -- Aura: "Enchant player. If a card would be put into
-  -- enchanted player's graveyard from anywhere, instead that card is revealed and
-  -- put on the bottom of that player's library." Pawl.Engine.Count's
-  -- findableAfterMove is the funnel.
+  -- The same rider through a redirect into a HIDDEN zone (CR 400.2) that
+  -- REVEALS the card on the way: CR 701.9c undefines a discarded card's
+  -- characteristics only when it is hidden "without being revealed", so the
+  -- revealed land is still a land and the rider must fire. Wheel of Sun and
+  -- Moon, {G/W}{G/W} Enchantment -- Aura: "Enchant player. If a card would be
+  -- put into enchanted player's graveyard from anywhere, instead that card is
+  -- revealed and put on the bottom of that player's library."
+  -- Pawl.Engine.Count's findableAfterMove is the funnel, and reads the reveal
+  -- off the log.
   --
   -- The Rest in Peace leg above with the one permanent swapped: the Wheel is
   -- alice's, enchanting bob, so the discard lands in bob's library while Psychic
-  -- Miasma -- alice's card -- still heads for alice's graveyard untouched. Bob's
-  -- library is stocked first, so "the bottom" is a position and not the whole
-  -- library. Dropping the hidden-zone test in findableAfterMove returns the spell
-  -- to alice's hand; the first assertion is what reddens.
-  Spec.it s "CR 400.7j a land discarded into a library does not return Psychic Miasma" $ do
+  -- Miasma -- alice's card -- returns to alice's hand. Bob's library is stocked
+  -- first, so "the bottom" is a position and not the whole library. Dropping the
+  -- reveal read in findableAfterMove leaves the spell in alice's graveyard; the
+  -- first assertion is what reddens. The unrevealed side -- a discard hidden
+  -- without a reveal -- has no producer in the pool (#2230).
+  Spec.it s "CR 701.9c a land discarded into a library revealed still returns Psychic Miasma" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     miasma <- S.printingOf s registry "Psychic Miasma"
@@ -702,8 +705,10 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (gs, spellId) = S.handOne miasma withHand
         cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure atBobAnswer cast Stack.resolveTop)
-    Spec.assertEqWith s "psychic miasma stayed in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName miasma)]
-    Spec.assertEqWith s "and reached no hand" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "psychic miasma returned to alice's hand" (namesIn Zone.Hand S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "and did not also reach alice's graveyard" (namesIn Zone.Graveyard S.alice after) []
+    -- The guard against a fix that reaches the right answer by suppressing the
+    -- redirect: the discard really did land in the hidden zone.
     Spec.assertEqWith s "bob's discarded swamp is on the bottom of his library" (namesIn Zone.Library S.bob after) [Just (S.printingName piker), Just (S.printingName swamp)]
     Spec.assertEqWith s "and bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
