@@ -15,10 +15,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- candidates are the cards an EARLIER effect of this same resolution named --
 -- Commune with the Gods' revealed five (CR 701.20a), Carth the Lion's looked-at
 -- seven (CR 701.20e) -- and where those cards are is whatever the effect that
--- bound them left them. A library batch is the case no zone-keyed arm can reach,
--- a library still having no filtered sweep (gap #2416) -- and
--- Pawl.Types.ObjectRef.TopOfLibraryUntil's walk is not one, since it stops at the
--- match that completes its count rather than collecting every one of them.
+-- bound them left them. A library batch is the case no zone-keyed arm can reach:
+-- Pawl.Types.ObjectRef.EachCardInYourLibrary's filtered sweep names every match
+-- in the whole zone rather than the handful an earlier clause bound, and
+-- Pawl.Types.ObjectRef.TopOfLibraryUntil's walk stops at the match that completes
+-- its count rather than collecting every one of them.
 --
 -- The COUNT is a Quantity rather than a Natural, Pawl.Types.TopOfLibrary's reason:
 -- Ancestral Memories' printed two sits beside a computed one. CR 609.3 covers the

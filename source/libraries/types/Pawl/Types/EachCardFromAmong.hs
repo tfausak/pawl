@@ -12,8 +12,8 @@ import qualified Pawl.Types.SlotName as SlotName
 -- reasons: a SLOT rather than a zone, because the candidates are the cards an
 -- earlier effect named (CR 701.20a's reveal, CR 701.20e's look) and where those
 -- cards are is wherever that effect left them -- which is how a batch still in a
--- LIBRARY is reachable at all, a library having no filtered sweep
--- (gap #2416).
+-- LIBRARY is reachable at all, Pawl.Types.ObjectRef.EachCardInYourLibrary's
+-- filtered sweep naming every match in the whole zone rather than that handful.
 --
 -- The whole difference from that type is that nobody is ASKED. A count-free
 -- "all" is not a choice, so CR 608.2d has nothing to hand out; the members that
