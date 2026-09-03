@@ -2159,6 +2159,9 @@ zadaSpec s registry =
       atZada zadaId p = case p of
         Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just zadaId) . Recipient.objectOf) offered) asked
         _ -> S.identityAnswer p
+      -- What each object on the stack targets, top first, read live off its
+      -- bindings the way Pawl.Engine.Resolve.targetsOnStack does.
+      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))))) (GameState.stack gs)
    in Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.it s "CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one" $ do
           (zadaId, pikerId, spiderId, wallId, mongooseId, growthId, board) <- boardOf
@@ -2166,15 +2169,27 @@ zadaSpec s registry =
               -- CR 603.3b puts Zada's trigger on the stack above the Growth;
               -- draining resolves the trigger, then its copies, then the Growth.
               placed = snd (Engine.runGamePure (atZada zadaId) cast Engine.settleForPriority)
+              -- The trigger alone, which is the moment the copies exist and
+              -- none has resolved -- where "a copy isn't created" is visible.
+              afterTrigger = resolveOne (atZada zadaId) placed
               after = drainStack (atZada zadaId) placed
               pt oid = S.powerToughnessOf oid after
           -- The fixture's own precondition, which no reading of rule 707.10d can
           -- redden: the Mongoose is on the battlefield to be passed over.
           Spec.assertBool s (S.powerToughnessOf mongooseId board == Just (2, 1)) "the Mongoose starts 2/1"
+          -- Rule 707.10d's last sentence at the only place it is observable: a
+          -- copy made for the Mongoose anyway would be COUNTERED for an illegal
+          -- target (CR 608.2b) and leave every P/T below reading the same, so
+          -- the copies are counted and named where they sit on the stack.
+          Spec.assertEqWith
+            s
+            "CR 707.10d one copy per creature the Growth could target, each on a different one, and none for the Mongoose"
+            (List.sort (concatMap (Maybe.mapMaybe Recipient.objectOf) (List.init (stackTargets afterTrigger))))
+            (List.sort [pikerId, spiderId, wallId])
           Spec.assertEqWith s "CR 707.10d a copy targeted the Piker" (pt pikerId) (Just (5, 4))
           Spec.assertEqWith s "CR 707.10d a different copy targeted the Spider" (pt spiderId) (Just (5, 7))
           Spec.assertEqWith s "CR 707.10d and a third the Wall" (pt wallId) (Just (3, 11))
-          Spec.assertEqWith s "CR 707.10d the Mongoose has shroud, so the spell could not target it and no copy was made for it" (pt mongooseId) (Just (2, 1))
+          Spec.assertEqWith s "CR 707.10d the Mongoose has shroud, so the spell could not target it" (pt mongooseId) (Just (2, 1))
           Spec.assertEqWith s "and Zada took only the original Growth, no copy having been made for it" (pt zadaId) (Just (6, 6))
           Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
         -- CR 707.10d's one player choice: "the copies are put onto the stack
@@ -2194,7 +2209,7 @@ zadaSpec s registry =
                     -- The trigger alone, so the copies are on the stack and none
                     -- of them has resolved.
                     afterTrigger = resolveOne (answering reorder) placed
-                 in fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid afterTrigger)))))) (GameState.stack afterTrigger)
+                 in stackTargets afterTrigger
               offered = stacked id
               reversed = stacked List.reverse
           Spec.assertEqWith s "CR 707.10d reversing the answer reverses the copies on the stack" (take 3 reversed) (List.reverse (take 3 offered))

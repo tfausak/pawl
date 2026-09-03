@@ -3,13 +3,13 @@ module Pawl.Types.CopyTargets where
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- | Where a copy put onto the stack by Pawl.Types.Effect's CopyStackObject arm
--- gets its targets: CR 707.10's three answers, which are three different acts
--- rather than three settings of one.
+-- gets its targets: three of CR 707.10's answers, which are different acts
+-- rather than settings of one.
 --
--- Not a Bool with a payload beside it (#2209): CR 707.10c hands the choice to a
--- player, CR 707.10d makes the effect enumerate one copy per candidate, and the
--- unmarked case asks nobody anything. Only one of the three can be true at once,
--- so the type says so.
+-- Not a Bool with a payload beside it, see #2209: CR 707.10c hands the choice to
+-- a player, CR 707.10d makes the effect enumerate one copy per candidate, and
+-- the unmarked case asks nobody anything. At most one can hold at a time, so the
+-- type says so.
 data CopyTargets
   = -- | CR 707.10 alone: the copy keeps the decisions the original made,
     -- targets included.

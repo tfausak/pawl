@@ -537,6 +537,14 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
 
+-- The refs a CR 707.10 answer names: rule 707.10d's candidates, and nothing for
+-- the other two, neither of which describes anything.
+copyTargetsRefs :: CopyTargets.CopyTargets -> [ObjectRef]
+copyTargetsRefs targets = case targets of
+  CopyTargets.Copied -> []
+  CopyTargets.ChosenByController -> []
+  CopyTargets.ForEach ref -> [ref]
+
 -- Every ObjectRef this ONE effect holds, its own only: a nested effect's refs
 -- are its own answer here, reached by whichever caller recurses.
 --
@@ -553,14 +561,6 @@ objectRefPlayerRefs ref = case ref of
 -- once (#2729). Two things pay for that: slotsOf's corpus lints, since a ref
 -- dropped here stops being reported there, and Pawl.CardSpec's planted
 -- objectRefPositions, which is the only observer of a position no card writes.
--- The refs a CR 707.10 answer names: rule 707.10d's candidates, and nothing for
--- the other two, neither of which describes anything.
-copyTargetsRefs :: CopyTargets.CopyTargets -> [ObjectRef]
-copyTargetsRefs targets = case targets of
-  CopyTargets.Copied -> []
-  CopyTargets.ChosenByController -> []
-  CopyTargets.ForEach ref -> [ref]
-
 effectObjectRefs :: Effect card ability -> [ObjectRef]
 effectObjectRefs effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> Foldable.toList (fmap DamagePart.ref parts)
@@ -2620,9 +2620,12 @@ clauseIsInert bound legal clause =
 -- reference names them but they CANNOT pay (CR 118.3), asked on neither limb;
 -- they decline, which only an OPTIONAL cost reaches; they chose to pay -- the
 -- one place the answer is not the raw choice, since Pawl.Engine.Cost.pay
--- restores the entry state and an Unpaid result is a complete no-op; or the
--- reference never named them at all, which is not an answer and leaves them out
--- of both branches.
+-- restores the payments an incomplete attempt made and an Unpaid result buys
+-- nothing, though it is not a no-op on the BOARD: Cost.reverseIllegal asks
+-- before reversing a mana ability, so a payer who declines keeps CR 605.3a's
+-- window -- the mana floating and the sources tapped; or the reference never
+-- named them at all, which is not an answer and leaves them out of both
+-- branches.
 --
 -- The cost is paid AGAINST `source` rather than the resolving stack object (CR
 -- 113.7a); the two are the same object for a spell.
