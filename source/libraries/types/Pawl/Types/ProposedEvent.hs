@@ -57,7 +57,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- nothing and pays nothing. Nothing is what a reader gating on a paid cost -- CR
 -- 702.37b's megamorph counter, the only such reader -- correctly declines.
 --
--- Twelve arms, not every replaceable event class the rules define: each of the rest
+-- Thirteen arms, not every replaceable event class the rules define: each of the rest
 -- is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
@@ -145,15 +145,30 @@ data ProposedEvent
     -- library".
     --
     -- ONE draw and no count: CR 121.2 makes an instruction to draw several cards
-    -- that many individual card draws, and this funnel runs once per draw.
-    --
-    -- Not implemented: CR 121.2a's modification of the NUMBER a single
-    -- instruction names, which rule 616.1g applies once before any of the
-    -- individual draws. That is a different event class -- the instruction, not
-    -- the draw -- and nothing raises it (#2660).
+    -- that many individual card draws, and this funnel runs once per draw. The
+    -- INSTRUCTION is WouldDrawCards below, a different event class that CR 616.1g
+    -- settles first.
     --
     -- The PlayerId and nothing else: rule 121.1's action has no source, no amount
     -- and no destination a replacement could rewrite, and the card it would move
     -- is not chosen until the draw happens.
     WouldDraw PlayerId.PlayerId
+  | -- | CR 121.2a: a player would be instructed to draw this many cards. Raised by
+    -- Pawl.Engine.Resolve's Effect.Draw arm once per drawer, after the quantity is
+    -- evaluated and before any of CR 121.2's individual draws -- rule 121.2a's
+    -- "this modification occurs before considering any of the individual card
+    -- draws", and rule 616.1g's containment: the instruction is settled here, then
+    -- each draw it leaves raises its own WouldDraw.
+    --
+    -- The count is the number the instruction NAMES, never a library or a hand
+    -- size, so a row that resizes it answers in the same currency and CR 616.2's
+    -- next iteration sees a differently-numbered instruction rather than a
+    -- differently-shaped event.
+    --
+    -- Effect.Draw is the only funnel that raises it, which is CR 121.2a's own
+    -- scope: rule 121.1's other two roads are the draw step's turn-based action
+    -- and CR 103.5's opening hand. The first draws one card, which is no
+    -- instruction to draw multiple; the second runs before any replacement effect
+    -- can exist, so the two readings are indistinguishable there.
+    WouldDrawCards PlayerId.PlayerId Natural.Natural
   deriving (Eq, Ord, Show)

@@ -2824,6 +2824,9 @@ rewriteReplacementEffect pairs effect = case effect of
   -- A DrawR is one CR 109.5 relation and one amount of life; no Filter and no
   -- card, so no printed word to swap. LifeLossR's answer, and for its reason.
   ReplacementEffect.DrawR {} -> effect
+  -- A DrawCountR is one CR 109.5 relation, one count and one nullary rewrite; no
+  -- Filter and no card, so no printed word to swap. DrawR's answer.
+  ReplacementEffect.DrawCountR {} -> effect
   ReplacementEffect.CounterR r ->
     ReplacementEffect.CounterR
       r
