@@ -825,6 +825,24 @@ data Prompt r where
   -- order, which CR 101.4c leaves open. Raised for two or more members, with no
   -- further elision: distinct objects are distinguishable by construction.
   OrderForEach :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt [Natural.Natural]
+  -- | CR 613.7m: the relative order of the timestamps a batch of this player's
+  -- objects receives at one moment. The [ObjectId] is one seat's group in the
+  -- engine's canonical order and the answer is a permutation of its INDICES,
+  -- first named taking the EARLIER stamp.
+  --
+  -- Not OrderForEach, though both order one seat's objects: this question has no
+  -- resolving object to carry -- CR 702.145c's nightfall sweep is a static
+  -- ability's -- and its chooser is the seat itself rather than the rule's actor.
+  -- Asked by Pawl.Engine.Restamp.order, which every road that restamps a batch
+  -- goes through: Pawl.Engine.Resolve's Effect.TurnFaceDown (CR 613.7f) and
+  -- turnPermanentsOver (CR 613.7g), and Pawl.Engine.Daytime's turnDue.
+  --
+  -- Asked once per GROUP and in APNAP order of the groups, the primary
+  -- determination being APNAP (CR 101.4) and nobody's choice. Raised for two or
+  -- more on the count alone, as the CR 101.4c caller of OrderTriggers above is:
+  -- whether the relative stamp is ever read depends on what applies in the layer
+  -- afterwards, which the asking site cannot know.
+  OrderTimestamps :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
   -- both halves of what a player at a table can see -- mulligans already taken,
   -- and how many cards another would bottom -- which diverge under CR 103.5c's

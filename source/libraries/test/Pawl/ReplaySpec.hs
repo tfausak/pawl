@@ -556,6 +556,25 @@ combatReplaySpec s =
             "identity permutation"
             (Replay.defaultAnswer (Prompt.OrderComponentCards decider S.alice Zone.Graveyard [PrintingId.MkPrintingId 3, PrintingId.MkPrintingId 4]))
             [0, 1 :: Natural.Natural]
+        -- CR 613.7m's stamp order, the sixth prompt carrying a [Natural]
+        -- permutation, and discriminating against the five above for their own
+        -- stated reason: a shared Response constructor would let a meld
+        -- arrangement's transcript entry reorder a batch of timestamps.
+        Spec.it s "OrderTimestamps records and replays a permutation" $ do
+          let p = Prompt.OrderTimestamps decider S.alice [oid, ObjectId.MkObjectId 8]
+              answer = [1, 0] :: [Natural.Natural]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "an OrderComponentCards transcript entry does not answer an OrderTimestamps"
+            (Replay.decode p (Replay.encode (Prompt.OrderComponentCards decider S.alice Zone.Library [PrintingId.MkPrintingId 3, PrintingId.MkPrintingId 4]) answer))
+            Nothing
+        Spec.it s "defaultAnswer keeps the order the batch was stamped in" $
+          Spec.assertEqWith
+            s
+            "identity permutation"
+            (Replay.defaultAnswer (Prompt.OrderTimestamps decider S.alice [oid, ObjectId.MkObjectId 8]))
+            [0, 1 :: Natural.Natural]
         Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
           let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
               answer = Set.singleton (ObjectId.MkObjectId 8)

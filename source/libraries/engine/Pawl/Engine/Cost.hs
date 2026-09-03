@@ -2258,6 +2258,12 @@ criteriaOf component = case component of
 -- rejection, so an Unpaid result is a complete no-op even though paying is
 -- monadic -- which CR 118.12's resolution-time caller rests on too.
 --
+-- Not implemented: rule 733.1's limits on that restore. Reversing the mana
+-- abilities activated in the CR 605.3a window is each player's OPTION and is
+-- taken here without asking, and a library move, a shuffle or a reveal one of
+-- them performed may not be reversed at all. `payTolls` and `payMana` below
+-- restore the same way (#3119).
+--
 -- `moment` is which of CR 601.2h and CR 118.12 this payment is (see
 -- Pawl.Types.PaymentMoment). Taken from the CALLER and never derived, since the
 -- cost itself does not say -- `counterCause` below is what reads it, and the
@@ -3024,13 +3030,16 @@ payComponent moment slots pid oid component = case component of
   -- picking. Pawl.CostSpec's "CR 118.3 exiling the Effigy first leaves no
   -- permanent to tap" is the proof.
   --
-  -- Not implemented: rule 107.5's other half, a permanent that is already tapped.
-  -- `canPayComponent`'s arm above reads the tap state beside the zone and is what
-  -- this would share; the mana window that runs first is where a permanent gets
-  -- tapped mid-payment (#3114).
+  -- `canPayComponent`'s own arm, so both halves of CR 107.5 are read once: the
+  -- other way a part paid earlier makes this one unpayable is the CR 605.3a mana
+  -- window, which offers this very permanent as a source and taps it. Nothing
+  -- narrows that offer -- CR 605.3a lets a player activate any mana ability at a
+  -- payment, and refusing the payment afterwards is the rules' own answer.
+  -- Pawl.CostSpec's "CR 107.5 tapping the source for mana loses its own {T}" is
+  -- the proof.
   CostComponent.TapThis -> do
     gs <- State.get
-    if Set.member oid (GameState.battlefield gs)
+    if canPayComponent slots pid oid component gs
       then do
         tapObject oid
         pure bindsNothing
@@ -3050,6 +3059,12 @@ payComponent moment slots pid oid component = case component of
   -- Through Event.sacrifice, the CR 701.21 funnel, and never a direct zone poke:
   -- a cost payment is a game event, so dies-triggers, replacement effects and the
   -- turn history all see it.
+  --
+  -- Not implemented: CR 118.3 asked again here, as TapThis above asks it. An
+  -- earlier part of the CR 601.2h order, or a mana ability activated in the CR
+  -- 605.3a window, can already have moved this permanent, and the funnel then does
+  -- nothing while this answers Paid. The same paragraph stands over ExileThis and
+  -- ReturnThis below (#3118).
   CostComponent.SacrificeThis -> do
     -- CR 701.21a's "a permanent they don't control" guard lives in the funnel;
     -- `pid` is the player paying, who for "sacrifice this" is its controller.
@@ -3059,6 +3074,7 @@ payComponent moment slots pid oid component = case component of
   -- SacrificeThis' call above and for its reason. CR 400.3 is what makes the bare
   -- Zone.Hand right: an object that would go to a hand other than its owner's
   -- goes to its owner's, so the funnel already spells the printed "its owner's".
+  -- SacrificeThis' CR 118.3 elision above covers this arm too (#3118).
   CostComponent.ReturnThis -> do
     Event.changeZone oid Zone.Hand
     pure bindsNothing
@@ -3386,7 +3402,8 @@ payComponent moment slots pid oid component = case component of
     Event.changeZone oid Zone.Exile
     pure bindsNothing
   -- CR 406.2's move off the BATTLEFIELD, through the same funnel and with no
-  -- prompt for the same reason: the cost names this permanent.
+  -- prompt for the same reason: the cost names this permanent. SacrificeThis'
+  -- CR 118.3 elision above covers this arm too (#3118).
   CostComponent.ExileThis -> do
     Event.changeZone oid Zone.Exile
     pure bindsNothing
