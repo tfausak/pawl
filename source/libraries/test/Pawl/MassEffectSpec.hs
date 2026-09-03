@@ -4853,7 +4853,7 @@ comeBackWrongSpec s registry =
 --
 --   * A LISTED name versus every permanent. carol's Serra Inquisitors is on CR
 --     206.3c's list and alice's Goblin Piker is not.
---   * NONTOKEN versus every permanent (CR 111.6). bob's token is built from the
+--   * NONTOKEN versus every permanent (CR 111.1). bob's token is built from the
 --     same Serra Inquisitors card, so its name matches too and only that
 --     conjunct tells the two apart.
 --   * CR 701.19c versus an ordinary destruction. alice's Aether Storm carries a
@@ -4889,7 +4889,7 @@ apocalypseChimeSpec s registry =
           Spec.assertBool s (not (null (GameState.replacements board))) "the fixture really armed a regeneration shield"
           Spec.assertBool s (not (S.onBattlefield carolsId after)) "CR 206.3c carol's Serra Inquisitors, a listed nontoken permanent, was destroyed"
           Spec.assertBool s (not (S.onBattlefield stormId after)) "CR 701.19c alice's Aether Storm was destroyed through its regeneration shield"
-          Spec.assertBool s (S.onBattlefield tokenId after) "CR 111.6 bob's token of that same listed card survives"
+          Spec.assertBool s (S.onBattlefield tokenId after) "CR 111.1 bob's token of that same listed card survives"
           Spec.assertBool s (S.onBattlefield pikerId after) "and alice's Goblin Piker, whose name is not on the list, survives"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
