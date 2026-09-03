@@ -458,6 +458,11 @@ merge2 l r =
 -- box they define. Where neither half defines the box, it travels with its own
 -- half's ability, left first: substituting into a box that holds no star is the
 -- identity, so which ability rides along is unobservable there.
+--
+-- Which also settles the half whose ability is DROPPED: a half that declares a
+-- CDA but prints no box in this slot loses its ability from the pair to the half
+-- that prints the box, where combining the two Maybes would have kept it. Same
+-- reason -- the box it would ride into holds no star.
 definedBox ::
   Face.Face Card.Card ->
   Face.Face Card.Card ->

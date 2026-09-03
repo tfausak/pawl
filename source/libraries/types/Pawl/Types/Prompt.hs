@@ -610,22 +610,31 @@ data Prompt r where
   -- NonEmpty is every player still in the game (CR 102.1), which CR 800.4 has
   -- already emptied of anyone who left. Asked only for two or more.
   ChoosePlayer :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
-  -- | CR 603.3b: each player, in APNAP order, puts the triggered abilities they
-  -- control on the stack in any order. The [TriggerEntry] is that player's
-  -- pending triggers in the engine's canonical order; the answer is a
-  -- permutation of the INDICES, so the last named resolves first. A
-  -- TriggerSource rather than an ObjectId inside the entry, because the
-  -- inherent abilities (CR 725.2's monarch pair, CR 702.179d's speed increase)
-  -- have no source.
+  -- | An order over a player's own triggered abilities. The [TriggerEntry] is
+  -- the entries in the engine's canonical order and the answer is a permutation
+  -- of their INDICES, giving the order they are PROCESSED in -- which is a
+  -- different thing at each of the two callers. A TriggerSource rather than an
+  -- ObjectId inside the entry, because the inherent abilities (CR 725.2's
+  -- monarch pair, CR 702.179d's speed increase) have no source.
+  --
+  -- CR 603.3b at Pawl.Engine.Engine.orderPending: each player, in APNAP order,
+  -- puts the triggers they control on the stack, so the entries are pushed in
+  -- the answered order and the LAST NAMED RESOLVES FIRST. Asked once per PASS of
+  -- rule 603.3b's two-part process, not once per batch, so the entries offered
+  -- are always all of one class.
+  --
+  -- CR 101.4c at Pawl.Engine.Event.delayedPending: within one controller's share
+  -- of a batch of delayed triggers being gathered, the order their own questions
+  -- are ASKED in is that player's choice, so the FIRST NAMED IS ASKED FIRST and
+  -- nothing about the stack is settled here. Offered only over the entries that
+  -- ask.
   --
   -- Positional, but not positional BY NECESSITY: equal entries can still be
   -- distinguishable, since CR 117.3b makes which of two same-ability triggers
   -- resolved first visible whenever the payload reads one (Aether Flash on two
-  -- entrants). So the elision is two or more AND the order observable;
-  -- Pawl.Engine.Engine.orderInert is the other half.
-  --
-  -- Asked once per PASS of CR 603.3b's two-part process, not once per batch, so
-  -- the entries offered are always all of one class.
+  -- entrants). So rule 603.3b's elision is two or more AND the order observable,
+  -- Pawl.Engine.Engine.orderInert being that half; the CR 101.4c caller elides on
+  -- the count alone.
   OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerEntry.TriggerEntry] -> Prompt [Natural.Natural]
   -- | CR 615.7: with damage from two or more applicable sources at once, the
   -- shielded player or the permanent's controller chooses which the shield
