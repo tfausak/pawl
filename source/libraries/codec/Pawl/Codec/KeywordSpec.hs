@@ -618,12 +618,24 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Bloodthirst 1)
+      (Keyword.Bloodthirst (Just 1))
       " {\"type\":\"Bloodthirst\",\"value\":1} "
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Bloodthirst 1) /= Codec.encode Keyword.codec (Keyword.Modular 1))
+      (Codec.encode Keyword.codec (Keyword.Bloodthirst (Just 1)) /= Codec.encode Keyword.codec (Keyword.Modular 1))
       "bloodthirst 1 is not modular 1"
+  -- CR 702.54b's X names no number, so it is the absent "value" key -- and it must
+  -- not collide with a printed zero, which rule 702.54a would gate on damage.
+  Spec.it s "Bloodthirst X without rule 702.54b's number" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Bloodthirst Nothing)
+      " {\"type\":\"Bloodthirst\"} "
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Bloodthirst Nothing) /= Codec.encode Keyword.codec (Keyword.Bloodthirst (Just 0)))
+      "bloodthirst X is not bloodthirst 0"
   -- CR 702.55a's haunt writes no payload at all -- the haunted object is board
   -- state (GameState.haunting), not a field of the keyword.
   Spec.it s "Haunt" $

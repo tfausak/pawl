@@ -711,6 +711,9 @@ quantityCounts quantity = case quantity of
   -- CR 120.1's tally of logged damage: a PlayerRef and nothing else, so no Count
   -- and no Filter here either.
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
+  -- The same log read as a TOTAL rather than a tally: a PlayerRef and nothing
+  -- else here either.
+  Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
   -- CR 601.2i's tally of casts, read off the handoff snapshot: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.SpellsCastLastTurn _ -> []
@@ -1812,6 +1815,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.CardsDiscardedThisTurn {} -> False
   Quantity.Type.LifeGainedThisTurn {} -> False
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
+  Quantity.Type.DamageDealtToPlayersThisTurn {} -> False
   Quantity.Type.SpellsCastLastTurn {} -> False
   Quantity.Type.DungeonsCompleted {} -> False
   Quantity.Type.CompletedDungeon {} -> False
@@ -3910,6 +3914,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.CardsDiscardedThisTurn _ -> []
   Quantity.Type.LifeGainedThisTurn _ -> []
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
+  Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
   Quantity.Type.SpellsCastLastTurn _ -> []
   Quantity.Type.DungeonsCompleted _ -> []
   Quantity.Type.CompletedDungeon {} -> []

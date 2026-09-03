@@ -3230,6 +3230,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity
   Quantity.Type.LifeGainedThisTurn _ -> quantity
   Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity
+  Quantity.Type.DamageDealtToPlayersThisTurn _ -> quantity
   Quantity.Type.SpellsCastLastTurn _ -> quantity
   Quantity.Type.DungeonsCompleted _ -> quantity
   Quantity.Type.CompletedDungeon {} -> quantity
@@ -4781,6 +4782,7 @@ quantityReads q = case q of
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.Type.LifeGainedThisTurn _ -> Set.empty
   Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty
+  Quantity.Type.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.Type.SpellsCastLastTurn _ -> Set.empty
   Quantity.Type.DungeonsCompleted _ -> Set.empty
   Quantity.Type.CompletedDungeon {} -> Set.empty
