@@ -411,9 +411,8 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Exert -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
-  -- CR 702.184a's ability is on a PERMANENT (CR 721.1's station card is an
-  -- artifact), so it belongs to battlefieldAbilitiesFor and not to this hand
-  -- roster.
+  -- CR 702.184a's ability puts its counters on "this permanent", so it belongs to
+  -- battlefieldAbilitiesFor and not to this hand roster.
   Keyword.Station -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.

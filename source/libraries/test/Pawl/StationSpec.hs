@@ -11,12 +11,12 @@
 -- -- Spacecraft whose whole printed text is station, a 2+ anthem and a 12+
 -- striation carrying flying, lifelink and a 3/5 box.
 --
--- The arithmetic is deliberately non-degenerate. Blind-Spot Giant is 4/1 and Hill
+-- The arithmetic is deliberately non-degenerate. Blind-Spot Giant is 4/3 and Hill
 -- Giant is 3/3, so a single station off the Blind-Spot loads 4 counters -- which is
--- not 1 (how many creatures were tapped), not 2 (the anthem's threshold), not 3 or
--- 5 (the Frigate's own numbers) and not 12. The two striation thresholds are read
--- as PAIRS of boards differing in exactly one thing: one charge counter against
--- two, and eleven against twelve.
+-- not 1 (how many creatures were tapped), not 2 (the anthem's threshold), not 3
+-- (its own toughness, the other giant's power, and the Frigate's), not 5 and not
+-- 12. The two striation thresholds are read as PAIRS of boards differing in
+-- exactly one thing: one charge counter against two, and eleven against twelve.
 --
 -- THREE SEATS, not two. CR 721.2a's "other creatures you control" is a real
 -- narrowing, and on a two-seat board "an opponent" and "the other player"
