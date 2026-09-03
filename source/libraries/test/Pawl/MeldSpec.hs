@@ -93,9 +93,9 @@ aimedAt oid p = case p of
 -- same permanent whose {T} the ability being paid still needs. A payer who takes
 -- it can no longer pay that {T} (CR 107.5) and loses the whole activation, which
 -- Pawl.CostSpec's "CR 107.5 tapping the source for mana loses its own {T}" pins.
--- So every board here names a Mountain instead, by identity rather than by index,
--- and answers nothing at all when the source under the cost is the only offer --
--- which fails the payment loudly rather than repairing it.
+-- So every board here answers with the first offer that is NOT that permanent,
+-- named by identity rather than by index, and with nothing at all when it is the
+-- only offer -- which fails the payment loudly rather than repairing it.
 --
 -- Wraps an inner answerer rather than replacing one, so each case keeps whatever
 -- it decided about its other prompts.

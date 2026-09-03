@@ -626,10 +626,10 @@ meldedBoard base battlements garrison mountain =
 -- {C}" taps the very permanent whose {T} the melding ability being paid still
 -- needs; a payer who takes it can no longer pay that {T} (CR 107.5) and loses the
 -- activation, which Pawl.CostSpec's "CR 107.5 tapping the source for mana loses
--- its own {T}" pins. So this board names a Mountain instead, by identity rather
--- than by index, and answers nothing when the source under the cost is the only
--- offer -- which fails the payment loudly rather than repairing it. Every other
--- prompt is left to the identity answerer.
+-- its own {T}" pins. So this board answers with the first offer that is NOT that
+-- permanent, named by identity rather than by index, and with nothing at all when
+-- it is the only offer -- which fails the payment loudly rather than repairing it.
+-- Every other prompt is left to the identity answerer.
 --
 -- Duplicated from Pawl.MeldSpec's `sparing` rather than hoisted into
 -- Pawl.Support, which rebuilds every spec in the tree.
