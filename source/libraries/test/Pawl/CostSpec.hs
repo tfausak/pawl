@@ -3226,7 +3226,8 @@ recordingOrders p = case p of
 -- alice controls the Effigy, settled and untapped, and exactly four untapped
 -- Plains -- the minimum that pays {4}, so the mana window has nothing to decide
 -- and a refusal below cannot be an unaffordable one. bob controls a Hill Giant
--- and a Goblin Piker: two creatures, so CR 601.2c's target is a real choice, and
+-- and a Goblin Piker: two creatures, so the target (CR 601.2c, reached for an
+-- activated ability by CR 602.2b) is a real choice, and
 -- two DIFFERENT printings so which one the ability reached is visible by name.
 --
 -- bob owns both creatures and alice owns the Effigy, which is what keeps the two
@@ -3298,10 +3299,12 @@ brittleEffigySpec s registry = Spec.describe s "Brittle Effigy" $ do
     Spec.assertEqWith s "where the cost's own exile is alice's" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
     Spec.assertBool s (not (S.onBattlefield effigyId after)) "the Effigy is gone too"
     Spec.assertBool s (S.onBattlefield giantId after) "and the creature the prompt did not name is untouched"
-  -- CR 601.2h's ordering prompt, which this cost is the first in `data/cards/` to
-  -- raise off a permanent-exiling part: {T} and "exile this artifact" are both
+  -- CR 601.2h's ordering prompt: {T} and "exile this artifact" are both
   -- order-sensitive and not equal, so the payer is asked, and the two parts are
-  -- offered together in one pass.
+  -- offered together in one pass. This is what makes ExileThis' orderSensitive
+  -- arm proven rather than a fence -- the two arms beside it, ReturnThis and
+  -- ReturnPermanents, each say at the site that their producer's cost carries no
+  -- second order-sensitive part.
   Spec.it s "CR 601.2h the payer orders the tap against the exile" $ do
     effigy <- S.printingOf s registry "Brittle Effigy"
     plains <- S.printingOf s registry "Plains"
