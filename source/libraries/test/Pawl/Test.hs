@@ -146,6 +146,8 @@ import qualified Pawl.Codec.DiscardCardsSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DiscardSpec
 import qualified Pawl.Codec.DiscardedSpec
+import qualified Pawl.Codec.DrawCountRSpec
+import qualified Pawl.Codec.DrawCountRewriteSpec
 import qualified Pawl.Codec.DrawRSpec
 import qualified Pawl.Codec.DrawRewriteSpec
 import qualified Pawl.Codec.DrawSpec
@@ -719,6 +721,8 @@ spec s registry = do
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.DiscardSpec.spec s
   Pawl.Codec.DiscardedSpec.spec s
+  Pawl.Codec.DrawCountRSpec.spec s
+  Pawl.Codec.DrawCountRewriteSpec.spec s
   Pawl.Codec.DrawRSpec.spec s
   Pawl.Codec.DrawRewriteSpec.spec s
   Pawl.Codec.DrawSpec.spec s

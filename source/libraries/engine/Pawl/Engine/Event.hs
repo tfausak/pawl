@@ -110,6 +110,8 @@ import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
+import qualified Pawl.Types.DrawCountR as DrawCountR
+import qualified Pawl.Types.DrawCountRewrite as DrawCountRewrite
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Drew as Drew
@@ -1375,6 +1377,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
   ReplacementEffect.DrawR {} -> False
+  ReplacementEffect.DrawCountR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
@@ -2616,6 +2619,37 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits DrawR only against WouldDraw.
     (ReplacementEffect.DrawR {}, _) -> pure (Just event)
+    -- CR 121.2a with CR 614.6: Alms Collector's "if an opponent would draw two or
+    -- more cards, instead you and that player each draw a card". The INSTRUCTION is
+    -- replaced outright rather than resized, so this arm cancels and performs the
+    -- two draws itself.
+    --
+    -- Cancelling is what CR 121.6c asks for as well as CR 614.6: a draw effect's
+    -- additional action ("draw three cards, then reveal them") is not performed on
+    -- cards drawn as a result of the replacement, and Pawl.Engine.Resolve binds its
+    -- slot from what the instruction returns -- nothing, once the event is gone.
+    --
+    -- CR 121.2c orders the two draws: the active player performs all of theirs
+    -- first, then each other player in turn order. `apnapOrder` supplies the order
+    -- and the filter the membership, Resolve's Effect.Draw arm's shape. A row whose
+    -- controller has left the game draws nobody the extra card and the instructed
+    -- player still draws one, which is CR 614.6's "instructions that can't be
+    -- carried out are simply ignored"; the same filter collapses the two to one
+    -- draw where the row's controller IS the instructed player, which the pool's
+    -- one producer never is -- its pattern is ControllerRelation.Opponents.
+    --
+    -- Each of these is an individual draw through `drawCard`, so CR 616.1g's inner
+    -- events still raise their own WouldDraw and a per-draw row (Words of Worship)
+    -- still applies to them.
+    (ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR _ _ rewrite), ProposedEvent.WouldDrawCards pid _) -> case rewrite of
+      DrawCountRewrite.EachDrawOne -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        let drawers = filter (\p -> p == pid || Just p == ReplacementCandidate.controller candidate) (Game.apnapOrder gs)
+        Monad.mapM_ drawCard drawers
+        pure Nothing
+    -- Unreachable: `applies` admits DrawCountR only against WouldDrawCards.
+    (ReplacementEffect.DrawCountR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)

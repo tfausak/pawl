@@ -65,6 +65,8 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DrawCountR as DrawCountR
+import qualified Pawl.Types.DrawCountRewrite as DrawCountRewrite
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Effect as Effect
@@ -144,6 +146,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -704,6 +707,18 @@ applies gs event candidate =
         -- hands. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
           matchesCandidatePlayer (Game.teams gs) (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
+        -- CR 121.2a: whose draw INSTRUCTIONS the row watches (CR 109.5's "you"),
+        -- and the number it names. Alms Collector's "two or more" is a condition on
+        -- the event rather than a rewrite that changes nothing, LifeLossR's third
+        -- conjunct above: an instruction naming one card never reaches CR 616.1's
+        -- choice and is never spent under CR 614.5.
+        --
+        -- Read off the SOURCE, the LifeLossR arm's posture rather than DrawR's: the
+        -- only producer is a permanent's static ability, whose CR 109.5 "you" is
+        -- its controller as projected now.
+        (ReplacementEffect.DrawCountR pat, ProposedEvent.WouldDrawCards pid n) ->
+          n >= DrawCountR.atLeast pat
+            && matchesPlayer gs src (DrawCountR.whose pat) pid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -718,6 +733,7 @@ applies gs event candidate =
         (ReplacementEffect.UntapR _, _) -> False
         (ReplacementEffect.LifeLossR {}, _) -> False
         (ReplacementEffect.DrawR {}, _) -> False
+        (ReplacementEffect.DrawCountR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
 -- CR 614.1a: would this rewrite actually change the loss? `admits` and `unspent`
@@ -1425,6 +1441,9 @@ bucketOfEffect re = case re of
   -- CR 616.1a-d are all about entering the battlefield and copying; drawing a
   -- card is neither, so CR 616.1e.
   ReplacementEffect.DrawR {} -> ReplacementBucket.Other
+  -- CR 616.1a-d are all about entering the battlefield and copying; an instruction
+  -- to draw cards is neither, so CR 616.1e.
+  ReplacementEffect.DrawCountR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entries and copies; a skip is none of those, so it
   -- falls to CR 616.1e.
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
@@ -1611,6 +1630,15 @@ readsApplier re = case re of
   -- rewrite that DOES read the applier has to be decided here rather than
   -- inheriting this answer.
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
+  -- CR 121.2a: "you and that player each draw a card" -- the "you" is the row's
+  -- own controller, so two rows alike in `effect` and unlike in `you` hand the
+  -- extra card to different seats. LifeLossRewrite.ExileFromTopOfYourLibrary's
+  -- answer, and for its reason. Unlike that one this is a PROVED behaviour rather
+  -- than a fence: Alms Collector is not legendary, so two of them under different
+  -- controllers stand at once, and Pawl.ReplacementSpec's "CR 616.1 two collectors
+  -- under different controllers are told apart, and the drawer chooses" is what
+  -- proves the drawer is asked which one applies.
+  ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR _ _ DrawCountRewrite.EachDrawOne) -> True
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -1757,6 +1785,9 @@ chooserOf gs event = case event of
   -- reason. There is no affected OBJECT: CR 121.1's card is not chosen until the
   -- draw happens.
   ProposedEvent.WouldDraw pid -> Just pid
+  -- CR 616.1 / 121.2a: the instruction is addressed to that same player, so
+  -- the seat that chooses among applicable rows is the one it names.
+  ProposedEvent.WouldDrawCards pid _ -> Just pid
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
@@ -2535,6 +2566,9 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- question never arrives besides -- `contested` above filters by
   -- WouldDealDamage, which no DrawR row matches.
   ReplacementEffect.DrawR {} -> Nothing
+  -- The instruction class one rule up, and the same answer for the same reason:
+  -- `contested` asks only about a damage batch.
+  ReplacementEffect.DrawCountR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
@@ -2551,6 +2585,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
@@ -2566,6 +2601,7 @@ asDestruction event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 -- asDestruction's twin one event class over: the permanent that actually becomes
 -- untapped, or Nothing when a replacement took the event.
@@ -2583,12 +2619,33 @@ asUntap event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 -- asUntap's twin one event class over: the player who actually draws a card, or
 -- Nothing when a replacement took the event (CR 614.6).
 asDraw :: ProposedEvent -> Maybe PlayerId
 asDraw event = case event of
   ProposedEvent.WouldDraw pid -> Just pid
+  ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
+
+-- asDraw's twin one event class up (CR 121.2a): who was instructed to draw and how
+-- many cards the instruction names once CR 616.1's loop has settled it, or Nothing
+-- when a row replaced the instruction outright.
+asDrawCount :: ProposedEvent -> Maybe (PlayerId, Natural)
+asDrawCount event = case event of
+  ProposedEvent.WouldDrawCards pid n -> Just (pid, n)
+  ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
@@ -2615,6 +2672,7 @@ asCounters event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 -- asCounters' player half. The CAUSE is dropped by both, for the same reason: what
 -- the funnel needs back is the placement to carry out, and the provenance has
@@ -2633,6 +2691,7 @@ asPlayerCounters event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 -- asPlayerCounters' sibling one event class over: the player who would lose life
 -- and how much of the loss has survived, or Nothing when a replacement took the
@@ -2653,6 +2712,7 @@ asLifeLoss event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 asTokens :: ProposedEvent -> Maybe (PlayerId, Card, Natural)
 asTokens event = case event of
@@ -2668,6 +2728,7 @@ asTokens event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
 -- skips become floating replacement effects, one per selector. Called by
@@ -2746,3 +2807,4 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
