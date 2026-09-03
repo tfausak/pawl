@@ -83,6 +83,14 @@
 -- here has: CR 303.4b's "enchanted", answered off the source the row carries.
 -- Brothers of Fire is the taxed ability, and the group runs two of them so that
 -- "the tax reached this object" is told apart from "the tax reached everything".
+--
+-- Scout's Warning is CR 601.1a's PLAY-scoped sibling of Vedalken Orrery's
+-- CastAsThoughItHadFlash, and the one producer whose criterion a LAND card can
+-- match: Dryad Arbor is a creature land, so its play (never a cast, CR 305.1)
+-- is what Pawl.Engine.Action.landTimingOk has to reach. It also carries the
+-- pool's only Expiry.WhenUsed grant -- CR 611.2a's "or until you play a
+-- matching card, whichever comes first" -- so Mountain beside it is the
+-- Filter's own negative and Goblin Piker proves the same grant widens a CAST.
 module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -5733,6 +5741,158 @@ activationsOf oid = filter isIt
       Action.Type.Activate o _ -> o == oid
       _ -> False
 
+-- alice has one untapped Plains and `warning`, `secondCard` in hand, in her
+-- own precombat main phase with an empty stack -- plus a second Plains ON TOP
+-- OF HER LIBRARY, CR 104.3c's own trap: Scout's Warning's second clause is
+-- "draw a card", and a fixture that never stocks the library decks her before
+-- any assertion below runs.
+scoutsWarningBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+scoutsWarningBoard plains warning secondCard =
+  let base = S.landsInPlay plains 1
+      (_, withLibrary) = S.addLibraryCard plains S.alice base
+      (warningId, g1) = S.addHandCard warning S.alice withLibrary
+      (secondId, g2) = S.addHandCard secondCard S.alice g1
+   in ( warningId,
+        secondId,
+        g2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- scoutsWarningBoard, with `warning` already cast and resolved through the
+-- REAL priority loop -- CR 601.2a's move and Pawl.Engine.Expiry.arm's
+-- Duration.UntilUsed -> Expiry.WhenUsed both run, so the stored grant this
+-- proves is the card's own resolution and not a hand-built stand-in.
+scoutsWarningResolved :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+scoutsWarningResolved plains warning secondCard =
+  let (warningId, secondId, before) = scoutsWarningBoard plains warning secondCard
+      resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+   in (secondId, resolveAll (S.runPure S.identityAnswer before (S.cast S.alice warningId)))
+
+isPlayOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isPlayOf oid action = case action of
+  Action.Type.Play o _ -> o == oid
+  Action.Type.Cast {} -> False
+  Action.Type.Activate _ _ -> False
+  Action.Type.TurnFaceUp {} -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
+  Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
+  Action.Type.ActivateManaAbility _ -> False
+  Action.Type.Pass -> False
+
+-- CR 116.2a's window forced shut without touching whose turn it is (CR
+-- 305.3's own axis, left alone either way) -- Pawl.CastSpec's own busy-stack
+-- trick: a nonempty stack fails Turn.sorcerySpeedWindow's empty-stack conjunct
+-- and nothing else.
+busyStack :: GameState.GameState -> GameState.GameState
+busyStack gs = gs {GameState.stack = [ObjectId.MkObjectId 999]}
+
+-- Scout's Warning {W} Instant: "The next creature card you play this turn can
+-- be played as though it had flash. Draw a card." Dryad Arbor is a creature
+-- LAND, so its play is what #1938 says pawl's cast-only permission could not
+-- reach; Mountain beside it is a land the grant's HasCardType Creature
+-- criterion refuses, and Goblin Piker is an ordinary creature SPELL, proving
+-- CR 601.1a's other half -- casting is playing too.
+scoutsWarningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scoutsWarningSpec s registry =
+  Spec.describe s "ScoutsWarning" $ do
+    -- The control: outside the sorcery-speed window with no grant in force,
+    -- Dryad Arbor is not offered.
+    Spec.it s "CR 116.2a Dryad Arbor is not offered with the stack busy and no grant" $ do
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      dryadArbor <- S.printingOf s registry "Dryad Arbor"
+      let (_, arborId, board) = scoutsWarningBoard plains warning dryadArbor
+      Spec.assertBool s (not (any (isPlayOf arborId) (Action.legalActions S.alice (busyStack board)))) "not offered"
+
+    -- CR 601.1a / 601.3b, the whole fix: once Scout's Warning has resolved,
+    -- Dryad Arbor -- a LAND card -- is offered outside the sorcery-speed
+    -- window, which Pawl.Engine.PlayerEffect.CastAsThoughItHadFlash alone
+    -- could never reach (#1938).
+    Spec.it s "CR 601.1a / 601.3b Dryad Arbor is offered once Scout's Warning has resolved" $ do
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      dryadArbor <- S.printingOf s registry "Dryad Arbor"
+      let (arborId, after) = scoutsWarningResolved plains warning dryadArbor
+      Spec.assertBool s (any (isPlayOf arborId) (Action.legalActions S.alice (busyStack after))) "offered"
+
+    -- The resolution itself: CR 611.2's stored effect the card installs, and
+    -- CR 611.2a's Expiry.WhenUsed the Duration.UntilUsed on the card resolved
+    -- into (#3008).
+    Spec.it s "CR 611.2 resolving stores one MayPlayAsThoughItHadFlash grant expiring on use" $ do
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      dryadArbor <- S.printingOf s registry "Dryad Arbor"
+      let (_, after) = scoutsWarningResolved plains warning dryadArbor
+      Spec.assertEqWith
+        s
+        "one stored grant, expiring on use"
+        (fmap (\a -> (ActivePlayerEffect.effect a, ActivePlayerEffect.expiry a)) (GameState.playerEffects after))
+        [(PlayerEffect.Type.MayPlayAsThoughItHadFlash (Filter.Type.HasCardType CardType.Creature), Expiry.Type.WhenUsed)]
+
+    -- WotC's own Scout's Warning / Quicken ruling: "until the turn ends or
+    -- until you cast [play] a creature card ... even if you [cast/play] it at
+    -- a time you normally could" -- so playing Dryad Arbor through the REAL
+    -- dispatch (Pawl.Engine.Engine's Action.Type.Play arm) consumes the grant,
+    -- not just the sorcery-speed clock (#3008).
+    Spec.it s "CR 611.2a playing Dryad Arbor consumes the grant" $ do
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      dryadArbor <- S.printingOf s registry "Dryad Arbor"
+      let (_, resolved) = scoutsWarningResolved plains warning dryadArbor
+          played = S.runPure S.playLandAnswer resolved Engine.priorityLoop
+      Spec.assertEqWith s "the grant is gone" (GameState.playerEffects played) []
+
+    -- The Filter side of that consumption: Mountain is a land and nothing
+    -- else, so it does not match the grant's HasCardType Creature criterion
+    -- and playing it leaves the grant standing -- consumption reads the
+    -- criterion rather than firing on any play at all.
+    Spec.it s "CR 611.2a playing a non-creature land does not consume it" $ do
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      mountain <- S.printingOf s registry "Mountain"
+      let (_, resolved) = scoutsWarningResolved plains warning mountain
+          played = S.runPure S.playLandAnswer resolved Engine.priorityLoop
+      Spec.assertEqWith s "the grant survives" (length (GameState.playerEffects played)) 1
+
+    -- CR 601.1a's other half: MayPlayAsThoughItHadFlash reaches a CAST too
+    -- (Pawl.Engine.PlayerEffect.mayCastAsThoughItHadFlash's own arm), not only
+    -- Action.landTimingOk -- an ordinary creature SPELL becomes castable
+    -- outside the sorcery-speed window as well.
+    Spec.it s "CR 601.1a the grant also widens a creature spell's cast window" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      let (pikerBase, pikerId) = S.pikerInHand mountain piker 9 Phase.PrecombatMain
+          withPlains = S.landsFor plains S.alice 1 pikerBase
+          -- CR 104.3c, scoutsWarningBoard's own trap: the second clause draws
+          -- a card, so the library must not be empty when it resolves.
+          (_, withLibrary) = S.addLibraryCard plains S.alice withPlains
+          (warningId, g1) = S.addHandCard warning S.alice withLibrary
+          before = g1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+          resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
+          resolved = resolveAll (S.runPure S.identityAnswer before (S.cast S.alice warningId))
+      Spec.assertBool s (not (S.castable S.alice pikerId (busyStack before))) "not castable before Scout's Warning resolves"
+      Spec.assertBool s (S.castable S.alice pikerId (busyStack resolved)) "castable once it has"
+
+    -- CR 514.2 / 611.2a: the "or until the turn ends" half -- an UNUSED grant
+    -- still ends at cleanup exactly as AtCleanup's does, so Scout's Warning
+    -- never lingers into a later turn with nothing to spend it on.
+    Spec.it s "CR 514.2 the cleanup sweep drops an unused WhenUsed grant" $ do
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      dryadArbor <- S.printingOf s registry "Dryad Arbor"
+      let (_, resolved) = scoutsWarningResolved plains warning dryadArbor
+      Spec.assertEqWith s "one stored before" (length (GameState.playerEffects resolved)) 1
+      Spec.assertEqWith s "none after cleanup" (GameState.playerEffects (Expiry.dropAtCleanup resolved)) []
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -5774,3 +5934,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   prowlingSerpopardSpec s registry
   jaredSpec s registry
   oppressiveRaysSpec s registry
+  scoutsWarningSpec s registry

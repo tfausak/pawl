@@ -809,6 +809,7 @@ durationConditions duration = case duration of
   -- below and never through a Condition -- an activated ability's own cost takes
   -- exactly that split (activatedAbilityCounts against activatedAbilityFilters).
   Duration.UntilPaid _ -> []
+  Duration.UntilUsed -> []
 
 -- Every Count reachable from a Duration, off the enumeration above.
 durationCounts :: Duration.Duration -> [Count.Type.Count Quantity.Type.Quantity]
@@ -4006,6 +4007,7 @@ durationFilters duration =
           Duration.UntilEndOfYourNextTurn -> []
           Duration.ForAsLongAs _ -> []
           Duration.UntilEndOfCombat -> []
+          Duration.UntilUsed -> []
       )
 
 -- A Modification reaches a Filter two ways: through its layer-7 quantities (a
@@ -4581,6 +4583,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.3b's "a spell with certain qualities", which is a Filter over the
   -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
   PlayerEffect.CastAsThoughItHadFlash f -> [f]
+  -- CR 601.1a / 601.3b's play-scoped sibling, the same shape (Scout's Warning's
+  -- is HasCardType Creature).
+  PlayerEffect.MayPlayAsThoughItHadFlash f -> [f]
   -- CR 701.6a's "a spell or ability", narrowed by the victim's own qualities
   -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
   -- Serpopard's is HasCardType Creature).
@@ -4689,6 +4694,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
+  PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -4746,6 +4752,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.SpendManaAsThough _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
+  PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CastOnlyAtSorcerySpeed -> False

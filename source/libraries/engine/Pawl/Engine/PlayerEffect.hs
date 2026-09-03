@@ -33,6 +33,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -538,6 +539,7 @@ prohibitsCasting pid oid name variable gs =
         -- prohibition, and CR 101.2 would let a prohibition outvote it anyway.
         -- mayCastAsThoughItHadFlash below is where it is read.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         -- CR 701.6a is about a spell or ability ALREADY on the stack, and CR
         -- 601.3 is about beginning to cast one: an uncounterable spell is not a
         -- spell anyone is more or less allowed to cast.
@@ -671,6 +673,7 @@ prohibitsPlayingLand pid names gs =
         -- CR 305.1 again: a land is never cast, so a permission about the timing
         -- of a CAST has nothing to widen here either.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         -- CR 305.1 again: a land is never put on the stack, so nothing about
         -- countering reaches a land play.
         PlayerEffect.CantBeCountered _ -> False
@@ -731,6 +734,7 @@ prohibitsSearching pid gs =
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -788,6 +792,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -847,6 +852,7 @@ prohibitsBecomingMonarch pid gs =
         -- 115.1's own check turns it away before this one is asked.
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -1069,6 +1075,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1108,6 +1115,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1150,6 +1158,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1296,6 +1305,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1348,6 +1358,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1388,6 +1399,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1446,6 +1458,12 @@ mayCastAsThoughItHadFlash pid oid gs =
   let allows (source, effect) = case effect of
         PlayerEffect.CastAsThoughItHadFlash criterion ->
           matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs
+        -- CR 601.1a: casting is one way of playing a card, so a play-scoped
+        -- grant (Scout's Warning) widens this window exactly as the cast-scoped
+        -- one above does. mayPlayAsThoughItHadFlash below reads this same arm
+        -- for CR 116.2a's land-play window, which this function never asks.
+        PlayerEffect.MayPlayAsThoughItHadFlash criterion ->
+          matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
@@ -1476,6 +1494,58 @@ mayCastAsThoughItHadFlash pid oid gs =
         -- The other CR 601.3 permission on this axis, and the two do not
         -- compose: that one names a ZONE and this question is about a TIME, so a
         -- card in a graveyard still waits for its own window.
+        PlayerEffect.CastFromGraveyard _ -> False
+        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
+        PlayerEffect.StateCoinFlip _ -> False
+   in any allows (applying pid gs)
+
+-- CR 601.1a / 601.3b: may `pid` PLAY `oid` as though it had flash -- the
+-- widened window Pawl.Engine.Action.landTimingOk reads beside
+-- Cast.flashOn for CR 116.2a's land-play window, exactly as
+-- mayCastAsThoughItHadFlash above is what Cast.timingOk reads beside
+-- Cast.instantSpeed for a cast.
+--
+-- Reads ONLY MayPlayAsThoughItHadFlash, and not CastAsThoughItHadFlash beside
+-- it: CR 601.3b's own rule is about beginning to CAST (Vedalken Orrery), and a
+-- land is never cast (CR 305.1), so a cast-scoped grant moves no land-play
+-- window. mayCastAsThoughItHadFlash above is the one place a play-scoped grant
+-- widens a CAST; this is the one place it widens a land PLAY, and neither
+-- folds into the other.
+mayPlayAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
+mayPlayAsThoughItHadFlash pid oid gs =
+  let allows (source, effect) = case effect of
+        PlayerEffect.MayPlayAsThoughItHadFlash criterion ->
+          matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost {} -> False
+        PlayerEffect.IncreaseActivationCost {} -> False
+        PlayerEffect.ReduceSpellCost {} -> False
+        PlayerEffect.ReduceActivationCost {} -> False
+        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AddSpellCost {} -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.SpendManaAsThough _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
+        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
+        PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -1561,6 +1631,7 @@ mayCastFromGraveyard pid oid gs =
         -- The other CR 601.3 permission on this axis names a TIME, and this
         -- question is about a ZONE.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
@@ -1635,6 +1706,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         -- own: Yawgmoth's Will's cast pays the card's printed cost.
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
@@ -1702,6 +1774,7 @@ mayPlayLandsFromGraveyard pid gs =
         -- the other.
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
@@ -1799,6 +1872,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         -- CR 701.6a grants no targeting immunity: Pawl.Types.Counterability
         -- says the same about CR 113.6g, and a Cancel at a spell Spider-Punk
         -- protects still targets it legally and still resolves.
@@ -1879,6 +1953,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -1945,6 +2020,7 @@ protectionCarriers gs =
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1990,6 +2066,7 @@ landPlaysAllowed pid gs =
   let grantOf effect = case effect of
         PlayerEffect.PlayAdditionalLands extra -> Just extra
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
@@ -2089,6 +2166,7 @@ maximumHandSize pid gs =
         PlayerEffect.SpendManaAsThough _ -> current
         PlayerEffect.CantBeTargetedBy _ -> current
         PlayerEffect.CastAsThoughItHadFlash _ -> current
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> current
         PlayerEffect.CantBeCountered _ -> current
         PlayerEffect.DamageCantBePrevented _ -> current
         PlayerEffect.DamageCantBeRedirected _ -> current
@@ -2153,6 +2231,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -2208,6 +2287,7 @@ spendManaAsThough pid gs =
         PlayerEffect.ReduceMaximumHandSize _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -2278,6 +2358,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         -- Spider-Punk's OTHER sentence, and no part of this answer: CR 615.12
         -- and CR 614.9 are about a damage event and CR 701.6a about an object on
         -- the stack. The two travel together on one card and share nothing.
@@ -2374,6 +2455,7 @@ unpreventable gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
    in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)
 
 -- CR 614.9: the patterns of every "that damage can't be ... dealt instead to
@@ -2436,6 +2518,7 @@ unredirectable gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
    in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)
 
 -- CR 705.3: every statement in force right now about a coin flip `pid` would
@@ -2481,6 +2564,7 @@ statedFlips pid gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -2495,3 +2579,115 @@ statedFlips pid gs =
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (says . snd) (applying pid gs)
+
+-- CR 611.2a / Quicken: `pid` has just CAST `oid` -- drop every one-shot
+-- (Expiry.WhenUsed) stored grant of theirs whose criterion matched, since CR
+-- 601.1a makes casting one way to play a card and the WotC ruling for both
+-- producers ends the effect "even if you cast it at a time you normally
+-- could" -- the timing loophole need not have been exercised.
+--
+-- Reads BOTH one-shot arms on this axis, unlike mayCastAsThoughItHadFlash
+-- above: a play-scoped grant (Scout's Warning) is spent by an ordinary cast
+-- exactly as a cast-scoped one (Quicken) is, since casting is playing.
+--
+-- ALL matching rows drop together, not the first: WotC's own ruling is that
+-- two of the same instant "will all apply to the very next ... spell you
+-- cast", so a second Quicken is not left standing once the first spell it
+-- could have named goes by.
+--
+-- Called from Pawl.Engine.Engine's Action.Type.Cast arm on the PRE-MOVE `oid`,
+-- while the card still lies where matchesObjectFrom can read it -- CR 400.7
+-- gives the object a new id once CR 601.2a puts it on the stack.
+consumedByCast :: PlayerId -> ObjectId -> GameState -> GameState
+consumedByCast pid oid gs =
+  let spent active =
+        ActivePlayerEffect.controller active == pid
+          && Expiry.expiresWhenUsed (ActivePlayerEffect.expiry active)
+          && let source = Just (ActivePlayerEffect.source active)
+              in case ActivePlayerEffect.effect active of
+                   PlayerEffect.CastAsThoughItHadFlash criterion -> matchesObjectFrom source criterion oid gs
+                   PlayerEffect.MayPlayAsThoughItHadFlash criterion -> matchesObjectFrom source criterion oid gs
+                   PlayerEffect.CantCastSpells -> False
+                   PlayerEffect.CantCastMoreThan _ -> False
+                   PlayerEffect.CantCastChosenName -> False
+                   PlayerEffect.CantPlayLandChosenName -> False
+                   PlayerEffect.IncreaseSpellCost {} -> False
+                   PlayerEffect.IncreaseActivationCost {} -> False
+                   PlayerEffect.ReduceSpellCost {} -> False
+                   PlayerEffect.ReduceActivationCost {} -> False
+                   PlayerEffect.AddActivationCost {} -> False
+                   PlayerEffect.AddSpellCost {} -> False
+                   PlayerEffect.PlayAdditionalLands _ -> False
+                   PlayerEffect.NoMaximumHandSize -> False
+                   PlayerEffect.SetMaximumHandSize _ -> False
+                   PlayerEffect.IncreaseMaximumHandSize _ -> False
+                   PlayerEffect.ReduceMaximumHandSize _ -> False
+                   PlayerEffect.DontLoseUnspentMana _ -> False
+                   PlayerEffect.SpendManaAsThough _ -> False
+                   PlayerEffect.CantBeTargetedBy _ -> False
+                   PlayerEffect.CantBeCountered _ -> False
+                   PlayerEffect.DamageCantBePrevented _ -> False
+                   PlayerEffect.DamageCantBeRedirected _ -> False
+                   PlayerEffect.CantSearchLibraries -> False
+                   PlayerEffect.HasProtectionFromChosenName -> False
+                   PlayerEffect.CantBecomeMonarch -> False
+                   PlayerEffect.CantCastMatching _ -> False
+                   PlayerEffect.CastOnlyAtSorcerySpeed -> False
+                   PlayerEffect.CantPlayLands -> False
+                   PlayerEffect.CastFromGraveyard _ -> False
+                   PlayerEffect.PlayLandsFromGraveyard -> False
+                   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+                   PlayerEffect.CantGetCounters _ -> False
+                   PlayerEffect.StateCoinFlip _ -> False
+   in gs {GameState.playerEffects = filter (not . spent) (GameState.playerEffects gs)}
+
+-- CR 611.2a / 601.1a's other half: `pid` has just PLAYED `oid` as a land --
+-- consumedByCast's twin, for a play rather than a cast.
+--
+-- Reads ONLY MayPlayAsThoughItHadFlash, unlike consumedByCast above: CR
+-- 601.3b's rule is about beginning to CAST (Quicken), and a land is never cast
+-- (CR 305.1), so a cast-scoped grant is not spent by a land play.
+--
+-- Called from Pawl.Engine.Engine's Action.Type.Play arm on the PRE-MOVE `oid`,
+-- for consumedByCast's own reason.
+consumedByLandPlay :: PlayerId -> ObjectId -> GameState -> GameState
+consumedByLandPlay pid oid gs =
+  let spent active =
+        ActivePlayerEffect.controller active == pid
+          && Expiry.expiresWhenUsed (ActivePlayerEffect.expiry active)
+          && case ActivePlayerEffect.effect active of
+            PlayerEffect.MayPlayAsThoughItHadFlash criterion -> matchesObjectFrom (Just (ActivePlayerEffect.source active)) criterion oid gs
+            PlayerEffect.CastAsThoughItHadFlash _ -> False
+            PlayerEffect.CantCastSpells -> False
+            PlayerEffect.CantCastMoreThan _ -> False
+            PlayerEffect.CantCastChosenName -> False
+            PlayerEffect.CantPlayLandChosenName -> False
+            PlayerEffect.IncreaseSpellCost {} -> False
+            PlayerEffect.IncreaseActivationCost {} -> False
+            PlayerEffect.ReduceSpellCost {} -> False
+            PlayerEffect.ReduceActivationCost {} -> False
+            PlayerEffect.AddActivationCost {} -> False
+            PlayerEffect.AddSpellCost {} -> False
+            PlayerEffect.PlayAdditionalLands _ -> False
+            PlayerEffect.NoMaximumHandSize -> False
+            PlayerEffect.SetMaximumHandSize _ -> False
+            PlayerEffect.IncreaseMaximumHandSize _ -> False
+            PlayerEffect.ReduceMaximumHandSize _ -> False
+            PlayerEffect.DontLoseUnspentMana _ -> False
+            PlayerEffect.SpendManaAsThough _ -> False
+            PlayerEffect.CantBeTargetedBy _ -> False
+            PlayerEffect.CantBeCountered _ -> False
+            PlayerEffect.DamageCantBePrevented _ -> False
+            PlayerEffect.DamageCantBeRedirected _ -> False
+            PlayerEffect.CantSearchLibraries -> False
+            PlayerEffect.HasProtectionFromChosenName -> False
+            PlayerEffect.CantBecomeMonarch -> False
+            PlayerEffect.CantCastMatching _ -> False
+            PlayerEffect.CastOnlyAtSorcerySpeed -> False
+            PlayerEffect.CantPlayLands -> False
+            PlayerEffect.CastFromGraveyard _ -> False
+            PlayerEffect.PlayLandsFromGraveyard -> False
+            PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+            PlayerEffect.CantGetCounters _ -> False
+            PlayerEffect.StateCoinFlip _ -> False
+   in gs {GameState.playerEffects = filter (not . spent) (GameState.playerEffects gs)}

@@ -1200,6 +1200,12 @@ priorityLoop = do
                                 -- that allowed this play cannot find the permanent
                                 -- the land card became, so a rider on the
                                 -- permission has nothing to attach to (gap #2398).
+                                --
+                                -- CR 611.2a / 601.1a: consumed on the PRE-MOVE id,
+                                -- while Pawl.Engine.PlayerEffect.matchesObjectFrom
+                                -- can still read the card -- CR 400.7 gives it a
+                                -- new one below.
+                                State.modify' (PlayerEffect.consumedByLandPlay p oid)
                                 Monad.void (Event.changeZoneShowing oid Zone.Battlefield mName)
                                 -- CR 305.2a counts the lands played this turn, so
                                 -- this TALLIES rather than flagging. CR 305.4:
@@ -1209,6 +1215,10 @@ priorityLoop = do
                                 settleForPriority
                                 loop
                               Action.Type.Cast oid name facing -> do
+                                -- CR 611.2a / 601.1a, consumedByLandPlay's own
+                                -- reason: the PRE-MOVE id, before CR 601.2a's move
+                                -- gives the spell a new one.
+                                State.modify' (PlayerEffect.consumedByCast p oid)
                                 Cast.castSpell Resolve.performManaAbility p oid name facing
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
