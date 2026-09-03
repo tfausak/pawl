@@ -2996,9 +2996,27 @@ chooseManaYield pid oid candidates gs = case candidates of
 
 payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent moment slots pid oid component = case component of
+  -- CR 118.3 asked AGAIN here, and not only at the gate: CR 601.2h lets the payer
+  -- order the parts, so a part paid earlier in that order can have moved this
+  -- permanent off the battlefield -- Brittle Effigy's ExileThis, Mindslaver's
+  -- SacrificeThis -- and rule 107.5's "a permanent that's already tapped can't be
+  -- tapped again" reaches the same way through the gate's own arm. Nothing on the
+  -- battlefield to tap makes the ORDER unpayable, which is not the same as the
+  -- cost being unpayable, so `canPay` above is right to have allowed it.
+  --
+  -- `canPayComponent`'s arm is the condition, so the gate and the payment answer
+  -- one question. Unpaid rather than Event.tap's silent no-op, which `pay` turns
+  -- into CR 601.2h's reversal of the whole announcement: refusing the order is
+  -- not choosing one for the player, and re-asking would have to end in the
+  -- engine picking. Pawl.CostSpec's "CR 118.3 exiling the Effigy first leaves no
+  -- permanent to tap" is the proof.
   CostComponent.TapThis -> do
-    tapObject oid
-    pure bindsNothing
+    gs <- State.get
+    if canPayComponent slots pid oid component gs
+      then do
+        tapObject oid
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- Through Pawl.Engine.Event.untap, the CR 701.26b funnel, exactly as TapThis
   -- above goes through Event.tap -- and rule 701.26b draws no such distinction
   -- between the two. A permanent with a stun counter therefore stays tapped and
