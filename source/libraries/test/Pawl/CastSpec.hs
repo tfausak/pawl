@@ -2292,11 +2292,10 @@ lierSpec s registry = Spec.describe s "Lier" $ do
 -- colour, which is what the one untapped Mountain left after the Mirror is cast
 -- discriminates: it pays the copied cost and cannot pay the printed one.
 --
--- Not implemented: CR 707.2's copiable RULES TEXT when the copy is CAST. The
--- flashback cast below resolves Acidic Soil's own damage clause rather than
--- Lightning Bolt's, because Pawl.Engine.Resolve.resolveSpellWith reads the
--- printed face's modes (#3098). The COST is this group's subject and is
--- unaffected by that.
+-- BOB CONTROLS NO LAND, which is what makes the two spells' resolutions readable
+-- apart: Acidic Soil's own clause deals alice 3 for her three lands and bob
+-- nothing, where the Lightning Bolt it copies deals its one target 3. So the CR
+-- 400.7 case below cannot pass by resolving the wrong spell.
 mirrorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 mirrorBoard s registry = do
   island <- S.printingOf s registry "Island"
@@ -2320,13 +2319,46 @@ mirrorBoard s registry = do
 -- CR 608.2b's re-read at resolution finds the recipient the engine offered. One
 -- predicate for both because the pools are disjoint: alice's graveyard holds only
 -- the subject and bob's only the original.
+--
+-- Rule 707.2's "any target" is deliberately NOT answered here. The copied
+-- Lightning Bolt's slot is never announced (CR 400.7, the case below), and an
+-- answerer that filled it would hide that by leaving a legal cast either way.
 mirrorAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 mirrorAnswer subject original p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
     fmap (Set.filter (\r -> r == Recipient.ToObject subject || r == Recipient.ToObject original) . snd) sets
   _ -> S.identityAnswer p
 
-mirrorOfTheFallenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+-- mirrorAnswer, recording the SLOT NAMES each ChooseTargets offered, in order.
+-- What CR 601.2c announces is not readable off the finished board: a slot never
+-- offered and a slot whose target did nothing leave the same life totals.
+mirrorRecordingAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [Set.Set SlotName.SlotName] r
+mirrorRecordingAnswer subject original p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> do
+    State.modify' (<> [Map.keysSet sets])
+    pure (mirrorAnswer subject original p)
+  _ -> pure (mirrorAnswer subject original p)
+
+-- Cast and resolve the Mirror, then flashback-cast the card it turned into a copy
+-- and resolve that, recording every slot announced along the way.
+runMirror :: (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId) -> (GameState.GameState, [Set.Set SlotName.SlotName])
+runMirror (board, inHand, subject, original) =
+  let (((), after), offered) =
+        State.runState
+          ( Engine.runGame (mirrorRecordingAnswer subject original) board $ do
+              S.cast S.alice inHand
+              Stack.resolveTop
+              S.cast S.alice subject
+              Stack.resolveTop
+          )
+          []
+   in (after, offered)
+
+-- The Mirror's own two slots, which the copy's cast is measured against below.
+mirrorSlots :: Set.Set SlotName.SlotName
+mirrorSlots = Set.fromList (fmap (SlotName.MkSlotName . Text.pack) ["archetype", "mirrored"])
+
+mirrorOfTheFallenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 mirrorOfTheFallenSpec s registry = Spec.describe s "MirrorOfTheFallen" $ do
   Spec.it s "CR 707.2 a graveyard card that is a copy is priced at the copy's mana cost" $ do
     soil <- S.printingOf s registry "Acidic Soil"
@@ -2366,6 +2398,28 @@ mirrorOfTheFallenSpec s registry = Spec.describe s "MirrorOfTheFallen" $ do
     -- CR 707.2b: the original is untouched -- bob's Lightning Bolt is still in
     -- his graveyard, so nothing above turned on the copy having consumed it.
     Spec.assertEqWith s "and bob's Lightning Bolt is still in his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+  -- CR 400.7 against CR 707.2, on the one board where the two disagree. The copy
+  -- lasts until the end of the game (CR 611.2a, no duration stated) and it is
+  -- rule 707.2's copiable rules text, so while the card lies in the graveyard it
+  -- IS Lightning Bolt -- which is what the flashback price above reads. Casting
+  -- it moves it to the stack, and CR 400.7 makes the spell there a NEW object
+  -- that the copy effect's fixed set of affected objects (CR 611.2c) does not
+  -- reach. So the spell is Acidic Soil again, in both of the places CR 707.2
+  -- would otherwise show: the target slot CR 601.2c announces and the effects CR
+  -- 608.2c resolves.
+  --
+  -- The same reading a Clone dying gets: the card in the graveyard is Clone.
+  Spec.it s "CR 400.7 the copy cast from the graveyard is a new object, so it announces and resolves Acidic Soil" $ do
+    board <- mirrorBoard s registry
+    let (resolved, offered) = runMirror board
+    -- Gameplay first, and the two seats disagree: Acidic Soil deals alice 3 for
+    -- her three lands and bob nothing for his none, where the Lightning Bolt in
+    -- bob's graveyard would have dealt one target 3 and the other nothing.
+    Spec.assertEqWith s "Acidic Soil's own clause dealt alice 3 for her three lands" (S.lifeOf S.alice resolved) (Just 17)
+    Spec.assertEqWith s "and bob nothing for his none" (S.lifeOf S.bob resolved) (Just 20)
+    -- CR 601.2c, which the life totals cannot see: Lightning Bolt's "any target"
+    -- was never offered, so the cast was announced off Acidic Soil too.
+    Spec.assertEqWith s "the Mirror announced its own two slots and the cast announced none" offered [mirrorSlots]
 
 -- Harness the Storm {2}{R} Enchantment (data/cards/harness-the-storm.json):
 -- "Whenever you cast an instant or sorcery spell from your hand, you may cast

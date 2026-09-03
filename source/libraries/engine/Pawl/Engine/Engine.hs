@@ -501,7 +501,7 @@ placePendingTriggers = do
   gs <- State.get
   let evs = Event.unscannedEvents gs
       -- The same events with their CR 608.2f groups still on them, which the two
-      -- gatherers below need and the two after them do not: CR 725.2's and CR
+      -- gatherers below need and the ones after them do not: CR 725.2's and CR
       -- 726.2's combat-damage abilities read the damager off Event.battlefieldAt,
       -- the board as it stood immediately after the damage.
       logged = Event.unscannedGrouped gs
