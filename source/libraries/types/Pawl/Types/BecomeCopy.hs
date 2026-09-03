@@ -18,8 +18,10 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- new object, which CR 611.2c's fixed set of affected objects does not reach, so
 -- the spell announces and resolves its own printed text -- the reading a Clone
 -- dying as Clone gets. Pawl.CastSpec's "CR 400.7 the copy cast from the graveyard
--- is a new object" proves it, and the snapshot's own death is
--- Pawl.Types.Object.newIncarnation clearing `bindings`.
+-- is a new object" proves it. Two independent roads hold it, which is why no
+-- one-line mutation reddens that case: Pawl.Types.Object.newIncarnation clears
+-- `bindings` on the move, and Pawl.Engine.Cast stamps the stack incarnation a
+-- fresh binding map besides.
 --
 -- Not implemented: a SPELL on the stack becoming a copy, the third noun in CR
 -- 707.1's list -- the one place CR 707.2's copiable rules text would have to
