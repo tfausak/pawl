@@ -23,7 +23,9 @@ data Pool
   | -- | CR 113.9: activated and triggered abilities on the stack (ToObject) --
     -- Stifle's "target activated or triggered ability". CR 115.2 clause (b) is
     -- what lets a slot name one at all. Squelch's "target activated ability" is
-    -- this pool under a Filter.IsActivatedAbility rather than a pool of its own.
+    -- this pool under a Filter.IsActivatedAbility rather than a pool of its own,
+    -- and "target triggered ability" is its negation (#163); Green Slime's "from
+    -- an artifact or enchantment source" is this pool under Filter.FromSource.
     --
     -- A SIBLING of Spells rather than a widening of it, and rule 113.9 is why:
     -- an ability on the stack is not a spell, so a Cancel must not reach an

@@ -389,6 +389,12 @@ data View = MkView
     -- permanent, a spell, a player, a printed face, an event snapshot. Each
     -- builder says so at its own site.
     activatedAbility :: Bool,
+    -- CR 113.7: the view of the object this ability came from, for
+    -- Filter.FromSource's nest to be matched against. Filled only by
+    -- Pawl.Engine.Projection.viewOfCharacteristics, through CR 113.7a's last
+    -- known information once the source has left. Nothing for every candidate
+    -- that is not an ability on the stack, where the atom is vacuously False.
+    abilitySource :: Maybe View,
     -- | CR 110.5a's tap status. Not a characteristic, so no projection writes it;
     -- read straight off the object.
     tapped :: Bool,
@@ -689,6 +695,9 @@ playerView pid =
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,
       activatedAbility = False,
+      -- CR 113.7 asks about an ability on the stack, and CR 109.1 makes a player
+      -- none.
+      abilitySource = Nothing,
       tapped = False,
       -- CR 110.5d gives status to PERMANENTS, and CR 109.1 makes a player none of
       -- those either -- the line below's reason, one status category over.
@@ -1403,6 +1412,10 @@ matches context view predicate = case predicate of
   -- CR 113.3b against rule 113.3c, read the way IsToken above is: a live read of
   -- what the object IS (Object.source), which no layer rewrites.
   Filter.IsActivatedAbility -> activatedAbility view
+  -- CR 113.7: the nest is matched against the SOURCE's view and the same
+  -- context, AttachedTo's arm's posture. False where the candidate is no
+  -- ability on the stack, since rule 113.7 has nothing to read there.
+  Filter.FromSource f -> maybe False (\src -> matches context src f) (abilitySource view)
   Filter.IsTapped -> tapped view
   -- CR 110.5, the same status one category over, and the battlefield scoping is
   -- inside the field for Transformed's reason: see the atom's own comment in
@@ -1591,6 +1604,8 @@ rewrite pairs predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
+  -- Descended into, HasAttached's reason: the nest describes the SOURCE.
+  Filter.FromSource f -> Filter.FromSource (rewrite pairs f)
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
   Filter.IsExiledFaceDown -> predicate
@@ -2026,6 +2041,10 @@ bakeBound players predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
+  -- Descended into, HasAttached's reason: the SOURCE's description is baked
+  -- exactly as the same atom at the top level would be, and boundSlots descends
+  -- to match.
+  Filter.FromSource f -> Filter.FromSource (bakeBound players f)
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
   Filter.IsExiledFaceDown -> predicate
@@ -2144,6 +2163,7 @@ manaValueThresholds predicate = case predicate of
   Filter.CanAttachToSubject -> []
   Filter.IsToken -> []
   Filter.IsActivatedAbility -> []
+  Filter.FromSource f -> manaValueThresholds f
   Filter.IsTapped -> []
   Filter.IsFaceDown -> []
   Filter.IsExiledFaceDown -> []
@@ -2263,6 +2283,8 @@ statesAQuality predicate = case predicate of
   Filter.CanAttachToSubject -> True
   Filter.IsToken -> True
   Filter.IsActivatedAbility -> True
+  -- True whatever the nest says, RepresentedByCard's reason one arm down.
+  Filter.FromSource _ -> True
   Filter.IsTapped -> True
   Filter.IsFaceDown -> True
   -- True whatever the nest says, AttachedTo's reason: "is represented by a card"
@@ -2344,6 +2366,10 @@ overBoundSlots f predicate = case predicate of
   -- one: `bakeBound` descends into the represented card's description, so the
   -- catch-all below would silently bake a slot this function never reported.
   Filter.RepresentedByCard g -> fmap Filter.RepresentedByCard (overBoundSlots f g)
+  -- Descended into for the atom above's reason, and named explicitly for the same
+  -- one: `bakeBound` descends into the source's description, so the catch-all
+  -- below would silently bake a slot this function never reported.
+  Filter.FromSource g -> fmap Filter.FromSource (overBoundSlots f g)
   -- Descended into for the atom above's reason, and named explicitly for the same
   -- one: `bakeBound` descends into the attacher's description, so the catch-all
   -- below would silently bake a slot this function never reported.
