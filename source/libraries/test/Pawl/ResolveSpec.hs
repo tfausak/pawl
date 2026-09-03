@@ -1015,6 +1015,29 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "nothing was discarded -- only Tweeze itself is in the graveyard" (namesIn Zone.Graveyard S.alice after) [nameOf "Tweeze"]
     Spec.assertEqWith s "CR 608.2c the ungated first clause still happened: bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
+  -- CR 608.2f / 603.12: does Effect.ForEach's own body run through the SAME
+  -- happened-fold a clause's instructions do, or does every body instruction
+  -- run unconditionally regardless of whether the one before it did anything?
+  -- Synthetic Communal Toll -- "When ~ enters, for each opponent, that player
+  -- mills a card. When they do, you gain 1 life." -- on a three-seat board
+  -- where bob's library holds a card and carol's is empty (CR 101.3: milling
+  -- from an empty library mills nothing and records no event): bob's own
+  -- instruction happened and carol's did not, so the reflexive should arm
+  -- once, not twice. A ForEach that skipped this fold would arm it for both.
+  Spec.it s "CR 608.2f / 603.12 a reflexive armed inside a ForEach reads only that member's own instruction" $ do
+    toll <- S.printingOf s registry "Synthetic Communal Toll"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, stocked) = S.addLibraryCard piker S.bob S.threePlayerGame
+        (_, entered) = S.entersWithTrigger toll S.alice stocked
+        resolveEverything gs =
+          let settled = S.runPure S.identityAnswer gs Engine.settleForPriority
+           in if null (GameState.stack settled)
+                then settled
+                else resolveEverything (S.runPure S.identityAnswer settled Stack.resolveTop)
+        after = resolveEverything entered
+    Spec.assertEqWith s "bob's library, which had a card, is empty: his mill happened" (Game.zoneMembers Zone.Library S.bob after) []
+    Spec.assertEqWith s "carol's library was already empty and stays that way" (Game.zoneMembers Zone.Library S.carol after) []
+    Spec.assertEqWith s "CR 608.2f / 603.12 the reflexive armed once, off bob's mill alone: alice gained exactly 1 life" (S.lifeOf S.alice after) (fmap (+ 1) (S.lifeOf S.alice entered))
   -- CR 608.2d's either-or, on the three boards that tell its four readings
   -- apart: Twiddle -- "You may tap or untap target artifact, creature, or land"
   -- -- aimed at bob's Goblin Piker. One mode, two clauses naming each other
