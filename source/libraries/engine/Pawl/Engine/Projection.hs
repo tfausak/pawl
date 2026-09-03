@@ -4074,9 +4074,12 @@ staticLives functioning changes lowest sa =
 -- only state it changes is CR 704.5n's window, an Equipment still attached to
 -- something that stopped being a creature, and CR 208.3 clears that permanent's
 -- power there (noncreaturePT) -- so a +1/+0 landing on it reads the same as
--- none. Stated because rule 122.1j does. Pawl.ProjectionSpec's "CR 208.3 leaves
--- a hone counter's host nothing to read the bonus off" is the board that shows
--- the masking.
+-- none. CR 208.3a says as much of the rules themselves: such an effect "is
+-- created even though it doesn't do anything unless that permanent becomes a
+-- creature". Stated because rule 122.1j states it, and because the same
+-- conjunct on a modification CR 208.3 does not mask is observable (#3143).
+-- Pawl.ProjectionSpec's "CR 208.3 leaves a hone counter's host nothing to read
+-- the bonus off" is the board that shows the masking.
 honeAffected :: Affected.Affected
 honeAffected =
   Affected.Matching

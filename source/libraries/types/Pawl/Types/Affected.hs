@@ -76,9 +76,9 @@ data Affected
     -- reached yet. Payload-free: CR 303.4m defines it for any permanent, Aura or
     -- not, so this atom is the phrase that names no type -- Song of the Dryads'
     -- "enchanted permanent", CR 301.6's "fortified land". A phrase that DOES name
-    -- one is narrower (CR 301.5f), and spells the type out beside this atom's own
-    -- content: @Matching (And [HasCardType Creature, HasAttached IsSource])@, as
-    -- Bonesplitter's card data does.
+    -- one is narrower (CR 301.5f, CR 303.4m), and spells the type out beside this
+    -- atom's own content: @Matching (And [HasCardType Creature, HasAttached
+    -- IsSource])@, as Bonesplitter's card data does.
     --
     -- Not implemented: the cards still carrying the bare atom where their printed
     -- phrase names a type, which therefore still reach a host that has stopped
