@@ -66,7 +66,8 @@ testCharacteristics =
       PC.subtypeWordChanges = [ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Spirit Subtype.Elf],
       -- A different keyword from `keywords` above, so a codec arm reading the
       -- wrong field would not round trip to the same JSON.
-      PC.textChangedKeywords = Map.singleton Keyword.Trample 1
+      PC.textChangedKeywords = Map.singleton Keyword.Trample 1,
+      PC.grantsStationToughness = True
     }
 
 testCharacteristicsJson :: String
@@ -82,7 +83,8 @@ testCharacteristicsJson =
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}],"
-    <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}]}"
+    <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}],"
+    <> "\"grantsStationToughness\":true}"
 
 -- | Every field but the two required ones at its default.
 minimalCharacteristics :: PC.ProjectedCharacteristics
@@ -108,7 +110,8 @@ minimalCharacteristics =
       PC.triggeredAbilities = [],
       PC.enchant = [],
       PC.subtypeWordChanges = [],
-      PC.textChangedKeywords = Map.empty
+      PC.textChangedKeywords = Map.empty,
+      PC.grantsStationToughness = False
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

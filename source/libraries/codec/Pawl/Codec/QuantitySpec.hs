@@ -457,6 +457,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.BlockersBeyondFirst
       " {\"type\":\"BlockersBeyondFirst\"} "
+  -- CR 702.184c, Power's wire shape: nothing beside the tag, the object being
+  -- the one the quantity is evaluated against.
+  Spec.it s "StationMeasure is nullary" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.StationMeasure
+      " {\"type\":\"StationMeasure\"} "
   -- A slot and a payload on the wire. Nested once, since a recursive decoder is
   -- where a payload gets lost -- and the inner arm is one whose OWN answer the
   -- slot moves, which is the whole point of the constructor.

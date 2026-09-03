@@ -770,4 +770,20 @@ data Quantity
     -- resolution never filled, an illegal target (CR 608.2b), or any evaluation
     -- outside a resolution, where there are no slots at all.
     AgainstSlot (AgainstSlot.AgainstSlot Quantity)
+  | -- | CR 702.184c: the tapped creature's power, UNLESS this evaluation's
+    -- SOURCE's controller controls a permanent carrying
+    -- Modification.GrantsStationToughness, in which case the tapped
+    -- creature's toughness whenever that is greater. Power's arm in every
+    -- respect but the substitution -- it names no object and reads the one
+    -- the evaluation is aimed at, through the same injected ViewOf, so CR
+    -- 608.2h's last known information answers for a tapped creature that has
+    -- left by the time the station ability resolves.
+    --
+    -- ENGINE-ONLY: Pawl.Engine.Keyword.station is the sole minted producer.
+    -- No printed card writes CR 702.184a's "power" itself, so no card should
+    -- ever author this arm; nothing in the type enforces that, the posture
+    -- Modification.SetController's own header states for the same reason.
+    --
+    -- A LEAF, Power's shape: it holds no Quantity of its own.
+    StationMeasure
   deriving (Eq, Ord, Show)

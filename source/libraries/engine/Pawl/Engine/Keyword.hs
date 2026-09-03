@@ -712,10 +712,13 @@ crew n =
 -- Spacecraft that arrived this turn may be stationed, and a creature that arrived
 -- this turn may be tapped to do it.
 --
--- THE EFFECT reads the tapped creature's power through Quantity.AgainstSlot on
--- that reserved slot, Unerring Sling's read. CR 608.2h's CURRENT information, the
--- permanent being tapped rather than moved. The counters land on the source, named
--- through Binding.triggerSource and never TARGETED (CR 115.10a), crew's posture.
+-- THE EFFECT reads through Quantity.AgainstSlot on that reserved slot,
+-- Unerring Sling's read, over Quantity.StationMeasure -- CR 702.184a's power
+-- unless CR 702.184c's substitution applies (Tapestry Warden), which that
+-- arm asks live off the ability's OWN source rather than off the tapped
+-- creature. CR 608.2h's CURRENT information, the permanent being tapped
+-- rather than moved. The counters land on the source, named through
+-- Binding.triggerSource and never TARGETED (CR 115.10a), crew's posture.
 --
 -- CounterKind.Named, because CR 122.1 letters charge counters nowhere: no rule
 -- reads the tally, only CR 721.2's own striations do, through
@@ -726,8 +729,6 @@ crew n =
 -- Nothing because CR 721.4 says so outright: the ability is present at all times
 -- and may be activated at any number of charge counters.
 --
--- Not implemented: CR 702.184c's static abilities that make a station ability read
--- a characteristic other than the tapped creature's power (#3127).
 station :: ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 station =
   ActivatedAbility.MkActivatedAbility
@@ -762,7 +763,7 @@ station =
       Effect.PutCounters
         ( PutCounters.MkPutCounters
             (CounterKind.Named chargeCounter)
-            (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.tappedPermanent Quantity.Power))
+            (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.tappedPermanent Quantity.StationMeasure))
             (ObjectRef.InSlot Binding.triggerSource)
         )
 

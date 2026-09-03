@@ -41,7 +41,8 @@ sampleSnapshot =
       PC.triggeredAbilities = [],
       PC.enchant = [],
       PC.subtypeWordChanges = [],
-      PC.textChangedKeywords = Map.empty
+      PC.textChangedKeywords = Map.empty,
+      PC.grantsStationToughness = False
     }
 
 spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()

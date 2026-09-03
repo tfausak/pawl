@@ -66,6 +66,9 @@ substituteStar star quantity = case quantity of
   Quantity.EnteredFrom _ -> quantity
   Quantity.WasCastFrom _ -> quantity
   Quantity.BlockersBeyondFirst -> quantity
+  -- No card prints CR 702.184a's ability at all -- Keyword.Station mints it --
+  -- so a printed P/T box can never contain this arm.
+  Quantity.StationMeasure -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
   -- ability with no resolution and so no slots, and Pawl.CardSpec's
   -- powerToughnessSlots keeps a slot-naming quantity out of a printed P/T.

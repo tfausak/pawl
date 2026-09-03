@@ -235,6 +235,13 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- written by the one applyModification arm precisely so they cannot disagree.
     --
     -- Not copiable, for subtypeWordChanges' reason and by the same construction.
-    textChangedKeywords :: Map.Map Keyword.Keyword Natural.Natural
+    textChangedKeywords :: Map.Map Keyword.Keyword Natural.Natural,
+    -- | CR 702.184c: does this object's controller's station abilities read a
+    -- tapped creature's toughness instead of its power?
+    -- Modification.GrantsStationToughness's only writer. Read by
+    -- Pawl.Engine.Quantity's StationMeasure arm off every battlefield
+    -- permanent the ability's controller controls, so the fact is per-object
+    -- here and folded to a per-player question at the one site that asks it.
+    grantsStationToughness :: Bool
   }
   deriving (Eq, Ord, Show)

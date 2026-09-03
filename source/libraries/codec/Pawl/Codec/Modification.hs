@@ -55,7 +55,8 @@ codec abilityCodec =
       Arm.payload "SetColor" colors Modification.SetColor (\x -> case x of Modification.SetColor y -> Just y; _ -> Nothing),
       Arm.payload "AddColor" colors Modification.AddColor (\x -> case x of Modification.AddColor y -> Just y; _ -> Nothing),
       Arm.nullary "AddChosenColor" Modification.AddChosenColor,
-      Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness
+      Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness,
+      Arm.nullary "GrantsStationToughness" Modification.GrantsStationToughness
     ]
   where
     colors = Common.set Color.codec

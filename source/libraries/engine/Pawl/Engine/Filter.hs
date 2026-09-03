@@ -562,7 +562,19 @@ data View = MkView
     -- asked through the reader Pawl.Engine.Projection.viewOfCharacteristics was
     -- handed, so a filter forcing this from inside the fold reads the board at
     -- that caller's own layer rather than restarting the projection (CR 613.1).
-    nonManaActivatedAbility :: Bool
+    nonManaActivatedAbility :: Bool,
+    -- CR 702.184c: does this candidate's controller's station abilities read a
+    -- tapped creature's toughness instead of its power? The projected mirror
+    -- of ProjectedCharacteristics.grantsStationToughness -- read off the
+    -- projection on the battlefield and off the printed face otherwise (a
+    -- static ability functions in every zone CR 113.6 allows, and Tapestry
+    -- Warden's own is unrestricted). No Filter atom consults it: it is here
+    -- for Pawl.Engine.Quantity's StationMeasure arm, which walks the
+    -- battlefield through the same ViewOf every other Quantity arm reads.
+    --
+    -- False on a player view: CR 109.1 gives a player no controller and so no
+    -- permanent whose Modification this could be.
+    grantsStationToughness :: Bool
   }
 
 -- The view of a PLAYER candidate: no card types, no colours, no controller --
@@ -711,7 +723,10 @@ playerView pid =
       -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
       -- list of what an object is has no player in it -- `keywords` above, one
       -- rule over.
-      nonManaActivatedAbility = False
+      nonManaActivatedAbility = False,
+      -- CR 702.184c reaches a permanent's controller, and a player view built
+      -- from a bare PlayerId has no permanent behind it to grant this at all.
+      grantsStationToughness = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
