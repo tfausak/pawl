@@ -87,7 +87,7 @@
                 },
                 "effects": [
                   {
-                    "type": "CopySpell",
+                    "type": "CopyStackObject",
                     "value": {
                       "newTargets": true,
                       "ref": {

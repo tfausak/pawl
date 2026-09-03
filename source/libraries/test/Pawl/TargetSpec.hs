@@ -102,6 +102,8 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Face as Face
@@ -157,6 +159,15 @@ soleActivatedAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAb
 soleActivatedAbility p = case Face.activatedAbilities (S.combinedFace p) of
   [only] -> Just only
   _ -> Nothing
+
+-- The one activated ability of a printing whose cost carries a named component,
+-- for a card that declares more than one. By the COST rather than by index, so a
+-- reordering of the card file cannot silently aim a case at the wrong ability.
+activatedAbilityCosting :: CostComponent.CostComponent Keyword.Keyword -> Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+activatedAbilityCosting component p =
+  List.find
+    (List.elem component . Cost.Type.components . ActivatedAbility.cost)
+    (Face.activatedAbilities (S.combinedFace p))
 
 -- `pid` controls the restricted creature -- a Blurred Mongoose or a Slippery
 -- Bogle -- and a Goblin Piker, and nothing else. The Piker is the CONTROL in
@@ -1354,11 +1365,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- Adric, Mathematical Genius' "Ultimate Sacrifice -- {1}{U}, Sacrifice Adric:
   -- Counter target activated or triggered ability" is Stifle's undifferentiated
   -- Pool.Abilities on an ACTIVATED ability, which is what makes the path
-  -- reachable at all. Not implemented, so the card file omits it: its other
-  -- ability, "{2}{U}, {T}: Copy target activated or triggered ability you
-  -- control. You may choose new targets for the copy" -- copying a SPELL on the
-  -- stack landed with Twincast, but copying an ABILITY did not (#2208) -- which
-  -- leaves pawl's Adric stricter than printed.
+  -- reachable at all. Its other ability copies one instead, so the card declares
+  -- two and this case names the one it wants by the component that separates them
+  -- -- the sacrifice.
   -- "Ultimate Sacrifice" is an ability word (CR 207.2c) and Doctor's companion is
   -- deck construction (CR 903); neither has a rules meaning in play.
   --
@@ -1372,7 +1381,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     island <- S.printingOf s registry "Island"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     adric <- S.printingOf s registry "Adric, Mathematical Genius"
-    case (soleActivatedAbility sorcerer, soleActivatedAbility adric) of
+    case (soleActivatedAbility sorcerer, activatedAbilityCosting CostComponent.SacrificeThis adric) of
       (Just ping, Just ultimateSacrifice) -> do
         let (srcId, withSorcerer) = S.addCreature sorcerer S.bob (Setup.emptyGame S.bothPlayers)
             -- CR 302.6: the Sorcerer must have settled before its {T} is legal.
@@ -1414,7 +1423,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
               Nothing -> Spec.assertFailure s "Ultimate Sacrifice should declare one target slot"
               Just theSlot -> Spec.assertEqWith s "and the pool held the ping and nothing else" (Target.legalRecipients (Just S.alice) adricId theSlot pinging) (Set.singleton (Recipient.ToObject pingId))
           _ -> Spec.assertFailure s "the fixture should put exactly one ability on the stack"
-      _ -> Spec.assertFailure s "Prodigal Sorcerer and Adric should each declare exactly one activated ability"
+      _ -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability, and Adric one whose cost sacrifices it"
 
   -- CR 115.2's OTHER escape hatch, the one Pool.Spells and Pool.Abilities are
   -- not: "only permanents are legal targets for spells and abilities, unless a

@@ -109,7 +109,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
-import qualified Pawl.Types.CopySpell as CopySpell
+import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
@@ -168,6 +168,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -595,7 +596,7 @@ effectObjectRefs effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> [ref]
   -- Both sides: CR 707.2's copiable values come off one and go onto the other.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> [original, subject]
-  Effect.CopySpell (CopySpell.MkCopySpell ref _) -> [ref]
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref _) -> [ref]
   Effect.Replace {} -> []
   Effect.SkipNextPhase {} -> []
   -- Absent where the shield's recipients are described rather than named.
@@ -738,7 +739,7 @@ effectPlayerRefs effect = case effect of
   Effect.Conjure {} -> []
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
-  Effect.CopySpell {} -> []
+  Effect.CopyStackObject {} -> []
   Effect.Replace {} -> []
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> [ref]
   Effect.PreventNextDamage {} -> []
@@ -920,7 +921,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   Effect.BecomeCopy {} -> Map.empty
-  Effect.CopySpell {} -> Map.empty
+  Effect.CopyStackObject {} -> Map.empty
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
   -- The ROW's own Filters and Quantities are READS too (replacementRowReads):
   -- Filter.IsBound in one names an object an earlier effect of this same
@@ -1430,7 +1431,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
-  Effect.CopySpell {} -> True
+  Effect.CopyStackObject {} -> True
   -- The ReplacementEffect's own reads are replacementRowReads', and slotsOf
   -- reports them through replacementRowSlots: its Filters name no target slot, and
   -- the Quantities a counter rewrite counts with are asked here. Not implemented:
@@ -1626,7 +1627,7 @@ readsX = any effectReadsX
       Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.BecomeCopy {} -> False
-      Effect.CopySpell {} -> False
+      Effect.CopyStackObject {} -> False
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too.
@@ -1788,7 +1789,7 @@ boundSlots effect = case effect of
   Effect.CreateCopy {} -> Set.empty
   -- Binds nothing: no new object comes into existence.
   Effect.BecomeCopy {} -> Set.empty
-  Effect.CopySpell {} -> Set.empty
+  Effect.CopyStackObject {} -> Set.empty
   -- CR 729.1b: the subgame's winner, reported rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the opponent this effect chose.
@@ -4385,30 +4386,42 @@ exileOrCease oid = do
     Just (Source.OfSpellCopy _) -> Event.changeZone oid Zone.Exile
     _ -> State.modify' (Game.cease oid)
 
--- CR 707.10: what a copy of this object's Source would be, or Nothing when the
--- object is not a spell. A CLASSIFICATION -- is-it-a-spell, read off the same
--- Source that Game.isSpell reads -- never which card it is.
+-- CR 707.10: what a copy of this object's Source would be, and which of CR
+-- 707.10's nouns the copy is, or Nothing when the object is neither a spell nor
+-- an ability. A CLASSIFICATION -- read off the same Source that Game.isSpell and
+-- Game.isAbility read -- never which card it is.
+--
+-- A copy of a SPELL gets a Source of its own (CR 112.1a's spell with no card),
+-- while a copy of an ABILITY keeps the original's Source unchanged: CR 707.10b's
+-- "a copy of an ability has the same source as the original ability", which that
+-- payload already carries (the source object and the ability itself). So the
+-- rule's second sentence -- an ability referring to its source by name refers to
+-- that same object -- and its third -- the copy counts as the same ability for
+-- effects counting resolutions -- both hold by construction rather than by
+-- anything written here. Pawl.CopySpec's Longtusk Cub case proves the second.
+--
+-- Not implemented: the count the third sentence is about, so nothing observes
+-- that half (gap #3135).
 --
 -- A copy of a copy answers with the copy's own printing: CR 707.2's copiable
 -- values are the ones the copied object reports, and its snapshot already carries
 -- them.
---
--- Not implemented: CR 707.10b's copy of an activated or triggered ability, which
--- keeps the original's source rather than naming a printing and so is a different
--- Source entirely (#2208).
-spellCopyOf :: Source.Source -> Maybe Source.Source
-spellCopyOf source = case source of
-  Source.OfCard pid -> Just (Source.OfSpellCopy pid)
-  Source.OfSpellCopy pid -> Just (Source.OfSpellCopy pid)
-  -- CR 707.10 copies a SPELL, and a melded permanent is never one (CR 701.42a
-  -- puts it onto the battlefield). CR 202.3c's copy of a melded permanent is a
-  -- permanent copy and does not come through here.
+copyOnStackOf :: Source.Source -> Maybe (Source.Source, StackObjectKind.StackObjectKind)
+copyOnStackOf source = case source of
+  Source.OfCard pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
+  Source.OfSpellCopy pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
+  Source.OfAbility a -> Just (Source.OfAbility a, StackObjectKind.Ability)
+  Source.OfTrigger t -> Just (Source.OfTrigger t, StackObjectKind.Ability)
+  -- CR 725.2's sourceless triggered ability is a triggered ability all the same,
+  -- and Pawl.Engine.Target.abilityRecipients offers it, so it copies like one.
+  Source.OfInherentTrigger t -> Just (Source.OfInherentTrigger t, StackObjectKind.Ability)
+  -- CR 707.10 copies what is ON THE STACK, and none of these three ever is: a
+  -- melded permanent and a token are put onto the battlefield (CR 701.42a, CR
+  -- 111.1) and an emblem into the command zone (CR 114.1). CR 202.3c's copy of a
+  -- melded permanent is a permanent copy and does not come through here.
   Source.OfMeld _ -> Nothing
   Source.OfToken _ -> Nothing
-  Source.OfAbility _ -> Nothing
-  Source.OfTrigger _ -> Nothing
   Source.OfEmblem _ -> Nothing
-  Source.OfInherentTrigger _ -> Nothing
 
 -- The TARGETS a spell or ability on the stack currently has, per slot. Every
 -- recipient-valued binding restricted to the slots the object actually declares
@@ -4423,8 +4436,37 @@ targetsOnStack :: ObjectId -> GameState -> Map.Map SlotName (Set Recipient)
 targetsOnStack oid gs =
   Maybe.fromMaybe Map.empty $ do
     obj <- Game.lookupObject oid gs
-    face <- Game.faceOf oid gs
-    pure (Map.restrictKeys (Binding.targetsOf (Object.bindings obj)) (Map.keysSet (targetSlotsOf obj oid gs face)))
+    pure (Map.restrictKeys (Binding.targetsOf (Object.bindings obj)) (Map.keysSet (stackTargetSlots obj oid gs)))
+
+-- CR 601.2c: the target slots an object on the stack declares, for whichever of
+-- CR 707.10's three nouns it is. A CLASSIFICATION off the object's Source, like
+-- copyOnStackOf above and never which card it is.
+--
+-- A card-backed object reads its printed face (targetSlotsOf). An ability has no
+-- card behind it -- CR 113.7a makes it an object in its own right, and
+-- Game.cardOf answers Nothing for one -- so its slots come off the modal its
+-- Source carries, which is where Pawl.Engine.Activate announced them against and
+-- where Pawl.Engine.Stack's two ability arms read its modes at resolution.
+--
+-- CR 612.1's rewrite (Projection.rewriteTargetSlot) is applied on the card-backed
+-- half alone, and that is agreement rather than an omission this reader makes:
+-- the two roads an ability's slots already travel -- Pawl.Engine.Activate's
+-- announcement and Pawl.Engine.Stack's resolution -- read the modal unrewritten,
+-- so a rewrite here would describe a slot neither of them announced. Whenever CR
+-- 612 does have to reach an ability on the stack, all three move together.
+stackTargetSlots :: Object.Object -> ObjectId -> GameState -> Map.Map SlotName TargetSlot.TargetSlot
+stackTargetSlots obj oid gs =
+  let chosen = Binding.modesOf (Object.bindings obj)
+      fromFace = maybe Map.empty (targetSlotsOf obj oid gs) (Game.faceOf oid gs)
+   in case Object.source obj of
+        Source.OfAbility a -> Modal.modesTargetSlots chosen (ActivatedAbility.modal (ActivatedAbilitySource.ability a))
+        Source.OfTrigger t -> Modal.modesTargetSlots chosen (TriggeredAbility.modal (TriggeredAbilitySource.ability t))
+        Source.OfInherentTrigger t -> Modal.modesTargetSlots chosen (TriggeredAbility.modal (InherentTriggerSource.ability t))
+        Source.OfCard _ -> fromFace
+        Source.OfSpellCopy _ -> fromFace
+        Source.OfMeld _ -> fromFace
+        Source.OfToken _ -> fromFace
+        Source.OfEmblem _ -> fromFace
 
 -- CR 707.10c: "the player may leave any number of the targets unchanged, even if
 -- those targets would be illegal. If the player chooses to change some or all of
@@ -4469,73 +4511,72 @@ targetsOnStack oid gs =
 chooseNewTargetsFor :: PlayerId -> ObjectId -> Game ()
 chooseNewTargetsFor controller copyId = do
   gs <- State.get
-  Monad.forM_ (Game.lookupObject copyId gs) $ \copy ->
-    Monad.forM_ (Game.faceOf copyId gs) $ \face -> do
-      let slots = targetSlotsOf copy copyId gs face
-          -- TARGET slots only, which targetsOnStack is: the reserved slots are
-          -- not targets and are not CR 707.10c's to change.
-          current = targetsOnStack copyId gs
-          -- CR 608.2b's own derivation, made against the CURRENT board: this is
-          -- a fresh choice of targets rather than a re-check of the old one, so
-          -- it reads what the board can supply now.
-          --
-          -- Seeded with the copy's own bindings, which is where CR 707.10 put the
-          -- original's decisions: a slot's CR 202.3 computed bound reading the
-          -- announced X (Stir the Grave) is answered off the SAME number the
-          -- original was, because CR 707.10c changes targets and nothing else.
-          --
-          -- A REGRESSION FENCE rather than a proven line, and the honest reason is
-          -- that the announced X reaches the bound a second way: Quantity.InSlot
-          -- asks the object the evaluation names before it asks the context, and
-          -- for a copy that object IS the announcement's holder. So the behaviour
-          -- Pawl.CopySpec's stirCopySpec proves stands with this seed empty too,
-          -- and what the seed adds is every OTHER slot atom -- Filter's
-          -- SameNameAsBound and IsBound, a ZoneScope.InSlot pool -- reading a
-          -- binding of the copy's that is not one of the re-chosen slots. Nothing
-          -- drives that half: stirCopySpec is the only case that copies a spell
-          -- whose slot reads the announcement at all, and its slot reads the X.
-          --
-          -- The slots being re-chosen are dropped from it. They are not decisions
-          -- the copy keeps -- this call is choosing them -- so a sibling read must
-          -- not be answered off the target it is about to replace, and CR 601.2c's
-          -- own road seeds no target either (Pawl.Engine.Cast.castProposed). The
-          -- second pass below is what relates one re-chosen slot to another.
-          seed = Map.withoutKeys (Object.bindings copy) (Map.keysSet slots)
-          fresh = Target.legalSets (Just controller) False seed copyId slots gs
-          -- CR 406.4: what this player may not name specifically is offered as
-          -- the pile it sits in, exactly as at CR 601.2c. The targets already
-          -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
-          -- one stand even when it is now illegal.
-          offer slot recipients = (Natural.length recipients, Set.union recipients (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh)))
-          asked = Map.mapWithKey offer current
-          -- Every slot answerable only one way means the options are
-          -- indistinguishable, and CR 707.10c's offer is elided.
-          settled slot = Set.isSubsetOf (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh))
-      Monad.unless (and (Map.elems (Map.mapWithKey settled current))) $ do
-        answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor controller gs) controller copyId asked)
-        let admits (n, offered) picked = Natural.length picked == n && Set.isSubsetOf picked offered
-            wellFormed =
-              Map.keysSet answer == Map.keysSet asked
-                && and (Map.elems (Map.intersectionWith admits asked answer))
-        Monad.when wellFormed $ do
-          -- CR 406.4's draw, run on the ANSWER: a pile the player named becomes
-          -- the card randomness picked out of it before any target is recorded.
-          drawn <- traverse (Target.drawFromPiles (Just controller)) answer
-          -- CR 707.10c: "if the player chooses to change some or all of the
-          -- targets, the new targets must be legal". Asked of the DRAWN answer
-          -- and not of the raw one, because rule 406.4 draws from the whole pile
-          -- -- the card it names can be one this slot refuses, and a pile is
-          -- never a target that was left unchanged. An unchanged target is
-          -- admitted whatever it is, which is the rule's own first sentence.
-          --
-          -- Pawl.ExileSpec's "CR 707.10c a copy's re-target keeps its old target
-          -- when the draw names a card the slot refuses" is what proves this
-          -- line: without it the copy records the illegal card and CR 608.2b
-          -- counters it, where the rule leaves it resolving on its old target.
-          let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
-          Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
-            let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
-            State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
+  Monad.forM_ (Game.lookupObject copyId gs) $ \copy -> do
+    let slots = stackTargetSlots copy copyId gs
+        -- TARGET slots only, which targetsOnStack is: the reserved slots are
+        -- not targets and are not CR 707.10c's to change.
+        current = targetsOnStack copyId gs
+        -- CR 608.2b's own derivation, made against the CURRENT board: this is
+        -- a fresh choice of targets rather than a re-check of the old one, so
+        -- it reads what the board can supply now.
+        --
+        -- Seeded with the copy's own bindings, which is where CR 707.10 put the
+        -- original's decisions: a slot's CR 202.3 computed bound reading the
+        -- announced X (Stir the Grave) is answered off the SAME number the
+        -- original was, because CR 707.10c changes targets and nothing else.
+        --
+        -- A REGRESSION FENCE rather than a proven line, and the honest reason is
+        -- that the announced X reaches the bound a second way: Quantity.InSlot
+        -- asks the object the evaluation names before it asks the context, and
+        -- for a copy that object IS the announcement's holder. So the behaviour
+        -- Pawl.CopySpec's stirCopySpec proves stands with this seed empty too,
+        -- and what the seed adds is every OTHER slot atom -- Filter's
+        -- SameNameAsBound and IsBound, a ZoneScope.InSlot pool -- reading a
+        -- binding of the copy's that is not one of the re-chosen slots. Nothing
+        -- drives that half: stirCopySpec is the only case that copies a spell
+        -- whose slot reads the announcement at all, and its slot reads the X.
+        --
+        -- The slots being re-chosen are dropped from it. They are not decisions
+        -- the copy keeps -- this call is choosing them -- so a sibling read must
+        -- not be answered off the target it is about to replace, and CR 601.2c's
+        -- own road seeds no target either (Pawl.Engine.Cast.castProposed). The
+        -- second pass below is what relates one re-chosen slot to another.
+        seed = Map.withoutKeys (Object.bindings copy) (Map.keysSet slots)
+        fresh = Target.legalSets (Just controller) False seed copyId slots gs
+        -- CR 406.4: what this player may not name specifically is offered as
+        -- the pile it sits in, exactly as at CR 601.2c. The targets already
+        -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
+        -- one stand even when it is now illegal.
+        offer slot recipients = (Natural.length recipients, Set.union recipients (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh)))
+        asked = Map.mapWithKey offer current
+        -- Every slot answerable only one way means the options are
+        -- indistinguishable, and CR 707.10c's offer is elided.
+        settled slot = Set.isSubsetOf (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh))
+    Monad.unless (and (Map.elems (Map.mapWithKey settled current))) $ do
+      answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor controller gs) controller copyId asked)
+      let admits (n, offered) picked = Natural.length picked == n && Set.isSubsetOf picked offered
+          wellFormed =
+            Map.keysSet answer == Map.keysSet asked
+              && and (Map.elems (Map.intersectionWith admits asked answer))
+      Monad.when wellFormed $ do
+        -- CR 406.4's draw, run on the ANSWER: a pile the player named becomes
+        -- the card randomness picked out of it before any target is recorded.
+        drawn <- traverse (Target.drawFromPiles (Just controller)) answer
+        -- CR 707.10c: "if the player chooses to change some or all of the
+        -- targets, the new targets must be legal". Asked of the DRAWN answer
+        -- and not of the raw one, because rule 406.4 draws from the whole pile
+        -- -- the card it names can be one this slot refuses, and a pile is
+        -- never a target that was left unchanged. An unchanged target is
+        -- admitted whatever it is, which is the rule's own first sentence.
+        --
+        -- Pawl.ExileSpec's "CR 707.10c a copy's re-target keeps its old target
+        -- when the draw names a card the slot refuses" is what proves this
+        -- line: without it the copy records the illegal card and CR 608.2b
+        -- counters it, where the rule leaves it resolving on its old target.
+        let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
+        Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
+          let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
+          State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
@@ -6805,22 +6846,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
         _ -> gs
-  Effect.CopySpell (CopySpell.MkCopySpell ref newTargets) -> do
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref newTargets) -> do
     gs <- State.get
-    -- CR 707.10: one copy per named spell, each put onto the stack. The named
+    -- CR 707.10: one copy per named object, each put onto the stack. The named
     -- objects are enumerated ONCE off this `gs` (CR 608.2f); each copy is then
     -- minted against the live state, since a fresh id and a fresh timestamp are
     -- both counters the previous mint moved.
     Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \original ->
-      -- CR 707.10 copies a SPELL, which Game.isSpell classifies off the object's
-      -- zone and its Source -- so an ObjectRef that named a card in a graveyard
-      -- copies nothing, that being CR 707.13's different act (#888).
-      Monad.forM_ (if Game.isSpell original gs then Game.lookupObject original gs else Nothing) $ \obj ->
-        -- CR 707.10's three nouns, and only the first is implemented: an
-        -- ObjectRef that named an ability on the stack finds no printing here
-        -- and copies nothing (#2208). The classification is the object's KIND,
-        -- never which card it is.
-        Monad.forM_ (spellCopyOf (Object.source obj)) $ \copySource -> do
+      -- CR 707.10's three nouns: a spell (Game.isSpell) and an activated or
+      -- triggered ability (Game.isAbility), each classifying off the object's
+      -- ZONE and its Source and never off which card it is. Everything else
+      -- copies nothing -- an ObjectRef that named a card in a graveyard reaches
+      -- CR 707.13's different act (#888), and a permanent on the battlefield is
+      -- the CreateCopy and BecomeCopy opcodes' subject rather than this one's.
+      Monad.forM_ (if Game.isSpell original gs || Game.isAbility original gs then Game.lookupObject original gs else Nothing) $ \obj ->
+        Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(copySource, kind) -> do
           gsNow <- State.get
           let (copyId, gs1) = Game.freshObjectId gsNow
               (ts, gs2) = Game.freshTimestamp gs1
@@ -6834,12 +6874,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- Owner and controller are the COPYING effect's controller, both
               -- stated outright by CR 707.10 and neither inherited: the copy is
               -- "owned by the player under whose control it was put on the
-              -- stack".
+              -- stack". Rule 707.10 gives an OWNER only to a copy of a spell, and
+              -- the same write is right for an ability: pawl's Object.owner on an
+              -- ability object is that ability's controller, which is what
+              -- Pawl.Engine.Activate stamps and what Pawl.Engine.Stack's two
+              -- ability arms read.
               --
               -- Zeroed: damage, counters and designations, none of which CR
-              -- 707.2 copies. A spell on the stack carries none of the three
-              -- today, so this is the rule written out rather than a difference
-              -- the board can show.
+              -- 707.2 copies. Neither a spell nor an ability on the stack carries
+              -- any of the three today, so this is the rule written out rather
+              -- than a difference the board can show.
+              --
+              -- CR 707.2's copiable values are stamped for a SPELL only, where the
+              -- other two copy opcodes stamp them so
+              -- Projection.copiableCharacteristics answers for all three and CR
+              -- 707.3 holds for free. The LIVE reader, not the last-known one: the
+              -- object was just looked up, so there is nothing to resurrect. An
+              -- ABILITY has no card behind it at all (CR 113.7a; Game.cardOf
+              -- answers Nothing for one), so there is nothing to snapshot -- CR
+              -- 707.10b's "the same source as the original ability" is the whole of
+              -- what its copy carries, and it rides in `copySource` above. That
+              -- half is a REGRESSION FENCE rather than a proven line: stamping a
+              -- snapshot on an ability copy anyway left the suite green
+              -- (2026-09-03), an ability having no characteristic any board can
+              -- read it back off.
+              stampCopiable = case kind of
+                StackObjectKind.Spell -> Binding.setCopy (Event.copiedSnapshot original gs)
+                StackObjectKind.Ability -> id
               copy =
                 obj
                   { Object.source = copySource,
@@ -6854,18 +6915,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     Object.counters = Map.empty,
                     Object.counterTimestamps = Map.empty,
                     Object.designations = Set.empty,
-                    -- CR 707.2's copiable values, stamped where the other two
-                    -- copy opcodes stamp them so Projection.copiableCharacteristics
-                    -- answers for all three and CR 707.3 holds for free. The LIVE
-                    -- reader, not the last-known one: the object was just looked
-                    -- up, so there is nothing to resurrect.
                     -- CR 109.5's "you" is RE-STAMPED, and it is the one binding
-                    -- that must be: Pawl.Engine.Cast writes the caster into it
-                    -- as the original is cast, and CR 707.10 makes the copy's
-                    -- controller the copying effect's controller instead. Every
-                    -- other binding is a DECISION, which CR 707.10 copies
-                    -- verbatim.
-                    Object.bindings = Binding.setYou controller (Binding.setCopy (Event.copiedSnapshot original gs) (Object.bindings obj))
+                    -- that must be: Pawl.Engine.Cast and Pawl.Engine.Activate
+                    -- write the caster or activator into it as the original goes
+                    -- on the stack, and CR 707.10 makes the copy's controller the
+                    -- copying effect's controller instead. Every other binding is
+                    -- a DECISION, which CR 707.10 copies verbatim -- including an
+                    -- ability's self slot, so CR 707.10b's "the copy refers to
+                    -- that same object" needs no write of its own.
+                    Object.bindings = Binding.setYou controller (stampCopiable (Object.bindings obj))
                   }
           State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue controller copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
           Monad.when newTargets (chooseNewTargetsFor controller copyId)
@@ -6876,17 +6934,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- 702.21a's ward fires on it.
           --
           -- EVERY target, not only the ones CR 707.10c changed: the copy "is
-          -- itself a spell" (CR 707.10), so an object the copy kept is a target
-          -- of a spell it was not a target of before. Read back off the board
-          -- AFTER the re-target above rather than from the copied bindings, for
-          -- the same reason.
+          -- itself a spell" -- or itself an ability -- under CR 707.10, so an
+          -- object the copy kept is a target of something it was not a target of
+          -- before. Read back off the board AFTER the re-target above rather than
+          -- from the copied bindings, for the same reason.
           --
-          -- The KIND is Spell because the guard two steps up established it:
-          -- Game.isSpell classified the copied object, and CR 707.10 makes a
-          -- copy of a spell a spell. A copy of an ABILITY does not reach here
-          -- (#2208).
+          -- The KIND is the copied object's, which copyOnStackOf classified: CR
+          -- 707.10's "a copy of a spell is itself a spell" and "a copy of an
+          -- ability is itself an ability".
           gsCopied <- State.get
-          Event.becameTarget copyId StackObjectKind.Spell controller (targetsOnStack copyId gsCopied)
+          Event.becameTarget copyId kind controller (targetsOnStack copyId gsCopied)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and not belt and braces: the source can

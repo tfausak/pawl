@@ -62,7 +62,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
-import qualified Pawl.Types.CopySpell as CopySpell
+import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -2409,7 +2409,7 @@ rewriteEffect pairs effect = case effect of
   -- The ref alone, CreateCopy's reason: CR 707.2 keeps a text change out of the
   -- copiable values, so what the copy becomes is not rewritten. CR 707.10c's
   -- offer is no land type either.
-  Effect.CopySpell (CopySpell.MkCopySpell ref newTargets) -> Effect.CopySpell (CopySpell.MkCopySpell (rewriteObjectRef pairs ref) newTargets)
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref newTargets) -> Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (rewriteObjectRef pairs ref) newTargets)
   -- CR 612.1 through the SHIELD a resolution installs: the row's duration, its
   -- CR 614.1 gate, and the replacement effect itself, which is where the word
   -- usually sits. rewritePrintedReplacement makes the same descent over a

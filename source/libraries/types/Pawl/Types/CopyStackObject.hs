@@ -1,10 +1,17 @@
-module Pawl.Types.CopySpell where
+module Pawl.Types.CopyStackObject where
 
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
--- | The payload of Pawl.Types.Effect's CopySpell arm: CR 707.10's "put a copy of
+-- | The payload of Pawl.Types.Effect's CopyStackObject arm: CR 707.10's "put a copy of
 -- it onto the stack". Twincast's "copy target instant or sorcery spell" is
--- @ref = InSlot spell@, @newTargets = True@.
+-- @ref = InSlot spell@, @newTargets = True@; Lithoform Engine's "copy target
+-- activated or triggered ability you control" is the same payload over a slot
+-- whose pool is Pawl.Types.Pool's Abilities.
+--
+-- ONE opcode for all three of CR 707.10's nouns, and not three: the rule states
+-- one act, and which noun the named object is is a CLASSIFICATION the executor
+-- reads off the object's Source (Pawl.Engine.Resolve's copyOnStackOf), never a
+-- choice the card makes.
 --
 -- An ObjectRef rather than a bare SlotName, for the reason
 -- Pawl.Types.CreateCopy's comment gives: every printed producer names a target
@@ -20,7 +27,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- Not implemented: CR 707.10d's "for each player or object it could target" and
 -- CR 707.10e's "a copy with a new specified target", each of which chooses the
 -- copy's targets rather than offering the controller a change (#2209).
-data CopySpell = MkCopySpell
+data CopyStackObject = MkCopyStackObject
   { ref :: ObjectRef.ObjectRef,
     newTargets :: Bool
   }
