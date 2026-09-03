@@ -175,9 +175,10 @@ data Keyword
     -- permanent enters with N +1/+1 counters on it; a CR 614.1c entry replacement
     -- carrying its own condition, each instance applying separately (CR 702.54c).
     --
-    -- Not implemented: CR 702.54b's "Bloodthirst X", where X is the TOTAL DAMAGE
-    -- an opponent was dealt rather than a printed number (#1588).
-    Bloodthirst Natural.Natural
+    -- Nothing is rule 702.54b's "bloodthirst X", Vanishing's spelling of the same
+    -- want: X is the total damage this permanent's controller's opponents were
+    -- dealt this turn, so it names no printed number and states no condition.
+    Bloodthirst (Maybe Natural.Natural)
   | -- | 702.55a: when this permanent dies, exile it haunting target creature; CR
     -- 702.55b's haunted object is board state rather than a characteristic.
     --

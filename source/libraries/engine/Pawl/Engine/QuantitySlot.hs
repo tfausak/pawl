@@ -150,6 +150,8 @@ overSlots f quantity = case quantity of
   Quantity.LifeGainedThisTurn _ -> pure quantity
   -- And another, CR 120.1's damage tally likewise.
   Quantity.PlayersDealtDamageThisTurn _ -> pure quantity
+  -- And another, CR 120.1's damage total likewise.
+  Quantity.DamageDealtToPlayersThisTurn _ -> pure quantity
   -- And another in that same position, CR 601.2i's cast tally having nothing
   -- beside its PlayerRef either.
   Quantity.SpellsCastLastTurn _ -> pure quantity
@@ -278,6 +280,7 @@ nestedRefs quantity = case quantity of
   Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
   Quantity.LifeGainedThisTurn ref -> Set.singleton (Left ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
+  Quantity.DamageDealtToPlayersThisTurn ref -> Set.singleton (Left ref)
   Quantity.SpellsCastLastTurn ref -> Set.singleton (Left ref)
   Quantity.DungeonsCompleted ref -> Set.singleton (Left ref)
   Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref _) -> Set.singleton (Left ref)
@@ -387,6 +390,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
   Quantity.LifeGainedThisTurn ref -> Quantity.LifeGainedThisTurn (f ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
+  Quantity.DamageDealtToPlayersThisTurn ref -> Quantity.DamageDealtToPlayersThisTurn (f ref)
   Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
   Quantity.DungeonsCompleted ref -> Quantity.DungeonsCompleted (f ref)
   Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref name) -> Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon (f ref) name)

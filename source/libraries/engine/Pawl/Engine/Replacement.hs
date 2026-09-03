@@ -845,8 +845,24 @@ admitsEntry gs oid rewrite = case rewrite of
   -- 120.3a's damaged-player record (Pawl.Engine.Game.damagedPlayer): damage to
   -- an opponent's creature or to the controller herself is not damage to an
   -- opponent, and CR 119.4's bare life loss is not damage at all. "Was an
-  -- opponent dealt damage" is that count compared against zero, which is why
-  -- nothing here needs rule 702.54b's SUM (#1588).
+  -- opponent dealt damage" is that count compared against zero.
+  --
+  -- RULE 702.54b'S X FORM STATES NO CONDITION -- "this permanent enters with X
+  -- +1/+1 counters on it, where X is the total damage your opponents have been
+  -- dealt this turn" -- so Nothing admits the entry whatever the log holds, and X
+  -- is read where the row applies (Pawl.Engine.Event). Petrified Wood-Kin with no
+  -- damage dealt enters with zero counters because X is zero, not because the row
+  -- was refused.
+  --
+  -- That last sentence is the RULE's wording rather than an observed difference,
+  -- and no board can make it one: X is a sum over the same opponents the arm
+  -- below counts, so X is greater than zero exactly when that arm answers True,
+  -- and admitting unconditionally places the same counters as admitting under
+  -- rule 702.54a's condition would. What separates them is CR 616.1's bucket --
+  -- a refused row is never offered -- and nothing in the pool puts a second entry
+  -- replacement on a bloodthirst X permanent to make that choice visible. So
+  -- Pawl.ReplacementSpec's Petrified Wood-Kin cases fence this arm against
+  -- refusing the row; they do not prove the wording.
   --
   -- CR 109.5's "you" is the ENTERING object's controller, read live off the board
   -- rather than off the candidate -- AsCopy's and SacrificeAnyNumber's posture,
@@ -857,7 +873,8 @@ admitsEntry gs oid rewrite = case rewrite of
   --
   -- The window is the event log's, which Engine.beginTurnOf clears at the turn
   -- handoff -- so "this turn" costs nothing here.
-  EntryRewrite.Bloodthirst _ ->
+  EntryRewrite.Bloodthirst Nothing -> True
+  EntryRewrite.Bloodthirst (Just _) ->
     let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
      in maybe False (> 0) (Quantity.evaluate (Projection.fullView gs) context gs oid (Quantity.Type.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent)))
   -- CR 702.150a's own first condition, the ability's rather than the pattern's:
@@ -1528,7 +1545,9 @@ readsApplier re = case re of
   -- CR 702.54a: no chooser at all, and the count rides the effect. The condition
   -- `admitsEntry` asks reads the ENTERING object's controller rather than the
   -- applier, so two bloodthirst rows on one permanent are admitted together and
-  -- place the same counters in either order.
+  -- place the same counters in either order. Rule 702.54b's X is the same answer
+  -- for the same reason: Pawl.Engine.Event reads its sum off that controller's
+  -- opponents, and two X rows on one permanent read one number.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> False
   -- CR 702.150a: no chooser at all, and the symbol count rides the effect.
   -- Applying it reads the row's payload and the entering object's pending

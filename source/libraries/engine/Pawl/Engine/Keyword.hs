@@ -1492,6 +1492,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- on it. That condition is Replacement.admitsEntry's rather than this function's
   -- -- nothing knowable from a keyword and a count can answer it. ONE ROW PER
   -- INSTANCE (CR 702.54c), both admitted or neither.
+  --
+  -- The payload rides across UNREAD, rule 702.54b's Nothing included: X is the
+  -- board's rather than the card's, so it is read where the row applies
+  -- (Pawl.Engine.Event) for the same reason the condition is not read here.
   Keyword.Bloodthirst n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.Bloodthirst n)))
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
