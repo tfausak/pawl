@@ -36,6 +36,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -118,8 +119,8 @@ plottable pid gs = filter (\oid -> canPlot pid oid gs) (Game.zoneMembers Zone.Ha
 -- nothing, so there is no event to record. It is what a "when this card becomes
 -- plotted" trigger (CR 702.170a, CR 702.170c) reads, the exile's own zone change
 -- saying only that a card left a hand.
-plot :: PlayerId -> ObjectId -> Game ()
-plot pid oid = do
+plot :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game ()
+plot perform pid oid = do
   before <- State.get
   if not (canPlot pid oid before)
     then pure ()
@@ -129,7 +130,7 @@ plot pid oid = do
       -- `keyword:plot`, 2026-09-01, every plot cost generic or monocoloured
       -- -- so no prompt is raised today.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and

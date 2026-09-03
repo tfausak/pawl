@@ -1,7 +1,10 @@
 module Pawl.Types.ManaOption where
 
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 
@@ -29,6 +32,17 @@ import qualified Pawl.Types.Mana as Mana
 data ManaOption = MkManaOption
   { cost :: Cost.Cost Keyword.Keyword,
     restrictions :: [ActivationRestriction.ActivationRestriction],
-    yield :: Mana.Mana
+    yield :: Mana.Mana,
+    -- | CR 405.6c: what else this activation does -- everything the chosen mode
+    -- says that is not a mana production. Ancient Tomb's "This land deals 2
+    -- damage to you", which Pawl.Engine.Cost.tapForManaWith runs through its
+    -- Pawl.Types.ManaAbilityPerformer once the mana is added.
+    --
+    -- Part of the OPTION rather than looked up from the source afterwards, for
+    -- the same reason the cost is: the option is what the player was offered,
+    -- and two routes alike in cost and yield but not in what else they do are
+    -- two options rather than one (List.nub in
+    -- Pawl.Engine.Mana.manaOptionsOfGiven compares this too).
+    effects :: [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)]
   }
   deriving (Eq, Ord, Show)

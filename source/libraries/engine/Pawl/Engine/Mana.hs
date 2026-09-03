@@ -24,14 +24,17 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activations as Activations
+import qualified Pawl.Types.Card as Card.Type
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Effect as Effect
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.HybridPhyrexian as HybridPhyrexian
@@ -254,15 +257,21 @@ producedTypes oid gs production = case production of
 -- printed. Gemstone Caverns says that sentence as two abilities whose
 -- ActivatedAbility.conditions are complements instead -- a gate abilitiesGiven
 -- does apply, with the board in hand (#1924).
-manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], [ManaAddition.ManaAddition])]
+--
+-- The FOURTH element is CR 405.6c's other half: what the selection says beyond
+-- its mana. Split by the same classification the rest of the mana path runs on
+-- (ManaAbility.manaProduced), so the rules core stays off effect identity, and
+-- carried rather than discarded because Pawl.Engine.Cost.tapForManaWith has to
+-- run it. CR 305.6's intrinsic route says nothing beyond its mana.
+manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], [ManaAddition.ManaAddition], [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)])]
 manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =
         fmap
-          (\manaType -> (intrinsicManaCost, [], [intrinsicManaAddition manaType]))
+          (\manaType -> (intrinsicManaCost, [], [intrinsicManaAddition manaType], []))
           (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
       selectionRoutes ability =
         fmap
-          (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Maybe.mapMaybe ManaAbility.manaProduced effects))
+          (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects))
           (Modal.selectionEffects (ActivatedAbility.modal ability))
       fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
@@ -419,9 +428,9 @@ manaOptionsOfGiven pcs oid gs =
             ManaUnit.restriction = ManaAddition.restriction addition,
             ManaUnit.rider = ManaAddition.rider addition
           }
-      expand (cost, restrictions, additions) =
+      expand (cost, restrictions, additions, others) =
         fmap
-          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = Mana.MkMana units})
+          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = Mana.MkMana units, ManaOption.effects = others})
           (traverse (\addition -> fmap (unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
@@ -616,7 +625,7 @@ manaSourcesGiven capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, restrictions, _) -> Activations.times (capacity ForOffer pcs pid oid cost restrictions gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, restrictions, _, _) -> Activations.times (capacity ForOffer pcs pid oid cost restrictions gs) > 0) (manaRoutesOfGiven pcs oid gs)
    in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana

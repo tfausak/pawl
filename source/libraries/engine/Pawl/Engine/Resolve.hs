@@ -171,6 +171,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
@@ -2711,7 +2712,7 @@ payGatePaidBy resolving source idx cIdx legal payer gate = do
           -- DuringResolution: rule 118.12's cost is paid as the spell or ability
           -- resolves, which is CR 609.1's effect, so a blight paid here is CR
           -- 614.16's subject where Soul Immolation's additional cost is not.
-          outcome <- Cost.pay PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
+          outcome <- Cost.pay performManaAbility PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
@@ -3645,7 +3646,7 @@ offerCast resolving caster slot optionality offer = do
   case chosen of
     Nothing -> pure ()
     Just (oid, name, applied, excused) -> do
-      let cast = Cast.castSpellWith applied caster oid name Facing.FaceUp
+      let cast = Cast.castSpellWith performManaAbility applied caster oid name Facing.FaceUp
           -- The SAME prompt on both paths: CR 118.8c creates no new decision.
           mayCast = do
             let decider = Decide.deciderFor caster gs
@@ -4931,7 +4932,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- the graveyard half of an "and/or" alone -- but observing it
                   -- needs a castable library card on the board at the same time,
                   -- which no case builds; removing it reddens nothing.
-                  Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching searcher)
+                  Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching performManaAbility searcher)
                   gs <- State.get
                   -- ONE prompt over the union, not one per zone: the card prints
                   -- one instruction with one count, and asking per zone would cap
@@ -8940,6 +8941,41 @@ performHandAction source player =
         (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
         (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
     )
+
+-- CR 405.6c: run the non-mana effects of a mana ability, which
+-- Pawl.Engine.Cost.tapForManaWith reaches through the
+-- Pawl.Types.ManaAbilityPerformer parameter.
+--
+-- CR 605.3b gives the ability no stack object, so the SOURCE stands in for the
+-- resolving one. Observably the same here rather than in general: nothing on
+-- this path reads the resolving object's own bindings -- the slots below are
+-- passed in whole, and CR 605.1a's "doesn't require a target" leaves the
+-- announcement with none of its own -- and CR 601.2b's X is announced into the
+-- source, which is what an X in a mana ability's cost would be read from.
+--
+-- Stands on the noSubgame floor, performHandAction's reason: no mana ability
+-- starts a subgame (#1900).
+performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
+performManaAbility source controller =
+  Monad.mapM_
+    ( applyEffect
+        source
+        source
+        controller
+        -- CR 109.5's "you" is the player who activated the ability, and CR
+        -- 115.1's self slot is the ability's source. Both are bound here rather
+        -- than read off an object, because there is no ability object carrying
+        -- them: Pawl.Engine.Activate.activateAbility stamps them at CR 601.2i
+        -- for every ability that does go on the stack.
+        manaAbilityBindings
+        manaAbilityBindings
+    )
+  where
+    manaAbilityBindings =
+      Map.fromList
+        [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
+          (Binding.you, Set.singleton (Recipient.ToPlayer controller))
+        ]
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

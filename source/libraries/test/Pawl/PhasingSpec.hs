@@ -475,7 +475,7 @@ effectSpec s registry = Spec.describe s "Effect" $ do
         (spell, board) = S.addHandCard ripple S.alice withMana
     case mine of
       victim : _ -> do
-        let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+        let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
             rippled = S.settleSba (rippleAt victim spell declared)
             damaged = S.runPure S.aggressiveAnswer rippled (Monad.void Damage.dealCombatDamage)
             bothConnect = S.runPure S.aggressiveAnswer (S.settleSba declared) (Monad.void Damage.dealCombatDamage)

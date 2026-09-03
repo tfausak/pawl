@@ -10961,7 +10961,7 @@ castHalf :: Printing.Printing -> Printing.Printing -> String -> (GameState.GameS
 castHalf land printing half =
   let (gs, oid) = S.handOne printing (S.landsInPlay land 4)
       name = CardName.MkCardName (Text.pack half)
-      cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid name Facing.FaceUp)
+      cast = S.runPure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid name Facing.FaceUp)
       after = S.runPure S.identityAnswer cast Stack.resolveTop
       nonLand o = not (Set.member CardType.Land (PC.cardTypes (Projection.project o after)))
    in ( after,

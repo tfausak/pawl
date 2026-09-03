@@ -83,6 +83,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
@@ -587,6 +588,12 @@ withEffect oid m gs =
 -- that only wants a game set up does not have to reach into Pawl.Engine.Resolve for it.
 performer :: HandActionPerformer.HandActionPerformer
 performer = Resolve.performHandAction
+
+-- The one CR 405.6c performer (Pawl.Engine.Resolve.performManaAbility), which
+-- every payment path takes as a parameter, so a test that pays a cost does not
+-- have to reach into Pawl.Engine.Resolve for it.
+manaPerformer :: ManaAbilityPerformer.ManaAbilityPerformer
+manaPerformer = Resolve.performManaAbility
 
 -- The source stand-in for a targeting call whose target slot is source-blind
 -- (every slot but the opponent's-creatures one, Pawl.ResolveSpec's CR 115.1a
@@ -1228,8 +1235,8 @@ threePlayerCombat mine theirs others =
 fightWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 fightWith answer gs =
   snd . Engine.runGamePure answer gs $ do
-    Combat.declareAttackers alice
-    Combat.declareBlockers
+    Combat.declareAttackers Resolve.performManaAbility alice
+    Combat.declareBlockers Resolve.performManaAbility
     Damage.dealCombatDamage
 
 -- Run a Game action purely under an answerer and keep only the final state. The
@@ -1747,7 +1754,7 @@ soleFaceName oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
 cast :: PlayerId.PlayerId -> ObjectId.ObjectId -> Game.Type.Game ()
 cast pid oid = do
   gs <- State.get
-  Cast.castSpell pid oid (soleFaceName oid gs) Facing.FaceUp
+  Cast.castSpell Resolve.performManaAbility pid oid (soleFaceName oid gs) Facing.FaceUp
 
 -- `cast`'s predicate half: Pawl.Engine.Cast.castable asked of that same half.
 castable :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool

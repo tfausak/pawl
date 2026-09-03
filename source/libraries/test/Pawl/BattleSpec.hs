@@ -370,7 +370,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
     case mine of
       [attacker] -> do
-        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
         Spec.assertEqWith
           s
           "the record names the battle"
@@ -389,7 +389,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.bob [piker] [] []
     case mine of
       [attacker] -> do
-        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
         Spec.assertEqWith
           s
           "the defending player instead"
@@ -406,7 +406,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Swamp"]
     case (mine, hers) of
       ([wraith], blocker : _) -> do
-        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
         Spec.assertEqWith
           s
           "and it really is attacking the battle"
@@ -420,7 +420,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Island"]
     case (mine, hers) of
       ([wraith], blocker : _) -> do
-        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
   Spec.it s "CR 310.9d the battle's CONTROLLER's lands are not the ones read" $ do
@@ -433,7 +433,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith", "Swamp"] [] ["Goblin Piker", "Island"]
     case (mine, hers) of
       (wraith : _, blocker : _) -> do
-        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
 
@@ -449,7 +449,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of
       ([wraith], blocker : _, [one, two]) -> do
-        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.manaPerformer S.alice)
             burned = castAt battle S.alice two (castAt battle S.alice one after)
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned)) "carol's Swamp still stops the block"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "CR 310.12b: the second Bolt took the last defense counter"
@@ -469,7 +469,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of
       ([wraith], blocker : _, [one, two]) -> do
-        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.manaPerformer S.alice)
             burned = castAt battle S.alice two (castAt battle S.alice one after)
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "no Swamp on carol's side, so the block is legal"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
@@ -483,7 +483,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (armed, bolts) <- twoBolts s registry gs
     case (mine, hers, bolts) of
       (wraith : _, blocker : _, [one, two]) -> do
-        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.manaPerformer S.alice)
             burned = castAt battle S.alice two (castAt battle S.alice one after)
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "alice's Swamp is not the protector's"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
@@ -503,7 +503,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (armed, bolts) <- twoBolts s registry (bothDefending gs)
     case (mine, hers, bolts) of
       ([wraith], blocker : _, [one, two]) -> do
-        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.manaPerformer S.alice)
             burned = castAt battle S.alice two (castAt battle S.alice one after)
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned)) "carol protected the Siege, so her Swamp stops the block"
         -- The premises, after the gameplay assertion so neither can absorb a
@@ -524,7 +524,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (armed, bolts) <- twoBolts s registry (bothDefending gs)
     case (mine, hers, bolts) of
       ([wraith], blocker : _, [one, two]) -> do
-        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.alice)
+        let after = S.runPure (attackTheBattle battle) armed (Combat.declareAttackers S.manaPerformer S.alice)
             burned = castAt battle S.alice two (castAt battle S.alice one after)
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) burned) "bob's Swamp is not the protector's, so the block is legal"
         Spec.assertBool s (not (Set.member battle (GameState.battlefield burned))) "the Siege is gone here too"
@@ -539,8 +539,8 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     -- meet and bob is never asked.
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [piker] [piker] []
-    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
-        blocked = S.runPure S.aggressiveAnswer attacked Combat.declareBlockers
+    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
+        blocked = S.runPure S.aggressiveAnswer attacked (Combat.declareBlockers S.manaPerformer)
     -- Asserted, not assumed: without it this case would read the same on a board
     -- where the creature attacked carol herself and no battle was involved at all.
     Spec.assertEqWith
@@ -558,8 +558,8 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (gs, battle, mine, _, hers) <- battleCombat s registry S.carol S.carol [piker] [] [piker]
     case (mine, hers) of
       ([attacker], [blocker]) -> do
-        let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
-            blocked = S.runPure S.aggressiveAnswer attacked Combat.declareBlockers
+        let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
+            blocked = S.runPure S.aggressiveAnswer attacked (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith
           s
           "the Piker is attacking the battle"
@@ -578,7 +578,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     -- nothing is attacking it.
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
-    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
         gone = S.departs Departure.Type.Conceded S.carol attacked
         checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
     Spec.assertBool s (Battle.isBeingAttacked battle gone) "the Siege is under attack"
@@ -1082,7 +1082,7 @@ damageSpec s registry = Spec.describe s "Damage" $ do
     (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
     case mine of
       [attacker] -> do
-        let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
             dealt = S.runPure S.identityAnswer attacked (Monad.void Damage.dealCombatDamage)
         Spec.assertEqWith
           s
@@ -1097,7 +1097,7 @@ damageSpec s registry = Spec.describe s "Damage" $ do
     -- 510.1b gives the attacker nothing to assign to and no damage event is built.
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
-    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.manaPerformer S.alice)
         killed = S.runPure S.identityAnswer attacked (Event.destroy Regenerability.Regenerable [battle])
         dealt = S.runPure S.identityAnswer killed (Monad.void Damage.dealCombatDamage)
     Spec.assertEqWith s "no damage was dealt at all" (S.damageEventsOf dealt) []

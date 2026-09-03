@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Resolve as Resolve
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -150,7 +151,7 @@ foretell pid oid = do
       -- reasons. CR 116.2h fixes this cost at {2}, so no symbol here is ever
       -- payable in multiple ways and no prompt is ever raised.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure actionCost
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay Resolve.performManaAbility PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         Payment.Unpaid -> State.put before
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and

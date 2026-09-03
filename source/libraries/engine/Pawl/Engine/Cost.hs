@@ -81,6 +81,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -2279,8 +2280,8 @@ criteriaOf component = case component of
 -- which CR 601.2h's payment comes after -- so a component's criterion can name
 -- them (announcedSlots below). Both callers stamp the bindings before calling
 -- this: Pawl.Engine.Cast.castProposed and Pawl.Engine.Activate.activateAbility.
-pay :: PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay moment subject announced spending pid oid cost = do
+pay :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+pay perform moment subject announced spending pid oid cost = do
   before <- State.get
   let slots = announcedSlots announced before
   case Cost.mana cost of
@@ -2289,7 +2290,7 @@ pay moment subject announced spending pid oid cost = do
     -- CR 601.2g: payMana PROMPTS for which sources to activate, so it is monadic
     -- and restores the pre-payment state itself when it cannot be paid.
     Just manaCost -> do
-      paidMana <- payManaExcept Set.empty announced subject spending pid manaCost
+      paidMana <- payManaExcept perform Set.empty announced subject spending pid manaCost
       if not paidMana
         then pure Payment.Unpaid
         else do
@@ -2340,8 +2341,8 @@ pay moment subject announced spending pid oid cost = do
 -- The pooled MANA is paid before the order is asked, which is CR 508.1i and CR
 -- 509.1e sitting ahead of the payment rule rather than a choice pawl made, and
 -- `pay` above takes the same posture for CR 601.2g.
-payToll :: PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
-payToll pid charges = do
+payToll :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
+payToll perform pid charges = do
   before <- State.get
   -- CR 118.6: a toll one of whose parts is unpayable is unpayable whole.
   case traverse (Cost.mana . snd) charges of
@@ -2355,7 +2356,7 @@ payToll pid charges = do
           -- Neither a cast nor an activation (ForNeither), so CR 106.6-restricted
           -- mana cannot pay a combat toll. Exact: CR 106.6's restrictions name a
           -- cast or an activation, and CR 508.1j's toll is neither.
-          else payMana PaymentSubject.ForNeither ManaSpending.AsProduced pid pooled
+          else payMana perform PaymentSubject.ForNeither ManaSpending.AsProduced pid pooled
       if not paidMana
         then pure False
         else do
@@ -2719,8 +2720,8 @@ orderSensitive component = case component of
 -- A permanent with two mana abilities, one of which could pay the other, is
 -- refused here where the rules allow it. No printing in `data/cards/` has two
 -- mana routes of which either eats mana (#2205).
-payManaExcept :: Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payManaExcept inFlight record subject spending pid cost = do
+payManaExcept :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payManaExcept perform inFlight record subject spending pid cost = do
   before <- State.get
   paid <- window Set.empty
   Monad.unless paid (State.put before)
@@ -2759,7 +2760,7 @@ payManaExcept inFlight record subject spending pid cost = do
           case answer of
             Nothing -> settle
             Just oid -> do
-              produced <- tapForManaWith inFlight oid
+              produced <- tapForManaWith perform inFlight oid
               window (if produced then refused else Set.insert oid refused)
     -- CR 601.2h: the window is closed, so the cost is paid out of what is there
     -- -- and simply is not paid when the player floated too little.
@@ -2810,8 +2811,8 @@ payManaExcept inFlight record subject spending pid cost = do
       Nothing -> gs
       Just sid -> gs {GameState.objects = Map.adjust (\o -> o {Object.manaSpent = spent}) sid (GameState.objects gs)}
 
-payMana :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
-payMana = payManaExcept Set.empty Nothing
+payMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payMana perform = payManaExcept perform Set.empty Nothing
 
 -- Which source to tap next, or none. `covered` says whether the pool already
 -- pays the cost, which picks between CR 118.3c's question and CR 601.2g's.
@@ -2855,19 +2856,19 @@ chooseSource covered pid candidates gs = do
 -- the offer (Mana.manaSourcesGiven), the two differing: a source is offered on
 -- having SOME payable option, and this picks among those.
 --
--- Not implemented: the ability's non-mana clauses -- Ancient Tomb's "deals 2
--- damage to you". Running them needs Pawl.Engine.Resolve, above this module
--- (#1118).
-tapForMana :: ObjectId -> Game Bool
-tapForMana = tapForManaWith Set.empty
+-- The ability's NON-MANA clauses run too (CR 405.6c), through the injected
+-- Pawl.Types.ManaAbilityPerformer rather than a call into Pawl.Engine.Resolve,
+-- which sits above this module.
+tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game Bool
+tapForMana perform = tapForManaWith perform Set.empty
 
 -- The same activation carrying the permanents whose mana ability is already
 -- mid-activation (CR 605.3c), which is payManaExcept's one narrowing: this
 -- activation's own permanent joins the set before its cost opens a window of its
 -- own, so the recursion cannot revisit it. CR 605.3a's priority window starts
 -- from the empty set, nothing being in flight there.
-tapForManaWith :: Set.Set ObjectId -> ObjectId -> Game Bool
-tapForManaWith inFlight oid = do
+tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> ObjectId -> Game Bool
+tapForManaWith perform inFlight oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure False
@@ -2915,14 +2916,30 @@ tapForManaWith inFlight oid = do
           -- elided by announceReductions wherever the answers cannot differ,
           -- which is every board `data/cards/` can build today.
           announced <- announceReductions controller oid gs announcedCost gathered
-          outcome <- payActivation inFlight controller oid (totalWith announced announcedCost)
+          outcome <- payActivation perform inFlight controller oid (totalWith announced announcedCost)
           case outcome of
             Payment.Unpaid -> pure False
             -- CR 605.3b: a mana ability's cost binds nothing this path could
-            -- read. It lifts the AddMana yield out rather than resolving the
-            -- ability, so there is no ability object to write a slot onto (#1118).
+            -- read, so the payment's own slots are dropped here. The ability
+            -- itself has no object either -- see `perform` below.
             Payment.Paid _ -> do
               State.modify' (Mana.addMana controller (Mana.unitsOf (ManaOption.yield chosen)))
+              -- CR 405.6c: "if a mana ability both produces mana and has another
+              -- effect, the mana is produced and the other effect happens
+              -- immediately" -- so the rest of the chosen mode runs HERE, inside
+              -- the window this activation was made in, rather than being queued
+              -- for a caller. Ancient Tomb's 2 damage is charged before the rest
+              -- of the payment can spend the mana it just made
+              -- (Pawl.ManaSpec's Ancient Tomb group).
+              --
+              -- AFTER the mana, which is rule 405.6c's own order and not the
+              -- printed one: the mana is produced, and then the other effect
+              -- happens.
+              --
+              -- The performer runs it against no ability object, CR 605.3b
+              -- leaving one uncreated; Pawl.Engine.Resolve.performManaAbility is
+              -- where the source stands in for it.
+              perform oid controller (ManaOption.effects chosen)
               pure True
 
 -- CR 602.2b sends an activation cost through CR 601.2b-i, so a mana ability pays
@@ -2941,8 +2958,8 @@ tapForManaWith inFlight oid = do
 --
 -- The recursion CR 602.2b makes of that window is bounded by the in-flight set
 -- this function adds to (CR 605.3c), not by the order.
-payActivation :: Set.Set ObjectId -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-payActivation inFlight pid oid cost = do
+payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set ObjectId -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+payActivation perform inFlight pid oid cost = do
   before <- State.get
   paid <- case Cost.mana cost of
     Just (ManaCost.MkManaCost []) -> pure True
@@ -2952,7 +2969,7 @@ payActivation inFlight pid oid cost = do
     -- so mana restricted to activations may pay it -- Omen Hawker's {C} into
     -- Chromatic Star's {1} -- and mana restricted to casts may not. `oid` is the
     -- ability's SOURCE, which is what "abilities of artifacts" reads.
-    Just manaCost -> payManaExcept (Set.insert oid inFlight) Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
+    Just manaCost -> payManaExcept perform (Set.insert oid inFlight) Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure False
   -- CR 602.2b sends this through CR 601.2h, so the payment is made while the

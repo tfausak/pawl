@@ -155,7 +155,7 @@ setUp s registry = do
 -- Cast one door and let the resulting permanent settle, triggers and all.
 castDoor :: CardName.CardName -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 castDoor door oid gs =
-  let cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid door Facing.FaceUp))
+  let cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid door Facing.FaceUp))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in resolveAll (settle resolved)
 
@@ -401,7 +401,7 @@ spec s registry = Spec.describe s "Room" $ do
           "the shut door is offered, at its own price"
           (unlocksOffered after)
           [(permId, saunaName)]
-        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.alice permId saunaName))))
+        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.manaPerformer S.alice permId saunaName))))
         Spec.assertEqWith
           s
           "CR 709.5c: both designations now"
@@ -468,7 +468,7 @@ spec s registry = Spec.describe s "Room" $ do
         after = castDoor furnaceName roomId funded
     case roomPermanent after of
       [permId] -> do
-        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.alice permId saunaName))))
+        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.manaPerformer S.alice permId saunaName))))
         -- The control: both doors are open and both halves are readable, which
         -- is the state every assertion below is measured against.
         Spec.assertEqWith
@@ -566,7 +566,7 @@ spec s registry = Spec.describe s "Room" $ do
     case roomPermanent after of
       [permId] -> do
         Spec.assertEqWith s "the RED door is what is shut" (unlocksOffered after) [(permId, furnaceName)]
-        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.alice permId furnaceName))))
+        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.manaPerformer S.alice permId furnaceName))))
         Spec.assertEqWith s "and opening it fires the trigger" (S.damageOf wallId opened) (Just 3)
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 709.5i: "Some abilities trigger when a player 'fully unlocks' a permanent
@@ -636,7 +636,7 @@ spec s registry = Spec.describe s "Room" $ do
           "CR 709.5d gave one designation, so CR 709.5i is not satisfied"
           (fmap Object.unlockedHalves (Game.lookupObject permId after))
           (Just (Set.singleton furnaceName))
-        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.alice permId saunaName))))
+        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.manaPerformer S.alice permId saunaName))))
         Spec.assertEqWith
           s
           "the control: CR 709.5e opened the second door"

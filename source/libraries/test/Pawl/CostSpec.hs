@@ -250,7 +250,7 @@ doorSpec s registry =
     Spec.it s "CR 118.6 paying an unpayable cost changes nothing" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 3
-          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
+          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay S.manaPerformer PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
       Spec.assertEqWith s "Unpaid" outcome Payment.Unpaid
       Spec.assertEqWith s "no land tapped" (S.tappedCount S.alice after) 0
     -- CR 701.21a: enough controlled permanents matching the criterion.
@@ -2499,7 +2499,7 @@ tappingNothing p = case p of
 -- cost was PAID: Cost.pay restores the entry state for an unpaid one, so a
 -- refused payment adds nothing and taps nothing.
 pooledFrom :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Int
-pooledFrom answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana oid)) of
+pooledFrom answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana S.manaPerformer oid)) of
   Mana.Type.MkMana units -> length units
 
 isTapped :: ObjectId.ObjectId -> GameState.GameState -> Bool
@@ -2507,7 +2507,7 @@ isTapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState
 
 -- The board after tapping the Drum for mana with `answer`.
 afterDrum :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-afterDrum answer drumId gs = S.runPure answer gs (Cost.tapForMana drumId)
+afterDrum answer drumId gs = S.runPure answer gs (Cost.tapForMana S.manaPerformer drumId)
 
 springleafDrumSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
@@ -2684,7 +2684,7 @@ slingBoard sling griffin hillGiant forest =
         _ -> (S.noSource, S.noSource)
       (slingId, withSling) = S.addCreature sling S.alice combat
       withLands = S.landsFor forest S.alice 3 withSling
-   in (slingId, griffinId, giantId, S.runPure (attackingWith griffinId) withLands (Combat.declareAttackers S.alice))
+   in (slingId, griffinId, giantId, S.runPure (attackingWith griffinId) withLands (Combat.declareAttackers S.manaPerformer S.alice))
 
 -- Attack with one named creature, FILTERED against the offer: an id the engine
 -- did not offer is not a legal declaration, so filtering keeps the case about
@@ -2968,7 +2968,7 @@ raptorBoard mountain raptor nexus withNexus held =
         S.runPure
           S.identityAnswer
           gs2
-          (Cast.castSpell S.alice card (S.printingName raptor) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+          (Cast.castSpell S.manaPerformer S.alice card (S.printingName raptor) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
       entered = Set.lookupMin (Set.difference (GameState.battlefield after) (Set.fromList before))
    in fmap (\permanent -> (permanent, after)) entered
 
@@ -2997,7 +2997,7 @@ putridRaptorSpec s registry =
         Just (permanent, gs) -> do
           Spec.assertEqWith s "CR 708.2a a 2/2 while face down" (S.powerToughnessOf permanent gs) (Just (2, 2))
           Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice gs) [(permanent, TurnUpProcedure.Morph)]
-          let after = S.runPure S.identityAnswer gs (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph permanent)
+          let after = S.runPure S.identityAnswer gs (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph permanent)
           Spec.assertEqWith s "CR 702.37e it is face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
           Spec.assertEqWith s "and the printed 4/4" (S.powerToughnessOf permanent after) (Just (4, 4))
           Spec.assertEqWith s "CR 701.9a one card was discarded to pay" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1

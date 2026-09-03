@@ -884,7 +884,7 @@ spoutsBoard island spouts mine stolen =
 -- resolving CONTROLLER would hand both cards the same end.
 castSpouts :: (PlayerId.PlayerId -> LibraryPosition.LibraryPosition) -> [Natural] -> GameState.GameState -> ObjectId.ObjectId -> (GameState.GameState, SpoutsLog)
 castSpouts end arrangement board spell =
-  let attacking = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+  let attacking = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
       answerer :: Prompt.Prompt r -> State.State SpoutsLog r
       answerer p = case p of
         Prompt.ChooseLibraryEnd _ pid oid -> do

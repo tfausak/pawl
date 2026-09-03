@@ -2258,7 +2258,7 @@ ringsAndRestoration ringsFirst plains island tenRings restoration =
             GameState.priority = Just S.alice
           }
       frontName = CardName.MkCardName (Text.pack "Sea Gate Restoration")
-      cast g = S.runPure S.identityAnswer g (Cast.castSpell S.alice spellId frontName Facing.FaceUp)
+      cast g = S.runPure S.identityAnswer g (Cast.castSpell S.manaPerformer S.alice spellId frontName Facing.FaceUp)
       resolve g = S.runPure S.identityAnswer g Stack.resolveTop
       rings = S.addCreature tenRings S.alice
    in if ringsFirst
@@ -4232,7 +4232,7 @@ runedHaloCombat plains halo curse piker name defender =
             GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
             GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defender]}
           }
-      fight = Combat.declareAttackers S.bob >> Combat.declareBlockers >> Damage.dealCombatDamage
+      fight = Combat.declareAttackers S.manaPerformer S.bob >> Combat.declareBlockers S.manaPerformer >> Damage.dealCombatDamage
    in (before, S.settleSba (S.runPure (S.attackTo defender) before fight))
 
 -- Cast the Halo and let it resolve, naming `name`.

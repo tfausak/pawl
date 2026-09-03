@@ -3740,7 +3740,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = S.combatBoardOf [evangel] [evangel, piker]
         warded = forgedBoard forge gs
-        board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.alice))
+        board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.manaPerformer S.alice))
     case (mine, theirs) of
       (attacker : _, [black, red]) -> do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton red (Set.singleton attacker)) board)) "the red Goblin Piker may not block it"
@@ -3877,7 +3877,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     case (mine, theirs) of
       ([attacker], [artifact, black]) -> do
         warded <- toweredBoard s registry attacker gs
-        let board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.alice))
+        let board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.manaPerformer S.alice))
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton artifact (Set.singleton attacker)) board)) "the Icehide Golem may not block it"
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton attacker)) board) "the Cabal Evangel beside it may, so nothing else refused the declaration"
         Spec.assertEqWith s "CR 611.2a one stored continuous effect, and nothing in the command zone" (length (GameState.continuousEffects board), Set.size (GameState.command board)) (1, 0)
@@ -3906,7 +3906,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     case (mine, theirs) of
       ([attacker], [artifact, black]) -> do
         warded <- bulwarkBoard s registry gs
-        let board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.alice))
+        let board = snd (Engine.runGamePure S.aggressiveAnswer warded (Combat.declareAttackers S.manaPerformer S.alice))
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton artifact (Set.singleton attacker)) board)) "the Icehide Golem may not block it"
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton attacker)) board) "the Cabal Evangel beside it may, so nothing else refused the declaration"
         Spec.assertEqWith s "CR 113.6b no stored effect and nothing in the command zone: the graveyard is the only grantor" (length (GameState.continuousEffects board), Set.size (GameState.command board)) (0, 0)
