@@ -116,6 +116,11 @@ arm players controller source duration gs = case duration of
   -- ability" -- and unlike that rule's static-ability sentence it must not follow
   -- the source's control afterwards.
   Duration.UntilPaid cost -> Just (Expiry.WhenPaid (PaidExpiry.MkPaidExpiry controller cost))
+  -- CR 611.2a: nothing about the game's clock or a payment is baked in --
+  -- Pawl.Engine.PlayerEffect.consumedByCast/consumedByLandPlay are what end
+  -- this early, matching the stored effect's own Filter against whatever was
+  -- just cast or played.
+  Duration.UntilUsed -> Just Expiry.WhenUsed
 
 -- Does a stored effect under this duration FOLLOW its objects across a zone
 -- change? CR 400.7's default is no -- the object that arrives is a new object
@@ -136,6 +141,7 @@ follows expiry = case expiry of
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.WhenPaid _ -> False
+  Expiry.WhenUsed -> False
 
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
 -- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
@@ -166,6 +172,9 @@ dropAtCleanup gs =
         Expiry.AtEndOf _ -> True
         -- CR 116.2c: only a payment ends this, and the cleanup step is not one.
         Expiry.WhenPaid _ -> True
+        -- CR 611.2a: every printed producer also says "this turn", so cleanup
+        -- ends an unused grant exactly as it ends AtCleanup's.
+        Expiry.WhenUsed -> False
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -222,6 +231,9 @@ sweepConditional = do
         Expiry.AtEndOf _ -> True
         -- CR 116.2c states a price, not a condition, so no board change ends it.
         Expiry.WhenPaid _ -> True
+        -- Consumed only by consumedByCast/consumedByLandPlay below, which run
+        -- outside this sweep.
+        Expiry.WhenUsed -> True
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.source active) (ActivePlayerEffect.expiry active)
@@ -363,6 +375,8 @@ dropAtTurnOf pid gs =
         -- either -- the offer goes away with the departed player's objects rather
         -- than at a moment this sweep can name.
         Expiry.WhenPaid _ -> True
+        -- No seat's turn beginning is a use.
+        Expiry.WhenUsed -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -413,6 +427,8 @@ dropAtEndOf ending gs =
         Expiry.AtEndOfTurnOf _ -> True
         -- CR 116.2c: no window of the turn ends it.
         Expiry.WhenPaid _ -> True
+        -- No step or phase ending is a use.
+        Expiry.WhenUsed -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -459,6 +475,7 @@ paidExpiries gs =
         Expiry.AtTurnOf _ -> []
         Expiry.AtEndOfTurnOf _ -> []
         Expiry.AtEndOf _ -> []
+        Expiry.WhenUsed -> []
    in concatMap paid (sourcedExpiries gs)
 
 -- Every stored expiry in the game, paired with the object it came from. Shared
@@ -500,6 +517,7 @@ dropWhenPaidBy oid gs =
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.AtEndOf _ -> True
+        Expiry.WhenUsed -> True
       keepEffect x = survives (ContinuousEffect.source x) (ContinuousEffect.expiry x)
       keepReplacement x = survives (ActiveReplacement.source x) (ActiveReplacement.expiry x)
       keepPlayerEffect x = survives (ActivePlayerEffect.source x) (ActivePlayerEffect.expiry x)
@@ -524,3 +542,21 @@ dropWhenPaidBy oid gs =
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
           GameState.objects = clearedPermissions keepPermission gs
         }
+
+-- CR 611.2a: does this expiry end when the effect carrying it is exercised,
+-- rather than only at a moment the clock or a payment could name? The one
+-- reader is Pawl.Engine.PlayerEffect's consumedByCast/consumedByLandPlay,
+-- which need to know which stored rows are eligible for early removal without
+-- themselves casing on Pawl.Types.Expiry -- the standing this module alone
+-- holds.
+expiresWhenUsed :: Expiry -> Bool
+expiresWhenUsed expiry = case expiry of
+  Expiry.WhenUsed -> True
+  Expiry.AtCleanup -> False
+  Expiry.Never -> False
+  Expiry.Perpetual -> False
+  Expiry.While {} -> False
+  Expiry.AtTurnOf _ -> False
+  Expiry.AtEndOfTurnOf _ -> False
+  Expiry.AtEndOf _ -> False
+  Expiry.WhenPaid _ -> False
