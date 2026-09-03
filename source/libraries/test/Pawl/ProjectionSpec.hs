@@ -328,6 +328,19 @@ wasteLoop lunar tidal lunarFirst =
               (l, g2) = S.addCreature lunar S.alice g1
            in (l, t, g2)
 
+-- Two Synthetic Echoing Mimics and a Goblin Piker, all Alice's, with the
+-- state-based actions swept. Each Mimic's CDA reads the other's power, which is
+-- CR 613.8a's loop at layer 7a; fresh timestamps ascend with placement, so the
+-- first returned id is the older. No swapped-order sibling, unlike wasteLoop:
+-- the two permanents are printings of the SAME card, so swapping them is an
+-- automorphism of the board and could only restate this case.
+mimicLoop :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+mimicLoop piker mimic =
+  let (older, g1) = S.addCreature mimic S.alice (Setup.emptyGame S.bothPlayers)
+      (younger, g2) = S.addCreature mimic S.alice g1
+      (_, g3) = S.addCreature piker S.alice g2
+   in (older, younger, snd (Engine.runGamePure S.identityAnswer g3 Engine.settleForPriority))
+
 -- Blood Moon, Urborg, and a Forest on the battlefield. `urborgFirst` controls
 -- the timestamp order (fresh timestamps ascend with placement), to prove the
 -- outcome is order-INDEPENDENT (CR 613.8 dependency overrides CR 613.7).
@@ -1737,6 +1750,59 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (lunarId, tidalId, gs) = wasteLoop lunar tidal False
     Spec.assertEqWith s "the older Tidal Waste applies: Lunar is an Island" (Projection.subtypesOf lunarId gs) (Set.singleton Subtype.Type.Island)
     Spec.assertEqWith s "and Tidal is untouched" (Projection.subtypesOf tidalId gs) Set.empty
+
+  -- CR 613.8a clause (c)'s SECOND limb: the dependency rule applies when BOTH
+  -- effects come from characteristic-defining abilities. CR 613.4a puts both of
+  -- these in layer 7a -- the Mimic's count reads a power the Nightmare's own CDA
+  -- defines there, so the Mimic depends on it and waits (CR 613.8b).
+  --
+  -- The Mimic is placed FIRST, so CR 613.7's timestamp order alone would apply it
+  -- before the Nightmare: only the reorder can produce 4. The Goblin Piker is the
+  -- positive control, a printed power the Greatest can see under either reading,
+  -- which keeps a wrong 0 from being the maximum of an EMPTY set rather than of
+  -- an undetermined one -- Aggregation.Greatest answers Nothing for both.
+  --
+  -- Synthetic, and it has to be. Scryfall o:"power and toughness are each equal
+  -- to" o:power t:creature, 2026-09-02: every one of the 153 hits counts types,
+  -- names, zones, counters, life or mana value, never a power. The two that read
+  -- a power -- Sutured Ghoul and Wretched Bonemass, o:"power and toughness are
+  -- each equal to the total power" -- read the EXILED cards used to make them,
+  -- which needs a summing Aggregation (#3108) and an exile-set binding first.
+  Spec.it s "CR 613.8a a P/T-defining ability reads the power another one defines" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    nightmare <- S.printingOf s registry "Nightmare"
+    mimic <- S.printingOf s registry "Synthetic Echoing Mimic"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (mimicId, g1) = S.addCreature mimic S.alice gs0
+        (_, g2) = S.addCreature piker S.alice g1
+        (_, g3) = S.addCreature swamp S.alice g2
+        (_, g4) = S.addCreature swamp S.alice g3
+        (_, g5) = S.addCreature swamp S.alice g4
+        (_, g6) = S.addCreature swamp S.alice g5
+        (nightmareId, gs) = S.addCreature nightmare S.alice g6
+        settled = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+    Spec.assertBool s (Set.member mimicId (GameState.battlefield settled)) "CR 704.5f does not bury the Mimic"
+    Spec.assertEqWith s "the Mimic's power is the Nightmare's DEFINED 4, not the Piker's printed 2" (Projection.powerOf mimicId settled) (Just 4)
+    Spec.assertEqWith s "and its toughness with it" (Projection.toughnessOf mimicId settled) (Just 4)
+    Spec.assertEqWith s "the Nightmare's own CDA still counts four Swamps" (Projection.powerOf nightmareId settled) (Just 4)
+
+  -- CR 613.8b's last sentence at layer 7a: two Mimics each read the other's
+  -- power, so each depends on the other (CR 613.8a clauses (a), (b) and (c)) and
+  -- the loop falls back to timestamp order. The older one applies while the
+  -- younger still has no power, so CR 208.2a makes it 0/0 and CR 704.5f buries
+  -- it; the younger then reads the Piker's 2 and lives.
+  --
+  -- The Piker is what makes the two outcomes DIFFER: with only the pair on the
+  -- board both maxima would be undeterminable and both would be 0/0, which is
+  -- also what the layer-bounded reading gives -- an order-blind board.
+  Spec.it s "CR 613.8b two P/T-defining abilities in a loop apply in timestamp order" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    mimic <- S.printingOf s registry "Synthetic Echoing Mimic"
+    let (olderId, youngerId, settled) = mimicLoop piker mimic
+    Spec.assertBool s (not (Set.member olderId (GameState.battlefield settled))) "the older Mimic was 0/0 and CR 704.5f buried it"
+    Spec.assertBool s (Set.member youngerId (GameState.battlefield settled)) "the younger Mimic lived"
+    Spec.assertEqWith s "the younger Mimic read the Piker's 2" (Projection.powerOf youngerId settled) (Just 2)
 
   -- CR 305.7's GATE half, which applyModification structurally cannot do:
   -- Urborg's ability lands on OTHER objects, so a stripped Urborg has to be kept
