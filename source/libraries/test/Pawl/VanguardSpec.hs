@@ -342,6 +342,11 @@ spec s registry = Spec.describe s "Vanguard" $ do
         Spec.assertBool s (not (Set.member fodderId (GameState.battlefield after))) "CR 701.21a: the permanent she chose was sacrificed"
         Spec.assertBool s (Set.member spareId (GameState.battlefield after)) "and the one she did not choose is still there"
         Spec.assertBool s (any (isActivationOf barrinId) (Action.legalActions S.alice board)) "CR 602.2: alice is offered the ability"
+        -- CR 902.6 twice over: the negative is held by BOTH halves of rule 602.2,
+        -- so it goes red only when Activate.activationSourcesGiven's command-zone
+        -- arm and mayActivateGiven's Controller arm are neutralized together --
+        -- neither alone. Pawl.ActivateSpec's Withered Wretch negative is the same
+        -- shape on the battlefield.
         Spec.assertBool s (not (any (isActivationOf barrinId) (Action.legalActions S.bob board))) "and bob, on the same board, is not"
       _ -> Spec.assertFailure s "the fixture should have put Barrin in alice's command zone"
 

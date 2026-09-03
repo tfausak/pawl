@@ -91,8 +91,7 @@ sicknessOkGiven pcs pid srcId ability =
 -- through zoneAbilitiesOf. In the COMMAND zone: the same reader again, whose CR
 -- 113.6p limb keeps an emblem's (CR 114.4) and a face-up vanguard card's (CR
 -- 902.7) rows that state no zone at all. Anywhere else: nothing -- flashback and
--- rule 702's other
--- zone abilities are CASTING permissions (CR 702.34a), so they reach
+-- rule 702's other zone abilities are CASTING permissions (CR 702.34a), so they reach
 -- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fifth zone adds
 -- an arm here: CR 113.6j reaches "any zone in which its cost can be paid", and
 -- Cost.zoneOfComponent names only the hand and the graveyard, so no cost in the
@@ -191,8 +190,8 @@ familyGranting = familyGrantingGiven Map.empty
 -- graveyard, the hand for Faerie Macabre's "Discard this card: Exile up to
 -- two target cards from graveyards", and the command zone for Barrin's
 -- "Sacrifice a permanent: Return target creature to its owner's hand" -- and the
--- zone is a parameter because
--- nothing in the reading below is about which zone it is: CR 113.6j says an
+-- zone is a parameter because nothing in the reading below is about which zone
+-- it is: CR 113.6j says an
 -- ability functions "from any zone in which its cost can be paid", and
 -- functionsIn is the same question asked of whichever zone the card is in.
 --
@@ -692,8 +691,8 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
 --
 -- Reaches exactly the hand today: abilitiesFor serves the battlefield, the hand,
 -- the graveyard and the command zone and answers [] elsewhere -- and of those
--- four only a hand is
--- hidden (CR 400.2 makes a graveyard and the command zone public zones), so the library offers
+-- four only a hand is hidden (CR 400.2 names the graveyard and the command zone
+-- among the public zones), so the library offers
 -- nothing to activate, and mana abilities never reach this function (CR 605.3b
 -- keeps them off the stack).
 --
