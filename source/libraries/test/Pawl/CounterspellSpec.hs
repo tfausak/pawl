@@ -1245,7 +1245,7 @@ hakbalAttacking hakbal inHand inLibrary =
    in -- Declared under aggressiveAnswer, which attacks with everything; the
       -- settle is what puts the CR 508.2b attack trigger onto the stack, so a
       -- case can resolve it under its own interpreter.
-      S.runPure S.aggressiveAnswer withLibrary (Combat.declareAttackers S.alice >> Engine.settleForPriority)
+      S.runPure S.aggressiveAnswer withLibrary (Combat.declareAttackers S.manaPerformer S.alice >> Engine.settleForPriority)
 
 -- paysFor, plus a pinned answer to the card the payment offers: `which` when it
 -- was offered, and the head otherwise -- the liar pattern, so a case that reads
@@ -1986,7 +1986,7 @@ clavilenoChain s registry swap = do
           S.runPure (evolveAt clavilenoId from to) g3 $ do
             S.cast S.alice evolutionId
             Stack.resolveTop
-      attacked = S.runPure S.aggressiveAnswer evolved (Combat.declareAttackers S.alice)
+      attacked = S.runPure S.aggressiveAnswer evolved (Combat.declareAttackers S.manaPerformer S.alice)
       -- CR 603.3: the attack trigger goes on the stack the next time a player
       -- would receive priority, and CR 603.3d chooses its target THERE rather
       -- than at resolution -- so the answerer that pins the victim rides this

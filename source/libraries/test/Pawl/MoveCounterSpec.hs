@@ -1403,7 +1403,7 @@ upToOneSpec s registry = Spec.describe s "CR 122.5 moving up to one counter off 
               Engine.runGame
                 (takesiesAnswer destination picks)
                 ready
-                (Cast.castSpell S.alice held takesiesName Facing.FaceUp >> Stack.resolveTop)
+                (Cast.castSpell S.manaPerformer S.alice held takesiesName Facing.FaceUp >> Stack.resolveTop)
             ((_, after), asked) = State.runState run 0
          in (asked, after)
   -- THE CASE THIS UNIT EXISTS FOR. Every permanent on the battlefield is a first

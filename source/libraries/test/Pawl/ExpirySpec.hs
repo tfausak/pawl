@@ -1054,7 +1054,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     let staged expiry =
           let gs0 = Setup.emptyGame S.bothPlayers
               (mtn, gs1) = S.addCreature mountain S.alice gs0
-              floated = S.runPure S.identityAnswer gs1 (Cost.tapForMana mtn)
+              floated = S.runPure S.identityAnswer gs1 (Cost.tapForMana S.manaPerformer mtn)
            in S.addPlayerEffect
                 expiry
                 (AffectedPlayers.Scoped PlayerScope.EachPlayer)

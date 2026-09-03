@@ -1489,7 +1489,7 @@ desertBoard piker desert =
 -- name a later step do it by overwriting GameState.phase on this.
 desertAttacked :: GameState.GameState -> GameState.GameState
 desertAttacked gs =
-  (S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.alice)) {GameState.priority = Just S.bob}
+  (S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.bob}
 
 -- Activates the first offered activation, else passes -- the interpreter that
 -- takes the Desert's ping the moment the engine offers it.
@@ -1626,7 +1626,7 @@ kongmingBoard piker contraptions sorcerer defender =
           }
       -- CR 508.1, then priority to bob -- who is the defending player on one of
       -- these two boards and a bystander on the other, which is the variable.
-      declared = (S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)) {GameState.priority = Just S.bob}
+      declared = (S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.bob}
    in case theirs of
         contraptionsId : sorcererId : _ -> (contraptionsId, sorcererId, declared)
         -- threePlayerCombat returns one id per printing given, so this is
@@ -3818,7 +3818,7 @@ lifeGainAbility p = case Face.activatedAbilities (S.combinedFace p) of
 trapRunnerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 trapRunnerBoard piker runner sorcerer =
   let (gs0, ours, theirs) = S.combatBoardOf [piker] [runner, sorcerer]
-      declared = (S.runPure S.aggressiveAnswer gs0 (Combat.declareAttackers S.alice)) {GameState.priority = Just S.bob}
+      declared = (S.runPure S.aggressiveAnswer gs0 (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.bob}
    in case (ours, theirs) of
         (attackerId : _, runnerId : sorcererId : _) -> (attackerId, runnerId, sorcererId, declared)
         -- combatBoardOf returns one id per printing given, so this is
@@ -3857,7 +3857,7 @@ printedActivationCombatPointSpec s registry = Spec.describe s "PrintedActivation
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (attackerId, runnerId, sorcererId, atAttackers) = trapRunnerBoard piker runner prodigalSorcerer
         beforeDeclaration = atAttackers {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
-        declared = (S.runPure noBlocks beforeDeclaration Combat.declareBlockers) {GameState.priority = Just S.bob}
+        declared = (S.runPure noBlocks beforeDeclaration (Combat.declareBlockers S.manaPerformer)) {GameState.priority = Just S.bob}
         inStep step = declared {GameState.phase = Phase.Combat step}
         offeredOn = Action.legalActions S.bob
     -- Anti-vacuity: the attack is real, the attacker is unblocked, and bob's

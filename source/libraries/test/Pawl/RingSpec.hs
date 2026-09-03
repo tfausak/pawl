@@ -160,7 +160,7 @@ intoCombat gs =
             GameState.combat = GameState.combat template,
             GameState.remaining = GameState.remaining template
           }
-   in S.runPure S.aggressiveAnswer moved (Combat.declareAttackers S.alice)
+   in S.runPure S.aggressiveAnswer moved (Combat.declareAttackers S.manaPerformer S.alice)
 
 -- CR 509.1a/509.1b: may bob declare this one creature blocking that one attacker?
 blocks :: ObjectId -> ObjectId -> GameState.GameState -> Bool
@@ -186,7 +186,7 @@ drainThrough gs =
   S.runPure
     S.aggressiveAnswer
     (intoCombat gs)
-    (Combat.declareBlockers >> Damage.dealCombatDamage >> Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+    (Combat.declareBlockers S.manaPerformer >> Damage.dealCombatDamage >> Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
 
 -- Drive a main-phase board into combat, declare blockers, then step into the end
 -- of combat step, resolving the whole stack at each stop.
@@ -204,7 +204,7 @@ sacrificeThrough :: GameState.GameState -> GameState.GameState
 sacrificeThrough gs =
   let resolveAll = Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority
       endOfCombat = Phase.Combat CombatStep.EndOfCombat
-      blocked = S.runPure S.aggressiveAnswer (intoCombat gs) (Combat.declareBlockers >> resolveAll)
+      blocked = S.runPure S.aggressiveAnswer (intoCombat gs) (Combat.declareBlockers S.manaPerformer >> resolveAll)
       entered = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endOfCombat S.alice)) (blocked {GameState.phase = endOfCombat})
    in S.runPure S.aggressiveAnswer entered resolveAll
 
@@ -606,7 +606,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     hillGiant <- S.printingOf s registry "Hill Giant"
     let (spells, _, _, board) = ringCombatBoard island escape piker 1 [piker] [hillGiant]
-        play gs = let after = S.settleSba (S.runPure S.aggressiveAnswer (intoCombat gs) (Combat.declareBlockers >> Damage.dealCombatDamage)) in (S.lifeOf S.bob after, S.creaturesInPlay S.alice after, S.creaturesInPlay S.bob after)
+        play gs = let after = S.settleSba (S.runPure S.aggressiveAnswer (intoCombat gs) (Combat.declareBlockers S.manaPerformer >> Damage.dealCombatDamage)) in (S.lifeOf S.bob after, S.creaturesInPlay S.alice after, S.creaturesInPlay S.bob after)
     Spec.assertEqWith
       s
       "unblockable with the Ring; blocked and dead without it"

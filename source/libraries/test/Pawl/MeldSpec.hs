@@ -88,6 +88,22 @@ aimedAt oid p = case p of
     S.preferring (\r -> Recipient.objectOf r == Just oid) sets
   _ -> S.identityAnswer p
 
+-- CR 605.3a's mana window opens before the rest of the cost is paid, and it
+-- offers Hanweir Battlements itself -- a land whose own "{T}: Add {C}" is on the
+-- same permanent whose {T} the ability being paid still needs. A payer who takes
+-- it can no longer pay that {T} (CR 107.5) and loses the whole activation, which
+-- Pawl.CostSpec's "CR 107.5 tapping the source for mana loses its own {T}" pins.
+-- So every board here answers with the first offer that is NOT that permanent,
+-- named by identity rather than by index, and with nothing at all when it is the
+-- only offer -- which fails the payment loudly rather than repairing it.
+--
+-- Wraps an inner answerer rather than replacing one, so each case keeps whatever
+-- it decided about its other prompts.
+sparing :: ObjectId.ObjectId -> (forall a. Prompt.Prompt a -> a) -> Prompt.Prompt r -> r
+sparing oid inner p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> List.find (/= oid) (NonEmpty.toList candidates)
+  _ -> inner p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Meld" $ do
   -- CR 712.8's second sentence gives a meld card's front face "its own set of
@@ -100,7 +116,7 @@ spec s registry = Spec.describe s "Meld" $ do
   Spec.it s "CR 712.8d a meld card on the battlefield has its front face's characteristics: Hanweir Battlements taps for {C}" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     let (battlementsId, gs) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Cost.tapForMana battlementsId)
+        after = S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer battlementsId)
     Spec.assertEqWith
       s
       "pool"
@@ -122,7 +138,7 @@ spec s registry = Spec.describe s "Meld" $ do
     case Face.activatedAbilities (S.combinedFace battlements) of
       _ : haste : _ -> do
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste pikerId ready)) "the Piker starts without haste"
-        let after = S.runPure (aimedAt pikerId) ready (do Activate.activateAbility S.alice battlementsId haste; Stack.resolveTop)
+        let after = S.runPure (sparing battlementsId (aimedAt pikerId)) ready (do Activate.activateAbility S.alice battlementsId haste; Stack.resolveTop)
         Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId after) "CR 702.10: the targeted creature gains haste"
       _ -> Spec.assertFailure s "Hanweir Battlements should print two activated abilities"
   -- CR 701.42a: "the resulting permanent is a single object represented by two
@@ -277,7 +293,7 @@ spec s registry = Spec.describe s "Meld" $ do
         board = readyFor mountain g2
     case Projection.abilitiesOf bId board of
       [_, _, melding] -> do
-        let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+        let after = S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
         Spec.assertEqWith s "one permanent named Hanweir, the Writhing Township" (S.countOnBattlefieldByName townshipName S.alice after) 1
         case namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after) of
           [meldedId] -> do
@@ -321,7 +337,7 @@ spec s registry = Spec.describe s "Meld" $ do
         board = readyFor mountain g2
     case Projection.abilitiesOf bId board of
       [_, _, melding] -> do
-        let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+        let after = S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
             -- Every departure from the battlefield to exile the log holds, each
             -- paired with the group it was stamped with.
             departures =
@@ -364,7 +380,7 @@ spec s registry = Spec.describe s "Meld" $ do
         board = readyFor mountain g3
     case Projection.abilitiesOf bId board of
       [_, _, melding] -> do
-        let melding_ chosen = S.runPure (choosing chosen) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+        let melding_ chosen = S.runPure (sparing bId (choosing chosen)) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
             survivor picked kept = fmap Object.zone (Game.lookupObject kept (melding_ picked))
             taken picked = fmap Object.zone (Game.lookupObject picked (melding_ picked))
         Spec.assertEqWith s "naming the first Garrison leaves the second on the battlefield" (survivor firstG secondG) (Just Zone.Battlefield)
@@ -387,7 +403,7 @@ spec s registry = Spec.describe s "Meld" $ do
           let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
               board = readyFor mountain (extra g1)
            in case Projection.abilitiesOf bId board of
-                [_, _, melding] -> (Just bId, S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop))
+                [_, _, melding] -> (Just bId, S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop))
                 _ -> (Nothing, board)
         borrowed g1 =
           let (theirs, g2) = S.addCreature garrison S.bob g1
@@ -409,7 +425,7 @@ spec s registry = Spec.describe s "Meld" $ do
         board = readyFor mountain g2
     case Projection.abilitiesOf bId board of
       [_, _, melding] -> do
-        let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+        let after = S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
         Spec.assertEqWith s "CR 701.42c both objects stay in the zone the exile left them in" (List.sort (exileNames after)) (List.sort [S.nameOf (Printing.card battlements), S.nameOf (Printing.card garrison)])
         Spec.assertEqWith s "CR 701.42b nothing melded" (S.countOnBattlefieldByName townshipName S.alice after) 0
         -- CR 111.8: a token that has left the battlefield ceases to exist the next
@@ -453,7 +469,9 @@ spec s registry = Spec.describe s "Meld" $ do
   -- copy report DIFFERENT numbers, and the Winnower reads both off one board:
   -- 3 is odd and blocks, the copy's 0 is even and cannot. Cackling Counterpart
   -- ("create a token that's a copy of target creature you control") is the copy,
-  -- and the two Islands are what pay its {1}{U}.
+  -- and three Islands are what pay its {1}{U} -- three rather than two because the
+  -- melding board above spends all five Mountains, the Battlements no longer
+  -- paying part of its own cost.
   Spec.it s "CR 202.3c a copy of a melded permanent has mana value 0" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
@@ -465,7 +483,7 @@ spec s registry = Spec.describe s "Meld" $ do
         (mMelded, after) = meldedThrough base battlements garrison mountain
     case mMelded of
       Just meldedId -> do
-        let (staged, spellId) = S.handOne counterpart (S.landsFor island S.alice 2 after)
+        let (staged, spellId) = S.handOne counterpart (S.landsFor island S.alice 3 after)
             copied = S.runPure (aimedAt meldedId) staged (do S.cast S.alice spellId; Stack.resolveTop)
         case filter (`Game.isToken` copied) (Set.toList (GameState.battlefield copied)) of
           [tokenId] -> do
@@ -814,7 +832,7 @@ spec s registry = Spec.describe s "Meld" $ do
         ready gs = gs {GameState.priority = Just S.alice, GameState.objects = fmap (\o -> o {Object.tapped = TapState.Untapped}) (GameState.objects gs)}
         melds gs = case Projection.abilitiesOf battlementsId gs of
           [_, _, melding] ->
-            let after = S.runPure S.identityAnswer (ready gs) (do Activate.activateAbility S.alice battlementsId melding; Stack.resolveTop)
+            let after = S.runPure (sparing battlementsId S.identityAnswer) (ready gs) (do Activate.activateAbility S.alice battlementsId melding; Stack.resolveTop)
              in fmap (\oid -> (oid, after)) (Maybe.listToMaybe (namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after)))
           _ -> Nothing
         pings (oid, gs) = S.runPure S.identityAnswer gs (Damage.applyDamage [Damage.damageEvent gs DamageKind.Combat oid (Recipient.ToPlayer S.bob) 2])
@@ -1105,7 +1123,7 @@ meldedThrough base battlements garrison mountain =
       board = readyFor mountain g2
    in case Projection.abilitiesOf bId board of
         [_, _, melding] ->
-          let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+          let after = S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
            in (Maybe.listToMaybe (namedTownship after (Game.zoneMembers Zone.Battlefield S.alice after)), after)
         _ -> (Nothing, board)
 

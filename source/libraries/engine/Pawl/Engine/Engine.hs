@@ -417,8 +417,8 @@ runTurnBasedActions phase = do
     -- computing the identical test, and kept so this arm still reads off CR
     -- 800.4j's enumeration above.
     Phase.Combat CombatStep.BeginningOfCombat -> Monad.when hasActive Combat.designateDefenders
-    Phase.Combat CombatStep.DeclareAttackers -> Monad.when hasActive (Combat.declareAttackers active)
-    Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers
+    Phase.Combat CombatStep.DeclareAttackers -> Monad.when hasActive (Combat.declareAttackers Resolve.performManaAbility active)
+    Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers Resolve.performManaAbility
     Phase.Combat CombatStep.CombatDamage -> do
       -- CR 510.4: deal this step's damage; if it was the first-strike step,
       -- splice a second combat damage step in after it. CR 510.3's between-steps
@@ -1197,7 +1197,7 @@ priorityLoop = do
                                 settleForPriority
                                 loop
                               Action.Type.Cast oid name facing -> do
-                                Cast.castSpell p oid name facing
+                                Cast.castSpell Resolve.performManaAbility p oid name facing
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
@@ -1207,7 +1207,7 @@ priorityLoop = do
                               -- pass count restarts, CR 117.4's "passing in
                               -- succession" meaning without actions in between.
                               Action.Type.TurnFaceUp oid procedure -> do
-                                FaceDown.turnFaceUp p procedure oid
+                                FaceDown.turnFaceUp Resolve.performManaAbility p procedure oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
@@ -1216,7 +1216,7 @@ priorityLoop = do
                               -- sees is the DESIGNATION, which settleForPriority
                               -- gathers like any other.
                               Action.Type.Unlock oid half -> do
-                                Room.unlock p oid half
+                                Room.unlock Resolve.performManaAbility p oid half
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
@@ -1234,7 +1234,7 @@ priorityLoop = do
                               -- CR 116.2k / 702.170b: a special action too, the
                               -- TurnFaceUp arm's shape.
                               Action.Type.Plot oid -> do
-                                Plot.plot p oid
+                                Plot.plot Resolve.performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
@@ -1268,7 +1268,7 @@ priorityLoop = do
                               -- mana ability whose cost went unpaid having changed
                               -- nothing (CR 601.2h).
                               Action.Type.ActivateManaAbility oid -> do
-                                Monad.void (Cost.tapForMana oid)
+                                Monad.void (Cost.tapForMana Resolve.performManaAbility oid)
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

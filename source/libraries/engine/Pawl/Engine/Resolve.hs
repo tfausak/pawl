@@ -48,6 +48,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Sba as Sba
@@ -171,6 +172,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
@@ -269,7 +271,6 @@ import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Teams as Teams
-import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
@@ -2711,7 +2712,7 @@ payGatePaidBy resolving source idx cIdx legal payer gate = do
           -- DuringResolution: rule 118.12's cost is paid as the spell or ability
           -- resolves, which is CR 609.1's effect, so a blight paid here is CR
           -- 614.16's subject where Soul Immolation's additional cost is not.
-          outcome <- Cost.pay PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
+          outcome <- Cost.pay performManaAbility PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
@@ -2820,6 +2821,13 @@ turnPermanentsOver legal resolving controller source ref = do
     _ -> do
       gs <- State.get
       pure (objectRefObjects legal resolving controller source gs ref)
+  -- CR 613.7m: which of the swept victims will ACTUALLY take a stamp, ordered by
+  -- their controllers. Asked BEFORE the write and off the pre-turn board, the
+  -- gather's own reason (CR 608.2f), and `turnsOver` below is the whole
+  -- membership question, so a permanent this instruction cannot turn over is no
+  -- part of anybody's choice.
+  gs0 <- State.get
+  ordered <- Restamp.order (filter (turnsOver (Projection.projectAll gs0) resolving gs0) victims)
   State.modify' $ \gs ->
     -- CR 701.27a: turn each victim over -- one assignment to Object.face, which
     -- is all a turn IS here, every characteristic read already resolving
@@ -2846,36 +2854,31 @@ turnPermanentsOver legal resolving controller source ref = do
     -- restriction being read off the layer fold. CR 613.7g's per-permanent stamp
     -- is a second thing, minted inside Game.turnFaceOver.
     --
-    -- LEFT fold, where this was a right one before the stamp: the fold now hands
-    -- out timestamps, so it must run the enumeration forwards for the relative
-    -- order to be the enumeration's.
+    -- LEFT fold, where this was a right one before the stamp: the fold hands out
+    -- CR 613.7g's timestamps, so it must run `ordered` forwards for the earlier
+    -- stamp to go to the permanent CR 613.7m put first.
     let (now, g1) = Game.freshTimestamp gs
-        pcs = Projection.projectAll g1
-        g2 = List.foldl' (turnOver pcs resolving now g1) g1 victims
+        g2 = List.foldl' (flip (Game.turnFaceOver now)) g1 ordered
      in Event.recordTransformed
-          (Game.facesTurned (GameState.objects g1) (GameState.objects g2) victims)
+          (Game.facesTurned (GameState.objects g1) (GameState.objects g2) ordered)
           g2
 
--- CR 701.27a over ONE object: turn it over, or leave the map as it was. The turn
--- itself is Game.turnFaceOver, shared with Pawl.Engine.Daytime's CR 702.145c/f
--- sweep. What this adds is the two gates that belong to an instruction rather
--- than to the act, and a static ability's turn has neither: CR 701.27f's
--- already-turned check, and CR 702.145b/e's "can't transform except due to its
--- daybound/nightbound ability" (Pawl.Engine.Daytime.restrictsTransform).
+-- CR 701.27a over ONE object, asked rather than performed: whether this
+-- instruction turns it over. The act itself is Game.turnFaceOver, shared with
+-- Pawl.Engine.Daytime's CR 702.145c/f sweep, and Game.turnsTo is the act's own
+-- half of this question. What this adds is the two gates that belong to an
+-- INSTRUCTION rather than to the act, and a static ability's turn has neither: CR
+-- 701.27f's already-turned check, and CR 702.145b/e's "can't transform except due
+-- to its daybound/nightbound ability" (Pawl.Engine.Daytime.restrictsTransform).
 --
--- `now` is minted ONCE for the whole instruction by the caller, because CR 608.2f
--- processes a swept set simultaneously and a later CR 701.27f comparison must not
--- tell two victims apart. `pcs` is hoisted likewise.
---
--- TWO boards: `frozen` is the pre-turn one both gates are asked of (CR 608.2f's
--- simultaneous processing), so no member of the batch is judged against a board a
--- sibling has already turned over on, while `gs` is the fold's accumulator, which
--- carries CR 613.7g's stamps as they are handed out.
-turnOver :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Timestamp.Timestamp -> GameState -> GameState -> ObjectId -> GameState
-turnOver pcs resolving now frozen gs oid
-  | alreadyTurnedFor resolving oid frozen = gs
-  | Daytime.restrictsTransform pcs oid = gs
-  | otherwise = Game.turnFaceOver now oid gs
+-- Asked of the PRE-TURN board (CR 608.2f's simultaneous processing), so no member
+-- of the batch is judged against a board a sibling has already turned over on,
+-- and `pcs` is that board's projection.
+turnsOver :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> ObjectId -> Bool
+turnsOver pcs resolving frozen oid =
+  not (alreadyTurnedFor resolving oid frozen)
+    && not (Daytime.restrictsTransform pcs oid)
+    && Maybe.isJust (Game.turnsTo oid frozen)
 
 -- CR 701.27f. True when this resolution must be ignored: the resolving object is
 -- an ability whose SOURCE is the very permanent being turned over (CR 113.7a),
@@ -3645,7 +3648,7 @@ offerCast resolving caster slot optionality offer = do
   case chosen of
     Nothing -> pure ()
     Just (oid, name, applied, excused) -> do
-      let cast = Cast.castSpellWith applied caster oid name Facing.FaceUp
+      let cast = Cast.castSpellWith performManaAbility applied caster oid name Facing.FaceUp
           -- The SAME prompt on both paths: CR 118.8c creates no new decision.
           mayCast = do
             let decider = Decide.deciderFor caster gs
@@ -4931,7 +4934,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- the graveyard half of an "and/or" alone -- but observing it
                   -- needs a castable library card on the board at the same time,
                   -- which no case builds; removing it reddens nothing.
-                  Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching searcher)
+                  Monad.when (searcher == owner && Set.member Zone.Library searchedZones) (Cast.castWhileSearching performManaAbility searcher)
                   gs <- State.get
                   -- ONE prompt over the union, not one per zone: the card prints
                   -- one instruction with one count, and asking per zone would cap
@@ -5398,48 +5401,51 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Just target -> sacrificeOne target
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> pure ()
-  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) ->
-    State.modify' $ \gs ->
-      -- CR 708.2: ONE assignment to Object.facing per victim is the whole effect.
-      -- What each permanent becomes is the list the effect carries (CR 708.2a's
-      -- 2/2 when it lists nothing); the rule calls those copiable values, so this
-      -- is a copiable swap rather than a CR 613 layer, performed by Game.faceOf.
-      -- FaceDownReason.TurnedFaceDown is CR 708.6's other half: it closes CR
-      -- 701.40b's turn-face-up procedure and leaves CR 702.37e's open. No CR 400.7
-      -- incarnation is minted, so the object id, marked damage, counters,
-      -- attachments and statuses all ride through -- the mirror of
-      -- FaceDown.performTurnFaceUp.
-      --
-      -- The TIMESTAMP does NOT ride through, and it is the one thing on that list
-      -- that does not: CR 613.7f gives a permanent a new one each time it turns
-      -- face down. Written by Game.turnFacing, the primitive the turn-face-up road
-      -- shares, so one rule has one writer.
-      --
-      -- CR 708.2b is the guard below: an effect that LISTS its own values would
-      -- otherwise overwrite the list already there. No event is recorded, so
-      -- nothing triggers on the turning-over (#984).
-      --
-      -- The victims are enumerated ONCE (CR 608.2f), as RemoveFromCombat's fold
-      -- below does; an illegal slot (CR 608.2b), a player recipient and an empty
-      -- match all turn nothing over. Unprompted and undirected: turning A face
-      -- down cannot change whether B may be, so the rule's ordering clause never
-      -- engages and there is nothing to ask.
-      --
-      -- LEFT fold, where RemoveFromCombat's is a right one, and the stamp above is
-      -- why: the fold now hands out timestamps, so it must run the enumeration
-      -- forwards for the relative order to be the enumeration's.
-      --
-      -- Not implemented: CR 613.7m's APNAP order over the permanents one effect
-      -- turns face down at once (#2571). They are stamped in the order
-      -- objectRefObjects enumerated them.
-      List.foldl'
-        ( \g target ->
-            if maybe False (Facing.isFaceDown . Object.facing) (Map.lookup target (GameState.objects g))
-              then g
-              else Game.turnFacing (Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.TurnedFaceDown, FaceDownState.listed = listed}) target g
-        )
-        gs
-        (objectRefObjects legal resolving controller source gs ref)
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) -> do
+    -- CR 708.2: ONE assignment to Object.facing per victim is the whole effect.
+    -- What each permanent becomes is the list the effect carries (CR 708.2a's
+    -- 2/2 when it lists nothing); the rule calls those copiable values, so this
+    -- is a copiable swap rather than a CR 613 layer, performed by Game.faceOf.
+    -- FaceDownReason.TurnedFaceDown is CR 708.6's other half: it closes CR
+    -- 701.40b's turn-face-up procedure and leaves CR 702.37e's open. No CR 400.7
+    -- incarnation is minted, so the object id, marked damage, counters,
+    -- attachments and statuses all ride through -- the mirror of
+    -- FaceDown.performTurnFaceUp.
+    --
+    -- The TIMESTAMP does NOT ride through, and it is the one thing on that list
+    -- that does not: CR 613.7f gives a permanent a new one each time it turns
+    -- face down. Written by Game.turnFacing, the primitive the turn-face-up road
+    -- shares, so one rule has one writer.
+    --
+    -- CR 708.2b is the guard below: an effect that LISTS its own values would
+    -- otherwise overwrite the list already there. No event is recorded, so
+    -- nothing triggers on the turning-over (#984).
+    --
+    -- The victims are enumerated ONCE (CR 608.2f), as RemoveFromCombat's fold
+    -- below does; an illegal slot (CR 608.2b), a player recipient and an empty
+    -- match all turn nothing over. CR 608.2f's own secondary sentence never
+    -- engages -- turning A face down cannot change whether B may be, so the
+    -- turnings are processed simultaneously -- and what IS asked below is a
+    -- different question: which of the simultaneous CR 613.7f stamps is earlier.
+    --
+    -- A permanent already face down is turned no further, read off the gather's
+    -- board rather than the fold's; the two agree, turning one permanent face
+    -- down leaving another's facing alone.
+    --
+    -- LEFT fold, where RemoveFromCombat's is a right one, and the stamp above is
+    -- why: the fold hands out timestamps, so it must run `ordered` forwards for
+    -- the earlier stamp to go to the permanent CR 613.7m put first.
+    gs0 <- State.get
+    let alreadyDown target = maybe False (Facing.isFaceDown . Object.facing) (Map.lookup target (GameState.objects gs0))
+        faceUp = filter (not . alreadyDown) (objectRefObjects legal resolving controller source gs0 ref)
+    ordered <- Restamp.order faceUp
+    State.modify'
+      ( \gs ->
+          List.foldl'
+            (flip (Game.turnFacing (Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.TurnedFaceDown, FaceDownState.listed = listed})))
+            gs
+            ordered
+      )
   -- CR 708 through FaceDown.turnFaceUpByEffect, the funnel CR 116.2b's special
   -- action shares: this arm decides only WHICH permanent, never what turning it
   -- over does. CR 701.40g lives inside that funnel and so applies here without
@@ -8940,6 +8946,45 @@ performHandAction source player =
         (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
         (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
     )
+
+-- CR 405.6c: run the non-mana effects of a mana ability, which
+-- Pawl.Engine.Cost.tapForManaWith reaches through the
+-- Pawl.Types.ManaAbilityPerformer parameter.
+--
+-- CR 605.3b gives the ability no stack object, so the SOURCE stands in for the
+-- resolving one, performHandAction's posture.
+--
+-- Not implemented: an object of the ability's own to carry slots the bindings
+-- below do not. A slot read that misses them falls through to the source
+-- PERMANENT's bindings instead. Exact for the pool as it stands -- CR 605.1a
+-- leaves a mana ability no targets to have bound, and the other slots
+-- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
+-- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
+-- data/cards/ reads (#3124).
+--
+-- Stands on the noSubgame floor, performHandAction's reason: no mana ability
+-- starts a subgame (#1900).
+performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
+performManaAbility source controller =
+  Monad.mapM_
+    ( applyEffect
+        source
+        source
+        controller
+        -- CR 109.5's "you" is the player who activated the ability, and the
+        -- reserved self slot is CR 113.7's source. Both are bound here rather
+        -- than read off an object, because there is no ability object carrying
+        -- them: Pawl.Engine.Activate.activateAbility stamps them for every
+        -- ability that does go on the stack.
+        manaAbilityBindings
+        manaAbilityBindings
+    )
+  where
+    manaAbilityBindings =
+      Map.fromList
+        [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
+          (Binding.you, Set.singleton (Recipient.ToPlayer controller))
+        ]
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

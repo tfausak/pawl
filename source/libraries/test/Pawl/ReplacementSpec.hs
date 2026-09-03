@@ -8916,7 +8916,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
     case held of
       goblinCard : _ ->
         let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
-            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.alice)
+            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.manaPerformer S.alice)
          in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
               Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
               Just goblin -> Spec.assertEqWith s "attacks" (attackersIn after) [goblin]
@@ -8930,7 +8930,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
     case held of
       goblinCard : _ ->
         let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
-            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.alice)
+            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.manaPerformer S.alice)
          in Spec.assertEqWith s "no attackers" (attackersIn after) []
       _ -> Spec.assertFailure s "fixture did not deal a card"
   -- THE CHOICE IS THE ANSWERER'S. Both outcomes above are reachable only through
@@ -9455,10 +9455,10 @@ brineArmed brine gs savorId brineId =
         S.runPure
           S.identityAnswer
           withSavor
-          (Cast.castSpell S.bob brineId (S.printingName brine) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+          (Cast.castSpell S.manaPerformer S.bob brineId (S.printingName brine) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
    in do
         permanent <- arrivedOne withSavor down
-        pure (S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.bob TurnUpProcedure.Morph permanent >> Engine.priorityLoop), permanent)
+        pure (S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.manaPerformer S.bob TurnUpProcedure.Morph permanent >> Engine.priorityLoop), permanent)
 
 -- The seven-turn timeline the two answering cases below share, plus carol's
 -- negative control alongside it: alice's own turn (1), Savor's extra turn (2),
@@ -10880,7 +10880,7 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
         let (handed, morphCard) = S.handOne ainok (S.landsInPlay mountain 8)
             seat pid gs = snd (S.addCreature piker pid gs)
             seated = seat S.bob (seat S.bob (seat S.alice (seat S.alice (snd (S.addCreature ooze S.alice handed)))))
-            after = S.runPure S.identityAnswer seated (Cast.castSpell S.alice morphCard (S.printingName ainok) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+            after = S.runPure S.identityAnswer seated (Cast.castSpell S.manaPerformer S.alice morphCard (S.printingName ainok) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
         pure (fmap (\permanent -> (after, permanent)) (enteredOne seated after))
   Spec.it s "CR 122.6 the token enters with one +1/+1 counter per OTHER creature alice controls" $ do
     made <- board
@@ -10890,7 +10890,7 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
         -- The controls: the action really is on offer beforehand, so a board with
         -- no token below is the rider and not a permanent that never turned over.
         Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice settled) [(morphling, TurnUpProcedure.Morph)]
-        let after = S.runPure S.identityAnswer settled (FaceDown.turnFaceUp S.alice TurnUpProcedure.Morph morphling >> Engine.priorityLoop)
+        let after = S.runPure S.identityAnswer settled (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph morphling >> Engine.priorityLoop)
         Spec.assertEqWith s "CR 110.5 it turned face up" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceUp)
         case newestNamed oozeTokenName after of
           Nothing -> Spec.assertFailure s "CR 111.1 the Ooze token did not reach the battlefield"

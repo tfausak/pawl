@@ -568,12 +568,12 @@ afterOdds face (boltId, oddsId, board) =
         -- would have.
         Prompt.ChooseTargets {} -> pinTarget (Recipient.ToPlayer S.bob) p
         _ -> S.identityAnswer p
-      cast1 = S.runPure (pinTarget (Recipient.ToPlayer S.bob)) board (Cast.castSpell S.alice boltId boltName Facing.FaceUp)
+      cast1 = S.runPure (pinTarget (Recipient.ToPlayer S.bob)) board (Cast.castSpell S.manaPerformer S.alice boltId boltName Facing.FaceUp)
       drain n g = if n <= (0 :: Int) || null (GameState.stack g) then g else drain (n - 1) (S.runPure answer g Stack.resolveTop)
    in case GameState.stack cast1 of
         [] -> cast1
         boltSpell : _ ->
-          let cast2 = S.runPure (pinTarget (Recipient.ToObject boltSpell)) cast1 (Cast.castSpell S.alice oddsId oddsName Facing.FaceUp)
+          let cast2 = S.runPure (pinTarget (Recipient.ToObject boltSpell)) cast1 (Cast.castSpell S.manaPerformer S.alice oddsId oddsName Facing.FaceUp)
            in S.settleSba (drain 8 cast2)
 
 -- How many CR 705.2 CALLS the whole run asked. Not readable off the board, so it
@@ -594,11 +594,11 @@ oddsCalls face (boltId, oddsId, board) =
           else do
             (_, next) <- Engine.runGame counting g Stack.resolveTop
             drain (n - 1) next
-      cast1 = S.runPure (pinTarget (Recipient.ToPlayer S.bob)) board (Cast.castSpell S.alice boltId boltName Facing.FaceUp)
+      cast1 = S.runPure (pinTarget (Recipient.ToPlayer S.bob)) board (Cast.castSpell S.manaPerformer S.alice boltId boltName Facing.FaceUp)
    in case GameState.stack cast1 of
         [] -> 0
         boltSpell : _ ->
-          let cast2 = S.runPure (pinTarget (Recipient.ToObject boltSpell)) cast1 (Cast.castSpell S.alice oddsId oddsName Facing.FaceUp)
+          let cast2 = S.runPure (pinTarget (Recipient.ToObject boltSpell)) cast1 (Cast.castSpell S.manaPerformer S.alice oddsId oddsName Facing.FaceUp)
            in State.execState (drain 8 cast2) 0
 
 boltName :: CardName.CardName

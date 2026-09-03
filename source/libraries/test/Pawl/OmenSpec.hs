@@ -108,7 +108,7 @@ spec s registry = Spec.describe s "Omen" $ do
     dawnbreaker <- S.printingOf s registry "Riling Dawnbreaker"
     plains <- S.printingOf s registry "Plains"
     let (gs, oid) = S.handOne dawnbreaker (S.landsInPlay plains 2)
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid roarName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid roarName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         namesIn zone = fmap (\o -> Projection.namesOf o resolved) (Game.zoneMembers zone S.alice resolved)
     Spec.assertEqWith s "the omen card is in its owner's library" (namesIn Zone.Library) [Set.singleton dawnbreakerName]
@@ -138,7 +138,7 @@ spec s registry = Spec.describe s "Omen" $ do
           _ -> pure (S.identityAnswer p)
         shufflesFor name lands =
           let (gs, oid) = S.handOne dawnbreaker (S.landsInPlay plains lands)
-              cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid name Facing.FaceUp))
+              cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid name Facing.FaceUp))
            in State.execState (Engine.runGame countingAnswer cast Stack.resolveTop) 0
     Spec.assertEqWith s "the Omen shuffles one library" (shufflesFor roarName 2) 1
     Spec.assertEqWith s "the creature half shuffles none" (shufflesFor dawnbreakerName 5) 0
