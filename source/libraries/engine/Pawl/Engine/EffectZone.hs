@@ -156,7 +156,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.BecomeCopy {} -> Nothing
   -- CR 707.10 mints a new object onto the stack; nothing the ability is on
   -- moves out of a zone.
-  Effect.CopySpell {} -> Nothing
+  Effect.CopyStackObject {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, and the answer stands: the rider

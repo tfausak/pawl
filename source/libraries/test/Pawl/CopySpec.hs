@@ -30,12 +30,16 @@
 -- departed original's text, whether an Unstable Shapeshifter or a Copy
 -- Enchantment / Clever Impersonator put it there (copiedAbilitySpec).
 --
--- And Pawl.Engine.Resolve's CopySpell arm (CR 707.10's copy of a spell on the
+-- And Pawl.Engine.Resolve's CopyStackObject arm (CR 707.10's copy of a spell on the
 -- stack, Twincast) with the CR 707.10c re-target prompt it raises -- including
 -- the announcement that prompt's offer is judged inside, CR 707.10's copied X
 -- read by a copied Stir the Grave's own target slot (stirCopySpec) -- the CR
 -- 704.5e state-based action in Pawl.Engine.Sba that removes the resolved copy,
 -- and Pawl.Engine.Stack's OfSpellCopy resolution arm.
+--
+-- And that same arm over CR 707.10's other two nouns -- an activated and a
+-- triggered ability on the stack, copied by Lithoform Engine
+-- (copyAbilityOnStackSpec), where CR 707.10b keeps the original's source.
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -86,6 +90,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -1777,8 +1782,9 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 
 -- CR 707.10f / 608.3f: a copy of a PERMANENT spell resolves into a token
 -- permanent. Lithoform Engine's third ability ("{4}, {T}: Copy target permanent
--- spell you control") is the pool's producer; its first ability, copying an
--- ability, is omitted, which leaves pawl's card stricter than printed (#2208).
+-- spell you control") is the pool's producer; copyAbilityOnStackSpec below drives
+-- its first, and the {3} one is the spell copy Twincast already proves, so all
+-- three legs of the printed card are exercised.
 --
 -- alice holds Nyxborn Rollicker -- data/cards/'s bestow card -- with the Engine
 -- on the battlefield, so ONE board reaches both the creature-spell copy (CR
@@ -1962,3 +1968,148 @@ permanentCopySpec s registry =
                 "CR 608.3b: the card resolved as a creature beside it"
                 (List.sort (fmap (\oid -> Game.isToken oid afterBoth) (rollickersOn rollicker afterBoth)))
                 [False, True]
+
+-- Lithoform Engine's {2} ability, picked by its COST rather than by index, so a
+-- reordering of the card file cannot silently aim these cases at the
+-- spell-copying legs and have the activation refuse for want of a target --
+-- copyRollicker's reason, one ability along.
+engineAbilityCopyingAbilities :: ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+engineAbilityCopyingAbilities engineId gs =
+  List.find
+    ((== Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) . Cost.Type.mana . ActivatedAbility.cost)
+    (Projection.abilitiesOf engineId gs)
+
+-- How many cards a player holds (CR 402.1), for the discard reads below.
+handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
+handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
+
+-- CR 707.10's OTHER two nouns, which Twincast above does not reach: an activated
+-- and a triggered ability on the stack, copied by Lithoform Engine's first
+-- ability -- "{2}, {T}: Copy target activated or triggered ability you control.
+-- You may choose new targets for the copy" (data/cards/lithoform-engine.json,
+-- Oracle text verified 2026-09-03).
+--
+-- CR 707.10b is what makes an ability copy different from a spell copy, and its
+-- three sentences split as follows. The FIRST -- "a copy of an ability has the
+-- same source as the original ability" -- and the SECOND -- "if the ability
+-- refers to its source by name, the copy refers to that same object and not to
+-- any other object with the same name" -- share one board: two Longtusk Cubs,
+-- whose "Pay {E}{E}: Put a +1/+1 counter on Longtusk Cub" is the pool's activated
+-- ability that names its own source, so the copy landing on the OTHER Cub is a
+-- readable wrong answer rather than an unobservable one.
+--
+-- Not implemented: the THIRD sentence's count -- how many times an ability has
+-- resolved during the turn -- which nothing in pawl keeps, so no board here can
+-- show that a copy counts as the same ability (gap #3135).
+--
+-- CR 707.10's "a copy of an activated ability isn't activated" rides on the first
+-- case as alice's energy: the cost was paid once, by the activation, and the copy
+-- pays nothing.
+copyAbilityOnStackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  -- TWO Cubs, alike in everything but which one's ability was copied, which is
+  -- the pair CR 707.10b's second sentence needs: one Cub cannot tell "the same
+  -- object" from "an object with that name".
+  --
+  -- Both counters land on the SAME Cub, so the read that discriminates is its
+  -- count of two -- a copy that resolved against the wrong Cub leaves one each,
+  -- and a copy that was never minted leaves one and zero.
+  Spec.it s "CR 707.10b a copied activated ability keeps its source, and the copy is not activated" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    cub <- S.printingOf s registry "Longtusk Cub"
+    let base = S.landsInPlay mountain 2
+        (engineId, withEngine) = S.addCreature engine S.alice base
+        (cubA, withA) = S.addCreature cub S.alice withEngine
+        (cubB, withB) = S.addCreature cub S.alice withA
+        -- Exactly one activation's worth of energy (CR 107.14), so a copy that
+        -- charged its own cost could not have paid it.
+        board = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice withB
+    case (Maybe.listToMaybe (Projection.abilitiesOf cubA board), engineAbilityCopyingAbilities engineId board) of
+      (Just pump, Just copier) -> do
+        let activated = S.runPure S.identityAnswer board {GameState.priority = Just S.alice} (Activate.activateAbility S.alice cubA pump)
+        case topOfStack activated of
+          Nothing -> Spec.assertFailure s "the Cub's ability should be on the stack"
+          Just abilId -> do
+            let staged = S.runPure (pinTarget (Recipient.ToObject abilId)) activated {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+                -- The Engine's ability, then the copy it minted, then the Cub's
+                -- own ability.
+                afterEngine = resolveOne S.identityAnswer staged
+                afterCopy = resolveOne S.identityAnswer afterEngine
+                afterBoth = resolveOne S.identityAnswer afterCopy
+            Spec.assertEqWith s "CR 707.10b both counters are on the Cub whose ability was copied" (S.counterOf CounterKind.PlusOnePlusOne cubA afterBoth) 2
+            Spec.assertEqWith s "and none on the other Longtusk Cub" (S.counterOf CounterKind.PlusOnePlusOne cubB afterBoth) 0
+            Spec.assertEqWith s "CR 707.10: the copy was not activated, so the energy paid once" (S.playerCounterOf PlayerCounterKind.Energy S.alice afterBoth) 0
+            -- Supporting, and after the reads above so it can absorb no mutation
+            -- they should catch: the copy really was a second object on the stack.
+            Spec.assertEqWith s "the copy resolved before the original, leaving one counter" (S.counterOf CounterKind.PlusOnePlusOne cubA afterCopy) 1
+            Spec.assertEqWith s "and the stack is empty" (GameState.stack afterBoth) []
+      _ -> Spec.assertFailure s "Longtusk Cub should declare one activated ability, and Lithoform Engine a {2} one"
+  -- CR 707.10c on an ABILITY, where the offer is a real choice: the copy is aimed
+  -- at alice and the original stays on bob, so the two seats' life totals are
+  -- 19 and 19. An engine that ignored the offer leaves 20 and 18, and one that
+  -- minted no copy leaves 20 and 19 -- three distinct boards.
+  Spec.it s "CR 707.10c new targets are chosen for a copied activated ability" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let base = S.landsInPlay mountain 2
+        (engineId, withEngine) = S.addCreature engine S.alice base
+        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice withEngine
+        -- CR 302.6: the Sorcerer's {T} is not payable until it has settled.
+        board = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
+    case (Maybe.listToMaybe (Projection.abilitiesOf sorcererId board), engineAbilityCopyingAbilities engineId board) of
+      (Just ping, Just copier) -> do
+        let pinged = S.runPure (pinTarget (Recipient.ToPlayer S.bob)) board {GameState.priority = Just S.alice} (Activate.activateAbility S.alice sorcererId ping)
+        case topOfStack pinged of
+          Nothing -> Spec.assertFailure s "the Sorcerer's ability should be on the stack"
+          Just abilId -> do
+            let staged = S.runPure (pinTarget (Recipient.ToObject abilId)) pinged {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+                -- The only ChooseTargets this run raises is CR 707.10c's, so this
+                -- answerer cannot be confused with the two announcements above.
+                afterEngine = resolveOne (pinTarget (Recipient.ToPlayer S.alice)) staged
+                afterCopy = resolveOne S.identityAnswer afterEngine
+                afterBoth = resolveOne S.identityAnswer afterCopy
+            Spec.assertEqWith s "CR 707.10c the copy dealt its damage to alice, whom the original never targeted" (S.lifeOf S.alice afterBoth) (Just 19)
+            Spec.assertEqWith s "and the original still dealt its damage to bob" (S.lifeOf S.bob afterBoth) (Just 19)
+            Spec.assertEqWith s "the copy resolved first: bob was untouched at that point" (S.lifeOf S.bob afterCopy) (Just 20)
+            Spec.assertEqWith s "and the stack is empty" (GameState.stack afterBoth) []
+      _ -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability, and Lithoform Engine a {2} one"
+  -- The rule's third noun. Ravenous Rats' "When Ravenous Rats enters, target
+  -- opponent discards a card" is a TRIGGERED ability with a target, so one case
+  -- reaches both the copy of a trigger and CR 707.10c over the slots an ability
+  -- object declares -- which come off the modal its Source carries, there being
+  -- no card behind an ability (CR 113.7a).
+  --
+  -- THREE seats, because two would leave "target opponent" one answer and CR
+  -- 707.10c's offer elided as indistinguishable: bob is the original's target and
+  -- carol the copy's, so each holds one card afterwards rather than one seat
+  -- holding none.
+  Spec.it s "CR 707.10 a triggered ability is copied, and its copy takes a new target" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    rats <- S.printingOf s registry "Ravenous Rats"
+    let withLands = S.landsFor swamp S.alice 4 S.threePlayerGame
+        (engineId, withEngine) = S.addCreature engine S.alice withLands
+        -- TWO cards each, so a seat that discarded twice and a seat that
+        -- discarded once are different boards.
+        stock pid gs = snd (S.addHandCard rats pid (snd (S.addHandCard rats pid gs)))
+        (board, ratsId) = S.handOne rats (stock S.carol (stock S.bob withEngine))
+    case engineAbilityCopyingAbilities engineId board of
+      Nothing -> Spec.assertFailure s "Lithoform Engine should declare a {2} ability"
+      Just copier -> do
+        let cast = S.runPure S.identityAnswer board {GameState.priority = Just S.alice} (S.cast S.alice ratsId)
+            -- The Rats resolve and enter; CR 603.3b puts the trigger on the
+            -- stack, and CR 603.3d announces its target there.
+            triggered = resolveOne (pinTarget (Recipient.ToPlayer S.bob)) cast
+        case topOfStack triggered of
+          Nothing -> Spec.assertFailure s "the Rats' entry trigger should be on the stack"
+          Just trigId -> do
+            let staged = S.runPure (pinTarget (Recipient.ToObject trigId)) triggered {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+                afterEngine = resolveOne (pinTarget (Recipient.ToPlayer S.carol)) staged
+                afterCopy = resolveOne S.identityAnswer afterEngine
+                afterBoth = resolveOne S.identityAnswer afterCopy
+            Spec.assertEqWith s "CR 707.10c the copy made carol discard, whom the trigger never targeted" (handSize S.carol afterBoth) 1
+            Spec.assertEqWith s "and the trigger itself still made bob discard" (handSize S.bob afterBoth) 1
+            Spec.assertEqWith s "the copy resolved first: bob still held both cards then" (handSize S.bob afterCopy) 2
+            Spec.assertEqWith s "and the stack is empty" (GameState.stack afterBoth) []

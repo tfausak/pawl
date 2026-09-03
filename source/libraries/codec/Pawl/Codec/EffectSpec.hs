@@ -35,7 +35,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
-import qualified Pawl.Types.CopySpell as CopySpell
+import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
@@ -733,19 +733,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       " {\"type\":\"CreateCopy\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":5},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   -- Twincast, both sentences. CR 707.10c's offer is elided when absent, so the
   -- two fixtures differ in exactly the key that carries it.
-  Spec.it s "CopySpell round-trips with and without CR 707.10c's offer" $ do
+  Spec.it s "CopyStackObject round-trips with and without CR 707.10c's offer" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CopySpell (CopySpell.MkCopySpell (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) True))
-      " {\"type\":\"CopySpell\",\"value\":{\"newTargets\":true,\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}} "
+      (Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) True))
+      " {\"type\":\"CopyStackObject\",\"value\":{\"newTargets\":true,\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CopySpell (CopySpell.MkCopySpell (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) False))
-      " {\"type\":\"CopySpell\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}} "
+      (Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) False))
+      " {\"type\":\"CopyStackObject\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}} "
   -- Unstable Shapeshifter's own pair. The two refs take DIFFERENT shapes on
   -- purpose: they are not interchangeable, and a codec that swapped them would
   -- round-trip a symmetric fixture unnoticed.

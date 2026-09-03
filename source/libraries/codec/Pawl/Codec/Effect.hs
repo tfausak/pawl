@@ -22,7 +22,7 @@ import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.Conjure as Conjure
-import qualified Pawl.Codec.CopySpell as CopySpell
+import qualified Pawl.Codec.CopyStackObject as CopyStackObject
 import qualified Pawl.Codec.Counter as Counter
 import qualified Pawl.Codec.Create as Create
 import qualified Pawl.Codec.CreateCopy as CreateCopy
@@ -138,7 +138,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Create" createCodec Effect.Create (\x -> case x of Effect.Create y -> Just y; _ -> Nothing),
       Arm.payload "Conjure" conjureCodec Effect.Conjure (\x -> case x of Effect.Conjure y -> Just y; _ -> Nothing),
       Arm.payload "CreateCopy" CreateCopy.codec Effect.CreateCopy (\x -> case x of Effect.CreateCopy y -> Just y; _ -> Nothing),
-      Arm.payload "CopySpell" CopySpell.codec Effect.CopySpell (\x -> case x of Effect.CopySpell y -> Just y; _ -> Nothing),
+      Arm.payload "CopyStackObject" CopyStackObject.codec Effect.CopyStackObject (\x -> case x of Effect.CopyStackObject y -> Just y; _ -> Nothing),
       Arm.payload "BecomeCopy" BecomeCopy.codec Effect.BecomeCopy (\x -> case x of Effect.BecomeCopy y -> Just y; _ -> Nothing),
       Arm.payload "Replace" replaceCodec Effect.Replace (\x -> case x of Effect.Replace y -> Just y; _ -> Nothing),
       Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
