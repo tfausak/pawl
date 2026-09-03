@@ -332,7 +332,22 @@ payableCostAt x spending pid oid gs cost =
 -- cast and the gate that prices it cannot disagree about what could be aimed at.
 --
 -- CR 601.2b's seed is empty, matching `targetable`: the X is not announced at
--- any of the moments this is read.
+-- any of the moments this is read. `unannounced` is True for exactly that
+-- reason, as Activate.candidateSlotsGiven's pre-X map is -- a slot's CR 202.3
+-- computed bound reading the X states NO bound here rather than an unmeetable
+-- one, so the gate is measured against every recipient the announcement could
+-- still reach. False would price the cost against a slot that offers nothing
+-- and refuse a cast CR 601.2 allows.
+--
+-- Inert on today's pool: this map is built only for a cost whose criterion
+-- names a slot (Cost.readsBoundSlot), and no card in `data/cards/` has both
+-- that and a target slot bounded by X. The cards with a
+-- Filter.ManaValueAtMostAmount slot are Stir the Grave, Synthetic Borrowed
+-- Exhumation and Synthetic Measured Refrain, each a bare mana cost with no
+-- component to carry a criterion; the rest of that list bounds an ACTIVATED or
+-- TRIGGERED ability's slot, neither of which takes this road. A card printing
+-- an X-bounded target slot beside a slot-reading additional cost is what would
+-- make the two values differ.
 castAimable :: PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set ObjectId)]
 castAimable pid oid gs = case Game.faceOf oid gs of
   Nothing -> []
@@ -341,7 +356,7 @@ castAimable pid oid gs = case Game.faceOf oid gs of
         enchant = Card.enchantSlotMapGiven (Projection.enchantOf oid gs)
         slotsOf mi = Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal)
         objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
-        setsOf slots = Target.legalSets (Just pid) False Map.empty oid slots gs
+        setsOf slots = Target.legalSets (Just pid) True Map.empty oid slots gs
      in fmap (fmap objectsOf . setsOf . slotsOf) (Set.toList (Target.fillableModes (Just pid) Map.empty oid enchant modal gs))
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is

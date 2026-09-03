@@ -854,15 +854,16 @@ admitsEntry gs oid rewrite = case rewrite of
   -- damage dealt enters with zero counters because X is zero, not because the row
   -- was refused.
   --
-  -- That last sentence is the RULE's wording rather than an observed difference,
-  -- and no board can make it one: X is a sum over the same opponents the arm
-  -- below counts, so X is greater than zero exactly when that arm answers True,
-  -- and admitting unconditionally places the same counters as admitting under
-  -- rule 702.54a's condition would. What separates them is CR 616.1's bucket --
-  -- a refused row is never offered -- and nothing in the pool puts a second entry
-  -- replacement on a bloodthirst X permanent to make that choice visible. So
-  -- Pawl.ReplacementSpec's Petrified Wood-Kin cases fence this arm against
-  -- refusing the row; they do not prove the wording.
+  -- The COUNTERS cannot tell the two readings apart: X is a sum over the same
+  -- opponents the arm below counts, so X is greater than zero exactly when that
+  -- arm answers True, and admitting unconditionally places the same counters as
+  -- admitting under rule 702.54a's condition would. CR 616.1's bucket is where
+  -- they diverge, and a board does make that visible -- an opponent's Kismet
+  -- (EntryRewrite.Tapped) is a second CR 616.1e candidate for the entering
+  -- Petrified Wood-Kin, so with nothing dealt this turn admitting the row leaves
+  -- two rows to race and raises Prompt.ChooseReplacement, where refusing it under
+  -- rule 702.54a's condition would leave one row and ask nobody. That prompt is
+  -- what Pawl.ReplacementSpec's Kismet case asserts.
   --
   -- CR 109.5's "you" is the ENTERING object's controller, read live off the board
   -- rather than off the candidate -- AsCopy's and SacrificeAnyNumber's posture,

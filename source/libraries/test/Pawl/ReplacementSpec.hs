@@ -9244,9 +9244,10 @@ readyForAlice gs =
 --
 -- ONE BOARD PER FORM, and every case differs from its siblings in nothing but
 -- what happened before the cast: the same three seats, the same lands, the same
--- card cast the same way. The permanent ENTERS in every case, so what the
--- assertions tell apart is "entered with counters" from "entered", never "entered"
--- from "did not".
+-- card cast the same way. The one exception is the CR 616.1e pair below, which
+-- differs in one permanent -- bob's Kismet -- and says so. The permanent ENTERS
+-- in every case, so what the assertions tell apart is "entered with counters"
+-- from "entered", never "entered" from "did not".
 --
 -- Distinct numbers everywhere, so no two readings coincide: bloodthirst 1 on a
 -- printed 3/1 shows as a 4/2, and the damage amounts are 4 at bob, 5 at alice, 2
@@ -9386,9 +9387,8 @@ bloodthirstSpec s registry =
               Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 8)
         -- CR 702.54b states NO CONDITION, unlike rule 702.54a: with nothing dealt
         -- X is zero and the permanent still enters. This case reads the zero, not
-        -- the absence of the condition -- the two readings place the same counters
-        -- on every board, which Pawl.Engine.Replacement.admitsEntry's arm argues
-        -- in full.
+        -- the absence of the condition -- the counters cannot tell the two
+        -- readings apart on any board, which the Kismet pair below is for.
         Spec.it s "CR 702.54b nobody was dealt damage, so X is zero" $ do
           forest <- S.printingOf s registry "Forest"
           woodKin <- S.printingOf s registry "Petrified Wood-Kin"
@@ -9401,6 +9401,48 @@ bloodthirstSpec s registry =
               Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne kin after) 0
               Spec.assertEqWith s "power" (Projection.powerOf kin after) (Just 3)
               Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 3)
+        -- CR 616.1e: what SEPARATES rule 702.54b's unconditional row from rule
+        -- 702.54a's conditional one, since the counters above cannot. bob's Kismet
+        -- ({3}{W} Enchantment, "Artifacts, creatures, and lands your opponents
+        -- control enter tapped", EntryRewrite.Tapped) is a second CR 616.1e
+        -- candidate for alice's entering Wood-Kin, and NOTHING was dealt this turn
+        -- -- so rule 702.54b admits its row and CR 616.1 hands alice the order,
+        -- where rule 702.54a's condition would refuse it and leave one row with
+        -- nothing to ask.
+        --
+        -- The two orders converge on one board -- CR 616.1f re-collects, so the
+        -- Wood-Kin ends up tapped with zero counters whichever applies first -- so
+        -- the prompt is the only observable, exactly as kismetSpec's cases are.
+        -- THE PAIR IS THIS CASE AND THE ONE BELOW, one board apart in nothing but
+        -- Kismet.
+        Spec.it s "CR 616.1e with nothing dealt the bloodthirst X row still races an opponent's Kismet" $ do
+          forest <- S.printingOf s registry "Forest"
+          woodKin <- S.printingOf s registry "Petrified Wood-Kin"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          kismet <- S.printingOf s registry "Kismet"
+          let (gs0, held, _) = bloodthirstXBoard forest woodKin sentry
+              raced = snd (S.addCreature kismet S.bob gs0)
+              cast = S.cast S.alice held >> Stack.resolveTop
+              after = S.runPure S.aggressiveAnswer raced cast
+          Spec.assertBool s (wasAskedToReplace (answersFor S.aggressiveAnswer raced cast)) "a ChooseReplacement was raised"
+          -- Non-vacuity, not the proof: BOTH rows applied, so the prompt was a race
+          -- between two rewrites rather than a question about one.
+          case woodKinIn after of
+            Nothing -> Spec.assertFailure s "Petrified Wood-Kin did not reach the battlefield"
+            Just kin -> do
+              Spec.assertEqWith s "CR 702.54b X is zero" (countersOn CounterKind.PlusOnePlusOne kin after) 0
+              Spec.assertBool s (Game.isTapped kin after) "CR 614.1d Kismet tapped it"
+        -- The DISCRIMINATING TWIN: the same board without Kismet, where rule
+        -- 702.54b's row is alone in its bucket and there is nothing to ask.
+        -- Without it "a prompt was raised" above would pass under a recorder that
+        -- reported one on every board.
+        Spec.it s "CR 616.1 the bloodthirst X row alone asks nobody" $ do
+          forest <- S.printingOf s registry "Forest"
+          woodKin <- S.printingOf s registry "Petrified Wood-Kin"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, _) = bloodthirstXBoard forest woodKin sentry
+              cast = S.cast S.alice held >> Stack.resolveTop
+          Spec.assertBool s (not (wasAskedToReplace (answersFor S.aggressiveAnswer gs0 cast))) "no ChooseReplacement was raised"
         -- CR 109.5: "your opponents" excludes the entering permanent's own
         -- controller. 7 at alice and 3 at bob, so a sum over every player would be
         -- 10 and a sum over the opponents is 3.
