@@ -1,0 +1,153 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Members"
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Land"
+                }
+              },
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              }
+            ]
+          },
+          "scope": {
+            "type": "InZone",
+            "value": {
+              "player": {
+                "type": "EachPlayer"
+              },
+              "zone": {
+                "type": "Battlefield"
+              }
+            }
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Twinned Colossus",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Golem"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    },
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Members"
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              },
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              }
+            ]
+          },
+          "scope": {
+            "type": "InZone",
+            "value": {
+              "player": {
+                "type": "EachPlayer"
+              },
+              "zone": {
+                "type": "Battlefield"
+              }
+            }
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Twinned Titan",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Giant"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ],
+  "layout": {
+    "type": "Split"
+  }
+}

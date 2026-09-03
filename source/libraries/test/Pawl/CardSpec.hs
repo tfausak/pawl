@@ -2,6 +2,21 @@
 -- dataflow lint.
 module Pawl.CardSpec where
 
+-- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- Dotted, because Pawl.Types.Keyword already holds the short alias here (the
+-- The json sublibrary's own modules, for the CR 701.3a completeness cross-check
+-- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
+-- alias because the two modules export disjoint names (TriggerSpec's
+-- alone: it counts the atom in a card's ENCODED form, which is a traversal of the
+-- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Engine.Condition may
+-- hand-maintained one below.
+-- later be imported and must not collide.
+-- precedent), and Modal.allEffects is how this lint reaches an activated or
+-- reverse of TriggerSpec's split).
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
+-- triggered ability's effects (Card.allEffects only reaches the spell).
+-- whole card written by somebody else and so an independent witness to the
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -23,34 +38,16 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
--- Dotted, because Pawl.Types.Keyword already holds the short alias here (the
--- reverse of TriggerSpec's split).
 import qualified Pawl.Engine.Keyword as Keyword.Engine
--- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
--- alias because the two modules export disjoint names (TriggerSpec's
--- precedent), and Modal.allEffects is how this lint reaches an activated or
--- triggered ability's effects (Card.allEffects only reaches the spell).
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
--- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
--- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Engine.Condition may
--- later be imported and must not collide.
-
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
-
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Subtype as Subtype.Engine
--- The json sublibrary's own modules, for the CR 701.3a completeness cross-check
--- alone: it counts the atom in a card's ENCODED form, which is a traversal of the
--- whole card written by somebody else and so an independent witness to the
--- hand-maintained one below.
-
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Object as Object
@@ -96,6 +93,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -258,6 +256,7 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
@@ -271,6 +270,7 @@ import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellCast as SpellCast
@@ -951,6 +951,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 509.3d's Filter is a predicate over the blocker, and holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.SelfBecomesBlockedBy _ -> []
+  TriggerCondition.PermanentBecomesBlockedBy _ -> []
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
   -- CR 509.3e's bystander form counts BLOCKERS rather than objects a Count
   -- names, and its PlayerRelation is no Count either.
@@ -976,6 +977,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- at all, so none of the three holds a Count. CR 701.44b holds a Filter, and
   -- a Filter holds no Count for PermanentEnters' reason above.
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
@@ -1673,9 +1675,23 @@ cardAuthoredEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card
 cardAuthoredEffects card =
   cardResolutionEffects card <> concatMap effectWithNested (concat (handActions card))
 
+-- Both slots of a face's characteristic-defining P/T: one printed ability, which
+-- Pawl.Codec.Face writes into each box's slot, or -- on CR 709.4c's combined view
+-- of a split card -- one half's ability per box (Pawl.Engine.Card.definedBox).
+-- The walks below want the quantities themselves.
+characteristicQuantities :: Face.Face Card.Type.Card -> [Quantity.Type.Quantity]
+characteristicQuantities card = case Face.characteristicPT card of
+  Nothing -> []
+  -- ONE quantity where the two slots agree, which every printed face's do: the
+  -- lints below compare a count of what a card mentions against a count of the
+  -- atoms in its encoded JSON, and the wire carries the ability once.
+  Just cda
+    | CharacteristicPT.power cda == CharacteristicPT.toughness cda -> [CharacteristicPT.power cda]
+    | otherwise -> [CharacteristicPT.power cda, CharacteristicPT.toughness cda]
+
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
-  concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
+  concatMap quantityCounts (characteristicQuantities card)
     -- CR 101.1's ceiling on CR 601.2b's X, which every printing states as a
     -- per-board amount (Soul Immolation's "the greatest toughness among
     -- creatures you control").
@@ -2859,7 +2875,7 @@ powerToughnessSlots card =
   Set.unions
     [ maybe Set.empty (QuantitySlot.slots . Power.unwrap) (Face.power card),
       maybe Set.empty (QuantitySlot.slots . Toughness.unwrap) (Face.toughness card),
-      maybe Set.empty QuantitySlot.slots (Face.characteristicPT card)
+      Set.unions (fmap QuantitySlot.slots (characteristicQuantities card))
     ]
 
 -- Every face a card MINTS, transitively: the faces of every token (CR 111.1)
@@ -4099,6 +4115,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
   -- Filter -- rule 702.25a's "without flanking".
   TriggerCondition.SelfBecomesBlockedBy f -> unframed [f]
+  -- The same rule read by a BYSTANDER, whose Filter is over the ATTACKER instead
+  -- -- CR 701.54c's "your Ring-bearer".
+  TriggerCondition.PermanentBecomesBlockedBy f -> unframed [f]
   -- The same rule's attacking-side form, whose Filter is a predicate over the
   -- blockers -- Serra Inquisitors' "black".
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> unframed [f]
@@ -4124,6 +4143,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 701.22d and CR 701.25d carry a PlayerRelation and CR 702.170a nothing,
   -- so none of them holds a Filter.
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
@@ -4232,6 +4252,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfBlocksOneOrMore _ -> []
   TriggerCondition.SelfBecomesBlocked -> []
   TriggerCondition.SelfBecomesBlockedBy _ -> []
+  TriggerCondition.PermanentBecomesBlockedBy _ -> []
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
   TriggerCondition.CreatureBecomesBlockedByAtLeast _ -> []
   TriggerCondition.SelfAttacksUnblocked -> []
@@ -4286,6 +4307,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.LoseControlOfBound slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
+  TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
@@ -5859,7 +5881,7 @@ cardFilters card =
   frame
     Unframed
     ( concatMap keywordFilters (Set.toList (Face.keywords card))
-        <> concatMap quantityFilters (Maybe.maybeToList (Face.characteristicPT card))
+        <> concatMap quantityFilters (characteristicQuantities card)
         <> concatMap quantityFilters (Face.maximumX card)
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
@@ -7320,8 +7342,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- DECLARING one is the mistake.
   Spec.it s "the shadowing lint accepts a delayed ability that only reads the slot" $ do
     let tokens = SlotName.MkSlotName (Text.pack "tokens")
-        reads_ = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] []]
-        declares = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] [tokens]]
+        reads_ = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = tokens, SlotSacrifice.sacrificer = Sacrificer.EffectController}] []]
+        declares = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = tokens, SlotSacrifice.sacrificer = Sacrificer.EffectController}] [tokens]]
     Spec.assertBool s (not (shadowsSlots (Set.singleton tokens) [reads_])) "reading a Create's slot is legal"
     Spec.assertBool s (shadowsSlots (Set.singleton tokens) [declares]) "declaring a target slot under the same name is not"
   -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
@@ -7542,7 +7564,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             )
     Spec.assertBool
       s
-      (modalCountsOffend (modeWith two (Effect.Sacrifice slot)))
+      (modalCountsOffend (modeWith two (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController})))
       "a two-target slot read as one object offends"
     Spec.assertBool
       s
@@ -7550,7 +7572,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and the same slot read through an ObjectRef does not"
     Spec.assertBool
       s
-      (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.Sacrifice slot))))
+      (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController}))))
       "nor does a one-target slot read as one object"
     -- CR 601.2c's "any number of target ...", which states no maximum to compare
     -- against: an unbounded slot is plural, so the same one-object reader offends.
@@ -7560,7 +7582,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- players" the sweep above walks.
     Spec.assertBool
       s
-      (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.Sacrifice slot)))
+      (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController})))
       "an unbounded slot read as one object offends too"
     -- The OTHER slot-naming arm of a number, on the offending board's own slot:
     -- an amount read is no arity claim, so the two-target slot is legal beside
@@ -7592,7 +7614,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and one number reading the slot both ways offends"
     Spec.assertBool
       s
-      (modalCountsOffend (modeReading two [amountReader, Effect.Sacrifice slot]))
+      (modalCountsOffend (modeReading two [amountReader, Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController}]))
       "as does an object read beside an amount read of the same slot"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
@@ -9784,7 +9806,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                                           PayGate.offeredAt = Nothing
                                         }
                                   )
-                                  (Seq.singleton (Effect.Sacrifice slot))
+                                  (Seq.singleton (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController}))
                               )
                           )
                           Map.empty
@@ -10816,15 +10838,18 @@ realSplitCardSpec s registry = Spec.describe s "RealSplitCard" $ do
 -- loyalty, defense, and the characteristic-defining ability a printed star stands
 -- for. Every producer is synthetic, because no printing carries any of them on a
 -- split half -- Scryfall `is:split (t:creature or t:planeswalker or t:battle)` and
--- `is:split is:permanent -t:room`, 2026-08-21, no hit against 137 split printings,
--- of which 30 are Rooms and the rest instants and sorceries. A printed split card
--- with a creature half is what would refute that.
+-- `is:split pow=*`, 2026-09-02, no hit -- nor `is:split is:permanent -t:room`,
+-- so the split printings that ARE permanents are Rooms, which print no P/T box.
+-- A printed split card with a creature half is what would refute that.
 --
--- Each card puts its box on the RIGHT half alone, which is what makes these proofs
--- rather than restatements: merge2 is a record UPDATE over the left half, so a
--- line that fell out of it -- or one written `Face.power l` -- answers Nothing,
--- and the permanent is a 0/0 (CR 208.5), a planeswalker with no loyalty counters
--- (CR 306.5b) or a battle with no defense counters (CR 310.4b).
+-- Every card but the twinned pair puts its box on the RIGHT half alone, which is
+-- what makes those proofs rather than restatements: merge2 is a record UPDATE
+-- over the left half, so a line that fell out of it -- or one written
+-- `Face.power l` -- answers Nothing, and the permanent is a 0/0 (CR 208.5), a
+-- planeswalker with no loyalty counters (CR 306.5b) or a battle with no defense
+-- counters (CR 310.4b). Synthetic Twinned Colossus // Synthetic Twinned Titan
+-- prints a P/T box on BOTH halves, each half defining one of the two boxes, which
+-- is the pair CR 709.4c combines.
 --
 -- The precondition every case asserts on the board: the PERMANENT shows CR 709.4's
 -- combined view and not CR 709.3b's single half. Naming the half is what casting
@@ -10855,6 +10880,22 @@ splitBoxSpec s registry = Spec.describe s "SplitBox" $ do
         -- COMBINED cost, {1}{U} plus {2}{R}. Five, so the CDA and the combined
         -- cost are both load bearing -- the right half alone reads three.
         Spec.assertEqWith s "the combined mana value, 2 + 3" (S.powerToughnessOf oid after) (Just (5, 5))
+        Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
+  Spec.it s "CR 709.4c the combined view keeps a P/T-defining ability from EACH half" $ do
+    forest <- S.printingOf s registry "Forest"
+    printing <- S.printingOf s registry "Synthetic Twinned Colossus"
+    case castHalf forest printing "Synthetic Twinned Colossus" of
+      (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
+      (after, Just oid) -> do
+        -- CR 709.4c gives the combined card "each ability in the text box of each
+        -- half", and these two define DISJOINT boxes: the left half's star is in
+        -- its power box and counts the four Forests castHalf put out, the right
+        -- half's is in its toughness box and counts the one creature on the
+        -- battlefield -- itself. CR 604.3 lets each override the number the other
+        -- half prints in that box, which is a 2 both times, so every one of the
+        -- four readings is a different number. Keeping the left half's ability
+        -- alone reads 4/2.
+        Spec.assertEqWith s "the left half's power and the right half's toughness" (S.powerToughnessOf oid after) (Just (4, 1))
         Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
   Spec.it s "CR 306.5b the combined view has the one half's printed loyalty" $ do
     forest <- S.printingOf s registry "Forest"

@@ -405,4 +405,15 @@ data TriggerCondition
     -- this way") reaches -- that event is no payment and can occur several times
     -- in one resolution, where this fires once (#2121).
     Reflexive
+  | -- | CR 701.54d: "whenever the Ring tempts you" (Nazgul), against
+    -- GameEvent.RingTempted. Fires on the temptation itself, so one whose
+    -- CR 701.54a actions were all impossible fires it too.
+    RingTemptsPlayer PlayerRelation.PlayerRelation
+  | -- | CR 509.3d read by a bystander: "whenever [a creature] becomes blocked by
+    -- a creature", the Filter over the ATTACKER and the blocker bound under
+    -- Pawl.Engine.Binding.blockingCreature (CR 701.54c's three-temptation tier).
+    --
+    -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
+    -- creature to block, records no event (#1146).
+    PermanentBecomesBlockedBy (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

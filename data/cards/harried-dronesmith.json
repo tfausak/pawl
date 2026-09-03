@@ -25,7 +25,9 @@
                     "effects": [
                       {
                         "type": "Sacrifice",
-                        "value": "token"
+                        "value": {
+                          "slot": "token"
+                        }
                       }
                     ]
                   }

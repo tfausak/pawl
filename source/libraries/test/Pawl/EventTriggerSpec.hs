@@ -86,6 +86,8 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerEntry as TriggerEntry
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -2517,6 +2519,160 @@ apnapDelayedSpec s registry =
           Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice (after gs)) (Just 24)
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob (after gs)) (Just 24)
           Spec.assertEqWith s "carol is at 24" (S.lifeOf S.carol (after gs)) (Just 24)
+
+-- CR 101.4c: a player making more than one choice at the same time picks the
+-- order they make them in. The choices are CR 603.7b's -- one seat holding TWO
+-- durationless delayed entries that one batch matches is asked twice, and
+-- nothing in the rules specifies which question comes first, so the player does.
+-- CR 603.3b's Prompt.OrderTriggers is the shape that asks it.
+--
+-- The two entries are Synthetic Singular Cure and Synthetic Singular Toll, both
+-- cast by alice: the same trigger condition on the same batch with DIFFERENT
+-- payloads, which is what makes the order observable on the board at all. Two
+-- copies of one card cannot show it -- equal payloads drain the same seats by
+-- the same amounts whichever entry named which gain -- so the second synthetic
+-- is the observability, not the capability.
+--
+--   * Synthetic Singular Toll {B} Instant
+--     (data/cards/synthetic-singular-toll.json): "The next time a player gains
+--     life, that player loses 3 life."
+--
+-- WHY A SYNTHETIC. Its sibling's search, re-run: Scryfall o:/[Ww]hen(ever)? a
+-- player gains life/, 2026-09-02, matches one printing -- False Cure, whose
+-- stated duration is what CR 603.7b's second sentence excludes. A printing that
+-- armed a duration-less delayed ability on a life gain would refute both cards;
+-- nothing in the CR forbids one.
+--
+-- 3 against the Cure's 8 (twice the 4 gained) on purpose: the two entries must
+-- be told apart by the AMOUNT a seat loses, so equal amounts would leave the two
+-- orders indistinguishable however the questions were asked.
+--
+-- The batch is singularCureSpec's Centaur Peacemaker, "each player gains 4
+-- life", one EventGroup across the seats (CR 608.2f), so each entry's
+-- per-occurrence condition matches three times and each is asked once.
+oneSeatDelayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oneSeatDelayedSpec s registry =
+  let -- apnapDelayedSpec's: which candidate is the named seat's own gain,
+      -- FILTERED out of the offered list rather than guessed.
+      indexOf pid candidates =
+        let gained event = case event of
+              GameEvent.LifeGained lc -> LifeChange.player lc == pid
+              _ -> False
+         in maybe 0 Int.toNaturalSaturating (List.findIndex gained (NonEmpty.toList candidates))
+      -- The state is the sources asked, in order, and every ordering prompt
+      -- raised, tagged with how many per-occurrence questions preceded it.
+      -- `picks` is the permutation alice answers the CR 101.4c one with, the one
+      -- thing the two proving cases differ in.
+      --
+      -- TWO ordering prompts reach this board and the tag is what tells them
+      -- apart: CR 101.4c's is raised as the batch is gathered, before any
+      -- question, and CR 603.3b's is raised by Engine.orderPending afterwards,
+      -- over the two triggers alice is putting on the stack. Only the first is
+      -- this group's, so only it is answered with `picks`.
+      --
+      -- CR 101.4b turned into an answer, apnapDelayedSpec's `laterKnows`: the
+      -- entry asked FIRST names alice's own gain and the one asked SECOND names
+      -- carol's, carol controlling no entry. So which seat loses 8 and which
+      -- loses 3 is exactly the ordering question.
+      answering :: ([Natural] -> [Natural]) -> Prompt.Prompt r -> State.State ([ObjectId.ObjectId], [(Int, [TriggerSource.TriggerSource])]) r
+      answering picks p = case p of
+        Prompt.OrderTriggers _ _ entries -> do
+          (questions, orderings) <- State.get
+          State.put (questions, orderings <> [(length questions, fmap TriggerEntry.source entries)])
+          let canonical = zipWith const [0 ..] entries
+          pure (if null questions then picks canonical else canonical)
+        Prompt.ChooseDelayedTriggerEvent _ _ source candidates -> do
+          (questions, orderings) <- State.get
+          State.put (questions <> [source], orderings)
+          pure (indexOf (if null questions then S.alice else S.carol) candidates)
+        _ -> pure (S.identityAnswer p)
+      -- The distinct EventGroups the log's life gains carry, and how many. The
+      -- precondition the group rests on: were the seats' gains not one group, the
+      -- earliest-group step would have picked a seat and CR 603.7b's second
+      -- sentence -- and so the questions this group orders -- never reached.
+      gainsIn gs =
+        Maybe.mapMaybe
+          ( \logged -> case LoggedEvent.event logged of
+              GameEvent.LifeGained _ -> Just (LoggedEvent.group logged)
+              _ -> Nothing
+          )
+          (Foldable.toList (GameState.events gs))
+      -- alice casts the Cure and then the Toll off three Swamps, with a Centaur
+      -- Peacemaker already placed and its Moved event recorded, so the CR 603.6a
+      -- scan runs at the next settle. The stack is last-in-first-out (CR 405.2 /
+      -- 608.1), so the Toll resolves first and so arms first.
+      armed = do
+        swamp <- S.printingOf s registry "Swamp"
+        cure <- S.printingOf s registry "Synthetic Singular Cure"
+        toll <- S.printingOf s registry "Synthetic Singular Toll"
+        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+        let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
+            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (cureSpell, withCure) = S.addHandCard cure S.alice withPeacemaker
+            (tollSpell, withToll) = S.addHandCard toll S.alice withCure
+            cast = S.cast S.alice cureSpell >> S.cast S.alice tollSpell
+            resolved = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer withToll cast)) Engine.priorityLoop)
+            moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
+        pure (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project peacemakerId resolved))] resolved)
+      -- The Cure alone, for the control: one entry, so there is nothing to order.
+      armedAlone = do
+        swamp <- S.printingOf s registry "Swamp"
+        cure <- S.printingOf s registry "Synthetic Singular Cure"
+        peacemaker <- S.printingOf s registry "Centaur Peacemaker"
+        let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
+            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (cureSpell, withCure) = S.addHandCard cure S.alice withPeacemaker
+            resolved = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer withCure (S.cast S.alice cureSpell))) Engine.priorityLoop)
+            moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
+        pure (S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project peacemakerId resolved))] resolved)
+      -- One run, read three ways, so the questions asked and the life totals
+      -- cannot come from different games.
+      played picks gs = State.runState (Engine.runGame (answering picks) gs (Engine.settleForPriority >> Engine.priorityLoop)) ([], [])
+      asked picks gs = fst (snd (played picks gs))
+      offered picks gs = snd (snd (played picks gs))
+      after picks gs = snd (fst (played picks gs))
+      -- The store's own order, which the reordering must NOT disturb: it is the
+      -- arming order every later gather reads.
+      armingOrder gs = fmap DelayedTrigger.source (Foldable.toList (GameState.delayedTriggers gs))
+   in Spec.describe s "CR 101.4c one seat's simultaneous delayed triggers" $ do
+        -- The proving case. alice answers the ordering prompt with the reverse of
+        -- the store, so the CURE is asked first: it names alice's own gain and
+        -- drains her 8, and the Toll, asked second, takes 3 off carol. An engine
+        -- that ignores the answer and asks in arming order drains alice 3 and
+        -- carol 8 instead.
+        Spec.it s "CR 101.4c the entry alice names first is asked first" $ do
+          gs <- armed
+          Spec.assertEqWith s "the Cure was asked first, so alice lost 8 of her own" (S.lifeOf S.alice (after reverse gs)) (Just 16)
+          Spec.assertEqWith s "the Toll was asked second, so carol lost 3" (S.lifeOf S.carol (after reverse gs)) (Just 21)
+          Spec.assertEqWith s "bob was named by neither" (S.lifeOf S.bob (after reverse gs)) (Just 24)
+          Spec.assertEqWith s "and the two questions came in the order alice chose" (asked reverse gs) (reverse (armingOrder gs))
+          -- CR 101.4c's prompt is the one raised before any question; CR 603.3b's
+          -- follows the two answers, and its entries are still in STORE order --
+          -- the half of this that must not move, since `outcomes` feeds it.
+          Spec.assertEqWith s "one ordering prompt before the questions, over alice's two entries in store order" (offered reverse gs) [(0, fmap TriggerSource.OfObject (armingOrder gs)), (2, fmap TriggerSource.OfObject (armingOrder gs))]
+          Spec.assertEqWith s "setup: every seat started at 20" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
+          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn (after reverse gs)), length (List.nub (gainsIn (after reverse gs)))) (3, 1)
+          Spec.assertEqWith s "and both entries are spent, neither having a stated duration" (Seq.length (GameState.delayedTriggers (after reverse gs))) 0
+        -- The other half of the pair, differing in exactly one thing -- the
+        -- permutation alice answers with. The Toll is asked first now, so the
+        -- amounts swap seats: alice pays 3 and carol pays 8.
+        Spec.it s "CR 101.4c the other order swaps which seat pays which amount" $ do
+          gs <- armed
+          Spec.assertEqWith s "the Toll was asked first, so alice lost only 3" (S.lifeOf S.alice (after id gs)) (Just 21)
+          Spec.assertEqWith s "the Cure was asked second, so carol lost 8" (S.lifeOf S.carol (after id gs)) (Just 16)
+          Spec.assertEqWith s "bob is still untouched" (S.lifeOf S.bob (after id gs)) (Just 24)
+          Spec.assertEqWith s "and the questions came in store order this time" (asked id gs) (armingOrder gs)
+          Spec.assertEqWith s "the same CR 101.4c prompt was raised, ahead of the same two questions" (fmap fst (offered id gs)) [0, 2]
+        -- The elision, and the control: ONE entry is not an order, so no ordering
+        -- prompt is raised at all -- while the per-occurrence question still is,
+        -- which is what keeps the case from passing on an empty board.
+        Spec.it s "CR 101.4c one entry has nothing to order, so nobody is asked to" $ do
+          gs <- armedAlone
+          Spec.assertEqWith s "no ordering prompt" (offered reverse gs) []
+          Spec.assertEqWith s "the Cure was still asked which gain, and named alice's" (S.lifeOf S.alice (after reverse gs)) (Just 16)
+          Spec.assertEqWith s "one question, from the one entry" (asked reverse gs) (armingOrder gs)
+          Spec.assertEqWith s "bob kept his 4" (S.lifeOf S.bob (after reverse gs)) (Just 24)
+          Spec.assertEqWith s "and so did carol" (S.lifeOf S.carol (after reverse gs)) (Just 24)
 
 -- CR 603.2c's FIRST sentence on the LIFE side, and the CR 608.2f bracket that
 -- makes it reachable: "each player gains 4 life" is ONE action taken on several
@@ -6307,6 +6463,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   falseCureSpec s registry
   singularCureSpec s registry
   apnapDelayedSpec s registry
+  oneSeatDelayedSpec s registry
   communalVigilSpec s registry
   lifelinkGainEventsSpec s registry
   forthEorlingasSpec s registry

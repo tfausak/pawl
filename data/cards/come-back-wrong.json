@@ -25,7 +25,9 @@
                     "effects": [
                       {
                         "type": "Sacrifice",
-                        "value": "returned"
+                        "value": {
+                          "slot": "returned"
+                        }
                       }
                     ]
                   }
