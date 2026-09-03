@@ -198,6 +198,7 @@ import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -14931,6 +14932,18 @@ delayedPending grouped gs =
       occurrences entry
         | batchScoped (TriggeredAbility.condition (DelayedTrigger.ability entry)) = fmap NonEmpty.head (eventGroups (matching entry))
         | otherwise = matching entry
+      -- Which entries CR 603.7b's second sentence actually ASKS, answered without
+      -- asking: the CR 101.4c ordering below has to know before the first
+      -- question is raised. The three gates are firedBy's own, read through this
+      -- one predicate rather than restated -- a stated duration lifts the rule
+      -- entirely, a reflexive entry never reaches firedBy, and one candidate is
+      -- no choice.
+      asks entry =
+        not (reflexive entry)
+          && Maybe.isNothing (DelayedTrigger.expiry entry)
+          && case eventGroups (occurrences entry) of
+            block : _ -> not (null (NonEmpty.tail block))
+            [] -> False
       -- CR 603.7b's exception, read through CR 603.2c. A stated duration lifts the
       -- one shot, and 603.2c then applies unmodified -- "it can trigger repeatedly
       -- if one event contains multiple occurrences" -- so every occurrence in the
@@ -14969,7 +14982,7 @@ delayedPending grouped gs =
             [] -> pure []
             block : _ ->
               let candidates = fmap LoggedEvent.event block
-               in if null (NonEmpty.tail candidates)
+               in if not (asks entry)
                     then pure [NonEmpty.head candidates]
                     else do
                       let controller = DelayedTrigger.controller entry
@@ -15062,8 +15075,20 @@ delayedPending grouped gs =
         --
         -- Replacement.seatOf is the shared answer to "how far down APNAP order",
         -- including its fallback: a controller off the seating roster sorts last.
-        -- A STABLE sort, so entries sharing a controller keep arming order,
-        -- which is not the order CR 101.4c has that player choose (gap #2455).
+        -- A STABLE sort, so entries sharing a controller reach `ordering` in
+        -- arming order, which is where CR 101.4c takes over.
+        --
+        -- CR 101.4c: within one controller's share, the order the questions are
+        -- asked in is itself that player's choice, so it is asked as CR 603.3b's
+        -- Prompt.OrderTriggers over the entries that will ask. Only where TWO or
+        -- more of theirs ask -- one question has no order to pick, and the rules
+        -- authorise no prompt then -- and only over those, an entry that raises
+        -- no question having nothing to order. The rest follow in arming order;
+        -- their position is unobservable, `asks` being false exactly where
+        -- `triggered` cannot ask.
+        --
+        -- Per controller and not per phase, so that a player makes ALL of their
+        -- choices before the next player makes any (CR 101.4, CR 101.4b).
         --
         -- The ASKING is all that is reordered. `outcomes` is reassembled in store
         -- order, because CR 101.4 governs neither of the two things it feeds: the
@@ -15071,8 +15096,24 @@ delayedPending grouped gs =
         -- and the surviving store's order is the arming order every later pass
         -- reads. Pawl.EventTriggerSpec's "the store still holds it" is what pins
         -- that second half.
-        let asking = List.sortOn (Replacement.seatOf gs . DelayedTrigger.controller . snd) (zip [0 :: Int ..] (Foldable.toList store))
-        answered <- traverse (\(index, entry) -> fmap (\fired -> (index, (entry, fired))) (triggered entry)) asking
+        let seated = List.sortOn (Replacement.seatOf gs . DelayedTrigger.controller . snd) (zip [0 :: Int ..] (Foldable.toList store))
+            controllers = List.nub (fmap (DelayedTrigger.controller . snd) seated)
+            -- CR 603.3b's entry, built from a STORE entry: the question is asked
+            -- before the entry has fired, so the PendingTrigger that
+            -- Pawl.Engine.Engine.entryOf reads does not exist yet.
+            entryOf entry = TriggerEntry.MkTriggerEntry (TriggerSource.OfObject (DelayedTrigger.source entry)) (DelayedTrigger.ability entry)
+            ordering pid =
+              let mine = filter ((pid ==) . DelayedTrigger.controller . snd) seated
+                  asking = filter (asks . snd) mine
+               in if length asking < 2
+                    then pure mine
+                    else do
+                      -- Filtered rather than trusted: Game.permute keeps the
+                      -- offered order for an answer that is not a permutation.
+                      answer <- Game.choose (Prompt.OrderTriggers (Decide.deciderFor pid gs) pid (fmap (entryOf . snd) asking))
+                      pure (Game.permute asking answer <> filter (not . asks . snd) mine)
+            asked (index, entry) = fmap (\fired -> (index, (entry, fired))) (triggered entry)
+        answered <- fmap concat (traverse (ordering Monad.>=> traverse asked) controllers)
         let outcomes = Seq.fromList (fmap snd (List.sortOn fst answered))
         pure (concatMap snd outcomes, fmap fst (Seq.filter (not . spent) outcomes))
 
