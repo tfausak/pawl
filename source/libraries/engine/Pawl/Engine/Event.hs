@@ -15098,9 +15098,9 @@ delayedPending grouped gs =
         -- that second half.
         let seated = List.sortOn (Replacement.seatOf gs . DelayedTrigger.controller . snd) (zip [0 :: Int ..] (Foldable.toList store))
             controllers = List.nub (fmap (DelayedTrigger.controller . snd) seated)
-            -- CR 603.3b's entry, built from the store rather than from a pending
-            -- trigger: the delayed ability is not an ability "of" its source, so
-            -- Pawl.Engine.Engine.entryOf has nothing to read it from.
+            -- CR 603.3b's entry, built from a STORE entry: the question is asked
+            -- before the entry has fired, so the PendingTrigger that
+            -- Pawl.Engine.Engine.entryOf reads does not exist yet.
             entryOf entry = TriggerEntry.MkTriggerEntry (TriggerSource.OfObject (DelayedTrigger.source entry)) (DelayedTrigger.ability entry)
             ordering pid =
               let mine = filter ((pid ==) . DelayedTrigger.controller . snd) seated
