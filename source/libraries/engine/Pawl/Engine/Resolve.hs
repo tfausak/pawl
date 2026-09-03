@@ -5534,12 +5534,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- card offering "a permanent card from among them" (Midnight Tilling)
         -- offers only what an earlier clause of this resolution named.
         chooseContext g = effectContext (Game.teams g) controller source legal (slotBindings resolving g)
-        -- CR 400.7j: bind what arrived into the resolving object's live bindings,
-        -- where a later effect of this resolution or a delayed ability it arms
-        -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
-        -- the single binding, which every reader sees; several take the group,
-        -- which the ObjectRef readers and Filter.IsBound see and slotOne does
-        -- not; none binds nothing, so no slot names an empty set.
         -- CR 608.2d's singular choice, shared by the two arms that make it, so a
         -- card cannot find "a creature named Hanweir Garrison" offered one way
         -- when the source rides along and another way when it does not.
@@ -5552,6 +5546,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               let offered = first NonEmpty.:| (second : more)
               answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
               pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+        -- CR 400.7j: bind what arrived into the resolving object's live bindings,
+        -- where a later effect of this resolution or a delayed ability it arms
+        -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
+        -- the single binding, which every reader sees; several take the group,
+        -- which the ObjectRef readers and Filter.IsBound see and slotOne does
+        -- not; none binds nothing, so no slot names an empty set.
         bindArrivals slot arrived = case arrived of
           [] -> pure ()
           [only] -> State.modify' (bindSlot resolving slot only)
@@ -5782,11 +5782,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- order they were written in.
               --
               -- The source is read off the PRE-MOVE board (CR 608.2c) through the
-              -- same battlefieldMatching sweep the counterpart comes from, with CR
-              -- 115.1's own "this permanent" as the filter, so a source that has
-              -- left the battlefield is simply not named -- CR 101.3 ignoring that
-              -- much of the instruction, CR 609.3 leaving the rest to do as much as
-              -- it can. It is not offered to anybody: the printed sentence names it
+              -- same battlefieldMatching sweep the counterpart comes from, filtered
+              -- by Filter.IsSource, which is what the card's "this land" is. So a
+              -- source that has left the battlefield is simply not named -- CR
+              -- 101.3 ignoring that much of the instruction, CR 609.3 leaving the
+              -- rest to do as much as it can. It is not offered to anybody: the printed sentence names it
               -- outright, and the one choice here is WHICH counterpart.
               --
               -- The counterpart comes FIRST and the source second, which is the

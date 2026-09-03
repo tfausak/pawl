@@ -308,9 +308,9 @@ spec s registry = Spec.describe s "Meld" $ do
   -- two separate move instructions could not produce however they were ordered.
   --
   -- The board is the melding case above's, and the LOG is what the batch is read
-  -- off: Pawl.Types.TriggerCondition's batch arms are PermanentsDie and
-  -- PermanentsReturnedToHand, and an exile satisfies neither, so no ability a
-  -- card could print observes this one.
+  -- off: the batch arms Pawl.Types.TriggerCondition has over a DEPARTURE are
+  -- PermanentsDie and PermanentsReturnedToHand, and an exile satisfies neither,
+  -- so no ability a card could print observes this one.
   Spec.it s "CR 608.2f the pair leaves the battlefield in one event" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"

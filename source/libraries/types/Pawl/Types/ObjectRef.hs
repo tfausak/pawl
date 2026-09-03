@@ -670,8 +670,9 @@ data ObjectRef
     -- 608.2d choice, its candidates and its posture are exactly the arm above's
     -- -- asked at two or more matches, elided at one, skipped at none. The source
     -- is not chosen and is not filtered: the printed sentence names it outright.
-    -- A source that is not on the battlefield is not named, CR 101.3 leaving the
-    -- rest of the instruction to do as much as it can (CR 609.3).
+    -- A source that is not on the battlefield is not named -- CR 101.3 ignores
+    -- that much of the instruction and CR 609.3 leaves the rest to do as much as
+    -- it can.
     --
     -- Not a target and never one (CR 115.10a), the arm above's reason.
     --
