@@ -3465,18 +3465,23 @@ hanweirBattlementsSpec s registry = Spec.describe s "Hanweir Battlements" $ do
 -- Ashnod's Altar "Sacrifice a creature: Add {C}{C}": a mana ability with no {T}
 -- in its cost, so CR 605.3a's window offers it while ANOTHER permanent's cost is
 -- being paid, and the creature it eats can be that permanent. That is CR 118.3
--- on the three cost parts that remove their own permanent, on boards where
--- TapThis' guard cannot refuse first -- none of the three costs below taps.
+-- on the cost parts that name the permanent the cost is on, on boards where
+-- TapThis' guard cannot refuse first -- none of the costs below taps.
 --
 -- One producer per part, each alice's ONLY creature so the Altar has exactly one
 -- thing to eat: Auriok Replica "{W}, Sacrifice this creature" is SacrificeThis,
 -- Hanged Executioner "{3}{W}, Exile this creature: Exile target creature" is
--- ExileThis, and Grinning Ignus "{R}, Return this creature to its owner's hand:
--- Add {C}{C}{R}" is ReturnThis -- that one a mana ability, so it is CR 602.2b's
--- nested window rather than an announcement's.
+-- ExileThis, Grinning Ignus "{R}, Return this creature to its owner's hand: Add
+-- {C}{C}{R}" is ReturnThis -- that one a mana ability, so it is CR 602.2b's
+-- nested window rather than an announcement's -- and Safehold Sentry "{2}{W},
+-- {Q}" is UntapThis, whose permanent the Altar can eat just as well.
 --
 -- Each is a PAIR differing in one thing, the source the payer names in the
 -- window, so no refusal can be an unaffordable cost or a missing activation.
+--
+-- alice's own precombat main phase with priority and an empty stack, which is
+-- what CR 602.5d's "activate only as a sorcery" needs for the Ignus; bob's
+-- Goblin Piker is across the table as the Executioner's target.
 altarBoard ::
   Printing.Printing ->
   Printing.Printing ->
@@ -3597,6 +3602,33 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
     Spec.assertBool s (not (S.onBattlefield ignusId after)) "CR 400.3 the Ignus returned to its owner's hand"
     Spec.assertEqWith s "which is alice's" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
     Spec.assertEqWith s "and the ability added its three mana" (poolSize S.alice after) 3
+
+  -- CR 118.3 on UntapThis, the fourth part naming its own permanent -- CR 107.6
+  -- is the mirror of CR 107.5, and the Altar makes it unpayable the same way. The
+  -- Sentry starts TAPPED, which for a {Q} cost is the payable state.
+  Spec.it s "CR 118.3 the Altar eats the Sentry before its own {Q} is paid" $ do
+    sentry <- S.printingOf s registry "Safehold Sentry"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (sentryId, altarId, pikerId, board) = altarBoard sentry altar plains piker 3
+        gs = S.tapObject sentryId board
+        after = S.runPure (feeding altarId pikerId) gs (Activate.activateAbility S.alice sentryId (theAbility sentry) >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 613.4c the Sentry never got its +0/+2" (Projection.toughnessOf sentryId after) (Just 2)
+    Spec.assertBool s (S.onBattlefield sentryId after) "and it is back on the battlefield"
+    Spec.assertEqWith s "CR 107.6 still tapped, the untap never having been paid" (fmap Object.tapped (Game.lookupObject sentryId after)) (Just TapState.Tapped)
+    Spec.assertEqWith s "with nothing on the stack" (length (GameState.stack after)) 0
+  Spec.it s "CR 107.6 paying from the Plains instead untaps the Sentry itself" $ do
+    sentry <- S.printingOf s registry "Safehold Sentry"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (sentryId, altarId, pikerId, board) = altarBoard sentry altar plains piker 3
+        gs = S.tapObject sentryId board
+        after = S.runPure (sparing altarId pikerId) gs (Activate.activateAbility S.alice sentryId (theAbility sentry) >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 613.4c the Sentry got its +0/+2" (Projection.toughnessOf sentryId after) (Just 4)
+    Spec.assertEqWith s "and paying the cost untapped it" (fmap Object.tapped (Game.lookupObject sentryId after)) (Just TapState.Untapped)
+    Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
 
 -- How many mana units a player has floating. Duplicated per this suite's
 -- convention of group-local helpers (ManaSpec carries its own).

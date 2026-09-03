@@ -1369,9 +1369,10 @@ claimOf slots pid oid component gs = case component of
   -- CR 101.2's prohibition, ReturnThis' reading above and for its reason; the
   -- two answers have to agree.
   --
-  -- A FENCE and not proven behaviour, ReturnThis' note above: Brittle Effigy is
-  -- the one card printing this component, its cost states a non-empty mana part,
-  -- so `repeatsOf` settles at 1 before any axis matters.
+  -- A FENCE and not proven behaviour, ReturnThis' note above: every printing of
+  -- this component in `data/cards/` -- Brittle Effigy, Hanged Executioner --
+  -- states a non-empty mana part, so `repeatsOf` settles at 1 before any axis
+  -- matters.
   CostComponent.ExileThis ->
     claim
       (ClaimAxis.Removal Zone.Battlefield)
@@ -3161,10 +3162,21 @@ payComponent moment slots pid oid component = case component of
   -- The payment is still MADE when CR 122.1d takes the untap, which is the rule
   -- rather than a shortcut: CR 614.6 replaces the EVENT the paying produces, and
   -- CR 601.2h's "partial payments are not allowed" is about what the player
-  -- performs, not about what the event turns into.
+  -- performs, not about what the event turns into. That is a replaced event and
+  -- not an unpayable part, so it is the guard below that has to be able to tell
+  -- them apart -- CR 122.1d leaves the permanent on the battlefield and tapped,
+  -- which `canPayComponent` calls payable.
+  --
+  -- CR 118.3 asked AGAIN here, TapThis' reason above with CR 107.6 in place of
+  -- CR 107.5. Pawl.CostSpec's "CR 118.3 the Altar eats the Sentry before its own
+  -- {Q} is paid" is the proof.
   CostComponent.UntapThis -> do
-    Event.untap oid
-    pure bindsNothing
+    gs <- State.get
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.untap oid
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- Through Event.sacrifice, the CR 701.21 funnel, and never a direct zone poke:
   -- a cost payment is a game event, so dies-triggers, replacement effects and the
   -- turn history all see it.
