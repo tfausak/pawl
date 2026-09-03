@@ -348,6 +348,9 @@ combatRecipient gs attacker target =
 -- pay any part of the same bar. Where one can, the question is asked -- and the
 -- answer may turn out to have been forced after all, which is the direction CR
 -- 510.1 itself takes by announcing the whole assignment at once.
+-- Not implemented: CR 510.1a lets a static ability substitute another
+-- characteristic for power here too (Tapestry Warden's second clause); this
+-- reads power unconditionally (#3167).
 attackerAssignment :: GameState -> Bool -> (ObjectId, AttackTarget) -> Game ([DamageEvent.DamageEvent], Map.Map Recipient.Recipient Natural)
 attackerAssignment gs contested (attacker, target) = case Projection.powerOf attacker gs of
   Nothing -> pure ([], Map.empty)
@@ -514,6 +517,9 @@ blockerChooser gs attackers controller =
 -- damage divided among them, so the unit of assignment is the blocker. An action
 -- and not a list for that division alone -- with one attacker blocked the rule
 -- forces the whole assignment and asks nothing.
+-- Not implemented: CR 510.1a lets a static ability substitute another
+-- characteristic for power here too (Tapestry Warden's second clause); this
+-- reads power unconditionally (#3167).
 blockerAssignment :: GameState -> (ObjectId, Set.Set ObjectId) -> Game [DamageEvent.DamageEvent]
 blockerAssignment gs (blocker, attackers) = case Projection.powerOf blocker gs of
   Nothing -> pure []
