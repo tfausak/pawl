@@ -56,7 +56,10 @@
                       {
                         "type": "Sacrifice",
                         "value": {
-                          "slot": "self"
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         }
                       }
                     ],

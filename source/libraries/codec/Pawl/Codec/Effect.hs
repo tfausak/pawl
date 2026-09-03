@@ -72,13 +72,13 @@ import qualified Pawl.Codec.RequireAttack as RequireAttack
 import qualified Pawl.Codec.RequireBlock as RequireBlock
 import qualified Pawl.Codec.Reveal as Reveal
 import qualified Pawl.Codec.RollDie as RollDie
+import qualified Pawl.Codec.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Codec.Search as Search
 import qualified Pawl.Codec.SetClassLevel as SetClassLevel
 import qualified Pawl.Codec.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Codec.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Codec.SlotName as SlotName
-import qualified Pawl.Codec.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.TakeExtraTurn as TakeExtraTurn
@@ -112,7 +112,7 @@ codec cardCodec abilityCodec =
       Arm.payload "ControlPlayerNextTurn" SlotName.codec Effect.ControlPlayerNextTurn (\x -> case x of Effect.ControlPlayerNextTurn y -> Just y; _ -> Nothing),
       Arm.payload "Destroy" Destroy.codec Effect.Destroy (\x -> case x of Effect.Destroy y -> Just y; _ -> Nothing),
       Arm.payload "Fight" Fight.codec Effect.Fight (\x -> case x of Effect.Fight y -> Just y; _ -> Nothing),
-      Arm.payload "Sacrifice" SlotSacrifice.codec Effect.Sacrifice (\x -> case x of Effect.Sacrifice y -> Just y; _ -> Nothing),
+      Arm.payload "Sacrifice" SacrificeEffect.codec Effect.Sacrifice (\x -> case x of Effect.Sacrifice y -> Just y; _ -> Nothing),
       Arm.payload "TurnFaceDown" TurnFaceDown.codec Effect.TurnFaceDown (\x -> case x of Effect.TurnFaceDown y -> Just y; _ -> Nothing),
       Arm.payload "TurnFaceUp" SlotName.codec Effect.TurnFaceUp (\x -> case x of Effect.TurnFaceUp y -> Just y; _ -> Nothing),
       Arm.payload "RemoveFromCombat" ObjectRef.codec Effect.RemoveFromCombat (\x -> case x of Effect.RemoveFromCombat y -> Just y; _ -> Nothing),
