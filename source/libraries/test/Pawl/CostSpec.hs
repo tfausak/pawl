@@ -18,6 +18,7 @@ module Pawl.CostSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -1949,6 +1950,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   barkhideTrollSpec s registry
   millikinSpec s registry
   brittleEffigySpec s registry
+  hanweirBattlementsSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -3366,3 +3368,92 @@ recordingOrdersTargeting victim p = case p of
     State.modify' (<> [components])
     pure (Replay.defaultAnswer p)
   _ -> pure (targeting victim p)
+
+-- Hanweir Battlements: a land printing "{T}: Add {C}" beside "{R}, {T}: Target
+-- creature gains haste until end of turn". One permanent carrying both a mana
+-- ability and a cost that needs its own {T}, which is what puts CR 605.3a's mana
+-- window and CR 107.5 on the same object.
+--
+-- alice controls the Battlements and exactly one untapped Mountain -- the minimum
+-- that pays the {R}, and the same one in both cases below, so neither refusal can
+-- be an unaffordable cost. bob's Goblin Piker is the target: an opponent's
+-- creature, so the grant is visible on a permanent the cost never touches.
+hanweirBattlementsBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hanweirBattlementsBoard battlements mountain piker =
+  let (battlementsId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+      (mountainId, g2) = S.addCreature mountain S.alice g1
+      (pikerId, g3) = S.addCreature piker S.bob g2
+   in ( battlementsId,
+        mountainId,
+        pikerId,
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Hanweir Battlements' SECOND printed activated ability, the "{R}, {T}" grant --
+-- `theAbility` above takes the first, which is the mana ability.
+hasteAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+hasteAbility p = case Face.activatedAbilities (S.combinedFace p) of
+  _ : haste : _ -> Just haste
+  _ -> Nothing
+
+-- CR 605.3a's window answered by IDENTITY: `source` whenever the engine offers
+-- it, and otherwise the head of what is left, which is how the {R} still gets
+-- paid after a wasted tap. The target is answered beside it, so the two cases
+-- below differ in `source` and nothing else.
+--
+-- The offers are RECORDED, because a run that never put the Battlements on the
+-- table would pay from the Mountain and prove nothing about CR 107.5.
+tappingFor :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+tappingFor source victim p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> do
+    State.modify' (<> [NonEmpty.toList candidates])
+    pure (Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== source) (NonEmpty.toList candidates))))
+  _ -> pure (targeting victim p)
+
+hanweirBattlementsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hanweirBattlementsSpec s registry = Spec.describe s "Hanweir Battlements" $ do
+  -- CR 107.5's second sentence: "a permanent that's already tapped can't be
+  -- tapped again to pay the cost". CR 605.3a lets the payer activate a mana
+  -- ability in the middle of paying, and the ability it offers here is the
+  -- Battlements' own -- so a payer who takes it has tapped the permanent whose
+  -- {T} the same cost still needs. CR 118.3 then makes the order unpayable, CR
+  -- 601.2h refuses the payment whole, and the announcement reverses.
+  --
+  -- The window is NOT narrowed to keep the offer off the table: CR 605.3a states
+  -- the permission without exception, and the reversal below is what the rules
+  -- answer it with.
+  Spec.it s "CR 107.5 tapping the source for mana loses its own {T}" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case hasteAbility battlements of
+      Nothing -> Spec.assertFailure s "Hanweir Battlements should print two activated abilities"
+      Just haste -> do
+        let (battlementsId, _, pikerId, gs) = hanweirBattlementsBoard battlements mountain piker
+            ((_, after), offers) = State.runState (Engine.runGame (tappingFor battlementsId pikerId) gs (Activate.activateAbility S.alice battlementsId haste >> Stack.resolveTop)) []
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste pikerId after)) "the Piker never gained haste"
+        Spec.assertEqWith s "and the permanent the payer tapped for mana is untapped again" (fmap Object.tapped (Game.lookupObject battlementsId after)) (Just TapState.Untapped)
+        Spec.assertEqWith s "with nothing on the stack" (length (GameState.stack after)) 0
+        Spec.assertEqWith s "CR 601.2h and the mana the window made is gone with the rest of the announcement" (Game.poolOf S.alice after) (Mana.Type.MkMana [])
+        -- The proxy behind those, kept after them: the window really did offer the
+        -- cost's own permanent, without which the payment would have come off the
+        -- Mountain and refused nothing.
+        Spec.assertEqWith s "the first mana window offered the Battlements itself" (take 1 (fmap (elem battlementsId) offers)) [True]
+  -- The other half of the pair: the SAME board and the same answerer, naming the
+  -- Mountain instead, pays in full and resolves.
+  Spec.it s "CR 605.3a naming another source pays the same cost and resolves" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case hasteAbility battlements of
+      Nothing -> Spec.assertFailure s "Hanweir Battlements should print two activated abilities"
+      Just haste -> do
+        let (battlementsId, mountainId, pikerId, gs) = hanweirBattlementsBoard battlements mountain piker
+            ((_, after), _) = State.runState (Engine.runGame (tappingFor mountainId pikerId) gs (Activate.activateAbility S.alice battlementsId haste >> Stack.resolveTop)) []
+        Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId after) "CR 702.10 the targeted Piker gained haste"
+        Spec.assertEqWith s "and the Battlements paid its own {T}" (fmap Object.tapped (Game.lookupObject battlementsId after)) (Just TapState.Tapped)
+        Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
