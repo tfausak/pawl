@@ -109,6 +109,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
+import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
@@ -557,7 +558,11 @@ objectRefPositions =
     ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
     ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders), [plantedRef "cc"]),
     ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject")), [plantedRef "bc-original", plantedRef "bc-subject"]),
-    ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") False), [plantedRef "cs"]),
+    ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied), [plantedRef "cs"]),
+    -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
+    -- reach: a copy effect whose candidate description reads a slot no clause
+    -- binds is a dangling read like any other.
+    ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each"))), [plantedRef "cs-ref", plantedRef "cs-each"]),
     ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
     ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
     ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing (plantedRef "rd-from") (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
@@ -3312,6 +3317,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
   Filter.Type.TargetsSource -> 0
+  Filter.Type.TargetsOnlySource -> 0
   Filter.Type.TargetsPlayer _ -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
@@ -3765,6 +3771,18 @@ perCreatureFilters perCreature = case perCreature of
 -- named in a library depth cannot be dropped where its Count is kept (#2740).
 refFilters :: ObjectRef.ObjectRef -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 refFilters = concatMap quantityFilters . Resolve.objectRefQuantities
+
+-- The refs a CR 707.10 answer names -- CR 707.10d's candidates, and nothing for
+-- the other two. Both sweeps below fold over it, so a candidate description is
+-- linted and its slot reads are seen by the dataflow lint.
+copyTargetsRefs :: CopyTargets.CopyTargets -> [ObjectRef.ObjectRef]
+copyTargetsRefs targets = case targets of
+  CopyTargets.Copied -> []
+  CopyTargets.ChosenByController -> []
+  CopyTargets.ForEach ref -> [ref]
+
+copyTargetsFilters :: CopyTargets.CopyTargets -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+copyTargetsFilters = concatMap objectRefFilters . copyTargetsRefs
 
 -- TAGGED pairs, PR #2739's reader's test: a path from here reaches
 -- keywordFilters, through the CounterKind a depth's Quantity may name.
@@ -4425,6 +4443,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.OwnedBy _ -> []
   Filter.Type.IsSource -> []
   Filter.Type.TargetsSource -> []
+  Filter.Type.TargetsOnlySource -> []
   Filter.Type.TargetsPlayer _ -> []
   -- Reads the whole bound set off Filter.Context, so a group is every one of its
   -- members rather than nothing -- the atom this lint must NOT report.
@@ -5372,8 +5391,9 @@ effectFilters effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> frame SourceHostFramed (objectRefFilters ref)
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject)
-  -- The one ref, CreateCopy's arm above: an EachMatching Filter is card text.
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref _) -> frame SourceHostFramed (objectRefFilters ref)
+  -- BOTH refs, CreateCopy's arm above: an EachMatching Filter is card text, and
+  -- CR 707.10d's candidates are named by one.
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> frame SourceHostFramed (objectRefFilters ref <> copyTargetsFilters targets)
   -- The ROW's own Filters are framed for printedReplacementFilters' reason: a
   -- stored row is read through the same
   -- Pawl.Engine.Replacement.candidateContext a printed one is, where the
@@ -5663,7 +5683,7 @@ effectObjectRefs effect = case effect of
   Effect.Conjure {} -> []
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> read_ [ref]
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> read_ [original, subject]
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref _) -> read_ [ref]
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> read_ (ref : copyTargetsRefs targets)
   Effect.Replace {} -> []
   Effect.SkipNextPhase {} -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)

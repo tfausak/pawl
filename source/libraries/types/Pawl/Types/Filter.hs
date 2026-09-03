@@ -116,6 +116,12 @@ data Filter keyword
     -- among its CR 601.2c targets (Terror of the Peaks' "spells ... that target
     -- this creature"); IsSource's posture, vacuously False off the stack.
     TargetsSource
+  | -- | CR 115.1 the atom above narrowed by "only": the candidate, a stack
+    -- object, targets the evaluation's source and nothing else (Zada, Hedron
+    -- Grinder's "an instant or sorcery spell that targets only Zada").
+    -- Vacuously False where the candidate targets nothing, a player target
+    -- alone being enough to fail it.
+    TargetsOnlySource
   | -- | CR 115.1 / 115.10a: the candidate has a player in this relation to the
     -- perspective among its targets, a ToPlayer alone counting (Shell of the
     -- Last Kappa's "spell that targets you").

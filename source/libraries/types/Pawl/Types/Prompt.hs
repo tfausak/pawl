@@ -831,6 +831,12 @@ data Prompt r where
   -- being APNAP (CR 101.4) and nobody's choice; the groups are asked in APNAP
   -- order, which CR 101.4c leaves open. Raised for two or more members, with no
   -- further elision: distinct objects are distinguishable by construction.
+  --
+  -- CR 707.10d is a THIRD caller and the one with no primary key at all: "the
+  -- copies are put onto the stack with those targets in the order of their
+  -- controller's choice", so Pawl.Engine.Resolve's CopyStackObject arm asks the
+  -- copying effect's controller about the whole candidate list at once rather
+  -- than through the APNAP grouping above.
   OrderForEach :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt [Natural.Natural]
   -- | CR 613.7m: the relative order of the timestamps a batch of this player's
   -- objects receives at one moment. The [ObjectId] is one seat's group in the
