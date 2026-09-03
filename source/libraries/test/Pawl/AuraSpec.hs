@@ -93,8 +93,8 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
--- Object.attachedTo, Affected.Attached -- so what is genuinely new is the CR
--- 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent,
+-- Object.attachedTo, and an affected set read off it -- so what is genuinely new
+-- is the CR 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent,
 -- and CR 704.5n's detach-rather-than-bury state-based action; see #193. The
 -- Reattach group below is the same keyword action aimed the other way, at a
 -- permanent the effect TARGETS rather than at its own source.
@@ -122,8 +122,11 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     Spec.assertEqWith s "the Equipment is attached to the creature" (fmap Object.attachedTo (Game.lookupObject equip after)) (Just (Just (Recipient.ToCreature creature)))
     Spec.assertBool s (Set.member equip (GameState.battlefield after)) "and is still on the battlefield"
   -- CR 301.5a: "The creature an Equipment is attached to is called the
-  -- 'equipped creature'." Affected.Attached already means exactly that, so
-  -- Bonesplitter's +2/+0 rides the same path Unholy Strength does.
+  -- 'equipped creature'." CR 301.5f makes the phrase name a creature and not
+  -- merely a host, so Bonesplitter's affected set spells the type out beside the
+  -- attachment; Pawl.ProjectionSpec's HoneCounter group is where the difference
+  -- shows. Unholy Strength's "enchanted creature" rides the bare atom still
+  -- (#3143).
   Spec.it s "CR 301.5a the equipped creature gets the Equipment's bonus" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
