@@ -101,7 +101,9 @@
                       },
                       {
                         "type": "Sacrifice",
-                        "value": "self"
+                        "value": {
+                          "slot": "self"
+                        }
                       }
                     ]
                   }
@@ -185,7 +187,9 @@
                       },
                       {
                         "type": "Sacrifice",
-                        "value": "self"
+                        "value": {
+                          "slot": "self"
+                        }
                       }
                     ]
                   }
