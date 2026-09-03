@@ -452,6 +452,9 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- battlefield, so no slot names them and the chooser is CR 608.2c's resolving
   -- controller.
   ObjectRef.ChosenPermanent _ -> Map.empty
+  -- The arm above's answer, for its reason: neither the source nor the
+  -- candidates come out of a slot.
+  ObjectRef.SourceAndChosenPermanent _ -> Map.empty
 
 -- The Quantities an ObjectRef carries: the two library walks' counts.
 -- Exhaustive, no wildcard, and every payload destructured positionally rather
@@ -488,6 +491,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.RandomCardInHand _ -> []
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
+  ObjectRef.SourceAndChosenPermanent _ -> []
 
 -- Every PlayerRef nested in one ObjectRef -- effectPlayerRefs' other half, and
 -- the seat a per-player walk counts against. objectRefSlots takes its player
@@ -525,6 +529,7 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.RandomCardInHand player -> [player]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
+  ObjectRef.SourceAndChosenPermanent _ -> []
 
 -- Every ObjectRef this ONE effect holds, its own only: a nested effect's refs
 -- are its own answer here, reached by whichever caller recurses.
@@ -3084,6 +3089,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- answer is an inert card-data error, which Pawl.CardSpec's inertChoosers
   -- rejects at load time.
   ObjectRef.ChosenPermanent _ -> []
+  -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
+  -- sweep answers nothing for it -- the source half included, which no reader may
+  -- take without the counterpart the one instruction names alongside it.
+  ObjectRef.SourceAndChosenPermanent _ -> []
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is zoneScopePlayers below -- either the perspective's own
@@ -3145,11 +3154,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- off GameState.exile directly because CR 400.1 makes exile one SHARED zone --
   -- no player to ask, and no APNAP sort, so ascending id and thus arrival order.
   --
-  -- The SAME read answers a second wording that rule 607.2a does not cover: one
-  -- ability referring back to what its own earlier instruction exiled, which is
-  -- CR 400.7j in CR 608.2c's written order rather than a link between two printed
-  -- abilities. Hanweir Battlements' "exile them, then meld them into Hanweir, the
-  -- Writhing Township" is that printing, and this is the ref its Meld reads.
+  -- Rule 607.2a's wording ALONE: an ability referring back to what its own
+  -- earlier instruction exiled is CR 400.7j in CR 608.2c's written order, and
+  -- names the slot that instruction bound instead -- Hanweir Battlements' "exile
+  -- them, then meld them into Hanweir, the Writhing Township" is that printing,
+  -- and its Meld reads an InSlot.
   ObjectRef.EachCardExiledWithSource mFilter ->
     let context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
         viewOf = Projection.viewsOf gs
@@ -3426,6 +3435,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- No recipients: the arm above's answer, for its reason -- only a gather that
   -- reaches the Game monad can ask the chooser.
   ObjectRef.ChosenPermanent _ -> []
+  ObjectRef.SourceAndChosenPermanent _ -> []
 
 -- The order for a per-object batch -- CR 608.2f's, and CR 701.44d's, which say
 -- the same thing about the PRIMARY key: APNAP first, reading a player recipient
@@ -5533,6 +5543,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- card offering "a permanent card from among them" (Midnight Tilling)
         -- offers only what an earlier clause of this resolution named.
         chooseContext g = effectContext (Game.teams g) controller source legal (slotBindings resolving g)
+        -- CR 608.2d's singular choice, shared by the two arms that make it, so a
+        -- card cannot find "a creature named Hanweir Garrison" offered one way
+        -- when the source rides along and another way when it does not.
+        chosenPermanent filter_ = do
+          gs <- State.get
+          case battlefieldMatching legal resolving controller source gs filter_ of
+            [] -> pure []
+            [only] -> pure [only]
+            first : second : more -> do
+              let offered = first NonEmpty.:| (second : more)
+              answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+              pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
         -- CR 400.7j: bind what arrived into the resolving object's live bindings,
         -- where a later effect of this resolution or a delayed ability it arms
         -- (CR 603.7c) can name it. The shape follows how many arrived: one takes
@@ -5760,15 +5782,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               --
               -- FILTERED, not trusted (#222), the hand arm's reason: an answer
               -- naming a permanent that was never offered would otherwise be moved.
-              ObjectRef.ChosenPermanent filter_ -> do
+              ObjectRef.ChosenPermanent filter_ -> chosenPermanent filter_
+              -- The arm above's choice with the SOURCE named alongside it: Hanweir
+              -- Battlements' "exile them", where "them" is this land and the
+              -- Garrison the Filter admits. One instruction over two objects, so
+              -- the two are gathered here and moved in the single batch CR 608.2f
+              -- makes them -- what two MoveToZone effects could not be, whichever
+              -- order they were written in.
+              --
+              -- The source is read off the PRE-MOVE board (CR 608.2c) through the
+              -- same battlefieldMatching sweep the counterpart comes from, filtered
+              -- by Filter.IsSource, which is what the card's "this land" is. So a
+              -- source that has left the battlefield is simply not named -- CR
+              -- 101.3 ignoring that much of the instruction, CR 609.3 leaving the
+              -- rest to do as much as it can. It is not offered to anybody: the printed sentence names it
+              -- outright, and the one choice here is WHICH counterpart.
+              --
+              -- The counterpart comes FIRST and the source second, which is the
+              -- order the two separate moves had. Nothing rests on it: CR 608.2f
+              -- makes the primary order APNAP, and both objects are the resolving
+              -- controller's, so its secondary sentence is reached only when the
+              -- action cannot be processed simultaneously -- and this one is.
+              ObjectRef.SourceAndChosenPermanent filter_ -> do
+                counterpart <- chosenPermanent filter_
                 gs <- State.get
-                case battlefieldMatching legal resolving controller source gs filter_ of
-                  [] -> pure []
-                  [only] -> pure [only]
-                  first : second : more -> do
-                    let offered = first NonEmpty.:| (second : more)
-                    answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
-                    pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+                pure (counterpart <> battlefieldMatching legal resolving controller source gs Filter.Type.IsSource)
             arrivals <- settleArrivals zone placement targets
             -- The batch's own board, read after CR 401.4's arrangement asks (which
             -- move nothing) and before any member does.
