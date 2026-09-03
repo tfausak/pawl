@@ -4582,10 +4582,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- event finds one of the two cards, and the rest are announced by
               -- the CardArrived events below.
               --
-              -- CR 712.21e's first half comes out of that: an effect that needs
-              -- the number of OBJECTS that changed zones folds the Moved events
-              -- one at a time (Pawl.Engine.Count.snapshotView), which answers
-              -- Nothing for a CardArrived, so a melded permanent counts as one.
+              -- CR 712.21e's two halves come out of that split: an effect that
+              -- needs the number of OBJECTS that changed zones folds the Moved
+              -- events one at a time and sees one, and one that needs the number
+              -- of CARDS folds this event and every CardArrived below and sees
+              -- two (Pawl.Engine.Count.snapshotView, Pawl.MeldSpec).
               --
               -- The OTHER arrivals ride along in Moved.others as well as in the
               -- CardArrived events below, which is CR 712.21c: "if an effect can

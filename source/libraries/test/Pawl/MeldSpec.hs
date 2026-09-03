@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
@@ -39,15 +40,19 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -61,6 +66,7 @@ import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -73,10 +79,12 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -694,6 +702,45 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "three triggers reached the stack" (length (GameState.stack settled)) 3
         Spec.assertEqWith s "setup: both cards were in the graveyard when they resolved" (List.sort (graveyardNames settled)) bothNames
         Spec.assertEqWith s "setup: exile was empty once the meld had consumed the pair" (exileNames settled) []
+  -- CR 712.21e, both halves on ONE board: "if an effect needs to know the number
+  -- of objects that changed zones, a melded permanent among those objects counts
+  -- as one object that moved. If the effect needs to know the number of cards
+  -- that changed zones, that melded permanent counts as two cards that moved."
+  --
+  -- Synthetic Grave Census -- "{T}: You gain X life, where X is the number of
+  -- cards put into graveyards from anywhere this turn" -- is the card half, and
+  -- the life total is the gameplay reading of the count. The pool's printed
+  -- producers cannot stand here: Dimir Strandcatcher counts cards put into a
+  -- graveyard "from anywhere other than the battlefield", which is the one origin
+  -- a melded permanent can leave from, and Case of the Gorgon's Kiss counts
+  -- CREATURE cards, which the pool's only meld pair cannot discriminate with --
+  -- Hanweir Battlements is a land card, so both readings answer 1 (#3152).
+  --
+  -- The object half is read off the SAME board through the other shape, which is
+  -- what makes the pair discriminating: an engine folding the arrivals under
+  -- EventShape.MovedBetween would answer 2 to both, and one that answered neither
+  -- would answer 1 to both.
+  Spec.it s "CR 712.21e a melded permanent's death is two cards put into a graveyard and one object that moved" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    census <- S.printingOf s registry "Synthetic Grave Census"
+    let (censusId, withCensus) = S.addCreature census S.alice (Setup.emptyGame S.bothPlayers)
+        (mMelded, board) = meldedThrough withCensus battlements garrison mountain
+        bothNames = List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")]
+    case (mMelded, Projection.abilitiesOf censusId board) of
+      (Just meldedId, [tally]) -> do
+        let dead = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [meldedId])
+            after = S.runPure S.identityAnswer dead (do Activate.activateAbility S.alice censusId tally; Stack.resolveTop)
+        Spec.assertEqWith s "CR 712.21e the melded permanent is two cards put into a graveyard, so alice gains 2" (S.lifeOf S.alice after) (Just 22)
+        Spec.assertEqWith s "CR 712.21e and one object that changed zones" (objectsMovedTo Zone.Graveyard dead) (Just 1)
+        -- The proxies, after both behaviours: alice really was at 20 when the
+        -- ability resolved, and the two cards really were in her graveyard for
+        -- the fold to find.
+        Spec.assertEqWith s "setup: alice was at 20 before the ability resolved" (S.lifeOf S.alice dead) (Just 20)
+        Spec.assertEqWith s "setup: two cards reached her graveyard" (List.sort (graveyardNames dead)) bothNames
+      (Nothing, _) -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      (_, other) -> Spec.assertFailure s ("expected one ability on Synthetic Grave Census, got " <> show (length other))
   -- CR 712.21c: "If an effect can find the new object that a melded permanent
   -- becomes as it leaves the battlefield, it finds both cards. (See rule 400.7.)
   -- If that effect causes actions to be taken upon those cards, the same actions
@@ -944,6 +991,50 @@ spec s registry = Spec.describe s "Meld" $ do
           Spec.assertEqWith s "setup: the components are the Garrison then the Battlements" (nameOf firstPid <> nameOf secondPid) [S.printingName garrison, S.printingName battlements]
           Spec.assertEqWith s "setup: alice's library and the command zone were both empty" (libraryNames board <> commandNames board) []
         other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
+  -- CR 903.9c against CR 712.21e's second half: the component that splits off to
+  -- the command zone is NOT one of the cards put into the zone the rest of the
+  -- move was headed for. Counted by each card's OWN destination, which is the
+  -- only place that split is recorded -- Pawl.Types.Moved's `others` carries the
+  -- command-zone component beside the other arrivals and says nothing about where
+  -- either landed.
+  --
+  -- TWO BOARDS DIFFERING IN ONE ANSWER, the library case above's pair: accepting
+  -- rule 903.9b's offer puts one card in the library and one in the command zone,
+  -- declining leaves CR 712.21 alone to put both in the library. An engine
+  -- counting the arrivals off the move's own destination would answer 2 to both.
+  --
+  -- Read through the fold rather than through a card, unlike the CR 712.21e case
+  -- above: no card in data/cards/ counts arrivals in a library or a command zone,
+  -- and Synthetic Grave Census names the graveyard, which this move never
+  -- reaches.
+  Spec.it s "CR 903.9c the component split into the command zone is not a card put into the library" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    griptide <- S.printingOf s registry "Griptide"
+    let (mMelded, base) = meldedThrough (Setup.emptyGame S.bothPlayers) battlements garrison mountain
+        (griptideId, withSpell) = S.addHandCard griptide S.alice base
+        board = S.landsFor island S.alice 4 withSpell
+    case mMelded >>= \meldedId -> fmap ((,) meldedId . Game.componentsOf . Object.source) (Game.lookupObject meldedId board) of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just (meldedId, components) -> case Foldable.toList components of
+        firstPid : _ -> do
+          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Just firstPid}) S.alice (GameState.players board)}
+              split = S.runPure (returningComponent meldedId) designated (do S.cast S.alice griptideId; Stack.resolveTop)
+              declined = S.runPure (arranging meldedId [0, 1]) designated (do S.cast S.alice griptideId; Stack.resolveTop)
+          Spec.assertEqWith s "CR 903.9c one card was put into the library" (cardsArrivingIn Zone.Library split) (Just 1)
+          Spec.assertEqWith s "CR 903.9c and the other into the command zone" (cardsArrivingIn Zone.Command split) (Just 1)
+          Spec.assertEqWith s "CR 712.21 declining rule 903.9b's offer puts both cards into the library" (cardsArrivingIn Zone.Library declined) (Just 2)
+          Spec.assertEqWith s "and none into the command zone" (cardsArrivingIn Zone.Command declined) (Just 0)
+          -- CR 712.21e's first half over the same pair of boards, the case above's
+          -- contrast: one object changed zones either way.
+          Spec.assertEqWith s "CR 712.21e one object moved to the library on both boards" (fmap (objectsMovedTo Zone.Library) [split, declined]) [Just 1, Just 1]
+          -- The proxies, kept after them: the split really did put the cards in
+          -- two different zones.
+          Spec.assertEqWith s "setup: the command zone holds one card and the library the other" (fmap length [commandNames split, libraryNames split]) [1, 1]
+          Spec.assertEqWith s "setup: and declining left both in the library" (fmap length [commandNames declined, libraryNames declined]) [0, 2]
+        other -> Spec.assertFailure s ("expected two components, got " <> show (length other))
   -- CR 903.9c's other destination, which CR 903.9b names alongside the library:
   -- Unsummon's "return target creature to its owner's hand". The board differs
   -- from the case above in the bounce spell alone, so an engine that had special
@@ -1137,6 +1228,30 @@ townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
 
 namedTownship :: GameState.GameState -> [ObjectId.ObjectId] -> [ObjectId.ObjectId]
 namedTownship gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just townshipName)
+
+-- CR 712.21e's second half read straight off the fold: how many CARDS were put
+-- into `zone` this turn, over every card alice's board can have moved. The
+-- filter admits everything a card is -- Pawl.Types.Filter.IsToken is how CR
+-- 111.6 keeps a token out, and Synthetic Grave Census writes it, but nothing on
+-- these boards is one.
+cardsArrivingIn :: Zone.Zone -> GameState.GameState -> Maybe Integer
+cardsArrivingIn zone gs =
+  S.countOf
+    (S.stubView [])
+    (Filter.contextFor Teams.none (Just S.alice) Nothing)
+    gs
+    (Count.Type.MkCount (Scope.InHistory (EventShape.CardArrivedIn zone)) (Filter.Type.And []) Aggregation.Members)
+
+-- cardsArrivingIn's first-half twin (CR 712.21e): how many OBJECTS moved from the
+-- battlefield into `zone`, which is the shape Khabal Ghoul's "each creature that
+-- died this turn" counts through.
+objectsMovedTo :: Zone.Zone -> GameState.GameState -> Maybe Integer
+objectsMovedTo zone gs =
+  S.countOf
+    (S.stubView [])
+    (Filter.contextFor Teams.none (Just S.alice) Nothing)
+    gs
+    (Count.Type.MkCount (Scope.InHistory (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield zone))) (Filter.Type.And []) Aggregation.Members)
 
 -- What alice owns in exile, by name. Each exiled object is a CR 400.7 incarnation
 -- with an id of its own, so the ids the board started with cannot be compared
