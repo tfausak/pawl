@@ -180,10 +180,10 @@ spec s registry = Spec.describe s "Teams" $ do
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice)) "CR 102.3 alice, bob's teammate, may still bolt him"
         Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.carol))) "CR 702.11c carol, his opponent, may not"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob)) "and bob may bolt himself"
-  -- CR 102.3 through the fourth arm that judges ControllerRelation.Opponents,
-  -- Pawl.Engine.Replacement's matchesZoneOwner, which the three cases above do
-  -- not reach: a zone change asks who OWNS the moving card (CR 400.3), not who
-  -- controls anything.
+  -- CR 102.3 through the zone-owner reader of ControllerRelation.Opponents,
+  -- Pawl.Engine.Replacement's matchesZoneOwner (judged, like its siblings, by
+  -- relationHolds), which the three cases above do not reach: a zone change
+  -- asks who OWNS the moving card (CR 400.3), not who controls anything.
   --
   -- Leyline of the Void, {2}{B}{B} Enchantment: "If a card would be put into an
   -- opponent's graveyard from anywhere, exile it instead." ONE board and one

@@ -4,19 +4,19 @@ module Pawl.Types.ControllerRelation where
 -- controller of the effect's SOURCE (that is what "you" means on a permanent's
 -- static ability). Hardened Scales says "a creature you control" (Yours); Rest in
 -- Peace's redirect has no controller clause at all (Anyones).
+--
+-- Judged in ONE place, Pawl.Engine.Replacement.relationHolds, whatever the
+-- pattern reads it for -- a player, an object's controller, or an object's
+-- owner (CR 400.3, for a zone change). Each reader supplies its own two players
+-- and nothing else.
 data ControllerRelation
   = Yours
   | Anyones
-  | -- | CR 102.2/102.3: "an opponent" -- Leyline of the Void's "an opponent's
-    -- graveyard". Read against the effect SOURCE's controller like its siblings,
-    -- except that for a ZONE CHANGE Pawl.Engine.Replacement reads the object's
-    -- OWNER (CR 400.3), the destination zone being theirs.
-    --
-    -- Read through Pawl.Types.Teams.areOpponents by all four arms that judge it
-    -- (Pawl.Engine.Replacement's matchesPlayer, matchesCandidatePlayer,
-    -- matchesController and matchesZoneOwner), so CR 102.3's teammate is not one
-    -- and CR 806.1's free-for-all every other player is. Pawl.TeamSpec's
-    -- "CR 102.3 a teammate's card is not put into an opponent's graveyard" is
-    -- what proves the zone-change arm.
+  | -- | CR 102.2 / 102.3: "an opponent" -- Leyline of the Void's "an opponent's
+    -- graveyard". Pawl.TeamSpec's "CR 102.3 a teammate's card is not put into an
+    -- opponent's graveyard" is what proves a teammate is not one.
     Opponents
+  | -- | CR 303.4b: the player the source enchants -- Wheel of Sun and Moon's
+    -- "enchanted player's graveyard".
+    EnchantedPlayers
   deriving (Bounded, Enum, Eq, Ord, Show)

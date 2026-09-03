@@ -1,0 +1,83 @@
+{
+  "faces": [
+    {
+      "enchant": [
+        {
+          "pool": {
+            "type": "Players"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            }
+          }
+        },
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            }
+          }
+        }
+      ],
+      "name": "Wheel of Sun and Moon",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "ZoneChangeR",
+            "value": {
+              "destination": {
+                "type": "Library"
+              },
+              "matching": {
+                "whenDestination": {
+                  "type": "Graveyard"
+                },
+                "whoseObject": {
+                  "type": "EnchantedPlayers"
+                }
+              },
+              "revealing": true
+            }
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
