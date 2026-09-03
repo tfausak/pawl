@@ -702,6 +702,20 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     fmap
       (\oid -> toInteger (max 0 (Set.size (Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs))) - 1)))
       mOid
+  -- CR 702.184c: Power's arm, with the substitution asked first. `context.source`
+  -- is the station ability's OWN source -- unmoved by AgainstSlot's re-aim, which
+  -- only ever repoints `mOid`/`mView` -- so this is the one place that can still
+  -- ask "who controls the ability being resolved" once the fold has moved on to
+  -- reading the tapped creature. controllerGrantsStationToughness walks the
+  -- battlefield through the same `viewOf` every other arm reads, so a snapshot
+  -- caller (CR 608.2h) answers False rather than reaching for a live board it was
+  -- never handed.
+  Quantity.StationMeasure ->
+    let substitutes = maybe False (controllerGrantsStationToughness viewOf gs) (Filter.source context)
+        greater = case (mView >>= Filter.toughness, mView >>= Filter.power) of
+          (Just t, Just p) -> t > p
+          _ -> False
+     in if substitutes && greater then mView >>= Filter.toughness else mView >>= Filter.power
   where
     recur = evaluateAgainst viewOf context gs announcedOn mOid mView
     -- Was this player dealt damage this turn? Game.wasDealtDamageThisTurn is the
@@ -751,6 +765,26 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
         Just zc <- [Game.enteredBattlefieldChange (LoggedEvent.event ev)],
         ZoneChange.object zc == oid
       ]
+
+-- CR 702.184c: does `src`'s controller control ANY permanent that grants the
+-- toughness substitution -- Modification.GrantsStationToughness's read, folded
+-- to the per-player question Quantity.StationMeasure asks. `src` is the STATION
+-- ABILITY's own source, so its controller is CR 109.5's "you" on Tapestry
+-- Warden's own printed ability, whichever creature happens to be tapped.
+--
+-- False when `viewOf src` cannot answer a controller at all -- a source CR
+-- 608.2h has no last-known information for, or a caller (a snapshot's own
+-- rebuild) that never fills a controller in the first place. This is the honest
+-- reading for both: rule 702.184c asks about a LIVE grant, and neither caller
+-- has a live board to walk.
+controllerGrantsStationToughness :: Count.ViewOf -> GameState -> ObjectId -> Bool
+controllerGrantsStationToughness viewOf gs src =
+  case viewOf src >>= Filter.controller of
+    Nothing -> False
+    Just controller ->
+      any
+        (maybe False (\v -> Filter.controller v == Just controller && Filter.grantsStationToughness v) . viewOf)
+        (Set.toList (GameState.battlefield gs))
 
 -- Is this declared attack an attack on one of that player's OPPONENTS? CR 506.3
 -- gives three things a creature can attack and rule 702.121a counts only the
@@ -911,6 +945,9 @@ objectSlots quantity = case quantity of
   Quantity.EnteredFrom _ -> Set.empty
   Quantity.WasCastFrom _ -> Set.empty
   Quantity.BlockersBeyondFirst -> Set.empty
+  -- Power's answer: it names no object at all and takes the one the evaluation
+  -- is aimed at, so there is no slot here for AgainstSlot to have named.
+  Quantity.StationMeasure -> Set.empty
   -- The one arm with an answer, and DESCENT beside it: the payload is evaluated
   -- against the named object and may aim at a further slot of its own.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Set.insert slot (objectSlots inner)
@@ -1125,6 +1162,8 @@ readsX quantity = case quantity of
   Quantity.EnteredFrom _ -> False
   Quantity.WasCastFrom _ -> False
   Quantity.BlockersBeyondFirst -> False
+  -- A leaf, Power's answer: it holds no Quantity of its own to hide X inside.
+  Quantity.StationMeasure -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion
   -- Plus above needs. Its own SlotName names a target rather than an amount, and X
   -- is only ever an amount.

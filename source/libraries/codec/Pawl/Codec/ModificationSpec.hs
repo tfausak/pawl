@@ -246,6 +246,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.SwitchPowerToughness
       " {\"type\":\"SwitchPowerToughness\"} "
+  -- layer 6, CR 702.184c: this object's controller's station abilities read
+  -- toughness instead of power. Payload-free, self-only.
+  Spec.it s "GrantsStationToughness" $
+    Common.assertCodec
+      s
+      codec
+      Modification.GrantsStationToughness
+      " {\"type\":\"GrantsStationToughness\"} "
   -- layer 6, CR 613.1f: a whole quoted activated ability, Presence of Gond's
   -- "{T}: Create a 1/1 green Elf Warrior creature token" reduced to its cost.
   Spec.it s "GainAbility" $

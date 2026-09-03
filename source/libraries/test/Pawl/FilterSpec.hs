@@ -93,7 +93,8 @@ blackCreature =
       Filter.manaSpentTags = Set.empty,
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
       -- atom's own cases below say which view they want rather than inheriting it.
-      Filter.nonManaActivatedAbility = False
+      Filter.nonManaActivatedAbility = False,
+      Filter.grantsStationToughness = False
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -146,7 +147,8 @@ devoidBigCreature =
       Filter.classLevel = Nothing,
       Filter.kicked = Map.empty,
       Filter.manaSpentTags = Set.empty,
-      Filter.nonManaActivatedAbility = False
+      Filter.nonManaActivatedAbility = False,
+      Filter.grantsStationToughness = False
     }
 
 -- A creature whose only ability is the given keyword -- the toxic N and landwalk

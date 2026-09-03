@@ -141,5 +141,7 @@ codec =
       Arm.nullary "BlockersBeyondFirst" Quantity.BlockersBeyondFirst,
       -- A slot and a whole Quantity, in that order: which object to aim at, then
       -- what to read off it.
-      Arm.payload "AgainstSlot" (AgainstSlot.codec codec) Quantity.AgainstSlot (\x -> case x of Quantity.AgainstSlot y -> Just y; _ -> Nothing)
+      Arm.payload "AgainstSlot" (AgainstSlot.codec codec) Quantity.AgainstSlot (\x -> case x of Quantity.AgainstSlot y -> Just y; _ -> Nothing),
+      -- CR 702.184c, engine-only: Power's shape, nothing on the wire.
+      Arm.nullary "StationMeasure" Quantity.StationMeasure
     ]
