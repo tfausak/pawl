@@ -1353,10 +1353,11 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.subtypes = Set.singleton Subtype.Aura}) byAnAura)) "subtype does not imply carrying one"
 
     -- CR 303.4b does let an Aura enchant a PLAYER, so unlike AttachedTo's player
-    -- case this False is a limitation rather than the rule.
-    --
-    -- Not implemented: an enchanted player (#2030).
-    Spec.it s "a player candidate is vacuously false" $ do
+    -- case this False is ControlsMoreThanYou's posture rather than the rule:
+    -- answered by rewriting at Pawl.Engine.Count.bakePerspective, and vacuously
+    -- False wherever it reaches a match unbaked. Pawl.CountSpec's Census of the
+    -- Cursed group proves the baked answer.
+    Spec.it s "a player candidate is False unbaked" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer byAnAura)) "player, narrow nest"
       Spec.assertBool s (not (Filter.matches self aPlayer byAnything)) "player, trivial nest"
 
