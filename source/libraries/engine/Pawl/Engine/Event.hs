@@ -5135,7 +5135,7 @@ sacrifice pid oid = do
       -- trigger's own source, `apply`'s CR 614.1c as-enters sacrifice, and an
       -- edict whose victim a player NAMED, and only the last of those could ever
       -- be wrong. Resolve's Effect.Sacrifice road asks the same question of the
-      -- permanent before it gets here (Resolve.sacrificeByController), since a
+      -- permanent before it gets here (Resolve.sacrificerFor), since a
       -- printed "its controller sacrifices it" names a player this arm could only
       -- refuse.
       Zone.Battlefield
