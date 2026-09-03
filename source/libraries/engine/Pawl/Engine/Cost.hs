@@ -3161,24 +3161,34 @@ payComponent moment slots pid oid component = case component of
   -- a cost payment is a game event, so dies-triggers, replacement effects and the
   -- turn history all see it.
   --
-  -- Not implemented: CR 118.3 asked again here, as TapThis above asks it. An
-  -- earlier part of the CR 601.2h order, or a mana ability activated in the CR
-  -- 605.3a window, can already have moved this permanent, and the funnel then does
-  -- nothing while this answers Paid. The same paragraph stands over ExileThis and
-  -- ReturnThis below (#3118).
+  -- CR 118.3 asked AGAIN here, TapThis' reason above: an earlier part of the CR
+  -- 601.2h order, or a mana ability activated in the CR 605.3a window, can
+  -- already have moved this permanent, and the funnel would then do nothing
+  -- while this answered Paid. Pawl.CostSpec's "CR 118.3 the Altar eats the
+  -- Replica before its own sacrifice is paid" is the proof.
   CostComponent.SacrificeThis -> do
-    -- CR 701.21a's "a permanent they don't control" guard lives in the funnel;
-    -- `pid` is the player paying, who for "sacrifice this" is its controller.
-    Event.sacrifice pid oid
-    pure bindsNothing
+    gs <- State.get
+    -- CR 701.21a's "a permanent they don't control" guard lives in the funnel as
+    -- well as in `canPayComponent`; `pid` is the player paying, who for
+    -- "sacrifice this" is its controller.
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.sacrifice pid oid
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- Through Event.changeZone, the CR 400.7 funnel, and never a direct zone poke,
   -- SacrificeThis' call above and for its reason. CR 400.3 is what makes the bare
   -- Zone.Hand right: an object that would go to a hand other than its owner's
   -- goes to its owner's, so the funnel already spells the printed "its owner's".
-  -- SacrificeThis' CR 118.3 elision above covers this arm too (#3118).
+  -- CR 118.3 asked again, SacrificeThis' reason above; Pawl.CostSpec's "CR 118.3
+  -- the Altar eats the Ignus before its own return is paid" is the proof.
   CostComponent.ReturnThis -> do
-    Event.changeZone oid Zone.Hand
-    pure bindsNothing
+    gs <- State.get
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.changeZone oid Zone.Hand
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- CR 119.4: the payment is subtracted from the life total, shared with CR
   -- 107.4f's Phyrexian symbol as the payability check above is -- and ASKED
   -- AGAIN here, because not every component reached the gate: a component a
@@ -3503,11 +3513,16 @@ payComponent moment slots pid oid component = case component of
     Event.changeZone oid Zone.Exile
     pure bindsNothing
   -- CR 406.2's move off the BATTLEFIELD, through the same funnel and with no
-  -- prompt for the same reason: the cost names this permanent. SacrificeThis'
-  -- CR 118.3 elision above covers this arm too (#3118).
+  -- prompt for the same reason: the cost names this permanent. CR 118.3 asked
+  -- again, SacrificeThis' reason above; Pawl.CostSpec's "CR 118.3 the Altar eats
+  -- the Executioner before its own exile is paid" is the proof.
   CostComponent.ExileThis -> do
-    Event.changeZone oid Zone.Exile
-    pure bindsNothing
+    gs <- State.get
+    if canPayComponent slots pid oid component gs
+      then do
+        Event.changeZone oid Zone.Exile
+        pure bindsNothing
+      else pure Payment.Unpaid
   -- CR 406.2's move again, for CHOSEN cards: the payer picks which, so this is a
   -- prompt. Elided only when forced, Sacrifice's elision.
   --

@@ -1951,6 +1951,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   millikinSpec s registry
   brittleEffigySpec s registry
   hanweirBattlementsSpec s registry
+  ashnodsAltarSpec s registry
   reversalSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
@@ -3460,6 +3461,142 @@ hanweirBattlementsSpec s registry = Spec.describe s "Hanweir Battlements" $ do
         Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId after) "CR 702.10 the targeted Piker gained haste"
         Spec.assertEqWith s "and the Battlements paid its own {T}" (fmap Object.tapped (Game.lookupObject battlementsId after)) (Just TapState.Tapped)
         Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
+
+-- Ashnod's Altar "Sacrifice a creature: Add {C}{C}": a mana ability with no {T}
+-- in its cost, so CR 605.3a's window offers it while ANOTHER permanent's cost is
+-- being paid, and the creature it eats can be that permanent. That is CR 118.3
+-- on the three cost parts that remove their own permanent, on boards where
+-- TapThis' guard cannot refuse first -- none of the three costs below taps.
+--
+-- One producer per part, each alice's ONLY creature so the Altar has exactly one
+-- thing to eat: Auriok Replica "{W}, Sacrifice this creature" is SacrificeThis,
+-- Hanged Executioner "{3}{W}, Exile this creature: Exile target creature" is
+-- ExileThis, and Grinning Ignus "{R}, Return this creature to its owner's hand:
+-- Add {C}{C}{R}" is ReturnThis -- that one a mana ability, so it is CR 602.2b's
+-- nested window rather than an announcement's.
+--
+-- Each is a PAIR differing in one thing, the source the payer names in the
+-- window, so no refusal can be an unaffordable cost or a missing activation.
+altarBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+altarBoard subject altar land piker n =
+  let (subjectId, g1) = S.addCreature subject S.alice (Setup.emptyGame S.bothPlayers)
+      (altarId, g2) = S.addCreature altar S.alice g1
+      (pikerId, g3) = S.addCreature piker S.bob g2
+      withLands = S.landsFor land S.alice n g3
+   in ( subjectId,
+        altarId,
+        pikerId,
+        withLands
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- CR 605.3a's window answered by IDENTITY: the Altar whenever the engine offers
+-- it, and otherwise the head of what is left, which is how the rest of the mana
+-- still gets paid after the Altar has eaten the permanent. The Altar is offered
+-- once at most -- it has no second creature to sacrifice -- so the fallback
+-- cannot name it again.
+feeding :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+feeding altarId victim p = case p of
+  Prompt.ChooseManaSource _ _ candidates ->
+    Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== altarId) (NonEmpty.toList candidates)))
+  _ -> targeting victim p
+
+-- The other half of every pair: the same board and the same target, naming
+-- anything BUT the Altar, and Nothing once the Altar is all that is offered.
+sparing :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+sparing altarId victim p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> List.find (/= altarId) (NonEmpty.toList candidates)
+  _ -> targeting victim p
+
+ashnodsAltarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
+  -- CR 118.3 on SacrificeThis. The payer spends the CR 605.3a window feeding the
+  -- Replica to the Altar, so by CR 601.2h's payment there is no permanent left
+  -- to sacrifice for the Replica's own cost; the payment is refused whole and
+  -- the announcement reverses (CR 701.21a's funnel would otherwise have done
+  -- nothing while the part counted paid).
+  Spec.it s "CR 118.3 the Altar eats the Replica before its own sacrifice is paid" $ do
+    replica <- S.printingOf s registry "Auriok Replica"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (replicaId, altarId, pikerId, gs) = altarBoard replica altar plains piker 1
+        after = S.runPure (feeding altarId pikerId) gs (Activate.activateAbility S.alice replicaId (theAbility replica) >> Stack.resolveTop)
+    Spec.assertBool s (S.onBattlefield replicaId after) "the Replica is back on the battlefield"
+    Spec.assertEqWith s "with nothing in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "and nothing on the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "CR 601.2h the mana the window made is gone with the rest of the announcement" (Game.poolOf S.alice after) (Mana.Type.MkMana [])
+  Spec.it s "CR 601.2g paying from the Plains instead sacrifices the Replica itself" $ do
+    replica <- S.printingOf s registry "Auriok Replica"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (replicaId, altarId, pikerId, gs) = altarBoard replica altar plains piker 1
+        after = S.runPure (sparing altarId pikerId) gs (Activate.activateAbility S.alice replicaId (theAbility replica) >> Stack.resolveTop)
+    Spec.assertBool s (not (S.onBattlefield replicaId after)) "CR 701.21a the Replica sacrificed itself"
+    Spec.assertEqWith s "into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
+
+  -- CR 118.3 on ExileThis, and the sharpest of the three: the Executioner's
+  -- ability exiles a creature, so the refusal is visible on a permanent the cost
+  -- never touches.
+  Spec.it s "CR 118.3 the Altar eats the Executioner before its own exile is paid" $ do
+    executioner <- S.printingOf s registry "Hanged Executioner"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (executionerId, altarId, pikerId, gs) = altarBoard executioner altar plains piker 4
+        after = S.runPure (feeding altarId pikerId) gs (Activate.activateAbility S.alice executionerId (theAbility executioner) >> Stack.resolveTop)
+    Spec.assertBool s (S.onBattlefield pikerId after) "the targeted Piker was never exiled"
+    Spec.assertBool s (S.onBattlefield executionerId after) "and the Executioner is back on the battlefield"
+    Spec.assertEqWith s "with nothing in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    Spec.assertEqWith s "nothing in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "and nothing on the stack" (length (GameState.stack after)) 0
+  Spec.it s "CR 406.2 paying from the Plains instead exiles the Executioner and its target" $ do
+    executioner <- S.printingOf s registry "Hanged Executioner"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (executionerId, altarId, pikerId, gs) = altarBoard executioner altar plains piker 4
+        after = S.runPure (sparing altarId pikerId) gs (Activate.activateAbility S.alice executionerId (theAbility executioner) >> Stack.resolveTop)
+    Spec.assertBool s (not (S.onBattlefield pikerId after)) "the targeted Piker was exiled"
+    Spec.assertBool s (not (S.onBattlefield executionerId after)) "and the Executioner paid its own half"
+    Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
+
+  -- CR 118.3 on ReturnThis, reached through CR 602.2b rather than through an
+  -- announcement: the Ignus' ability is itself a mana ability, so paying its {R}
+  -- opens the window CR 605.3a describes and the Altar is in it. The whole
+  -- activation reverses, so the Altar's own sacrifice goes back with it.
+  Spec.it s "CR 118.3 the Altar eats the Ignus before its own return is paid" $ do
+    ignus <- S.printingOf s registry "Grinning Ignus"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (ignusId, altarId, pikerId, gs) = altarBoard ignus altar mountain piker 1
+        after = S.runPure (feeding altarId pikerId) gs (Cost.tapForMana S.manaPerformer ignusId)
+    Spec.assertBool s (S.onBattlefield ignusId after) "the Ignus is back on the battlefield"
+    Spec.assertEqWith s "with nothing of alice's in hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+    Spec.assertEqWith s "nothing in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "CR 601.2h and no mana floating, the Altar's activation reversed with the rest" (Game.poolOf S.alice after) (Mana.Type.MkMana [])
+  Spec.it s "CR 605.3a paying from the Mountain instead returns the Ignus and adds its mana" $ do
+    ignus <- S.printingOf s registry "Grinning Ignus"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (ignusId, altarId, pikerId, gs) = altarBoard ignus altar mountain piker 1
+        after = S.runPure (sparing altarId pikerId) gs (Cost.tapForMana S.manaPerformer ignusId)
+    Spec.assertBool s (not (S.onBattlefield ignusId after)) "CR 400.3 the Ignus returned to its owner's hand"
+    Spec.assertEqWith s "which is alice's" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+    Spec.assertEqWith s "and the ability added its three mana" (poolSize S.alice after) 3
 
 -- How many mana units a player has floating. Duplicated per this suite's
 -- convention of group-local helpers (ManaSpec carries its own).
