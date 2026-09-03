@@ -132,6 +132,13 @@ data Prompt r where
   -- Floating is observable (Omnath, Locus of Mana), so this is never elided,
   -- and its candidate list is collapsed exactly as ChooseManaSource's is.
   ChooseExtraManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
+  -- | CR 733.1: an action the player could not legally complete is being
+  -- reversed -- do they also reverse the mana abilities they activated while
+  -- making it? Exercises reverses them, Declines keeps them, and the mana they
+  -- made stays in the pool (CR 106.4). The list is the sources whose abilities
+  -- were activated, so the prompt exists only where the rule offers something
+  -- to reverse. All or nothing rather than a subset (#3134).
+  ReverseManaAbilities :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 605.3b: which mana the source produces, asked as the mana ability
   -- resolves. A ManaOption is the whole mana one activation adds together with
   -- what CR 602.2b charges for it, so "{T}: Add {C}{C}" is one candidate.
