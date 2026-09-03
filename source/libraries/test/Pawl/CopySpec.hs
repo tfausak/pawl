@@ -36,6 +36,10 @@
 -- read by a copied Stir the Grave's own target slot (stirCopySpec) -- the CR
 -- 704.5e state-based action in Pawl.Engine.Sba that removes the resolved copy,
 -- and Pawl.Engine.Stack's OfSpellCopy resolution arm.
+--
+-- And that same arm over CR 707.10's other two nouns -- an activated and a
+-- triggered ability on the stack, copied by Lithoform Engine
+-- (copyAbilityOnStackSpec), where CR 707.10b keeps the original's source.
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -1778,8 +1782,9 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 
 -- CR 707.10f / 608.3f: a copy of a PERMANENT spell resolves into a token
 -- permanent. Lithoform Engine's third ability ("{4}, {T}: Copy target permanent
--- spell you control") is the pool's producer; its first ability, copying an
--- ability, is omitted, which leaves pawl's card stricter than printed (#2208).
+-- spell you control") is the pool's producer; copyAbilityOnStackSpec below drives
+-- its first, and the {3} one is the spell copy Twincast already proves, so all
+-- three legs of the printed card are exercised.
 --
 -- alice holds Nyxborn Rollicker -- data/cards/'s bestow card -- with the Engine
 -- on the battlefield, so ONE board reaches both the creature-spell copy (CR

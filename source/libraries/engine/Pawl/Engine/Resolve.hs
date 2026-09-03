@@ -6880,7 +6880,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- ABILITY has no card behind it at all (CR 113.7a; Game.cardOf
               -- answers Nothing for one), so there is nothing to snapshot -- CR
               -- 707.10b's "the same source as the original ability" is the whole of
-              -- what its copy carries, and it rides in `copySource` above.
+              -- what its copy carries, and it rides in `copySource` above. That
+              -- half is a REGRESSION FENCE rather than a proven line: stamping a
+              -- snapshot on an ability copy anyway left the suite green
+              -- (2026-09-03), an ability having no characteristic any board can
+              -- read it back off.
               stampCopiable = case kind of
                 StackObjectKind.Spell -> Binding.setCopy (Event.copiedSnapshot original gs)
                 StackObjectKind.Ability -> id
