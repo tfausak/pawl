@@ -8947,11 +8947,15 @@ performHandAction source player =
 -- Pawl.Types.ManaAbilityPerformer parameter.
 --
 -- CR 605.3b gives the ability no stack object, so the SOURCE stands in for the
--- resolving one. Observably the same here rather than in general: nothing on
--- this path reads the resolving object's own bindings -- the slots below are
--- passed in whole, and CR 605.1a's "doesn't require a target" leaves the
--- announcement with none of its own -- and CR 601.2b's X is announced into the
--- source, which is what an X in a mana ability's cost would be read from.
+-- resolving one, performHandAction's posture.
+--
+-- Not implemented: an object of the ability's own to carry slots the bindings
+-- below do not. A slot read that misses them falls through to the source
+-- PERMANENT's bindings instead. Exact for the pool as it stands -- CR 605.1a
+-- leaves a mana ability no targets to have bound, and the other slots
+-- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
+-- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
+-- data/cards/ reads (#3124).
 --
 -- Stands on the noSubgame floor, performHandAction's reason: no mana ability
 -- starts a subgame (#1900).
@@ -8962,11 +8966,11 @@ performManaAbility source controller =
         source
         source
         controller
-        -- CR 109.5's "you" is the player who activated the ability, and CR
-        -- 115.1's self slot is the ability's source. Both are bound here rather
+        -- CR 109.5's "you" is the player who activated the ability, and the
+        -- reserved self slot is CR 113.7's source. Both are bound here rather
         -- than read off an object, because there is no ability object carrying
-        -- them: Pawl.Engine.Activate.activateAbility stamps them at CR 601.2i
-        -- for every ability that does go on the stack.
+        -- them: Pawl.Engine.Activate.activateAbility stamps them for every
+        -- ability that does go on the stack.
         manaAbilityBindings
         manaAbilityBindings
     )

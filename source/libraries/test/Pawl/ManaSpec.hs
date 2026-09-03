@@ -1418,12 +1418,30 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
         (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (Cost.tapForMana S.manaPerformer solRingId)) 0) 0
 
-  -- CR 405.6c: "if a mana ability both produces mana and has another effect, the
-  -- mana is produced and the other effect happens immediately". Ancient Tomb
-  -- ("{T}: Add {C}{C}. This land deals 2 damage to you") is the pool's one mana
-  -- ability with a clause beyond its mana, and CR 605.3b is what makes that
-  -- clause the payment path's business rather than a resolution's: the ability
-  -- never goes on the stack, so nothing above Pawl.Engine.Cost would run it.
+-- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
+-- other source's prompt to S.identityAnswer, which takes the head. A payment off
+-- several two-yield sources needs a different answer from each, and the prompt
+-- carries the object it is about, so keying on that is what lets one answerer
+-- send one Palladium Myr to its Forest and the other to its {C}{C}.
+prefersLongYieldFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+prefersLongYieldFrom wanted p = case p of
+  Prompt.ChooseManaYield _ _ oid candidates
+    | oid == wanted ->
+        let size option = case ManaOption.yield option of
+              Mana.Type.MkMana units -> length units
+         in List.maximumBy (\a b -> compare (size a) (size b)) (NonEmpty.toList candidates)
+  _ -> S.identityAnswer p
+
+-- CR 405.6c: "mana abilities resolve immediately. If a mana ability both
+-- produces mana and has another effect, the mana is produced and the other
+-- effect happens immediately." Ancient Tomb ("{T}: Add {C}{C}. This land deals
+-- 2 damage to you") is the pool's first mana ability with a clause beyond its
+-- mana, and CR 605.3b is what makes that clause the payment path's business
+-- rather than a resolution's: the ability never goes on the stack, so nothing
+-- above Pawl.Engine.Cost would run it. Pawl.Engine.Resolve.performManaAbility is
+-- the executor the payment path is handed for it.
+ancientTombSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ancientTombSpec s registry = Spec.describe s "Ancient Tomb" $ do
   Spec.it s "CR 405.6c Ancient Tomb charges its damage for the mana it makes" $ do
     ancientTomb <- S.printingOf s registry "Ancient Tomb"
     sapphireMedallion <- S.printingOf s registry "Sapphire Medallion"
@@ -1459,20 +1477,6 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
     Spec.assertBool s (elem tombId (Mana.manaSources Cost.manaActivations S.alice board)) "and it is a mana source"
     Spec.assertEqWith s "the activation used no stack (CR 605.3b)" (length (GameState.stack after)) 0
     Spec.assertEqWith s "while the damage was still dealt" (S.lifeOf S.alice after) (Just 18)
-
--- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
--- other source's prompt to S.identityAnswer, which takes the head. A payment off
--- several two-yield sources needs a different answer from each, and the prompt
--- carries the object it is about, so keying on that is what lets one answerer
--- send one Palladium Myr to its Forest and the other to its {C}{C}.
-prefersLongYieldFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-prefersLongYieldFrom wanted p = case p of
-  Prompt.ChooseManaYield _ _ oid candidates
-    | oid == wanted ->
-        let size option = case ManaOption.yield option of
-              Mana.Type.MkMana units -> length units
-         in List.maximumBy (\a b -> compare (size a) (size b)) (NonEmpty.toList candidates)
-  _ -> S.identityAnswer p
 
 -- CR 118.3 on a source offering SEVERAL yields, one of which adds more than one
 -- mana. Ashaya, Soul of the Wild ("Each nontoken creature you control is a Forest
@@ -4840,6 +4844,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   anyColorSpec s registry
   chosenColorSpec s registry
   solRingSpec s registry
+  ancientTombSpec s registry
   palladiumMyrSpec s registry
   hybridSpec s registry
   shuYunSpec s registry
