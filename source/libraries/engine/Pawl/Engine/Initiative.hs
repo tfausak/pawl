@@ -167,7 +167,7 @@ damagerOf holder gs event = case event of
 -- damage: a first-strike step and the regular step are separate batches and
 -- rightly trigger twice. That is where this parts company with
 -- Monarch.inherentMonarchPending, whose per-damager reading of the identically
--- worded CR 725.2 is #3126.
+-- worded CR 725.2 is #3129.
 inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentPending events gs = held <> takes
   where

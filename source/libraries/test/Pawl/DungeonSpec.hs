@@ -528,9 +528,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
   -- data/cards/undercity.json is the DUNGEON face alone. The printing's other
   -- face, The Initiative, is a reminder rather than a source: CR 726.2 makes the
   -- three initiative abilities inherent, with no source, so transcribing them onto
-  -- a face would be wrong as well as unreachable, and rule 726 is #746's.
-  -- Synthetic Undercity Stair is the producer meanwhile, since CR 726.2's
-  -- inherent ability is the only printed "venture into Undercity" there is.
+  -- a face would be wrong as well as unreachable. Pawl.Engine.Initiative mints
+  -- them instead, and Pawl.InitiativeSpec drives them.
+  --
+  -- Synthetic Undercity Stair is still this case's producer: rule 726.2's is the
+  -- only "venture into Undercity" any printing states, and it reaches CR 701.49d
+  -- through the initiative rather than through an ability a card can bear.
   --
   -- ONE board, two abilities on it: Synthetic Undercity Stair's "venture into
   -- Undercity" and Secret Door's plain "venture into the dungeon". alice owns
