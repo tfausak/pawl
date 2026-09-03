@@ -4,17 +4,21 @@
 -- Covers Pawl.Engine.Vanguard and the CR 902 readings its callers make:
 -- Pawl.Engine.Setup's starting life, command zone and rebuild paths,
 -- Pawl.Engine.Mulligan's starting hand size, and Pawl.Engine.PlayerEffect's
--- maximum hand size. Also the four walks that let a vanguard's abilities function
+-- maximum hand size. Also the five walks that let a vanguard's abilities function
 -- from the command zone, all of which ask Vanguard.functionsFromCommandZone:
 -- Pawl.Engine.Event's triggered one, Pawl.Engine.Projection's static and
--- replacement ones, and Pawl.Engine.CombatRestriction.inForce.
+-- replacement ones, Pawl.Engine.CombatRestriction.inForce, and
+-- Pawl.Engine.Activate's activated one.
 module Pawl.VanguardSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
@@ -26,6 +30,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
@@ -90,6 +95,45 @@ handSize gs = length (Game.zoneMembers Zone.Hand S.alice gs)
 
 commandNames :: GameState.GameState -> [CardName.CardName]
 commandNames gs = fmap (\oid -> maybe (CardName.MkCardName (Text.pack "?")) S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Command S.alice gs)
+
+-- Is this menu entry an activation of that object's ability? EXHAUSTIVE, so a new
+-- kind of action has to be classified rather than counted as one of these.
+isActivationOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isActivationOf oid action = case action of
+  Action.Type.Activate srcId _ -> srcId == oid
+  Action.Type.ActivateManaAbility _ -> False
+  Action.Type.Pass -> False
+  Action.Type.Play _ _ -> False
+  Action.Type.Cast {} -> False
+  Action.Type.TurnFaceUp {} -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
+  Action.Type.Ignore _ -> False
+  Action.Type.EndEffect _ -> False
+
+-- Takes the command-zone object's ability from the priority menu ONCE --
+-- sacrificing `fodder`, aiming at `victim` -- and passes at every window after
+-- that. Threaded through State because a pure answerer cannot tell the second
+-- offer from the first: alice still holds a permanent to sacrifice and a creature
+-- of her own to bounce once this one has resolved, so "take it whenever offered"
+-- would keep going until she had nothing left.
+takesOnce :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+takesOnce srcId fodder victim p = case p of
+  Prompt.ChooseAction _ _ actions -> do
+    taken <- State.get
+    case filter (isActivationOf srcId) actions of
+      offer : _ | taken == 0 -> do
+        State.put 1
+        pure offer
+      _ -> pure Action.Type.Pass
+  -- FILTERS the offered recipients rather than building one: CR 608.2b re-reads
+  -- the targets at resolution, and a hand-built recipient of the same permanent
+  -- is a different one and would be dropped there with no error.
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets)
+  Prompt.ChooseSacrifices _ _ _ candidates _ -> pure (Set.fromList (filter (== fodder) candidates))
+  _ -> pure (S.identityAnswer p)
 
 -- One noncombat hit, the shape Pawl.Engine.Damage.applyDamage takes.
 hit :: ObjectId.ObjectId -> Recipient.Recipient -> Natural -> DamageEvent.DamageEvent
@@ -260,6 +304,46 @@ spec s registry = Spec.describe s "Vanguard" $ do
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [free] control) "and may on the board that differs only in the vanguard"
     Spec.assertBool s (not (Combat.canAttack S.alice barred board)) "so it is not a CR 508.1a candidate either"
     Spec.assertEqWith s "where without the vanguard it is the one offered" (Combat.legalAttackers S.alice control) [free]
+
+  -- CR 902.7 / CR 313.4, third limb of rule 902.7's sentence: "its activated
+  -- abilities may be activated". Barrin (Vanguard, hand +0 / life +6, "Sacrifice
+  -- a permanent: Return target creature to its owner's hand" -- Scryfall pvan,
+  -- paper, checked 2026-09-02), whose cost holds no mana, so the board needs no
+  -- source. End to end through Engine.priorityLoop: the activation is one alice
+  -- takes off the offered menu, so Action.legalActions naming the command-zone
+  -- card is what the bounce below rests on.
+  --
+  -- Three creatures and not two: alice keeps a spare, so the CR 701.21a sacrifice
+  -- is a genuine choice rather than a forced one the engine elides, and the spare
+  -- surviving is what pins her answer. Bob's is the victim, so CR 400.3's "its
+  -- owner's hand" lands somewhere alice's hand does not.
+  Spec.it s "CR 902.7 a vanguard's activated ability may be activated from the command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    barrin <- S.printingOf s registry "Barrin"
+    let place vanguard =
+          let (fodder, g1) = S.addCreature piker S.alice (built mountain vanguard)
+              (spare, g2) = S.addCreature piker S.alice g1
+              (victim, g3) = S.addCreature piker S.bob g2
+           in (fodder, spare, victim, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+        (fodderId, spareId, victimId, board) = place (Just barrin)
+        -- The control: the same three creatures, the same answerer, and no
+        -- vanguard for it to take -- so every assertion below reads the other way
+        -- on a board differing in exactly that.
+        (controlFodder, _, controlVictim, control) = place Nothing
+    case Game.zoneMembers Zone.Command S.alice board of
+      [barrinId] -> do
+        let played srcId fodder victim gs = snd (State.evalState (Engine.runGame (takesOnce srcId fodder victim) gs Engine.priorityLoop) 0)
+            after = played barrinId fodderId victimId board
+            without = played barrinId controlFodder controlVictim control
+        Spec.assertEqWith s "CR 902.7 bob's Piker is in his hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 1
+        Spec.assertEqWith s "and without the vanguard nothing bounced it" (length (Game.zoneMembers Zone.Hand S.bob without)) 0
+        Spec.assertBool s (not (Set.member victimId (GameState.battlefield after))) "so it is off the battlefield"
+        Spec.assertBool s (not (Set.member fodderId (GameState.battlefield after))) "CR 701.21a: the permanent she chose was sacrificed"
+        Spec.assertBool s (Set.member spareId (GameState.battlefield after)) "and the one she did not choose is still there"
+        Spec.assertBool s (any (isActivationOf barrinId) (Action.legalActions S.alice board)) "CR 602.2: alice is offered the ability"
+        Spec.assertBool s (not (any (isActivationOf barrinId) (Action.legalActions S.bob board))) "and bob, on the same board, is not"
+      _ -> Spec.assertFailure s "the fixture should have put Barrin in alice's command zone"
 
   -- CR 313.2 against CR 727.2: a restart puts every card into its owner's new
   -- library, and the vanguard card is the exception -- it stays where it is, and

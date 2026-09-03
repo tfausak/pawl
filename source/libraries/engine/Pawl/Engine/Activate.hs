@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -87,9 +88,12 @@ sicknessOkGiven pcs pid srcId ability =
 -- abilities that name the hand, per CR 113.6j and CR 113.6m (Faerie Macabre's
 -- "Discard this card: ..."). In a graveyard: the PRINTED abilities
 -- whose own cost or effect names the graveyard, per CR 113.6m -- both zones
--- through zoneAbilitiesOf. Anywhere else: nothing -- flashback and rule 702's other
+-- through zoneAbilitiesOf. In the COMMAND zone: the same reader again, whose CR
+-- 113.6p limb keeps an emblem's (CR 114.4) and a face-up vanguard card's (CR
+-- 902.7) rows that state no zone at all. Anywhere else: nothing -- flashback and
+-- rule 702's other
 -- zone abilities are CASTING permissions (CR 702.34a), so they reach
--- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fourth zone adds
+-- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fifth zone adds
 -- an arm here: CR 113.6j reaches "any zone in which its cost can be paid", and
 -- Cost.zoneOfComponent names only the hand and the graveyard, so no cost in the
 -- vocabulary is payable from a library or from exile. CR 113.6m's EFFECT half
@@ -145,6 +149,12 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
     Nothing -> []
     Just face -> Keyword.handAbilitiesOf (Face.keywords face) <> zoneAbilitiesOf Zone.Hand oid gs
   Just Zone.Graveyard -> zoneAbilitiesOf Zone.Graveyard oid gs
+  -- CR 114.4 and CR 902.7's third limb, "its activated abilities may be
+  -- activated". The narrowing to the objects rule 113.6p names is inside
+  -- zoneAbilitiesOf, so a commander or a dungeon card sharing this zone offers
+  -- only a row that STATES it (CR 113.6b) -- the split Pawl.Engine.Projection's
+  -- fromCommandZone and Pawl.Engine.Event's inCommand make with the same test.
+  Just Zone.Command -> zoneAbilitiesOf Zone.Command oid gs
   _ -> []
 
 -- CR 702 / CR 601.2f: WHICH RULE minted this ability of `oid`, as the family
@@ -159,8 +169,10 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 -- different keyword source than the arm that MINTED the ability would classify it
 -- as printed, which reads as "no reduction" rather than as an error.
 --
--- Nothing for every other zone, matching abilitiesForGiven's silence there: no
--- rule-702 keyword mints an activated ability outside a hand or the battlefield.
+-- Nothing for every other zone, the command zone included, where
+-- abilitiesForGiven does offer abilities: no rule-702 keyword mints an activated
+-- ability outside a hand or the battlefield, so a command-zone offer is always a
+-- printed one and always classifies as printed here.
 familyGrantingGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe KeywordFamily.KeywordFamily
 familyGrantingGiven pcs oid gs ability = case fmap Object.zone (Game.lookupObject oid gs) of
   Just Zone.Battlefield -> Keyword.familyGranting (Projection.keywordsGiven pcs oid gs) ability
@@ -175,9 +187,11 @@ familyGranting :: ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Car
 familyGranting = familyGrantingGiven Map.empty
 
 -- CR 113.6j + CR 113.6m + CR 702.178b: the AUTHORED abilities a card outside the
--- battlefield offers from the zone it is in. Two zones ask it today -- the
--- graveyard, and the hand for Faerie Macabre's "Discard this card: Exile up to
--- two target cards from graveyards" -- and the zone is a parameter because
+-- battlefield offers from the zone it is in. Three zones ask it today -- the
+-- graveyard, the hand for Faerie Macabre's "Discard this card: Exile up to
+-- two target cards from graveyards", and the command zone for Barrin's
+-- "Sacrifice a permanent: Return target creature to its owner's hand" -- and the
+-- zone is a parameter because
 -- nothing in the reading below is about which zone it is: CR 113.6j says an
 -- ability functions "from any zone in which its cost can be paid", and
 -- functionsIn is the same question asked of whichever zone the card is in.
@@ -217,7 +231,23 @@ familyGranting = familyGrantingGiven Map.empty
 zoneAbilitiesOf :: Zone.Zone -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
   (Just face, Just obj) ->
-    let functionsHere = functionsIn (Face.delayedAbilities face) zone
+    let delayed = Face.delayedAbilities face
+        -- CR 113.6p, the limb beside CR 113.6b that reads the OBJECT rather than
+        -- the ability: an emblem's abilities function in the command zone (CR
+        -- 114.4) and a face-up vanguard card's do too (CR 902.7), so a row of one
+        -- that states no zone functions here instead of taking rule 113.6's
+        -- battlefield default. functionsIn keeps the default and this disjunct
+        -- overrides it, rather than the two readings being written twice;
+        -- Vanguard.functionsFromCommandZone is rule 113.6p's own list, shared with
+        -- the static, replacement, triggered and combat-restriction walks over
+        -- this zone, so a commander's or a dungeon card's unstated row is left
+        -- functioning on the battlefield where rule 113.6 puts it.
+        functionsHere ability =
+          functionsIn delayed zone ability
+            || ( zone == Zone.Command
+                   && Maybe.isNothing (zoneFunctionedFrom delayed ability)
+                   && Vanguard.functionsFromCommandZone oid gs
+               )
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
           Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just (Object.owner obj)) (Just oid)) gs oid cond
@@ -294,6 +324,15 @@ functionsIn delayed zone ability = case zoneFunctionedFrom delayed ability of
 -- has no controller at all (CR 108.4), and CR 400.3 puts every card in either in
 -- its owner's.
 --
+-- The command zone answers the owner as well, and its two rules say so
+-- themselves rather than leaning on rule 602.2's fallback: CR 902.6 makes the
+-- controller of a face-up vanguard card its owner, and CR 114.2 makes an emblem
+-- both owned and controlled by the player it was created for. Rule 400.3 puts
+-- every other card in that zone in its owner's, as it does a hand and a
+-- graveyard. Pawl.Engine.Event's command-zone trigger walk takes the owner for
+-- the same two rules, so the two cannot disagree about who a vanguard's
+-- abilities belong to.
+--
 -- The default only. CR 602.2's own "unless the object specifically says
 -- otherwise" is read one function down, in mayActivateGiven, so what this
 -- answers stays a fact about the OBJECT and its zone rather than about one
@@ -313,6 +352,7 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
     Zone.Battlefield -> Projection.controllerOfGiven grants Set.empty oid gs
     Zone.Hand -> Just (Object.owner obj)
     Zone.Graveyard -> Just (Object.owner obj)
+    Zone.Command -> Just (Object.owner obj)
     _ -> Nothing
 
 -- CR 602.2's whole permission conjunct: its default, and the "unless the object
@@ -335,9 +375,10 @@ mayActivateGiven grants pid srcId ability gs = case ActivatedAbility.activator a
 
 -- The objects whose activated abilities `pid` may be offered, which is the
 -- candidate half of CR 602.2 as mayActivateGiven above is the permission half:
--- what this player controls, plus their own hand and graveyard (CR 400.3), plus
--- CR 602.1b's exception -- a permanent someone else controls whose ability says
--- any player may activate it.
+-- what this player controls, plus their own hand, graveyard and command zone (CR
+-- 400.3, and CR 902.6 / CR 114.2 for the two objects rule 113.6p names there),
+-- plus CR 602.1b's exception -- a permanent someone else controls whose ability
+-- says any player may activate it.
 --
 -- ONE reader for both. Action.legalActions and Pawl.ActivateSpec's differential
 -- reference each used to build this list themselves, and the widening is exactly
@@ -347,14 +388,21 @@ mayActivateGiven grants pid srcId ability gs = case ActivatedAbility.activator a
 --
 -- The exception arm reads the BATTLEFIELD only. Every printing of the clause is
 -- on a permanent (Scryfall o:"any player may activate" game:paper, 2026-09-02,
--- 41 cards), and a hand or graveyard is its owner's alone anyway, so an arm
--- there would offer nothing any card asks for.
+-- 41 cards), and another player's hand, graveyard or command zone offers nothing
+-- any card asks for, so those three arms stay this player's own.
 --
--- The `activator` filter on that arm NARROWS a candidate list; it does not
--- decide anything. mayActivateGiven is the permission and would refuse every
--- object this filter drops, so the two agree by construction rather than by
--- being kept in step -- which is why Pawl.ActivateSpec's Withered Wretch
--- negative goes red only when BOTH are neutralized.
+-- That is where the DIVISION OF LABOUR between this list and mayActivateGiven
+-- lies, and it is not symmetric. On the battlefield the two agree by
+-- construction: the `activator` filter drops exactly the objects
+-- mayActivateGiven's Controller arm would refuse, which is why
+-- Pawl.ActivateSpec's Withered Wretch negative goes red only when BOTH are
+-- neutralized. Off it they do not: mayActivateGiven's AnyPlayer arm asks only
+-- that the object HAVE an activator and that `pid` still be playing, and
+-- activatorOfGiven answers the OWNER for a hand, a graveyard and the command
+-- zone -- so an "any player may activate" ability printed on a card in someone
+-- else's hand, graveyard or command zone would pass the permission and is kept
+-- out by this enumeration's zone scoping alone. No printing writes one, per the
+-- search above.
 activationSources :: PlayerId -> GameState -> [ObjectId]
 activationSources pid gs = activationSourcesGiven (Projection.controlGrants gs) Map.empty pid gs
 
@@ -364,7 +412,7 @@ activationSourcesGiven grants pcs pid gs =
       mine = Set.fromList own
       openToAnyone oid = any ((== Activator.AnyPlayer) . ActivatedAbility.activator) (abilitiesForGiven pcs oid gs)
       others = filter (\oid -> not (Set.member oid mine) && openToAnyone oid) (Set.toList (GameState.battlefield gs))
-   in own <> others <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs
+   in own <> others <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs <> Game.zoneMembers Zone.Command pid gs
 
 -- CR 606.3 (CR 306.5d says the same for planeswalkers): a loyalty ability may be
 -- activated only with priority and an empty stack during a main phase of its
@@ -642,9 +690,10 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
 -- a hand in its owner's, and Activate.activatorOf gives a card in a hand to that
 -- owner precisely because CR 108.4 leaves it with no controller.
 --
--- Reaches exactly the hand today: abilitiesFor serves the battlefield, the hand
--- and the graveyard and answers [] elsewhere -- and of those three only a hand is
--- hidden (CR 400.2 makes a graveyard a public zone), so the library offers
+-- Reaches exactly the hand today: abilitiesFor serves the battlefield, the hand,
+-- the graveyard and the command zone and answers [] elsewhere -- and of those
+-- four only a hand is
+-- hidden (CR 400.2 makes a graveyard and the command zone public zones), so the library offers
 -- nothing to activate, and mana abilities never reach this function (CR 605.3b
 -- keeps them off the stack).
 --
