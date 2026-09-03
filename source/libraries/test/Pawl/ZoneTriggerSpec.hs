@@ -4855,9 +4855,10 @@ bystanderSpec s registry =
 --
 -- CR 603.10a is deliberately NOT this case. There the rule's own "unless its
 -- trigger condition ... specifies that the object is put into that zone" arm
--- decides, and that half of the clause is unimplemented (#2502) -- the Aura
--- half beside it is read, in `screamsFromWithinSpec` below; a bystander carries
--- any condition at all, so nothing about either reaches here.
+-- decides -- `Pawl.Engine.Event.conditionPutsSelfInto`, read by
+-- `Pawl.Engine.Event.leftBattlefield`'s own filter -- and the Aura half beside
+-- it is read, in `screamsFromWithinSpec` below; a bystander carries any
+-- condition at all, so nothing about either reaches here.
 --
 -- The pair, chosen so that ONE derivation is the only difference between them:
 --
@@ -5654,6 +5655,76 @@ banewaspAfflictionSpec s registry =
           (enchanted, gs) <- board S.alice
           Spec.assertEqWith s "alice controlled the Spider, so alice pays" (lives (run enchanted gs)) (Just 15, Just 20)
 
+-- CR 113.6m's general "unless" clause, over a whole card: "an ability whose...
+-- effect specifies that it moves the object it's on out of a particular zone
+-- functions only in that zone, UNLESS its trigger condition... specifies that
+-- the object is put into that zone". Combined here with CR 113.6m's final
+-- sentence (#2500): the graveyard-naming move sits inside a DELAYED ability the
+-- dies trigger arms, the shape `Pawl.Engine.Event.leftBattlefield` -- CR
+-- 603.10a's look-back at the very event that removes a bearer -- exists to
+-- read correctly.
+--
+-- Synthetic Grave Reflex {1}{B} Creature -- Insect 1/1, "When this creature
+-- dies, return this card from your graveyard to your hand at the beginning of
+-- the next end step" (data/cards/synthetic-grave-reflex.json). No printing
+-- combines a dies trigger with a delayed graveyard return this way -- Scryfall
+-- `o:"when this creature dies" o:"return this card from your graveyard"
+-- o:"beginning of the next end step"`, 2026-09-03, no hit -- and nothing in
+-- the CR forbids the shape.
+--
+-- Endless Cockroaches cannot prove this: its own effect moves Binding.became
+-- rather than the reserved source slot, so Pawl.Engine.EffectZone.zoneFunctionedFrom
+-- already answers Nothing for it and the exception is never reached
+-- (`becameSlotSpec` above proves the trigger fires either way). Here the
+-- delayed ability's own effect names the reserved slot, so the fold DOES pin
+-- the graveyard, and only `Event.conditionPutsSelfInto` reading SelfDies against
+-- that zone exempts the ability back to the battlefield default -- where its
+-- SelfDies condition needs to function to ever be checked at all.
+--
+-- The proving quantity is whether the trigger reaches the stack: without the
+-- exception, `functionsIn Zone.Battlefield` is False for this ability,
+-- `leftBattlefield`'s filter excludes it from the death event's own candidates,
+-- and SelfDies is never checked against the one event that could satisfy it.
+--
+-- Not carried to the delayed ability's OWN resolution: CR 603.7e gives a
+-- delayed ability the ARMING ability's source, which here is the dead
+-- battlefield id CR 608.2h's last known information supplies for a SelfDies
+-- trigger -- not Binding.became, which only `eventBindings` stamps onto the
+-- ARMING ability's own bindings, never onto a delayed ability's. So the
+-- payload's `InSlot self` finds nothing to move once the end step arrives; a
+-- correct printing would need the delayed ability's own source rebound to the
+-- graveyard incarnation, which is a second gap this unit does not fix (#3173).
+-- The two legs below stop where that gap starts.
+graveReflexSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graveReflexSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      -- Kill the creature, settle CR 117.5 so the SBA pass places the dies
+      -- trigger.
+      kill victim gs = settle (S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim]))
+   in Spec.describe s "GraveReflex" $ do
+        Spec.it s "CR 113.6m a dies-armed delayed graveyard return still fires from the battlefield" $ do
+          reflex <- S.printingOf s registry "Synthetic Grave Reflex"
+          let (victim, g1) = S.addCreature reflex S.alice (Setup.emptyGame S.bothPlayers)
+              placed = kill victim g1
+          Spec.assertEqWith s "CR 113.6m the dies trigger reached the stack" (length (GameState.stack placed)) 1
+          -- The precondition the assertion above rests on, AFTER it so it
+          -- cannot absorb a mutation aimed at the exception.
+          Spec.assertEqWith s "the creature really died first" (Game.lookupObject victim placed) Nothing
+          let armed = resolveTop placed
+          Spec.assertEqWith s "resolving it armed exactly one delayed ability" (Seq.length (GameState.delayedTriggers armed)) 1
+        -- The classification itself, isolated from the board: without the
+        -- exception the delayed effect's stated graveyard origin would pin the
+        -- ability there; with it, SelfDies exempts the pin away.
+        Spec.it s "CR 113.6m the ability's own effect names the graveyard, and SelfDies exempts it" $ do
+          reflex <- S.printingOf s registry "Synthetic Grave Reflex"
+          let face = S.combinedFace reflex
+          Spec.assertEqWith
+            s
+            "no zone is pinned once the exception is read"
+            (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
+            [Nothing]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cyclingTriggerSpec s registry
@@ -5691,6 +5762,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   widowedBladeSpec s registry
   skullclampSpec s registry
   prizedAmalgamSpec s registry
+  graveReflexSpec s registry
   banewaspAfflictionSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
