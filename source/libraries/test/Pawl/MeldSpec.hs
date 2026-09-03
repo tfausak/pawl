@@ -725,20 +725,29 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
     census <- S.printingOf s registry "Synthetic Grave Census"
+    piker <- S.printingOf s registry "Goblin Piker"
     let (censusId, withCensus) = S.addCreature census S.alice (Setup.emptyGame S.bothPlayers)
         (mMelded, board) = meldedThrough withCensus battlements garrison mountain
+        (tokenId, withToken) = S.addToken (Printing.card piker) S.alice board
         bothNames = List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")]
     case (mMelded, Projection.abilitiesOf censusId board) of
-      (Just meldedId, [tally]) -> do
-        let dead = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [meldedId])
-            after = S.runPure S.identityAnswer dead (do Activate.activateAbility S.alice censusId tally; Stack.resolveTop)
-        Spec.assertEqWith s "CR 712.21e the melded permanent is two cards put into a graveyard, so alice gains 2" (S.lifeOf S.alice after) (Just 22)
+      (Just meldedId, [ability]) -> do
+        let tallied gs victims = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable victims)) (do Activate.activateAbility S.alice censusId ability; Stack.resolveTop)
+            dead = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [meldedId])
+        Spec.assertEqWith s "CR 712.21e the melded permanent is two cards put into a graveyard, so alice gains 2" (S.lifeOf S.alice (tallied board [meldedId])) (Just 22)
         Spec.assertEqWith s "CR 712.21e and one object that changed zones" (objectsMovedTo Zone.Graveyard dead) (Just 1)
-        -- The proxies, after both behaviours: alice really was at 20 when the
+        -- CR 111.6's "a token isn't a card", off a board differing in ONE thing:
+        -- a Goblin Piker token dying beside the melded permanent puts a third
+        -- object into the graveyard and still no third card, which is the
+        -- conjunct Synthetic Grave Census prints as "cards".
+        Spec.assertEqWith s "CR 111.6 a token dying beside them is not a card, so still 2" (S.lifeOf S.alice (tallied withToken [meldedId, tokenId])) (Just 22)
+        Spec.assertEqWith s "CR 712.21e and the token IS an object that changed zones, so 2 there" (objectsMovedTo Zone.Graveyard (S.runPure S.identityAnswer withToken (Event.destroy Regenerability.Regenerable [meldedId, tokenId]))) (Just 2)
+        -- The proxies, after every behaviour: alice really was at 20 when the
         -- ability resolved, and the two cards really were in her graveyard for
         -- the fold to find.
         Spec.assertEqWith s "setup: alice was at 20 before the ability resolved" (S.lifeOf S.alice dead) (Just 20)
         Spec.assertEqWith s "setup: two cards reached her graveyard" (List.sort (graveyardNames dead)) bothNames
+        Spec.assertEqWith s "setup: the token was on the battlefield to be destroyed" (fmap Object.zone (Game.lookupObject tokenId withToken)) (Just Zone.Battlefield)
       (Nothing, _) -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       (_, other) -> Spec.assertFailure s ("expected one ability on Synthetic Grave Census, got " <> show (length other))
   -- CR 712.21c: "If an effect can find the new object that a melded permanent

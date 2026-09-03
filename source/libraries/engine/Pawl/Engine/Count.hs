@@ -562,7 +562,7 @@ snapshotView gs shape event = case event of
     -- departed the battlefield here.
     EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
-    -- CR 601.2i moves a card to the STACK, so a cast is a card arriving there --
+    -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
     -- but the Moved event the same cast emits is what says so, and answering here
     -- too would count one cast twice.
     EventShape.CardArrivedIn {} -> Nothing
