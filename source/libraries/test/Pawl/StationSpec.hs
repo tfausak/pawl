@@ -22,8 +22,11 @@
 -- narrowing, and on a two-seat board "an opponent" and "the other player"
 -- coincide.
 --
--- Not covered here: CR 702.184c's static abilities that make a station ability
--- read a characteristic other than the tapped creature's power (#3127).
+-- tapestryWardenSpec covers CR 702.184c's substitution. Tapestry Warden's own
+-- ruling is what its three cases prove: the check is made as the station
+-- ability RESOLVES (against the tapped creature's toughness, not the
+-- stationing permanent's), not as it is activated, and only when that
+-- toughness is greater.
 module Pawl.StationSpec where
 
 import qualified Data.Set as Set
@@ -125,6 +128,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Station" $ do
   stationAbilitySpec s registry
   striationSpec s registry
+  tapestryWardenSpec s registry
 
 -- CR 702.184a's ability: its cost, its effect, and CR 721.4's "at all times".
 stationAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -254,3 +258,101 @@ striationSpec s registry = Spec.describe s "Striation" $ do
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Flying frigateId eleven)) "no flying at eleven"
     Spec.assertBool s (Projection.hasKeyword Keyword.Type.Flying frigateId twelve) "flying at twelve"
     Spec.assertBool s (Projection.hasKeyword Keyword.Type.Lifelink frigateId twelve) "and lifelink"
+
+-- CR 702.184c: Tapestry Warden's own three rulings, each its own case. Wall of
+-- Stone (0/8) is the tapped creature throughout: its toughness exceeds its
+-- power, and at power 0 the untouched reading assigns NO charge counters at
+-- all (station's own n > 0 guard in Pawl.Engine.Resolve), which is what makes
+-- "8 charge counters" and "0 charge counters" a pair no numeric coincidence
+-- could produce -- and what a mutation dropping the substitution reddens on
+-- the gameplay assertion rather than on a proxy.
+tapestryWardenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
+  Spec.it s "CR 702.184c a controlled Tapestry Warden substitutes the tapped creature's toughness" $ do
+    frigate <- S.printingOf s registry "Lumen-Class Frigate"
+    warden <- S.printingOf s registry "Tapestry Warden"
+    wall <- S.printingOf s registry "Wall of Stone"
+    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addCreature warden S.alice gs0
+        (wallId, gs2) = S.addCreature wall S.alice gs1
+        gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pinned :: Prompt.Prompt r -> r
+        pinned p = case p of
+          Prompt.ChooseTaps {} -> Set.singleton wallId
+          _ -> S.identityAnswer p
+        after = stationWith pinned frigateId gs
+    Spec.assertEqWith s "8 charge counters, Wall of Stone's toughness" (S.counterOf charge frigateId after) 8
+  -- The same board with the Warden left off -- the pair below's positive
+  -- half, and the reason 0 rather than some other power was chosen: Wall of
+  -- Stone's printed power alone can never be mistaken for its toughness.
+  Spec.it s "CR 702.184c without Tapestry Warden the same tap loads none, power 0" $ do
+    frigate <- S.printingOf s registry "Lumen-Class Frigate"
+    wall <- S.printingOf s registry "Wall of Stone"
+    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
+        (wallId, gs1) = S.addCreature wall S.alice gs0
+        gs = gs1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pinned :: Prompt.Prompt r -> r
+        pinned p = case p of
+          Prompt.ChooseTaps {} -> Set.singleton wallId
+          _ -> S.identityAnswer p
+        after = stationWith pinned frigateId gs
+    Spec.assertEqWith s "0 charge counters, Wall of Stone's power" (S.counterOf charge frigateId after) 0
+  -- CR 702.184c's "this object's controller": a Tapestry Warden ANYWHERE on
+  -- the battlefield is not enough, only alice's OWN. THREE SEATS, so bob's
+  -- Warden is neither alice's nor "the other player"'s in the two-seat sense.
+  Spec.it s "CR 702.184c an opponent's Tapestry Warden grants nothing" $ do
+    frigate <- S.printingOf s registry "Lumen-Class Frigate"
+    warden <- S.printingOf s registry "Tapestry Warden"
+    wall <- S.printingOf s registry "Wall of Stone"
+    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addCreature warden S.bob gs0
+        (wallId, gs2) = S.addCreature wall S.alice gs1
+        gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pinned :: Prompt.Prompt r -> r
+        pinned p = case p of
+          Prompt.ChooseTaps {} -> Set.singleton wallId
+          _ -> S.identityAnswer p
+        after = stationWith pinned frigateId gs
+    Spec.assertEqWith s "0 charge counters, Wall of Stone's power: bob's Warden is not alice's" (S.counterOf charge frigateId after) 0
+  -- The ruling's own board: activated while alice controls the Warden, but it
+  -- leaves before the ability resolves. Split into activate-then-resolve,
+  -- unlike stationWith's one step, so the departure lands in between.
+  Spec.it s "CR 702.184c the check is made as the ability RESOLVES, not as it is activated" $ do
+    frigate <- S.printingOf s registry "Lumen-Class Frigate"
+    warden <- S.printingOf s registry "Tapestry Warden"
+    wall <- S.printingOf s registry "Wall of Stone"
+    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
+        (wardenId, gs1) = S.addCreature warden S.alice gs0
+        (wallId, gs2) = S.addCreature wall S.alice gs1
+        gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pinned :: Prompt.Prompt r -> r
+        pinned p = case p of
+          Prompt.ChooseTaps {} -> Set.singleton wallId
+          _ -> S.identityAnswer p
+    case stationAbility frigateId gs of
+      Nothing -> Spec.assertFailure s "fixture should offer station"
+      Just ability ->
+        let activated = S.runPure pinned gs (Activate.activateAbility S.alice frigateId ability)
+            departed = activated {GameState.battlefield = Set.delete wardenId (GameState.battlefield activated)}
+            after = S.runPure pinned departed Stack.resolveTop
+         in Spec.assertEqWith s "power 0, not toughness 8: the grant was gone by resolution" (S.counterOf charge frigateId after) 0
+  -- CR 702.184c's own "whenever that toughness is greater": Tapestry Warden
+  -- stands, but Blind-Spot Giant's 4/3 has toughness BELOW power, so the
+  -- untouched power still loads. Blind-Spot rather than the module's equal
+  -- 3/3 Hill Giant deliberately: 3 and 3 read the same whichever field the
+  -- ability picks, so only an UNEQUAL non-greater pair (4 power, 3 toughness)
+  -- can tell "the gate held" from "the gate was dropped".
+  Spec.it s "CR 702.184c a tapped creature whose toughness is not greater still loads its power" $ do
+    frigate <- S.printingOf s registry "Lumen-Class Frigate"
+    warden <- S.printingOf s registry "Tapestry Warden"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addCreature warden S.alice gs0
+        (giantId, gs2) = S.addCreature blindSpot S.alice gs1
+        gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pinned :: Prompt.Prompt r -> r
+        pinned p = case p of
+          Prompt.ChooseTaps {} -> Set.singleton giantId
+          _ -> S.identityAnswer p
+        after = stationWith pinned frigateId gs
+    Spec.assertEqWith s "4 charge counters, Blind-Spot Giant's power (4 > 3 toughness)" (S.counterOf charge frigateId after) 4

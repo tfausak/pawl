@@ -54,6 +54,7 @@ codec = Fields.object $ do
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) PC.enchant
   subtypeWordChanges <- Fields.defaulted "subtypeWordChanges" [] (Common.list ChangeSubtypeWord.codec) PC.subtypeWordChanges
   textChangedKeywords <- Fields.defaulted "textChangedKeywords" Map.empty (Common.multiset Keyword.codec) PC.textChangedKeywords
+  grantsStationToughness <- Fields.defaulted "grantsStationToughness" False Common.boolean PC.grantsStationToughness
   pure
     PC.MkProjectedCharacteristics
       { PC.names = names,
@@ -76,5 +77,6 @@ codec = Fields.object $ do
         PC.triggeredAbilities = triggeredAbilities,
         PC.enchant = enchant,
         PC.subtypeWordChanges = subtypeWordChanges,
-        PC.textChangedKeywords = textChangedKeywords
+        PC.textChangedKeywords = textChangedKeywords,
+        PC.grantsStationToughness = grantsStationToughness
       }

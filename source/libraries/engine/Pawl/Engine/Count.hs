@@ -843,5 +843,8 @@ viewOfSnapshot mController isToken counters snapshot =
                   <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
               )
-          )
+          ),
+      -- CR 702.184c off the snapshot, which carries the field: the marker
+      -- outlives the object exactly as a keyword or a P/T does.
+      Filter.grantsStationToughness = PC.grantsStationToughness snapshot
     }

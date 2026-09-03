@@ -740,6 +740,9 @@ quantityCounts quantity = case quantity of
   -- CR 509.1h's declaration, read against the object the quantity is evaluated
   -- against: a nullary leaf, so no Count and no Filter here either.
   Quantity.Type.BlockersBeyondFirst -> []
+  -- CR 702.184c's engine-only substitution, Power's shape: no Count and no
+  -- Filter here either.
+  Quantity.Type.StationMeasure -> []
   -- Not a leaf: aiming the evaluation at another object does not stop the payload
   -- from being a Count, so the Filter lints must reach through it.
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> quantityCounts inner
@@ -863,6 +866,8 @@ modificationCounts modification = case modification of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
+  -- Payload-free, so there is no Count to sweep.
+  Modification.GrantsStationToughness -> []
 
 -- Every Count reachable from a StaticAbility: its modifications' P/T quantities,
 -- plus CR 604.2's "as long as" gate, which is a Condition and so a pair of
@@ -1833,6 +1838,9 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.EnteredFrom {} -> False
   Quantity.Type.WasCastFrom {} -> False
   Quantity.Type.BlockersBeyondFirst -> False
+  -- ENGINE-ONLY (Pawl.Types.Quantity's own header): no printed box may
+  -- contain it, which this lint is what enforces.
+  Quantity.Type.StationMeasure -> False
   Quantity.Type.AgainstSlot {} -> False
 
 -- Does this face print a power or toughness box CR 208.1/208.2 could not print?
@@ -3951,6 +3959,8 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.EnteredFrom _ -> []
   Quantity.Type.WasCastFrom _ -> []
   Quantity.Type.BlockersBeyondFirst -> []
+  -- Carries no CounterKind at all, Power's shape.
+  Quantity.Type.StationMeasure -> []
   -- quantityCounts' descent: aiming the evaluation at another object does not
   -- stop the payload from naming a kind.
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> quantityKindFilters inner
@@ -4046,6 +4056,8 @@ modificationFilters modification = case modification of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
+  -- Payload-free, so there is no Filter to sweep.
+  Modification.GrantsStationToughness -> []
 
 -- Four Filter positions, not two: the affected set, each modification's own
 -- keywords and Counts, -- since CR 604.2's "as long as" gate landed -- the

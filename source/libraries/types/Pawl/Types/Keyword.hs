@@ -392,10 +392,8 @@ data Keyword
     Bestow (Cost.Cost Keyword)
   | -- | 702.184a: tap another untapped creature you control to load this
     -- permanent with that creature's power in charge counters, as a sorcery.
-    --
-    -- Not implemented: CR 702.184c's static abilities that make a station
-    -- ability read a characteristic other than the tapped creature's power
-    -- (Tapestry Warden) (#3127).
+    -- CR 702.184c's substitution of another characteristic is
+    -- Quantity.StationMeasure's own arm, not a payload here.
     Station
   deriving (Eq, Ord, Show)
 

@@ -264,6 +264,11 @@ layer m = case m of
   Modification.AddColor _ -> Layer.Color
   Modification.AddChosenColor -> Layer.Color
   Modification.SwitchPowerToughness -> Layer.SwitchPT
+  -- CR 613.1f, GainKeyword's arm: no rule 613 sublayer is CR 702.184c's own,
+  -- so this joins the other ability-shaping grants at layer 6. Nothing else
+  -- in the layer system reads or writes PC.grantsStationToughness, so
+  -- ordering against a P/T or type-changing modification never bites.
+  Modification.GrantsStationToughness -> Layer.Ability
 
 -- Apply one modification to characteristics-in-progress. P/T quantities are
 -- evaluated against the CURRENT state (CR 604.2); Resolve freezes a resolution's
@@ -497,6 +502,10 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- CR 613.4d.
         Modification.SwitchPowerToughness ->
           pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
+        -- CR 702.184c: a SET, not an accumulation -- the fact is a bare marker
+        -- with no count and no source to prefer among several grants.
+        Modification.GrantsStationToughness ->
+          pc {PC.grantsStationToughness = True}
 
 -- CR 205.3d: an object can't gain a subtype that doesn't correspond to one of
 -- its types. CR 205.1a's removal clause is the same question in the other
@@ -567,6 +576,7 @@ cardTypesAfter m types = case m of
   Modification.SetBasePowerToughness {} -> types
   Modification.ModifyPowerToughness {} -> types
   Modification.SwitchPowerToughness -> types
+  Modification.GrantsStationToughness -> types
   Modification.SetLandSubtype _ -> types
   Modification.SetLandSubtypeToChosen -> types
   Modification.AddLandSubtype _ -> types
@@ -1048,7 +1058,10 @@ viewOfCard face =
               ( all
                   ManaAbility.isManaAbility
                   (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face))
-              )
+              ),
+          -- CR 702.184c reaches a permanent's CONTROLLER; this builder describes
+          -- a printed FACE with no controller and no board to grant it one.
+          Filter.grantsStationToughness = False
         }
 
 -- CR 208.1's PRINTED power box, for a card off the battlefield. Nothing for a
@@ -1442,7 +1455,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- characteristics (CR 109.3) written by layer 6. The whole list the object
       -- HAS, not the list it can activate here. LAZY -- see the field's own comment
       -- in Pawl.Engine.Filter.
-      Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesFromCharacteristics peers pc oid gs))
+      Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesFromCharacteristics peers pc oid gs)),
+      -- CR 702.184c off the PROJECTION, applyModification's GrantsStationToughness
+      -- arm being layer 6's only writer.
+      Filter.grantsStationToughness = PC.grantsStationToughness pc
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id naming nothing.
@@ -1579,7 +1595,10 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.triggeredAbilities = [],
         PC.enchant = [],
         PC.subtypeWordChanges = [],
-        PC.textChangedKeywords = Map.empty
+        PC.textChangedKeywords = Map.empty,
+        -- CR 702.184c: an ability on the stack grants nothing to its
+        -- controller's station abilities of its own.
+        PC.grantsStationToughness = False
       }
   Just face ->
     -- The seed predates every layer, so it can describe no object: every view is
@@ -1658,7 +1677,10 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             PC.enchant = Face.enchant face,
             -- The seed is CR 613.1's starting point, before layer 3 has run.
             PC.subtypeWordChanges = [],
-            PC.textChangedKeywords = Map.empty
+            PC.textChangedKeywords = Map.empty,
+            -- CR 613.1's starting point, before layer 6 has run:
+            -- applyModification's GrantsStationToughness arm is the only writer.
+            PC.grantsStationToughness = False
           }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
@@ -1813,6 +1835,8 @@ freezeQuantities gs announcedOn source context m =
         Modification.AddColor _ -> Just m
         Modification.AddChosenColor -> Just m
         Modification.SwitchPowerToughness -> Just m
+        -- No quantity to freeze: a bare marker.
+        Modification.GrantsStationToughness -> Just m
 
 -- Every Quantity a modification carries, in order. A new Quantity field goes here
 -- as well as in freezeQuantities -- the compiler forces the arm, not its content.
@@ -1851,6 +1875,7 @@ quantitiesOf m = case m of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
+  Modification.GrantsStationToughness -> []
 
 -- CR 305.7: does this modification SET a land's subtype, and so strip the land's
 -- rules text? Total, like removesAbilities: a new subtype-setting Modification
@@ -1900,6 +1925,8 @@ setsLandSubtype m = case m of
   Modification.SetColor _ -> False
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
+  -- An ability-shaping grant, not a type change.
+  Modification.GrantsStationToughness -> False
 
 -- Every SetLandSubtype and SetLandSubtypeToChosen effect in the game, each with
 -- its source and affected set, for a reader OUTSIDE the layer fold. A legitimate
@@ -2144,6 +2171,8 @@ rewriteModification pairs m =
         -- Hammerheim changes what its removal reaches not at all.
         Modification.LoseKeywordFamily _ -> acc
         Modification.SwitchPowerToughness -> acc
+        -- Nothing to rewrite: a bare marker naming no subtype word.
+        Modification.GrantsStationToughness -> acc
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
         -- hacked Aspect of Wolf counts the new type. rewriteQuantity is the same
         -- descent rewriteCondition and the CDA path take.
@@ -3259,6 +3288,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.EnteredFrom _ -> quantity
   Quantity.Type.WasCastFrom _ -> quantity
   Quantity.Type.BlockersBeyondFirst -> quantity
+  -- A leaf like Power above: no subtype word to hide, whichever way it reads.
+  Quantity.Type.StationMeasure -> quantity
   -- Not a leaf: the payload is a whole Quantity and may hide a Count.
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (rewriteQuantity pairs inner))
 
@@ -3937,6 +3968,8 @@ removesAbilities m = case m of
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
+  -- A grant, GainKeyword's answer above: not a removal.
+  Modification.GrantsStationToughness -> False
   Modification.AddLandSubtype _ -> False
   Modification.ChangeSubtypeWord {} -> False
   Modification.AddCardType _ -> False
@@ -4751,6 +4784,13 @@ modificationWrites m = case m of
   Modification.AddChosenColor -> Set.singleton Colors
   Modification.SetController _ -> Set.singleton Controller
   Modification.SetControllerToSource -> Set.singleton Controller
+  -- Writes ProjectedCharacteristics.grantsStationToughness, which Aspect has no
+  -- finer grain for than Keywords -- an ability-shaping write with no reader
+  -- inside the layer fold at all (Quantity.StationMeasure reads it OUTSIDE
+  -- CR 613.8a's dependency question, off the finished projection). A
+  -- REGRESSION FENCE rather than a proved behaviour: no board in the pool
+  -- makes another effect's affected set depend on it.
+  Modification.GrantsStationToughness -> Set.singleton Keywords
 
 -- Which aspects a Modification's own QUANTITIES read -- CR 613.8a clause (b)'s
 -- last limb: applying another effect can change "what it does to any of the
@@ -4778,6 +4818,8 @@ modificationReads m = case m of
   -- Carries a payload-free family, so there is no Filter here to read anything.
   Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
+  -- Carries no Quantity: a bare marker.
+  Modification.GrantsStationToughness -> Set.empty
   Modification.SetLandSubtype _ -> Set.empty
   Modification.SetLandSubtypeToChosen -> Set.empty
   Modification.AddLandSubtype _ -> Set.empty
@@ -4808,6 +4850,9 @@ quantityReads q = case q of
   Quantity.Type.Count c -> filterReads (Count.Type.filter c) <> aggregationReads (Count.Type.aggregation c)
   Quantity.Type.Power -> Set.singleton PowerA
   Quantity.Type.Toughness -> Set.singleton PowerA
+  -- Reads whichever of the two the substitution picks, so it reads PowerA
+  -- exactly as Power and Toughness do above.
+  Quantity.Type.StationMeasure -> Set.singleton PowerA
   Quantity.Type.Plus (Plus.MkPlus a b) -> quantityReads a <> quantityReads b
   Quantity.Type.Halved (Halved.MkHalved _ a) -> quantityReads a
   Quantity.Type.Negate a -> quantityReads a
@@ -6151,6 +6196,8 @@ grantsKeywordWhere p m = case m of
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
+  -- Hands out no Keyword at all.
+  Modification.GrantsStationToughness -> False
 
 -- Does this modification write a card type or subtype that intrinsicReplacementsOf
 -- mints an entry replacement from -- CR 306.5b's planeswalker, CR 310.4b's battle
@@ -6207,6 +6254,8 @@ grantsMintingType m = case m of
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
+  -- Writes no card type or subtype at all.
+  Modification.GrantsStationToughness -> False
 
 -- CR 306.5b / 310.4b: the card types intrinsicReplacementsOf mints a CR 614.1c row
 -- from. Rule 714.3a's Saga is a SUBTYPE and so is asked one function up.

@@ -170,6 +170,10 @@ overSlots f quantity = case quantity of
   -- And a nullary arm, which names nothing at all: CR 509.1h's declaration is
   -- read against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.BlockersBeyondFirst -> pure quantity
+  -- And a nullary arm too: CR 702.184c's substitution reads no slot of its
+  -- own, the object being the one the evaluation is aimed at, as
+  -- BlockersBeyondFirst is.
+  Quantity.StationMeasure -> pure quantity
   -- The one arm that names a TARGET slot and is visited here anyway. Every other
   -- nested target slot is a PlayerRef this function leaves to Resolve.slotsOf,
   -- which cannot see it (#1079); reporting this one is what lets slotsOf recover
@@ -288,6 +292,9 @@ nestedRefs quantity = case quantity of
   Quantity.EnteredFrom inZone -> Set.singleton (Left (InZone.player inZone))
   Quantity.WasCastFrom inZone -> Set.singleton (Left (InZone.player inZone))
   Quantity.BlockersBeyondFirst -> Set.empty
+  -- Reads a live grant off the resolving object rather than a bound reference
+  -- or slot: nothing here for a target-slot walk to find.
+  Quantity.StationMeasure -> Set.empty
   -- Its own slot is left out because `slots` above DOES report it, unlike the
   -- nested PlayerRefs; the payload is walked like any other.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> nestedRefs inner
@@ -426,6 +433,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.DamageDealtToThisTurn -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
+  Quantity.StationMeasure -> quantity
   where
     recur = mapPlayerRefs f intoCount
 
