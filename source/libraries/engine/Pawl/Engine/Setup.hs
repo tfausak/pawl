@@ -1028,9 +1028,8 @@ applyCrossings finalSub parent =
                 (Object.source obj)
                 (Object.counters obj)
                 (Event.copiedSnapshot oid g)
-                (Object.attachedTo obj)
-                -- CR 603.10a's look-back, taken while the answer still
-                -- exists: the arrow of the field above turned round.
+                -- CR 303.4b / 301.5a with the arrow turned round, taken
+                -- while the answer still exists (CR 603.10a).
                 (Game.attachments oid g)
                 (Object.chosenNames obj)
                 (Game.isBlocking oid g)

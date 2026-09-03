@@ -870,13 +870,9 @@ lastKnownRiderSpec s registry =
                     -- Nothing here copies anything; the field is filled to
                     -- build the record.
                     LastKnown.copiable = Projection.copiableCharacteristics srcId equipped,
-                    -- The Sorcerer wears the Collar rather than the other way
-                    -- round, so the object this record is about is attached to
-                    -- nothing.
-                    LastKnown.attachedTo = Nothing,
                     -- The Collar is attached to the Sorcerer, but this record
-                    -- is filed under a still-live id by hand rather than by
-                    -- the funnel, and nothing here reads the look-back.
+                    -- is filed under a still-live id by hand rather than by the
+                    -- funnel, and nothing here reads the look-back.
                     LastKnown.attached = Set.empty,
                     -- CR 201.4: nothing named a card here.
                     LastKnown.chosenNames = Set.empty,

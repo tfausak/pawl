@@ -326,8 +326,9 @@ isBlocking oid gs = any (Set.member oid) (Map.elems (Combat.blockers (GameState.
 -- for the same reason and answers the same set; it is a Filter atom rather than
 -- a plain id list, so the two cannot share a body.
 --
--- Compared through Recipient.objectOf: Object.attachedTo carries CR 115.1's tag
--- as well as the id, and a host is the same host whichever tag names it.
+-- Compared through Recipient.objectOf: Object.attachedTo carries the tag the
+-- attaching pool produced as well as the id, and a host is the same host
+-- whichever tag names it.
 attachments :: ObjectId -> GameState -> Set.Set ObjectId
 attachments oid gs =
   Set.filter

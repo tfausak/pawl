@@ -9,7 +9,6 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 
 -- | CR 608.2h: what an object WAS, filed under the id it had while it existed.
@@ -17,7 +16,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Eleven things rather than the characteristics alone, because the other ten
+-- Ten things rather than the characteristics alone, because the other nine
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -33,10 +32,9 @@ import qualified Pawl.Types.Source as Source
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
 -- its own field gives. Nor is the COMBAT STATUS, the eighth, for the reason its
 -- own field gives. Nor is the PROTECTOR, the ninth, for the reason its own field
--- gives. Nor are the permanents ATTACHED TO it, the tenth, for the reason its
--- own field gives.
+-- gives.
 --
--- All eleven fields STRICT (!): entries are keyed by an id that no longer exists
+-- All ten fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -92,33 +90,23 @@ data LastKnown = MkLastKnown
     -- and not whether the object was ITSELF a copy (CR 707.2's "as modified by
     -- other copy effects").
     copiable :: !ProjectedCharacteristics.ProjectedCharacteristics,
-    -- | CR 303.4b / CR 301.5a: what it was attached to as it left -- the same
-    -- Object.attachedTo the live object carried. What "enchanted creature" and
-    -- "equipped creature" mean for an Aura or an Equipment that is itself
-    -- already gone.
+    -- | CR 303.4b / CR 301.5a: the permanents that were attached TO it as it
+    -- left -- Object.attachedTo with the arrow turned round, swept off the
+    -- battlefield by Pawl.Engine.Game.attachments as the object ceased. What
+    -- "enchanted creature" and "equipped creature" mean once the creature is
+    -- gone.
     --
-    -- Not a characteristic either (CR 109.3's list has no attachment), and not
-    -- recoverable from anything above, so it sits beside the projection for
-    -- `controller`'s reason. CR 704.5m takes an AURA off the battlefield in the
-    -- very SBA batch that killed its host, so a live read of the link is
-    -- unavailable exactly when the rules still ask for it --
-    -- Pawl.Types.TriggerCondition.AttachedCreatureDies is the reader.
+    -- Not a characteristic either (CR 109.3 names "what an Aura enchants" as an
+    -- example of what is not one), and not recoverable from anything above, so
+    -- it sits beside the projection for `controller`'s reason.
     --
-    -- Nothing for an object that was attached to nothing, which is every object
-    -- that is not an Aura, an Equipment or a Fortification.
-    attachedTo :: !(Maybe Recipient.Recipient),
-    -- | CR 603.10a: the permanents that were attached TO it as it left --
-    -- `attachedTo` above with the arrow turned round, swept off the battlefield
-    -- by Pawl.Engine.Game.attachments as the object ceased.
-    --
-    -- The reading TriggerCondition.AttachedCreatureDies needs, and the only one
-    -- an EQUIPMENT bearer has: CR 704.5n detaches an Equipment rather than
-    -- burying it, in the same CR 117.5 batch that buried its host, so by the
-    -- time triggers are placed the Equipment stands on the battlefield with a
-    -- cleared link and files no record of its own. Reading it off the HOST is
-    -- what makes the look-back available to a bearer that is still alive, and it
-    -- answers CR 704.5m's Aura the same way, that Aura having been attached when
-    -- this was taken. Proved by Pawl.ZoneTriggerSpec's Skullclamp group.
+    -- CR 603.10a's look-back for TriggerCondition.AttachedCreatureDies, its one
+    -- reader, and off the HOST rather than the bearer because that is the only
+    -- side the answer survives on: the SBA batch that kills the host buries an
+    -- Aura (CR 704.5m) and clears an Equipment's link (CR 704.5n) before CR
+    -- 117.5 places any trigger, and the Equipment, still standing, files no
+    -- record of its own. Proved by Pawl.ZoneTriggerSpec's Skullclamp and
+    -- ScreamsFromWithin groups.
     --
     -- Empty for everything nothing was attached to, which is most objects.
     attached :: !(Set.Set ObjectId.ObjectId),

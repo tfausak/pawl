@@ -5278,9 +5278,9 @@ screamsFromWithinSpec s registry =
           Spec.assertEqWith s "and CR 704.5m really took the Aura off the battlefield" (Game.lookupObject aura after) Nothing
           Spec.assertEqWith
             s
-            "so the trigger was gathered off CR 608.2h last known information"
-            (fmap LastKnown.attachedTo (Map.lookup aura (GameState.lastKnown after)))
-            (Just (Just (Recipient.ToCreature enchanted)))
+            "so the trigger was gathered off the HOST's CR 608.2h record of what was attached to it"
+            (fmap LastKnown.attached (Map.lookup enchanted (GameState.lastKnown after)))
+            (Just (Set.singleton aura))
         -- CR 603.10a's own case, and the leg that makes `looksBack`'s arm
         -- load-bearing: the Aura leaves the battlefield in the SAME event group
         -- as its host -- a wrath -- so the live board holds neither, and the
@@ -5477,7 +5477,7 @@ skullclampSpec s registry =
           Spec.assertEqWith s "no trigger is placed" (length (GameState.stack placed)) 0
           Spec.assertEqWith s "so alice draws nothing" (S.handSize S.alice placed) 0
           Spec.assertEqWith s "and the Goblin Piker really died" (Game.lookupObject bystander placed) Nothing
-        -- Skullclamp's own board, with no removal in it: CR 613.4b's layer 7c
+        -- Skullclamp's own board, with no removal in it: CR 613.4c's layer 7c
         -- makes the equipped 2/1 Piker a 3/0 and CR 704.5f buries it, which is
         -- the same look-back reached through the card's static half.
         Spec.it s "CR 704.5f the printed +1/-1 kills the equipped creature and the trigger still fires" $ do

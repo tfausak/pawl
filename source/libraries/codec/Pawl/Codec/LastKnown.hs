@@ -8,14 +8,13 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
-import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.Source as Source
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LastKnown as LastKnown
 
--- | All eleven axes, none derivable from another: the type's own haddock says why
+-- | All ten axes, none derivable from another: the type's own haddock says why
 -- CR 608.2h needs each of them beside the projection.
 codec :: Codec.Codec LastKnown.LastKnown
 codec = Fields.object $ do
@@ -25,7 +24,6 @@ codec = Fields.object $ do
   source <- Fields.required "source" Source.codec LastKnown.source
   counters <- Fields.required "counters" (Common.multiset (CounterKind.codec Keyword.codec)) LastKnown.counters
   copiable <- Fields.required "copiable" ProjectedCharacteristics.codec LastKnown.copiable
-  attachedTo <- Fields.required "attachedTo" (Common.maybe Recipient.codec) LastKnown.attachedTo
   attached <- Fields.required "attached" (Common.set ObjectId.codec) LastKnown.attached
   chosenNames <- Fields.required "chosenNames" (Common.set CardName.codec) LastKnown.chosenNames
   blocking <- Fields.required "blocking" Common.boolean LastKnown.blocking
@@ -38,7 +36,6 @@ codec = Fields.object $ do
         LastKnown.source = source,
         LastKnown.counters = counters,
         LastKnown.copiable = copiable,
-        LastKnown.attachedTo = attachedTo,
         LastKnown.attached = attached,
         LastKnown.chosenNames = chosenNames,
         LastKnown.blocking = blocking,
