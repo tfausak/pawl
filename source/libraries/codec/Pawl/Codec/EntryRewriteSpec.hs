@@ -155,16 +155,27 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
   -- CR 702.54a: bloodthirst's rewrite, which DOES carry its N -- the printed
   -- number varies by card, where rule 702.136a fixes riot's. Encoded distinctly
   -- from WithCounters, whose payload names a counter kind rule 702.54a fixes.
+  -- Rule 702.54b's X is the same arm with no number, since the sum it names is
+  -- the board's rather than the card's.
   Spec.it s "Bloodthirst (Bloodrage Vampire)" $ do
     Common.assertCodec
       s
       (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
-      (EntryRewrite.Bloodthirst 1)
+      (EntryRewrite.Bloodthirst (Just 1))
       " {\"type\":\"Bloodthirst\",\"value\":1} "
     Spec.assertBool
       s
-      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst 1) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1))))
+      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst (Just 1)) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1))))
       "bloodthirst 1 is not an unconditional +1/+1 counter"
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.Bloodthirst Nothing)
+      " {\"type\":\"Bloodthirst\"} "
+    Spec.assertBool
+      s
+      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst Nothing) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst (Just 0)))
+      "rule 702.54b's X is not bloodthirst 0"
   -- CR 702.150a: compleated's rewrite, whose payload is the number of PHYREXIAN
   -- MANA SYMBOLS life was paid for rather than the counters subtracted -- rule
   -- 702.150a's "two" is the rule's. Encoded distinctly from Bloodthirst, which
@@ -177,7 +188,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       " {\"type\":\"Compleated\",\"value\":1} "
     Spec.assertBool
       s
-      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Compleated 1) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst 1))
+      (Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Compleated 1) /= Codec.encode (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) (EntryRewrite.Bloodthirst (Just 1)))
       "one Phyrexian symbol paid with life is not bloodthirst 1"
   -- CR 614.1d: the tap-state rewrite a permanent's own text prints, payload-free
   -- because rule 614.1d and CR 110.5b fix both halves.

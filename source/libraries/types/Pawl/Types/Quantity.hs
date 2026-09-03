@@ -588,14 +588,24 @@ data Quantity
     --
     -- Rule 702.54b's variant asks a DIFFERENT question -- "the total damage your
     -- opponents have been dealt this turn", which sums amounts where this counts
-    -- players. Not implemented: no quantity sums damage dealt to PLAYERS --
-    -- DamageDealtToThisTurn below sums it for one object, over the same log -- and
-    -- Keyword.Bloodthirst's payload is a printed Natural that cannot say X
-    -- (#1588). The keyword itself IS implemented -- rule 702.54a's N form, whose
-    -- condition is this quantity (Bloodrage Vampire).
+    -- players. DamageDealtToPlayersThisTurn below is that sum.
     --
     -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
     PlayersDealtDamageThisTurn PlayerRef.PlayerRef
+  | -- | CR 120.1 / 608.2i: how much damage in total the players this reference
+    -- names were dealt this turn -- rule 702.54b's "the total damage your
+    -- opponents have been dealt this turn" (Petrified Wood-Kin).
+    --
+    -- PlayersDealtDamageThisTurn's twin over the same log and the same CR 120.3a
+    -- recipient, summing AMOUNTS where that one tallies who: two Lightning Bolts
+    -- at one opponent is one opponent there and 6 damage here.
+    --
+    -- SUMS over a reference naming several rather than answering "whose?", which
+    -- is what rule 702.54b's plural "your opponents" asks for and the one place
+    -- this differs from LifeGainedThisTurn's arity.
+    --
+    -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
+    DamageDealtToPlayersThisTurn PlayerRef.PlayerRef
   | -- | CR 120.1 / 608.2i: how much damage was dealt this turn to the object this
     -- quantity is evaluated against -- Burning-Eye Zubera's "if 4 or more damage
     -- was dealt to it this turn", asked of a creature CR 400.7 has already

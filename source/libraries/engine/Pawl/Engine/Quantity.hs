@@ -495,6 +495,20 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.PlayersDealtDamageThisTurn ref -> case playersOf ref of
     Nothing -> Nothing
     Just pids -> Just (toInteger (length (filter wasDealtDamage pids)))
+  -- CR 120.1 / 608.2i: how much damage in total the players this reference names
+  -- were dealt this turn -- rule 702.54b's "the total damage your opponents have
+  -- been dealt this turn", which Pawl.Engine.Event's Bloodthirst arm asks with
+  -- PlayerRelation.Opponent.
+  --
+  -- SUMS the seats where the arm above counts them, which is the whole difference
+  -- between rule 702.54a's threshold and rule 702.54b's X: three damage to one
+  -- opponent and two to another is two opponents there and five here.
+  --
+  -- Same log, same CR 120.3a recipient and the same empty-log answer of 0; only
+  -- the reference is ever unanswered.
+  Quantity.DamageDealtToPlayersThisTurn ref -> case playersOf ref of
+    Nothing -> Nothing
+    Just pids -> Just (toInteger (sum (fmap (Game.damageDealtToPlayerThisTurn gs) pids)))
   -- CR 601.2i / 608.2i: how many spells that player cast during the turn just
   -- ended. LifeTotal's arm in ARITY -- one player's tally, so a reference naming
   -- several answers "whose?" rather than a sum -- and read STRAIGHT OFF the
@@ -889,6 +903,7 @@ objectSlots quantity = case quantity of
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
   Quantity.LifeGainedThisTurn _ -> Set.empty
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
+  Quantity.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.SpellsCastLastTurn _ -> Set.empty
   Quantity.DungeonsCompleted _ -> Set.empty
   Quantity.CompletedDungeon {} -> Set.empty
@@ -1102,6 +1117,7 @@ readsX quantity = case quantity of
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.LifeGainedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False
+  Quantity.DamageDealtToPlayersThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
   Quantity.DungeonsCompleted _ -> False
   Quantity.CompletedDungeon {} -> False

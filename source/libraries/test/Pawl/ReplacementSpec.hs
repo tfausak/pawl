@@ -9209,6 +9209,22 @@ bloodthirstBoard swamp vampire sentry =
       (held, gs) = S.addHandCard vampire S.alice withSentry
    in (readyForAlice gs, held, bobsSentry)
 
+-- alice controls seven untapped Forests on a THREE-SEAT board and holds one
+-- Petrified Wood-Kin ({6}{G} 3/3, "This spell can't be countered. / Bloodthirst X
+-- / Protection from instants"), in her precombat main phase with priority; bob
+-- controls one Ogre Sentry, the source every damage event in the group names.
+-- Returns the state, the card in hand and the Sentry.
+--
+-- Three seats for bloodthirstBoard's reason and for one more: rule 702.54b's
+-- "your opponents" is a SUM ACROSS PLAYERS, which two seats cannot tell from one
+-- player's own total.
+bloodthirstXBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+bloodthirstXBoard forest woodKin sentry =
+  let lands = S.landsFor forest S.alice 7 S.threePlayerGame
+      (bobsSentry, withSentry) = S.addCreature sentry S.bob lands
+      (held, gs) = S.addHandCard woodKin S.alice withSentry
+   in (readyForAlice gs, held, bobsSentry)
+
 -- alice, in her precombat main phase, with priority. Applied by the fixture above
 -- and again after a turn handoff, which leaves the game in CR 502's untap step.
 readyForAlice :: GameState.GameState -> GameState.GameState
@@ -9220,19 +9236,22 @@ readyForAlice gs =
     }
 
 -- CR 702.54: bloodthirst, on Bloodrage Vampire ({2}{B} 3/1 Vampire, "Bloodthirst
--- 1" and nothing else). The second minted entry replacement whose own rule states
--- a condition, after rule 702.145b's daybound, which is why
--- Pawl.Engine.Replacement.admitsEntry now has two arms that are not `True`.
+-- 1" and nothing else) for rule 702.54a's N, and on Petrified Wood-Kin ({6}{G}
+-- 3/3, "Bloodthirst X") for rule 702.54b's X. The second minted entry replacement
+-- whose own rule states a condition, after rule 702.145b's daybound, which is why
+-- Pawl.Engine.Replacement.admitsEntry now has two arms that are not `True` --
+-- and rule 702.54b's X is not one of them, since that variant states none.
 --
--- ONE BOARD throughout, and every case differs from the others in nothing but
--- what happened before the cast: the same three seats, the same three Swamps, the
--- same card cast the same way. The Vampire ENTERS in every case, so what the
+-- ONE BOARD PER FORM, and every case differs from its siblings in nothing but
+-- what happened before the cast: the same three seats, the same lands, the same
+-- card cast the same way. The permanent ENTERS in every case, so what the
 -- assertions tell apart is "entered with counters" from "entered", never "entered"
 -- from "did not".
 --
 -- Distinct numbers everywhere, so no two readings coincide: bloodthirst 1 on a
 -- printed 3/1 shows as a 4/2, and the damage amounts are 4 at bob, 5 at alice, 2
--- at bob's Sentry (which a 3/3 survives) and 6 of life paid.
+-- at bob's Sentry (which a 3/3 survives) and 6 of life paid. The X cases pick
+-- theirs the same way, and each case says which readings its numbers separate.
 --
 -- The damage goes in through Damage.applyDamage, the funnel that records the
 -- event, exactly as Pawl.TriggerSpec's Furious Spinesplitter group does -- and
@@ -9247,6 +9266,7 @@ bloodthirstSpec s registry =
           (Damage.applyDamage [DamageEvent.MkDamageEvent src target amount False False False 0 Nothing DamageKind.Noncombat])
       enters = castAndResolve S.aggressiveAnswer
       vampireIn = newestNamed (CardName.MkCardName $ Text.pack "Bloodrage Vampire")
+      woodKinIn = newestNamed (CardName.MkCardName $ Text.pack "Petrified Wood-Kin")
    in Spec.describe s "Bloodthirst (CR 702.54)" $ do
         Spec.it s "CR 702.54a nobody was dealt damage, so it enters a 3/1" $ do
           swamp <- S.printingOf s registry "Swamp"
@@ -9339,8 +9359,59 @@ bloodthirstSpec s registry =
           Spec.assertEqWith
             s
             "bloodthirst 1 held twice mints two rows"
-            (Keyword.Engine.mintedReplacementsFor (Keyword.Bloodthirst 1) 2)
-            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.Bloodthirst 1))))
+            (Keyword.Engine.mintedReplacementsFor (Keyword.Bloodthirst (Just 1)) 2)
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.Bloodthirst (Just 1)))))
+        -- CR 702.54b: bloodthirst X on Petrified Wood-Kin. THE PAIR IS THIS CASE
+        -- AND THE ONE BELOW, one board apart in nothing but what was dealt.
+        --
+        -- 3 at bob and 2 at carol, so every reading of the rule reaches a
+        -- different number: rule 702.54b's sum is 5, rule 702.54a's tally of
+        -- damaged opponents is 2, one seat's total is 3, and a lifetime count of
+        -- damage events is 2. A printed 3/3 makes the projection 8/8, which no
+        -- other reading produces either.
+        Spec.it s "CR 702.54b X is the total damage its controller's opponents were dealt" $ do
+          forest <- S.printingOf s registry "Forest"
+          woodKin <- S.printingOf s registry "Petrified Wood-Kin"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, bobsSentry) = bloodthirstXBoard forest woodKin sentry
+              damaged = hit bobsSentry (Recipient.ToPlayer S.carol) 2 (hit bobsSentry (Recipient.ToPlayer S.bob) 3 gs0)
+              after = enters damaged held
+          case woodKinIn after of
+            Nothing -> Spec.assertFailure s "Petrified Wood-Kin did not reach the battlefield"
+            Just kin -> do
+              Spec.assertEqWith s "five +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne kin after) 5
+              -- Printed 3/3, so the counters show in the projection (CR 613.4c,
+              -- layer 7c).
+              Spec.assertEqWith s "power" (Projection.powerOf kin after) (Just 8)
+              Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 8)
+        -- CR 702.54b states NO CONDITION, unlike rule 702.54a: with nothing dealt
+        -- X is zero and the permanent still enters, which is why
+        -- Pawl.Engine.Replacement.admitsEntry admits this rewrite unasked.
+        Spec.it s "CR 702.54b nobody was dealt damage, so X is zero" $ do
+          forest <- S.printingOf s registry "Forest"
+          woodKin <- S.printingOf s registry "Petrified Wood-Kin"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, _) = bloodthirstXBoard forest woodKin sentry
+              after = enters gs0 held
+          case woodKinIn after of
+            Nothing -> Spec.assertFailure s "Petrified Wood-Kin did not reach the battlefield"
+            Just kin -> do
+              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne kin after) 0
+              Spec.assertEqWith s "power" (Projection.powerOf kin after) (Just 3)
+              Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 3)
+        -- CR 102.2 / 109.5: "your opponents" excludes the entering permanent's own
+        -- controller. 7 at alice and 3 at bob, so a sum over every player would be
+        -- 10 and a sum over the opponents is 3.
+        Spec.it s "CR 102.2 damage to the controller herself is not in X" $ do
+          forest <- S.printingOf s registry "Forest"
+          woodKin <- S.printingOf s registry "Petrified Wood-Kin"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, bobsSentry) = bloodthirstXBoard forest woodKin sentry
+              damaged = hit bobsSentry (Recipient.ToPlayer S.bob) 3 (hit bobsSentry (Recipient.ToPlayer S.alice) 7 gs0)
+              after = enters damaged held
+          case woodKinIn after of
+            Nothing -> Spec.assertFailure s "Petrified Wood-Kin did not reach the battlefield"
+            Just kin -> Spec.assertEqWith s "three +1/+1 counters, not ten" (countersOn CounterKind.PlusOnePlusOne kin after) 3
 
 -- The tap state of a permanent, which is what CR 502.3's untap step writes -- and
 -- so what a skipped untap step leaves alone.

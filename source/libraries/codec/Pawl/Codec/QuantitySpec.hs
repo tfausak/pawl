@@ -376,6 +376,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.PlayersDealtDamageThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"PlayersDealtDamageThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 120.1 again, the same log read as a TOTAL: Petrified Wood-Kin's rule
+  -- 702.54b X is the Relative arm over Opponent, and it must not share a tag with
+  -- the tally above, which answers a different number on the same board.
+  Spec.it s "DamageDealtToPlayersThisTurn, relative and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.DamageDealtToPlayersThisTurn (PlayerRef.Relative PlayerRelation.Opponent))
+      " {\"type\":\"DamageDealtToPlayersThisTurn\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"Opponent\"}}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.DamageDealtToPlayersThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      " {\"type\":\"DamageDealtToPlayersThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 601.2i, on CardsDiscardedThisTurn's terms again: a PlayerRef and nothing
   -- else. Daybreak Ranger // Nightfall Predator writes the Candidate arm, which is
   -- how a per-player quantity is read under a count over players; the InSlot arm

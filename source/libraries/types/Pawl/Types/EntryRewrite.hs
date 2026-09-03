@@ -278,14 +278,21 @@ data EntryRewrite effect
     -- number varies by card, where rule 702.136a fixes riot's at one. The
     -- COUNTER KIND does not, because rule 702.54a fixes it at +1/+1.
     --
+    -- Nothing is rule 702.54b's "bloodthirst X", Keyword.Bloodthirst's payload
+    -- carried through unchanged. X is NOT settled at mint time as N is: the mint
+    -- is handed a keyword and a count, never a board, so the sum is read where
+    -- the row applies (Pawl.Engine.Event) and rule 702.54b's silence about a
+    -- condition is read where rule 702.54a's is asked
+    -- (Pawl.Engine.Replacement.admitsEntry).
+    --
     -- NOT WRITTEN BY A CARD -- minted from the finished projection by
     -- Pawl.Engine.Keyword.mintedReplacementsFor, so a card says only
-    -- `Keyword.Bloodthirst 1` and rule 702.54a says what it means. It still
-    -- round-trips through the codec, because every arm of this type does.
+    -- `Keyword.Bloodthirst (Just 1)` and rule 702.54a says what it means. It
+    -- still round-trips through the codec, because every arm of this type does.
     --
     -- The counters go through Pawl.Engine.Event.addEnteringCounters, as
     -- WithCounters' and riot's do, so CR 614.16 applies to them.
-    Bloodthirst Natural.Natural
+    Bloodthirst (Maybe Natural.Natural)
   | -- | CR 702.150a via CR 614.1c: compleated. "If this permanent would enter
     -- with one or more loyalty counters on it and the player who cast it chose to
     -- pay life for any part of its cost represented by Phyrexian mana symbols, it
