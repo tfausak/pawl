@@ -318,6 +318,22 @@ removeFromCombat oid gs =
 isBlocking :: ObjectId -> GameState -> Bool
 isBlocking oid gs = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs)))
 
+-- CR 303.4b / 301.5a with the arrow turned round: the permanents attached to
+-- this one. pawl keeps the link on the ATTACHED permanent, so there is nothing
+-- to look up from this side and the answer is a sweep of the battlefield --
+-- which supplies CR 110.1's narrowing for free, an attached permanent being on
+-- the battlefield by definition. Pawl.Engine.Projection's `attachedViews` sweeps
+-- for the same reason and answers the same set; it is a Filter atom rather than
+-- a plain id list, so the two cannot share a body.
+--
+-- Compared through Recipient.objectOf: Object.attachedTo carries CR 115.1's tag
+-- as well as the id, and a host is the same host whichever tag names it.
+attachments :: ObjectId -> GameState -> Set.Set ObjectId
+attachments oid gs =
+  Set.filter
+    (\attacher -> (lookupObject attacher gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid)
+    (GameState.battlefield gs)
+
 removeFromZones :: PlayerId -> ObjectId -> GameState -> GameState
 removeFromZones pid oid gs =
   gs

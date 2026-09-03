@@ -23,7 +23,7 @@ minimalJson = "{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
-  -- CR 608.2h, all ten axes. `characteristics` and `copiable` are the same type
+  -- CR 608.2h, all eleven axes. `characteristics` and `copiable` are the same type
   -- and hold DIFFERENT values here, because CR 707.2's layer-1-only reading is
   -- exactly what the whole fold loses -- an encoder writing one where the other
   -- belongs would round trip against equal values.
@@ -39,6 +39,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.counters = Map.singleton CounterKind.PlusOnePlusOne 3,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attachedTo = Just (Recipient.ToCreature (ObjectId.MkObjectId 8)),
+          LastKnown.attached = Set.singleton (ObjectId.MkObjectId 9),
           LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")),
           LastKnown.blocking = True,
           LastKnown.protector = Just (PlayerId.MkPlayerId 7)
@@ -49,7 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}]"
           <> ",\"copiable\":"
           <> minimalJson
-          <> ",\"attachedTo\":{\"type\":\"ToCreature\",\"value\":8}"
+          <> ",\"attachedTo\":{\"type\":\"ToCreature\",\"value\":8},\"attached\":[9]"
           <> ",\"chosenNames\":[\"Goblin Piker\"],\"blocking\":true,\"protector\":7} "
       )
   -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
@@ -67,6 +68,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.counters = Map.empty,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attachedTo = Nothing,
+          LastKnown.attached = Set.empty,
           LastKnown.chosenNames = Set.empty,
           LastKnown.blocking = False,
           LastKnown.protector = Nothing
@@ -77,7 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"counters\":[]"
           <> ",\"copiable\":"
           <> minimalJson
-          <> ",\"attachedTo\":null"
+          <> ",\"attachedTo\":null,\"attached\":[]"
           <> ",\"chosenNames\":[],\"blocking\":false,\"protector\":null} "
       )
   Spec.it s "has a schema" $

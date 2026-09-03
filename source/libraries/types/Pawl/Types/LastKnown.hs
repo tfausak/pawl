@@ -6,6 +6,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
@@ -16,7 +17,7 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Ten things rather than the characteristics alone, because the other nine
+-- Eleven things rather than the characteristics alone, because the other ten
 -- questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
@@ -32,9 +33,10 @@ import qualified Pawl.Types.Source as Source
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
 -- its own field gives. Nor is the COMBAT STATUS, the eighth, for the reason its
 -- own field gives. Nor is the PROTECTOR, the ninth, for the reason its own field
--- gives.
+-- gives. Nor are the permanents ATTACHED TO it, the tenth, for the reason its
+-- own field gives.
 --
--- All ten fields STRICT (!): entries are keyed by an id that no longer exists
+-- All eleven fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -102,13 +104,24 @@ data LastKnown = MkLastKnown
     -- unavailable exactly when the rules still ask for it --
     -- Pawl.Types.TriggerCondition.AttachedCreatureDies is the reader.
     --
-    -- Not implemented: the same question for an EQUIPMENT, which CR 704.5n
-    -- merely detaches, so it survives the batch with no entry here and no live
-    -- link either (#3144).
-    --
     -- Nothing for an object that was attached to nothing, which is every object
     -- that is not an Aura, an Equipment or a Fortification.
     attachedTo :: !(Maybe Recipient.Recipient),
+    -- | CR 603.10a: the permanents that were attached TO it as it left --
+    -- `attachedTo` above with the arrow turned round, swept off the battlefield
+    -- by Pawl.Engine.Game.attachments as the object ceased.
+    --
+    -- The reading TriggerCondition.AttachedCreatureDies needs, and the only one
+    -- an EQUIPMENT bearer has: CR 704.5n detaches an Equipment rather than
+    -- burying it, in the same CR 117.5 batch that buried its host, so by the
+    -- time triggers are placed the Equipment stands on the battlefield with a
+    -- cleared link and files no record of its own. Reading it off the HOST is
+    -- what makes the look-back available to a bearer that is still alive, and it
+    -- answers CR 704.5m's Aura the same way, that Aura having been attached when
+    -- this was taken. Proved by Pawl.ZoneTriggerSpec's Skullclamp group.
+    --
+    -- Empty for everything nothing was attached to, which is most objects.
+    attached :: !(Set.Set ObjectId.ObjectId),
     -- | CR 201.4: the card names that had been chosen for it -- the same
     -- Object.chosenNames the live object carried. What CR 608.2h answers for a
     -- CR 611.2c effect whose source chose a name and then left the zone it was

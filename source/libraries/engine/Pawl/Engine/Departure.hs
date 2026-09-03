@@ -252,6 +252,9 @@ objectsLeaveWith pid gs =
                 (Object.counters obj)
                 (Event.copiedSnapshot oid gs)
                 (Object.attachedTo obj)
+                -- CR 603.10a's look-back, taken while the answer still
+                -- exists: the arrow of the field above turned round.
+                (Game.attachments oid gs)
                 (Object.chosenNames obj)
                 (Game.isBlocking oid gs)
                 -- CR 310.9a, read straight off the object like the owner above:

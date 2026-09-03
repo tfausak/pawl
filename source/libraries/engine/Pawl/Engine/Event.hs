@@ -4328,7 +4328,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- `snapshot` is, and the copy binding and face it reads live
                         -- on `obj`, which is about to cease. No third board walk --
                         -- it reads that binding or the printed face and stops.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the
@@ -5714,7 +5714,7 @@ forgetObject gs oid = case Game.lookupObject oid gs of
         cleared = Game.removeFromZones (Object.owner obj) oid gs
      in cleared
           { GameState.objects = Map.delete oid (GameState.objects cleared),
-            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
+            GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Object.attachedTo obj) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown cleared)
           }
 
 -- CR 119.3: move one player's life total by this much, and record the CR 608.2i
@@ -8788,37 +8788,28 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PermanentsDealCombatDamageToPlayer f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer f) event
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
-  -- ZoneChange.departed for that arm's reason (CR 603.10a), against the host id
-  -- Object.attachedTo records.
+  -- ZoneChange.departed for that arm's reason (CR 603.10a).
   --
-  -- The host is read through Recipient.objectOf, AttachedCreatureMentors' route
-  -- for CR 303.4's other destination: an Aura enchanting a PLAYER has no host id
-  -- to compare and answers False, as does one attached to nothing.
+  -- CR 603.10a's look-back, and the ONE reading of the link: the deceased's own
+  -- CR 608.2h record of what was attached to it, filed by the zone-change funnel
+  -- from the pre-move board. Neither reading off the BEARER survives to the CR
+  -- 117.5 boundary -- CR 704.5m buries an Aura in the same SBA batch, and CR
+  -- 704.5n clears an Equipment's Object.attachedTo in it -- so the host is where
+  -- the attachment as of the event still exists, for both bearer shapes at once.
+  -- Pawl.Types.LastKnown.attached is the field; CR 303.4m is what makes an
+  -- Equipment's "equipped creature" the same link an Aura's "enchanted creature"
+  -- is.
   --
   -- No characteristic of the deceased is read, unlike PermanentDies -- the
   -- attachment link already says which permanent this is about, so there is
-  -- nothing for last known information to answer.
+  -- nothing more for last known information to answer.
   --
-  -- LAST KNOWN INFORMATION where the bearer is gone (CR 608.2h), which is
-  -- AttachedCreatureMentors' one point of departure and is load-bearing rather
-  -- than defensive: CR 704.5m takes the Aura off the battlefield in the very SBA
-  -- batch that buried its host, and CR 117.5 places triggers only after that
-  -- batch settles, so by the time this is asked the live link is ALWAYS gone.
-  --
-  -- Not implemented: an EQUIPMENT bearer, which CR 704.5n leaves standing. The
-  -- live read ahead of the fallback was meant for it, but CR 704.5n has already
-  -- cleared Object.attachedTo by the time CR 117.5 places triggers, and a
-  -- surviving bearer has no last-known entry -- so neither read finds the link
-  -- and the trigger never matches. CR 603.10a's look-back at the attachment as of
-  -- the event is what would answer, and matchesTrigger takes only the post-batch
-  -- GameState (#3144).
+  -- Empty for a departure the funnel never filed, which no event this arm admits
+  -- can be: a battlefield-to-graveyard move is the funnel's own.
   TriggerCondition.AttachedCreatureDies -> case event of
     GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
-          let hostOfBearer = case Game.lookupObject bearer gs of
-                Just obj -> Object.attachedTo obj
-                Nothing -> LastKnown.attachedTo =<< Map.lookup bearer (GameState.lastKnown gs)
-           in (Recipient.objectOf =<< hostOfBearer) == Just (ZoneChange.departed zc)
+          maybe False (Set.member bearer . LastKnown.attached) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -8879,14 +8870,15 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- and rule 701.26a's "only untapped permanents can be tapped" makes a repeat tap
   -- no event at all. So this arm asks only whose tap it was.
   --
-  -- The host is read through Recipient.objectOf, AttachedCreatureDies' route for
-  -- CR 303.4's other destination: an Aura enchanting a PLAYER has no host id to
-  -- compare and answers False, as does one attached to nothing.
+  -- The host is read through Recipient.objectOf, AttachedCreatureMentors' route
+  -- for CR 303.4's other destination: an Aura enchanting a PLAYER has no host id
+  -- to compare and answers False, as does one attached to nothing.
   --
-  -- LIVE only, where AttachedCreatureDies falls back on CR 608.2h last known
-  -- information. That fallback is load-bearing there because CR 704.5m buries the
-  -- Aura in the same SBA batch as its host; here the host is still standing -- it
-  -- has just become tapped -- so the link is on the board to be read.
+  -- LIVE and off the BEARER, where AttachedCreatureDies reads CR 608.2h's record
+  -- of the deceased instead. That look-back is load-bearing there because the
+  -- same SBA batch that kills the host takes the link away (CR 704.5m, CR
+  -- 704.5n); here the host is still standing -- it has just become tapped -- so
+  -- the link is on the board to be read.
   TriggerCondition.AttachedCreatureBecomesTapped -> case event of
     GameEvent.BecameTapped tapped ->
       let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
