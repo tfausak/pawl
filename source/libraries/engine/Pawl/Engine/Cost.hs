@@ -2996,23 +2996,24 @@ chooseManaYield pid oid candidates gs = case candidates of
 
 payComponent :: PaymentMoment.PaymentMoment -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent moment slots pid oid component = case component of
-  -- CR 118.3 asked AGAIN here, and not only at the gate: CR 601.2h lets the payer
+  -- CR 118.3 asked AGAIN here and not only at the gate: CR 601.2h lets the payer
   -- order the parts, so a part paid earlier in that order can have moved this
   -- permanent off the battlefield -- Brittle Effigy's ExileThis, Mindslaver's
-  -- SacrificeThis -- and rule 107.5's "a permanent that's already tapped can't be
-  -- tapped again" reaches the same way through the gate's own arm. Nothing on the
-  -- battlefield to tap makes the ORDER unpayable, which is not the same as the
-  -- cost being unpayable, so `canPay` above is right to have allowed it.
-  --
-  -- `canPayComponent`'s arm is the condition, so the gate and the payment answer
-  -- one question. Unpaid rather than Event.tap's silent no-op, which `pay` turns
-  -- into CR 601.2h's reversal of the whole announcement: refusing the order is
-  -- not choosing one for the player, and re-asking would have to end in the
-  -- engine picking. Pawl.CostSpec's "CR 118.3 exiling the Effigy first leaves no
+  -- SacrificeThis -- leaving no permanent to tap. That makes the ORDER unpayable
+  -- rather than the cost, so `canPay` above was right to allow it, and CR 601.2h
+  -- refuses the payment whole: Unpaid rather than Event.tap's silent no-op, which
+  -- `pay` turns into the reversal of the entire announcement. Refusing an order is
+  -- not choosing one for the player, and re-asking would have to end in the engine
+  -- picking. Pawl.CostSpec's "CR 118.3 exiling the Effigy first leaves no
   -- permanent to tap" is the proof.
+  --
+  -- Not implemented: rule 107.5's other half, a permanent that is already tapped.
+  -- `canPayComponent`'s arm above reads the tap state beside the zone and is what
+  -- this would share; the mana window that runs first is where a permanent gets
+  -- tapped mid-payment (#3114).
   CostComponent.TapThis -> do
     gs <- State.get
-    if canPayComponent slots pid oid component gs
+    if Set.member oid (GameState.battlefield gs)
       then do
         tapObject oid
         pure bindsNothing
