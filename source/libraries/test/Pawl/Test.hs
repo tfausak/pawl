@@ -338,6 +338,7 @@ import qualified Pawl.Codec.RollDieSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
 import qualified Pawl.Codec.SacrificeAnyNumberSpec
+import qualified Pawl.Codec.SacrificeEffectSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.SacrificeSpec
 import qualified Pawl.Codec.SacrificerSpec
@@ -355,7 +356,6 @@ import qualified Pawl.Codec.SicknessSpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotCountSpec
 import qualified Pawl.Codec.SlotNameSpec
-import qualified Pawl.Codec.SlotSacrificeSpec
 import qualified Pawl.Codec.SourceSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
@@ -919,6 +919,7 @@ spec s registry = do
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.SacrificeAnyNumberSpec.spec s
+  Pawl.Codec.SacrificeEffectSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ReturnPermanentsSpec.spec s
   Pawl.Codec.SacrificeSpec.spec s
@@ -937,7 +938,6 @@ spec s registry = do
   Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotCountSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
-  Pawl.Codec.SlotSacrificeSpec.spec s
   Pawl.Codec.SourceSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.SpeedDecreaseSpec.spec s

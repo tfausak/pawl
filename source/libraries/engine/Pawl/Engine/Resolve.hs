@@ -255,6 +255,7 @@ import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -266,7 +267,6 @@ import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
 import Pawl.Types.SlotName (SlotName)
-import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
@@ -574,7 +574,7 @@ effectObjectRefs effect = case effect of
   Effect.RestartGame exempt -> Maybe.maybeToList exempt
   Effect.ControlPlayerNextTurn {} -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> [ref]
-  Effect.Sacrifice {} -> []
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> [ref]
   Effect.Attach {} -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
@@ -887,7 +887,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The three slot fields are DEFINITIONS, not reads; they belong to boundSlots
   -- below.
   Effect.Destroy {} -> Map.empty
-  Effect.Sacrifice payload -> oneSlot (SlotSacrifice.slot payload)
+  -- The ref is the whole read, and the head above already took it.
+  Effect.Sacrifice {} -> Map.empty
   Effect.TurnFaceDown {} -> Map.empty
   Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat _ -> Map.empty
@@ -5506,27 +5507,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- iterations (CR 101.3).
     Monad.forM_ mPermanents $ \slot ->
       Monad.unless (null destroyed) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList (fmap fst destroyed))))
-  Effect.Sacrifice (SlotSacrifice.MkSlotSacrifice slot sacrificer) -> do
-    -- A slot a Create bound to a GROUP names every token at once, so all of them
-    -- are sacrificed, in mint order. Read off the resolving object's live
-    -- bindings rather than out of `chosen`: a group binding is never a target, so
-    -- it owes CR 608.2b nothing.
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer) -> do
+    -- CR 701.21 through the single funnel, which is NOT Event.destroy (CR
+    -- 701.21a): a sacrifice is not a destruction, so indestructible (CR 702.12b)
+    -- and a regeneration shield leave it alone.
     --
-    -- CR 603.7c's zone check applies per MEMBER rather than to the whole word: a
-    -- member that is gone is simply not affected, and the rest still are.
-    bound <- State.gets (slotGroup slot resolving)
-    let sacrificeOne = sacrificerFor sacrificer controller
-    case bound of
-      -- One at a time rather than as one event (#757).
-      Just victims -> Monad.mapM_ sacrificeOne victims
-      Nothing -> case legalOne slot legal of
-        Just recipient -> case Recipient.objectOf recipient of
-          Nothing -> pure () -- a player recipient cannot be sacrificed
-          -- CR 701.21: through the single funnel, which is NOT Event.destroy (CR
-          -- 701.21a).
-          Just target -> sacrificeOne target
-        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
-        _ -> pure ()
+    -- The victims come from objectRefObjects like every other ObjectRef reader,
+    -- which is what lets Golgothian Sylex's EachMatching sweep the battlefield.
+    -- Its InSlot arm keeps what a bare SlotName did: a slot a Create bound to a
+    -- GROUP names every token at once, in mint order, ahead of the target read
+    -- and owing CR 608.2b nothing; an illegal slot (CR 608.2b) and a player
+    -- recipient both arrive here as the empty list. CR 603.7c's zone check
+    -- applies per MEMBER rather than to the whole word: a member that is gone is
+    -- simply not affected, and the rest still are.
+    --
+    -- One at a time rather than as one event (#757).
+    gs <- State.get
+    Monad.mapM_ (sacrificerFor sacrificer controller) (objectRefObjects legal resolving controller source gs ref)
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) -> do
     -- CR 708.2: ONE assignment to Object.facing per victim is the whole effect.
     -- What each permanent becomes is the list the effect carries (CR 708.2a's
