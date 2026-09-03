@@ -108,7 +108,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
-import qualified Pawl.Types.CopySpell as CopySpell
+import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
@@ -557,7 +557,7 @@ objectRefPositions =
     ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
     ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders), [plantedRef "cc"]),
     ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject")), [plantedRef "bc-original", plantedRef "bc-subject"]),
-    ("copy-spell", Effect.CopySpell (CopySpell.MkCopySpell (plantedRef "cs") False), [plantedRef "cs"]),
+    ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") False), [plantedRef "cs"]),
     ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
     ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
     ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing (plantedRef "rd-from") (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
@@ -1114,7 +1114,7 @@ ownCounts effect = case effect of
   Effect.BecomeCopy {} -> []
   -- CR 707.10 copies one spell per named object and prints no count, so the
   -- BecomeCopy arm above answers for this too.
-  Effect.CopySpell {} -> []
+  Effect.CopyStackObject {} -> []
   -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
   -- control three or more artifacts", and its Counts are as much card data as a
   -- Duration's.
@@ -1280,7 +1280,7 @@ ownQuantities effect = case effect of
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> [quantity]
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> quantity : Resolve.riderQuantities riders
   Effect.BecomeCopy {} -> []
-  Effect.CopySpell {} -> []
+  Effect.CopyStackObject {} -> []
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
@@ -1521,7 +1521,7 @@ effectNestedEffects effect = case effect of
   Effect.Conjure {} -> []
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
-  Effect.CopySpell {} -> []
+  Effect.CopyStackObject {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.TakeTheInitiative {} -> []
@@ -2048,7 +2048,7 @@ effectReplacements effect = case effect of
   Effect.Conjure (Conjure.MkConjure _ card _) -> overFaces cardReplacementEffects card
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
-  Effect.CopySpell {} -> []
+  Effect.CopyStackObject {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
@@ -2957,7 +2957,7 @@ effectMintedFaces effect = case effect of
   -- Mints nothing at all: it rewrites an existing permanent's copiable values.
   Effect.BecomeCopy {} -> []
   -- Mints no face either: the copy's text is the copied spell's.
-  Effect.CopySpell {} -> []
+  Effect.CopyStackObject {} -> []
   Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> concatMap effectMintedFaces (replacementEffectRiders replacement)
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
@@ -5373,7 +5373,7 @@ effectFilters effect = case effect of
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject)
   -- The one ref, CreateCopy's arm above: an EachMatching Filter is card text.
-  Effect.CopySpell (CopySpell.MkCopySpell ref _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref _) -> frame SourceHostFramed (objectRefFilters ref)
   -- The ROW's own Filters are framed for printedReplacementFilters' reason: a
   -- stored row is read through the same
   -- Pawl.Engine.Replacement.candidateContext a printed one is, where the
@@ -5663,7 +5663,7 @@ effectObjectRefs effect = case effect of
   Effect.Conjure {} -> []
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> read_ [ref]
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> read_ [original, subject]
-  Effect.CopySpell (CopySpell.MkCopySpell ref _) -> read_ [ref]
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref _) -> read_ [ref]
   Effect.Replace {} -> []
   Effect.SkipNextPhase {} -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
