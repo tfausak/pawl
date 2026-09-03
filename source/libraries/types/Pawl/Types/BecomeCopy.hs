@@ -14,9 +14,19 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- priced at the copy's mana cost" is what proves the copiable values follow it
 -- there.
 --
--- Not implemented: CR 707.2's copiable rules text when the copy is CAST --
--- Pawl.Engine.Resolve.resolveSpellWith takes a spell's modes and effects off the
--- printed face, so a card cast after becoming a copy resolves its own (#3098).
+-- The copy does NOT follow the card onto the stack. CR 400.7 makes a cast card a
+-- new object, which CR 611.2c's fixed set of affected objects does not reach, so
+-- the spell announces and resolves its own printed text -- the reading a Clone
+-- dying as Clone gets. Pawl.CastSpec's "CR 400.7 the copy cast from the graveyard
+-- is a new object" proves it. Two independent roads hold it, which is why no
+-- one-line mutation reddens that case: Pawl.Types.Object.newIncarnation clears
+-- `bindings` on the move, and Pawl.Engine.Cast stamps the stack incarnation a
+-- fresh binding map besides.
+--
+-- Not implemented: a SPELL on the stack becoming a copy, the third noun in CR
+-- 707.1's list -- the one place CR 707.2's copiable rules text would have to
+-- reach Pawl.Engine.Resolve.resolveSpellWith, which reads the printed face
+-- (#3154).
 --
 -- TWO ObjectRefs, named rather than positional for Pawl.Types.RequireBlock's
 -- reason: the sides are not interchangeable, and a card file that swapped them
