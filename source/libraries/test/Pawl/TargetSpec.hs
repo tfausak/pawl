@@ -45,7 +45,10 @@
 -- announcement. Its case reads the same union-offer plus joint-check pair
 -- Dwell's does, and turns on an announcement the joint check has to reject.
 -- Synthetic Hammer Refrain is that card under CR 700.2d's repeat, where the
--- filter's slot name has to follow the occurrence the way the pool's does.
+-- filter's slot name has to follow the occurrence the way the pool's does, and
+-- Itzquinth, Firstborn of Gishath is the same pair on the road no spell takes:
+-- a CR 603.12 reflexive ability, whose announcement is judged as CR 603.3d puts
+-- it on the stack rather than as CR 601.2c casts it.
 --
 -- Cancel and Stifle's case has a third beside it, on the same pool one rule
 -- over: CR 115.5's self-exclusion for an ABILITY, which Adric, Mathematical
