@@ -289,12 +289,15 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   -- Baking the nest against this candidate would bake a question about the HOST
   -- against a player who is not it.
   Filter.Type.AttachedTo _ -> predicate
-  -- NOT descended into either, for the atom above's reason: CR 303.4b does let an
-  -- Aura enchant a player, but this view holds no board to find it on, so
-  -- Pawl.Engine.Filter answers the atom False for a player candidate whatever the
-  -- nest says (#2030). Baking the nest here would bake a question about the
-  -- ATTACHER against the player it is attached to.
-  Filter.Type.HasAttached _ -> predicate
+  -- CR 303.4b / 301.5a: something the nested Filter admits is attached TO this
+  -- PLAYER candidate. Baked here for CardsInGraveyardAtLeast's reason -- CR
+  -- 109.3 keeps attachment off the characteristics, so this is a board
+  -- question rather than one `viewOf` can answer -- and swept the same way
+  -- Pawl.Engine.Projection's attachedViews sweeps for an object: pawl stores
+  -- the attachment on the ATTACHED permanent, so there is nothing to index
+  -- from this side.
+  Filter.Type.HasAttached f ->
+    truth (any (\view -> Filter.matches context view f) (Maybe.mapMaybe viewOf (attachersOfPlayer gs candidate)))
   Filter.Type.IsAttachedToSource -> predicate
   Filter.Type.IsHostOfSource -> predicate
   Filter.Type.CanHostSubject -> predicate
@@ -345,6 +348,17 @@ controlledMatching viewOf context gs inner pid =
         Nothing -> False
         Just view -> Filter.controller view == Just pid && Filter.matches context view inner
    in toInteger (length (Prelude.filter matching (Set.toList (GameState.battlefield gs))))
+
+-- CR 303.4b / 301.5a: the permanents attached TO player `candidate` --
+-- HasAttached's reverse of AttachedTo, and `bakePerspective`'s door onto the
+-- board for it. Narrowed to the battlefield, as Pawl.Engine.Projection's
+-- attachedViews narrows for the object-side sweep.
+attachersOfPlayer :: GameState -> PlayerId -> [ObjectId]
+attachersOfPlayer gs candidate =
+  [ attacher
+  | attacher <- Set.toList (GameState.battlefield gs),
+    (Game.lookupObject attacher gs >>= Object.attachedTo >>= Recipient.playerOf) == Just candidate
+  ]
 
 keep :: Filter.Type.Filter Keyword.Type.Keyword -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of

@@ -261,9 +261,10 @@ data Filter keyword
     -- above, neither expressing the other, attachment being directed. Any, not
     -- all (CR 303.4b), and narrowed to attachers on the battlefield.
     --
-    -- Not implemented: a PLAYER candidate, whom CR 303.4b does let an Aura
-    -- enchant -- the atom is False for one, since Pawl.Engine.Filter.playerView
-    -- holds no board to find the attachers on (#2030).
+    -- CR 303.4b's other enchantable is a PLAYER candidate: vacuously False where
+    -- this reaches a match unbaked, ControlsMoreThanYou's posture, since a bare
+    -- player View holds no board to find the attachers on. Answered by rewriting
+    -- at Pawl.Engine.Count.bakePerspective.
     HasAttached (Filter keyword)
   | -- | CR 701.3a / 301.5a: the candidate is attached to the evaluation's SOURCE
     -- -- Kemba's Legion's "for each Equipment attached to this creature". Host

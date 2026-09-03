@@ -365,6 +365,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   mimingSlimeSpec s registry
   tyranidInvasionSpec s registry
   oreskosExplorerSpec s registry
+  censusOfTheCursedSpec s registry
   relicRunnerSpec s registry
   flunkSpec s registry
 
@@ -984,6 +985,70 @@ oreskosExplorerSpec s registry =
           Spec.assertEqWith s "only bob is ahead, so one card found" (inHand after) 1
           Spec.assertEqWith s "and it was a Plains, revealed" (S.revealsOf after) [(S.alice, plainsName)]
           Spec.assertEqWith s "three cards left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+          Spec.assertEqWith s "everything resolved" (GameState.stack after) []
+
+-- CR 303.4b's "enchanted", asked of a PLAYER candidate: the fold
+-- Pawl.Engine.Count.bakePerspective and Pawl.FilterSpec's HasAttached group
+-- divide between them, so GAMEPLAY LEVEL is the only level that can prove the
+-- two meet -- a unit-level match reads the vacuous False, Oreskos Explorer's
+-- reason.
+--
+-- Synthetic Census of the Cursed, {2}{U} Sorcery: "Draw a card for each
+-- enchanted player." No printed card asks a Filter about an arbitrary player's
+-- enchanted-ness (five Scryfall queries empty, 2026-09-02); the printed
+-- neighbour is a Curse looking at its OWN enchanted player
+-- (Affected.AttachedPlayerControls, CR 702.5d), which this does not exercise.
+--
+-- THREE SEATS, and Curse of Death's Hold -- already a real enchant-player Aura,
+-- cast for real by Pawl.AuraSpec's EnchantPlayer group, so placing it by
+-- S.attachTo fixture here proves only the count's read and not the attach path
+-- a second time -- attached to alice (the CASTER) and to bob, and to neither
+-- Aura on carol:
+--
+--   alice enchanted   bob enchanted   carol unenchanted   -> 2
+--
+-- which tells "every enchanted player" (2) apart from "opponents you have" (1,
+-- bob only, since EachPlayer -- unlike Tyranid Invasion's Relative Opponent --
+-- includes the caster) and "every player" (3, the filter doing nothing). The
+-- second case moves a SECOND Curse onto bob alone and checks the draw still
+-- comes out to 1: Aggregation.Members counts PLAYERS matching the filter, not
+-- attachments, so two Auras on one enchanted player must not double it.
+censusOfTheCursedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+censusOfTheCursedSpec s registry =
+  let board island forest curses =
+        let withLands = S.landsFor island S.alice 3 S.threePlayerGame
+            withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard forest S.alice g)) withLands [1 .. (3 :: Int)]
+            withCurses =
+              List.foldl'
+                (\g (curse, pid) -> let (oid, g1) = S.addCreature curse S.alice g in S.attachTo oid (Recipient.ToPlayer pid) g1)
+                withLibrary
+                curses
+         in withCurses
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castCensus census gs =
+        let (oid, gs1) = S.addHandCard census S.alice gs
+            cast = S.runPure S.identityAnswer gs1 (S.cast S.alice oid)
+         in S.runPure S.identityAnswer cast Engine.priorityLoop
+      inHand gs = length (Game.zoneMembers Zone.Hand S.alice gs)
+   in Spec.describe s "Synthetic Census of the Cursed" $ do
+        Spec.it s "CR 303.4b draws once per enchanted player, the caster included, and skips the unenchanted one" $ do
+          curse <- S.printingOf s registry "Curse of Death's Hold"
+          island <- S.printingOf s registry "Island"
+          forest <- S.printingOf s registry "Forest"
+          census <- S.printingOf s registry "Synthetic Census of the Cursed"
+          let after = castCensus census (board island forest [(curse, S.alice), (curse, S.bob)])
+          Spec.assertEqWith s "alice and bob are both enchanted, so two cards drawn" (inHand after) 2
+          Spec.assertEqWith s "everything resolved" (GameState.stack after) []
+        Spec.it s "CR 303.4b two Auras on the same player still count as ONE enchanted player" $ do
+          curse <- S.printingOf s registry "Curse of Death's Hold"
+          island <- S.printingOf s registry "Island"
+          forest <- S.printingOf s registry "Forest"
+          census <- S.printingOf s registry "Synthetic Census of the Cursed"
+          let after = castCensus census (board island forest [(curse, S.bob), (curse, S.bob)])
+          Spec.assertEqWith s "one enchanted player, however many Auras are on him" (inHand after) 1
           Spec.assertEqWith s "everything resolved" (GameState.stack after) []
 
 -- Finds as many matching cards as the search allows, off the head of the offered

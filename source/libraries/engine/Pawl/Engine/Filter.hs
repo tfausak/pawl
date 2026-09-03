@@ -298,8 +298,11 @@ data View = MkView
     -- asks CR 303.4b's existential and nothing indexes the field.
     --
     -- Empty where nothing is attached, and where the candidate is a player (CR
-    -- 303.4b's other enchantable, #2030). Narrowed to attachers on the
-    -- BATTLEFIELD, as `attachedToView` narrows its host and for CR 110.1's reason:
+    -- 303.4b's other enchantable): this builder holds a PlayerId and no board
+    -- to sweep, so Pawl.Engine.Count.bakePerspective answers HasAttached for a
+    -- player candidate instead, ahead of this field ever being read. Narrowed
+    -- to attachers on the BATTLEFIELD, as `attachedToView` narrows its host and
+    -- for CR 110.1's reason:
     -- an object that has left is no longer a permanent and no longer attached to
     -- anything, the stale window CR 704.5m closes on the next state-based-action
     -- pass.
@@ -663,11 +666,12 @@ playerView pid =
       -- CR 303.4b lets an Aura enchant a PLAYER, so unlike the field above this
       -- one asks a question a player candidate really can answer -- but not here:
       -- this view is built from a PlayerId alone and holds no board to sweep for
-      -- the attachers.
-      --
-      -- Not implemented: an enchanted player, which wants baking against the game
-      -- state at Pawl.Engine.Count.bakePerspective the way ControlsMoreThanYou is
-      -- (#2030).
+      -- the attachers. False is therefore the DEFAULT and not the answer, but
+      -- unlike `dealtDamageThisTurn` above it stays the default here: CR 109.3
+      -- keeps attachment off the characteristics, so this is ControlsMoreThanYou's
+      -- posture rather than that field's -- Pawl.Engine.Count.bakePerspective
+      -- rewrites the HasAttached atom against the board instead of filling this
+      -- field, and only the Scope.OverPlayers road travels through it.
       attachedViews = [],
       -- CR 303.4 again: a player is attached to nothing, so there is no host id
       -- for IsAttachedToSource to compare either.
