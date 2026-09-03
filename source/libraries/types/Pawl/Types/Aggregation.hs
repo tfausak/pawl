@@ -22,9 +22,8 @@ data Aggregation quantity
     -- existing Quantity that Pawl.Engine.Quantity.evaluate already reads against
     -- one object rather than a narrower stand-in duplicating its arms.
     --
-    -- Least and a summing arm are the obvious neighbours and are NOT here: no
-    -- card in data/cards asks for them. Printed cards DO ask for the summing one
-    -- -- Sutured Ghoul and Wretched Bonemass each read "the total power of the
-    -- exiled cards" -- so it arrives with whichever of those lands first (#2482).
+    -- Not implemented: a summing arm, which Sutured Ghoul and Wretched
+    -- Bonemass both ask for ("the total power of the exiled cards") (#3108).
+    -- Least is not here either, and no card in data/cards asks for it.
     Greatest quantity
   deriving (Eq, Ord, Show)

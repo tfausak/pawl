@@ -248,7 +248,7 @@
                         "type": "MoveToZone",
                         "value": {
                           "ref": {
-                            "type": "ChosenPermanent",
+                            "type": "SourceAndChosenPermanent",
                             "value": {
                               "type": "And",
                               "value": [
@@ -277,18 +277,7 @@
                               ]
                             }
                           },
-                          "zone": {
-                            "type": "Exile"
-                          }
-                        }
-                      },
-                      {
-                        "type": "MoveToZone",
-                        "value": {
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "self"
-                          },
+                          "slot": "melded",
                           "zone": {
                             "type": "Exile"
                           }
@@ -298,7 +287,8 @@
                         "type": "Meld",
                         "value": {
                           "objects": {
-                            "type": "EachCardExiledWithSource"
+                            "type": "InSlot",
+                            "value": "melded"
                           },
                           "result": {
                             "faces": [

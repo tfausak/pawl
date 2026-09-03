@@ -103,6 +103,7 @@ zoneFunctionedFrom delayed effect = case effect of
     ObjectRef.RandomCardInHand _ -> Nothing
     ObjectRef.AnyNumberMatching _ -> Nothing
     ObjectRef.ChosenPermanent _ -> Nothing
+    ObjectRef.SourceAndChosenPermanent _ -> Nothing
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.Fight {} -> Nothing
   Effect.ModifyTarget {} -> Nothing

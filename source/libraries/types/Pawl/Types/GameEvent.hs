@@ -31,6 +31,7 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | CR 608.2i: one entry of the turn-scoped record of what happened. Effects
 -- that look back in time read it, so entries are APPENDED by the
@@ -43,6 +44,15 @@ data GameEvent
     -- strict snapshot of the moved object as it last existed in the zone it LEFT
     -- (CR 608.2h) rather than a re-derivation from the printed card.
     Moved Moved.Moved
+  | -- | CR 712.21: one of the CARDS a zone change put into a zone, other than
+    -- the one the Moved event above already names. The ZoneChange's `departed`
+    -- is the object that left and `to` is where this card landed, which CR
+    -- 903.9c can make a different zone from the Moved event's.
+    --
+    -- Recorded only where one departure minted several arrivals, so CR 712.21's
+    -- first clause keeps its arity -- one permanent left the battlefield, and a
+    -- condition watching for that sees one Moved and no CardArrived.
+    CardArrived ZoneChange.ZoneChange
   | -- | CR 120 / 510: damage was dealt. The record the CR 704.5h deathtouch
     -- state-based action reads, watermarked rather than drained.
     DamageDealt DamageEvent.DamageEvent

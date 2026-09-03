@@ -1,5 +1,6 @@
 module Pawl.Engine.Projection where
 
+import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -2658,6 +2659,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.RandomCardInHand _ -> ref
   ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
   ObjectRef.ChosenPermanent f -> ObjectRef.ChosenPermanent (Filter.rewrite pairs f)
+  ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
 
 -- CR 612.1/612.2a through the CARD an Effect.Create or an Effect.CreateEmblem
 -- defines its token or emblem with: the type line, the name, and the rules text.
@@ -3028,6 +3030,7 @@ rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Tri
 rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
   TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
+  TriggerCondition.CardPutIntoGraveyard f -> TriggerCondition.CardPutIntoGraveyard (Filter.rewrite pairs f)
   TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDie f -> TriggerCondition.PermanentsDie (Filter.rewrite pairs f)
   TriggerCondition.PermanentLeavesTheBattlefield f -> TriggerCondition.PermanentLeavesTheBattlefield (Filter.rewrite pairs f)
@@ -4846,6 +4849,34 @@ effectUnits =
         _ -> False
    in NonEmpty.groupBy sameEffect
 
+-- One effect, as CR 613.8's ordering asks about it: everything the dependency
+-- scan needs, lifted off whatever produces it. Two shapes reach it -- a card
+-- effect's parts at this layer, and an object's own P/T-defining ability at
+-- layer 7a -- because CR 613.8a's clause (c) admits a dependency between two
+-- characteristic-defining abilities, and a CDA is not a Gathered candidate
+-- (applyCharacteristicPT says why).
+--
+-- Clause (c)'s other half needs no test here: layer 7a is the ONLY layer whose
+-- units are CDAs and no Modification lands there (Layer), so a pending list
+-- holds either all CDAs or none.
+data Unit = MkUnit
+  { -- CR 613.6's memo key; Nothing for a CDA, whose affected set is a fixed id.
+    uEffect :: !(Maybe (ObjectId, Natural)),
+    uSource :: ObjectId,
+    uAffected :: Affected.Affected,
+    -- CR 613.7a: a CDA takes the timestamp of the object it is on (CR 604.3).
+    uTimestamp :: Timestamp,
+    uReads :: Set Aspect,
+    uWrites :: Set Aspect,
+    uMovable :: Maybe (Set Aspect),
+    uApply :: Count.ViewOf -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
+  }
+
+-- Which aspects a P/T-defining ability's two quantities read -- modificationReads
+-- for CR 613.4a's sublayer, and over-declaring for the same reason.
+definingReads :: CharacteristicPT.CharacteristicPT -> Set Aspect
+definingReads cda = quantityReads (CharacteristicPT.power cda) <> quantityReads (CharacteristicPT.toughness cda)
+
 -- CR 613: apply continuous effects layer by layer, ascending. Within a layer, CR
 -- 613.8's dependency ordering falling back to CR 613.7 timestamp order. CR
 -- 613.8's EXISTENCE dependency is the exception, handled by source-liveness
@@ -4857,15 +4888,20 @@ project oid gs = projectFrom (gather gs) oid gs
 -- ability, read from the PARTIAL projection (post-layer-6) so LoseAllAbilities
 -- can strip it first, and evaluated against the current state.
 --
--- Folded in place rather than emitted as a synthetic Gathered: gather runs
--- BEFORE the fold and has no partial to read, and layer 6 is what decides
--- whether the object still HAS the ability; CR 604.3 / 208.2a make a CDA
--- function in all zones while gather walks the battlefield only; Gathered
--- records a timestamp only for a gathered candidate, so there is none here to
--- sort on -- an implementation fact and not a rules one, CR 604.3 making a CDA a
--- static ability and CR 613.7a giving it the timestamp of the object it is on;
--- and this one is DYNAMIC, CR 707.2 making a copy recompute from the printed
--- text rather than freeze a number into Binding.copy at entry.
+-- Not a gathered candidate: gather runs BEFORE the fold and has no partial to
+-- read, and layer 6 is what decides whether the object still HAS the ability;
+-- CR 604.3 / 208.2a make a CDA function in all zones while gather walks the
+-- battlefield only; and this one is DYNAMIC, CR 707.2 making a copy recompute
+-- from the printed text rather than freeze a number into Binding.copy at entry.
+-- So it is built into a Unit inside the fold instead, where a partial and a
+-- timestamp are both to hand.
+--
+-- The VIEW decides whether CR 613.8a's clause (c) is honoured. Handed the
+-- layer-bounded view, a count reads the printed value of a characteristic
+-- another CDA defines at this same sublayer; handed `resolve`'s running board,
+-- it reads the defined one. projectDeciding takes the second whenever this
+-- object's own CDA can tell them apart (definingMovable) and the first
+-- otherwise, that being almost every projection.
 --
 -- Quantity.determine rather than setPT, because CR 208.2a makes a CDA always
 -- produce a number: a creature whose CDA cannot be determined is a 0/0 that CR
@@ -4874,9 +4910,9 @@ project oid gs = projectFrom (gather gs) oid gs
 -- CR 604.3a(3): a CDA affects no other object, so the Filter.Context is the
 -- object's OWN controller, not the source's (CR 109.5).
 --
--- Not implemented: CR 613.8a's clause (c) lets two CDAs depend on each other, so
--- a CDA counting a characteristic another CDA defines sees the printed value
--- instead (#2482).
+-- Pawl.ProjectionSpec's "CR 613.8a a P/T-defining ability reads the power
+-- another one defines" is what proves clause (c) reaches this sublayer, and its
+-- CR 613.8b sibling what proves the loop falls back to timestamp order.
 applyCharacteristicPT :: Count.ViewOf -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyCharacteristicPT viewOf gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
@@ -4944,10 +4980,15 @@ projectDeciding admits cands = forObject
                 -- CR 613.3: characteristic-defining abilities first, within the
                 -- layer they define -- subtype 4, colour 5, P/T 7a. Taken per
                 -- OBJECT, as the dependency scan seeds every snapshot the same.
+                --
+                -- The 7a arm is the CHEAP reading of CR 613.4a, sound only while
+                -- no CDA here can read what another defines: `resolve` applies
+                -- the CDAs as ordinary units instead when definingMovable says
+                -- one can.
                 seedFor o p = case lyr of
                   Layer.Type -> applySubtypeDefining p
                   Layer.Color -> applyColorDefining p
-                  Layer.CharacteristicPT -> applyCharacteristicPT bounded gs o p
+                  Layer.CharacteristicPT | not definingMovable -> applyCharacteristicPT bounded gs o p
                   _ -> p
                 -- CR 208.5 on the PROJECTED object's own running partial, at the
                 -- same sublayer gate viewOfBoard and viewUpTo read it through: a
@@ -4985,9 +5026,9 @@ projectDeciding admits cands = forObject
                 -- every caller; the branch below where nothing is movable calls
                 -- affectsGiven with `bounded` itself, which is the same answer
                 -- there because no effect on it can move any other's set.
-                appliesTo viewOf o ds pc c = case gEffect c of
+                appliesTo viewOf o ds pc u = case uEffect u of
                   Just k | Just answer <- Map.lookup k ds -> answer
-                  _ -> affectsWith grants viewOf (gSource c) o (gAffected c) pc gs
+                  _ -> affectsWith grants viewOf (uSource u) o (uAffected u) pc gs
                 -- Fold every part of ONE effect landing in this layer, in the
                 -- order the card lists them (CR 613.6). The ViewOf is the SAME
                 -- for every object the effect reaches, so a count inside it
@@ -5002,20 +5043,53 @@ projectDeciding admits cands = forObject
                   let parts = NonEmpty.toList cs
                       unitTypes = List.foldl' (\ts c -> cardTypesAfter (gModification c) ts) (PC.cardTypes pc) parts
                    in List.foldl' (\p c -> applyModification viewOf (gSource c) gs o unitTypes (gModification c) p) pc parts
-                -- Apply one effect, recording its decision the first time.
-                -- Re-inserting an existing key rewrites the value just read.
-                applyOne viewOf o (pc, ds) cs =
+                -- A gathered effect's parts at this layer, as CR 613.8's ordering
+                -- asks about them. The head part answers for the unit's affected
+                -- set and its timestamp (CR 613.6, CR 613.7a).
+                unitOf cs =
                   let c = NonEmpty.head cs
-                      answer = appliesTo viewOf o ds pc c
-                      ds' = case gEffect c of
-                        Nothing -> ds
-                        Just k -> Map.insert k answer ds
-                   in (if answer then applyUnit viewOf o pc cs else pc, ds')
+                   in MkUnit
+                        { uEffect = gEffect c,
+                          uSource = gSource c,
+                          uAffected = gAffected c,
+                          uTimestamp = gTimestamp c,
+                          uReads = unitReads cs,
+                          uWrites = unitWrites cs,
+                          uMovable = movableAspects c,
+                          uApply = \viewOf o pc -> applyUnit viewOf o pc cs
+                        }
+                -- One object's own P/T-defining ability as a unit (CR 613.4a).
+                -- CR 604.3a(3) makes its affected set the object alone, which is
+                -- why nothing can move it; the pair it writes is the only aspect
+                -- this sublayer writes.
+                --
+                -- uApply reads the CDA back off the partial it is handed rather
+                -- than closing over `cda`, which is how the ONE unit answers for
+                -- whatever `resolve`'s running board holds for that object.
+                definingUnitOf o ts cda =
+                  MkUnit
+                    { uEffect = Nothing,
+                      uSource = o,
+                      uAffected = Affected.TheseObjects (Set.singleton o),
+                      uTimestamp = ts,
+                      uReads = definingReads cda,
+                      uWrites = Set.singleton PowerA,
+                      uMovable = Nothing,
+                      uApply = \viewOf o' pc -> applyCharacteristicPT viewOf gs o' pc
+                    }
                 -- CR 613.6's per-object half of movableAspects: an effect whose
                 -- set this object already settled cannot be moved at it.
-                decidedAt ds c = case gEffect c of
+                decidedAt ds u = case uEffect u of
                   Just k -> Map.member k ds
                   Nothing -> False
+                -- Apply one effect, recording its decision the first time.
+                -- Re-inserting an existing key rewrites the value just read.
+                applyOne viewOf o (pc, ds) u =
+                  let answer = appliesTo viewOf o ds pc u
+                      ds' = case uEffect u of
+                        Nothing -> ds
+                        Just k -> Map.insert k answer ds
+                   in (if answer then uApply u viewOf o pc else pc, ds')
                 -- Every OTHER battlefield object's state as this layer begins,
                 -- so all of them derive the same order. Lazy, and scanned after
                 -- the projected object. Terminates for projectUpTo's reason: a
@@ -5063,7 +5137,7 @@ projectDeciding admits cands = forObject
                         -- object, shared by the dependency scan -- this is the
                         -- hot loop. CR 613.6 makes the head part answer for the
                         -- unit.
-                        answersAt o p d = fmap (\(i, cs) -> (i, appliesTo view o d p (NonEmpty.head cs))) pending
+                        answersAt o p d = fmap (Bifunctor.second (appliesTo view o d p)) pending
                         answerFor ans i = Maybe.fromMaybe False (List.lookup i ans)
                         -- The board as it stands: every battlefield object plus
                         -- the projected one, which need not be there.
@@ -5110,10 +5184,9 @@ projectDeciding admits cands = forObject
                         -- `boards` is built from. Reached only when `a`'s filter
                         -- can read a second projection -- changesHere below is the
                         -- other case.
-                        changesAt after afterView (i, as) (o, p, d, ans) =
-                          let a = NonEmpty.head as
-                           in not (decidedAt d a)
-                                && appliesTo afterView o d (maybe p fst (Map.lookup o after)) a /= answerFor ans i
+                        changesAt after afterView (i, a) (o, p, d, ans) =
+                          not (decidedAt d a)
+                            && appliesTo afterView o d (maybe p fst (Map.lookup o after)) a /= answerFor ans i
                         -- The same question where `a`'s affected set reads no
                         -- SECOND projection (affectedReadsPeers): applying `b`
                         -- then moves `a`'s answer only where `b` landed, since
@@ -5123,50 +5196,50 @@ projectDeciding admits cands = forObject
                         -- no peer cannot tell the two views apart. So this is
                         -- changesAt with the board-wide application dropped --
                         -- which is what keeps the scan off `reachable`.
-                        changesHere bs j (i, as) (o, p, d, ans) =
-                          let a = NonEmpty.head as
-                           in not (decidedAt d a)
-                                && answerFor ans j
-                                && appliesTo view o d (applyUnit view o p bs) a /= answerFor ans i
+                        changesHere b j (i, a) (o, p, d, ans) =
+                          not (decidedAt d a)
+                            && answerFor ans j
+                            && appliesTo view o d (uApply b view o p) a /= answerFor ans i
                         -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
                         -- asks about the whole affected SET, which is also how CR
                         -- 613.8b's loop becomes visible. Clause (c)'s CDA
-                        -- exclusion needs no test -- a CDA is never a candidate;
-                        -- clause (b)'s "existence" half is liveGiven's.
-                        movesSet x@(_, as) (j, bs) =
-                          case movableAspects (NonEmpty.head as) of
+                        -- exclusion needs no test -- layer 7a's units are all
+                        -- CDAs and no other layer holds one (Unit); clause (b)'s
+                        -- "existence" half is liveGiven's.
+                        movesSet x@(_, a) (j, b) =
+                          case uMovable a of
                             Nothing -> False
                             Just aspects ->
-                              not (Set.disjoint aspects (unitWrites bs))
-                                && if affectedReadsPeers (gAffected (NonEmpty.head as))
-                                  then let after = appliedEverywhere bs in any (changesAt after (viewOfBoard after) x) boards
-                                  else any (changesHere bs j x) boards
+                              not (Set.disjoint aspects (uWrites b))
+                                && if affectedReadsPeers (uAffected a)
+                                  then let after = appliedEverywhere b in any (changesAt after (viewOfBoard after) x) boards
+                                  else any (changesHere b j x) boards
                         -- CR 613.8a clause (b)'s LAST limb: applying `b` changes
                         -- what `a` does to the things it applies to. Only a
                         -- magnitude can move, so what is compared is the P/T `a`
                         -- writes from the SAME base under two views, judged only
                         -- where `a` applies. No decidedAt gate, unlike changesAt:
                         -- a settled set says nothing about magnitude.
-                        changesMagnitude (i, as) (_, bs) =
-                          let after = appliedEverywhere bs
+                        changesMagnitude (i, a) (_, b) =
+                          let after = appliedEverywhere b
                               afterView = viewOfBoard after
                               writtenPT p = (PC.power p, PC.toughness p)
                            in any
                                 ( \(o, p, _, ans) ->
                                     answerFor ans i
-                                      && writtenPT (applyUnit view o p as) /= writtenPT (applyUnit afterView o p as)
+                                      && writtenPT (uApply a view o p) /= writtenPT (uApply a afterView o p)
                                 )
                                 boards
                         -- `b` applied to every object whose set holds it, judged
                         -- against the board as it stands (CR 613.6).
-                        appliedEverywhere bs =
+                        appliedEverywhere b =
                           Map.mapWithKey
-                            (\o (p, d) -> (if appliesTo view o d p (NonEmpty.head bs) then applyUnit view o p bs else p, d))
+                            (\o (p, d) -> (if appliesTo view o d p b then uApply b view o p else p, d))
                             running
-                        dependsOnOne x@(i, as) y@(j, bs) =
+                        dependsOnOne x@(i, a) y@(j, b) =
                           j /= i
                             && ( movesSet x y
-                                   || (not (Set.disjoint (unitReads as) (unitWrites bs)) && changesMagnitude x y)
+                                   || (not (Set.disjoint (uReads a) (uWrites b)) && changesMagnitude x y)
                                )
                         ready = filter (\a -> not (any (dependsOnOne a) pending)) pending
                         -- The dependency edges, built only when the whole round
@@ -5190,10 +5263,42 @@ projectDeciding admits cands = forObject
                             cyclic -> cyclic
                         -- CR 613.7a gives every part of one ability the source
                         -- permanent's timestamp.
-                        (chosen, next) = List.minimumBy (Ord.comparing (\(_, cs) -> gTimestamp (NonEmpty.head cs))) batch
+                        (chosen, next) = List.minimumBy (Ord.comparing (uTimestamp . snd)) batch
                      in resolve (applyOne view oid (pc, ds) next) (Map.mapWithKey (\o st -> applyOne view o st next) others) (filter ((/= chosen) . fst) pending)
                 -- Is there anything at this layer CR 613.8 could reorder?
-                movableHere = Set.member lyr movableLayers
+                movableHere = Set.member lyr movableLayers || definingMovable
+                -- CR 613.8a clause (c) at layer 7a: two P/T-defining abilities
+                -- can depend on each other, and the only aspect that sublayer
+                -- writes is the pair itself. So the general path is needed
+                -- exactly when THIS object's own CDA reads it -- countsItsOwnLayer's
+                -- question, asked of the CDA the fold reached rather than of a
+                -- gathered candidate, since a CDA is neither. Over-admits for
+                -- that function's reason and answers False for almost every
+                -- projection, which is what keeps `resolve` off this sublayer.
+                --
+                -- One object's own reading is the whole test: layer 7a writes
+                -- nothing but P/T, so a CDA that reads neither cannot tell the
+                -- bounded view from the running board, and every OTHER object's
+                -- projection asks this same question of its own CDA.
+                definingMovable = case (lyr, PC.characteristicPT partial) of
+                  (Layer.CharacteristicPT, Just cda) -> Set.member PowerA (definingReads cda)
+                  _ -> False
+                -- CR 613.4a's units, in a board-wide order so that every object's
+                -- projection breaks a timestamp tie the same way. `oid` is here
+                -- as well as on the battlefield: CR 604.3 makes a CDA function in
+                -- every zone.
+                --
+                -- Not implemented: the range is `reachable`, which at this
+                -- sublayer is the battlefield alone, so a count cannot read a
+                -- power a CDA defines on a card in another zone (#3109).
+                definingUnits =
+                  [ definingUnitOf o (Object.timestamp obj) cda
+                  | (o, (p, _)) <- Map.toAscList (Map.insert oid (seeded, decided) otherBoards),
+                    Just obj <- [Game.lookupObject o gs],
+                    Just cda <- [PC.characteristicPT p]
+                  ]
+                -- Every unit CR 613.8 orders at this layer.
+                pendingHere = fmap unitOf (effectUnits here) <> (if definingMovable then definingUnits else [])
                 -- CR 613.6's memo, populated against `seeded` -- sound only on
                 -- the branch below where nothing is movable.
                 remember ds c = case gEffect c of
@@ -5202,7 +5307,7 @@ projectDeciding admits cands = forObject
                     | gLayer c /= lyr || Map.member k ds -> ds
                     | otherwise -> Map.insert k (affectsWith grants bounded (gSource c) oid (gAffected c) seeded gs) ds
              in if movableHere
-                  then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits here))
+                  then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] pendingHere)
                   else
                     -- Nothing here can be moved, so no candidate depends on any
                     -- other: CR 613.8 says nothing, CR 613.7 timestamp order
