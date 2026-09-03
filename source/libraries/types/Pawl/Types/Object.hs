@@ -371,11 +371,12 @@ data Object = MkObject
     -- carrying everything a card can ask, which leaves "was it snow?" and "what
     -- colour was it?" (Boreal Outrider, #2008) as reads rather than fields.
     --
-    -- Written by Pawl.Engine.Cost.payMana, which restores the whole state when
-    -- the cost goes unpaid, so a rejected cast records nothing. An ACTIVATION's
-    -- units land on the ability object and never on its source -- Pawl.ManaSpec's
-    -- "CR 400.7d an activation's record goes on the ability object, not on its
-    -- source" is the proof. Carried across the one move CR 400.7d admits,
+    -- Written by Pawl.Engine.Cost.payMana, and only once the payment has
+    -- settled: an unpaid cost is unwound to a state older than this write, even
+    -- where CR 733.1 lets the payer keep what the mana window did, so a rejected
+    -- cast records nothing. An ACTIVATION's units land on the ability object and
+    -- never on its source -- Pawl.ManaSpec's "CR 400.7d an activation's record
+    -- goes on the ability object, not on its source" is the proof. Carried across the one move CR 400.7d admits,
     -- `kicked`'s route, which is what Berg Strider's clause needs.
     manaSpent :: Mana.Mana,
     -- | CR 107.3m: the value of X chosen for the SPELL that became this

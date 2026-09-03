@@ -336,6 +336,12 @@ data Response
     -- ChoseRiot and ChosePayLifeOnEntry for their reason: a transcript that
     -- answered one as-enters "may" must not silently answer a different one.
     ChoseUnleash OptionalDecision.OptionalDecision
+  | -- | CR 733.1: whether the payer of an action that could not be legally
+    -- completed also reversed the mana abilities they activated while making it
+    -- (Exercises) or kept them and the mana they made (Declines). Distinct from
+    -- the as-enters answers above for their reason: a transcript that answered
+    -- one "may" must not silently answer a different one.
+    ReversedManaAbilities OptionalDecision.OptionalDecision
   | -- | CR 614.1c / 119.4: whether a permanent's controller paid the life its
     -- "as this enters, you may pay N life" ability asked for (Exercises) or let
     -- it enter tapped (Declines). Distinct from ChoseRiot for the reason
