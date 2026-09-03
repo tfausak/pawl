@@ -1502,9 +1502,9 @@ pileMembers perspective pile gs =
 --
 -- `seed` is the announcement's OWN bindings, the same map the offer was computed
 -- against (legalSets) -- CR 601.2b's X, for a cast and for an activation alike
--- (CR 602.2b). The joint check joins it
--- UNDER the chosen targets, exactly as legalSetsGiven's second pass does, so the
--- re-derivation reads the same environment the offer did: a slot's CR 202.3
+-- (CR 602.2b). The joint check joins it UNDER the chosen targets, exactly as
+-- legalSetsGiven's second pass does, so the re-derivation reads the same
+-- environment the offer did: a slot's CR 202.3
 -- computed bound reading Binding.variableX (Pawl.TargetSpec's "CR 601.2c the
 -- joint check re-derives a jointly judged slot against the announced X") is
 -- answerable here rather than vacuously unmeetable, and the offer and this

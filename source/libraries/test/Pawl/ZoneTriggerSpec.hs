@@ -2780,12 +2780,13 @@ permanentReturnedToHandSpec s registry =
 -- triggers only once each turn. {X}{W}, Return a land you control to its
 -- owner's hand: Return target artifact or enchantment card with mana value X or
 -- less from your graveyard to the battlefield. Activate only as a sorcery."
--- Name, cost, type line and Oracle text checked against Scryfall 2026-09-02.
+-- Name, cost, type line and Oracle text checked against Scryfall 2026-09-03.
 -- The activated ability is authored: its target's "mana value X or less" is a
 -- slot bound reading the announced X, and Pawl.ActivateSpec's "CR 601.2c/602.2b
 -- whole card: Tameshi at X=1 returns the mana value 1 artifact card" is what
--- proves the value reaches it. Retract {U} Instant, "Return all artifacts you control to their
--- owner's hand" (data/cards/retract.json, same check), is the one effect
+-- proves the value reaches it. Retract {U} Instant, "Return all artifacts you
+-- control to their owner's hand" (data/cards/retract.json, same check), is the
+-- one effect
 -- returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve brackets as one
 -- Pawl.Types.EventGroup.
 --
