@@ -9401,10 +9401,10 @@ bloodthirstSpec s registry =
               Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne kin after) 0
               Spec.assertEqWith s "power" (Projection.powerOf kin after) (Just 3)
               Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 3)
-        -- CR 102.2 / 109.5: "your opponents" excludes the entering permanent's own
+        -- CR 109.5: "your opponents" excludes the entering permanent's own
         -- controller. 7 at alice and 3 at bob, so a sum over every player would be
         -- 10 and a sum over the opponents is 3.
-        Spec.it s "CR 102.2 damage to the controller herself is not in X" $ do
+        Spec.it s "CR 109.5 damage to the controller herself is not in X" $ do
           forest <- S.printingOf s registry "Forest"
           woodKin <- S.printingOf s registry "Petrified Wood-Kin"
           sentry <- S.printingOf s registry "Ogre Sentry"
