@@ -3,7 +3,8 @@ module Pawl.Types.CharacteristicPT where
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | CR 208.2's characteristic-defining power and toughness -- the pair a printed
--- star box resolves to, evaluated fresh at every projection.
+-- star box resolves to, evaluated fresh at every projection, and on
+-- Pawl.Types.Face the pair of abilities it resolves FROM.
 
 -- BOTH fields are a Quantity and they are NOT interchangeable, so they are named
 -- rather than positional: Tarmogoyf's pair is @*@ and @*+1@, and a swap would

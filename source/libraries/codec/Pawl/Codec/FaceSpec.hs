@@ -30,6 +30,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
@@ -245,7 +246,7 @@ populatedFace =
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       Face.loyalty = Just (Loyalty.Literal 3),
       Face.colorIndicator = Set.singleton Color.White,
-      Face.characteristicPT = Just Quantity.ManaValue,
+      Face.characteristicPT = Just CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = Quantity.ManaValue, CharacteristicPT.toughness = Quantity.ManaValue},
       Face.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility,
       Face.rooms = Seq.empty,
       Face.dungeonEntryQuality = Nothing,
@@ -433,7 +434,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.characteristicPT = Just Quantity.ManaValue}
+        baseFace {Face.characteristicPT = Just CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = Quantity.ManaValue, CharacteristicPT.toughness = Quantity.ManaValue}}
         (init baseFaceJson <> ",\"characteristicPT\":{\"type\":\"ManaValue\"}}")
     Spec.it s "delayedAbilities" $
       Common.assertJsonCodec

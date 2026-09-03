@@ -26,6 +26,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -130,7 +131,15 @@ data Face card = MkFace
     -- is an ABILITY, not a number: the projection seeds it unevaluated so a copy
     -- acquires the ability (CR 707.2a) and layer 7a recomputes it every time. Read
     -- through Pawl.Engine.Projection, never directly.
-    characteristicPT :: Maybe Quantity.Quantity,
+    --
+    -- PER BOX, where a printed card has one ability: CR 208.2a's template defines
+    -- "[power or toughness]" or both at once, and a printed face writes the one
+    -- quantity it declares into both slots (Pawl.Codec.Face), where substituting
+    -- into a box that prints no star is the identity. Two slots for CR 709.4c: a
+    -- split card has each ability in either half's text box, so a combined view
+    -- (Pawl.Engine.Card.merge2) can hold one half's ability in one slot and the
+    -- other half's in the other.
+    characteristicPT :: Maybe CharacteristicPT.CharacteristicPT,
     -- | CR 604.1/604.2: this face's static continuous abilities (Humility), which
     -- the projection gathers live.
     staticAbilities :: [StaticAbility.StaticAbility card],

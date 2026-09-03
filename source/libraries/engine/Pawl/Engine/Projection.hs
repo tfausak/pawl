@@ -25,6 +25,7 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -1491,14 +1492,18 @@ copiableMintsType oid gs = case copiableSnapshotOf oid gs of
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
 -- has a printed power and toughness box (CR 208.1) for the star to sit in.
+--
+-- PER BOX: a printed face declares one ability and Pawl.Codec.Face writes it into
+-- both slots, but CR 709.4c's combined view of a split card can hold one half's
+-- ability in each (Pawl.Engine.Card.definedBox).
 seedCharacteristicPT :: Face.Face Card.Type.Card -> Maybe CharacteristicPT.CharacteristicPT
 seedCharacteristicPT face =
   case (Face.characteristicPT face, Face.power face, Face.toughness face) of
     (Just star, Just (Power.MkPower p), Just (Toughness.MkToughness t)) ->
       Just
         CharacteristicPT.MkCharacteristicPT
-          { CharacteristicPT.power = Quantity.substituteStar star p,
-            CharacteristicPT.toughness = Quantity.substituteStar star t
+          { CharacteristicPT.power = Star.substituteStar (CharacteristicPT.power star) p,
+            CharacteristicPT.toughness = Star.substituteStar (CharacteristicPT.toughness star) t
           }
     _ -> Nothing
 
@@ -2636,7 +2641,7 @@ rewriteFace pairs face = List.foldl' apply1 face pairs
               -- than Map.mapKeysWith (+), since a face's keywords are a Set.
               Face.keywords = Set.map (Filter.rewriteKeyword pair) (Face.keywords renamed),
               -- CR 208.2a's star, unevaluated as at layer 3.
-              Face.characteristicPT = fmap (rewriteQuantity pair) (Face.characteristicPT renamed),
+              Face.characteristicPT = fmap (rewriteCharacteristicPT pair) (Face.characteristicPT renamed),
               -- CR 101.1's ceiling on X, whose Quantity can Count a criterion
               -- naming a land type word. A regression fence: neither printing
               -- pairs a bounded X with one -- both say "the greatest toughness
@@ -3023,6 +3028,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfBlocksOneOrMore f -> TriggerCondition.SelfBlocksOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlocked -> condition
   TriggerCondition.SelfBecomesBlockedBy f -> TriggerCondition.SelfBecomesBlockedBy (Filter.rewrite pairs f)
+  TriggerCondition.PermanentBecomesBlockedBy f -> TriggerCondition.PermanentBecomesBlockedBy (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> condition
   TriggerCondition.SelfAttacksUnblocked -> condition
@@ -3063,6 +3069,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.LoseControlOfBound _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.RingTemptsPlayer _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
