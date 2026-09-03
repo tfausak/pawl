@@ -166,6 +166,7 @@ import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Printing as Printing
@@ -174,6 +175,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
@@ -2144,10 +2146,33 @@ apply batch candidate event =
       -- row reaching this point already means the condition held; see that
       -- function for why the question is asked there rather than here.
       --
-      -- No prompt, and none is owed: rule 702.54a states no choice.
+      -- Nothing is rule 702.54b's bloodthirst X, whose count is NOT the row's:
+      -- "X is the total damage your opponents have been dealt this turn", read
+      -- here rather than at mint time because the mint is handed a keyword and a
+      -- count, never a board. That sum is Quantity.DamageDealtToPlayersThisTurn,
+      -- the same log rule 702.54a's condition is read off one function over.
+      --
+      -- CR 109.5's "you" is the ENTERING object's controller, read live off the
+      -- board -- `admitsEntry`'s posture for its arm and for its reason, and what
+      -- keeps `readsApplier` answering False for this rewrite.
+      --
+      -- The LIVE board and not Projection.boardAsEntering, unlike the
+      -- WithCounters arm above: this quantity folds the event log, which CR
+      -- 614.12's "how they apply" does not reach and which no permanent entering
+      -- in the same batch can change.
+      --
+      -- No prompt, and none is owed: neither rule 702.54a nor rule 702.54b states
+      -- a choice.
       EntryRewrite.Bloodthirst n -> do
+        gs <- State.get
+        let count = case n of
+              Just printed -> printed
+              Nothing ->
+                let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
+                    quantity = Quantity.Type.DamageDealtToPlayersThisTurn (PlayerRef.Relative PlayerRelation.Opponent)
+                 in maybe 0 Integer.toNaturalSaturating (Quantity.evaluate (Projection.fullView gs) context gs oid quantity)
         Replacement.consume (ReplacementCandidate.identity candidate)
-        addEnteringCounters oid CounterKind.PlusOnePlusOne n
+        addEnteringCounters oid CounterKind.PlusOnePlusOne count
         pure (Just event)
       -- CR 702.150a via CR 614.1c: compleated on Tamiyo, Compleated Sage. "It
       -- instead enters the battlefield with that many loyalty counters MINUS TWO

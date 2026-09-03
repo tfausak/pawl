@@ -317,9 +317,9 @@ data Face card = MkFace
     -- value and no later rule re-reads it, so a creature that leaves in response
     -- does not shrink an X already announced.
     --
-    -- Not implemented: the same sentence printed on an ACTIVATED ability, whose X
-    -- is announced through CR 602.2b and whose ceiling is that ability's rather
-    -- than the face's (Blighted Nightmare) (#1985).
+    -- A SPELL's X alone. The same sentence printed on an ACTIVATED ability bounds
+    -- the X announced through CR 602.2b and lives on
+    -- Pawl.Types.ActivatedAbility.maximumX, one card being able to print both.
     maximumX :: [Quantity.Quantity],
     -- | CR 118.9: this face's printed alternative costs, which its controller MAY
     -- pay rather than the spell's mana cost (Fireblast). CR 118.9c: this does not

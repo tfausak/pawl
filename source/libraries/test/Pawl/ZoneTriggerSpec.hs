@@ -2786,13 +2786,13 @@ permanentReturnedToHandSpec s registry =
 -- triggers only once each turn. {X}{W}, Return a land you control to its
 -- owner's hand: Return target artifact or enchantment card with mana value X or
 -- less from your graveyard to the battlefield. Activate only as a sorcery."
--- Name, cost, type line and Oracle text checked against Scryfall 2026-09-02.
--- Not implemented: the activated ability -- its target's "mana value X or less"
--- is a slot bound reading the announced X, which Pawl.Engine.Activate's
--- targeting road cannot hand a slot (#2672); the bound dropped would leave the
--- card WEAKER than printed, so the whole ability is omitted, which leaves it
--- STRICTER. Retract {U} Instant, "Return all artifacts you control to their
--- owner's hand" (data/cards/retract.json, same check), is the one effect
+-- Name, cost, type line and Oracle text checked against Scryfall 2026-09-03.
+-- The activated ability is authored: its target's "mana value X or less" is a
+-- slot bound reading the announced X, and Pawl.ActivateSpec's "CR 601.2c/602.2b
+-- whole card: Tameshi at X=1 returns the mana value 1 artifact card" is what
+-- proves the value reaches it. Retract {U} Instant, "Return all artifacts you
+-- control to their owner's hand" (data/cards/retract.json, same check), is the
+-- one effect
 -- returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve brackets as one
 -- Pawl.Types.EventGroup.
 --
@@ -5138,7 +5138,7 @@ kindredSpec s registry =
         Map.findWithDefault
           Set.empty
           slot
-          (Target.legalSets (Just S.alice) Map.empty S.noSource (Map.singleton slot (TargetSlot.required pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
+          (Target.legalSets (Just S.alice) False Map.empty S.noSource (Map.singleton slot (TargetSlot.required pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
    in Spec.describe s "Kindred" $ do
         -- The proving test for CR 308. CR 308.2 makes the kindred subtypes
         -- "the same as the set of creature subtypes", so the ENCHANTMENT

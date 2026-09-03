@@ -7,6 +7,7 @@ import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | CR 602.1 / 700.2 / 602.2b: "[cost]: [effect]", modal-capable. VALUE-typed:
 -- Action.Activate carries the value and validates by membership
@@ -17,6 +18,18 @@ import qualified Pawl.Types.Modal as Modal
 -- (CR 118.1).
 data ActivatedAbility card ability = MkActivatedAbility
   { cost :: Cost.Cost Keyword.Keyword,
+    -- | CR 101.1: the ceilings this ABILITY's own words put on the value of X its
+    -- activator announces at CR 602.2b via rule 601.2b -- Blighted Nightmare's "X
+    -- can't be greater than the greatest toughness among creatures you control".
+    -- Empty for every ability that states none, which is nearly all of them.
+    --
+    -- ON THE ABILITY and not on Pawl.Types.Face.maximumX, which is the same
+    -- sentence printed about a SPELL's X: one card can print both, and one face
+    -- field cannot hold two ceilings bounding two different announcements. Every
+    -- other reason that field's haddock gives -- the list for CR 101.2, Quantities
+    -- rather than Naturals, read once at the announcement -- holds here unchanged,
+    -- and Pawl.Engine.Cost.ceilingOf is the evaluator both share.
+    maximumX :: [Quantity.Quantity],
     modal :: Modal.Modal card ability,
     -- | CR 602.5: every clause of the "activate only ..." rider the ability
     -- carries, ALL of which must hold. Empty for an ability without one, which is

@@ -1395,6 +1395,24 @@ damagedObject event = damageRecipient event >>= Recipient.objectOf
 wasDealtDamageThisTurn :: GameState -> PlayerId -> Bool
 wasDealtDamageThisTurn gs pid = any ((== Just pid) . damagedPlayer . LoggedEvent.event) (GameState.events gs)
 
+-- CR 120.1 / 608.2i: how much damage was dealt to this PLAYER this turn --
+-- wasDealtDamageThisTurn's twin summing amounts where that one answers yes or
+-- no, over the same damagedPlayer fold and the same CR 120.3a recipient. Rule
+-- 702.54b's "the total damage your opponents have been dealt this turn" is the
+-- reader, through Pawl.Engine.Quantity's DamageDealtToPlayersThisTurn arm.
+--
+-- damageDealt and not damagedPlayer, because the AMOUNT is what a total wants;
+-- damageRecipient is the same answer with it dropped. CR 120.8's `amount > 0`
+-- fence lives in damageDealt, so a 0 contributes nothing here either.
+damageDealtToPlayerThisTurn :: GameState -> PlayerId -> Natural
+damageDealtToPlayerThisTurn gs pid =
+  sum
+    [ amount
+    | logged <- Foldable.toList (GameState.events gs),
+      Just (recipient, amount) <- [damageDealt (LoggedEvent.event logged)],
+      Recipient.playerOf recipient == Just pid
+    ]
+
 -- CR 120.1 / 608.2i: how much damage was dealt to this OBJECT this turn --
 -- wasDealtDamageThisTurn's twin over CR 120.1's other three recipients, summing
 -- amounts where that one asks a yes or no. Burning-Eye Zubera's "if 4 or more

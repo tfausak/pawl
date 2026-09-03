@@ -232,7 +232,7 @@ nonlandPermanentTargetSpec s registry = Spec.describe s "M4h NonlandPermanentTar
     let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
         nonlandOther = Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]
         slots = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.Permanents (Just nonlandOther))
-        got = Target.legalSets Nothing Map.empty (S.creatureId gs) slots gs
+        got = Target.legalSets Nothing False Map.empty (S.creatureId gs) slots gs
     Spec.assertEqWith
       s
       "source excluded from its own set"

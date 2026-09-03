@@ -73,7 +73,12 @@ codec =
       Arm.payload "Modular" Common.natural Keyword.Modular (\x -> case x of Keyword.Modular y -> Just y; _ -> Nothing),
       Arm.payload "Bushido" Common.natural Keyword.Bushido (\x -> case x of Keyword.Bushido y -> Just y; _ -> Nothing),
       Arm.payload "Soulshift" Common.natural Keyword.Soulshift (\x -> case x of Keyword.Soulshift y -> Just y; _ -> Nothing),
-      Arm.payload "Bloodthirst" Common.natural Keyword.Bloodthirst (\x -> case x of Keyword.Bloodthirst y -> Just y; _ -> Nothing),
+      -- Rule 702.54b's bloodthirst X is the ABSENT "value" key, vanishing's
+      -- spelling below and for its reason: the two forms are one constructor, and
+      -- rule 702.54a's N form (Bloodrage Vampire's
+      -- @{"type":"Bloodthirst","value":1}@) is untouched by this arm being
+      -- optional.
+      Arm.optionalPayload "Bloodthirst" Common.natural Keyword.Bloodthirst (\x -> case x of Keyword.Bloodthirst y -> Just y; _ -> Nothing),
       Arm.nullary "Haunt" Keyword.Haunt,
       Arm.nullary "SplitSecond" Keyword.SplitSecond,
       -- CR 702.63b's numberless vanishing is the ABSENT "value" key, hexproof's

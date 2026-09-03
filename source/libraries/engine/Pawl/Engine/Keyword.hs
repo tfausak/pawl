@@ -426,6 +426,7 @@ cycling cost searchFor =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       -- CR 702.29a gives the card this ability outright, with no "as long as".
@@ -482,6 +483,7 @@ reinforce n cost =
           (ModeSelection.ChooseExactly 1),
       -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
       -- default, and gives the ability outright with no "as long as".
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -659,6 +661,7 @@ crew n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       -- CR 702.122a gives the permanent this ability outright, with no "as long
@@ -705,6 +708,7 @@ levelUp cost =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
           (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -732,6 +736,7 @@ outlast cost =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
           (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -772,6 +777,7 @@ equip cost =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton equipTarget slot)))
           (ModeSelection.ChooseExactly 1),
       -- CR 702.6a's "Activate only as a sorcery", which CR 307.5 spells out.
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -813,6 +819,7 @@ fortify cost =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton fortifyTarget slot)))
           (ModeSelection.ChooseExactly 1),
       -- CR 702.67a's "Activate only as a sorcery", which CR 307.5 spells out.
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -1492,6 +1499,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- on it. That condition is Replacement.admitsEntry's rather than this function's
   -- -- nothing knowable from a keyword and a count can answer it. ONE ROW PER
   -- INSTANCE (CR 702.54c), both admitted or neither.
+  --
+  -- The payload rides across UNREAD, rule 702.54b's Nothing included: X is the
+  -- board's rather than the card's, so it is read where the row applies
+  -- (Pawl.Engine.Event) for the same reason the condition is not read here.
   Keyword.Bloodthirst n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.Bloodthirst n)))
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
