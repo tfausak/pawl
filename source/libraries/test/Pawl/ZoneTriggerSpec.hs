@@ -939,8 +939,19 @@ planarVoidSpec s registry =
         Spec.it s "CR 603.10 the Void's OWN arrival in the graveyard triggers nothing" $ do
           (voidId, board) <- withVoid
           let died = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [voidId])
-          Spec.assertBool s (Set.member voidName (namesIn Zone.Graveyard S.alice died)) "CR 603.10 its own card stays in the graveyard"
+              settled = S.runPure S.identityAnswer died Engine.settleForPriority
+              -- Resolved as well as settled, so the exile assertion below is
+              -- about a trigger that DIDN'T FIRE rather than one that merely sat
+              -- on the stack unresolved. Stack.resolveTop over the empty stack
+              -- this board leaves is a no-op.
+              after = S.runPure S.identityAnswer settled Stack.resolveTop
+          Spec.assertBool s (not (Set.member voidName (namesIn Zone.Exile S.alice after))) "CR 603.10 it does not exile its own card"
+          Spec.assertBool s (Set.member voidName (namesIn Zone.Graveyard S.alice after)) "CR 603.10 which stays in the graveyard"
+          -- The proxies, kept after the behaviour: nothing was gathered and
+          -- nothing reached the stack, so the card above is unexiled because the
+          -- condition declined rather than because a trigger went unresolved.
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered died)) []
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack settled)) 0
 
 -- CR 603.6c: leaves-the-battlefield abilities "trigger when a permanent moves
 -- from the battlefield to another zone ... written as, but aren't limited to,

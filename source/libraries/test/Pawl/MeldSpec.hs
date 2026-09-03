@@ -14,6 +14,7 @@
 -- the Battlements is the half CR 712.4a puts the melding ability on.
 module Pawl.MeldSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -607,7 +608,12 @@ spec s registry = Spec.describe s "Meld" $ do
       Just meldedId -> do
         let dead = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [meldedId])
             settled = S.runPure S.identityAnswer dead Engine.settleForPriority
-            after = S.runPure S.identityAnswer settled (Stack.resolveTop >> Stack.resolveTop >> Stack.resolveTop)
+            -- SIX resolutions over a stack of three, so the counter assertion
+            -- below reads a drained stack: capping the resolutions at the
+            -- expected count would let a fourth trigger sit there unresolved and
+            -- the count pass for the wrong reason. Stack.resolveTop over an
+            -- empty stack is a no-op.
+            after = S.runPure S.identityAnswer settled (Monad.replicateM_ 6 Stack.resolveTop)
         Spec.assertEqWith s "CR 712.21 the card-arrival trigger fired twice, so both cards were exiled" (List.sort (exileNames after)) bothNames
         Spec.assertEqWith s "CR 712.21 and the dies trigger fired once" (S.playerCounterOf PlayerCounterKind.Experience S.alice after) 1
         Spec.assertEqWith s "and neither card was left in the graveyard" (graveyardNames after) []
