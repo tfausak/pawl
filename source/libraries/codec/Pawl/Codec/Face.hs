@@ -59,6 +59,7 @@ import qualified Pawl.Codec.Vanguard as Vanguard
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Counterability as Counterability.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -86,7 +87,14 @@ codec cardCodec = Fields.object $ do
   defense <- Fields.defaulted "defense" Nothing (Common.maybe Defense.codec) Face.defense
   -- CR 313.6 / 313.7: absent on every card but a vanguard.
   vanguard <- Fields.defaulted "vanguard" Nothing (Common.maybe Vanguard.codec) Face.vanguard
-  characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe Quantity.codec) Face.characteristicPT
+  -- ONE quantity on the wire, where Face.characteristicPT holds a slot per box:
+  -- CR 208.2a's template is one ability, whether it defines one box or both, and
+  -- substituting it into a box that prints no star is the identity. The pair
+  -- exists for CR 709.4c's combined view of a split card, which
+  -- Pawl.Engine.Card.definedBox builds and nothing writes back to the wire, so
+  -- the encoder reads the power slot: a face this codec DECODED has the same
+  -- ability in both.
+  characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe Quantity.codec) (fmap CharacteristicPT.power . Face.characteristicPT)
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) Face.enchant
   keywords <- Fields.defaulted "keywords" Set.empty (Common.set Keyword.codec) Face.keywords
   colorIndicator <- Fields.defaulted "colorIndicator" Set.empty (Common.set Color.codec) Face.colorIndicator
@@ -141,7 +149,7 @@ codec cardCodec = Fields.object $ do
         Face.loyalty = loyalty,
         Face.defense = defense,
         Face.vanguard = vanguard,
-        Face.characteristicPT = characteristicPT,
+        Face.characteristicPT = fmap (\q -> CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = q, CharacteristicPT.toughness = q}) characteristicPT,
         Face.enchant = enchant,
         Face.keywords = keywords,
         Face.colorIndicator = colorIndicator,

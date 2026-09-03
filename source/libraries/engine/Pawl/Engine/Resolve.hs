@@ -52,6 +52,7 @@ import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
@@ -1943,7 +1944,7 @@ bakeTokenCharacteristics :: (Quantity.Type.Quantity -> Maybe Integer) -> Card.Ty
 bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card.Type.faces card)}
   where
     bake quantity =
-      if Quantity.containsStar quantity
+      if Star.containsStar quantity
         then quantity
         else Quantity.Type.Literal (Quantity.determineWith eval quantity)
     bakeFace face =
