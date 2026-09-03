@@ -99,6 +99,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -722,11 +723,9 @@ componentDemandGrowsWithX component = case component of
   CostComponent.PayLifeX -> True
   -- CR 118.3 measures the announced amount against the energy counters the
   -- player has, so a big enough X refuses -- PayLifeX's arm above and for its
-  -- reason. `greatestPayableX` stops on the predicate either way and
-  -- Pawl.CardSpec's CR 101.1 sweep scopes to spell costs (#1985), so nothing
-  -- observes this answer at gameplay level; Pawl.CostSpec's "an unannounced
-  -- energy X is unpayable, and its demand grows with the value" is what states
-  -- it.
+  -- reason. Pawl.CardSpec's CR 101.1 sweep reads this answer now that it covers
+  -- activation costs: Sphinx of the Revelation's carries this component and
+  -- states no ceiling, so False here would make that printing an offender.
   CostComponent.PayEnergyX -> True
   -- FALSE, and that is CR 701.68b rather than an omission: the rule refuses a
   -- blight only where the player controls no creature, and names no number of
@@ -780,10 +779,17 @@ componentDemandGrowsWithX component = case component of
 -- 101.2 makes the printed "can't" beat the permission, so an unreadable ceiling
 -- refuses rather than permits.
 maximumX :: PlayerId -> ObjectId -> Face.Face card -> GameState -> Maybe Natural
-maximumX pid oid face gs =
+maximumX pid oid face = ceilingOf pid oid (Face.maximumX face)
+
+-- The same reduction over ceilings a caller has already gathered, shared with
+-- Pawl.Engine.Activate: CR 602.2b routes an activation through rule 601.2b, so an
+-- ability's own ceilings (Pawl.Types.ActivatedAbility.maximumX) are read exactly
+-- as a face's are, off the ability's source and its activator.
+ceilingOf :: PlayerId -> ObjectId -> [Quantity.Type.Quantity] -> GameState -> Maybe Natural
+ceilingOf pid oid quantities gs =
   let context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
-      ceilingOf quantity = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid quantity))
-   in case fmap ceilingOf (Face.maximumX face) of
+      evaluated quantity = Integer.toNaturalSaturating (Maybe.fromMaybe 0 (Quantity.evaluate (Projection.fullView gs) context gs oid quantity))
+   in case fmap evaluated quantities of
         [] -> Nothing
         ceilings -> Just (minimum ceilings)
 
