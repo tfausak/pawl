@@ -590,14 +590,7 @@ swing answer attacker gs =
         untapped
           { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
             GameState.combat = Combat.emptyCombat,
-            GameState.remaining =
-              Seq.fromList
-                [ Phase.Combat CombatStep.DeclareAttackers,
-                  Phase.Combat CombatStep.DeclareBlockers,
-                  Phase.Combat CombatStep.CombatDamage,
-                  Phase.Combat CombatStep.EndOfCombat,
-                  Phase.PostcombatMain
-                ]
+            GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.BeginningOfCombat)
           }
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status

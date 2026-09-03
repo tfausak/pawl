@@ -68,7 +68,6 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
-import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -1175,15 +1174,7 @@ combatBoardOf mine theirs =
             GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [bob]},
             -- The steps after declare attackers, so a runStep-driven test (Tasks
             -- 2 and 4) can advance through combat. Direct-call tests ignore it.
-            GameState.remaining =
-              Seq.fromList
-                [ Phase.Combat CombatStep.DeclareBlockers,
-                  Phase.Combat CombatStep.CombatDamage,
-                  Phase.Combat CombatStep.EndOfCombat,
-                  Phase.PostcombatMain,
-                  Phase.Ending EndingStep.EndStep,
-                  Phase.Ending EndingStep.Cleanup
-                ]
+            GameState.remaining = phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
           },
         ours,
         yours
@@ -1215,16 +1206,7 @@ threePlayerCombat mine theirs others =
    in ( gs3
           { GameState.activePlayer = alice,
             GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
-            GameState.remaining =
-              Seq.fromList
-                [ Phase.Combat CombatStep.DeclareAttackers,
-                  Phase.Combat CombatStep.DeclareBlockers,
-                  Phase.Combat CombatStep.CombatDamage,
-                  Phase.Combat CombatStep.EndOfCombat,
-                  Phase.PostcombatMain,
-                  Phase.Ending EndingStep.EndStep,
-                  Phase.Ending EndingStep.Cleanup
-                ]
+            GameState.remaining = phasesAfter (Phase.Combat CombatStep.BeginningOfCombat)
           },
         ours,
         yours,
@@ -1294,6 +1276,16 @@ inCombatPhase :: Phase.Phase -> Bool
 inCombatPhase p = case p of
   Phase.Combat _ -> True
   _ -> False
+
+-- The schedule Engine.advance leaves once PHASE is current: everything after
+-- it in Turn.allPhases (CR 500.1).
+phasesAfter :: Phase.Phase -> Seq.Seq Phase.Phase
+phasesAfter phase = Seq.drop 1 (Seq.dropWhileL (/= phase) (Seq.fromList Turn.allPhases))
+
+-- phasesAfter, cut once the postcombat main phase (CR 506.1 / 511.3) is
+-- reached, for a fixture that runs only through it.
+phasesAfterThroughPostcombatMain :: Phase.Phase -> Seq.Seq Phase.Phase
+phasesAfterThroughPostcombatMain phase = Seq.takeWhileL (<= Phase.PostcombatMain) (phasesAfter phase)
 
 lifeOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Integer
 lifeOf pid gs = fmap Player.life (Map.lookup pid (GameState.players gs))
