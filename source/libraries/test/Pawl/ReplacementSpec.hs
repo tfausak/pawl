@@ -9425,8 +9425,11 @@ bloodthirstSpec s registry =
               cast = S.cast S.alice held >> Stack.resolveTop
               after = S.runPure S.aggressiveAnswer raced cast
           Spec.assertBool s (wasAskedToReplace (answersFor S.aggressiveAnswer raced cast)) "a ChooseReplacement was raised"
-          -- Non-vacuity, not the proof: BOTH rows applied, so the prompt was a race
-          -- between two rewrites rather than a question about one.
+          -- Non-vacuity, not the proof: the tap shows Kismet really was the second
+          -- candidate, so "a prompt" is not a question about one row, and the zero
+          -- pins the board this case is about. Neither reads the bloodthirst row's
+          -- application -- zero counters is what refusing it would leave too,
+          -- which is the whole reason the prompt is the assertion.
           case woodKinIn after of
             Nothing -> Spec.assertFailure s "Petrified Wood-Kin did not reach the battlefield"
             Just kin -> do

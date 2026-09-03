@@ -341,13 +341,14 @@ payableCostAt x spending pid oid gs cost =
 --
 -- Inert on today's pool: this map is built only for a cost whose criterion
 -- names a slot (Cost.readsBoundSlot), and no card in `data/cards/` has both
--- that and a target slot bounded by X. The cards with a
--- Filter.ManaValueAtMostAmount slot are Stir the Grave, Synthetic Borrowed
--- Exhumation and Synthetic Measured Refrain, each a bare mana cost with no
--- component to carry a criterion; the rest of that list bounds an ACTIVATED or
--- TRIGGERED ability's slot, neither of which takes this road. A card printing
--- an X-bounded target slot beside a slot-reading additional cost is what would
--- make the two values differ.
+-- that and a target slot bounded by X. Filter.ManaValueAtMostAmount is the one
+-- atom that reads boundUnannounced, so its cards are the whole list; grepped
+-- over data/cards/ on 2026-09-03 the SPELLS among them are Stir the Grave,
+-- Synthetic Borrowed Exhumation and Synthetic Measured Refrain, each a bare
+-- mana cost with no component to carry a criterion; the rest of that list
+-- bounds an ACTIVATED or TRIGGERED ability's slot, neither of which takes this
+-- road. A card printing an X-bounded target slot beside a slot-reading
+-- additional cost is what would make the two values differ.
 castAimable :: PlayerId -> ObjectId -> GameState -> [Map.Map SlotName.SlotName (Set.Set ObjectId)]
 castAimable pid oid gs = case Game.faceOf oid gs of
   Nothing -> []
