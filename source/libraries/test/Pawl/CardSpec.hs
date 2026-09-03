@@ -1679,10 +1679,14 @@ cardAuthoredEffects card =
 -- of a split card -- one half's ability per box (Pawl.Engine.Card.definedBox).
 -- The walks below want the quantities themselves.
 characteristicQuantities :: Face.Face Card.Type.Card -> [Quantity.Type.Quantity]
-characteristicQuantities card =
-  concatMap
-    (\cda -> [CharacteristicPT.power cda, CharacteristicPT.toughness cda])
-    (Maybe.maybeToList (Face.characteristicPT card))
+characteristicQuantities card = case Face.characteristicPT card of
+  Nothing -> []
+  -- ONE quantity where the two slots agree, which every printed face's do: the
+  -- lints below compare a count of what a card mentions against a count of the
+  -- atoms in its encoded JSON, and the wire carries the ability once.
+  Just cda
+    | CharacteristicPT.power cda == CharacteristicPT.toughness cda -> [CharacteristicPT.power cda]
+    | otherwise -> [CharacteristicPT.power cda, CharacteristicPT.toughness cda]
 
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
