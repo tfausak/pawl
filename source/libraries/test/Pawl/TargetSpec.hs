@@ -45,7 +45,10 @@
 -- announcement. Its case reads the same union-offer plus joint-check pair
 -- Dwell's does, and turns on an announcement the joint check has to reject.
 -- Synthetic Hammer Refrain is that card under CR 700.2d's repeat, where the
--- filter's slot name has to follow the occurrence the way the pool's does.
+-- filter's slot name has to follow the occurrence the way the pool's does, and
+-- Itzquinth, Firstborn of Gishath is the same pair on the road no spell takes:
+-- a CR 603.12 reflexive ability, whose announcement is judged as CR 603.3d puts
+-- it on the stack rather than as CR 601.2c casts it.
 --
 -- Cancel and Stifle's case has a third beside it, on the same pool one rule
 -- over: CR 115.5's self-exclusion for an ABILITY, which Adric, Mathematical
@@ -67,6 +70,7 @@
 -- the stack.
 module Pawl.TargetSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -116,6 +120,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -2629,6 +2634,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- And the same announcement read TWICE, by the offer and by CR 601.2c's joint
   -- check: a slot whose bound reads that X and whose pool reads a sibling slot.
   borrowedExhumationSpec s registry
+  -- The joint check on the road no spell takes: CR 603.3d's placement, where an
+  -- announcement that fails it is asked again rather than reversed.
+  itzquinthSpec s registry
 
 razorfinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 razorfinSpec s registry = Spec.describe s "HasCountersOfAnyKind (CR 122.1)" $ do
@@ -3112,3 +3120,80 @@ aimingExhumation x oid p = case p of
       )
       asked
   _ -> S.identityAnswer p
+
+-- CR 603.3d's announcement for Itzquinth's reflexive ability, threaded through a
+-- counter because a pure `Prompt r -> r` cannot tell a re-ask from the first ask
+-- (Pawl.CopySpec's countingAnswer shape): call 0 names `dealer` in BOTH slots,
+-- and every call after it names `victim` in the victim slot.
+--
+-- FILTERED out of the offered set rather than built, aimingHammer's reason -- so
+-- the refused answer also depends on the victim slot being OFFERED the dealer's
+-- own candidate, which is CR 601.2c's union.
+answeringItzquinth :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+answeringItzquinth dealer victim p = case p of
+  Prompt.ChooseToPay {} -> pure PaymentDecision.Pays
+  Prompt.ChooseTargets _ _ _ asked -> do
+    asked_ <- State.get
+    State.modify' (+ 1)
+    let wanted slot = if asked_ == 0 || slot == SlotName.MkSlotName (Text.pack "dealer") then dealer else victim
+    pure (Map.mapWithKey (\slot (_, offered) -> Set.filter ((==) (Just (wanted slot)) . Recipient.objectOf) offered) asked)
+  _ -> pure (S.identityAnswer p)
+
+-- CR 603.3d: "The remainder of the process for putting a triggered ability on the
+-- stack is identical to the process for casting a spell listed in rules
+-- 601.2c-d." Rules 601.2c-d and no further, so CR 601.2e's return to before the
+-- proposal is not a trigger's remedy: an announcement CR 601.2c refuses is asked
+-- again, and the rule's own removal is reserved for the board where "no legal
+-- choices can be made" at all.
+--
+-- Itzquinth, Firstborn of Gishath {R}{G} Legendary Creature -- Dinosaur 2/3
+-- (data/cards/itzquinth-firstborn-of-gishath.json): "Haste. When Itzquinth
+-- enters, you may pay {2}. When you do, target Dinosaur you control deals damage
+-- equal to its power to another target creature." (name, cost, type line, P/T and
+-- Oracle text checked against api.scryfall.com, 2026-09-02). Nothing is omitted,
+-- so pawl's card is neither stricter nor weaker than printed.
+--
+-- Fall of the Hammer's mutually dependent pair -- the victim slot is
+-- Not (IsBound "dealer") -- hung on a CR 603.12 reflexive ability, so the
+-- announcement is made as THAT ability goes on the stack (Engine.placeBorne)
+-- rather than as a spell is cast (Cast.castProposed). It is the pool's only card
+-- whose jointly judged slots are on a triggered ability.
+--
+-- TWO BOARDS differing in exactly ONE thing: whether bob has a Wall of Stone. The
+-- same two Mountains pay the same {2} on both, and the same Itzquinth enters the
+-- same way, so neither answer is about mana or about the payment.
+itzquinthSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+itzquinthSpec s registry = Spec.describe s "Announcing a trigger's targets (CR 603.3d)" $ do
+  Spec.it s "CR 603.3d a trigger's announcement naming one creature in both slots is asked again" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    wall <- S.printingOf s registry "Wall of Stone"
+    itzquinth <- S.printingOf s registry "Itzquinth, Firstborn of Gishath"
+    let (wallId, withWall) = S.addCreature wall S.bob (S.landsInPlay mountain 2)
+        (dinoId, together) = S.entersWithTrigger itzquinth S.alice withWall
+        (aloneId, alone) = S.entersWithTrigger itzquinth S.alice (S.landsInPlay mountain 2)
+        -- The CR 603.6a enters trigger onto the stack, then its resolution (where
+        -- CR 118.12's {2} is paid and CR 603.12's reflexive is armed), then the
+        -- settle that puts the reflexive itself on the stack -- which is the
+        -- moment CR 603.3d announces its targets.
+        place board = S.runPure S.identityAnswer board Engine.settleForPriority
+        arm dealer victim board = State.runState (Engine.runGame (answeringItzquinth dealer victim) (place board) (Stack.resolveTop >> Engine.settleForPriority)) 0
+        ((_, placed), asks) = arm dinoId wallId together
+        after = S.runPure S.identityAnswer placed Stack.resolveTop
+        ((_, ceased), _) = arm aloneId aloneId alone
+    -- The gameplay-level assertions first: the re-asked announcement is the one
+    -- that stands, so Itzquinth's two damage reaches the Wall and not itself.
+    -- Without the joint check the first answer stands, the victim slot holds
+    -- Itzquinth, and CR 608.2b drops it at resolution -- leaving the Wall at zero.
+    Spec.assertEqWith s "the coherent answer stands: the Wall took Itzquinth's two damage" (S.damageOf wallId after) (Just 2)
+    Spec.assertEqWith s "and Itzquinth, named in both slots by the refused answer, took none" (S.damageOf dinoId after) (Just 0)
+    -- CR 603.3d's own removal, on the board where no coherent announcement
+    -- exists: Itzquinth is the only creature, so it fills each slot alone and
+    -- neither slot's candidate leaves the other one anything.
+    Spec.assertEqWith s "with no second creature, the reflexive ability is removed from the stack (CR 603.3d)" (length (GameState.stack ceased)) 0
+    Spec.assertEqWith s "so it never dealt itself its own two damage" (S.damageOf aloneId ceased) (Just 0)
+    -- The proxies last. The payment happened on BOTH boards, so the removal above
+    -- is the announcement and not a gate that skipped the reflexive entirely.
+    Spec.assertEqWith s "alice paid {2} on the board with the Wall" (S.tappedCount S.alice placed) 2
+    Spec.assertEqWith s "and on the board without it" (S.tappedCount S.alice ceased) 2
+    Spec.assertEqWith s "the reflexive ability really reached the stack when a coherent answer existed" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "and alice was asked twice for it: the incoherent answer was refused and the announcement asked again" asks 2

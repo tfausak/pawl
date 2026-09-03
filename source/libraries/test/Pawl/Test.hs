@@ -336,6 +336,7 @@ import qualified Pawl.Codec.RoundingSpec
 import qualified Pawl.Codec.SacrificeAnyNumberSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.SacrificeSpec
+import qualified Pawl.Codec.SacrificerSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
@@ -350,6 +351,7 @@ import qualified Pawl.Codec.SicknessSpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotCountSpec
 import qualified Pawl.Codec.SlotNameSpec
+import qualified Pawl.Codec.SlotSacrificeSpec
 import qualified Pawl.Codec.SourceSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
@@ -909,6 +911,7 @@ spec s registry = do
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ReturnPermanentsSpec.spec s
   Pawl.Codec.SacrificeSpec.spec s
+  Pawl.Codec.SacrificerSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
@@ -923,6 +926,7 @@ spec s registry = do
   Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotCountSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
+  Pawl.Codec.SlotSacrificeSpec.spec s
   Pawl.Codec.SourceSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.SpeedDecreaseSpec.spec s

@@ -92,5 +92,8 @@ codec =
       Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
       Arm.payload "Exerted" ObjectId.codec GameEvent.Exerted (\x -> case x of GameEvent.Exerted y -> Just y; _ -> Nothing),
       Arm.payload "BecameTapped" ObjectId.codec GameEvent.BecameTapped (\x -> case x of GameEvent.BecameTapped y -> Just y; _ -> Nothing),
-      Arm.payload "CoinFlipped" CoinFlipped.codec GameEvent.CoinFlipped (\x -> case x of GameEvent.CoinFlipped y -> Just y; _ -> Nothing)
+      Arm.payload "CoinFlipped" CoinFlipped.codec GameEvent.CoinFlipped (\x -> case x of GameEvent.CoinFlipped y -> Just y; _ -> Nothing),
+      -- CR 701.54d. One player id, Scried's shape above: the rule names the
+      -- tempted player and nothing else.
+      Arm.payload "RingTempted" PlayerId.codec GameEvent.RingTempted (\x -> case x of GameEvent.RingTempted y -> Just y; _ -> Nothing)
     ]
