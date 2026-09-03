@@ -526,31 +526,17 @@ snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> May
 snapshotView gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot _) -> case shape of
     EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
-      if ZoneChange.from zc == from && ZoneChange.to zc == to
-        then -- CR 608.2h: who controlled it and what KIND of object it was, read
-        -- from the record the move funnel filed under the DEPARTED id as the
-        -- object ceased -- the same pre-move state `snapshot` was taken
-        -- against, and the route Event.departedFrom already takes back from a
-        -- Moved event (CR 400.7 makes that id name nothing else, ever).
-        --
-        -- No record only where nothing departed: Event.recordTokenEntry's
-        -- battlefield-to-battlefield pseudo-move for a new token, whose object
-        -- is therefore still live and can be asked directly.
-          let lastKnown = Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs)
-           in Just
-                ( viewOfSnapshot
-                    (fmap LastKnown.controller lastKnown)
-                    (maybe (Game.isToken (ZoneChange.object zc) gs) (Game.sourceIsToken . LastKnown.source) lastKnown)
-                    -- CR 122.2 / 400.7: the counters ceased to exist as the object
-                    -- moved, so this is a CR 608.2i look-back at what it HAD --
-                    -- read off the same record `controller` above comes from,
-                    -- which the funnel took beside the projection precisely
-                    -- because CR 613.4c has already consumed them into the power
-                    -- and toughness the snapshot carries.
-                    (maybe Map.empty LastKnown.counters lastKnown)
-                    snapshot
-                )
-        else Nothing
+      if ZoneChange.from zc == from && ZoneChange.to zc == to then Just (departedView gs zc snapshot) else Nothing
+    -- CR 712.21e's second half, whose unit is the CARD: this event announces the
+    -- move's LEADING arrival (Pawl.Engine.Event.changeZoneAttaching), so it is
+    -- worth one card here and each arrival after it is worth another through the
+    -- CardArrived arm below. An ordinary move has no arrival after the leading
+    -- one, so the two shapes agree about everything but a melded permanent.
+    --
+    -- The DESTINATION alone, per the constructor's own note, and the origin is
+    -- not read at all.
+    EventShape.CardArrivedIn zone ->
+      if ZoneChange.to zc == zone then Just (departedView gs zc snapshot) else Nothing
     EventShape.SpellCast -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   -- CR 615.13's record names two ids, a recipient and an amount, and snapshots no
@@ -577,6 +563,10 @@ snapshotView gs shape event = case event of
     -- departed the battlefield here.
     EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
+    -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
+    -- but the Moved event the same cast emits is what says so, and answering here
+    -- too would count one cast twice.
+    EventShape.CardArrivedIn {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.TookInitiative _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
@@ -640,12 +630,60 @@ snapshotView gs shape event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
-  -- Not implemented: CR 712.21e's second half counts a melded permanent as two
-  -- CARDS that changed zones, which this event is what a count would fold. No
-  -- EventShape distinguishes cards from the OBJECTS the Moved arm above answers
-  -- for, and answering this under MovedBetween would make Khabal Ghoul's "each
-  -- creature that died" count a melded creature three times (#3104).
-  GameEvent.CardArrived _ -> Nothing
+  -- CR 712.21e's second half: every arrival AFTER the leading one, which is what
+  -- makes a melded permanent two cards where the Moved arm above makes it one
+  -- object. Read under the card shape alone -- answering it under MovedBetween
+  -- would make Khabal Ghoul's "each creature that died this turn" see a melded
+  -- creature three times.
+  --
+  -- Matched on this event's OWN destination and not the move's, which is CR
+  -- 903.9c: a melded commander's component splits off to the command zone while
+  -- the rest of the move goes where it was headed, and only the card that
+  -- arrived in the named zone is counted (Pawl.MeldSpec).
+  GameEvent.CardArrived zc -> case shape of
+    -- The CR 608.2h record filed under the DEPARTED id, which is the melded
+    -- permanent's and so the same record the Moved event beside this one reads.
+    -- Nothing where no record was filed, the honest answer for a card whose
+    -- characteristics as it moved cannot be recovered.
+    --
+    -- Not implemented: a view of the CARD that arrived rather than of the
+    -- permanent it was part of, so a melded permanent's two components are
+    -- indistinguishable here and Case of the Gorgon's Kiss cannot yet ask
+    -- whether each was a creature card (#3152).
+    EventShape.CardArrivedIn zone ->
+      if ZoneChange.to zc == zone
+        then fmap (departedView gs zc . LastKnown.characteristics) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
+        else Nothing
+    EventShape.MovedBetween {} -> Nothing
+    EventShape.SpellCast -> Nothing
+
+-- CR 608.2h: who controlled the moving object and what KIND of object it was,
+-- read from the record the move funnel filed under the DEPARTED id as the object
+-- ceased -- the same pre-move state a Moved event's snapshot is taken against,
+-- and the route Event.departedFrom already takes back from such an event (CR
+-- 400.7 makes that id name nothing else, ever).
+--
+-- No record only where nothing departed: Event.recordTokenEntry's
+-- battlefield-to-battlefield pseudo-move for a new token, whose object is
+-- therefore still live and can be asked directly.
+--
+-- CR 122.2 / 400.7: the counters ceased to exist as the object moved, so they are
+-- a CR 608.2i look-back at what it HAD -- read off the same record `controller`
+-- comes from, which the funnel took beside the projection precisely because CR
+-- 613.4c has already consumed them into the power and toughness the snapshot
+-- carries.
+--
+-- `snapshot` is a parameter rather than read from the record because the two
+-- events that reach here carry it differently: a Moved event stamps its own, and
+-- a CardArrived event has none of its own to stamp.
+departedView :: GameState -> ZoneChange.ZoneChange -> PC.ProjectedCharacteristics -> Filter.View
+departedView gs zc snapshot =
+  let lastKnown = Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs)
+   in viewOfSnapshot
+        (fmap LastKnown.controller lastKnown)
+        (maybe (Game.isToken (ZoneChange.object zc) gs) (Game.sourceIsToken . LastKnown.source) lastKnown)
+        (maybe Map.empty LastKnown.counters lastKnown)
+        snapshot
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a

@@ -16,6 +16,13 @@ spec s = Spec.describe s "Pawl.Codec.EventShape" $ do
       EventShape.codec
       (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard))
       " {\"type\":\"MovedBetween\",\"value\":{\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}}} "
+  -- CR 712.21e's second half: one zone, and it is the destination.
+  Spec.it s "CardArrivedIn" $
+    Common.assertCodec
+      s
+      EventShape.codec
+      (EventShape.CardArrivedIn Zone.Graveyard)
+      " {\"type\":\"CardArrivedIn\",\"value\":{\"type\":\"Graveyard\"}} "
   -- CR 601.2i's cast: PAYLOADLESS, so the encoded form is the bare tag and a
   -- decoder that demanded a value would reject every card that names it.
   Spec.it s "SpellCast" $

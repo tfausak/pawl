@@ -1540,8 +1540,8 @@ addCounter kind n oid gs =
 -- WRONG for Convincing Mirage, whose "Enchant land" is a Pool.Permanents slot
 -- narrowed by a Land filter, and whose candidates are therefore ToObject. That
 -- costs nothing for a rule that reads only WHICH object is named -- CR 704.5n,
--- CR 704.5p, CR 400.7, and Affected.Attached, which goes through
--- Recipient.objectOf -- which is every caller that attaches to a non-creature
+-- CR 704.5p, CR 400.7, and the Mirage's own HasAttached IsSource, all of which
+-- go through Recipient.objectOf -- which is every caller that attaches to a non-creature
 -- today. A test that puts Convincing Mirage in front of stillLegalEnchant must
 -- CAST it instead; Pawl.AuraSpec's whole-card case is that cast.
 attach :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState

@@ -2678,7 +2678,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     -- CREATURE do so" is Affected.Matching Filter.IsSource, matched against the
     -- attacker's identity. No Aura and no animator anywhere -- the requirement
     -- rides on a creature card. Fails against an implementation that only ever
-    -- resolves Affected.Attached.
+    -- resolves an attachment, which is what Lure beside it prints.
     prizedUnicorn <- S.printingOf s registry "Prized Unicorn"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, theirs) = attacking [prizedUnicorn] [piker]
@@ -3721,7 +3721,7 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
         Spec.assertBool s (Combat.legalAttackDeclarationAs S.alice [(otherPiker, AttackTarget.OfPlaneswalker otherJace)] control) "and attackable under the Archon, whose sentence names only the seat"
         Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(pikerId, AttackTarget.OfPlayer S.bob)] board)) "CR 508.1b: bob himself is off limits under the Vow"
         Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.alice [(otherPiker, AttackTarget.OfPlayer S.bob)] control)) "and under the Archon, which is the half the two cards share"
-        -- The fixture pin: the Aura has to be ON the Piker for Affected.Attached
+        -- The fixture pin: the Aura has to be ON the Piker for its affected set
         -- to reach it, and its +2/+2 is the only thing on either board that says
         -- so.
         Spec.assertEqWith s "the Vow really is attached, so the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId board) (Just (4, 3))
