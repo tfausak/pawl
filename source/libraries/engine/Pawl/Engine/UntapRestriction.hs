@@ -44,12 +44,17 @@ doesNotUntap :: [ObjectId] -> GameState -> Set ObjectId
 doesNotUntap candidates gs =
   let setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
+      -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       named source affected candidate =
-        Projection.affects
+        Projection.affectsOn
+          pcs
+          grants
           source
           candidate
           affected
-          (Projection.project candidate gs)
           gs
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []

@@ -137,7 +137,8 @@ applies pid controller gs affected = case affected of
 -- 104.2a has already ended such a game, so nothing observes it.
 permanentLeader :: GameState -> Maybe PlayerId
 permanentLeader gs =
-  let controls pid = length (filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs)))
+  let grants = Projection.controlGrants gs
+      controls pid = length (filter (\oid -> Projection.controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs)))
       tallies = fmap (\pid -> (pid, controls pid)) (Game.stillPlaying gs)
    in case tallies of
         [] -> Nothing

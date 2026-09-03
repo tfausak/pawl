@@ -38,6 +38,7 @@ import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Pile as Pile
+import Pawl.Types.PlayerEffect (PlayerEffect)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -186,9 +187,12 @@ legalRecipientsGiven pcs grants pools perspective unannounced bindings source sl
       -- paid for. That is the same posture opponentOf's controller read takes
       -- below.
       sourceView = Projection.viewOfObjectGiven pcs grants source gs
+      -- The player rows out of the caller's Pools, which a whole enumeration
+      -- shares; a player the pools do not list is gathered on the spot.
+      rowsOf pid = Maybe.fromMaybe (PlayerEffect.applying pid gs) (lookup pid (playerRowsPool pools))
       keep recipient =
         not (sourceOnStack && Recipient.objectOf recipient == Just source)
-          && targetable pcs perspective source sourceView gs recipient
+          && targetable pcs rowsOf perspective source sourceView gs recipient
    in Set.filter keep (admittedGiven pcs grants pools perspective unannounced bindings source slot gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SLOT itself admits -- its
@@ -557,19 +561,16 @@ poolHeldLastKnown pool view =
 --
 -- NOT because the player half is cheap: PlayerEffect.applying forces
 -- Projection.abilityRemoval, a whole-board gather, the moment any permanent
--- carries a player ability, and this asks it once per player candidate. That is
--- the same cost class the cast path already pays on such a board (Cast.castable
--- reaches `applying` through Cost.spellAdjustments, once per card in hand per
--- legalActions pass), and the benchmarks were unmoved. Hoisting `applying` per
--- enumeration the way `pcs` is hoisted is #435's question, and #578 would catch
--- it regressing.
+-- carries a player ability. `rowsOf` is the caller's per-player gather of those
+-- rows -- Pools.playerRowsPool for an enumeration, so the walk is taken once per
+-- player rather than once per player candidate per slot.
 --
 -- EXHAUSTIVE over Recipient rather than routed through Recipient.objectOf: with
 -- the player arm split out, an objectOf-shaped match would leave a Nothing branch
 -- no input reaches and would silently swallow a new constructor -- a new one must
 -- break this build rather than default to targetable.
-targetable :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> Filter.View -> GameState -> Recipient -> Bool
-targetable pcs perspective source sourceView gs recipient =
+targetable :: Map ObjectId PC.ProjectedCharacteristics -> (PlayerId -> [(Maybe ObjectId, PlayerEffect)]) -> Maybe PlayerId -> ObjectId -> Filter.View -> GameState -> Recipient -> Bool
+targetable pcs rowsOf perspective source sourceView gs recipient =
   let restrictedObject oid =
         let keywords = Projection.keywordsGiven pcs oid gs
             -- The candidate's controller, read at most once and only where a
@@ -618,7 +619,7 @@ targetable pcs perspective source sourceView gs recipient =
         -- `restrictedObject` reads `sourceView`, CR 702.16b naming a spell's
         -- quality and an ability's source in one sentence.
         Recipient.ToPlayer pid ->
-          let rows = PlayerEffect.applying pid gs
+          let rows = rowsOf pid
            in not (PlayerEffect.protectedFromTargeting rows perspective pid gs)
                 && not (PlayerEffect.protectedFromGiven rows source gs)
         Recipient.ToCreature oid -> restrictedObject oid
@@ -704,7 +705,13 @@ data Pools = MkPools
     abilityPool :: Set Recipient,
     spellsAndPermanentsPool :: Set Recipient,
     playersAndPlaneswalkersPool :: Set Recipient,
-    exilePool :: Set Recipient
+    exilePool :: Set Recipient,
+    -- Not a pool of recipients: the CR 613.10/613.11 player rows `targetable`
+    -- reads for a PLAYER candidate, gathered once per player for the whole
+    -- enumeration rather than once per player candidate per slot. A list of
+    -- lazy pairs rather than a strict Map, so a slot that admits no player
+    -- gathers nothing.
+    playerRowsPool :: [(PlayerId, [(Maybe ObjectId, PlayerEffect)])]
   }
 
 -- The pools of one board. `pcs` is the caller's whole-board projection, as
@@ -731,7 +738,8 @@ poolsGiven pcs gs =
       -- and an object, so no permanent can appear under two tags here.
       playersAndPlaneswalkersPool =
         Set.union (playerRecipients gs) (planeswalkerRecipientsGiven pcs gs),
-      exilePool = exileRecipients gs
+      exilePool = exileRecipients gs,
+      playerRowsPool = fmap (\pid -> (pid, PlayerEffect.applying pid gs)) (Game.stillPlaying gs)
     }
 
 -- The closed part: build the pool's base recipient set over zones, tagging each

@@ -654,15 +654,20 @@ restricted select defending candidates gs = restrictedIn (inForce defending gs) 
 restrictedIn :: [(ObjectId, [(Subtype.Subtype, Subtype.Subtype)], CombatRestriction.CombatRestriction)] -> (CombatRestriction.CombatRestriction -> Maybe Affected.Affected) -> [ObjectId] -> GameState -> Set ObjectId
 restrictedIn rows select candidates gs =
   let -- CR 613.11 puts these effects after every layer, so the affected set is
+      -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       -- read against the FULL projection -- the opposite of
       -- Projection.affects's callers inside the layer fold, which read
       -- characteristics as of their own layer.
       named source affected creature =
-        Projection.affects
+        Projection.affectsOn
+          pcs
+          grants
           source
           creature
           affected
-          (Projection.project creature gs)
           gs
       -- CR 612.1 again, on the other half of the same printed sentence: the
       -- AFFECTED set is rewritten before it is asked, so a hacked "Swamps can't
@@ -690,7 +695,7 @@ restrictedIn rows select candidates gs =
 -- Computed ONCE per declaration pass and handed to every pair check, `restricted`'s
 -- posture and for its reason: the caller asks this at the top of a pass where a
 -- per-pair predicate would walk the battlefield inside
--- Pawl.Engine.Combat.candidateBlockDeclarations' exponential filter (#200). The
+-- Pawl.Engine.Combat.bestBlockDeclaration's search (#200). The
 -- cross product costs |blockers| * |attackers| projections, and only on a board
 -- that actually states such a restriction -- `inForce` yields nothing on every
 -- other board, so the fold never reaches a candidate.
@@ -713,12 +718,17 @@ restrictedIn rows select candidates gs =
 -- checked -- CR 509.1b's second paragraph is what says nothing re-checks it after.
 cantBeBlockedBy :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
 cantBeBlockedBy defending blockers attackers gs =
-  let named source affected creature =
-        Projection.affects
+  let -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
+      named source affected creature =
+        Projection.affectsOn
+          pcs
+          grants
           source
           creature
           affected
-          (Projection.project creature gs)
           gs
       -- CR 612.1, on both of the printed sentence's halves: the attackers it
       -- names and the blockers it describes are words on the SOURCE's card, so
@@ -780,12 +790,17 @@ cantAttackPlayer candidates players gs =
         Just (AimedAt.MkAimedAt scope kinds) ->
           let barred = filter (\pid -> PlayerEffect.inScope pid (ActiveAttackProhibition.controller active) gs scope) players
            in [(creature, pid, kind) | creature <- storedSubjects candidates gs active, pid <- barred, kind <- Set.toList kinds]
+      -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       named source affected creature =
-        Projection.affects
+        Projection.affectsOn
+          pcs
+          grants
           source
           creature
           affected
-          (Projection.project creature gs)
           gs
       fromRestriction player (source, changes, restriction) = case attackingPlayer restriction of
         Nothing -> []

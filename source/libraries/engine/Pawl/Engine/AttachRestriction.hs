@@ -109,6 +109,8 @@ refusesGiven pcs subject host gs =
       -- Forced at most once, and only by a board on which some permanent
       -- actually declares a prohibition.
       subjectView = Projection.viewOfObject subject gs
+      hostView = Projection.project host gs
+      grants = Projection.controlGrants gs
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> False
         Just face -> case Face.attachRestrictions face of
@@ -122,11 +124,12 @@ refusesGiven pcs subject host gs =
         let affected = AttachRestriction.affected restriction
             attachers = AttachRestriction.attachers restriction
             named =
-              Projection.affects
+              Projection.affectsUnder
+                grants
                 source
                 host
                 (if null changes then affected else Projection.rewriteAffected changes affected)
-                (Projection.project host gs)
+                hostView
                 gs
             barred =
               Filter.matches
