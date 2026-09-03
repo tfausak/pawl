@@ -613,6 +613,7 @@ substituteXInComponent x component = case component of
   -- mana cost's {X} would have taken.
   CostComponent.BlightX -> CostComponent.Blight x
   CostComponent.ExileThisFromGraveyard -> component
+  CostComponent.ExileThis -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
   CostComponent.MillCards _ -> component
@@ -665,6 +666,7 @@ componentHasVariable component = case component of
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> True
   CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.MillCards _ -> False
@@ -749,6 +751,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   CostComponent.MillCards _ -> False
@@ -1008,6 +1011,7 @@ loyaltyAmountOf component = case component of
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
+  CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.MillCards _ -> Nothing
@@ -1064,6 +1068,7 @@ zoneOfComponent component = case component of
   -- the suite green, the two readings agreeing wherever CR 113.6's default holds.
   CostComponent.ReturnThis -> Nothing
   CostComponent.SacrificeThis -> Nothing
+  CostComponent.ExileThis -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergyX -> Nothing
@@ -1144,6 +1149,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
+  CostComponent.ExileThis -> False
   -- CR 118.8c: the hand is a hidden zone, but this names the object the cost is
   -- ON rather than describing a card, so nothing is stated for a player to fail
   -- to find -- DiscardThis' answer above and for its reason.
@@ -1342,6 +1348,23 @@ claimOf slots pid oid component gs = case component of
   -- `repeatsOf` settles at 1 before any axis matters. Keying it ClaimAxis.Tapping
   -- instead leaves the suite green.
   CostComponent.ReturnThis ->
+    claim
+      (ClaimAxis.Removal Zone.Battlefield)
+      ( itself
+          ( Set.member oid (GameState.battlefield gs)
+              && Projection.controllerOf oid gs == Just pid
+          )
+      )
+      1
+  -- The same battlefield pool the two arms above claim, and on the same axis: a
+  -- permanent exiled is as gone from the battlefield as one sacrificed. WITHOUT
+  -- CR 101.2's prohibition, ReturnThis' reading above and for its reason; the
+  -- two answers have to agree.
+  --
+  -- A FENCE and not proven behaviour, ReturnThis' note above: Brittle Effigy is
+  -- the one card printing this component, its cost states a non-empty mana part,
+  -- so `repeatsOf` settles at 1 before any axis matters.
+  CostComponent.ExileThis ->
     claim
       (ClaimAxis.Removal Zone.Battlefield)
       ( itself
@@ -1739,6 +1762,7 @@ uncountedCeiling component = case component of
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
+  CostComponent.ExileThis -> Nothing
   -- Counted by `objectCeiling` too, the library being this claim's pool.
   CostComponent.MillCards _ -> Nothing
   -- Counted by `lifeCeiling`, CR 119.4.
@@ -1927,6 +1951,7 @@ lifeOwedByComponent component = case component of
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
   CostComponent.ExileThisFromGraveyard -> 0
+  CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
   CostComponent.MillCards _ -> 0
@@ -1967,6 +1992,7 @@ plusOneCountersOwedByComponent component = case component of
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
   CostComponent.ExileThisFromGraveyard -> 0
+  CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
   CostComponent.MillCards _ -> 0
@@ -2005,6 +2031,13 @@ canPayComponent slots pid oid component gs = case component of
   -- own, so no board here can hold a prohibited Grinning Ignus. A declared
   -- reading, not a tested one.
   CostComponent.ReturnThis ->
+    Set.member oid (GameState.battlefield gs)
+      && Projection.controllerOf oid gs == Just pid
+  -- CR 406.2 as a cost: only a permanent, and only one this player controls --
+  -- ReturnThis' two conjuncts above, and WITHOUT CR 101.2's prohibition for that
+  -- arm's reason, an effect forbidding a sacrifice saying nothing about an exile.
+  -- `claimOf` must agree.
+  CostComponent.ExileThis ->
     Set.member oid (GameState.battlefield gs)
       && Projection.controllerOf oid gs == Just pid
   -- CR 119.4: payable only if the life total is at least the amount. This
@@ -2206,6 +2239,7 @@ criteriaOf component = case component of
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
   CostComponent.ExileThisFromGraveyard -> []
+  CostComponent.ExileThis -> []
   CostComponent.MillCards _ -> []
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
@@ -2523,6 +2557,7 @@ paidInSecondPass component = case component of
   CostComponent.ReturnThis -> False
   CostComponent.ReturnPermanents {} -> False
   CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
   -- These move no object at all.
@@ -2609,6 +2644,7 @@ orderSensitive component = case component of
   CostComponent.ExileCardsFromGraveyard {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
   CostComponent.ExileThisFromGraveyard -> True
+  CostComponent.ExileThis -> True
   CostComponent.TapThis -> True
   CostComponent.UntapThis -> True
   CostComponent.TapForTotalPower {} -> True
@@ -3311,6 +3347,11 @@ payComponent moment slots pid oid component = case component of
   -- 113.7a load-bearing here -- Loxodon Surveyor's draw resolves off a source
   -- that has already left the graveyard the cost read.
   CostComponent.ExileThisFromGraveyard -> do
+    Event.changeZone oid Zone.Exile
+    pure bindsNothing
+  -- CR 406.2's move off the BATTLEFIELD, through the same funnel and with no
+  -- prompt for the same reason: the cost names this permanent.
+  CostComponent.ExileThis -> do
     Event.changeZone oid Zone.Exile
     pure bindsNothing
   -- CR 406.2's move again, for CHOSEN cards: the payer picks which, so this is a

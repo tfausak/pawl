@@ -2,10 +2,21 @@ module Pawl.Types.BecomeCopy where
 
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
--- | The payload of Pawl.Types.Effect's BecomeCopy arm: CR 707.4's change of a
--- permanent already on the battlefield into a copy of another object. Unstable
--- Shapeshifter's "this creature becomes a copy of that creature" is
--- @original = InSlot became@, @subject = EachMatching IsSource@.
+-- | The payload of Pawl.Types.Effect's BecomeCopy arm: an effect turning an
+-- object that already exists into a copy of another one (CR 707.1), which for a
+-- permanent is CR 707.4's change. Unstable Shapeshifter's "this creature becomes
+-- a copy of that creature" is @original = InSlot became@,
+-- @subject = EachMatching IsSource@.
+--
+-- NEITHER SIDE is confined to the battlefield: CR 707.1's object is a "spell,
+-- permanent, or card", so Synthetic Mirror of the Fallen's subject is a card in
+-- a graveyard and Pawl.CastSpec's "CR 707.2 a graveyard card that is a copy is
+-- priced at the copy's mana cost" is what proves the copiable values follow it
+-- there.
+--
+-- Not implemented: CR 707.2's copiable rules text when the copy is CAST --
+-- Pawl.Engine.Resolve.resolveSpellWith takes a spell's modes and effects off the
+-- printed face, so a card cast after becoming a copy resolves its own (#3098).
 --
 -- TWO ObjectRefs, named rather than positional for Pawl.Types.RequireBlock's
 -- reason: the sides are not interchangeable, and a card file that swapped them
@@ -13,8 +24,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- of the Shapeshifter instead.
 --
 -- Each is an ObjectRef rather than a bare SlotName, for the reason CreateCopy's
--- comment gives: `original` is a slot on every producer in the pool, while
--- `subject` is "this permanent" and so an EachMatching over IsSource. Mirrorweave's
+-- comment gives: `original` is a slot on both producers in the pool, while
+-- `subject` is Unstable Shapeshifter's "this permanent" and so an EachMatching
+-- over IsSource, and the Mirror's targeted card and so a slot. Mirrorweave's
 -- "each other creature becomes a copy of target nonlegendary creature" is the
 -- swept shape the same field takes, and needs only a duration besides (#1753).
 --
