@@ -25,10 +25,12 @@
                       {
                         "type": "CopyStackObject",
                         "value": {
-                          "newTargets": true,
                           "ref": {
                             "type": "InSlot",
                             "value": "ability"
+                          },
+                          "targets": {
+                            "type": "ChosenByController"
                           }
                         }
                       }
@@ -75,10 +77,12 @@
                       {
                         "type": "CopyStackObject",
                         "value": {
-                          "newTargets": true,
                           "ref": {
                             "type": "InSlot",
                             "value": "spell"
+                          },
+                          "targets": {
+                            "type": "ChosenByController"
                           }
                         }
                       }

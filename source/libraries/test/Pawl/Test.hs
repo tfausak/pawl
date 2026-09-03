@@ -103,6 +103,7 @@ import qualified Pawl.Codec.ControllerBecomesTargetSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CopyStackObjectSpec
+import qualified Pawl.Codec.CopyTargetsSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
@@ -697,6 +698,7 @@ spec s registry = do
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CopyStackObjectSpec.spec s
+  Pawl.Codec.CopyTargetsSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
   Pawl.Codec.ConjureDestinationSpec.spec s
   Pawl.Codec.ConjureSpec.spec s
@@ -1004,6 +1006,8 @@ spec s registry = do
   Pawl.CopySpec.copiedAbilitySpec s registry
   Pawl.CopySpec.permanentCopySpec s registry
   Pawl.CopySpec.copyAbilityOnStackSpec s registry
+  Pawl.CopySpec.copiedTriggerTargetSpec s registry
+  Pawl.CopySpec.zadaSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry

@@ -617,6 +617,22 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) aPlayer Filter.Type.TargetsSource)) "player"
       Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.TargetsSource)) "a permanent targets nothing"
 
+  -- CR 115.1 with "only" on it: Zada, Hedron Grinder's trigger condition. The
+  -- gameplay-level proof is Pawl.CopySpec's Zada group; these cases pin the
+  -- atom, and the pair against TargetsSource above is what shows the two are
+  -- different questions -- the fixture spell targets creature 9 AND player 1,
+  -- which is "targets 9" and is not "targets only 9".
+  Spec.describe s "TargetsOnlySource" $ do
+    Spec.it s "matches only when every target is the source" $ do
+      Spec.assertBool s (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) (targetingSpell {Filter.targets = Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 9))}) Filter.Type.TargetsOnlySource) "the source is the only target"
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) targetingSpell Filter.Type.TargetsOnlySource)) "and not when a player is targeted beside it"
+      Spec.assertBool s (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) targetingSpell Filter.Type.TargetsSource) "which TargetsSource still admits"
+
+    Spec.it s "no source in context, a player, and an object targeting nothing are vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self targetingSpell Filter.Type.TargetsOnlySource)) "no source"
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) aPlayer Filter.Type.TargetsOnlySource)) "player"
+      Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.TargetsOnlySource)) "a permanent targets nothing"
+
   Spec.describe s "TargetsPlayer" $ do
     Spec.it s "CR 115.1 You matches a spell aimed at the perspective, and Opponent one aimed at another player" $ do
       Spec.assertBool s (Filter.matches other targetingSpell (Filter.Type.TargetsPlayer PlayerRelation.You)) "player 1 is targeted, from player 1"

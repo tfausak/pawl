@@ -1191,6 +1191,15 @@ matches context view predicate = case predicate of
   Filter.TargetsSource -> case source context of
     Just src -> any ((== Just src) . Recipient.objectOf) (targets view)
     Nothing -> False
+  -- The atom above with "only" on it, so ARITY is asked as well as membership:
+  -- every one of the candidate's targets is the source. A player target answers
+  -- Nothing to Recipient.objectOf and so fails, which is the rule -- "targets
+  -- only Zada" is false of a spell that also names a player. Vacuously False
+  -- where the candidate targets nothing at all, which the emptiness guard is:
+  -- `all` over an empty set is True and a permanent targets nothing.
+  Filter.TargetsOnlySource -> case source context of
+    Just src -> not (Set.null (targets view)) && all ((== Just src) . Recipient.objectOf) (targets view)
+    Nothing -> False
   -- CR 115.1's player target, judged against the perspective the way ControlledBy
   -- judges a controller. ONLY a ToPlayer counts: CR 115.10a says an object is a
   -- target only where the word names it, and a spell aimed at a creature names
@@ -1518,6 +1527,7 @@ rewrite pairs predicate = case predicate of
   -- Untouched for IsSource's reason: a target relation is not a word CR 612.1
   -- swaps.
   Filter.TargetsSource -> predicate
+  Filter.TargetsOnlySource -> predicate
   Filter.TargetsPlayer _ -> predicate
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
@@ -1949,6 +1959,7 @@ bakeBound players predicate = case predicate of
   -- Untouched for IsSource's reason: both read the Context, and neither names a
   -- slot.
   Filter.TargetsSource -> predicate
+  Filter.TargetsOnlySource -> predicate
   Filter.TargetsPlayer _ -> predicate
   -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
@@ -2073,6 +2084,7 @@ manaValueThresholds predicate = case predicate of
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
   Filter.TargetsSource -> []
+  Filter.TargetsOnlySource -> []
   Filter.TargetsPlayer _ -> []
   Filter.IsBound _ -> []
   Filter.SameNameAsBound _ -> []
@@ -2194,6 +2206,7 @@ statesAQuality predicate = case predicate of
   -- CR 701.23b for IsSource's reason, and unreachable from a search besides: a
   -- card in a library targets nothing.
   Filter.TargetsSource -> True
+  Filter.TargetsOnlySource -> True
   Filter.TargetsPlayer _ -> True
   Filter.IsBound _ -> True
   Filter.SameNameAsBound _ -> True
