@@ -6499,7 +6499,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- other than its owner's graveyard to have been discarded all the same, so
     -- what the funnel moved is what was discarded wherever it landed. CR 400.7j
     -- then decides whether a later part of the effect can FIND it -- a public
-    -- destination yes, a hidden one no -- which is a question about the reader.
+    -- destination yes, a hidden one only if the card was revealed on the way
+    -- (CR 701.9c) -- which is a question about the reader.
     --
     -- Bound onto `resolving` and as a GROUP, `buried`'s shape and for its reason:
     -- slotBindings reads live GameState unconditionally, which is what puts the
