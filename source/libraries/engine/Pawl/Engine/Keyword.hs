@@ -743,6 +743,7 @@ station =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton load))) Map.empty))
           (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
