@@ -268,6 +268,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CastAsThoughItHadFlash (Filter.And []))
       " {\"type\":\"CastAsThoughItHadFlash\",\"value\":{\"type\":\"And\",\"value\":[]}} "
+  -- CR 601.1a / Scout's Warning: the PLAY-scoped sibling, carrying its Filter.
+  Spec.it s "MayPlayAsThoughItHadFlash, Scout's Warning's creature card" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.MayPlayAsThoughItHadFlash (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"MayPlayAsThoughItHadFlash\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 601.3b's "certain qualities" (Yeva, Nature's Herald), so a codec that
   -- dropped the payload would round-trip one of these and not both.
   Spec.it s "CastAsThoughItHadFlash, a filter that names qualities" $

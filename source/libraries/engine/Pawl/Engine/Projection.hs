@@ -1331,21 +1331,12 @@ viewOfCharacteristics peers oid pc controller counters gs =
           >>= Recipient.objectOf
           >>= \host -> if Set.member host (GameState.battlefield gs) then peers host else Nothing,
       -- CR 303.4b / 301.5a with the arrow turned round: the permanents attached TO
-      -- this candidate. pawl keeps the attachment on the ATTACHED permanent, so
-      -- there is nothing to look up from this side and the index is built by
-      -- sweeping the battlefield -- which also supplies CR 110.1's narrowing for
-      -- free, `attachedToView` above having to state it. Each attacher's own
+      -- this candidate, Pawl.Engine.Game.attachments' sweep. Each attacher's own
       -- characteristics come through `peers`, at this caller's depth, which is
       -- what keeps a HasAttached reached from inside the layer fold out of a loop.
       -- The list must stay lazy in its spine: nothing forces the sweep unless a
       -- Filter names the atom.
-      Filter.attachedViews =
-        Maybe.mapMaybe
-          peers
-          [ attacher
-          | attacher <- Set.toList (GameState.battlefield gs),
-            (Game.lookupObject attacher gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
-          ],
+      Filter.attachedViews = Maybe.mapMaybe peers (Set.toList (Game.attachments oid gs)),
       -- CR 701.3a / 301.5a: the same attachment as the HOST'S ID -- IsAttachedToSource
       -- compares it against the match's source, which this builder does not know.
       -- Not narrowed to the battlefield the way `attachedToView` is.

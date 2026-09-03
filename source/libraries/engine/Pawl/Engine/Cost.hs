@@ -104,6 +104,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -2302,31 +2303,52 @@ reverseIllegal pid activated closed before = case NonEmpty.nonEmpty activated of
       OptionalDecision.Declines -> pure ()
 
 -- CR 733.1's last sentence: shuffling a library or revealing cards from one is
--- never reversed, even where the mana ability that did it is. Neither writes
--- more than one field of GameState -- Event.shuffleLibrary only `library`,
--- Event.reveal only one GameEvent.Revealed entry onto `events` -- so restoring
--- `snapshot` with those two fields taken from `since` (the state as the mana
+-- never reversed, even where the mana ability that did it is. Restoring
+-- `snapshot` with those two things taken from `since` (the state as the mana
 -- window closed, still carrying them) keeps every OTHER write reversed while
 -- these two stand.
 --
--- `events` keeps only the REVEALED entries `since` gained past `snapshot`'s own
--- length, not the whole suffix: a tap or a mana addition the window performed
--- is exactly what the surrounding reversal DOES undo, and carrying its own log
--- entry forward would misstate a board that no longer shows it happened.
--- `nextEventGroup` rides at `since`'s value, since a carried-over entry may
--- already hold a group `snapshot`'s own counter would otherwise repeat --
--- GameState.events' groups are non-decreasing along the log.
+-- A library is kept from `since` only where its MEMBERSHIP is unchanged -- a
+-- shuffle reorders and moves nothing, and a window of mana abilities cannot
+-- move a library card (CR 605.1a). A library whose members differ is one the
+-- surrounding action itself changed, which CR 733.1 DOES reverse: a spell cast
+-- from a library (Panglacial Wurm) went to the stack, and a MillCards cost went
+-- to a graveyard. Pawl.CastSpec's "a refused library cast puts Panglacial back"
+-- is the proof; keeping such a library wholesale left the card in no zone.
+--
+-- `events` keeps only the Revealed entries `since` gained past `snapshot`'s own
+-- length whose card is in a library on BOTH sides, not the whole suffix: a tap
+-- or a mana addition the window performed is exactly what the surrounding
+-- reversal DOES undo, and a card revealed from a hand (CR 602.2a's activation
+-- reveal, logged ahead of Pawl.Engine.Activate's own snapshot) is not what the
+-- rule's "revealed from a library" protects. `nextEventGroup` rides at
+-- `since`'s value, since a carried-over entry may already hold a group
+-- `snapshot`'s own counter would otherwise repeat -- GameState.events' groups
+-- are non-decreasing along the log.
 keepingLibraryActions :: GameState -> GameState -> GameState
 keepingLibraryActions since snapshot =
   snapshot
-    { GameState.library = GameState.library since,
-      GameState.events = GameState.events snapshot <> Seq.filter isRevealed (Seq.drop (Seq.length (GameState.events snapshot)) (GameState.events since)),
+    { GameState.library = Map.mapWithKey keep (GameState.library snapshot),
+      GameState.events = GameState.events snapshot <> Seq.filter revealedFromLibrary (Seq.drop (Seq.length (GameState.events snapshot)) (GameState.events since)),
       GameState.nextEventGroup = GameState.nextEventGroup since
     }
   where
-    isRevealed logged = case LoggedEvent.event logged of
-      GameEvent.Revealed {} -> True
+    keep pid held = case Map.lookup pid (GameState.library since) of
+      Just reordered | members reordered == members held -> reordered
+      _ -> held
+    members held = Set.fromList (Foldable.toList held)
+    inLibraryOf gs oid = any (Foldable.elem oid) (GameState.library gs)
+    revealedFromLibrary logged = case LoggedEvent.event logged of
+      GameEvent.Revealed revealed -> inLibraryOf snapshot (Revealed.card revealed) && inLibraryOf since (Revealed.card revealed)
       _ -> False
+
+-- The restore every caller that reverts a failed payment to its own snapshot
+-- performs: `before` with what CR 733.1's last sentence keeps standing, read off
+-- the live state. One body so a new caller cannot regress to a bare State.put.
+restoreKeepingLibraryActions :: GameState -> Game ()
+restoreKeepingLibraryActions before = do
+  gs <- State.get
+  State.put (keepingLibraryActions gs before)
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment, whose order is
 -- the PAYER's (payComponents below).
@@ -2443,9 +2465,7 @@ pay perform moment subject announced spending pid oid cost = do
             -- every current caller redoes this same restore against its OWN
             -- wider `before` once Unpaid reaches it, which is what an observer
             -- actually sees.
-            PaymentMoment.OutsideResolution -> do
-              gs <- State.get
-              State.put (keepingLibraryActions gs before)
+            PaymentMoment.OutsideResolution -> restoreKeepingLibraryActions before
           pure Payment.Unpaid
 
 -- CR 508.1h-508.1j and CR 509.1d-509.1f: pay a COMBAT TOLL -- the costs to attack
@@ -2530,8 +2550,7 @@ payToll perform pid charges = do
               -- False here reaches it -- that caller's is what an observer
               -- actually sees (CombatEffectSpec has no shuffling toll to prove
               -- this one directly).
-              gs <- State.get
-              State.put (keepingLibraryActions gs before)
+              restoreKeepingLibraryActions before
               pure False
 
 -- Which way each of the toll's symbols payable in more than one way will be
@@ -2643,10 +2662,10 @@ tollOrderObservable charges = case filter (any orderSensitive . snd) charges of
 -- Not implemented: CR 733.1's OTHER library carve-out -- a card MillCards moved
 -- from a library to a graveyard is not reversed either -- for a tag whose own
 -- mill (`paidInSecondPass`) completes before a LATER tag in this fold refuses.
--- `payToll`'s and Pawl.Engine.Combat's whole-state reverts undo that mill along
--- with the rest; `keepingLibraryActions` does not cover it, a library-to-zone
--- move touching more fields than a shuffle or a reveal does. No toll in
--- `data/cards/` mills (#3162).
+-- `payToll`'s and Pawl.Engine.Combat's reverts undo that mill along with the
+-- rest: `keepingLibraryActions` hands a library whose membership changed back
+-- to the snapshot, a library-to-zone move touching more than the library. No
+-- toll in `data/cards/` mills (#3162).
 payTagged :: PlayerId -> [(ObjectId, [CostComponent.CostComponent Keyword.Type.Keyword])] -> Game Payment.Payment
 payTagged pid charges = case charges of
   [] -> pure bindsNothing
@@ -2895,9 +2914,7 @@ payManaExcept perform inFlight record subject spending pid cost = do
   -- `before` of its own once False reaches it, which is what an observer
   -- actually sees; this restore is the same discipline kept for a caller
   -- that calls this directly.
-  Monad.unless paid $ do
-    gs <- State.get
-    State.put (keepingLibraryActions gs before)
+  Monad.unless paid (restoreKeepingLibraryActions before)
   pure paid
 
 -- payManaExcept's window, handing back what CR 733.1 needs to reverse it: the

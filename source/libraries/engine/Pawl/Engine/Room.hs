@@ -186,9 +186,7 @@ unlock perform pid oid half = do
           -- mana ability tapped in the window this payment opened may have
           -- shuffled or revealed, and this reject-not-repair restore must not
           -- undo that too.
-          Payment.Unpaid -> do
-            gs <- State.get
-            State.put (Cost.keepingLibraryActions gs before)
+          Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
           -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action
           -- resolves nothing whose effects could read a slot.
           -- CR 709.5e names the actor itself: the player who paid the unlock

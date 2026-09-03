@@ -112,3 +112,11 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       Expiry.codec
       (Expiry.WhenPaid (PaidExpiry.MkPaidExpiry (PlayerId.MkPlayerId 2) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) [])))
       " {\"type\":\"WhenPaid\",\"value\":{\"player\":2,\"cost\":{\"mana\":[{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Blue\"}}}]}}} "
+  -- CR 611.2a: the one-shot Duration.UntilUsed arms into. Nullary, and
+  -- distinct from AtCleanup, which it also honours.
+  Spec.it s "WhenUsed" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      Expiry.WhenUsed
+      " {\"type\":\"WhenUsed\"} "

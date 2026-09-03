@@ -117,9 +117,14 @@ arm players controller source duration gs = case duration of
   -- the source's control afterwards.
   Duration.UntilPaid cost -> Just (Expiry.WhenPaid (PaidExpiry.MkPaidExpiry controller cost))
   -- CR 611.2a: nothing about the game's clock or a payment is baked in --
-  -- Pawl.Engine.PlayerEffect.consumedByCast/consumedByLandPlay are what end
-  -- this early, matching the stored effect's own Filter against whatever was
-  -- just cast or played.
+  -- Pawl.Engine.PlayerEffect.spentByCast/spentByLandPlay are what end this
+  -- early, matching the stored effect's own Filter against whatever was just
+  -- cast or played.
+  --
+  -- Not implemented: a consumer for any OTHER carrier this arms -- a continuous
+  -- effect, a replacement or a delayed trigger under UntilUsed stores WhenUsed
+  -- and then lasts until cleanup, and no lint refuses the duration there
+  -- (#3176).
   Duration.UntilUsed -> Just Expiry.WhenUsed
 
 -- Does a stored effect under this duration FOLLOW its objects across a zone
@@ -231,8 +236,8 @@ sweepConditional = do
         Expiry.AtEndOf _ -> True
         -- CR 116.2c states a price, not a condition, so no board change ends it.
         Expiry.WhenPaid _ -> True
-        -- Consumed only by consumedByCast/consumedByLandPlay below, which run
-        -- outside this sweep.
+        -- Consumed only by Pawl.Engine.PlayerEffect.spentByCast/spentByLandPlay,
+        -- which run outside this sweep.
         Expiry.WhenUsed -> True
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
@@ -545,8 +550,8 @@ dropWhenPaidBy oid gs =
 
 -- CR 611.2a: does this expiry end when the effect carrying it is exercised,
 -- rather than only at a moment the clock or a payment could name? The one
--- reader is Pawl.Engine.PlayerEffect's consumedByCast/consumedByLandPlay,
--- which need to know which stored rows are eligible for early removal without
+-- reader is Pawl.Engine.PlayerEffect's spentGrants (spentByCast and
+-- spentByLandPlay), which needs to know which stored rows are eligible for early removal without
 -- themselves casing on Pawl.Types.Expiry -- the standing this module alone
 -- holds.
 expiresWhenUsed :: Expiry -> Bool

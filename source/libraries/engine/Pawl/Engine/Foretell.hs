@@ -157,9 +157,7 @@ foretell pid oid = do
         -- ability tapped in the window this payment opened may have shuffled
         -- or revealed, and this reject-not-repair restore must not undo that
         -- too.
-        Payment.Unpaid -> do
-          gs <- State.get
-          State.put (Cost.keepingLibraryActions gs before)
+        Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
         -- Dropped, Pawl.Engine.Ignore's reason: this action exiles a card and
         -- resolves nothing, and the later cast pays its own cost.
         Payment.Paid _ -> do

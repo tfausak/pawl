@@ -1454,52 +1454,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
 -- rather than CR 709.4's combined view. The posture spellCostAdjustments takes,
 -- through the same matchesObject.
 mayCastAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
-mayCastAsThoughItHadFlash pid oid gs =
-  let allows (source, effect) = case effect of
-        PlayerEffect.CastAsThoughItHadFlash criterion ->
-          matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs
-        -- CR 601.1a: casting is one way of playing a card, so a play-scoped
-        -- grant (Scout's Warning) widens this window exactly as the cast-scoped
-        -- one above does. mayPlayAsThoughItHadFlash below reads this same arm
-        -- for CR 116.2a's land-play window, which this function never asks.
-        PlayerEffect.MayPlayAsThoughItHadFlash criterion ->
-          matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs
-        PlayerEffect.PlayAdditionalLands _ -> False
-        PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
-        PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.SetMaximumHandSize _ -> False
-        PlayerEffect.IncreaseMaximumHandSize _ -> False
-        PlayerEffect.ReduceMaximumHandSize _ -> False
-        PlayerEffect.DontLoseUnspentMana _ -> False
-        PlayerEffect.SpendManaAsThough _ -> False
-        PlayerEffect.CantBeTargetedBy _ -> False
-        PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented _ -> False
-        PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
-        PlayerEffect.CantBecomeMonarch -> False
-        PlayerEffect.CantCastMatching _ -> False
-        PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
-        -- The other CR 601.3 permission on this axis, and the two do not
-        -- compose: that one names a ZONE and this question is about a TIME, so a
-        -- card in a graveyard still waits for its own window.
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
-        PlayerEffect.CantGetCounters _ -> False
-        PlayerEffect.StateCoinFlip _ -> False
-   in any allows (applying pid gs)
+mayCastAsThoughItHadFlash pid oid gs = any (grantReaches castFlashGrant oid gs) (applying pid gs)
 
 -- CR 601.1a / 601.3b: may `pid` PLAY `oid` as though it had flash -- the
 -- widened window Pawl.Engine.Action.landTimingOk reads beside
@@ -1514,44 +1469,66 @@ mayCastAsThoughItHadFlash pid oid gs =
 -- widens a CAST; this is the one place it widens a land PLAY, and neither
 -- folds into the other.
 mayPlayAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
-mayPlayAsThoughItHadFlash pid oid gs =
-  let allows (source, effect) = case effect of
-        PlayerEffect.MayPlayAsThoughItHadFlash criterion ->
-          matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs
-        PlayerEffect.CastAsThoughItHadFlash _ -> False
-        PlayerEffect.PlayAdditionalLands _ -> False
-        PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
-        PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.SetMaximumHandSize _ -> False
-        PlayerEffect.IncreaseMaximumHandSize _ -> False
-        PlayerEffect.ReduceMaximumHandSize _ -> False
-        PlayerEffect.DontLoseUnspentMana _ -> False
-        PlayerEffect.SpendManaAsThough _ -> False
-        PlayerEffect.CantBeTargetedBy _ -> False
-        PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented _ -> False
-        PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
-        PlayerEffect.CantBecomeMonarch -> False
-        PlayerEffect.CantCastMatching _ -> False
-        PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
-        PlayerEffect.CantGetCounters _ -> False
-        PlayerEffect.StateCoinFlip _ -> False
-   in any allows (applying pid gs)
+mayPlayAsThoughItHadFlash pid oid gs = any (grantReaches landPlayFlashGrant oid gs) (applying pid gs)
+
+-- One row of `applying`, asked whether the grant `grantOf` reads off it reaches
+-- `oid`: CR 601.3b's first sentence through matchesObjectFrom, and its second --
+-- what a choice still to be made during the proposal could make of the card --
+-- through choiceCouldApply.
+grantReaches :: (PlayerEffect -> Maybe (Filter Keyword)) -> ObjectId -> GameState -> (Maybe ObjectId, PlayerEffect) -> Bool
+grantReaches grantOf oid gs (source, effect) =
+  maybe False (\criterion -> matchesObjectFrom source criterion oid gs || choiceCouldApply source criterion oid gs) (grantOf effect)
+
+-- CR 601.1a / 601.3b: the criterion a grant on the "as though it had flash"
+-- axis applies to a LAND PLAY, or Nothing. Only the play-scoped grant (Scout's
+-- Warning) reaches a land: CR 601.3b's own rule is about beginning to CAST
+-- (Vedalken Orrery), and a land is never cast (CR 305.1). Exhaustive, so a new
+-- PlayerEffect is named here by -Werror; castFlashGrant below leans on that.
+landPlayFlashGrant :: PlayerEffect -> Maybe (Filter Keyword)
+landPlayFlashGrant effect = case effect of
+  PlayerEffect.MayPlayAsThoughItHadFlash criterion -> Just criterion
+  PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+  PlayerEffect.CantCastSpells -> Nothing
+  PlayerEffect.CantCastMoreThan _ -> Nothing
+  PlayerEffect.CantCastChosenName -> Nothing
+  PlayerEffect.CantPlayLandChosenName -> Nothing
+  PlayerEffect.IncreaseSpellCost {} -> Nothing
+  PlayerEffect.IncreaseActivationCost {} -> Nothing
+  PlayerEffect.ReduceSpellCost {} -> Nothing
+  PlayerEffect.ReduceActivationCost {} -> Nothing
+  PlayerEffect.AddActivationCost {} -> Nothing
+  PlayerEffect.AddSpellCost {} -> Nothing
+  PlayerEffect.PlayAdditionalLands _ -> Nothing
+  PlayerEffect.NoMaximumHandSize -> Nothing
+  PlayerEffect.SetMaximumHandSize _ -> Nothing
+  PlayerEffect.IncreaseMaximumHandSize _ -> Nothing
+  PlayerEffect.ReduceMaximumHandSize _ -> Nothing
+  PlayerEffect.DontLoseUnspentMana _ -> Nothing
+  PlayerEffect.SpendManaAsThough _ -> Nothing
+  PlayerEffect.CantBeTargetedBy _ -> Nothing
+  PlayerEffect.CantBeCountered _ -> Nothing
+  PlayerEffect.DamageCantBePrevented _ -> Nothing
+  PlayerEffect.DamageCantBeRedirected _ -> Nothing
+  PlayerEffect.CantSearchLibraries -> Nothing
+  PlayerEffect.HasProtectionFromChosenName -> Nothing
+  PlayerEffect.CantBecomeMonarch -> Nothing
+  PlayerEffect.CantCastMatching _ -> Nothing
+  PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
+  PlayerEffect.CantPlayLands -> Nothing
+  PlayerEffect.CastFromGraveyard _ -> Nothing
+  PlayerEffect.PlayLandsFromGraveyard -> Nothing
+  PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
+  PlayerEffect.CantGetCounters _ -> Nothing
+  PlayerEffect.StateCoinFlip _ -> Nothing
+
+-- The same axis for a CAST: the cast-scoped grant, and -- CR 601.1a, casting
+-- being one way to play a card -- every grant landPlayFlashGrant admits. The
+-- fallthrough is to that EXHAUSTIVE function, so a new constructor still owes an
+-- arm.
+castFlashGrant :: PlayerEffect -> Maybe (Filter Keyword)
+castFlashGrant effect = case effect of
+  PlayerEffect.CastAsThoughItHadFlash criterion -> Just criterion
+  _ -> landPlayFlashGrant effect
 
 -- CR 601.3b's LOOKAHEAD, asked of a permission that does NOT name the spell as it
 -- stands: could a choice still to be made during this spell's proposal cause the
@@ -2580,114 +2557,40 @@ statedFlips pid gs =
         PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (says . snd) (applying pid gs)
 
--- CR 611.2a / Quicken: `pid` has just CAST `oid` -- drop every one-shot
--- (Expiry.WhenUsed) stored grant of theirs whose criterion matched, since CR
--- 601.1a makes casting one way to play a card and the WotC ruling for both
--- producers ends the effect "even if you cast it at a time you normally
--- could" -- the timing loophole need not have been exercised.
+-- CR 611.2a / Quicken: the one-shot (Expiry.WhenUsed) stored grants `pid`
+-- would SPEND by casting `oid` -- every row on this axis that applies to them
+-- (`applies`, the readers' own gate, so a row scoped to another seat is neither
+-- widened for one player and spent by another) whose criterion matches. WotC's
+-- ruling for both producers ends the effect "even if you cast it at a time you
+-- normally could", so the timing loophole need not have been exercised; and
+-- ALL matching rows go together, since two Quickens "will all apply to the very
+-- next ... spell you cast".
 --
--- Reads BOTH one-shot arms on this axis, unlike mayCastAsThoughItHadFlash
--- above: a play-scoped grant (Scout's Warning) is spent by an ordinary cast
--- exactly as a cast-scoped one (Quicken) is, since casting is playing.
---
--- ALL matching rows drop together, not the first: WotC's own ruling is that
--- two of the same instant "will all apply to the very next ... spell you
--- cast", so a second Quicken is not left standing once the first spell it
--- could have named goes by.
---
--- Called from Pawl.Engine.Engine's Action.Type.Cast arm on the PRE-MOVE `oid`,
--- while the card still lies where matchesObjectFrom can read it -- CR 400.7
--- gives the object a new id once CR 601.2a puts it on the stack.
-consumedByCast :: PlayerId -> ObjectId -> GameState -> GameState
-consumedByCast pid oid gs =
-  let spent active =
-        ActivePlayerEffect.controller active == pid
-          && Expiry.expiresWhenUsed (ActivePlayerEffect.expiry active)
-          && let source = Just (ActivePlayerEffect.source active)
-              in case ActivePlayerEffect.effect active of
-                   PlayerEffect.CastAsThoughItHadFlash criterion -> matchesObjectFrom source criterion oid gs
-                   PlayerEffect.MayPlayAsThoughItHadFlash criterion -> matchesObjectFrom source criterion oid gs
-                   PlayerEffect.CantCastSpells -> False
-                   PlayerEffect.CantCastMoreThan _ -> False
-                   PlayerEffect.CantCastChosenName -> False
-                   PlayerEffect.CantPlayLandChosenName -> False
-                   PlayerEffect.IncreaseSpellCost {} -> False
-                   PlayerEffect.IncreaseActivationCost {} -> False
-                   PlayerEffect.ReduceSpellCost {} -> False
-                   PlayerEffect.ReduceActivationCost {} -> False
-                   PlayerEffect.AddActivationCost {} -> False
-                   PlayerEffect.AddSpellCost {} -> False
-                   PlayerEffect.PlayAdditionalLands _ -> False
-                   PlayerEffect.NoMaximumHandSize -> False
-                   PlayerEffect.SetMaximumHandSize _ -> False
-                   PlayerEffect.IncreaseMaximumHandSize _ -> False
-                   PlayerEffect.ReduceMaximumHandSize _ -> False
-                   PlayerEffect.DontLoseUnspentMana _ -> False
-                   PlayerEffect.SpendManaAsThough _ -> False
-                   PlayerEffect.CantBeTargetedBy _ -> False
-                   PlayerEffect.CantBeCountered _ -> False
-                   PlayerEffect.DamageCantBePrevented _ -> False
-                   PlayerEffect.DamageCantBeRedirected _ -> False
-                   PlayerEffect.CantSearchLibraries -> False
-                   PlayerEffect.HasProtectionFromChosenName -> False
-                   PlayerEffect.CantBecomeMonarch -> False
-                   PlayerEffect.CantCastMatching _ -> False
-                   PlayerEffect.CastOnlyAtSorcerySpeed -> False
-                   PlayerEffect.CantPlayLands -> False
-                   PlayerEffect.CastFromGraveyard _ -> False
-                   PlayerEffect.PlayLandsFromGraveyard -> False
-                   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
-                   PlayerEffect.CantGetCounters _ -> False
-                   PlayerEffect.StateCoinFlip _ -> False
-   in gs {GameState.playerEffects = filter (not . spent) (GameState.playerEffects gs)}
+-- Asked, not applied: Pawl.Engine.Cast.castSpellWith asks this of the
+-- asProposed-stamped PRE-MOVE state -- so the criterion sees the chosen half and
+-- CR 708.2a's face-down 2/2, the same view the cast's own gate read -- and hands
+-- the rows to `consume` only once CR 601.2h's payment has succeeded, so a
+-- rejected or reversed announcement (CR 601.2e, CR 733.1) spends nothing.
+-- Pawl.PlayerEffectSpec's "a rejected cast leaves the grant standing" and "a
+-- face-down cast spends the grant off the face the gate read" are the proofs.
+spentByCast :: PlayerId -> ObjectId -> GameState -> [ActivePlayerEffect.ActivePlayerEffect]
+spentByCast = spentGrants castFlashGrant
 
--- CR 611.2a / 601.1a's other half: `pid` has just PLAYED `oid` as a land --
--- consumedByCast's twin, for a play rather than a cast.
---
--- Reads ONLY MayPlayAsThoughItHadFlash, unlike consumedByCast above: CR
--- 601.3b's rule is about beginning to CAST (Quicken), and a land is never cast
--- (CR 305.1), so a cast-scoped grant is not spent by a land play.
---
--- Called from Pawl.Engine.Engine's Action.Type.Play arm on the PRE-MOVE `oid`,
--- for consumedByCast's own reason.
-consumedByLandPlay :: PlayerId -> ObjectId -> GameState -> GameState
-consumedByLandPlay pid oid gs =
+-- CR 611.2a / 601.1a's other half: the rows `pid` would spend by playing `oid`
+-- as a land. Asked of the pre-move state by Pawl.Engine.Engine's Play arm for
+-- spentByCast's reason, and consumed once the land has actually moved.
+spentByLandPlay :: PlayerId -> ObjectId -> GameState -> [ActivePlayerEffect.ActivePlayerEffect]
+spentByLandPlay = spentGrants landPlayFlashGrant
+
+spentGrants :: (PlayerEffect -> Maybe (Filter Keyword)) -> PlayerId -> ObjectId -> GameState -> [ActivePlayerEffect.ActivePlayerEffect]
+spentGrants grantOf pid oid gs =
   let spent active =
-        ActivePlayerEffect.controller active == pid
+        applies pid (ActivePlayerEffect.controller active) gs (ActivePlayerEffect.scope active)
           && Expiry.expiresWhenUsed (ActivePlayerEffect.expiry active)
-          && case ActivePlayerEffect.effect active of
-            PlayerEffect.MayPlayAsThoughItHadFlash criterion -> matchesObjectFrom (Just (ActivePlayerEffect.source active)) criterion oid gs
-            PlayerEffect.CastAsThoughItHadFlash _ -> False
-            PlayerEffect.CantCastSpells -> False
-            PlayerEffect.CantCastMoreThan _ -> False
-            PlayerEffect.CantCastChosenName -> False
-            PlayerEffect.CantPlayLandChosenName -> False
-            PlayerEffect.IncreaseSpellCost {} -> False
-            PlayerEffect.IncreaseActivationCost {} -> False
-            PlayerEffect.ReduceSpellCost {} -> False
-            PlayerEffect.ReduceActivationCost {} -> False
-            PlayerEffect.AddActivationCost {} -> False
-            PlayerEffect.AddSpellCost {} -> False
-            PlayerEffect.PlayAdditionalLands _ -> False
-            PlayerEffect.NoMaximumHandSize -> False
-            PlayerEffect.SetMaximumHandSize _ -> False
-            PlayerEffect.IncreaseMaximumHandSize _ -> False
-            PlayerEffect.ReduceMaximumHandSize _ -> False
-            PlayerEffect.DontLoseUnspentMana _ -> False
-            PlayerEffect.SpendManaAsThough _ -> False
-            PlayerEffect.CantBeTargetedBy _ -> False
-            PlayerEffect.CantBeCountered _ -> False
-            PlayerEffect.DamageCantBePrevented _ -> False
-            PlayerEffect.DamageCantBeRedirected _ -> False
-            PlayerEffect.CantSearchLibraries -> False
-            PlayerEffect.HasProtectionFromChosenName -> False
-            PlayerEffect.CantBecomeMonarch -> False
-            PlayerEffect.CantCastMatching _ -> False
-            PlayerEffect.CastOnlyAtSorcerySpeed -> False
-            PlayerEffect.CantPlayLands -> False
-            PlayerEffect.CastFromGraveyard _ -> False
-            PlayerEffect.PlayLandsFromGraveyard -> False
-            PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
-            PlayerEffect.CantGetCounters _ -> False
-            PlayerEffect.StateCoinFlip _ -> False
-   in gs {GameState.playerEffects = filter (not . spent) (GameState.playerEffects gs)}
+          && maybe False (\criterion -> matchesObjectFrom (Just (ActivePlayerEffect.source active)) criterion oid gs) (grantOf (ActivePlayerEffect.effect active))
+   in filter spent (GameState.playerEffects gs)
+
+-- Drop the rows spentByCast / spentByLandPlay named, once the play they were
+-- asked about has happened.
+consume :: [ActivePlayerEffect.ActivePlayerEffect] -> GameState -> GameState
+consume rows gs = gs {GameState.playerEffects = filter (`notElem` rows) (GameState.playerEffects gs)}

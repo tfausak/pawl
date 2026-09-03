@@ -340,18 +340,9 @@ data Modification ability
     -- on whatever 7a, 7b and 7c already produced, not on the printed box.
     -- Carries no payload: two applications return the object to normal for free.
     SwitchPowerToughness
-  | -- | CR 702.184c: while this object's controller controls it, every station
-    -- ability that player controls reads the TAPPED creature's toughness
-    -- instead of its power, whenever that toughness is greater. Tapestry
-    -- Warden's "each creature you control ... stations permanents using its
-    -- toughness rather than its power" -- its own ruling settles that "its" is
-    -- the tapped creature's, not the granter's, and that the check is made as
-    -- the station ability RESOLVES.
-    --
-    -- Self-only (`Filter.IsSource`, DestructionR's posture) rather than a
-    -- printed Filter over other creatures: the substitution is a fact about
-    -- the CONTROLLER, not about which creature stations, so nothing here
-    -- narrows a set of affected permanents. Payload-free: no printing
-    -- substitutes a characteristic other than toughness.
+  | -- | CR 702.184c: while this object's controller controls it, that player's
+    -- station abilities read the tapped creature's toughness where it exceeds
+    -- its power (Tapestry Warden). Self-only, like DestructionR: a fact about the
+    -- controller, not a set of affected permanents.
     GrantsStationToughness
   deriving (Eq, Ord, Show)

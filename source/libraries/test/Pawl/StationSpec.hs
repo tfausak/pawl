@@ -336,6 +336,30 @@ tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
             departed = activated {GameState.battlefield = Set.delete wardenId (GameState.battlefield activated)}
             after = S.runPure pinned departed Stack.resolveTop
          in Spec.assertEqWith s "power 0, not toughness 8: the grant was gone by resolution" (S.counterOf charge frigateId after) 0
+  -- The ruling's "a station ability YOU control": CR 113.8 keeps the ability
+  -- alice's after bob takes the Frigate in response, and it is alice's Warden
+  -- that answers as it resolves, not bob's want of one.
+  Spec.it s "CR 113.8 the ability's controller, not the stationing permanent's new one, is asked for the grant" $ do
+    frigate <- S.printingOf s registry "Lumen-Class Frigate"
+    warden <- S.printingOf s registry "Tapestry Warden"
+    wall <- S.printingOf s registry "Wall of Stone"
+    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addCreature warden S.alice gs0
+        (wallId, gs2) = S.addCreature wall S.alice gs1
+        gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pinned :: Prompt.Prompt r -> r
+        pinned p = case p of
+          Prompt.ChooseTaps {} -> Set.singleton wallId
+          _ -> S.identityAnswer p
+    case stationAbility frigateId gs of
+      Nothing -> Spec.assertFailure s "fixture should offer station"
+      Just ability ->
+        let activated = S.runPure pinned gs (Activate.activateAbility S.alice frigateId ability)
+            stolen = S.giveControl frigateId S.bob activated
+            after = S.runPure pinned stolen Stack.resolveTop
+         in do
+              Spec.assertEqWith s "toughness 8: alice's ability, alice's Warden" (S.counterOf charge frigateId after) 8
+              Spec.assertEqWith s "and bob really controls the Frigate as it resolves" (Projection.controllerOf frigateId stolen) (Just S.bob)
   -- CR 702.184c's own "whenever that toughness is greater": Tapestry Warden
   -- stands, but Blind-Spot Giant's 4/3 has toughness BELOW power, so the
   -- untouched power still loads. Blind-Spot rather than the module's equal

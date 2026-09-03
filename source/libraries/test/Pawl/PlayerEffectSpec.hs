@@ -148,6 +148,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -5771,21 +5772,6 @@ scoutsWarningResolved plains warning secondCard =
       resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
    in (secondId, resolveAll (S.runPure S.identityAnswer before (S.cast S.alice warningId)))
 
-isPlayOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
-isPlayOf oid action = case action of
-  Action.Type.Play o _ -> o == oid
-  Action.Type.Cast {} -> False
-  Action.Type.Activate _ _ -> False
-  Action.Type.TurnFaceUp {} -> False
-  Action.Type.Unlock _ _ -> False
-  Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot _ -> False
-  Action.Type.Foretell _ -> False
-  Action.Type.Ignore _ -> False
-  Action.Type.EndEffect _ -> False
-  Action.Type.ActivateManaAbility _ -> False
-  Action.Type.Pass -> False
-
 -- CR 116.2a's window forced shut without touching whose turn it is (CR
 -- 305.3's own axis, left alone either way) -- Pawl.CastSpec's own busy-stack
 -- trick: a nonempty stack fails Turn.sorcerySpeedWindow's empty-stack conjunct
@@ -5809,7 +5795,7 @@ scoutsWarningSpec s registry =
       warning <- S.printingOf s registry "Scout's Warning"
       dryadArbor <- S.printingOf s registry "Dryad Arbor"
       let (_, arborId, board) = scoutsWarningBoard plains warning dryadArbor
-      Spec.assertBool s (not (any (isPlayOf arborId) (Action.legalActions S.alice (busyStack board)))) "not offered"
+      Spec.assertBool s (not (any (playing arborId) (Action.legalActions S.alice (busyStack board)))) "not offered"
 
     -- CR 601.1a / 601.3b, the whole fix: once Scout's Warning has resolved,
     -- Dryad Arbor -- a LAND card -- is offered outside the sorcery-speed
@@ -5820,7 +5806,7 @@ scoutsWarningSpec s registry =
       warning <- S.printingOf s registry "Scout's Warning"
       dryadArbor <- S.printingOf s registry "Dryad Arbor"
       let (arborId, after) = scoutsWarningResolved plains warning dryadArbor
-      Spec.assertBool s (any (isPlayOf arborId) (Action.legalActions S.alice (busyStack after))) "offered"
+      Spec.assertBool s (any (playing arborId) (Action.legalActions S.alice (busyStack after))) "offered"
 
     -- The resolution itself: CR 611.2's stored effect the card installs, and
     -- CR 611.2a's Expiry.WhenUsed the Duration.UntilUsed on the card resolved
@@ -5892,6 +5878,83 @@ scoutsWarningSpec s registry =
       let (_, resolved) = scoutsWarningResolved plains warning dryadArbor
       Spec.assertEqWith s "one stored before" (length (GameState.playerEffects resolved)) 1
       Spec.assertEqWith s "none after cleanup" (GameState.playerEffects (Expiry.dropAtCleanup resolved)) []
+
+    -- CR 601.2e / 733.1: a cast that is rejected -- here at CR 601.2h, the mana
+    -- refused -- is returned to the moment before it was proposed, and the
+    -- grant it would have spent is part of that moment. Driven through
+    -- Pawl.Engine.Engine's own Cast arm, where a spend ahead of
+    -- Cast.castSpellWith's rewind snapshot once lost the grant: the answerer
+    -- proposes the Piker ONCE, refuses every mana source, then passes.
+    Spec.it s "CR 601.2e a rejected cast leaves the grant standing" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      warning <- S.printingOf s registry "Scout's Warning"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (pikerId, resolved) = scoutsWarningResolved plains warning piker
+          -- Two untapped Mountains, so the Piker is OFFERED (Cast.castable
+          -- prices it) and the refusal happens at the payment, not the gate.
+          funded = S.landsFor mountain S.alice 2 resolved
+          castOfPiker action = case action of
+            Action.Type.Cast oid _ _ -> oid == pikerId
+            _ -> False
+          -- (asked, found): pass once the cast has been proposed, and record
+          -- whether it ever was.
+          answerer :: Prompt.Prompt r -> State.State (Bool, Bool) r
+          answerer p = case p of
+            Prompt.ChooseAction _ _ actions -> do
+              (asked, found) <- State.get
+              let offer = List.find castOfPiker actions
+              State.put (True, found || Maybe.isJust offer)
+              pure (if asked then Action.Type.Pass else Maybe.fromMaybe Action.Type.Pass offer)
+            Prompt.ChooseManaSource {} -> pure Nothing
+            _ -> pure (S.identityAnswer p)
+          ((_, after), (_, proposed)) = State.runState (Engine.runGame answerer funded Engine.priorityLoop) (False, False)
+      Spec.assertEqWith s "CR 601.2e the grant survives the rejected cast" (length (GameState.playerEffects after)) 1
+      Spec.assertBool s proposed "the Piker really was proposed"
+      Spec.assertEqWith s "nothing was tapped for it" (S.tappedCount S.alice after) 1
+      Spec.assertEqWith s "and it is back in hand" (fmap Object.zone (Game.lookupObject pikerId after)) (Just Zone.Hand)
+
+    -- CR 601.3's door into a cast, not Pawl.Engine.Engine's: Panglacial Wurm
+    -- cast during a search goes through Cast.castWhileSearching, and the grant
+    -- is spent there exactly as it is by an ordinary cast -- the spend lives in
+    -- Cast.castSpellWith, the one funnel every door reaches.
+    Spec.it s "CR 601.3 a cast made while searching spends the grant" $ do
+      forest <- S.printingOf s registry "Forest"
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
+      let base = S.landsFor plains S.alice 1 (S.landsInPlay forest 7)
+          -- The Wurm first and the Plains on top of it: Scout's Warning's second
+          -- clause draws the top card (CR 104.3c's trap in scoutsWarningBoard),
+          -- and the Wurm has to still be in the library for the search to offer.
+          (_, withWurm) = S.addLibraryCard panglacialWurm S.alice base
+          (_, withDraw) = S.addLibraryCard plains S.alice withWurm
+          (warningId, g1) = S.addHandCard warning S.alice withDraw
+          before = g1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+          resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer before (S.cast S.alice warningId)) Engine.priorityLoop
+          castFirst :: Prompt.Prompt r -> r
+          castFirst p = case p of
+            Prompt.CastWhileSearching _ _ options -> Maybe.listToMaybe options
+            _ -> S.identityAnswer p
+          after = S.runPure castFirst resolved (Cast.castWhileSearching S.manaPerformer S.alice)
+      Spec.assertEqWith s "CR 611.2a the grant is spent by the search's own cast" (GameState.playerEffects after) []
+      Spec.assertEqWith s "the grant stood before it" (length (GameState.playerEffects resolved)) 1
+      Spec.assertEqWith s "and the Wurm really was cast" (length (GameState.stack after)) 1
+
+    -- CR 708.2a: a face-down cast is a 2/2 creature spell, which is the face
+    -- the cast's gate read the grant against -- and the spend reads the same
+    -- face, not the Aura printed underneath. Gift of Doom is an Aura with
+    -- morph, so its printed face fails HasCardType Creature and only the
+    -- proposed, face-down view spends the grant.
+    Spec.it s "CR 708.2a a face-down cast spends the grant off the face the gate read" $ do
+      plains <- S.printingOf s registry "Plains"
+      warning <- S.printingOf s registry "Scout's Warning"
+      giftOfDoom <- S.printingOf s registry "Gift of Doom"
+      let (giftId, resolved) = scoutsWarningResolved plains warning giftOfDoom
+          funded = S.landsFor plains S.alice 3 resolved
+          after = S.runPure S.identityAnswer funded (Cast.castSpell S.manaPerformer S.alice giftId (CardName.MkCardName (Text.pack "Gift of Doom")) (Facing.faceDown FaceDownReason.Morphed))
+      Spec.assertEqWith s "CR 708.2a the grant is spent by the face-down creature spell" (GameState.playerEffects after) []
+      Spec.assertEqWith s "and the spell really is on the stack" (length (GameState.stack after)) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
