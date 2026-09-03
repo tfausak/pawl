@@ -46,6 +46,8 @@ codec =
       Arm.payload "PermanentDealsCombatDamageToPlayer" filterCodec TriggerCondition.PermanentDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
       Arm.payload "PermanentsDealCombatDamageToPlayer" filterCodec TriggerCondition.PermanentsDealCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentsDealCombatDamageToPlayer y -> Just y; _ -> Nothing),
       Arm.nullary "CreatureDealtCombatDamageToMonarch" TriggerCondition.CreatureDealtCombatDamageToMonarch,
+      Arm.nullary "CreaturesDealtCombatDamageToInitiative" TriggerCondition.CreaturesDealtCombatDamageToInitiative,
+      Arm.nullary "PlayerTookInitiative" TriggerCondition.PlayerTookInitiative,
       Arm.nullary "OpponentLostLifeDuringYourTurn" TriggerCondition.OpponentLostLifeDuringYourTurn,
       Arm.payload "SelfAttacks" TriggerFrequency.codec TriggerCondition.SelfAttacks (\x -> case x of TriggerCondition.SelfAttacks y -> Just y; _ -> Nothing),
       Arm.payload "SelfAttacksWithAnother" filterCodec TriggerCondition.SelfAttacksWithAnother (\x -> case x of TriggerCondition.SelfAttacksWithAnother y -> Just y; _ -> Nothing),

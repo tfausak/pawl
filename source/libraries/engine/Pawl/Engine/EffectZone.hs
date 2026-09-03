@@ -221,6 +221,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
+  Effect.TakeTheInitiative {} -> Nothing
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing

@@ -601,6 +601,10 @@ data GameState = MkGameState
     -- one at a time). Nothing until a player becomes the monarch. On GameState,
     -- not Player, because it is one designation, not a per-player counter.
     monarch :: Maybe PlayerId.PlayerId,
+    -- | CR 726.1/726.3: the initiative, the monarch's sibling designation -- at
+    -- most one holder, and Nothing until an effect instructs a player to take
+    -- it. On GameState for GameState.monarch's reason.
+    initiative :: Maybe PlayerId.PlayerId,
     -- | CR 731.1: the game's day/night designation. Nothing is the rule's own
     -- third state, "the game starts with neither designation", and it is the only
     -- state that is not a Daytime -- CR 731.1's last sentence makes it

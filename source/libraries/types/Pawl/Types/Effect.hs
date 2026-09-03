@@ -31,6 +31,7 @@ import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
+import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -426,6 +427,8 @@ data Effect card ability
     CreateEmblem card
   | -- | CR 725: a player the MonarchTarget names becomes the monarch.
     BecomeMonarch MonarchTarget.MonarchTarget
+  | -- | CR 726.1: a player the InitiativeTarget names takes the initiative.
+    TakeTheInitiative InitiativeTarget.InitiativeTarget
   | -- | The permanent in the slot gains this designation -- CR 702.112a's
     -- renown, CR 701.37a's monstrous, CR 701.60a's suspect and CR 719.3a's
     -- solved. Writes Object.designations, which CR 613 could not carry, and is

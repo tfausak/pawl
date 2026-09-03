@@ -157,6 +157,7 @@ codec resolve = Fields.object $ do
   pendingControl <- Fields.defaulted "pendingControl" Map.empty (Common.naturalMap PlayerId.codec Decider.codec) GameState.pendingControl
   activeControl <- Fields.defaulted "activeControl" Nothing (Common.maybe Decider.codec) GameState.activeControl
   monarch <- Fields.defaulted "monarch" Nothing (Common.maybe PlayerId.codec) GameState.monarch
+  initiative <- Fields.defaulted "initiative" Nothing (Common.maybe PlayerId.codec) GameState.initiative
   daytime <- Fields.defaulted "daytime" Nothing (Common.maybe Daytime.codec) GameState.daytime
   spellsCastLastTurn <- Fields.defaulted "spellsCastLastTurn" 0 Common.natural GameState.spellsCastLastTurn
   castsLastTurn <- Fields.defaulted "castsLastTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.castsLastTurn
@@ -231,6 +232,7 @@ codec resolve = Fields.object $ do
         GameState.pendingControl = pendingControl,
         GameState.activeControl = activeControl,
         GameState.monarch = monarch,
+        GameState.initiative = initiative,
         GameState.daytime = daytime,
         GameState.spellsCastLastTurn = spellsCastLastTurn,
         GameState.castsLastTurn = castsLastTurn,

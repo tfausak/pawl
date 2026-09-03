@@ -73,6 +73,7 @@ import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -1508,6 +1509,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.BecomeMonarch MonarchTarget.TheController)
       " {\"type\":\"BecomeMonarch\",\"value\":{\"type\":\"TheController\"}} "
+  Spec.it s "TakeTheInitiative" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.TakeTheInitiative InitiativeTarget.ControllerOfSource)
+      " {\"type\":\"TakeTheInitiative\",\"value\":{\"type\":\"ControllerOfSource\"}} "
   Spec.it s "Designate Renowned" $
     Common.assertJsonCodec
       s

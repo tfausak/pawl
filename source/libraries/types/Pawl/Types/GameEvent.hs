@@ -78,6 +78,10 @@ data GameEvent
     -- keys off, and the substrate for any future "whenever a player becomes the
     -- monarch" trigger.
     BecameMonarch PlayerId.PlayerId
+  | -- | CR 726.1/726.5: a player took the initiative, recorded whether or not
+    -- they already held it -- CR 726.5 re-triggers on a re-take, which is why
+    -- this is not GameEvent.BecameMonarch's shape.
+    TookInitiative PlayerId.PlayerId
   | -- | CR 701.9a: a card was DISCARDED, by the discarding player, naming the
     -- incarnation the card became (CR 400.7). Emitted by
     -- Pawl.Engine.Event.discard, the one funnel every discard goes through, and

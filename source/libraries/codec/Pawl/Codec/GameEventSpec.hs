@@ -129,6 +129,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BecameMonarch (PlayerId.MkPlayerId 0))
       " {\"type\":\"BecameMonarch\",\"value\":0} "
+  Spec.it s "TookInitiative" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.TookInitiative (PlayerId.MkPlayerId 0))
+      " {\"type\":\"TookInitiative\",\"value\":0} "
   -- CR 702.29c/d's two-descriptions-one-event shape: ToPayCyclingCost is the
   -- payload that ALSO satisfies a "cycles or discards" trigger once, not twice.
   Spec.it s "Discarded" $

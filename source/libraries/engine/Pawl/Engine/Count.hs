@@ -577,6 +577,7 @@ snapshotView gs shape event = case event of
     EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
   -- the same discard emits is what carries one -- so there is nothing here for
   -- an EventShape to match against.
