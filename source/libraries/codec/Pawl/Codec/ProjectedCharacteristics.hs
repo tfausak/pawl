@@ -16,6 +16,7 @@ import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
+import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Codec.StaticAbility as StaticAbility
@@ -36,6 +37,7 @@ codec = Fields.object $ do
   supertypes <- Fields.defaulted "supertypes" Set.empty (Common.set Supertype.codec) PC.supertypes
   keywords <- Fields.defaulted "keywords" Map.empty (Common.multiset Keyword.codec) PC.keywords
   colors <- Fields.defaulted "colors" Set.empty (Common.set Color.codec) PC.colors
+  manaCost <- Fields.defaulted "manaCost" Nothing (Common.maybe ManaCost.codec) PC.manaCost
   manaValue <- Fields.defaulted "manaValue" Nothing (Common.maybe Common.integer) PC.manaValue
   power <- Fields.defaulted "power" Nothing (Common.maybe Common.integer) PC.power
   toughness <- Fields.defaulted "toughness" Nothing (Common.maybe Common.integer) PC.toughness
@@ -58,6 +60,7 @@ codec = Fields.object $ do
         PC.supertypes = supertypes,
         PC.keywords = keywords,
         PC.colors = colors,
+        PC.manaCost = manaCost,
         PC.manaValue = manaValue,
         PC.power = power,
         PC.toughness = toughness,
