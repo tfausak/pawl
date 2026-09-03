@@ -9385,8 +9385,10 @@ bloodthirstSpec s registry =
               Spec.assertEqWith s "power" (Projection.powerOf kin after) (Just 8)
               Spec.assertEqWith s "toughness" (Projection.toughnessOf kin after) (Just 8)
         -- CR 702.54b states NO CONDITION, unlike rule 702.54a: with nothing dealt
-        -- X is zero and the permanent still enters, which is why
-        -- Pawl.Engine.Replacement.admitsEntry admits this rewrite unasked.
+        -- X is zero and the permanent still enters. This case reads the zero, not
+        -- the absence of the condition -- the two readings place the same counters
+        -- on every board, which Pawl.Engine.Replacement.admitsEntry's arm argues
+        -- in full.
         Spec.it s "CR 702.54b nobody was dealt damage, so X is zero" $ do
           forest <- S.printingOf s registry "Forest"
           woodKin <- S.printingOf s registry "Petrified Wood-Kin"

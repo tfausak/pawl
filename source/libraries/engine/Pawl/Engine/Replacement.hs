@@ -852,7 +852,17 @@ admitsEntry gs oid rewrite = case rewrite of
   -- dealt this turn" -- so Nothing admits the entry whatever the log holds, and X
   -- is read where the row applies (Pawl.Engine.Event). Petrified Wood-Kin with no
   -- damage dealt enters with zero counters because X is zero, not because the row
-  -- was refused; Pawl.ReplacementSpec's Petrified Wood-Kin pair reads that.
+  -- was refused.
+  --
+  -- That last sentence is the RULE's wording rather than an observed difference,
+  -- and no board can make it one: X is a sum over the same opponents the arm
+  -- below counts, so X is greater than zero exactly when that arm answers True,
+  -- and admitting unconditionally places the same counters as admitting under
+  -- rule 702.54a's condition would. What separates them is CR 616.1's bucket --
+  -- a refused row is never offered -- and nothing in the pool puts a second entry
+  -- replacement on a bloodthirst X permanent to make that choice visible. So
+  -- Pawl.ReplacementSpec's Petrified Wood-Kin cases fence this arm against
+  -- refusing the row; they do not prove the wording.
   --
   -- CR 109.5's "you" is the ENTERING object's controller, read live off the board
   -- rather than off the candidate -- AsCopy's and SacrificeAnyNumber's posture,
