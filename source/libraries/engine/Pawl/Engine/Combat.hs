@@ -438,9 +438,9 @@ withinLimit limit size = case limit of
 -- CR 508.1d's two halves, computed together because neither is usable alone: the
 -- requirement instances in force, and a declaration obeying the maximum number of
 -- them that could be obeyed without disobeying any restriction. blockCeiling
--- answers CR 509.1c's twin question, but NOT the same way any more: the argument
--- below turns on the attacking restrictions all being set-shaped, and CR 509.1b's
--- are not (#342).
+-- answers CR 509.1c's twin question, but not the same way: the argument below
+-- turns on the attacking restrictions all being set-shaped, and CR 509.1b's are
+-- not, so that side is a bounded search rather than a greedy scan.
 --
 -- A DECLARATION here is CR 508.1a's set and CR 508.1b's announcement together --
 -- Map ObjectId AttackTarget, the shape Combat.attackers itself takes -- because
@@ -946,7 +946,7 @@ menaceAllowsGiven pcs declaration gs =
       -- never twice: CR 702.111b counts CREATURES blocking, not blocks.
       blockerCounts = Map.fromListWith (+) (fmap (\attacker -> (attacker, 1 :: Int)) (concatMap Set.toList (Map.elems declaration)))
       -- The count first, so a comfortably blocked attacker never pays for a
-      -- keyword read inside candidateBlockDeclarations' exponential filter.
+      -- keyword read inside bestBlockDeclaration's search.
       allowed (attacker, count) = count >= 2 || not (Projection.hasKeywordGiven pcs Keyword.Menace attacker gs)
    in all allowed (Map.toList blockerCounts)
 
@@ -1000,9 +1000,8 @@ pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs =
 -- over the pairs, menaceAllows over the creatures blocking each attacker, and the
 -- bound over the declaration's SIZE. CR 509.1a's per-creature ARITY is a fourth
 -- conjunct -- not a restriction, but a fact about the declaration. This is also
--- the seam blockCeiling's enumeration is filtered through, and it takes a
--- projected board and a hoisted `limit` because it is that enumeration's
--- exponential filter's body (#342).
+-- the seam bestBlockDeclaration's search judges each leaf through, and it takes
+-- a projected board and a hoisted `limit` because it is asked once per leaf.
 blockDeclarationAllowed :: Maybe Natural -> (ObjectId -> Maybe Natural) -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId (Set ObjectId) -> GameState -> Bool
 blockDeclarationAllowed limit arity pcs able declaration gs =
   -- CR 509.1b restriction-checks every creature against every creature it is
@@ -1025,22 +1024,70 @@ requirementsMet :: Map (ObjectId, ObjectId) Natural -> Map ObjectId (Set ObjectI
 requirementsMet requirements declaration =
   sum (Map.filterWithKey (\(blocker, attacker) _ -> Set.member attacker (Map.findWithDefault Set.empty blocker declaration)) requirements)
 
--- Every declaration CR 509.1a lets the defending player write down, given the
--- pairs CR 509.1b allows: each candidate blocker independently blocks nothing, or
--- blocks up to its own arity's worth of attackers it may block.
+-- CR 509.1c's maximization: a declaration obeying the most of `requirements`
+-- that any declaration CR 509.1a lets the defending player write down obeys
+-- without disobeying a restriction, the FIRST such in lexicographic order
+-- (candidates in order, each blocking nothing before blocking something).
 --
--- EXPONENTIAL: O((attackers + 1) ^ blockers) at arity one, a blocker at arity k
--- widening ITS OWN factor to the subsets of size at most k. Nothing caps it and
--- nothing samples it -- a cap would answer CR 509.1c's maximum with a number that
--- is not the maximum. blockCeiling's guard keeps it off the hot path (#342).
-candidateBlockDeclarations :: (ObjectId -> Maybe Natural) -> (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId (Set ObjectId)]
-candidateBlockDeclarations arity able candidates attackers =
-  let extend acc blocker =
-        let options = choicesUpTo (arity blocker) (filter (able blocker) attackers)
-            apply declaration chosen =
-              if Set.null chosen then declaration else Map.insert blocker chosen declaration
-         in concatMap (\declaration -> fmap (apply declaration) options) acc
-   in List.foldl' extend [Map.empty] candidates
+-- A bounded depth-first search rather than an enumeration. Each blocker's
+-- options are the subsets, up to its arity, of the attackers it is REQUIRED to
+-- block plus the attackers with menace that some blocker is required to block
+-- (CR 702.111b: the extra blocker is what makes the required block legal). A
+-- block of any other attacker adds no requirement obeyed and can be dropped
+-- from a legal declaration without making it illegal -- dropping every block of
+-- an unwanted menace attacker together -- so the answer lies in this smaller
+-- space, and the drop only moves a declaration earlier, so the first maximum is
+-- unchanged. A partial declaration is abandoned once what it has obeyed plus
+-- the most its remaining blockers could obey -- the largest values that fit
+-- under CR 509.1b's blocker limit -- cannot exceed the best found, which is the
+-- same "strictly better" test the fold applies, so no leaf that could replace
+-- the best is skipped. Lure over N blockers visits O(N^2) nodes where the
+-- enumeration built (attackers + 1)^N declarations.
+--
+-- Nothing caps it and nothing samples it: a cap would answer CR 509.1c's
+-- maximum with a number that is not the maximum. The worst case is still
+-- exponential -- an unbounded arity against wanted menace attackers -- but it
+-- is now the worst case rather than every case.
+bestBlockDeclaration :: Map (ObjectId, ObjectId) Natural -> Maybe Natural -> (ObjectId -> Maybe Natural) -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> GameState -> Map ObjectId (Set ObjectId)
+bestBlockDeclaration requirements limit arity pcs able candidates attackers gs =
+  let requiredOf = Map.fromListWith Set.union [(blocker, Set.singleton attacker) | (blocker, attacker) <- Map.keys requirements]
+      wanted = Set.fromList (fmap snd (Map.keys requirements))
+      menaced = Set.filter (\attacker -> Projection.hasKeywordGiven pcs Keyword.Menace attacker gs) wanted
+      relevant blocker =
+        let required = Map.findWithDefault Set.empty blocker requiredOf
+         in filter (\attacker -> able blocker attacker && (Set.member attacker required || Set.member attacker menaced)) attackers
+      valueOf blocker chosen = sum [Map.findWithDefault 0 (blocker, attacker) requirements | attacker <- Set.toList chosen]
+      -- Blockers with some option beyond blocking nothing, with their options
+      -- in choicesUpTo's order and the most each could obey alone.
+      movers =
+        [ (blocker, options, maximum (fmap (valueOf blocker) options))
+        | blocker <- candidates,
+          let options = choicesUpTo (arity blocker) (relevant blocker),
+          not (null (drop 1 options))
+        ]
+      -- How many more blockers may block under `limit`.
+      room used = case limit of
+        Nothing -> Nothing
+        Just l -> Just (if l <= used then 0 else l - used)
+      -- The most a completion of this node could obey.
+      ceilingOf met used remaining =
+        let values = List.sortBy (flip compare) (fmap (\(_, _, v) -> v) remaining)
+         in met + sum (maybe values (\k -> take (Natural.toIntSaturating k) values) (room used))
+      go best declaration met used remaining =
+        if ceilingOf met used remaining <= snd best
+          then best
+          else case remaining of
+            [] ->
+              if blockDeclarationAllowed limit arity pcs able declaration gs
+                then (declaration, met)
+                else best
+            (blocker, options, _) : rest ->
+              let try acc chosen
+                    | Set.null chosen = go acc declaration met used rest
+                    | room used == Just 0 = acc
+                    | otherwise = go acc (Map.insert blocker chosen declaration) (met + valueOf blocker chosen) (used + 1) rest
+               in List.foldl' try best options
+   in fst (go (Map.empty, 0) Map.empty 0 0 movers)
 
 -- Every subset of `attackers` of size at most `n`, the empty one first, or every
 -- subset at all when `n` is Nothing. Declining to block is always among them,
@@ -1055,13 +1102,13 @@ choicesUpTo n attackers =
 -- requirement instances in force, and a declaration obeying the maximum number of
 -- them that could be obeyed without disobeying any restriction.
 --
--- Map.empty when no requirement is in force, WITHOUT enumerating anything: the
+-- Map.empty when no requirement is in force, WITHOUT searching anything: the
 -- maximum is zero and every declaration obeys zero, and the empty declaration is
--- within every bound. The attacking side needs no such guard any more, its search
--- having stopped being an enumeration; CR 509.1b's pairwise restrictions are why
--- that argument does not carry over here (#342).
+-- within every bound. The attacking side is a greedy scan rather than a search;
+-- CR 509.1b's pairwise restrictions are why that argument does not carry over
+-- here, so this side is bestBlockDeclaration's bounded search.
 --
--- The fold's Map.empty seed is always legal under restrictions alone, which is
+-- The search's Map.empty seed is always legal under restrictions alone, which is
 -- what makes the answer total. blockCeilingGiven is the half legalBlockDeclaration
 -- reaches, so the two share one grant walk and one whole-board projection.
 --
@@ -1090,15 +1137,10 @@ blockCeilingGiven grants pcs pid gs =
       -- requirements: a creature is excused wholly or not at all, and what it
       -- would have blocked never enters the question.
       freely blocker = BlockCost.blocksFreely blocker gs
-      better best declaration =
-        if requirementsMet requirements declaration > requirementsMet requirements best
-          then declaration
-          else best
-      legal = filter (\declaration -> blockDeclarationAllowed limit arity pcs able declaration gs) (candidateBlockDeclarations arity able (filter freely candidates) attackers)
    in ( requirements,
         if Map.null requirements
           then Map.empty
-          else List.foldl' better Map.empty legal
+          else bestBlockDeclaration requirements limit arity pcs able (filter freely candidates) attackers gs
       )
 
 -- CR 509.1: is this declaration one the defending player may make? Both checks
