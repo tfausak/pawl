@@ -5407,8 +5407,9 @@ monarchTriggerSpec s registry =
         -- objects that exist IMMEDIATELY AFTER the damage, and the CR 704.5g
         -- destruction that kills a trampler its blocker traded with is a LATER
         -- event. Engine.performSettle runs that state-based action before the
-        -- trigger scan, so a live read of the damager finds an id
-        -- Event.placeObject has already retired and the crown never moves (#3132).
+        -- trigger scan, so a live read of the damager found an id
+        -- Event.placeObject had already retired, and the crown never moved; see
+        -- #3132.
         --
         -- A REAL combat, not the group's hand-written damage event, because the
         -- fixture that rewrites the log is exactly the fixture that cannot produce

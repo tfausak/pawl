@@ -265,8 +265,8 @@ spec s registry = Spec.describe s "Initiative" $ do
   -- objects that exist IMMEDIATELY AFTER the damage, and the CR 704.5g
   -- destruction that kills a trampler its blocker traded with is a later event.
   -- Engine.performSettle runs that state-based action before the trigger scan, so
-  -- a live read of the damager finds an id Event.placeObject has already retired
-  -- and the hand-off never happens (#3132).
+  -- a live read of the damager found an id Event.placeObject had already retired,
+  -- and the hand-off never happened; see #3132.
   --
   -- A REAL combat, not a hand-written damage event, because the fixture that
   -- rewrites the log is exactly the fixture that cannot produce this board: alice
