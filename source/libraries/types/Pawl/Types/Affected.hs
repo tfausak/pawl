@@ -80,9 +80,10 @@ data Affected
     -- atom's own content: @Matching (And [HasCardType Creature, HasAttached
     -- IsSource])@, as Bonesplitter's card data does.
     --
-    -- Not implemented: the cards still carrying the bare atom where their printed
-    -- phrase names a type, which therefore still reach a host that has stopped
-    -- being one (#3143).
+    -- Not implemented: Control Magic, the one card in the pool whose printed
+    -- phrase names a type and still carries the bare atom, because the layer-2
+    -- control fold reads copiable characteristics and so cannot see a type
+    -- change (#3150).
     Attached
   | -- | CR 303.4b / 303.4m: the objects matching the Filter that the ENCHANTED
     -- PLAYER controls -- Curse of Death's Hold's "creatures enchanted player

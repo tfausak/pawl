@@ -6,7 +6,24 @@
           "type": "CantAttackPlayer",
           "value": {
             "affected": {
-              "type": "Attached"
+              "type": "Matching",
+              "value": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "HasAttached",
+                    "value": {
+                      "type": "IsSource"
+                    }
+                  }
+                ]
+              }
             },
             "defenders": {
               "type": "You"
@@ -48,7 +65,24 @@
       "staticAbilities": [
         {
           "affected": {
-            "type": "Attached"
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasAttached",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
           },
           "modifications": [
             {

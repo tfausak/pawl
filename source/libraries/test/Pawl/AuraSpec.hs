@@ -125,8 +125,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- 'equipped creature'." CR 301.5f makes the phrase name a creature and not
   -- merely a host, so Bonesplitter's affected set spells the type out beside the
   -- attachment; Pawl.ProjectionSpec's HoneCounter group is where the difference
-  -- shows. Unholy Strength's "enchanted creature" rides the bare atom still
-  -- (#3143).
+  -- shows, and its Basilisk Collar case is what proves the type gate bites.
   Spec.it s "CR 301.5a the equipped creature gets the Equipment's bonus" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
