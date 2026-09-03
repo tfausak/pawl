@@ -41,16 +41,21 @@ cantBeSacrificed candidates gs =
       -- both unforced until some permanent actually declares a prohibition.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
+      -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       -- CR 613.11 puts these effects after every layer, so the affected set is
       -- read against the FULL projection -- the opposite of Projection.affects's
       -- callers inside the layer fold, which read characteristics as of their
       -- own layer.
       named source affected candidate =
-        Projection.affects
+        Projection.affectsOn
+          pcs
+          grants
           source
           candidate
           affected
-          (Projection.project candidate gs)
           gs
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []

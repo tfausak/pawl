@@ -1835,10 +1835,11 @@ applyCopyException snapshot exception = case exception of
 legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch filter_ self gs =
   let context = Filter.contextFor (Game.teams gs) (Projection.controllerOf self gs) (Just self)
+      viewOf = Projection.viewsOf gs
       eligible oid =
         oid /= self
           && not (Set.member oid batch)
-          && Filter.matches context (Projection.viewOfObject oid gs) filter_
+          && Filter.matches context (viewOf oid) filter_
    in filter eligible (Set.toAscList (GameState.battlefield gs))
 
 -- CR 614.1c / 701.20a: the cards a player may reveal from their hand to satisfy
@@ -1858,7 +1859,8 @@ legalCopyTargets batch filter_ self gs =
 -- lookup instead, which is the whole of the "from your hand" in the sentence.
 revealableFromHand :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 revealableFromHand pid filter_ gs =
-  let matching oid = Filter.matches (Filter.contextFor (Game.teams gs) Nothing Nothing) (Projection.viewOfObject oid gs) filter_
+  let viewOf = Projection.viewsOf gs
+      matching oid = Filter.matches (Filter.contextFor (Game.teams gs) Nothing Nothing) (viewOf oid) filter_
    in filter matching (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
@@ -2042,9 +2044,10 @@ liveDestination gs oid
 -- own guard puts a destination; liveDestination then answers the rest.
 printedDestination :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Recipient.Recipient
 printedDestination gs context filter_ =
-  case [oid | oid <- Set.toList (GameState.battlefield gs), Filter.matches context (Projection.viewOfObject oid gs) filter_] of
-    [oid] -> liveDestination gs oid
-    _ -> Nothing
+  let viewOf = Projection.viewsOf gs
+   in case [oid | oid <- Set.toList (GameState.battlefield gs), Filter.matches context (viewOf oid) filter_] of
+        [oid] -> liveDestination gs oid
+        _ -> Nothing
 
 -- CR 615.12: could a prevention effect prevent any of this damage event, or is
 -- this damage that "can't be prevented" (Spider-Punk)?

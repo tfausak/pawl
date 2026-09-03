@@ -57,14 +57,20 @@ prohibited :: ObjectId -> CounterKind.CounterKind Keyword.Keyword -> GameState -
 prohibited oid kind gs =
   let setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
+      -- The object's projection and the grant walk, taken once for every
+      -- source rather than once per source; both unforced until some
+      -- permanent actually reaches `named`.
+      view = Projection.project oid gs
+      grants = Projection.controlGrants gs
       -- CR 613.11 puts these effects after every layer, so the affected set is
       -- read against the FULL projection.
       named source affected =
-        Projection.affects
+        Projection.affectsUnder
+          grants
           source
           oid
           affected
-          (Projection.project oid gs)
+          view
           gs
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> False
