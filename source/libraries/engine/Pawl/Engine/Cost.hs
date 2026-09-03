@@ -3007,13 +3007,16 @@ payComponent moment slots pid oid component = case component of
   -- picking. Pawl.CostSpec's "CR 118.3 exiling the Effigy first leaves no
   -- permanent to tap" is the proof.
   --
-  -- Not implemented: rule 107.5's other half, a permanent that is already tapped.
-  -- `canPayComponent`'s arm above reads the tap state beside the zone and is what
-  -- this would share; the mana window that runs first is where a permanent gets
-  -- tapped mid-payment (#3114).
+  -- `canPayComponent`'s own arm, so both halves of CR 107.5 are read once: the
+  -- other way a part paid earlier makes this one unpayable is the CR 605.3a mana
+  -- window, which offers this very permanent as a source and taps it. Nothing
+  -- narrows that offer -- CR 605.3a lets a player activate any mana ability at a
+  -- payment, and refusing the payment afterwards is the rules' own answer.
+  -- Pawl.CostSpec's "CR 107.5 tapping the source for mana loses its own {T}" is
+  -- the proof.
   CostComponent.TapThis -> do
     gs <- State.get
-    if Set.member oid (GameState.battlefield gs)
+    if canPayComponent slots pid oid component gs
       then do
         tapObject oid
         pure bindsNothing
