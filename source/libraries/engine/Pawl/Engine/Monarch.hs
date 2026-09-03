@@ -12,23 +12,20 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
-import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
-import qualified Pawl.Types.DamageEvent as DamageEvent
-import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
-import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -45,7 +42,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -100,22 +96,25 @@ crownSteal =
 monarchAbilities :: [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 monarchAbilities = [endStepDraw, crownSteal]
 
--- CR 725.2: match one inherent ability against one event for the given monarch
--- (who is the ability's controller), yielding the placed ability's binding
--- environment. Sourceless -- no bearer, so this is a dedicated matcher rather
--- than Event.matchesTrigger.
-inherentMatch :: PlayerId -> TriggerCondition -> GameState -> GameEvent -> Maybe (Map SlotName.SlotName Binding)
-inherentMatch monarch cond gs event = case (cond, event) of
+-- CR 725.2: match one inherent ability against one LOGGED event for the given
+-- monarch (who is the ability's controller), yielding the placed ability's
+-- binding environment. Sourceless -- no bearer, so this is a dedicated matcher
+-- rather than Event.matchesTrigger.
+--
+-- LoggedEvent and not GameEvent, because the crown steal needs the event's group:
+-- Event.combatDamagerAgainst reads the damager off CR 603.10's sample for that
+-- group, so a creature the same step's state-based actions have already destroyed
+-- still steals the crown.
+inherentMatch :: PlayerId -> TriggerCondition -> GameState -> LoggedEvent.LoggedEvent -> Maybe (Map SlotName.SlotName Binding)
+inherentMatch monarch cond gs logged = case (cond, LoggedEvent.event logged) of
   (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
     | began == wanted && scopeOk scope active -> Just Map.empty
   -- CR 725.2: bind the damaging creature under the reserved trigger-source slot
   -- so Effect.BecomeMonarch ControllerOfSource crowns THAT creature's
-  -- controller.
-  (TriggerCondition.CreatureDealtCombatDamageToMonarch, GameEvent.DamageDealt ev)
-    | DamageEvent.kind ev == DamageKind.Combat
-        && DamageEvent.target ev == Recipient.ToPlayer monarch
-        && Projection.isCreatureOf (DamageEvent.source ev) gs ->
-        Just (Binding.setTriggerSource (DamageEvent.source ev) Map.empty)
+  -- controller. The whole match is Event.combatDamagerAgainst's, which screens
+  -- the event shape as well as the damager.
+  (TriggerCondition.CreatureDealtCombatDamageToMonarch, _) ->
+    fmap (\(oid, _) -> Binding.setTriggerSource oid Map.empty) (Event.combatDamagerAgainst monarch gs logged)
   _ -> Nothing
   where
     -- The monarch is the seat this scope is read against: CR 725.2 makes these
@@ -134,7 +133,7 @@ inherentMatch monarch cond gs event = case (cond, event) of
 -- nowhere to find them. Skipping Event.interveningHolds costs nothing because
 -- CR 603.4 applies to neither ability (see oneEffect); an inherent ability that
 -- does carry an "if" checks it in its own gatherer, as Pawl.Engine.Speed does.
-inherentMonarchPending :: [GameEvent] -> GameState -> [PendingTrigger]
+inherentMonarchPending :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 inherentMonarchPending events gs = case GameState.monarch gs of
   Nothing -> []
   Just m ->

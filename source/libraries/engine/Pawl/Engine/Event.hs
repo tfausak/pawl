@@ -79,6 +79,7 @@ import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CarryOver as CarryOver
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFace as CoinFace
@@ -281,6 +282,39 @@ battlefieldCandidates gs =
             )
             (Set.toAscList (GameState.battlefield gs))
         )
+
+-- CR 603.10, FIRST sentence: the battlefield as it stood immediately after the
+-- event `group` names, which is the board that rule checks a trigger condition
+-- against. `recordEvent` files one sample per group; the live board answers for a
+-- group no sample names, `eventTriggers`' fallback and its reason.
+battlefieldAt :: EventGroup.EventGroup -> GameState -> Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics)
+battlefieldAt group gs = Map.findWithDefault (battlefieldCandidates gs) group (GameState.battlefieldWhenTriggered gs)
+
+-- CR 725.2 / CR 726.2: the creature that dealt this logged event's COMBAT damage
+-- to `victim`, paired with who controlled it. Nothing for any other event, and
+-- Nothing for a source that was not a creature then.
+--
+-- Read off `battlefieldAt` and not the live board -- CR 603.10's first sentence,
+-- not its look-back: the damager is judged as it stood immediately after the
+-- damage, and the CR 704.5g destruction that kills a trampler its blocker traded
+-- with is a LATER event. Engine.performSettle runs that state-based action before
+-- placePendingTriggers, and changeZone mints a fresh id, so a live read finds
+-- nothing at all where the rules find a creature (CR 608.2h says the same from the
+-- other side). Proved by Pawl.InitiativeSpec's "CR 726.2 a trampler that trades
+-- with its blocker still hands the initiative over".
+--
+-- Both halves come from the ONE sample, so "was it a creature?" and "whose was
+-- it?" cannot be answered about two different boards.
+combatDamagerAgainst :: PlayerId -> GameState -> LoggedEvent.LoggedEvent -> Maybe (ObjectId, PlayerId)
+combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
+  GameEvent.DamageDealt ev
+    | DamageEvent.kind ev == DamageKind.Combat && DamageEvent.target ev == Recipient.ToPlayer victim ->
+        case Map.lookup (DamageEvent.source ev) (battlefieldAt (LoggedEvent.group logged) gs) of
+          Just candidate
+            | Set.member CardType.Creature (PC.cardTypes (BattlefieldCandidate.characteristics candidate)) ->
+                Just (DamageEvent.source ev, BattlefieldCandidate.controller candidate)
+          _ -> Nothing
+  _ -> Nothing
 
 -- CR 704.3 / CR 608.2f: run `body` as ONE event, so every event it records
 -- shares an EventGroup and CR 603.10a's look-back can tell "at the same time"
@@ -13600,19 +13634,19 @@ eventTriggers events gs =
       -- "until end of turn" ending between CR 514.1's discard and CR 514.3a's
       -- placement) triggered under the old one.
       --
-      -- The LIVE board answers for a group the sample does not name, which is the
-      -- honest reading for an event this module never recorded: a fixture that
-      -- appends to the log directly has no sampled board, and the game as it stands
-      -- is the only one there is. Lazy, so a scan whose every group is sampled
-      -- never projects it.
-      liveBattlefield = battlefieldCandidates gs
       -- Out of the record and into the pair the rest of the scan's unions use.
       -- Only the STORED shape is named (#126); `candidates` below unions this
       -- with six sibling maps that are computed here and never serialized.
+      --
+      -- `battlefieldAt` is the sample, and its fallback to the LIVE board is the
+      -- honest reading for an event this module never recorded: a fixture that
+      -- appends to the log directly has no sampled board, and the game as it
+      -- stands is the only one there is. Lazy, so a scan whose every group is
+      -- sampled never projects it.
       onBattlefieldAt group =
         Map.mapWithKey
           (\oid candidate -> (BattlefieldCandidate.controller candidate, battlefieldAbilitiesOf oid (BattlefieldCandidate.characteristics candidate)))
-          (Map.findWithDefault liveBattlefield group (GameState.battlefieldWhenTriggered gs))
+          (battlefieldAt group gs)
       -- The permanent this event took OFF the battlefield, read from
       -- CR 608.2h last known information -- both the abilities and the objects'
       -- appearance immediately prior to the event, which is what CR 603.10 says
@@ -15615,8 +15649,10 @@ reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events 
 -- Pawl.Engine.Engine. The arm answers True
 -- rather than failing because an inherent ability's own gatherer owns CR 603.4:
 -- rule 725.2's pair has no intervening "if" at all, and CR 702.179d's does,
--- checked inside Pawl.Engine.Speed.inherentPending. A fourth gatherer must do the
--- same; there is no subject object to hand this function, so routing one here
+-- checked inside Pawl.Engine.Speed.inherentPending. EVERY such gatherer owns its
+-- own check -- Pawl.Engine.Monarch, Pawl.Engine.Initiative, Pawl.Engine.Speed and
+-- Pawl.Engine.Rad each have one, and a further one would too; there is no subject
+-- object to hand this function, so routing one here
 -- would mean giving Condition.holds the ability object Pawl.Engine.Stack's CR
 -- 608.2a re-check uses, which does not exist until placement.
 --

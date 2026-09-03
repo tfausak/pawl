@@ -9406,15 +9406,20 @@ bloodthirstSpec s registry =
         -- ({3}{W} Enchantment, "Artifacts, creatures, and lands your opponents
         -- control enter tapped", EntryRewrite.Tapped) is a second CR 616.1e
         -- candidate for alice's entering Wood-Kin, and NOTHING was dealt this turn
-        -- -- so rule 702.54b admits its row and CR 616.1 hands alice the order,
-        -- where rule 702.54a's condition would refuse it and leave one row with
-        -- nothing to ask.
+        -- -- so rule 702.54b admits its row and there are two rows to order, where
+        -- rule 702.54a's condition would refuse it and leave one row with nothing
+        -- to ask.
         --
         -- The two orders converge on one board -- CR 616.1f re-collects, so the
         -- Wood-Kin ends up tapped with zero counters whichever applies first -- so
         -- the prompt is the only observable, exactly as kismetSpec's cases are.
         -- THE PAIR IS THIS CASE AND THE ONE BELOW, one board apart in nothing but
         -- Kismet.
+        --
+        -- That WAS the choice was asked is all this proves: Response.ChoseReplacement
+        -- records the chosen index alone, so the replay log names no asked player and
+        -- CR 616.1's "the affected object's controller" is not observable here. The
+        -- rule's chooser is kismetSpec's question, not this case's.
         Spec.it s "CR 616.1e with nothing dealt the bloodthirst X row still races an opponent's Kismet" $ do
           forest <- S.printingOf s registry "Forest"
           woodKin <- S.printingOf s registry "Petrified Wood-Kin"
