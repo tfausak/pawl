@@ -5467,6 +5467,50 @@ selflessSquireSpec s registry = Spec.describe s "Selfless Squire (CR 615.13)" $ 
     Spec.assertEqWith s "alice's 3 was prevented too" (S.lifeOf S.alice playerAfter) (Just 20)
     Spec.assertEqWith s "and THAT fired the Squire" (length (GameState.stack playerDealt)) 1
     Spec.assertEqWith s "for 3 counters, off a prevention its own ability had nothing to do with" (S.powerToughnessOf squire playerAfter) (Just (4, 4))
+  -- CR 109.5's relation, read alongside CR 615.13's amount: Selfless Squire's
+  -- condition says "damage that would be dealt to YOU", and alice is its only
+  -- "you" -- so a shield admitting MORE than alice must bind only her share,
+  -- never the total it stopped for everyone it covers.
+  --
+  -- Synthetic Impartial Ward ({1}{W} Instant, "Prevent the next 10 damage that
+  -- would be dealt to any player this turn") is the producer: no card in
+  -- data/cards/ writes a PreventNextDamage/PreventAllDamage shield whose player
+  -- half admits more than one player -- every whoRecipient in the pool is You
+  -- (divine-deflection, synthetic-communal-bulwark, synthetic-parting-ward,
+  -- ajani-steadfast, pariah), and Scryfall o:"prevent" o:"any player"
+  -- o:"this turn" and o:"damage that would be dealt to an opponent",
+  -- 2026-09-03, neither hit a shield of this shape (#3079).
+  --
+  -- Distinct shares -- alice's 2, bob's 4 -- so a sum (6) cannot be mistaken
+  -- for her own (2), and the Squire is put on directly so only the Ward's
+  -- shield is in play.
+  Spec.it s "CR 109.5 a shield spanning two players binds only the relation's own share, not their sum (#3079)" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    squirePrinting <- S.printingOf s registry "Selfless Squire"
+    ward <- S.printingOf s registry "Synthetic Impartial Ward"
+    let base = S.landsInPlay plains 2
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (squire, g2) = S.addCreature squirePrinting S.alice g1
+        (g3, spellId) = S.handOne ward g2
+        shielded = castAndResolve S.identityAnswer g3 spellId
+        batch = [hit attacker (Recipient.ToPlayer S.alice) 2, hit attacker (Recipient.ToPlayer S.bob) 4]
+        (dealt, after) = strikeAndSettle shielded batch
+    Spec.assertEqWith s "setup: the Ward installed a floating shield holding 10" (shieldsLeft shielded) [10]
+    Spec.assertEqWith s "both shares were prevented whole" (amounts after) []
+    -- The record the binding reads: ONE prevention, holding each player's own
+    -- share -- not one row per player.
+    Spec.assertEqWith
+      s
+      "one prevention was recorded, holding each player's share"
+      (fmap DamagePrevented.amounts (preventionsRecorded after))
+      [Map.fromList [(Recipient.ToPlayer S.alice, 2), (Recipient.ToPlayer S.bob, 4)]]
+    Spec.assertEqWith s "exactly one trigger was gathered" (length (GameState.stack dealt)) 1
+    -- The discriminating assertion: alice's OWN 2, never the application's 6.
+    -- An eventBindings that does not re-ask the relation sums the whole record
+    -- and puts 6 counters on instead.
+    Spec.assertEqWith s "so the Squire counts alice's 2, not alice-and-bob's 6" (countersOn CounterKind.PlusOnePlusOne squire after) 2
+    Spec.assertEqWith s "leaving the 1/1 a 3/3" (S.powerToughnessOf squire after) (Just (3, 3))
 
 -- Aim every target slot at the FIRST of `wanted` the offered set actually holds.
 -- The offered set is FILTERED rather than a recipient built by hand: CR 608.2b

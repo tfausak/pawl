@@ -134,7 +134,7 @@ poisonousSpec s registry =
         -- controller (Binding.you) instead.
         Spec.it s "CR 603.2 the damaged player rides the trigger in the reserved slot" $ do
           let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
-              bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing TriggerCondition.SelfDealsCombatDamageToPlayer ev
+              bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev
           Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.bob)))
         -- The proving test. CR 702.70a: "Whenever this creature deals combat
         -- damage to a player, that player gets N poison counters." bob is dealt
@@ -417,7 +417,7 @@ annihilatorSpec s registry =
         -- "defending player" reads. The falsifier is an arm that binds the
         -- attacking side instead.
         Spec.it s "CR 603.2 the defending player rides the declaration in the reserved slot" $ do
-          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 7) S.carol 1))
+          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 7) S.carol 1))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 613.8's dependency, read off the projection before any attack: WHICH
         -- permanents actually carry the granted keyword. Without this the two
@@ -4820,7 +4820,7 @@ afflictSpec s registry =
         -- 702.130a's "defending player" reads. The falsifier is an arm that binds
         -- the attacking side, or none at all.
         Spec.it s "CR 603.2 the defending player rides the becomes-blocked event in the reserved slot" $ do
-          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 9) S.carol 1))
+          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 9) S.carol 1))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 702.130b: "If a creature has multiple instances of afflict, each
         -- triggers separately." Asked of the mint rather than of a board, as
