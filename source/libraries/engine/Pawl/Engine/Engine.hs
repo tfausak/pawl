@@ -500,17 +500,22 @@ placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
   let evs = Event.unscannedEvents gs
+      -- The same events with their CR 608.2f groups still on them, which the two
+      -- gatherers below need and the two after them do not: CR 725.2's and CR
+      -- 726.2's combat-damage abilities read the damager off Event.battlefieldAt,
+      -- the board as it stood immediately after the damage.
+      logged = Event.unscannedGrouped gs
       -- CR 725.2: the monarch's inherent triggers hang on no object, so
       -- Event.gatherTriggers -- which asks each battlefield permanent what it
       -- triggers -- has nowhere to find them. Gathered separately, from the SAME
       -- snapshot and before the watermark bump, then merged into the one batch
       -- below: placing them after the ordered batch would make them resolve
       -- first, by the engine's choice rather than the player's.
-      inherent = Monarch.inherentMonarchPending evs gs
+      inherent = Monarch.inherentMonarchPending logged gs
       -- CR 726.2's three, gathered for the reason above. Empty while no player
       -- has the initiative, except for its third ability, which is gathered from
       -- the take itself.
-      initiative = Initiative.inherentPending evs gs
+      initiative = Initiative.inherentPending logged gs
       -- CR 702.179d, another of the rulebook's inherent abilities, gathered for
       -- the reason above. At most one entry, and only for the active player.
       revving = Speed.inherentPending evs gs
@@ -523,13 +528,13 @@ placePendingTriggers = do
       -- sourceless gatherers above these DO have a source, so they carry
       -- TriggerSource.OfObject and go through placeBorne.
       entered = Dungeon.roomPending evs gs
-  -- The GROUPED view of the same snapshot, which the CR 603.10a look-back in
-  -- Event.eventTriggers needs and the inherent gatherers above do not.
+  -- The CR 603.10a look-back in Event.eventTriggers, over the same grouped
+  -- snapshot the two gatherers above took.
   -- Not in the `let` because it can ASK -- CR 603.7b's second sentence is a
   -- question for the controller of a delayed entry that matched two simultaneous
   -- occurrences -- and it is asked BEFORE the watermark below moves, so the game
   -- the question carries is the one the batch occurred in.
-  (pending, surviving) <- Event.gatherTriggers (Event.unscannedGrouped gs) gs
+  (pending, surviving) <- Event.gatherTriggers logged gs
   -- MODIFY rather than put the snapshot back: the gather above may have asked a
   -- question, and Game.choose stamps GameState.lastChoice, which CR 104.4b's
   -- mandatory-loop watchdog reads. Putting `gs` would drop that stamp. Nothing

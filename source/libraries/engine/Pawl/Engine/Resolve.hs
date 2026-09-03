@@ -7398,11 +7398,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           MonarchTarget.TheController -> Just controller
           -- CR 725.2: the controller of the ability's bound source, read from the
           -- reserved trigger-source slot.
+          --
+          -- CR 608.2h's last known information, not the live board: the creature
+          -- that stole the crown by connecting is routinely dead by the time this
+          -- resolves -- it traded with its blocker in the same damage step -- and
+          -- a live read would crown nobody. Same reading as
+          -- Event.combatDamagerAgainst, which bound the slot.
           MonarchTarget.ControllerOfSource ->
             Map.lookup Binding.triggerSource chosen
               >>= Binding.onlyOne
               >>= Recipient.objectOf
-              >>= (\o -> Projection.controllerOf o gs)
+              >>= (\o -> Projection.controllerWithLastKnown o gs)
           -- CR 601.2c's chosen player, re-checked under CR 608.2b: the slot is a
           -- TARGET, so an illegal one crowns nobody while the rest of the ability
           -- still resolves.
@@ -7425,12 +7431,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let taker = case target of
           InitiativeTarget.TheController -> Just controller
           -- CR 726.2: the controller of the ability's bound source, read from the
-          -- reserved trigger-source slot.
+          -- reserved trigger-source slot. CR 608.2h's last known information, for
+          -- Effect.BecomeMonarch ControllerOfSource's reason one rule over.
           InitiativeTarget.ControllerOfSource ->
             Map.lookup Binding.triggerSource chosen
               >>= Binding.onlyOne
               >>= Recipient.objectOf
-              >>= (\o -> Projection.controllerOf o gs)
+              >>= (\o -> Projection.controllerWithLastKnown o gs)
     case taker of
       Nothing -> pure ()
       -- CR 726.3's hand-off, CR 726.5's re-take and the CR 603.2 event are all

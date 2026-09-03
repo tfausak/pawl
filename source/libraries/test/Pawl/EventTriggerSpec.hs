@@ -5210,6 +5210,20 @@ monarchTriggerSpec s registry =
       -- ExpirySpec's monarch group drives the same rule the same way.
       combatDamageTo monarch damager =
         S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing DamageKind.Combat)]
+      -- Attack bob with everything, block with everything, and divide a
+      -- trampler's damage the way CR 510.1c and CR 702.19b together require --
+      -- each blocker's own threshold first, the excess through to bob. The
+      -- thresholds the prompt offers ARE CR 510.1c's lethal amounts, so nothing
+      -- here restates a creature's toughness. Written out rather than left to
+      -- S.identityAnswer, which never names a player recipient and would put the
+      -- whole assignment on the blocker. Pawl.InitiativeSpec keeps its own copy,
+      -- Pawl.Support being too expensive a home for a two-case helper.
+      tramplingAtBob :: Prompt.Prompt r -> r
+      tramplingAtBob p = case p of
+        Prompt.AssignCombatDamage _ _ _ thresholds n ->
+          let toBlockers = Map.delete (Recipient.ToPlayer S.bob) thresholds
+           in Map.insert (Recipient.ToPlayer S.bob) (n - sum (Map.elems toBlockers)) toBlockers
+        _ -> S.attackTo S.bob p
    in Spec.describe s "MonarchTrigger" $ do
         -- The whole chain off one entry: CR 603.6a's entry trigger crowns alice,
         -- Effect.BecomeMonarch records CR 725.1's event, and the second ability
@@ -5388,6 +5402,42 @@ monarchTriggerSpec s registry =
           Spec.assertEqWith s "and alice, untargeted, still has her Lich" (S.creaturesInPlay S.alice after) 1
           Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the reassignment recorded its crowning"
           Spec.assertEqWith s "CR 104.2a two survivors, so the game is still going" (GameState.result after) Nothing
+          Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
+        -- CR 603.10, first sentence: the crown steal is checked against the
+        -- objects that exist IMMEDIATELY AFTER the damage, and the CR 704.5g
+        -- destruction that kills a trampler its blocker traded with is a LATER
+        -- event. Engine.performSettle runs that state-based action before the
+        -- trigger scan, so a live read of the damager finds an id
+        -- Event.placeObject has already retired and the crown never moves (#3132).
+        --
+        -- A REAL combat, not the group's hand-written damage event, because the
+        -- fixture that rewrites the log is exactly the fixture that cannot produce
+        -- this board: alice attacks bob with War Mammoth (3/3 trample) and bob
+        -- blocks with Boggart Brute (3/2), so the Mammoth assigns the Brute its
+        -- lethal 2 and tramples 1 through, and the Brute's 3 kills the Mammoth in
+        -- the same step. carol never joins.
+        Spec.it s "CR 725.2 a trampler that trades with its blocker still steals the crown" $ do
+          warMammoth <- S.printingOf s registry "War Mammoth"
+          boggartBrute <- S.printingOf s registry "Boggart Brute"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (base, mine, theirs, _) = S.threePlayerCombat [warMammoth] [boggartBrute] [piker]
+              staged =
+                base
+                  { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                    GameState.combat = (GameState.combat base) {Combat.Type.defenders = [S.bob]}
+                  }
+              held = S.withMonarch S.bob staged
+              after = resolveAll tramplingAtBob (S.fightWith tramplingAtBob held)
+          Spec.assertEqWith s "bob wore the crown going in" (GameState.monarch held) (Just S.bob)
+          -- The board this case is about. Neither this nor the life total can tell
+          -- the two readings apart -- the Mammoth dies and bob loses 1 under both
+          -- -- so they pin the board rather than prove the rule.
+          Spec.assertEqWith s "CR 704.5g the Mammoth traded with the Brute, so both are off the battlefield" (fmap (\oid -> S.onBattlefield oid after) (mine <> theirs)) [False, False]
+          Spec.assertEqWith s "CR 702.19b and 1 point trampled through to bob" (S.lifeOf S.bob after) (Just 19)
+          -- The rule: alice's dead Mammoth still crowned her.
+          Spec.assertEqWith s "CR 725.2 alice is the monarch" (GameState.monarch after) (Just S.alice)
+          Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the crowning recorded its event, naming her"
+          Spec.assertEqWith s "carol, who never joined the combat, kept her creature" (S.creaturesInPlay S.carol after) 1
           Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
 
 -- CR 603.7: Ray of Command's THIRD sentence -- "When you lose control of the
