@@ -732,13 +732,13 @@ affectsWith grants peers source oid a partial gs = case a of
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
   -- the enchanted player's. The candidate's controller is bound once and used
   -- twice.
-  Affected.AttachedPlayerControls f -> case Game.lookupObject source gs >>= Object.attachedTo of
-    Just (Recipient.ToPlayer pid) ->
+  Affected.AttachedPlayerControls f -> case enchantedPlayerOf source gs of
+    Just pid ->
       let controller = controllerOfGiven grants Set.empty oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
             && Filter.matches (Filter.contextFor (Game.teams gs) (controllerOfGiven grants Set.empty source gs) (Just source)) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
-    _ -> False
+    Nothing -> False
 
 -- The characteristics view of an object: its CR 613 projection and its projected
 -- controller (CR 613.1b; Nothing when the id is unknown). Rule 613.1 names no
@@ -6482,6 +6482,13 @@ controlGrants gs =
 -- Filter.IsHostOfSource be answered anywhere a source and a GameState are in hand.
 hostOf :: ObjectId -> GameState -> Maybe ObjectId
 hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
+
+-- CR 303.4b's other destination: WHICH PLAYER this object is attached to --
+-- what an enchant-player Aura "enchants". hostOf's twin, Nothing where the
+-- object is attached to nothing or to an object. Like hostOf, no projection,
+-- read live off Object.attachedTo.
+enchantedPlayerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
+enchantedPlayerOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.playerOf
 
 -- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2
 -- control effects, last timestamp wins (CR 613.7). Stored continuous effects and

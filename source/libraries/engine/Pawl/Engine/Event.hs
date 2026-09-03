@@ -1508,11 +1508,15 @@ apply batch candidate event =
       -- today. The shuffle half genuinely cannot be here; see resolveZoneChange.
       --
       -- The OWNER shows it, which is who CR 400.3's destination library belongs
-      -- to and, for every row in the pool, who holds the card: a redirect
-      -- naming Filter.IsSource acts on a card that is nobody's permanent in the
-      -- hidden zones this fires from, so Projection.controllerOf would answer
-      -- the owner anyway. A row redirecting an opponent's permanent while
-      -- revealing it would separate the two, and none is printed.
+      -- to and who holds the card: a redirect naming Filter.IsSource acts on a
+      -- card that is nobody's permanent in the hidden zones this fires from, so
+      -- Projection.controllerOf would answer the owner anyway, and Wheel of Sun
+      -- and Moon's "revealed and put on the bottom of that player's library"
+      -- names the enchanted player, whose graveyard the card was headed for --
+      -- its owner (CR 400.3) even when it dies under another player's control.
+      -- Pawl.ZoneChangeSpec's "Wheel of Sun and Moon reroutes only the enchanted
+      -- player's cards" reads the reveal off the log; no test drives the stolen
+      -- permanent.
       Monad.when revealing $ do
         gs <- State.get
         Monad.forM_ (Game.lookupObject (ZoneChange.departed zc) gs) $ \obj ->

@@ -120,7 +120,6 @@ import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -561,7 +560,7 @@ applies gs event candidate =
         -- enumerated, so this is a Maybe rather than a set of zones.
         (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _), ProposedEvent.WouldChangeZone zc) ->
           maybe True (== ZoneChange.to zc) (ZoneChangePattern.whenDestination pat)
-            && matchesZoneOwner gs (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
+            && matchesZoneOwner gs src (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
         -- plus the one fact about the ROW rather than the event -- a shield
@@ -706,7 +705,7 @@ applies gs event candidate =
         -- resolved and survives the source leaving the battlefield or changing
         -- hands. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
-          matchesCandidatePlayer (Game.teams gs) (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
+          matchesCandidatePlayer gs src (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
         -- CR 121.2a: whose draw INSTRUCTIONS the row watches (CR 109.5's "you"),
         -- and the number it names. Alms Collector's "two or more" is a condition on
         -- the event rather than a rewrite that changes nothing, LifeLossR's third
@@ -958,20 +957,42 @@ matchesPutter gs src subject cause = case (subject, cause) of
   (CounterSubject.ByAnything, CounterCause.ByPayment _) -> True
   (CounterSubject.ByAnything, CounterCause.ByRule _) -> True
 
+-- CR 614.1: the ONE judgement of a ControllerRelation. The four readers below
+-- each extract the two players their rule names -- CR 109.5's "you" as their
+-- segment supplies it, and the event's player, an object's controller or an
+-- object's owner -- and ask nothing else, so a new constructor is one arm here
+-- that `-Werror` names rather than four it does not (see #2854, where the
+-- Opponents arm shipped as `/=` in one reader and CR 102.3 in the other three).
+--
+-- Nothing matches nothing, on either side: an effect with no controller states
+-- no relation it could satisfy and has no opponents, and an unknown player is
+-- nobody's. Two absences are NOT a match. CR 108.4a's owner fallback is
+-- Projection.controllerOf's already -- an object that exists always has a
+-- controller there -- so `theirs` is Nothing only for an id naming no object,
+-- which no proposed event carries; matchesController's old `controllerOf oid ==
+-- controllerOf src` matched two absences on no board.
+--
+-- CR 303.4b's enchanted player is read off the SOURCE's attachment rather than
+-- supplied, because every reader has the source in hand and no segment bakes
+-- one: a floating row's source has left the battlefield, so it enchants nobody
+-- and the arm admits nothing.
+relationHolds :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> Maybe PlayerId -> Bool
+relationHolds gs src you rel theirs = case rel of
+  ControllerRelation.Anyones -> True
+  ControllerRelation.Yours -> both (==) you theirs
+  ControllerRelation.Opponents -> both (Game.areOpponents gs) you theirs
+  ControllerRelation.EnchantedPlayers -> both (==) (Projection.enchantedPlayerOf src gs) theirs
+  where
+    both f a b = Maybe.fromMaybe False (f <$> a <*> b)
+
 -- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against
--- the controller of the effect's SOURCE? Anyones always does; a source with no
--- controller has no "you" and no opponents, so it admits neither.
+-- the controller of the effect's SOURCE?
 --
 -- matchesController's sibling for the players a pattern names outright rather
 -- than through an object -- the token's controller (CR 111.2), the player putting
 -- counters (CR 122.6a) and the player receiving them (CR 122.1).
 matchesPlayer :: GameState -> ObjectId -> ControllerRelation -> PlayerId -> Bool
-matchesPlayer gs src rel pid = case rel of
-  ControllerRelation.Anyones -> True
-  ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
-  ControllerRelation.Opponents -> case Projection.controllerOf src gs of
-    Just you -> Game.areOpponents gs you pid
-    Nothing -> False
+matchesPlayer gs src rel pid = relationHolds gs src (Projection.controllerOf src gs) rel (Just pid)
 
 -- matchesPlayer's twin for a row whose "you" is the CANDIDATE's rather than a
 -- fresh projection of its source -- the shape matchesZoneOwner already takes, and
@@ -981,33 +1002,20 @@ matchesPlayer gs src rel pid = case rel of
 -- the source live instead unscopes such a row the moment the source leaves the
 -- battlefield, and hands it to the new controller on a control change.
 --
--- Nothing matches nothing, matchesZoneOwner's posture: an effect with no
--- controller states no relation it could satisfy, and has no opponents either.
---
 -- The three arms still on matchesPlayer -- CounterR, TokenR, LifeLossR -- are
 -- equivalent to this today and are left alone: every producer of theirs is a
 -- permanent's static ability, whose source is on the battlefield whenever the row
 -- is consulted. DrawR is the first ControllerRelation pattern whose producer
 -- installs a floating row, which is where the two readings come apart (#2662).
-matchesCandidatePlayer :: Teams.Teams -> Maybe PlayerId -> ControllerRelation -> PlayerId -> Bool
-matchesCandidatePlayer teams you rel pid = case rel of
-  ControllerRelation.Anyones -> True
-  ControllerRelation.Yours -> you == Just pid
-  ControllerRelation.Opponents -> case you of
-    Just mine -> Teams.areOpponents teams mine pid
-    Nothing -> False
+matchesCandidatePlayer :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> PlayerId -> Bool
+matchesCandidatePlayer gs src you rel pid = relationHolds gs src you rel (Just pid)
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
--- against the controller of the effect's SOURCE? Anyones always does.
+-- against the controller of the effect's SOURCE? Controller-based, unlike
+-- matchesZoneOwner below. CR 102.2: no producer today for Opponents -- a counter
+-- or token pattern scoped to an opponent's permanents.
 matchesController :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
-matchesController gs src rel oid = case rel of
-  ControllerRelation.Anyones -> True
-  ControllerRelation.Yours -> Projection.controllerOf oid gs == Projection.controllerOf src gs
-  -- CR 102.2: no producer today -- a counter or token pattern scoped to an
-  -- opponent's permanents. Controller-based, unlike matchesZoneOwner below.
-  ControllerRelation.Opponents -> case (Projection.controllerOf oid gs, Projection.controllerOf src gs) of
-    (Just theirs, Just yours) -> Game.areOpponents gs yours theirs
-    _ -> False
+matchesController gs src rel oid = relationHolds gs src (Projection.controllerOf src gs) rel (Projection.controllerOf oid gs)
 
 -- CR 614.1 / 615.1: is this DAMAGE coming from a source the pattern admits?
 -- Matched through Pawl.Engine.Filter, against the PROJECTED view of the damage's
@@ -1164,28 +1172,15 @@ matchesDamageRecipient gs context de filter_ = case Recipient.objectOf (DamageEv
 -- unscoped every floating "your graveyard" redirect the moment its own source
 -- left the stack -- Yawgmoth's Will's second sentence, whose proof is
 -- Pawl.PlayerEffectSpec's YawgmothsWill group.
-matchesZoneOwner :: GameState -> Maybe PlayerId -> ControllerRelation -> ObjectId -> Bool
-matchesZoneOwner gs you rel oid =
-  let ownerOf o = fmap Object.owner (Game.lookupObject o gs)
-   in case rel of
-        ControllerRelation.Anyones -> True
-        ControllerRelation.Yours -> case (ownerOf oid, you) of
-          (Just owner, Just mine) -> owner == mine
-          -- An unknown owner or a sourceless effect admits nothing rather than
-          -- everything, exactly as the Opponents arm below does: two absent
-          -- answers are not a match.
-          _ -> False
-        -- CR 102.3's opponents and not "not mine": a teammate's card reaches
-        -- their own graveyard. Game.areOpponents is the one predicate, the same
-        -- one matchesPlayer, matchesCandidatePlayer and matchesController ask
-        -- through -- this arm is the fourth of them, and Pawl.TeamSpec's
-        -- "CR 102.3 a teammate's card is not put into an opponent's graveyard"
-        -- is the test that proves it.
-        ControllerRelation.Opponents -> case (ownerOf oid, you) of
-          (Just owner, Just mine) -> Game.areOpponents gs mine owner
-          -- An unknown owner or a sourceless effect admits nothing rather than
-          -- everything: a redirect with no controller has no opponents.
-          _ -> False
+--
+-- CR 102.3's opponents and not "not mine": a teammate's card reaches their own
+-- graveyard, and Pawl.TeamSpec's "CR 102.3 a teammate's card is not put into an
+-- opponent's graveyard" is the test that proves it through this reader.
+-- CR 303.4b's enchanted player is Wheel of Sun and Moon's, and
+-- Pawl.ZoneChangeSpec's "Wheel of Sun and Moon reroutes only the enchanted
+-- player's cards" is the proof.
+matchesZoneOwner :: GameState -> ObjectId -> Maybe PlayerId -> ControllerRelation -> ObjectId -> Bool
+matchesZoneOwner gs src you rel oid = relationHolds gs src you rel (fmap Object.owner (Game.lookupObject oid gs))
 
 -- Which permanents a pattern admits, matched through Pawl.Engine.Filter over the
 -- PROJECTED view: creature-ness (CR 205.2b / 300.2 / 613.1d, so an Opalescence'd
