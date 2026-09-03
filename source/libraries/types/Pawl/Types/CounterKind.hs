@@ -184,10 +184,12 @@ data CounterKind keyword
     --
     -- CR 613.4c is the layer, as it is for CR 122.1a's P/T counters, so
     -- Pawl.Engine.Projection.counterGathered emits it at Layer.ModifyPT --
-    -- but with Affected.Attached rather than the bearer, which is the same
-    -- affected set an Equipment's own "equipped creature gets +N/+0" ability
-    -- names. CR 301.5a's equipped creature is read live there, so the bonus
-    -- follows the Equipment as it moves and goes with it when it comes off.
+    -- but affecting the host rather than the bearer, which is the same affected
+    -- set an Equipment's own "equipped creature gets +N/+0" ability names
+    -- (Pawl.Engine.Projection.honeAffected). CR 301.5a's equipped creature is
+    -- read live there, so the bonus follows the Equipment as it moves and goes
+    -- with it when it comes off, and the rule's two restrictions -- an Equipment
+    -- bearing it, a creature receiving it -- are that set's filter.
     Hone
   | -- | CR 122.1: a kind no rule in the CR reads, identified by the NAME the
     -- card prints -- Zhao, the Moon Slayer's conqueror counter, Gemstone

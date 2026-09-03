@@ -4066,6 +4066,29 @@ staticLives :: (Layer -> Condition.Type.Condition -> Bool) -> [(Subtype.Type.Sub
 staticLives functioning changes lowest sa =
   maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
 
+-- CR 122.1j's affected set: the creature the counter's bearer, an Equipment, is
+-- attached to. Named here rather than written inline so counterGathered's `at`
+-- stays one line.
+--
+-- The HasCardType conjunct is UNPROVEN by any board, and structurally so: the
+-- only state it changes is CR 704.5n's window, an Equipment still attached to
+-- something that stopped being a creature, and CR 208.3 clears that permanent's
+-- power there (noncreaturePT) -- so a +1/+0 landing on it reads the same as
+-- none. CR 208.3a says as much of the rules themselves: such an effect "is
+-- created even though it doesn't do anything unless that permanent becomes a
+-- creature". Stated because rule 122.1j states it, and because the same
+-- conjunct on a modification CR 208.3 does not mask is observable (#3143).
+-- Pawl.ProjectionSpec's "CR 208.3 leaves a hone counter's host nothing to read
+-- the bonus off" is the board that shows the masking.
+honeAffected :: Affected.Affected
+honeAffected =
+  Affected.Matching
+    ( Filter.Type.And
+        [ Filter.Type.HasCardType CardType.Creature,
+          Filter.Type.HasAttached (Filter.Type.And [Filter.Type.IsSource, Filter.Type.HasSubtype Subtype.Type.Equipment])
+        ]
+    )
+
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c, as one
 -- synthetic ModifyPowerToughness per KIND. CR 122.1b / 613.1f: a keyword counter
 -- grants its keyword in layer 6, one grant per counter, since that layer counts
@@ -4100,18 +4123,26 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
             pt = deltaOf CounterKind.PlusOnePlusOne 1 <> deltaOf CounterKind.MinusOneMinusOne (-1)
             -- CR 122.1j / 613.4c: a hone counter sits on the EQUIPMENT and gives
             -- +1/+0 to the creature that Equipment is attached to, so this is
-            -- the one kind whose recipient is not its bearer. Affected.Attached
-            -- rather than the bearer's own id: it is the same affected set an
-            -- Equipment's printed "equipped creature gets +N/+0" names, and it
-            -- reads CR 301.5a's equipped creature live, so the bonus follows
-            -- the Equipment when it moves and is gone the moment it comes off.
-            -- Unattached, the set is empty and the part reaches nothing.
+            -- the one kind whose recipient is not its bearer. Not the bearer's
+            -- own id but CR 301.5a's equipped creature, read live: the bonus
+            -- follows the Equipment when it moves and is gone the moment it
+            -- comes off, and unattached the set is empty.
             --
-            -- Not implemented: rule 122.1j says an Equipment and this asks only
-            -- that the bearer is attached to something, so a hone counter on an
-            -- Aura would pump its host (#2328).
+            -- Both of the rule's restrictions are the filter's. HasAttached's
+            -- nest is the BEARER, IsSource naming it, so "on an Equipment" is a
+            -- subtype read of this counter's own object; HasCardType is the
+            -- HOST, so "any creature that Equipment is attached to" excludes one
+            -- that has stopped being a creature and the CR 704.5n sweep has not
+            -- yet unattached. The same affected set an Equipment's printed
+            -- "equipped creature gets +N/+0" names (Bonesplitter), CR 301.5f
+            -- restricting that phrase to a creature the same way.
+            --
+            -- Both reads are CR 613.1d's layer 4, asked from a layer 7c part:
+            -- viewOfCharacteristics reaches the bearer through `peers` at the
+            -- fold's own depth, so the question is answered by the layers
+            -- already applied rather than by re-entering gather.
             honed =
-              [ (at CounterKind.Hone Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal n) (Quantity.Type.Literal 0)))) {gAffected = Affected.Attached}
+              [ (at CounterKind.Hone Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal n) (Quantity.Type.Literal 0)))) {gAffected = honeAffected}
               | let n = toInteger (Map.findWithDefault 0 CounterKind.Hone cs),
                 n /= 0
               ]

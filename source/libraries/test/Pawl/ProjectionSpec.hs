@@ -4012,6 +4012,66 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     Spec.assertEqWith s "moved: the Giant is 3 + 2 + 2" (Projection.powerOf giantId onGiant) (Just 7)
     Spec.assertEqWith s "and the Piker is back to its printed 2" (Projection.powerOf pikerId onGiant) (Just 2)
 
+  -- CR 122.1j's HOST clause -- "any creature that Equipment is attached to", CR
+  -- 301.5f's reading of the same phrase in Bonesplitter's own text -- has NO
+  -- OBSERVER, and this board is why rather than a proof of it. The only state
+  -- where the clause bites is CR 704.5n's window, an Equipment still attached to
+  -- something that has stopped being a creature (a crewed Vehicle's "until end
+  -- of turn" running out, CR 702.122a, before the next state-based check). CR
+  -- 208.3 clears a noncreature permanent's power there (Projection.noncreaturePT),
+  -- so a +1/+0 landing on one and no +1/+0 at all read the same Nothing.
+  -- honeAffected states the clause because rule 122.1j does; mutating the
+  -- conjunct away leaves the suite green, and it is a fence rather than a proven
+  -- line. The clause IS observable for a modification CR 208.3 does not mask --
+  -- Basilisk Collar's granted deathtouch, say -- which is #3143's board and not
+  -- this counter's.
+  --
+  -- Consulate Dreadnought ({1} Artifact -- Vehicle 7/11, "Crew 6", checked
+  -- against api.scryfall.com 2026-09-03) is the host: a permanent with printed
+  -- numbers that is not a creature, so the masking is the only reason the read
+  -- comes back empty. A Goblin Piker beside it carries the positive reading, and
+  -- no two numbers on the two boards coincide.
+  Spec.it s "CR 208.3 leaves a hone counter's host nothing to read the bonus off, and CR 704.5n then unattaches" $ do
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base = Setup.emptyGame S.bothPlayers
+        (vehicle, g1) = S.addCreature dreadnought S.alice base
+        (pikerId, g2) = S.addCreature piker S.alice g1
+        (equip, g3) = S.addCreature bonesplitter S.alice g2
+        honed = S.addCounter CounterKind.Hone 2 equip g3
+        onVehicle = S.attach equip vehicle honed
+        onPiker = S.attach equip pikerId honed
+    Spec.assertEqWith s "the uncrewed Vehicle has no power at all, so neither the counters nor the Equipment's own +2/+0 is visible on it" (Projection.powerOf vehicle onVehicle) Nothing
+    Spec.assertEqWith s "the same Equipment on a creature: 2 + 2 + 2" (Projection.powerOf pikerId onPiker) (Just 6)
+    Spec.assertEqWith s "the Equipment is attached in the window this board reads" (Projection.hostOf equip onVehicle) (Just vehicle)
+    Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Projection.hostOf equip (S.settleSba onVehicle)) Nothing
+
+  -- CR 122.1j's BEARER clause: "a hone counter on an Equipment". Synthetic Honed
+  -- Binding ({1}{W} Enchantment -- Aura, "Enchant creature" / "When this Aura
+  -- enters, put a hone counter on it") is the producer, and synthetic because
+  -- only two printings make hone counters -- Dwalin, Weaponmaster and Sting,
+  -- Bilbo's Sword -- and both put them on Equipment (Scryfall o:/hone counter/,
+  -- 2026-09-03). Nothing in rule 122.1j forbids the card.
+  --
+  -- Two boards ONE attachment apart: the same single counter on the Aura and on
+  -- the Bonesplitter beside it, both attached to the same Piker.
+  Spec.it s "CR 122.1j whole card: a hone counter on an Aura gives the enchanted creature nothing" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    binding <- S.printingOf s registry "Synthetic Honed Binding"
+    let base = Setup.emptyGame S.bothPlayers
+        (pikerId, g1) = S.addCreature piker S.alice base
+        (equip, g2) = S.addCreature bonesplitter S.alice g1
+        (aura, g3) = S.entersWithTrigger binding S.alice (S.attach equip pikerId g2)
+        enchanted = S.attach aura pikerId g3
+        placed = S.runPure S.identityAnswer enchanted Engine.placePendingTriggers
+        onAura = S.runPure S.identityAnswer placed Stack.resolveTop
+        onEquip = S.addCounter CounterKind.Hone 1 equip enchanted
+    Spec.assertEqWith s "2 printed + the Bonesplitter's 2, and nothing from the Aura's counter" (Projection.powerOf pikerId onAura) (Just 4)
+    Spec.assertEqWith s "the same counter on the Equipment beside it is the +1 it would have been" (Projection.powerOf pikerId onEquip) (Just 5)
+    Spec.assertEqWith s "the Aura's own trigger did put the counter on it" (S.counterOf CounterKind.Hone aura onAura) 1
+
   -- The whole card. Dwalin, Weaponmaster {1}{R/W} Legendary Creature -- Dwarf
   -- Warrior 2/1, "First strike" / "Whenever Dwalin enters or attacks, put a hone
   -- counter on each Equipment you control." (name, cost, type line and Oracle
