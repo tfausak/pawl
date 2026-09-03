@@ -4838,6 +4838,60 @@ comeBackWrongSpec s registry =
           Spec.assertBool s (not (S.onBattlefield victim after)) "the token was still destroyed"
           Spec.assertEqWith s "CR 111.7 and it ceased to exist rather than staying in a graveyard" (namesIn Zone.Graveyard S.bob after) []
 
+-- Apocalypse Chime {2} Artifact -- "{2}, {T}, Sacrifice this artifact: Destroy
+-- all nontoken permanents with a name originally printed in the Homelands
+-- expansion. They can't be regenerated." (name, cost, type line and Oracle text
+-- checked against api.scryfall.com, 2026-09-02.)
+--
+-- CR 206.3 is what makes this ordinary card data rather than a question about
+-- sets: the errata reads "a name originally printed in", and CR 206.3c prints
+-- the whole list of names. A name is a characteristic (CR 109.3) and an
+-- expansion is not, so the list rides Filter.Or over Filter.HasName and the
+-- engine never learns what Homelands was.
+--
+-- The board tells apart the readings a wrong list or a dropped conjunct takes:
+--
+--   * A LISTED name versus every permanent. carol's Serra Inquisitors is on CR
+--     206.3c's list and alice's Goblin Piker is not.
+--   * NONTOKEN versus every permanent (CR 111.1). bob's token is built from the
+--     same Serra Inquisitors card, so its name matches too and only that
+--     conjunct tells the two apart.
+--   * CR 701.19c versus an ordinary destruction. alice's Aether Storm carries a
+--     regeneration shield and is destroyed through it.
+--   * EVERY controller versus the activator's. Three seats, one of the listed
+--     permanents each.
+--
+-- Aether Storm rather than a second Serra Inquisitors for the shielded
+-- permanent, so that no one mutation can redden two of these assertions at
+-- once: it is an enchantment, which is also "all nontoken PERMANENTS" being
+-- read wider than creatures. Neither its "creature spells can't be cast" nor
+-- its pay-life ability is reachable here -- nothing is cast and no other
+-- ability is activated.
+apocalypseChimeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+apocalypseChimeSpec s registry =
+  Spec.describe s "ApocalypseChime" $ do
+    Spec.it s "CR 206.3c destroys the listed nontoken permanents, through a shield, and nothing else" $ do
+      chime <- S.printingOf s registry "Apocalypse Chime"
+      plains <- S.printingOf s registry "Plains"
+      piker <- S.printingOf s registry "Goblin Piker"
+      storm <- S.printingOf s registry "Aether Storm"
+      inquisitors <- S.printingOf s registry "Serra Inquisitors"
+      let (chimeId, g1) = S.addCreature chime S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
+          (pikerId, g2) = S.addCreature piker S.alice g1
+          (stormId, g3) = S.addCreature storm S.alice g2
+          (tokenId, g4) = S.addToken (Printing.card inquisitors) S.bob (S.addRegenShield stormId g3)
+          (carolsId, g5) = S.addCreature inquisitors S.carol g4
+          board = g5 {GameState.priority = Just S.alice}
+      case soleActivatedAbility chime of
+        Nothing -> Spec.assertFailure s "Apocalypse Chime should print exactly one activated ability"
+        Just ability -> do
+          let after = S.runPure S.identityAnswer board (Activate.activateAbility S.alice chimeId ability >> Stack.resolveTop)
+          Spec.assertBool s (not (null (GameState.replacements board))) "the fixture really armed a regeneration shield"
+          Spec.assertBool s (not (S.onBattlefield carolsId after)) "CR 206.3c carol's Serra Inquisitors, a listed nontoken permanent, was destroyed"
+          Spec.assertBool s (not (S.onBattlefield stormId after)) "CR 701.19c alice's Aether Storm was destroyed through its regeneration shield"
+          Spec.assertBool s (S.onBattlefield tokenId after) "CR 111.1 bob's token of that same listed card survives"
+          Spec.assertBool s (S.onBattlefield pikerId after) "and alice's Goblin Piker, whose name is not on the list, survives"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   plummetSpec s registry
@@ -4876,3 +4930,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
   communeWithLavaSpec s registry
+  apocalypseChimeSpec s registry
