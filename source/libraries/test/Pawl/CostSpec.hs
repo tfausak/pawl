@@ -113,7 +113,7 @@ import qualified Pawl.Types.Zone as Zone
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing
 
 doorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 doorSpec s registry =
@@ -1902,11 +1902,9 @@ hatredSpec s registry =
     -- The third substrate, and the classification that separates it from the
     -- blight above: CR 118.3 measures an announced "Pay X {E}" against the
     -- counters the player has, so the demand DOES grow and
-    -- Cost.greatestPayableX's climb needs no ceiling to stop. Asserted here
-    -- because nothing else reads the answer -- Pawl.CardSpec's CR 101.1 sweep
-    -- scopes to spell costs, an activated ability's X getting no ceiling from
-    -- the face (#1985) -- so this is a stated classification rather than
-    -- gameplay-visible behaviour.
+    -- Cost.greatestPayableX's climb needs no ceiling to stop. Pawl.CardSpec's CR
+    -- 101.1 sweep is the other reader, Sphinx of the Revelation's activation cost
+    -- carrying the component with no ceiling beside it.
     Spec.it s "CR 118.3 an unannounced energy X is unpayable, and its demand grows with the value" $ do
       swamp <- S.printingOf s registry "Swamp"
       piker <- S.printingOf s registry "Goblin Piker"

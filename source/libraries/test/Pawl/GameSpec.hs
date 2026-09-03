@@ -1470,7 +1470,7 @@ declareAttackersAskAnswer p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing
 
 -- Records every player asked Prompt.Concede, in order -- the
 -- concedeOrderAnswer shape -- and drives alice through exactly one Activate
@@ -2509,6 +2509,7 @@ restartOnStack mountain =
               Modal.MkModal
                 (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.RestartGame Nothing)))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
+            ActivatedAbility.maximumX = [],
             ActivatedAbility.restrictions = [],
             ActivatedAbility.activator = Activator.Controller,
             ActivatedAbility.condition = Nothing,

@@ -107,7 +107,7 @@ chooseNoModes p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -124,6 +124,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
   variableActivationCostSpec s registry
+  abilityCeilingSpec s registry
   youOnActivatedAbilitySpec s registry
   textChangedAbilitySpec s registry
   textChangedCostSpec s registry
@@ -324,6 +325,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
                     Cost.Type.components = []
                   },
               ActivatedAbility.modal = singleModeAbility [] Map.empty,
+              ActivatedAbility.maximumX = [],
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
@@ -908,6 +910,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
         twoModes =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
+            []
             ( Modal.MkModal
                 (Seq.fromList [Mode.MkMode Seq.empty Map.empty, Mode.MkMode Seq.empty Map.empty])
                 (ModeSelection.ChooseExactly 1)
@@ -1958,7 +1961,7 @@ tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"
 shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
   Just ab -> ab
-  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
+  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
 
 -- alice controls Tovolar showing his BACK face -- "{X}{R}{G}: Target Wolf or
 -- Werewolf you control gets +X/+0 and gains trample until end of turn" -- a
@@ -2604,7 +2607,7 @@ textChangedTargetSpec s registry =
         Nothing -> []
         Just ability -> case Seq.lookup 0 (Modal.modes (ActivatedAbility.modal ability)) of
           Nothing -> []
-          Just mode -> fmap Set.toList (Map.elems (Target.legalSets (Just S.alice) Map.empty elfId (Mode.targetSlots mode) gs))
+          Just mode -> fmap Set.toList (Map.elems (Target.legalSets (Just S.alice) False Map.empty elfId (Mode.targetSlots mode) gs))
       run hacked = do
         arborElf <- S.printingOf s registry "Arbor Elf"
         forest <- S.printingOf s registry "Forest"
@@ -4056,3 +4059,168 @@ hoistDifferentialSpec s registry = do
     -- that reused one permanent's answer cannot pass this.
     Spec.assertEqWith s "the reference offers three different per-permanent answers to differ about" (length reference) 18
     Spec.assertEqWith s "and the hoisted enumeration answers it action for action" (activationsIn (Action.legalActions S.alice board)) reference
+
+-- CR 101.1 / 602.2b / 601.2c, the two halves of an activation's announced X that
+-- only a card printing both can prove: a ceiling the ABILITY's own words put on
+-- the value, and a target slot whose CR 202.3 computed bound reads the value once
+-- it is named.
+--
+-- Blighted Nightmare {2}{B} Enchantment (YECL, digital-only), Oracle text checked
+-- against Scryfall 2026-09-03: "When this enchantment enters, creature cards in
+-- your graveyard perpetually get +1/+1. / Blight X, Return this enchantment to
+-- its owner's hand: Return target creature card with mana value X or less from
+-- your graveyard to the battlefield. X can't be greater than the greatest
+-- toughness among creatures you control. Activate only as a sorcery."
+--
+-- Not implemented: the enters-the-battlefield trigger, whose perpetual +1/+1
+-- applies to CARDS IN A GRAVEYARD rather than to permanents (#3123). Its omission
+-- leaves pawl's copy STRICTER than printed, and nothing below reads a graveyard
+-- card's power or toughness.
+--
+-- THE FALSIFIER for the whole group is an X that reaches neither the ceiling nor
+-- the slot. A blight's demand never grows (Cost.demandGrowsWithX), so the
+-- ability's own ceiling is the ONLY thing on this board that refuses a value; and
+-- the slot's bound is the only thing keeping the mana value 4 card out. Drop
+-- either and the board below still activates -- with the wrong card, or with no
+-- refusal at all.
+--
+-- alice controls the Nightmare, a creature whose toughness is the ceiling, and a
+-- Goblin Piker to take the blight; her graveyard holds a mana value 3 creature
+-- card and a mana value 4 one. Every number on the board is distinct: two
+-- creatures, toughnesses 3 (or 4) and 1, mana values 3 and 4.
+blightedNightmareBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  m (Printing.Printing, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+blightedNightmareBoard s registry tallest = do
+  nightmare <- S.printingOf s registry "Blighted Nightmare"
+  tall <- S.printingOf s registry tallest
+  piker <- S.printingOf s registry "Goblin Piker"
+  tyrant <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (srcId, g0) = S.addCreature nightmare S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g1) = S.addCreature tall S.alice g0
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (tyrantId, g3) = S.addGraveyardCard tyrant S.alice g2
+      (giantId, g4) = S.addGraveyardCard giant S.alice g3
+  pure
+    ( nightmare,
+      srcId,
+      pikerId,
+      tyrantId,
+      giantId,
+      g4 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+    )
+
+-- The names in pid's graveyard. NAMES and not ids: a card that leaves the
+-- graveyard for the battlefield is a new object (CR 400.7), so an id-keyed read
+-- would answer the same however the activation went.
+graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+graveyardNames pid gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs)
+
+-- Announces X, pins CR 701.68a's blight to one creature, and narrows the target
+-- slot to one graveyard card by FILTERING the offered set -- answerXTargeting's
+-- reason, plus the blight the cost demands.
+answerBlightXTargeting :: Natural -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+answerBlightXTargeting x blighted wanted p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseBlight {} -> blighted
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just wanted) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Announces the bound the prompt carries and records it, the answerAtBound
+-- treatment for a cost whose X is a blight.
+answerBlightAtBound :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [Natural] r
+answerBlightAtBound blighted p = case p of
+  Prompt.ChooseX _ _ _ bound -> do
+    State.modify' (\seen -> seen <> [bound])
+    pure bound
+  Prompt.ChooseBlight {} -> pure blighted
+  _ -> pure (S.identityAnswer p)
+
+-- Answers Prompt.ChooseReturns with the first candidate the engine offered, which
+-- is all Tameshi's "return a land you control" needs: WHICH land goes back is
+-- Pawl.CostSpec's question (Meloku the Clouded Mirror), not this group's.
+answerXTargetingReturning :: Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+answerXTargetingReturning x wanted p = case p of
+  Prompt.ChooseReturns _ _ _ candidates _ -> Set.fromList (take 1 candidates)
+  _ -> answerXTargeting x wanted p
+
+abilityCeilingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+abilityCeilingSpec s registry = Spec.describe s "AbilityCeilingAndBoundSlot" $ do
+  -- BOTH halves on one board: the announced 3 is what the ceiling permits and
+  -- what the slot's bound measures the graveyard against.
+  Spec.it s "CR 101.1/601.2c whole card: Blighted Nightmare at X=3 returns the mana value 3 card and leaves the 4" $ do
+    (nightmare, srcId, pikerId, tyrantId, _, g1) <- blightedNightmareBoard s registry "Ogre Sentry"
+    tyrant <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+    giant <- S.printingOf s registry "Hill Giant"
+    let act = do Activate.activateAbility S.alice srcId (theAbility nightmare); Stack.resolveTop
+        after = snd (Engine.runGamePure (answerBlightXTargeting 3 pikerId tyrantId) g1 act)
+    Spec.assertEqWith s "the mana value 3 creature card is on the battlefield, so the announced 3 reached the slot's bound" (S.countOnBattlefieldByName (S.printingName tyrant) S.alice after) 1
+    Spec.assertEqWith s "and the mana value 4 one the bound excluded is all that is left in the graveyard" (graveyardNames S.alice after) [S.printingName giant]
+    Spec.assertEqWith s "the cost's blight put the announced 3 counters on the Piker" (S.counterOf CounterKind.MinusOneMinusOne pikerId after) 3
+    Spec.assertBool s (not (S.onBattlefield srcId after)) "and its other half returned the Nightmare to hand"
+    Spec.assertEqWith s "stack empty after resolution" (GameState.stack after) []
+    Spec.assertBool s (Activate.activatable S.alice srcId (theAbility nightmare) g1) "the ability is offered before any X exists"
+
+  -- The ceiling is READ, and read off the board: the tallest creature alice
+  -- controls is what bounds the prompt, and nothing else on either board is 3 or
+  -- 4. Without a ceiling this bound does not exist at all -- CR 701.68b refuses a
+  -- blight only for a player controlling no creature, so the climb has nothing
+  -- else to stop on.
+  Spec.it s "CR 101.1 the ChooseX bound is the greatest toughness among creatures you control" $ do
+    let boundsWith tallest = do
+          (nightmare, srcId, pikerId, _, _, g1) <- blightedNightmareBoard s registry tallest
+          pure (State.execState (Engine.runGame (answerBlightAtBound pikerId) g1 (Activate.activateAbility S.alice srcId (theAbility nightmare))) [])
+    three <- boundsWith "Ogre Sentry"
+    four <- boundsWith "Giant Spider"
+    Spec.assertEqWith s "a 2/3 alongside a 2/1 bounds X at 3" three [3]
+    Spec.assertEqWith s "a 2/4 alongside it bounds X at 4" four [4]
+
+  -- CR 101.2 for the direction, and reject-not-repair for the posture: the
+  -- announcement is honoured and then loses the ability. The SAME board as the
+  -- whole-card case above, differing in the announced value alone.
+  Spec.it s "CR 101.1/602.2 an X above the ability's ceiling is a no-op" $ do
+    (nightmare, srcId, pikerId, tyrantId, _, g1) <- blightedNightmareBoard s registry "Ogre Sentry"
+    tyrant <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
+    let act = do Activate.activateAbility S.alice srcId (theAbility nightmare); Stack.resolveTop
+        after = snd (Engine.runGamePure (answerBlightXTargeting 4 pikerId tyrantId) g1 act)
+    Spec.assertEqWith s "nothing came back from the graveyard" (S.countOnBattlefieldByName (S.printingName tyrant) S.alice after) 0
+    Spec.assertEqWith s "both cards are still in it" (length (graveyardNames S.alice after)) 2
+    Spec.assertBool s (S.onBattlefield srcId after) "the Nightmare was not returned to hand"
+    Spec.assertEqWith s "and no -1/-1 counter was paid" (S.counterOf CounterKind.MinusOneMinusOne pikerId after) 0
+    Spec.assertEqWith s "with nothing left on the stack" (GameState.stack after) []
+
+  -- The bound's other direction, on the same board and the same announcement: a
+  -- card the announced X does not reach is not among the recipients the slot
+  -- offers, so an answer naming it names nothing and CR 601.2e reverses the
+  -- activation.
+  Spec.it s "CR 601.2c a graveyard card whose mana value exceeds the announced X is not offered" $ do
+    (nightmare, srcId, pikerId, _, giantId, g1) <- blightedNightmareBoard s registry "Ogre Sentry"
+    giant <- S.printingOf s registry "Hill Giant"
+    let act = do Activate.activateAbility S.alice srcId (theAbility nightmare); Stack.resolveTop
+        after = snd (Engine.runGamePure (answerBlightXTargeting 3 pikerId giantId) g1 act)
+    Spec.assertEqWith s "the mana value 4 card did not come back" (S.countOnBattlefieldByName (S.printingName giant) S.alice after) 0
+    Spec.assertEqWith s "both cards are still in the graveyard" (length (graveyardNames S.alice after)) 2
+    Spec.assertBool s (S.onBattlefield srcId after) "and the activation reversed, the Nightmare staying put"
+
+  -- The paper printing of the same slot, whose {X}{W} needs no ceiling: Tameshi,
+  -- Reality Architect -- "{X}{W}, Return a land you control to its owner's hand:
+  -- Return target artifact or enchantment card with mana value X or less from
+  -- your graveyard to the battlefield. Activate only as a sorcery." Oracle text
+  -- checked against Scryfall 2026-09-03.
+  Spec.it s "CR 601.2c/602.2b whole card: Tameshi at X=1 returns the mana value 1 artifact card" $ do
+    tameshi <- S.printingOf s registry "Tameshi, Reality Architect"
+    plains <- S.printingOf s registry "Plains"
+    ring <- S.printingOf s registry "Sol Ring"
+    ball <- S.printingOf s registry "Crystal Ball"
+    let (srcId, g0) = S.addCreature tameshi S.alice (S.landsInPlay plains 3)
+        (ringId, g1) = S.addGraveyardCard ring S.alice g0
+        (_, g2) = S.addGraveyardCard ball S.alice g1
+        g3 = g2 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        act = do Activate.activateAbility S.alice srcId (theAbility tameshi); Stack.resolveTop
+        after = snd (Engine.runGamePure (answerXTargetingReturning 1 ringId) g3 act)
+    Spec.assertEqWith s "the mana value 1 artifact card is on the battlefield" (S.countOnBattlefieldByName (S.printingName ring) S.alice after) 1
+    Spec.assertEqWith s "and the mana value 3 one the announced 1 excluded is still in the graveyard" (graveyardNames S.alice after) [S.printingName ball]
