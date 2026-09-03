@@ -1996,11 +1996,11 @@ handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 -- any other object with the same name" -- share one board: two Longtusk Cubs,
 -- whose "Pay {E}{E}: Put a +1/+1 counter on Longtusk Cub" is the pool's activated
 -- ability that names its own source, so the copy landing on the OTHER Cub is a
--- readable wrong answer rather than an unobservable one. The THIRD sentence,
--- about effects that count how many times an ability has resolved during the
--- turn, has no observer: nothing in pawl counts resolutions, and no card in
--- data/cards asks for one (Scryfall o:"that ability has resolved", 2026-09-03,
--- no hit reachable by pawl's vocabulary).
+-- readable wrong answer rather than an unobservable one.
+--
+-- Not implemented: the THIRD sentence's count -- how many times an ability has
+-- resolved during the turn -- which nothing in pawl keeps, so no board here can
+-- show that a copy counts as the same ability (gap #3135).
 --
 -- CR 707.10's "a copy of an activated ability isn't activated" rides on the first
 -- case as alice's energy: the cost was paid once, by the activation, and the copy

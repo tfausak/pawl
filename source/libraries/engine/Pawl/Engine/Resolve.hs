@@ -4399,6 +4399,9 @@ exileOrCease oid = do
 -- effects counting resolutions -- both hold by construction rather than by
 -- anything written here. Pawl.CopySpec's Longtusk Cub case proves the second.
 --
+-- Not implemented: the count the third sentence is about, so nothing observes
+-- that half (gap #3135).
+--
 -- A copy of a copy answers with the copy's own printing: CR 707.2's copiable
 -- values are the ones the copied object reports, and its snapshot already carries
 -- them.
@@ -4444,10 +4447,12 @@ targetsOnStack oid gs =
 -- Source carries, which is where Pawl.Engine.Activate announced them against and
 -- where Pawl.Engine.Stack's two ability arms read its modes at resolution.
 --
--- CR 612.1's text changes reach the card-backed half alone. Nothing rewrites an
--- ability object's text today: Projection.textChangesAffecting is gathered over
--- the BATTLEFIELD, so a Spy Kit on the ability's source never reached the ability
--- on the stack either, before or after this reader existed.
+-- CR 612.1's rewrite (Projection.rewriteTargetSlot) is applied on the card-backed
+-- half alone, and that is agreement rather than an omission this reader makes:
+-- the two roads an ability's slots already travel -- Pawl.Engine.Activate's
+-- announcement and Pawl.Engine.Stack's resolution -- read the modal unrewritten,
+-- so a rewrite here would describe a slot neither of them announced. Whenever CR
+-- 612 does have to reach an ability on the stack, all three move together.
 stackTargetSlots :: Object.Object -> ObjectId -> GameState -> Map.Map SlotName TargetSlot.TargetSlot
 stackTargetSlots obj oid gs =
   let chosen = Binding.modesOf (Object.bindings obj)
@@ -6879,9 +6884,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- ability arms read.
               --
               -- Zeroed: damage, counters and designations, none of which CR
-              -- 707.2 copies. A spell on the stack carries none of the three
-              -- today, so this is the rule written out rather than a difference
-              -- the board can show.
+              -- 707.2 copies. Neither a spell nor an ability on the stack carries
+              -- any of the three today, so this is the rule written out rather
+              -- than a difference the board can show.
               --
               -- CR 707.2's copiable values are stamped for a SPELL only, where the
               -- other two copy opcodes stamp them so
@@ -6934,9 +6939,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- EVERY target, not only the ones CR 707.10c changed: the copy "is
           -- itself a spell" -- or itself an ability -- under CR 707.10, so an
           -- object the copy kept is a target of something it was not a target of
-          -- before. Read back off the board
-          -- AFTER the re-target above rather than from the copied bindings, for
-          -- the same reason.
+          -- before. Read back off the board AFTER the re-target above rather than
+          -- from the copied bindings, for the same reason.
           --
           -- The KIND is the copied object's, which copyOnStackOf classified: CR
           -- 707.10's "a copy of a spell is itself a spell" and "a copy of an
