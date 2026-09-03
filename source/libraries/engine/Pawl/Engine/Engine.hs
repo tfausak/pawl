@@ -31,6 +31,7 @@ import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
+import qualified Pawl.Engine.Initiative as Initiative
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
@@ -506,19 +507,24 @@ placePendingTriggers = do
       -- below: placing them after the ordered batch would make them resolve
       -- first, by the engine's choice rather than the player's.
       inherent = Monarch.inherentMonarchPending evs gs
-      -- CR 702.179d, the rulebook's third inherent ability, gathered for the
-      -- reason above. At most one entry, and only for the active player.
+      -- CR 726.2's three, gathered for the reason above. Empty while no player
+      -- has the initiative, except for its third ability, which is gathered from
+      -- the take itself.
+      initiative = Initiative.inherentPending evs gs
+      -- CR 702.179d, another of the rulebook's inherent abilities, gathered for
+      -- the reason above. At most one entry, and only for the active player.
       revving = Speed.inherentPending evs gs
-      -- CR 728.1, the fourth, gathered for the same reason. At most one entry,
-      -- and only for the active player.
+      -- CR 728.1, another, gathered for the same reason. At most one entry, and
+      -- only for the active player.
       irradiated = Rad.inherentPending evs gs
       -- CR 309.4c's room abilities, gathered separately because
       -- Event.gatherTriggers reads the command zone for CR 113.6p's list -- an
-      -- emblem and a vanguard card -- and a dungeon card is on neither. Unlike the four above these DO have a
-      -- source, so they carry TriggerSource.OfObject and go through placeBorne.
+      -- emblem and a vanguard card -- and a dungeon card is on neither. Unlike the
+      -- sourceless gatherers above these DO have a source, so they carry
+      -- TriggerSource.OfObject and go through placeBorne.
       entered = Dungeon.roomPending evs gs
   -- The GROUPED view of the same snapshot, which the CR 603.10a look-back in
-  -- Event.eventTriggers needs and the three inherent gatherers above do not.
+  -- Event.eventTriggers needs and the inherent gatherers above do not.
   -- Not in the `let` because it can ASK -- CR 603.7b's second sentence is a
   -- question for the controller of a delayed entry that matched two simultaneous
   -- occurrences -- and it is asked BEFORE the watermark below moves, so the game
@@ -542,7 +548,7 @@ placePendingTriggers = do
         GameState.battlefieldWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
-  gathered <- reactions (pending <> inherent <> revving <> irradiated <> entered)
+  gathered <- reactions (pending <> inherent <> initiative <> revving <> irradiated <> entered)
   -- CR 603.3b's two sentences, run one after the other rather than ordered
   -- together and placed at the end: the rule's first sentence PUTS its abilities
   -- on the stack before its second is reached, which is observable both in the
@@ -653,6 +659,7 @@ abilityTriggeredOf event = case event of
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.Revealed {} -> Nothing

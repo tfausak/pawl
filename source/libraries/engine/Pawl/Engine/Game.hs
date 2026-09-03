@@ -1099,6 +1099,7 @@ castOf event = case event of
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.Revealed {} -> Nothing
@@ -1168,6 +1169,7 @@ discardOf event = case event of
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BecameBlocking {} -> Nothing
@@ -1241,6 +1243,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BecameBlocking {} -> Nothing
@@ -1329,6 +1332,7 @@ damageDealt event = case event of
   GameEvent.Moved {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BecameBlocking {} -> Nothing
@@ -1449,6 +1453,7 @@ lifeGainOf event = case event of
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BecameBlocking {} -> Nothing

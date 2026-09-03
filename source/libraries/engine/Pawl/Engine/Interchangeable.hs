@@ -97,7 +97,7 @@ representatives pcs gs candidates =
 --     one object says about another is namedByAnother's question.
 --   * GameState.players, GameState.manaPool, GameState.pendingControl,
 --     GameState.activeControl (a Decider is a PlayerId), GameState.monarch,
---     GameState.drewFromEmpty, GameState.speedIncreasedThisTurn,
+--     GameState.initiative, GameState.drewFromEmpty, GameState.speedIncreasedThisTurn,
 --     GameState.extraTurns and the per-player counters (landsPlayed,
 --     drawsThisTurn, spellsCastLastTurn, castsLastTurn) are keyed by or valued
 --     at a PLAYER and name no object.
