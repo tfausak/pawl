@@ -16,18 +16,18 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 
 -- | CR 613.7m: the order a batch of objects receiving timestamps at the same
--- moment receives them in. The answer is the caller's fold order, so the first
--- named takes the EARLIER stamp.
+-- moment receives them in. The RESULT is the caller's fold order, so whatever
+-- comes back first takes the EARLIER stamp.
 --
 -- Two keys, as the rule has two sentences. The primary is APNAP (CR 101.4) over
 -- the seat each object belongs to, which is nobody's choice. The secondary is
 -- that seat's own choice among the objects it holds, asked as one
 -- Prompt.OrderTimestamps per group.
 --
--- WHOSE a group is: the object's controller, or its owner where it has none, in
--- the rule's own words. Both readings are reachable here, since CR 110.2 gives
--- every permanent a controller while the batch is a list of ids the caller
--- swept.
+-- WHOSE a group is: the object's controller, or its owner where it has none,
+-- which is the rule's own parenthetical. CR 110.2 gives every permanent a
+-- controller, so the owner branch is reached only by an id the battlefield no
+-- longer holds (CR 400.7) -- which the writers then decline to restamp anyway.
 --
 -- The rule NAMES only the active player's choice and then says "followed by each
 -- other player in turn order". Read as an ellipsis -- each seat orders its own
@@ -35,8 +35,13 @@ import qualified Pawl.Types.Prompt as Prompt
 -- engine, because the engine may not choose (and no rule elsewhere assigns that
 -- order).
 --
--- Asked at two or more, where the group is a real choice; a group of one is one
--- order. Game.permute keeps the engine's order for a non-permutation answer.
+-- Asked at two or more, on the count alone, as Prompt.OrderTriggers' CR 101.4c
+-- caller is: whether the relative stamp is ever read depends on what applies in
+-- the layer afterwards, which this cannot know. A group of one is one order.
+-- Game.permute keeps the engine's order for a non-permutation answer.
+--
+-- Proved by Pawl.RestampSpec, whose two boards separate the keys: the seat's own
+-- choice on the transform road, and APNAP across two seats on the nightfall one.
 order :: [ObjectId] -> Game [ObjectId]
 order oids = do
   gs <- State.get

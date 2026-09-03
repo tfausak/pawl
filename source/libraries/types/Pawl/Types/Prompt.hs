@@ -839,8 +839,9 @@ data Prompt r where
   --
   -- Asked once per GROUP and in APNAP order of the groups, the primary
   -- determination being APNAP (CR 101.4) and nobody's choice. Raised for two or
-  -- more, with no further elision: two permanents receiving one layer's
-  -- timestamps are distinguishable whenever anything reads that layer.
+  -- more on the count alone, as the CR 101.4c caller of OrderTriggers above is:
+  -- whether the relative stamp is ever read depends on what applies in the layer
+  -- afterwards, which the asking site cannot know.
   OrderTimestamps :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
   -- both halves of what a player at a table can see -- mulligans already taken,

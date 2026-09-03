@@ -6,11 +6,13 @@
 -- objects receive at one moment -- APNAP (CR 101.4) across the seats, and each
 -- seat's own choice among the objects it holds, asked as Prompt.OrderTimestamps.
 --
--- The road under test is the transform one: Pawl.Engine.Resolve's
+-- Two of the three roads are driven, one per key. Pawl.Engine.Resolve's
 -- turnPermanentsOver hands its swept victims to Restamp.order before the fold
--- that mints CR 613.7g's per-permanent stamps. Pawl.Engine.Resolve's
--- Effect.TurnFaceDown arm (CR 613.7f) and Pawl.Engine.Daytime's turnDue reach the
--- same function; see the note on restampOrderSpec for what no board can observe.
+-- that mints CR 613.7g's per-permanent stamps, and that is where the seat's own
+-- choice is proved; Pawl.Engine.Daytime's turnDue is where APNAP across two seats
+-- is. The third, Pawl.Engine.Resolve's Effect.TurnFaceDown arm (CR 613.7f),
+-- reaches the same function and no board can observe it -- see the note on
+-- restampOrderSpec.
 module Pawl.RestampSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -54,12 +56,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
 -- the answer observable: the two cases below differ in exactly one thing, the
 -- permutation alice answers with.
 --
--- The other two roads to a restamp reach Restamp.order too and no board here
--- drives them. CR 708.2a leaves a face-down permanent no abilities of its own, so
--- nothing a permanent turned face down by Effect.TurnFaceDown writes can be read
--- back; and CR 702.145c's nightfall sweep would need a daybound pair, which
--- cannot be turned by an instruction (CR 702.145b) and so cannot share this
--- board.
+-- The face-down road reaches Restamp.order too and nothing drives it: CR 708.2a
+-- leaves a face-down permanent no abilities of its own, so nothing a permanent
+-- turned face down by Effect.TurnFaceDown writes can be read back, and mutating
+-- that call site leaves the suite green. CR 702.145c's nightfall sweep is the
+-- third road and has its own board below, which cannot be this one -- a daybound
+-- permanent refuses an instruction's transform (CR 702.145b).
 restampOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 restampOrderSpec s registry =
   Spec.describe s "OrderTimestamps" $ do
