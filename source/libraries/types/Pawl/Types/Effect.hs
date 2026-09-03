@@ -9,7 +9,7 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Conjure as Conjure
-import qualified Pawl.Types.CopySpell as CopySpell
+import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
@@ -271,13 +271,11 @@ data Effect card ability
     -- trigger as it copies and cannot copy again (#1292); and a stated duration
     -- (#1753).
     BecomeCopy BecomeCopy.BecomeCopy
-  | -- | CR 707.10: put a copy of a spell on the stack onto the stack (Twincast),
-    -- cloning the original stack object so CR 707.10's "all decisions made for
-    -- it" carries over.
-    --
-    -- Not implemented: copying an activated or triggered ability, CR 707.10's
-    -- other two nouns (#2208).
-    CopySpell CopySpell.CopySpell
+  | -- | CR 707.10: put a copy of a spell or of an activated or triggered ability
+    -- on the stack onto the stack (Twincast, Lithoform Engine), cloning the
+    -- original stack object so CR 707.10's "all decisions made for it" carries
+    -- over.
+    CopyStackObject CopyStackObject.CopyStackObject
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition asked as the event
     -- would happen (CR 614.1). Targetless.

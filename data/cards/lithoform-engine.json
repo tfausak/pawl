@@ -12,6 +12,56 @@
             "mana": [
               {
                 "type": "Generic",
+                "value": 2
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "CopyStackObject",
+                        "value": {
+                          "newTargets": true,
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "ability"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "ability": {
+                    "filter": {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    "pool": {
+                      "type": "Abilities"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
                 "value": 3
               }
             ]
@@ -23,7 +73,7 @@
                   {
                     "effects": [
                       {
-                        "type": "CopySpell",
+                        "type": "CopyStackObject",
                         "value": {
                           "newTargets": true,
                           "ref": {
@@ -95,7 +145,7 @@
                   {
                     "effects": [
                       {
-                        "type": "CopySpell",
+                        "type": "CopyStackObject",
                         "value": {
                           "ref": {
                             "type": "InSlot",

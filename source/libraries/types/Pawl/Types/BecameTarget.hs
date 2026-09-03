@@ -16,7 +16,7 @@ import qualified Pawl.Types.StackObjectKind as StackObjectKind
 -- An announcement is not the only way in. CR 115.1 has the targets declared "as
 -- part of the process of putting the spell or ability on the stack", and CR
 -- 707.10c puts a COPY there with targets nobody announced, so
--- Pawl.Engine.Resolve's CopySpell arm records them the same way.
+-- Pawl.Engine.Resolve's CopyStackObject arm records them the same way.
 --
 -- A record rather than positional fields, Pawl.Types.Countering's reason: `source`
 -- and the ObjectId inside `targeted` are the two ends of the same act, so a
