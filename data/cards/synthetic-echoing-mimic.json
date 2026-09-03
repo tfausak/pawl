@@ -1,0 +1,85 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Greatest",
+            "value": {
+              "type": "Power"
+            }
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              },
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "Not",
+                "value": {
+                  "type": "IsSource"
+                }
+              }
+            ]
+          },
+          "scope": {
+            "type": "InZone",
+            "value": {
+              "player": {
+                "type": "EachPlayer"
+              },
+              "zone": {
+                "type": "Battlefield"
+              }
+            }
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Echoing Mimic",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Shapeshifter"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -4,8 +4,9 @@ module Pawl.Types.Layer where
 -- so the DERIVED Ord IS the application order -- the sole thing the projection
 -- sorts on. Complete for diffability against CR 613 (the Keyword posture). Copy
 -- and CharacteristicPT have no Modification producer -- a copy is seeded into the
--- fold by Projection.copiableCharacteristics and a CDA's P/T by
--- Projection.applyCharacteristicPT, rather than applied as continuous effects.
+-- fold by Projection.copiableCharacteristics, and a CDA's P/T is applied by
+-- Projection.applyCharacteristicPT off the object's own partial rather than
+-- gathered as a continuous effect.
 -- No Enum/Bounded -- nothing enumerates layers or asks for bounds.
 data Layer
   = Copy -- 613.1a, layer 1
