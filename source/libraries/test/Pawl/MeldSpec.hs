@@ -582,6 +582,41 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "setup: alice held no experience counters before it died" (S.playerCounterOf PlayerCounterKind.Experience S.alice board) 0
         Spec.assertEqWith s "setup: Meren was on the battlefield to see it" (fmap Object.zone (Game.lookupObject merenId after)) (Just Zone.Battlefield)
         Spec.assertEqWith s "setup: alice's graveyard was empty before it died" (graveyardNames board) []
+  -- CR 712.21's Example, taken whole and on ONE board: "An ability that triggers
+  -- 'whenever a creature dies' triggers once. An ability that triggers 'whenever
+  -- a card is put into a graveyard from anywhere' triggers twice."
+  --
+  -- Meren of Clan Nel Toth is the first ability and Planar Void the second, so
+  -- the two arities are read off the same death. Planar Void exiles "that card",
+  -- which makes the count observable at gameplay level rather than as a trigger
+  -- tally: firing once would leave one of the two cards in alice's graveyard,
+  -- and a second DEPARTURE event -- the other way to reach two triggers -- would
+  -- hand alice a second experience counter.
+  Spec.it s "CR 712.21 a melded permanent's death fires a dies trigger once and a card-arrival trigger twice" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+    void <- S.printingOf s registry "Planar Void"
+    let (_, withMeren) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+        (_, base) = S.addCreature void S.alice withMeren
+        (mMelded, board) = meldedThrough base battlements garrison mountain
+        bothNames = List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")]
+    case mMelded of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just meldedId -> do
+        let dead = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [meldedId])
+            settled = S.runPure S.identityAnswer dead Engine.settleForPriority
+            after = S.runPure S.identityAnswer settled (Stack.resolveTop >> Stack.resolveTop >> Stack.resolveTop)
+        Spec.assertEqWith s "CR 712.21 the card-arrival trigger fired twice, so both cards were exiled" (List.sort (exileNames after)) bothNames
+        Spec.assertEqWith s "CR 712.21 and the dies trigger fired once" (S.playerCounterOf PlayerCounterKind.Experience S.alice after) 1
+        Spec.assertEqWith s "and neither card was left in the graveyard" (graveyardNames after) []
+        -- The proxies, all after the two behaviours: three triggers reached the
+        -- stack (one death, two arrivals), and both cards really were in the
+        -- graveyard for them to find.
+        Spec.assertEqWith s "three triggers reached the stack" (length (GameState.stack settled)) 3
+        Spec.assertEqWith s "setup: both cards were in the graveyard when they resolved" (List.sort (graveyardNames settled)) bothNames
+        Spec.assertEqWith s "setup: exile was empty once the meld had consumed the pair" (exileNames settled) []
   -- CR 712.21c: "If an effect can find the new object that a melded permanent
   -- becomes as it leaves the battlefield, it finds both cards. (See rule 400.7.)
   -- If that effect causes actions to be taken upon those cards, the same actions

@@ -686,6 +686,7 @@ abilityTriggeredOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.CardArrived _ -> Nothing
 
 -- CR 603.3b's record of one ability triggering: its source (CR 113.7), its
 -- controller as it triggered (CR 603.3a) and its trigger condition. Nothing for a

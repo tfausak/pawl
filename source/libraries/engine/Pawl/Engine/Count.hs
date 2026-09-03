@@ -638,6 +638,12 @@ snapshotView gs shape event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  -- Not implemented: CR 712.21e's second half counts a melded permanent as two
+  -- CARDS that changed zones, which this event is what a count would fold. No
+  -- EventShape distinguishes cards from the OBJECTS the Moved arm above answers
+  -- for, and answering this under MovedBetween would make Khabal Ghoul's "each
+  -- creature that died" count a melded creature three times (#3104).
+  GameEvent.CardArrived _ -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a

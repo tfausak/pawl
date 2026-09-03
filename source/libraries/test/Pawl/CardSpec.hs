@@ -903,6 +903,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.CardPutIntoGraveyard _ -> []
   TriggerCondition.PermanentDies _ -> []
   TriggerCondition.PermanentsDie _ -> []
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
@@ -4047,6 +4048,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.3b's names a PlayerRelation; the Saga is found through CR 714.2d's
   -- final chapter number rather than through a Filter.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
+  TriggerCondition.CardPutIntoGraveyard f -> unframed [f]
   TriggerCondition.PermanentDies f -> unframed [f]
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- so it is swept the same way -- answering [] here would exempt Vengeful
@@ -4259,6 +4261,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
+  TriggerCondition.CardPutIntoGraveyard _ -> []
   TriggerCondition.PermanentDies _ -> []
   TriggerCondition.PermanentsDie _ -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
