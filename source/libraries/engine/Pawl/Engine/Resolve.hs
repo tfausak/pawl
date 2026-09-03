@@ -2354,11 +2354,11 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- ignored convert arms no reflexive", the case that proves it.
 --
 -- Effect.ForEach's body (below) runs its instructions through this SAME fold,
--- reset per member rather than carried across members: Nihiloor's "for each
--- opponent, tap up to one untapped creature you control. When you do, gain
--- control ..." is Pawl.ResolveSpec's "CR 608.2f / 603.12 a reflexive armed
--- inside a ForEach reads only that member's own instruction", the case that
--- proves it.
+-- reset per member rather than carried across members. Synthetic Communal Toll
+-- (data/cards/synthetic-communal-toll.json) stands in for Nihiloor's "for each
+-- opponent, tap up to one untapped creature you control. When you do, ..."
+-- (#3166); Pawl.ResolveSpec's "CR 608.2f / 603.12 a reflexive armed inside a
+-- ForEach reads only that member's own instruction" is the case that proves it.
 --
 -- Not implemented: only the instruction IMMEDIATELY before the arm is asked
 -- about, not whichever earlier instruction the reflexive's own wording names

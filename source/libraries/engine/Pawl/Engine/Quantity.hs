@@ -702,16 +702,17 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     fmap
       (\oid -> toInteger (max 0 (Set.size (Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs))) - 1)))
       mOid
-  -- CR 702.184c: Power's arm, with the substitution asked first. `context.source`
-  -- is the station ability's OWN source -- unmoved by AgainstSlot's re-aim, which
-  -- only ever repoints `mOid`/`mView` -- so this is the one place that can still
-  -- ask "who controls the ability being resolved" once the fold has moved on to
-  -- reading the tapped creature. controllerGrantsStationToughness walks the
+  -- CR 702.184c: Power's arm, with the substitution asked first. `perspective`
+  -- is CR 109.5's "you" of the ability being resolved -- its controller (CR
+  -- 113.8), unmoved by AgainstSlot's re-aim, which only ever repoints
+  -- `mOid`/`mView`, and unmoved by whoever controls the stationing permanent
+  -- NOW: Tapestry Warden's ruling gates on the station ability's controller
+  -- controlling the Warden as it resolves. grantsStationToughnessFor walks the
   -- battlefield through the same `viewOf` every other arm reads, so a snapshot
   -- caller (CR 608.2h) answers False rather than reaching for a live board it was
   -- never handed.
   Quantity.StationMeasure ->
-    let substitutes = maybe False (controllerGrantsStationToughness viewOf gs) (Filter.source context)
+    let substitutes = maybe False (grantsStationToughnessFor viewOf gs) (Filter.perspective context)
         greater = case (mView >>= Filter.toughness, mView >>= Filter.power) of
           (Just t, Just p) -> t > p
           _ -> False
@@ -766,25 +767,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
         ZoneChange.object zc == oid
       ]
 
--- CR 702.184c: does `src`'s controller control ANY permanent that grants the
--- toughness substitution -- Modification.GrantsStationToughness's read, folded
--- to the per-player question Quantity.StationMeasure asks. `src` is the STATION
--- ABILITY's own source, so its controller is CR 109.5's "you" on Tapestry
--- Warden's own printed ability, whichever creature happens to be tapped.
---
--- False when `viewOf src` cannot answer a controller at all -- a source CR
--- 608.2h has no last-known information for, or a caller (a snapshot's own
--- rebuild) that never fills a controller in the first place. This is the honest
--- reading for both: rule 702.184c asks about a LIVE grant, and neither caller
--- has a live board to walk.
-controllerGrantsStationToughness :: Count.ViewOf -> GameState -> ObjectId -> Bool
-controllerGrantsStationToughness viewOf gs src =
-  case viewOf src >>= Filter.controller of
-    Nothing -> False
-    Just controller ->
-      any
-        (maybe False (\v -> Filter.controller v == Just controller && Filter.grantsStationToughness v) . viewOf)
-        (Set.toList (GameState.battlefield gs))
+-- CR 702.184c: does `you` control ANY permanent that grants the toughness
+-- substitution -- Modification.GrantsStationToughness's read, folded to the
+-- per-player question Quantity.StationMeasure asks. False for a caller whose
+-- `viewOf` cannot see the battlefield (a snapshot's own rebuild): rule 702.184c
+-- asks about a LIVE grant, and that caller has no live board to walk.
+grantsStationToughnessFor :: Count.ViewOf -> GameState -> PlayerId.PlayerId -> Bool
+grantsStationToughnessFor viewOf gs you =
+  any
+    (maybe False (\v -> Filter.controller v == Just you && Filter.grantsStationToughness v) . viewOf)
+    (Set.toList (GameState.battlefield gs))
 
 -- Is this declared attack an attack on one of that player's OPPONENTS? CR 506.3
 -- gives three things a creature can attack and rule 702.121a counts only the

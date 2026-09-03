@@ -2009,9 +2009,7 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
                         -- reason -- a mana ability tapped in the window this
                         -- payment opened may have shuffled or revealed, and
                         -- this restore must not undo that too.
-                        Payment.Unpaid -> do
-                          failedGs <- State.get
-                          State.put (Cost.keepingLibraryActions failedGs before)
+                        Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
                         -- WHICH of the candidate costs was paid is `castFor`
                         -- above, and it lives no longer than this announcement:
                         -- the one rule that asks (CR 702.34a) asks as the cast

@@ -261,9 +261,7 @@ turnFaceUp perform pid procedure oid = do
           -- mana ability tapped in the window this payment opened may have
           -- shuffled or revealed, and this reject-not-repair restore must not
           -- undo that too.
-          Payment.Unpaid -> do
-            gs <- State.get
-            State.put (Cost.keepingLibraryActions gs before)
+          Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
           -- turning a permanent face up resolves nothing.
           Payment.Paid _ -> performTurnFaceUp (Just procedure) oid

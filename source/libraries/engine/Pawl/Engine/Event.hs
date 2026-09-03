@@ -4328,7 +4328,14 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                         -- `snapshot` is, and the copy binding and face it reads live
                         -- on `obj`, which is about to cease. No third board walk --
                         -- it reads that binding or the printed face and stops.
-                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid gs) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
+                        --
+                        -- What was ATTACHED is read off `lki`, the pre-batch board
+                        -- `snapshot` and `lastController` read, and not the live
+                        -- `gs`: in a simultaneous batch an Equipment with a lower
+                        -- id moves before its host, and the live board has already
+                        -- forgotten it. Pawl.ZoneTriggerSpec's "the Equipment dying
+                        -- in the same batch, ahead of its host" is the proof.
+                        GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.owner obj) (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs) (Game.attachments oid lki) (Object.chosenNames obj) (Game.isBlocking oid gs) (Object.protector obj)) (GameState.lastKnown g1)
                       }
               -- CR 712.21: "If a melded permanent leaves the battlefield, one
               -- permanent leaves the battlefield and two cards are put into the

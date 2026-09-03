@@ -115,9 +115,7 @@ ignore pid oid = do
         -- ability tapped in the window this payment opened may have shuffled
         -- or revealed, and this reject-not-repair restore must not undo that
         -- too.
-        Payment.Unpaid -> do
-          gs <- State.get
-          State.put (Cost.keepingLibraryActions gs before)
+        Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
         -- The payment's bound slots are dropped: CR 116.2d's special action puts
         -- nothing on the stack, so there is no resolving object whose effects
         -- could read one.

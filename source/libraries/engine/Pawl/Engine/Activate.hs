@@ -1062,6 +1062,4 @@ activateAbility pid srcId ability = do
                 -- a mana ability tapped in the window this payment opened may
                 -- have shuffled or revealed, and this reject-not-repair
                 -- restore must not undo that too.
-                Payment.Unpaid -> do
-                  failedGs <- State.get
-                  State.put (Cost.keepingLibraryActions failedGs before)
+                Payment.Unpaid -> Cost.restoreKeepingLibraryActions before

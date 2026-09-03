@@ -322,9 +322,8 @@ isBlocking oid gs = any (Set.member oid) (Map.elems (Combat.blockers (GameState.
 -- this one. pawl keeps the link on the ATTACHED permanent, so there is nothing
 -- to look up from this side and the answer is a sweep of the battlefield --
 -- which supplies CR 110.1's narrowing for free, an attached permanent being on
--- the battlefield by definition. Pawl.Engine.Projection's `attachedViews` sweeps
--- for the same reason and answers the same set; it is a Filter atom rather than
--- a plain id list, so the two cannot share a body.
+-- the battlefield by definition. Pawl.Engine.Projection's `attachedViews` is
+-- this sweep seen through `peers`.
 --
 -- Compared through Recipient.objectOf: Object.attachedTo carries the tag the
 -- attaching pool produced as well as the id, and a host is the same host

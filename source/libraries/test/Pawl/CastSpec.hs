@@ -508,6 +508,30 @@ castSpec s registry = Spec.describe s "Cast" $ do
     Spec.assertEqWith s "Panglacial is on the stack" onStack 1
     Spec.assertEqWith s "Panglacial left the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
     Spec.assertEqWith s "seven Forests tapped to pay {5}{G}{G}" (S.tappedCount S.alice after) 7
+  -- CR 733.1 reverses a move from a library TO THE STACK; only a move to any
+  -- other zone, a shuffle or a reveal stands. Cost.keepingLibraryActions once
+  -- kept the failed state's library wholesale, which left a refused library cast
+  -- in no zone at all.
+  Spec.it s "CR 733.1 a refused library cast puts Panglacial back in the library" $ do
+    forest <- S.printingOf s registry "Forest"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
+    let base = S.landsInPlay forest 7
+        (wurmId, gs) = S.addLibraryCard panglacialWurm S.alice base
+        -- Accepts the offer ONCE: with the Wurm back in the library the search
+        -- offers it again, and CR 601.3 lets alice keep declining.
+        refuse :: Prompt.Prompt r -> State.State Bool r
+        refuse p = case p of
+          Prompt.CastWhileSearching _ _ options -> do
+            offered <- State.get
+            State.put True
+            pure (if offered then Nothing else Maybe.listToMaybe options)
+          Prompt.ChooseManaSource {} -> pure Nothing
+          _ -> pure (S.identityAnswer p)
+        after = snd (State.evalState (Engine.runGame refuse gs (Cast.castWhileSearching S.manaPerformer S.alice)) False)
+    Spec.assertEqWith s "CR 733.1 Panglacial is back in the library" (Game.zoneMembers Zone.Library S.alice after) [wurmId]
+    Spec.assertEqWith s "nothing on the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "no Forest tapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "CR 400.7 the same object, never moved" (Game.objectCount after) (Game.objectCount gs)
   -- CR 709.3 ("A player chooses which half of a split card they are casting
   -- before putting it onto the stack") does not stop at the library door, and CR
   -- 601.3 grants a permission to CAST rather than a narrower one: a split card

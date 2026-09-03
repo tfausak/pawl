@@ -5478,6 +5478,17 @@ skullclampSpec s registry =
           Spec.assertEqWith s "no trigger is placed" (length (GameState.stack placed)) 0
           Spec.assertEqWith s "so alice draws nothing" (S.handSize S.alice placed) 0
           Spec.assertEqWith s "and the Goblin Piker really died" (Game.lookupObject bystander placed) Nothing
+        -- CR 603.10a's own case: the Equipment leaves in the SAME batch as its
+        -- host, and ahead of it in the batch's order. The host's record must be
+        -- taken from the pre-batch board, or the live board has already
+        -- forgotten the link by the time the host files it.
+        Spec.it s "CR 603.10a the Equipment dying in the same batch, ahead of its host, still fires" $ do
+          (host, _, equipment, gs) <- board
+          let placed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [equipment, host] >> Engine.settleForPriority)
+              after = resolve placed
+          Spec.assertEqWith s "CR 603.10a alice drew two cards" (S.handSize S.alice after) 2
+          Spec.assertEqWith s "the host's record still names the Equipment" (fmap LastKnown.attached (Map.lookup host (GameState.lastKnown after))) (Just (Set.singleton equipment))
+          Spec.assertEqWith s "and both really left the battlefield in one batch" (fmap (`Game.lookupObject` after) [host, equipment]) [Nothing, Nothing]
         -- Skullclamp's own board, with no removal in it: CR 613.4c's layer 7c
         -- makes the equipped 2/1 Piker a 3/0 and CR 704.5f buries it, which is
         -- the same look-back reached through the card's static half.

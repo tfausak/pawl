@@ -1672,8 +1672,7 @@ attemptAttackDeclaration perform pid rejected = do
             -- CR 733.1's last sentence -- a mana ability the toll's window
             -- tapped may have shuffled or revealed, and this restore must not
             -- undo that too.
-            gsFailed <- State.get
-            State.put (Cost.keepingLibraryActions gsFailed before)
+            Cost.restoreKeepingLibraryActions before
             -- And then the declaration is made again, normally a smaller attack
             -- the player can afford. CombatEffectSpec's "CR 508.1 the rewound
             -- declaration is made again: two Pikers under a Ghostly Prison
@@ -2134,9 +2133,7 @@ attemptBlockDeclaration perform pid attacking rejected = do
         -- Through Cost.keepingLibraryActions rather than a bare State.put: CR
         -- 733.1's last sentence -- a mana ability the toll's window tapped may
         -- have shuffled or revealed, and this restore must not undo that too.
-        Monad.unless paid $ do
-          gsFailed <- State.get
-          State.put (Cost.keepingLibraryActions gsFailed before)
+        Monad.unless paid (Cost.restoreKeepingLibraryActions before)
         gs2 <- State.get
         if not paid && again
           then attemptBlockDeclaration perform pid attacking (Set.insert chosen rejected)
