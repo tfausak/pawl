@@ -49,743 +49,242 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Timestamp as Timestamp
 
 data GameState = MkGameState
-  { -- | CR 800.2: the options this game was started with. Settled before the
-    -- game begins and never written afterwards; the two paths that rebuild a
-    -- game in place, Setup.restartGame (CR 727.1) and Setup.subgameStateFrom
-    -- (CR 729.2), each carry it forward.
+  { -- | CR 800.2: the options this game was started with; never written after
+    -- the game begins.
     settings :: GameSettings.GameSettings,
     objects :: Map.Map ObjectId.ObjectId Object.Object,
     library :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     hand :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     graveyard :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
-    -- | CR 400.1's battlefield, MINUS its phased-out permanents, which
-    -- `phasedOut` below holds instead.
+    -- | CR 400.1's battlefield, minus its phased-out permanents, which
+    -- `phasedOut` holds instead.
     battlefield :: Set.Set ObjectId.ObjectId,
-    -- | CR 702.26b: the permanents whose status is "phased out", each mapped to
-    -- the player who controlled it WHEN IT PHASED OUT. They are still
-    -- ON the battlefield -- CR 702.26d says the phasing event changes no zone, and
-    -- their `Object.zone` stays `Zone.Battlefield` to say so -- but rule 702.26b
-    -- says that "except for rules and effects that specifically mention
-    -- phased-out permanents, a phased-out permanent is treated as though it does
-    -- not exist".
-    --
-    -- Keeping them in a SEPARATE set, rather than flagging them inside
-    -- `battlefield`, is what makes that sentence true by construction: every
-    -- reader that walks the battlefield -- the projection, targeting, the
-    -- state-based actions, combat, cost payment -- is asking about existing
-    -- permanents, and none of them has to remember phasing to get the right
-    -- answer. Four rules sit on the other side of rule 702.26b's "except", and
-    -- each is answered somewhere different:
-    --
-    --   * CR 502.1's phasing event, which reads and writes this field, and
-    --     Effect.PhaseOut, which writes it through the same performer
-    --     (Pawl.Engine.Phasing).
-    --   * CR 702.26k, a phased-out permanent leaving the game with its owner,
-    --     which deletes from it (Pawl.Engine.Game.removeFromZones).
-    --   * CR 702.26n, a row whose player has left and whose turn CR 800.4k will
-    --     not let begin, which is rekeyed to that rule's schedule as the walk
-    --     passes the seat (Pawl.Engine.Phasing.orphanSchedule, called from
-    --     Pawl.Engine.Engine).
-    --   * CR 514.2's damage sweep, which does NOT name this field and does not
-    --     have to: Pawl.Engine.Damage.removeAllDamage clears every object rather
-    --     than every permanent, so a phased-out one is already covered.
-    --
-    -- The PLAYER is stored rather than recomputed because rule 702.26a asks who
-    -- controlled the permanent "when it phased out", and CR 702.26e takes the
-    -- live answer away: a phased-out permanent is not in the set of objects a
-    -- continuous effect affects, so a control-changing effect that would name it
-    -- must not be read while it is gone -- nor may one that expires meanwhile
-    -- (CR 702.26f) hand it back to somebody else. A stored player is that
-    -- sentence; Pawl.Engine.Projection.controllerOf is not.
-    --
-    -- The row also says WHICH of rule 702.26's schedules the permanent is on:
-    -- CR 702.26g's distinction between a permanent that phased out directly,
-    -- which phases in during its player's next untap step, and one that phased
-    -- out indirectly, which "won't phase in by itself" and comes back with the
-    -- permanent it is attached to -- plus CR 702.26n's, which a direct row moves
-    -- onto once its player has left. See Pawl.Types.PhasedOut.
-    --
-    -- What DOESN'T live here is why a permanent phased out DIRECTLY, and nothing
-    -- needs it: rule 702.26a phases in every permanent that phased out under that
-    -- player's control, so the keyword decides who LEAVES and never who returns.
-    -- A creature with no phasing ability that Reality Ripple phased out is on the
-    -- same schedule as one that phased out on its own.
+    -- | CR 702.26b: the phased-out permanents, each with the player who
+    -- controlled it when it phased out (CR 702.26a) and which of rule 702.26's
+    -- schedules it is on. A separate set so every battlefield reader treats
+    -- them as not existing by construction; see Pawl.Types.PhasedOut.
     phasedOut :: Map.Map ObjectId.ObjectId PhasedOut.PhasedOut,
     exile :: Set.Set ObjectId.ObjectId,
-    -- | CR 400.1: the command zone -- a shared collection (not per-player), keyed
-    -- into `objects` like `battlefield`/`exile`. Emblems live here.
+    -- | CR 400.1: the command zone, shared rather than per-player.
     command :: Set.Set ObjectId.ObjectId,
     stack :: [ObjectId.ObjectId],
     players :: Map.Map PlayerId.PlayerId Player.Player,
-    -- | CR 729.4: the cards outside THIS game that sit in a game on hold --
-    -- empty for a game nobody is nested inside. Filled by
-    -- Pawl.Engine.Setup.subgameStateFrom from its parent's card objects (and
-    -- from the parent's own copy of this field, which is CR 729.6's nesting),
-    -- and spent by Pawl.Engine.OutsideTheGame.
+    -- | CR 729.4: the cards outside this game that sit in a game on hold; empty
+    -- for a game nobody is nested inside.
     outsideObjects :: Map.Map ObjectId.ObjectId OutsideObject.OutsideObject,
-    -- | CR 729.4a: the outer ids this game has brought in, in the order they
-    -- crossed. Read once, by Pawl.Engine.Setup.applyCrossings, which
-    -- Pawl.Engine.Engine.playSubgame runs on the game it holds; an id that is
-    -- not one of that game's own objects came from further out and is passed
-    -- outward one level (CR 729.6).
+    -- | CR 729.4a: the outer ids this game has brought in, in crossing order,
+    -- read by Pawl.Engine.Setup.applyCrossings.
     broughtIn :: Seq.Seq ObjectId.ObjectId,
     -- | CR 106.4. Absent from the map means an empty pool.
     manaPool :: Map.Map PlayerId.PlayerId Mana.Mana,
     -- | CR 508/509. Lives for one combat phase; cleared at CR 511.
     combat :: Combat.Combat,
-    -- | CR 608.2i: what happened this turn, in order. Appended by the
-    -- change-and-emit funnels and by Engine.runStep's step-begin emission; NEVER
-    -- cleared by a reader. Cleared with both watermarks at turn handoff
-    -- (Engine.handoffTurn) -- not at cleanup, which is still part of this turn.
-    --
-    -- Each entry carries the EventGroup it belongs to (CR 704.3 / CR 608.2f's
-    -- "single event"), stamped by Event.recordEvent. The log stays FLAT and both
-    -- watermarks below stay counts of ELEMENTS: a group can legitimately be half
-    -- consumed, since scannedThrough and damageScannedThrough drain the same log
-    -- at different cadences. Groups are non-decreasing along the log, because
-    -- recordEvent only ever mints a fresh one or repeats the frozen one.
+    -- | CR 608.2i: what happened this turn, in order, each entry stamped with
+    -- its EventGroup (CR 608.2f's single event). Cleared at turn handoff
+    -- (Engine.handoffTurn), never by a reader.
     events :: Seq.Seq LoggedEvent.LoggedEvent,
-    -- | The group Event.recordEvent stamps on the next event it records.
-    --
-    -- Advanced past on each record, EXCEPT inside an Event.simultaneously
-    -- bracket, which is what makes every event in the bracket's body share a
-    -- group. NOT reset at turn handoff, where the log itself is cleared: nothing
-    -- compares a group against a value, only against another group, so a monotone
-    -- sequence keeps "later group" meaning what it says and the gap costs
-    -- nothing. A restarted game (CR 727.1) and a subgame (CR 729.1a) do start the
-    -- sequence over, because each is a new game rather than a later turn of this
-    -- one.
+    -- | The group Event.recordEvent stamps on the next event; advanced per
+    -- record except inside an Event.simultaneously bracket. Not reset at turn
+    -- handoff.
     nextEventGroup :: EventGroup.EventGroup,
-    -- | How deep the Event.simultaneously brackets are nested. Zero means each
-    -- recorded event is its own group.
-    --
-    -- The OUTERMOST bracket wins, which is what a counter buys over a flag: a CR
-    -- 704.3 state-based-action pass whose destruction batch is itself a CR 608.2f
-    -- simultaneous action is still one event, and the nested bracket must not end
-    -- the outer one's group early.
+    -- | How deep the Event.simultaneously brackets are nested; the outermost
+    -- bracket's group wins.
     eventGroupDepth :: Natural.Natural,
-    -- | CR 608.2h / 113.7a: last known information, keyed by the id an object had
-    -- BEFORE it left a zone.
-    --
-    -- Every zone change mints a fresh id (CR 400.7), so a departed object's OLD
-    -- id names nothing in `objects`. That is exactly the condition under which
-    -- this map is the answer, and it is why the key is the pre-move id: the id
-    -- an ability on the stack still carries as its source is the old one.
-    --
-    -- Written by the same funnel that records the Moved event, from the same
-    -- snapshot value, so the two cannot disagree. Both are kept because they
-    -- answer different questions: the log answers "what happened, in order"
-    -- (CR 608.2i) and needs the NEW id for an enters trigger to scan, while this
-    -- answers "what was that object" by the OLD id, in one lookup. They are also
-    -- read TOGETHER by Event.eventTriggers, which is how a permanent that enters
-    -- and dies inside one CR 117.5 settle still gets its CR 603.6a entry trigger
-    -- scanned.
-    --
-    -- Grows for the whole game, deliberately: an entry can be needed arbitrarily
-    -- later (a delayed trigger's source, CR 603.7d), so there is no point at
-    -- which pruning is provably safe.
+    -- | CR 608.2h / 113.7a: last known information, keyed by the id an object
+    -- had before it left a zone (CR 400.7). Grows for the whole game.
     lastKnown :: Map.Map ObjectId.ObjectId LastKnown.LastKnown,
-    -- | CR 117.5: how far the trigger scan has consumed. Everything at or after
-    -- this index is unscanned. Consumption is an index bump; the record stays.
+    -- | CR 117.5: how far the trigger scan has consumed the event log.
     scannedThrough :: Natural.Natural,
-    -- | CR 603.10's first sentence: "objects that exist immediately after an event
-    -- are checked to see if the event matched any trigger conditions, and
-    -- continuous effects that exist at that time are used to determine what the
-    -- trigger conditions are". The trigger scan runs once at the CR 117.5 boundary
-    -- rather than at each event, so this is what "at that time" costs: the
-    -- battlefield as it stood immediately after each unscanned event, keyed by that
-    -- event's group.
-    --
-    -- Three answers ride on it, and the live board at the scan gets all three
-    -- wrong on some board: WHICH permanents were there to be checked, WHAT
-    -- abilities each of them had, and CR 603.3a's controller of each. Written by
-    -- the one append point (Event.recordEvent) and read by Event.eventTriggers,
-    -- which falls back to the live board for a group this does not name.
-    --
-    -- ONE ENTRY PER GROUP, last write winning, because a group is CR 608.2f's
-    -- single event: its members are recorded one after another as the bracket
-    -- applies them, so the LAST of them is the one standing "immediately after"
-    -- the whole thing. Between groups the entries genuinely differ, which a
-    -- per-batch sample cannot express -- a permanent that entered at the second
-    -- group was not there to be checked against the first.
-    --
-    -- LAZY, and worth saying because it decides the cost: each entry is a thunk
-    -- over the state at that moment, so a group whose entry the scan never reads
-    -- costs nothing, and one it does costs the projection it would have paid at
-    -- the scan anyway. Cleared as the scan consumes the log, which is what bounds
-    -- both the map and the states its thunks retain.
+    -- | CR 603.10: the battlefield as it stood immediately after each unscanned
+    -- event, keyed by group, one lazy entry per group; read by
+    -- Event.eventTriggers, cleared as the scan consumes the log.
     battlefieldWhenTriggered :: Map.Map EventGroup.EventGroup (Map.Map ObjectId.ObjectId (BattlefieldCandidate.BattlefieldCandidate ProjectedCharacteristics.ProjectedCharacteristics)),
-    -- | Who controlled each permanent on the battlefield the last time
-    -- Pawl.Engine.Engine.sampleControl looked. The OBSERVATION POINT for a control
-    -- change: control is derived (CR 613.1b layer 2), so nothing announces a
-    -- change, and comparing this snapshot against the live projection is what
-    -- turns one into the GameEvent.ControlChanged that CR 603.2 needs.
-    --
-    -- ONE READING, not a history, unlike battlefieldWhenTriggered above: a diff
-    -- compares the board against the last look rather than against a named moment,
-    -- so the entry a group would key is exactly what it must not keep.
-    --
-    -- REBUILT from the battlefield at every sample rather than updated in place,
-    -- which is what prunes it: a permanent that left has no entry to go stale, and
-    -- one that comes back is a new object by CR 400.7 with an id this never saw.
-    -- An id absent from the snapshot is therefore first-sighted, and a first
-    -- sighting is not a change -- which is what keeps a permanent ENTERING under
-    -- a player who is not its owner (CR 110.2's Object.enteredUnder) from reading
-    -- as a control change it never was.
+    -- | Who controlled each permanent the last time
+    -- Pawl.Engine.Engine.sampleControl looked; diffing it against the live
+    -- projection is what yields GameEvent.ControlChanged (CR 603.2). Rebuilt
+    -- at every sample, so a first sighting is not a change.
     controlSample :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
-    -- | How far the STATE-BASED ACTION check has consumed the event log --
-    -- "since the last state-based action check", the boundary CR 704.5h names.
-    --
-    -- Not damage-only despite the name it was given for its first reader: CR
-    -- 903.9a asks the same question of the same boundary ("that object was put
-    -- into that zone since the last time state-based actions were checked"), and
-    -- Pawl.Engine.Commander.returnable reads it through
-    -- Pawl.Engine.Event.unscannedSbaEvents. One watermark, because there is one
-    -- check -- a second field would be a duplicate that could only ever drift.
+    -- | How far the state-based action check has consumed the event log --
+    -- CR 704.5h's and CR 903.9a's "since the last state-based action check".
     damageScannedThrough :: Natural.Natural,
     -- | CR 603.7: delayed triggered abilities awaiting their event, in creation
-    -- order. An entry is removed as it fires (CR 603.7b) unless it states a
-    -- duration, in which case one of the Pawl.Engine.Expiry sweeps ends it
-    -- instead. NOT cleared at turn handoff -- "at the beginning of the next end
-    -- step" survives into the next turn if this turn's end step passed before
-    -- the ability was armed.
+    -- order; not cleared at turn handoff.
     delayedTriggers :: Seq.Seq DelayedTrigger.DelayedTrigger,
-    -- | CR 611.2: stored continuous effects from resolutions (Giant Growth,
-    -- Serpent's Gift), each with an expiry the Pawl.Engine.Expiry sweeps consult.
-    -- Static-ability effects are NOT here -- the projection re-derives those live.
+    -- | CR 611.2: stored continuous effects from resolutions, each with an
+    -- expiry; static-ability effects are re-derived live instead.
     continuousEffects :: [ContinuousEffect.ContinuousEffect Card.Card],
-    -- | CR 614.3 / 615.3: floating replacement effects from resolutions (Fog's
-    -- prevention, Drudge Skeletons' regeneration shield), each with an expiry the
-    -- Pawl.Engine.Expiry sweeps consult (CR 514.2) and a use count (CR 614.3).
-    -- The event-pipeline analog of continuousEffects; a permanent's STATIC
-    -- replacement abilities are not here -- the projection re-derives those live.
+    -- | CR 614.3 / 615.3: floating replacement effects from resolutions, each
+    -- with an expiry and a use count; static replacement abilities are
+    -- re-derived live instead.
     replacements :: [ActiveReplacement.ActiveReplacement],
     -- | CR 615.5: prevention applications whose additional effect has not run
-    -- yet, oldest first. A QUEUE rather than a return value, because the module
-    -- that applies a prevention (Pawl.Engine.Damage, below Pawl.Engine.Resolve)
-    -- cannot run a card's effects and the module that can is two funnels away --
-    -- widening the return type instead would reach every DamageSpec call site.
-    --
-    -- Filled by Damage.applyDamage with the preventions that carry a rider and
-    -- drained by Resolve.runPreventionRiders, which its two callers run
-    -- immediately after the damage and BEFORE the next state-based action check
-    -- (CR 704.3). That gap is where the rule lives: the counters Test of Faith
-    -- puts on are on before CR 704.5g asks whether the creature died.
-    --
-    -- Empty at every priority window the engine reaches, so nothing else has to
-    -- know it exists. It is not the whole of CR 615.5's state -- `ambientAmounts`
-    -- below is the channel the amount travels on while a drained rider runs.
+    -- yet, drained by Resolve.runPreventionRiders before the next state-based
+    -- action check (CR 704.3). Empty at every priority window.
     pendingPreventionRiders :: Seq.Seq Prevention.Prevention,
-    -- | CR 615.5's amount channel: the amount bindings an effect running OUTSIDE
-    -- any object's environment can read, which today is a prevention's additional
-    -- effect and nothing else. Written and restored around one rider by
-    -- Resolve.runPreventionRider, and read LAST by Quantity's InSlot arm, after
-    -- both of that arm's object lookups.
-    --
-    -- Ambient rather than a binding on an object, which is what a rider's amount
-    -- used to be: CR 615.5's "the amount of damage that was prevented" has to
-    -- reach a rider whose shielded recipient is a PLAYER (Inkshield's "for each 1
-    -- damage prevented this way"), and a player has no Object to bind anything
-    -- to. The installing spell's object cannot stand in either -- CR 400.7 minted
-    -- a new object in its owner's graveyard, so its id names nothing.
-    --
-    -- A Map keyed by slot rather than a bare amount, so the reader stays an
-    -- ordinary slot lookup instead of hardcoding Pawl.Engine.Binding.eventAmount.
-    --
-    -- Empty at every priority window the engine reaches, exactly as the queue
-    -- above is: it is non-empty only for the span of one rider's effects.
+    -- | CR 615.5's amount channel: the amount bindings a prevention rider can
+    -- read outside any object's environment, its recipient possibly being a
+    -- player. Empty at every priority window.
     ambientAmounts :: Map.Map SlotName.SlotName Natural.Natural,
-    -- | CR 729.5: the slots a resolution filled AFTER its own object ceased to
-    -- exist, keyed by the id that object had. "The spell or ability that created
-    -- the subgame finishes resolving, even if it was created by a spell card
-    -- that's no longer on the stack" is the one rule that makes a resolution
-    -- outlive its carrier: a wish cast INSIDE a subgame may name the very
-    -- Shahrazad that is resolving (CR 729.4 puts the main game's stack outside
-    -- the subgame), and Pawl.Engine.Setup.applyCrossings then deletes that
-    -- object from the main game before CR 729.5 resumes the resolution.
-    --
-    -- `ambientAmounts` above one rule over, and off-object for its reason: an
-    -- Object.bindings write is a Map.adjust, so a slot bound onto an id that has
-    -- been deleted is silently dropped. Where that field carries CR 615.5's
-    -- amount for a recipient that is a PLAYER and so has no object at all, this
-    -- one carries a slot whose holder existed and then stopped.
-    --
-    -- KEYED BY ObjectId rather than a bare slot map, so nothing has to be
-    -- cleared: Pawl.Engine.Resolve's two resolution loops read this only as the
-    -- fallback for an object Game.lookupObject can no longer find, and an id is
-    -- never reused -- GameState.nextObjectId only ever climbs (Game.freshObjectId
-    -- increments it; Setup.funnelBack takes the max of the two games' and then
-    -- climbs past it for each card CR 712.21's split mints). Never
-    -- pruned, as `lastKnown` is not, and one entry per resolution that outlived
-    -- its own object.
+    -- | CR 729.5: the slots a resolution filled after its own object ceased to
+    -- exist, keyed by that object's id; the fallback Pawl.Engine.Resolve reads
+    -- for an object it can no longer find. Never pruned.
     detachedBindings :: Map.Map ObjectId.ObjectId (Map.Map SlotName.SlotName Binding.Binding),
-    -- | CR 614.1c: as-enters rewrites whose effects have not run yet, oldest
-    -- first. `pendingPreventionRiders` above one rule over, queued for the same
-    -- reason and drained the same way: Pawl.Engine.Event applies the replacement
-    -- and cannot run a card's effects, so Pawl.Engine.Resolve.runEntryEffects
-    -- does it.
-    --
-    -- WHERE IT IS DRAINED is the whole of what the deferral costs. The drain is
-    -- the first thing Pawl.Engine.Engine.performSettle does, so the effects run
-    -- before the SBA pass and before the trigger scan that would see the
-    -- permanent -- which is what Monstrous War-Leech needs, since CR 704.5f asks
-    -- about a power and toughness the mill decides, and what Ixidron needs harder:
-    -- its power and toughness ARE the count its own sweep changes, so a drain
-    -- after the SBA pass would bury it as a 0/0.
+    -- | CR 614.1c: as-enters rewrites whose effects have not run yet, drained
+    -- first thing in Pawl.Engine.Engine.performSettle, before the SBA pass and
+    -- the trigger scan. Empty at every priority window.
     --
     -- Not implemented: the effects running inside the entry, where CR 614.1c puts
     -- them. A resolution that puts a permanent onto the battlefield and then reads
     -- the board itself would see the pre-effect one (#1639); no card in the pool
     -- does that.
-    --
-    -- Empty at every priority window the engine reaches, so nothing else has to
-    -- know it exists.
     pendingEntryEffects :: Seq.Seq PendingEntryEffect.PendingEntryEffect,
-    -- | CR 113.6 / 614.12: the permanents entering the battlefield BESIDE the one
-    -- whose entry loop is running -- materialized here already, because
-    -- Pawl.Engine.Event settles a whole batch onto the battlefield before running
-    -- any member's entry loop, but not yet entered as far as the rules are
-    -- concerned. Their static abilities do not function, so
-    -- Pawl.Engine.Projection gathers no continuous effect from them: CR 614.12
-    -- admits only the entering permanent's OWN static abilities and "continuous
-    -- effects that already exist", and a sibling's are neither.
-    --
-    -- NEVER holds the entry loop's own subject, whose static abilities CR 614.12
-    -- does count -- Pawl.Engine.Event.runEntry writes the batch it was already
-    -- passed, and every door subtracts the subject before passing it.
-    --
-    -- Empty at every priority window the engine reaches, exactly as the two
-    -- queues above are: it is non-empty only for the span of one entry loop.
+    -- | CR 113.6 / 614.12: the permanents entering beside the one whose entry
+    -- loop is running -- materialized but not yet entered, so their static
+    -- abilities do not function. Never holds the loop's own subject. Empty at
+    -- every priority window.
     enteringBeside :: Set.Set ObjectId.ObjectId,
-    -- | CR 614.12: the SUBJECT of every entry loop currently running -- the one
-    -- permanent `enteringBeside` above deliberately leaves out. Materialized on
-    -- the battlefield, so that CR 614.12's "characteristics of the permanent as it
-    -- would exist on the battlefield" is a plain projection, but not on it as far
-    -- as the rules are concerned: Frontier Mastodon's ferocious row "checks if you
-    -- control a creature with power 4 or greater as Frontier Mastodon enters the
-    -- battlefield. Because Frontier Mastodon isn't on the battlefield at this
-    -- time, it won't count itself" (Gatherer, 2014-11-24).
-    --
-    -- Together with `enteringBeside` this is every permanent that is
-    -- materialized but not entered, which is what
-    -- Pawl.Engine.Projection.boardAsEntering subtracts from the battlefield before
-    -- a CR 614.12 determination reads it. Neither field subsumes the other: a
-    -- subject's own static abilities DO apply to it (which
-    -- is why abilitySources subtracts only the siblings), and a sibling is no more
-    -- countable than the subject (which is why the board subtracts both).
-    --
-    -- A SET rather than one id because an entry rewrite can reach another entry --
-    -- the SacrificeAnyNumber arm sacrifices, RunEffects resolves -- and an outer
-    -- subject has not entered while an inner one runs. `enteringCounters` is keyed
-    -- per object for the same nesting.
-    --
-    -- Empty at every priority window the engine reaches, exactly as the queues
-    -- above are: it is non-empty only for the span of an entry loop.
+    -- | CR 614.12: the subject of every entry loop currently running,
+    -- materialized but not entered; with `enteringBeside`, what
+    -- Pawl.Engine.Projection.boardAsEntering subtracts. Empty at every priority
+    -- window.
     enteringSubjects :: Set.Set ObjectId.ObjectId,
-    -- | CR 614.1c: the counters each entering permanent is so far going to enter
-    -- WITH, pending. Written by Pawl.Engine.Event's entry rewrites and by the two
-    -- doors that dress a permanent before its entry loop, rewritten by the
-    -- CounterR and Compleated rows that CR 616.1 orders against each other, and
-    -- flushed onto the object by runEntry once the loop drains.
-    --
-    -- SEPARATE from Object.counters, not folded into it, because the two doors
-    -- above run before runEntry and their comments rest on no entry replacement
-    -- reading a counter the object already has. A pending map keeps that true:
-    -- nothing here is on the object yet.
-    --
-    -- Keyed by ObjectId rather than held as one map, because an entry rewrite can
-    -- reach another entry (SacrificeAnyNumber sacrifices, RunEffects resolves) and
-    -- the outer subject's pending count has to survive the inner one.
-    --
-    -- Empty outside an entry. An id is inserted when the first row gives that
-    -- object counters and deleted by the flush.
+    -- | CR 614.1c: the counters each entering permanent is so far going to
+    -- enter with, pending until runEntry flushes them onto the object. Empty
+    -- outside an entry.
     enteringCounters :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural),
-    -- | CR 611.1 / 613.11: stored PLAYER and RULES-modifying continuous effects
-    -- from resolutions (Silence), each with an expiry the Pawl.Engine.Expiry
-    -- sweeps consult. A permanent's printed player abilities are NOT here --
-    -- Pawl.Engine.PlayerEffect re-derives those live.
+    -- | CR 611.1 / 613.11: stored player- and rules-modifying continuous effects
+    -- from resolutions, each with an expiry; printed ones are re-derived live.
     playerEffects :: [ActivePlayerEffect.ActivePlayerEffect],
-    -- | CR 509.1c / 613.11: stored BLOCKING REQUIREMENTS from resolutions
-    -- (provoke), each with an expiry the Pawl.Engine.Expiry sweeps consult. A
-    -- permanent's printed block requirements are NOT here --
-    -- Pawl.Engine.BlockRequirement re-derives those live.
+    -- | CR 509.1c / 613.11: stored blocking requirements from resolutions, each
+    -- with an expiry; printed ones are re-derived live.
     blockRequirements :: [ActiveBlockRequirement.ActiveBlockRequirement],
-    -- | CR 508.1d / 613.11: stored ATTACKING REQUIREMENTS from resolutions
-    -- (Alluring Siren), the field above's twin on the other side of the combat
-    -- phase. A permanent's printed attack requirements are NOT here --
-    -- Pawl.Engine.AttackRequirement re-derives those live.
+    -- | CR 508.1d / 613.11: stored attacking requirements from resolutions, each
+    -- with an expiry; printed ones are re-derived live.
     attackRequirements :: [ActiveAttackRequirement.ActiveAttackRequirement],
-    -- | CR 701.19c / 611.1: stored REGENERATION PROHIBITIONS from resolutions
-    -- (Hurr Jackal), each with an expiry the Pawl.Engine.Expiry sweeps consult.
-    -- Read at Pawl.Engine.Event.resolveDestruction, which turns a standing row
-    -- into that event's Pawl.Types.Regenerability. Nothing printed lives here:
-    -- an effect that destroys and forbids regeneration in one breath (Terror)
-    -- carries the Regenerability on the destruction instead.
+    -- | CR 701.19c / 611.1: stored regeneration prohibitions from resolutions,
+    -- each with an expiry, read at Pawl.Engine.Event.resolveDestruction.
     unregeneratables :: [ActiveUnregeneratable.ActiveUnregeneratable],
-    -- | CR 509.1b / 611.1: stored BLOCKING RESTRICTIONS from resolutions (Zirda,
-    -- the Dawnwaker), each with an expiry the Pawl.Engine.Expiry sweeps consult.
-    -- Read at Pawl.Engine.CombatRestriction.blockProhibited, which unions them into
-    -- that module's `cantBlock`. A permanent's printed restrictions are NOT here
-    -- -- Pawl.Engine.CombatRestriction.inForce re-derives those live off the
-    -- battlefield.
+    -- | CR 509.1b / 611.1: stored blocking restrictions from resolutions, each
+    -- with an expiry; printed ones are re-derived live.
     blockProhibitions :: [ActiveBlockProhibition.ActiveBlockProhibition],
-    -- | CR 508.1c / 611.1: stored ATTACKING RESTRICTIONS from resolutions
-    -- (Netter en-Dal, Chronomantic Escape), each with an expiry the
-    -- Pawl.Engine.Expiry sweeps consult. Read at
-    -- Pawl.Engine.CombatRestriction.attackProhibited, which unions the rows
-    -- aimed at nothing into that module's `cantAttack`, and at
-    -- Pawl.Engine.CombatRestriction.cantAttackPlayer, which unions the aimed
-    -- rows into its announcement set. A permanent's printed restrictions are
-    -- NOT here -- Pawl.Engine.CombatRestriction.inForce re-derives those live
-    -- off the battlefield.
+    -- | CR 508.1c / 611.1: stored attacking restrictions from resolutions, each
+    -- with an expiry; printed ones are re-derived live.
     attackProhibitions :: [ActiveAttackProhibition.ActiveAttackProhibition],
-    -- | CR 116.2d: the ignores players have paid for, each with an expiry the
-    -- Pawl.Engine.Expiry sweeps consult. Read by Pawl.Engine.PlayerEffect.applying,
-    -- which drops an ignored permanent's abilities for the ignoring player alone
-    -- -- so this suppresses, where every neighbour above adds.
+    -- | CR 116.2d: the ignores players have paid for, each with an expiry, read
+    -- by Pawl.Engine.PlayerEffect.applying.
     ignoredAbilities :: [IgnoredAbility.IgnoredAbility],
-    -- | The seating order. CR 800.5 (or CR 806.3 for Grand Melee) only says
-    -- players determine SOME seating order; CR 103.1's last sentence is what
-    -- makes it the turn order, beginning with the starting player -- so this
-    -- field is that seating order, rotated so the starting player is first. It
-    -- lists every player who BEGAN this game and is never shortened. Who is
-    -- still IN the game is Game.stillPlaying, and every departure-aware read
-    -- filters through that on top of this.
-    --
-    -- Two rules depend on a departed player keeping their seat:
-    --   * CR 800.4m -- the seat is how the handoff knows when a departed player's
-    --     turn WOULD have begun.
-    --   * CR 800.4a -- finding the departed player's successor in turn order
-    --     needs their own position.
-    --
-    -- CR 729.1b is NOT a third, though it used to be listed as one. Shahrazad's
-    -- "each player who doesn't win the subgame" is the set who PLAYED it, and CR
-    -- 729.4 puts a player who is not in the subgame outside it -- so the roster
-    -- there is Game.stillPlaying's, the same set Setup.subgameStateFrom seats,
-    -- and this field would name a seat that never played.
+    -- | The seating order (CR 800.5) rotated so the starting player is first,
+    -- which CR 103.1 makes the turn order. Lists every player who began the
+    -- game and is never shortened -- CR 800.4a and 800.4m need a departed
+    -- player's seat; who is still in is Game.stillPlaying.
     turnOrder :: [PlayerId.PlayerId],
     activePlayer :: PlayerId.PlayerId,
     phase :: Phase.Phase,
-    -- | CR 500. The steps still scheduled this turn, in order; `phase` is the one
-    -- in progress. The turn is DATA: CR 508.8 drops steps from this, CR 510.4 and
-    -- 500.8/500.9 splice steps and phases into it. `Turn.allPhases` is the
-    -- template a new turn refills from (see Engine.handoffTurn).
+    -- | CR 500: the steps still scheduled this turn, in order, `phase` being the
+    -- one in progress; CR 508.8 drops steps and CR 510.4, 500.8 and 500.9
+    -- splice them in. Refilled from `Turn.allPhases` at handoff.
     remaining :: Seq.Seq Phase.Phase,
     priority :: Maybe PlayerId.PlayerId,
     passes :: Natural.Natural,
     turnNumber :: Natural.Natural,
     result :: Maybe Result.Result,
     -- | CR 727.4: raised while a restart has replaced this game underneath the
-    -- frames still running it, so Engine.priorityLoop and Engine.runStep unwind
-    -- to the rebuilt turn 1 instead of acting on it. Transient: Engine.runStep
-    -- lowers it as that turn's untap step begins.
+    -- frames still running it; Engine.runStep lowers it as turn 1's untap step
+    -- begins.
     restartSignal :: RestartSignal.RestartSignal,
-    -- | CR 724.1: raised while an effect that ends the turn is unwinding through
-    -- the frames that were running the step it ended, so Engine.priorityLoop
-    -- neither settles nor grants another round (CR 724.1f). Transient:
-    -- Engine.runStep lowers it as CR 724.1d's cleanup step begins.
+    -- | CR 724.1: raised while an effect that ends the turn unwinds through the
+    -- frames running the ended step; Engine.runStep lowers it as CR 724.1d's
+    -- cleanup step begins.
     endTurnSignal :: EndTurnSignal.EndTurnSignal,
     nextObjectId :: ObjectId.ObjectId,
-    -- | Every printing this game knows, named by an id the objects carry
-    -- instead of the whole Printing. Two ids naming the same card is a benign
-    -- state, not something to guard against: CR 109.3 lists what an object's
-    -- characteristics are and closes with "any other information about an
-    -- object isn't a characteristic", which is where the illustration (CR
-    -- 203.1) and the expansion symbol (CR 206.1) sit -- both stated to have no
-    -- effect on game play. The engine's identity questions are name-keyed
-    -- instead (CR 100.2a's deck limit, CR 201.2's matching).
-    --
-    -- Append-only, and never collected -- a token that ceases to exist under
-    -- CR 704.5d drops its Object but keeps its entry. Deliberate rather than a
-    -- gap: the table is bounded by game length and each entry names a Printing
-    -- already shared in memory, so a reachability scan over every Source,
-    -- Player.commander and Player.dungeon would serve a cost nothing has
-    -- measured; see #1594.
+    -- | Every printing this game knows, by the id the objects carry; two ids
+    -- naming one card is benign (CR 109.3). Append-only and never collected.
     printings :: Map.Map PrintingId.PrintingId Printing.Printing,
     -- | `printings` read backwards, so Pawl.Engine.Game.intern answers with the
-    -- id a printing already has instead of minting a second one for it. That
-    -- makes "objects of the same printing share an id" a property of the table
-    -- rather than a convention each minting site has to keep.
-    --
-    -- No CURRENT reader breaks without it: Pawl.Engine.Setup.createDeck interns
-    -- once and hands the one id to both createCard and Commander.designate, so
-    -- isCommander's comparison holds either way. What it buys is that a future
-    -- minting site cannot get it wrong, and that a deck listing its commander
-    -- among its cards too (CR 903.5b forbids it; #940 means pawl does not
-    -- enforce it) behaves like a well-formed one.
-    --
-    -- Keyed by the whole Printing, so interning pays a deep Ord Card. It is paid
-    -- once per DISTINCT printing per game: at setup, and once per
-    -- token-creation or emblem event.
+    -- id a printing already has. A deck listing its commander among its cards
+    -- too (CR 903.5b forbids it; #940 means pawl does not enforce it) behaves
+    -- like a well-formed one.
     printingIds :: Map.Map Printing.Printing PrintingId.PrintingId,
     nextPrintingId :: PrintingId.PrintingId,
-    -- | CR 613.7: the monotonic source of timestamps for objects (at creation) and
-    -- stored continuous effects (at CR 611 creation). See Timestamp.
+    -- | CR 613.7: the monotonic source of timestamps for objects and stored
+    -- continuous effects. See Timestamp.
     nextTimestamp :: Timestamp.Timestamp,
-    -- | CR 104.4b: the timestamp as of the last time a player was offered an
-    -- OPTIONAL action. The gap between this and nextTimestamp is how many events
-    -- have happened with no player able to decide anything, which is
-    -- Pawl.Engine.Engine.checkMandatoryLoop's heuristic for a loop of mandatory
-    -- actions.
-    --
-    -- Advanced only by Pawl.Engine.Game.choose, so a new prompt site cannot
-    -- forget to reset it. Conceding is deliberately not one of its callers: CR
-    -- 104.3a lets a player concede at any time, so if that counted as the
-    -- optional action, no loop would ever be mandatory.
-    --
-    -- Pawl.Engine.Setup also SETS it, at the three seams where a game begins
-    -- (emptyGame, restartGame, subgameStateFrom) and where one ends back into its
-    -- parent (funnelBack). Each sets it to the timestamp supply's value there, so
-    -- neither a fresh game nor a resumed one inherits a gap run up elsewhere.
+    -- | CR 104.4b: the timestamp as of the last optional action offered to a
+    -- player, advanced only by Pawl.Engine.Game.choose (conceding excepted, CR
+    -- 104.3a); its gap from nextTimestamp is
+    -- Pawl.Engine.Engine.checkMandatoryLoop's heuristic.
     lastChoice :: Timestamp.Timestamp,
     drewFromEmpty :: Set.Set PlayerId.PlayerId,
-    -- | CR 305.2a: how many lands each player has already played this turn --
-    -- the right-hand side of that rule's comparison, whose left-hand side is
-    -- Pawl.Engine.PlayerEffect.landPlaysAllowed. A player with no row here has
-    -- played none.
-    --
-    -- A COUNT and not a yes/no, because CR 305.2 lets a continuous effect raise
-    -- the number a player may play, so one is not the only interesting
-    -- threshold (Exploration, Azusa Lost but Seeking).
-    --
-    -- Cleared PER PLAYER at that player's untap step (Engine.runTurnBasedActions),
-    -- which is what makes it "this turn".
+    -- | CR 305.2a: how many lands each player has played this turn, a count
+    -- because CR 305.2 lets an effect raise the allowance; cleared per player
+    -- at their untap step.
     landsPlayed :: Map.Map PlayerId.PlayerId Natural.Natural,
-    -- | CR 121.1: how many cards each player has already drawn this turn. A player
-    -- with no row here has drawn none. Written by Pawl.Engine.Event.drawCard, the
-    -- one funnel every draw goes through, and read only there -- to stamp the
-    -- ordinal onto the GameEvent.Drew it records, which is what a card asking
-    -- "your second card each turn" -- or CR 702.94a's "the first card you've drawn
-    -- this turn" -- actually matches against.
-    --
-    -- STORED rather than folded out of the turn-scoped event log, which would
-    -- otherwise be the Event.declarationsOf precedent: CR 103.3's opening hands
-    -- are drawn through the same funnel BEFORE the first turn begins, and that
-    -- log is not cleared between the two. A field can be -- and is, at the end of
-    -- Mulligan.openingHands -- while the log cannot without discarding the rest
-    -- of setup's history.
-    --
-    -- Cleared for EVERY player at the turn handoff (Engine.beginTurnOf), not per
-    -- player at their untap step as landsPlayed above is: a player draws on other
-    -- players' turns (Howling Mine, an instant), so the tally that resets is the
-    -- whole map.
+    -- | CR 121.1: how many cards each player has drawn this turn, stamped as the
+    -- ordinal onto GameEvent.Drew; cleared for every player at turn handoff,
+    -- and after CR 103.3's opening hands.
     drawsThisTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
     -- | CR 702.179d: the players whose inherent speed-increase ability has
-    -- already triggered this turn -- that rule's "this ability triggers only
-    -- once each turn", which nothing else in the game state records.
-    --
-    -- STORED rather than derived off the turn-scoped event log, unlike CR
-    -- 508.3a's once-a-turn (Event.declarationsOf) and CR 606.3's
-    -- (Activate.loyaltyActivatedThisTurn). Those two read a log entry that IS the
-    -- thing being limited; this ability's limit is on the TRIGGER, and the log's
-    -- nearest entry is the life loss, which is not the same event: an opponent
-    -- losing life while the player has no speed (CR 702.179b) fires nothing,
-    -- because CR 702.179d hangs the ability off "a player having 1 or more
-    -- speed" -- and a log-derived limit would spend the turn's one trigger on it.
-    --
-    -- Cleared at the turn handoff (Engine.beginTurnOf), beside the event log, so
-    -- "each turn" needs nothing to reset it per player. A Set and not a Bool
-    -- because the rule scopes the limit to the ability, and each player controls
-    -- their own.
+    -- triggered this turn; stored because the limit is on the trigger, not on
+    -- a logged event. Cleared at turn handoff.
     speedIncreasedThisTurn :: Set.Set PlayerId.PlayerId,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
-    -- controlled. Map.insert overwrites (CR 723.1a, last created wins). Promoted
-    -- to activeControl at the actual start of that player's turn (CR 723.1b).
+    -- controlled; last created wins (CR 723.1a), promoted to activeControl at
+    -- that player's turn (CR 723.1b).
     pendingControl :: Map.Map PlayerId.PlayerId Decider.Decider,
-    -- | CR 723.1/723.3: the decider controlling the ACTIVE player this turn, if any.
-    -- Only the active player is ever controlled during their turn, so one Maybe
-    -- suffices. Overwritten every turn start, so control ends at the next turn's
-    -- beginning (CR 723.1).
+    -- | CR 723.1 / 723.3: the decider controlling the active player this turn,
+    -- overwritten at every turn start.
     activeControl :: Maybe Decider.Decider,
-    -- | CR 725.1/725.3: the monarch, a single game-wide player designation (at most
-    -- one at a time). Nothing until a player becomes the monarch. On GameState,
-    -- not Player, because it is one designation, not a per-player counter.
+    -- | CR 725.1 / 725.3: the monarch, a single game-wide designation.
     monarch :: Maybe PlayerId.PlayerId,
-    -- | CR 726.1/726.3: the initiative, the monarch's sibling designation -- at
-    -- most one holder, and Nothing until an effect instructs a player to take
-    -- it. On GameState for GameState.monarch's reason.
+    -- | CR 726.1 / 726.3: the initiative, the monarch's sibling designation.
     initiative :: Maybe PlayerId.PlayerId,
-    -- | CR 731.1: the game's day/night designation. Nothing is the rule's own
-    -- third state, "the game starts with neither designation", and it is the only
-    -- state that is not a Daytime -- CR 731.1's last sentence makes it
-    -- unreachable once either designation has been gained, so nothing ever writes
-    -- Nothing back.
-    --
-    -- On GameState and not on Object, for CR 725.1's reason rather than CR
-    -- 701.54b's: "day and night are designations THE GAME ITSELF can have", which
-    -- is the monarch's footing, where the Ring-bearer is a permanent's and rides
-    -- Object.ringBearerFor. Pawl.Engine.Ring's haddock draws that line.
-    --
-    -- Written only by Pawl.Engine.Daytime, because becoming day or night also
-    -- turns daybound and nightbound permanents over (CR 702.145c/f).
+    -- | CR 731.1: the game's day\/night designation; Nothing is the rule's "neither",
+    -- unreachable once either has been gained. Written only by
+    -- Pawl.Engine.Daytime.
     daytime :: Maybe Daytime.Daytime,
-    -- | CR 502.2 / 731.2: how many spells the PREVIOUS turn's active player cast
-    -- during that turn -- the whole of what the untap step's day/night check asks
-    -- about the turn just ended.
-    --
-    -- A stored snapshot rather than a fold over the event log, which is the one
-    -- thing it cannot be: GameState.events is cleared at the handoff
-    -- (Engine.beginTurnOf), and this is read AFTER that, in the next turn's untap
-    -- step. Written by beginTurnOf from the outgoing turn's log, which is the last
-    -- moment the count exists.
-    --
-    -- ONE number and not a map, because rule 731.2 names exactly one player, "the
-    -- previous turn's active player". Not implemented: CR 731.2a's reading for the
-    -- shared team turns option, which asks about a whole team (#2848). The
-    -- per-player question a CARD asks is castsLastTurn below, and Engine.beginTurnOf
-    -- reads THIS field out of that map so the two cannot disagree.
+    -- | CR 502.2 / 731.2: how many spells the previous turn's active player cast
+    -- that turn, snapshotted at handoff from the outgoing log, which is cleared
+    -- there. Not implemented: CR 731.2a's reading for the shared team turns
+    -- option, which asks about a whole team (#2848).
     spellsCastLastTurn :: Natural.Natural,
-    -- | CR 601.2i / 608.2i: how many spells EACH player cast during the turn just
-    -- ended -- Daybreak Ranger's "if no spells were cast last turn" and Nightfall
-    -- Predator's "if a player cast two or more spells last turn", neither of which
-    -- is about one named seat.
-    --
-    -- A MAP where spellsCastLastTurn above is a scalar, and not a widening of it:
-    -- rule 731.2 names exactly one player and a card names all of them, so the two
-    -- fields answer different questions off the same fold. Engine.beginTurnOf
-    -- builds this and then reads the scalar out of it, which is what keeps the
-    -- invariant `Map.findWithDefault 0 (previous active player) castsLastTurn ==
-    -- spellsCastLastTurn` true by construction rather than by discipline.
-    --
-    -- SPARSE, as drawsThisTurn is: a player who cast nothing has no entry, and
-    -- every reader takes 0 for an absent one. Nobody having cast is a number.
-    --
-    -- A stored snapshot rather than a fold over the event log, for the reason
-    -- spellsCastLastTurn is one: GameState.events is cleared at the same handoff
-    -- that writes this, and every reader is in a LATER turn.
+    -- | CR 601.2i / 608.2i: how many spells each player cast during the turn
+    -- just ended, sparse, snapshotted at the same handoff; spellsCastLastTurn
+    -- is read out of it by Engine.beginTurnOf so the two cannot disagree.
     castsLastTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
-    -- | CR 725 (Palace Jailer): objects exiled "until an opponent becomes the
-    -- monarch", keyed by the exiled incarnation id to the watch that ends the
-    -- exile -- the effect's controller, plus whether a crowning has already
-    -- discharged it, so that an opponent BECOMING the monarch can be told from an
-    -- opponent merely holding the crown. Marked by Pawl.Engine.Monarch.crown and
-    -- swept by Pawl.Engine.Monarch.returnExiledForMonarch. Not an Expiry: the
-    -- Expiry sweeps are delete-and-recompute and cannot perform the return zone
-    -- change.
+    -- | CR 725: objects exiled "until an opponent becomes the monarch", keyed
+    -- by the exiled incarnation, swept by
+    -- Pawl.Engine.Monarch.returnExiledForMonarch. Not an Expiry, which cannot
+    -- perform a zone change.
     exiledUntilMonarch :: Map.Map ObjectId.ObjectId MonarchWatch.MonarchWatch,
-    -- | CR 610.3: objects moved "until this leaves the battlefield", keyed by the
-    -- incarnation the move minted (CR 400.7) to the watch that ends it -- the
-    -- source whose departure is the specified event, plus the zone the object came
-    -- from. Written by Pawl.Engine.Resolve's MoveToZone arm and swept by
-    -- Pawl.Engine.MoveDuration.returnMoved, the settle-loop counterpart of
-    -- exiledUntilMonarch's sweep one field up and not an Expiry for that field's
-    -- reason.
-    --
-    -- The exile half of CR 607.2a's link (exiledWith, below) does NOT answer this:
-    -- that relation says which ability exiled a card, where this one says the move
-    -- is only half finished. Nothing a card prints returns these objects.
+    -- | CR 610.3: objects moved "until this leaves the battlefield", keyed by
+    -- the incarnation the move minted, swept by
+    -- Pawl.Engine.MoveDuration.returnMoved.
     movedUntilSourceLeaves :: Map.Map ObjectId.ObjectId ReturnWatch.ReturnWatch,
     -- | CR 702.55b: which object each haunting card haunts, keyed by the exiled
-    -- incarnation Effect.ExileHaunting minted and answering with the object that
-    -- haunt ability targeted. Read by TriggerCondition.HauntedCreatureDies, which
-    -- is the only thing rule 702.55b's link is for.
-    --
-    -- Board state rather than a field on the exiled Object, for exiledUntilMonarch's
-    -- reason one field up: it is a relation between two ids that outlives neither,
-    -- and CR 400.7 would strip it from an object that moved again anyway.
-    --
-    -- Never cleaned up on the VALUE side: rule 702.55b keeps naming the object the
-    -- haunt ability targeted after that object is gone (the haunted creature dying
-    -- is the whole point), so only Pawl.Engine.Departure's CR 800.4a sweep removes
-    -- an entry, and only by its key.
+    -- incarnation; the value is never cleaned up, the haunted creature dying
+    -- being the point.
     haunting :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
-    -- | CR 607.2's linked set, as a relation: which object each card now in exile
-    -- is linked to. Keyed by the EXILED incarnation (the id CR 400.7 minted as
-    -- the card arrived in exile), valued by the object the link names -- rule
-    -- 607.2a's ability whose instruction exiled it, or rule 607.2b's generator of
-    -- the replacement effect that did. Read only by
-    -- ObjectRef.EachCardExiledWithSource.
-    --
-    -- The RELATION rather than either rule: "an instruction in an ability of this
-    -- object put this card in exile" also answers a back-reference INSIDE one
-    -- ability (CR 400.7j, in CR 608.2c's written order), which rule 607.2's
-    -- linked abilities do not cover. That arm's haddock names the printing.
-    --
-    -- Board state rather than a field on the exiled Object, for `haunting`'s
-    -- reason one field up: it is a relation between two ids that outlives neither.
-    -- The VALUE is what forces it -- Hoarding Dragon's second ability is a dies
-    -- trigger, so the object the link names is already gone by the time the link
-    -- is read, and CR 603.10a's look-back is what makes the trigger's source the
-    -- battlefield incarnation that did the exiling rather than the graveyard card.
-    --
-    -- Written by TWO writers, one per sub-rule (607.2b's is below). Rule 607.2a's
-    -- is Pawl.Engine.Resolve.applyEffectWith, which files every card that
-    -- ARRIVED in exile while an effect ran against that effect's source. A
-    -- difference over GameState.exile and not a case over the opcode: rule 607.2a
-    -- asks which ability's instruction exiled the card, never which instruction it
-    -- was, so the rules core stays off effect identity and Search's exile, a
-    -- MoveToZone's and a keyword's are all one road.
+    -- | CR 607.2's linked set as a relation: the object each exiled card is
+    -- linked to, keyed by the exiled incarnation and written by
+    -- Pawl.Engine.Resolve.applyEffectWith (rule 607.2a) and Pawl.Engine.Event's
+    -- zone change funnel (rule 607.2b) as a difference over GameState.exile,
+    -- never a case over the opcode. Cleaned up by key only.
     --
     -- Scoped to the OBJECT and not to the printed ABILITY, where rule 607.2a
     -- scopes it to the ability. The two differ only for a card with two exiling
     -- abilities and two referring ones, since pawl has no ability identity to key
     -- on at all -- Pawl.Types.Source embeds the ability value, not an index. No
     -- printing in the pool is in that shape (#1535).
-    --
-    -- Rule 607.2b's writer is Pawl.Engine.Event's zone change funnel: an exile
-    -- another object's replacement effect causes inside that window links to the
-    -- replacement's own object, not to whatever ability was resolving, so the
-    -- funnel files it as the arriving incarnation is minted and
-    -- recordExiledWith's insertWith leaves that entry standing.
-    --
-    -- Cleaned up by KEY only, never by value, for `haunting`'s reason: an entry
-    -- whose value is gone is exactly the entry Hoarding Dragon reads. Three sweeps
-    -- do it -- recordExiledWith drops the key of a card that has left exile,
-    -- since CR 400.7 gives that card a new id and the old one can never be named
-    -- again, Pawl.Engine.Departure drops the keys CR 800.4a takes out of the
-    -- game with their owner, and Pawl.Engine.Setup.restartGame keeps only the
-    -- cards CR 727.5 exempted from the rebuild, which are the only ones still in
-    -- exile when the new game begins.
     exiledWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
-    -- | CR 406.4: which pile each card now in exile face down is in, as a stamp
-    -- shared by every card the same instruction exiled at the same time --
-    -- "separate piles based on when they were exiled and how they were exiled".
-    -- A NAME and not an order: two cards are in one pile exactly when this holds
-    -- the same value for both, and Pawl.Engine.Exile.pileOf is what reads it.
-    --
-    -- Drawn from GameState.nextTimestamp, which is a supply of distinct values
-    -- before it is an ordering, rather than from a counter of its own: a name
-    -- needs nothing but distinctness, and a second supply would be a second field
-    -- for every sweep and every codec to keep.
-    --
-    -- Board state rather than a field on the exiled Object, for `exiledWith`'s
-    -- reason one field up: CR 400.7 would strip it from an object that moved
-    -- again, and a card that has moved is out of every pile anyway.
-    --
-    -- ONE writer, Pawl.Engine.Resolve.recordExilePile, which stamps every card
-    -- that arrived in exile face down while one effect ran. That window is CR
-    -- 406.4's "when and how" exactly: one execution of one instruction, at one
-    -- time. A difference over GameState.exile and not a case over the opcode, so
-    -- the rules core stays off effect identity -- `exiledWith`'s road above.
-    --
-    -- Cleaned up by key, by the three sweeps `exiledWith` names and for its
-    -- reasons: recordExilePile drops a key that has left exile,
-    -- Pawl.Engine.Departure drops what CR 800.4a takes out of the game, and
-    -- Pawl.Engine.Setup.restartGame keeps only CR 727.5's exempted cards, which
-    -- are the only ones still in a pile when the new game begins.
+    -- | CR 406.4: which pile each face-down exiled card is in, a name drawn from
+    -- nextTimestamp and shared by every card one execution of one instruction
+    -- exiled (Pawl.Engine.Resolve.recordExilePile). Cleaned up by key only.
     exilePiles :: Map.Map ObjectId.ObjectId Timestamp.Timestamp,
-    -- | CR 500.7: the extra turns that have been created and not yet taken, MOST
-    -- RECENTLY CREATED FIRST. A stack, not a queue, and a list precisely because
-    -- the style guide reserves lists for stacks (GameState.stack is the other
-    -- one). Popped by Engine.handoffTurn before the seating order is consulted.
-    --
-    -- One entry per turn, so two effects giving one player an extra turn each
-    -- are two entries: CR 500.7 adds extra turns one at a time, which makes them
-    -- countable rather than a set of players. Each entry also carries the steps
-    -- and phases THAT turn skips, which is how a CR 500.11 skip printed as "the
-    -- untap step of that turn" (Savor the Moment) names a turn without a
-    -- reference that could dangle.
+    -- | CR 500.7: the extra turns created and not yet taken, most recently
+    -- created first, each carrying the steps that turn skips (CR 500.11).
     extraTurns :: [ExtraTurn.ExtraTurn],
-    -- | CR 500.7 / 103.1: while an EXTRA turn is under way, the seat the ordinary
-    -- turn order resumes from -- the active player of the most recent turn that
-    -- was not an extra one. Nothing on an ordinary turn, where that seat IS
-    -- GameState.activePlayer and there is nothing to remember.
-    --
-    -- CR 500.7 adds a turn directly after the specified turn and takes nothing
-    -- away, so the turn that would have followed it still follows it. Anchoring
-    -- the CR 103.1 walk on activePlayer instead would make an extra turn CONSUME
-    -- the taker's ordinary turn whenever the two are different players -- Time
-    -- Warp aimed at an opponent.
+    -- | CR 500.7 / 103.1: while an extra turn is under way, the seat the
+    -- ordinary turn order resumes from; Nothing on an ordinary turn.
     turnAnchor :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)
