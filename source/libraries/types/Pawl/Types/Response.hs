@@ -411,6 +411,12 @@ data Response
     -- reason: replaying a transcript against the wrong one would reorder a sweep
     -- instead of a trigger batch.
     OrderedForEach [Natural.Natural]
+  | -- | CR 613.7m: the relative order a player chose for the timestamps their own
+    -- objects receive at one moment, as a permutation of the offered indices. A
+    -- separate constructor from the ones above for their reason: replaying a
+    -- transcript against the wrong one would reorder a sweep instead of a batch
+    -- of stamps.
+    OrderedTimestamps [Natural.Natural]
   | -- | CR 616.1: the index of the replacement effect a player chose to apply
     -- next.
     ChoseReplacement Natural.Natural
