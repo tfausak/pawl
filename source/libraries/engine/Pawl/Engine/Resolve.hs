@@ -35,6 +35,7 @@ import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
+import qualified Pawl.Engine.Initiative as Initiative
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
@@ -167,6 +168,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
+import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -645,6 +647,7 @@ effectObjectRefs effect = case effect of
     RestrictedCreatures.Matching _ -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
+  Effect.TakeTheInitiative {} -> []
   Effect.Designate {} -> []
   Effect.SetClassLevel {} -> []
   Effect.Unsuspect ref -> [ref]
@@ -775,6 +778,7 @@ effectPlayerRefs effect = case effect of
   Effect.ForbidAttack {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
+  Effect.TakeTheInitiative {} -> []
   Effect.Designate {} -> []
   Effect.SetClassLevel {} -> []
   Effect.Unsuspect {} -> []
@@ -1009,6 +1013,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm.
   Effect.BecomeMonarch target -> monarchTargetSlots target
+  -- CR 726.1 names no target slot at all: neither InitiativeTarget arm reads one.
+  Effect.TakeTheInitiative _ -> Map.empty
   -- A READ: the slot names the permanent gaining the designation.
   Effect.Designate (Designate.MkDesignate _ slot) -> oneSlot slot
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> oneSlot slot
@@ -1497,6 +1503,9 @@ ownSlotsAreExhaustive effect = case effect of
   -- The one arm answering NO: CR 725.2 reads Binding.triggerSource.
   Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
+  Effect.TakeTheInitiative InitiativeTarget.TheController -> True
+  -- CR 726.2 reads Binding.triggerSource, Effect.BecomeMonarch ControllerOfSource's answer.
+  Effect.TakeTheInitiative InitiativeTarget.ControllerOfSource -> False
   Effect.Designate (Designate.MkDesignate _ _) -> True
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
   Effect.Unsuspect _ -> True
@@ -1657,6 +1666,7 @@ readsX = any effectReadsX
       Effect.RequireAttack {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
+      Effect.TakeTheInitiative {} -> False
       Effect.Designate (Designate.MkDesignate _ _) -> False
       Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
       Effect.Unsuspect _ -> False
@@ -1903,6 +1913,7 @@ boundSlots effect = case effect of
   Effect.RequireAttack {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
+  Effect.TakeTheInitiative {} -> Set.empty
   Effect.Designate (Designate.MkDesignate _ _) -> Set.empty
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Set.empty
   Effect.Unsuspect _ -> Set.empty
@@ -7405,6 +7416,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- CR 725.3's handoff, the CR 603.2 event and CR 725's exile watches are all
       -- Monarch.crown's, so no caller can move the crown without them.
       Just p -> State.modify' (Monarch.crown p)
+  -- CR 726.1: the initiative moves, whichever InitiativeTarget named the taker.
+  Effect.TakeTheInitiative target -> do
+    gs <- State.get
+    let taker = case target of
+          InitiativeTarget.TheController -> Just controller
+          -- CR 726.2: the controller of the ability's bound source, read from the
+          -- reserved trigger-source slot.
+          InitiativeTarget.ControllerOfSource ->
+            Map.lookup Binding.triggerSource chosen
+              >>= Binding.onlyOne
+              >>= Recipient.objectOf
+              >>= (\o -> Projection.controllerOf o gs)
+    case taker of
+      Nothing -> pure ()
+      -- CR 726.3's hand-off, CR 726.5's re-take and the CR 603.2 event are all
+      -- Initiative.takeInitiative's, so no caller can move the designation
+      -- without them. No eligibility gate, where the crown has one: rule 726
+      -- states no "can't take the initiative" effect.
+      Just p -> State.modify' (Initiative.takeInitiative p)
   -- The slot's permanent gains the designation (CR 702.112a, CR 701.37a, CR
   -- 701.60a) -- a state write, not a CR 613 modification.
   --

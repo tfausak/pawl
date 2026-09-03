@@ -44,6 +44,7 @@ import qualified Pawl.Codec.ForbidAttack as ForbidAttack
 import qualified Pawl.Codec.ForbidBlock as ForbidBlock
 import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
+import qualified Pawl.Codec.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LookAt as LookAt
 import qualified Pawl.Codec.ManaAddition as ManaAddition
@@ -173,6 +174,7 @@ codec cardCodec abilityCodec =
       Arm.payload "ForbidAttack" ForbidAttack.codec Effect.ForbidAttack (\x -> case x of Effect.ForbidAttack y -> Just y; _ -> Nothing),
       Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
       Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch (\x -> case x of Effect.BecomeMonarch y -> Just y; _ -> Nothing),
+      Arm.payload "TakeTheInitiative" InitiativeTarget.codec Effect.TakeTheInitiative (\x -> case x of Effect.TakeTheInitiative y -> Just y; _ -> Nothing),
       Arm.payload "Designate" Designate.codec Effect.Designate (\x -> case x of Effect.Designate y -> Just y; _ -> Nothing),
       Arm.payload "SetClassLevel" SetClassLevel.codec Effect.SetClassLevel (\x -> case x of Effect.SetClassLevel y -> Just y; _ -> Nothing),
       Arm.payload "Unsuspect" ObjectRef.codec Effect.Unsuspect (\x -> case x of Effect.Unsuspect y -> Just y; _ -> Nothing),

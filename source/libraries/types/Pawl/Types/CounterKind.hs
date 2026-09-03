@@ -212,7 +212,7 @@ data CounterKind keyword
     -- Pawl.Codec.CounterName.make is why two spellings cannot be two kinds: CR
     -- 122.1's last sentence makes counters with the same name interchangeable,
     -- so the name is the identity and a spelling that collides with a
-    -- constructor above is rejected at the only door in. That module's familyOf
+    -- constructor above is rejected at card data's only door in. That module's familyOf
     -- cases over this type without a wildcard, so a constructor added above owes
     -- a Pawl.Types.CounterKindFamily constructor and a spelling there.
     Named CounterName.CounterName

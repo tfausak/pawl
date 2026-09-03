@@ -2588,6 +2588,7 @@ rewriteEffect pairs effect = case effect of
   -- whole of what CR 612.1 can reach.
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)
   Effect.BecomeMonarch {} -> effect
+  Effect.TakeTheInitiative {} -> effect
   Effect.Designate (Designate.MkDesignate _ _) -> effect
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
@@ -3058,6 +3059,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDealCombatDamageToPlayer f -> TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.rewrite pairs f)
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
+  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> condition
+  TriggerCondition.PlayerTookInitiative -> condition
   TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition
   TriggerCondition.SelfRevealedForMiracle -> condition

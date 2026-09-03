@@ -1992,6 +1992,10 @@ representativeEvents cond =
         -- Event.eventTriggers instead -- PermanentsDie's posture below.
         TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> one combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
+        -- CR 726.2's pair, matched by Pawl.Engine.Initiative.inherentPending rather
+        -- than by Event.matchesTrigger, the monarch's condition above's posture.
+        TriggerCondition.CreaturesDealtCombatDamageToInitiative -> one combatDamage
+        TriggerCondition.PlayerTookInitiative -> one (GameEvent.TookInitiative S.bob)
         -- CR 702.179d's own event. Like the monarch's condition above it, this
         -- one is matched by Pawl.Engine.Speed.inherentPending rather than by
         -- Event.matchesTrigger, which answers False for it whatever the event --
@@ -2382,6 +2386,8 @@ everyTriggerCondition =
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
+    TriggerCondition.CreaturesDealtCombatDamageToInitiative,
+    TriggerCondition.PlayerTookInitiative,
     TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
     TriggerCondition.SelfRevealedForMiracle,
@@ -2786,9 +2792,8 @@ permanentReturnedToHandSpec s registry =
 -- whole card: Tameshi at X=1 returns the mana value 1 artifact card" is what
 -- proves the value reaches it. Retract {U} Instant, "Return all artifacts you
 -- control to their owner's hand" (data/cards/retract.json, same check), is the
--- one effect
--- returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve brackets as one
--- Pawl.Types.EventGroup.
+-- one effect returning two: CR 608.2f's sweep, which Pawl.Engine.Resolve
+-- brackets as one Pawl.Types.EventGroup.
 --
 -- WHY A SYNTHETIC BESIDE THE PRINTING. Tameshi's "triggers only once each turn"
 -- makes the batch reading indistinguishable from the per-permanent one on any

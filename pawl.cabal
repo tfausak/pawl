@@ -469,6 +469,8 @@ library codec
     Pawl.Codec.IncreaseSpellCostSpec
     Pawl.Codec.InherentTriggerSource
     Pawl.Codec.InherentTriggerSourceSpec
+    Pawl.Codec.InitiativeTarget
+    Pawl.Codec.InitiativeTargetSpec
     Pawl.Codec.InstanceOrdinal
     Pawl.Codec.InstanceOrdinalSpec
     Pawl.Codec.InZone
@@ -952,6 +954,7 @@ library engine
     Pawl.Engine.Game
     Pawl.Engine.Goad
     Pawl.Engine.Ignore
+    Pawl.Engine.Initiative
     Pawl.Engine.Interchangeable
     Pawl.Engine.Keyword
     Pawl.Engine.Mana
@@ -1275,6 +1278,7 @@ library test
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.GoadSpec
+    Pawl.InitiativeSpec
     Pawl.InvestigateSpec
     Pawl.KeywordTriggerSpec
     Pawl.LibraryOrderSpec
@@ -1307,6 +1311,7 @@ library test
     Pawl.SpecialActionSpec
     Pawl.SpeedSpec
     Pawl.SplitSecondSpec
+    Pawl.StationSpec
     Pawl.Support
     Pawl.TargetSpec
     Pawl.TeamSpec
@@ -1552,6 +1557,7 @@ library types
     Pawl.Types.IncreaseActivationCost
     Pawl.Types.IncreaseSpellCost
     Pawl.Types.InherentTriggerSource
+    Pawl.Types.InitiativeTarget
     Pawl.Types.InstanceOrdinal
     Pawl.Types.InZone
     Pawl.Types.Keyword

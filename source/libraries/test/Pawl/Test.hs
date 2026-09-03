@@ -204,6 +204,7 @@ import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.IncreaseActivationCostSpec
 import qualified Pawl.Codec.IncreaseSpellCostSpec
 import qualified Pawl.Codec.InherentTriggerSourceSpec
+import qualified Pawl.Codec.InitiativeTargetSpec
 import qualified Pawl.Codec.InstanceOrdinalSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
@@ -451,6 +452,7 @@ import qualified Pawl.FaceDownSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.GameSpec
 import qualified Pawl.GoadSpec
+import qualified Pawl.InitiativeSpec
 import qualified Pawl.InvestigateSpec
 import qualified Pawl.Json.ArraySpec
 import qualified Pawl.Json.BooleanSpec
@@ -505,6 +507,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
 import qualified Pawl.SplitSecondSpec
+import qualified Pawl.StationSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
 import qualified Pawl.TransformSpec
@@ -824,6 +827,7 @@ spec s registry = do
   Pawl.Codec.ModificationSpec.spec s
   Pawl.Codec.ModifyPowerToughnessSpec.spec s
   Pawl.Codec.ModifyTargetSpec.spec s
+  Pawl.Codec.InitiativeTargetSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.MonarchWatchSpec.spec s
   Pawl.Codec.MorphSpec.spec s
@@ -1049,6 +1053,7 @@ spec s registry = do
   Pawl.JsonSchema.PatternSpec.spec s
   Pawl.JsonSchema.SchemaSpec.spec s
   Pawl.JsonSchema.ValidateSpec.spec s
+  Pawl.InitiativeSpec.spec s registry
   Pawl.InvestigateSpec.spec s registry
   Pawl.KeywordTriggerSpec.spec s registry
   Pawl.LibraryOrderSpec.spec s registry
@@ -1087,6 +1092,7 @@ spec s registry = do
   Pawl.SpecialActionSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
   Pawl.SplitSecondSpec.spec s registry
+  Pawl.StationSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TeamSpec.spec s registry
   Pawl.TransformSpec.spec s registry
