@@ -97,10 +97,14 @@ data LastKnown = MkLastKnown
     --
     -- Not a characteristic either (CR 109.3's list has no attachment), and not
     -- recoverable from anything above, so it sits beside the projection for
-    -- `controller`'s reason. CR 704.5m and CR 704.5n take an Aura or an
-    -- Equipment off the battlefield in the very SBA batch that killed its host,
-    -- so a live read of the link is unavailable exactly when the rules still ask
-    -- for it -- Pawl.Types.TriggerCondition.AttachedCreatureDies is the reader.
+    -- `controller`'s reason. CR 704.5m takes an AURA off the battlefield in the
+    -- very SBA batch that killed its host, so a live read of the link is
+    -- unavailable exactly when the rules still ask for it --
+    -- Pawl.Types.TriggerCondition.AttachedCreatureDies is the reader.
+    --
+    -- Not implemented: the same question for an EQUIPMENT, which CR 704.5n
+    -- merely detaches, so it survives the batch with no entry here and no live
+    -- link either (#3144).
     --
     -- Nothing for an object that was attached to nothing, which is every object
     -- that is not an Aura, an Equipment or a Fortification.

@@ -89,10 +89,12 @@
                   {
                     "type": "CopyStackObject",
                     "value": {
-                      "newTargets": true,
                       "ref": {
                         "type": "InSlot",
                         "value": "spell"
+                      },
+                      "targets": {
+                        "type": "ChosenByController"
                       }
                     }
                   }

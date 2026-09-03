@@ -267,6 +267,8 @@ library codec
     Pawl.Codec.CopyExceptionSpec
     Pawl.Codec.CopyStackObject
     Pawl.Codec.CopyStackObjectSpec
+    Pawl.Codec.CopyTargets
+    Pawl.Codec.CopyTargetsSpec
     Pawl.Codec.Cost
     Pawl.Codec.CostComponent
     Pawl.Codec.CostComponentSpec
@@ -1442,6 +1444,7 @@ library types
     Pawl.Types.ControllerRelation
     Pawl.Types.CopyException
     Pawl.Types.CopyStackObject
+    Pawl.Types.CopyTargets
     Pawl.Types.Cost
     Pawl.Types.CostAdjustments
     Pawl.Types.CostComponent

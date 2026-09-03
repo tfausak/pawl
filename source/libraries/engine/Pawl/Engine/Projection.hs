@@ -63,6 +63,7 @@ import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
+import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -2406,10 +2407,12 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders))
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) ->
     Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject))
-  -- The ref alone, CreateCopy's reason: CR 707.2 keeps a text change out of the
-  -- copiable values, so what the copy becomes is not rewritten. CR 707.10c's
-  -- offer is no land type either.
-  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref newTargets) -> Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (rewriteObjectRef pairs ref) newTargets)
+  -- BOTH refs, CreateCopy's reason: CR 707.2 keeps a text change out of the
+  -- copiable values, so what the copy becomes is not rewritten, but CR 707.10d's
+  -- description of the candidates ("each other creature you control") is card
+  -- text like any other ref's. CR 707.10c's offer is no land type at all.
+  Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) ->
+    Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (rewriteObjectRef pairs ref) (rewriteCopyTargets pairs targets))
   -- CR 612.1 through the SHIELD a resolution installs: the row's duration, its
   -- CR 614.1 gate, and the replacement effect itself, which is where the word
   -- usually sits. rewritePrintedReplacement makes the same descent over a
@@ -2667,6 +2670,15 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
   ObjectRef.ChosenPermanent f -> ObjectRef.ChosenPermanent (Filter.rewrite pairs f)
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
+
+-- CR 612.1 through CR 707.10d's description of the copies' candidates, which is
+-- card text like any other ref's. The other two answers name nothing a land-type
+-- swap can find.
+rewriteCopyTargets :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CopyTargets.CopyTargets -> CopyTargets.CopyTargets
+rewriteCopyTargets pairs targets = case targets of
+  CopyTargets.Copied -> targets
+  CopyTargets.ChosenByController -> targets
+  CopyTargets.ForEach ref -> CopyTargets.ForEach (rewriteObjectRef pairs ref)
 
 -- CR 612.1/612.2a through the CARD an Effect.Create or an Effect.CreateEmblem
 -- defines its token or emblem with: the type line, the name, and the rules text.
@@ -4396,6 +4408,7 @@ filterReads f = case f of
   -- CR 115.1 / 109.3: a target is a property of a stack object and no
   -- characteristic, so no Modification writes one.
   Filter.Type.TargetsSource -> Set.empty
+  Filter.Type.TargetsOnlySource -> Set.empty
   Filter.Type.TargetsPlayer _ -> Set.empty
   -- Reads an IDENTITY, which CR 109.3 does not count as a characteristic.
   Filter.Type.IsBound _ -> Set.empty
@@ -4611,6 +4624,7 @@ filterReadsPeers f = case f of
   Filter.Type.OwnedBy _ -> False
   Filter.Type.IsSource -> False
   Filter.Type.TargetsSource -> False
+  Filter.Type.TargetsOnlySource -> False
   Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
   Filter.Type.SameNameAsBound _ -> False

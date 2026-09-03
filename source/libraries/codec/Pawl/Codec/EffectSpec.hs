@@ -36,6 +36,7 @@ import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
+import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
@@ -731,20 +732,27 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) EntryRiders.defaultValue))
       " {\"type\":\"CreateCopy\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":5},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
-  -- Twincast, both sentences. CR 707.10c's offer is elided when absent, so the
-  -- two fixtures differ in exactly the key that carries it.
-  Spec.it s "CopyStackObject round-trips with and without CR 707.10c's offer" $ do
+  -- Twincast's second sentence and Zada, Hedron Grinder's, against CR 707.10
+  -- alone. The three fixtures differ in exactly the key that carries the
+  -- answer, which is elided when the card prints none.
+  Spec.it s "CopyStackObject round-trips each of CR 707.10's answers" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) True))
-      " {\"type\":\"CopyStackObject\",\"value\":{\"newTargets\":true,\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}} "
+      (Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) CopyTargets.ChosenByController))
+      " {\"type\":\"CopyStackObject\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"targets\":{\"type\":\"ChosenByController\"}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) False))
+      (Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You)))))
+      " {\"type\":\"CopyStackObject\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"},\"targets\":{\"type\":\"ForEach\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) CopyTargets.Copied))
       " {\"type\":\"CopyStackObject\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}} "
   -- Unstable Shapeshifter's own pair. The two refs take DIFFERENT shapes on
   -- purpose: they are not interchangeable, and a codec that swapped them would

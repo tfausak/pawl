@@ -430,7 +430,8 @@ data CostComponent keyword
     ExileThisFromGraveyard
   | -- | CR 406.2 as a cost, from the OTHER zone: exile the permanent the cost is
     -- on, off the battlefield. Brittle Effigy's "{4}, {T}, Exile this artifact:
-    -- Exile target creature" is the printing. A cost by CR 118.1's general
+    -- Exile target creature" is one printing, Hanged Executioner's "{3}{W}, Exile
+    -- this creature: Exile target creature" another. A cost by CR 118.1's general
     -- reading, ExileThisFromGraveyard's argument above unchanged.
     --
     -- The second CONSTRUCTOR that arm calls for rather than a zone parameter on

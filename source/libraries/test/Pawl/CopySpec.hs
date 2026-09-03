@@ -43,7 +43,9 @@
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
@@ -52,6 +54,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
@@ -67,10 +70,12 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -2113,3 +2118,153 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertEqWith s "and the trigger itself still made bob discard" (handSize S.bob afterBoth) 1
             Spec.assertEqWith s "the copy resolved first: bob still held both cards then" (handSize S.bob afterCopy) 2
             Spec.assertEqWith s "and the stack is empty" (GameState.stack afterBoth) []
+
+-- CR 707.10d, end to end: Zada, Hedron Grinder {3}{R} Legendary Creature --
+-- Goblin Ally 3/3, "Whenever you cast an instant or sorcery spell that targets
+-- only Zada, copy that spell for each other creature you control that the spell
+-- could target. Each copy targets a different one of those creatures."
+-- (data/cards/zada-hedron-grinder.json, Oracle text verified 2026-09-03.)
+--
+-- Both halves of the rule are on one board: the COUNT (one copy per candidate
+-- the Growth could target) and the TARGETS (the effect picks them, and no
+-- prompt offers them to anyone). Blurred Mongoose is what makes "could target"
+-- do work -- 2/1 with shroud (CR 702.18a), a creature alice controls that the
+-- Growth cannot target, so rule 707.10d's last sentence gives it no copy.
+--
+-- FIVE DISTINCT PAIRS after the Growths, so no two reads share a number: the
+-- Piker 5/4, the Spider 5/7, the Wall 3/11, Zada 6/6 from the original alone,
+-- and the Mongoose still 2/1.
+zadaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+zadaSpec s registry =
+  let boardOf = do
+        forest <- S.printingOf s registry "Forest"
+        zada <- S.printingOf s registry "Zada, Hedron Grinder"
+        piker <- S.printingOf s registry "Goblin Piker"
+        spider <- S.printingOf s registry "Giant Spider"
+        wall <- S.printingOf s registry "Wall of Stone"
+        mongoose <- S.printingOf s registry "Blurred Mongoose"
+        growth <- S.printingOf s registry "Giant Growth"
+        let lands = S.landsFor forest S.alice 1 S.threePlayerGame
+            (zadaId, g1) = S.addCreature zada S.alice lands
+            (pikerId, g2) = S.addCreature piker S.alice g1
+            (spiderId, g3) = S.addCreature spider S.alice g2
+            (wallId, g4) = S.addCreature wall S.alice g3
+            (mongooseId, g5) = S.addCreature mongoose S.alice g4
+            (withGrowth, growthId) = S.handOne growth g5
+        pure (zadaId, pikerId, spiderId, wallId, mongooseId, growthId, withGrowth)
+      -- The Growth is aimed at Zada and at nothing else, which is the trigger's
+      -- whole condition; the copies' targets are the effect's and reach no
+      -- prompt at all.
+      atZada :: ObjectId -> Prompt.Prompt r -> r
+      atZada zadaId p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just zadaId) . Recipient.objectOf) offered) asked
+        _ -> S.identityAnswer p
+      -- What each object on the stack targets, top first, read live off its
+      -- bindings the way Pawl.Engine.Resolve.targetsOnStack does.
+      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))))) (GameState.stack gs)
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        Spec.it s "CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one" $ do
+          (zadaId, pikerId, spiderId, wallId, mongooseId, growthId, board) <- boardOf
+          let cast = snd (Engine.runGamePure (atZada zadaId) board {GameState.priority = Just S.alice} (S.cast S.alice growthId))
+              -- CR 603.3b puts Zada's trigger on the stack above the Growth;
+              -- draining resolves the trigger, then its copies, then the Growth.
+              placed = snd (Engine.runGamePure (atZada zadaId) cast Engine.settleForPriority)
+              -- The trigger alone, which is the moment the copies exist and
+              -- none has resolved -- where "a copy isn't created" is visible.
+              afterTrigger = resolveOne (atZada zadaId) placed
+              after = drainStack (atZada zadaId) placed
+              pt oid = S.powerToughnessOf oid after
+          -- The fixture's own precondition, which no reading of rule 707.10d can
+          -- redden: the Mongoose is on the battlefield to be passed over.
+          Spec.assertBool s (S.powerToughnessOf mongooseId board == Just (2, 1)) "the Mongoose starts 2/1"
+          -- Rule 707.10d's last sentence at the only place it is observable: a
+          -- copy made for the Mongoose anyway would be COUNTERED for an illegal
+          -- target (CR 608.2b) and leave every P/T below reading the same, so
+          -- the copies are counted and named where they sit on the stack.
+          Spec.assertEqWith
+            s
+            "CR 707.10d one copy per creature the Growth could target, each on a different one, and none for the Mongoose"
+            (List.sort (concatMap (Maybe.mapMaybe Recipient.objectOf) (List.init (stackTargets afterTrigger))))
+            (List.sort [pikerId, spiderId, wallId])
+          Spec.assertEqWith s "CR 707.10d a copy targeted the Piker" (pt pikerId) (Just (5, 4))
+          Spec.assertEqWith s "CR 707.10d a different copy targeted the Spider" (pt spiderId) (Just (5, 7))
+          Spec.assertEqWith s "CR 707.10d and a third the Wall" (pt wallId) (Just (3, 11))
+          Spec.assertEqWith s "CR 707.10d the Mongoose has shroud, so the spell could not target it" (pt mongooseId) (Just (2, 1))
+          Spec.assertEqWith s "and Zada took only the original Growth, no copy having been made for it" (pt zadaId) (Just (6, 6))
+          Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+        -- CR 707.10d's one player choice: "the copies are put onto the stack
+        -- with those targets in the order of their controller's choice". Two
+        -- runs off one board differing in exactly the answer
+        -- Prompt.OrderForEach is given, read off the STACK before anything
+        -- resolves -- which is the moment the order is observable.
+        Spec.it s "CR 707.10d the copies go onto the stack in their controller's chosen order" $ do
+          (zadaId, _, _, _, _, growthId, board) <- boardOf
+          let answering :: ([Natural.Natural] -> [Natural.Natural]) -> (forall r. Prompt.Prompt r -> r)
+              answering reorder p = case p of
+                Prompt.OrderForEach _ _ _ group -> reorder (zipWith const [0 ..] group)
+                _ -> atZada zadaId p
+              stacked reorder =
+                let cast = snd (Engine.runGamePure (answering reorder) board {GameState.priority = Just S.alice} (S.cast S.alice growthId))
+                    placed = snd (Engine.runGamePure (answering reorder) cast Engine.settleForPriority)
+                    -- The trigger alone, so the copies are on the stack and none
+                    -- of them has resolved.
+                    afterTrigger = resolveOne (answering reorder) placed
+                 in stackTargets afterTrigger
+              offered = stacked id
+              reversed = stacked List.reverse
+          Spec.assertEqWith s "CR 707.10d reversing the answer reverses the copies on the stack" (take 3 reversed) (List.reverse (take 3 offered))
+          Spec.assertBool s (take 3 offered /= take 3 reversed) "and the two orders differ, so the prompt was live"
+          Spec.assertEqWith s "three copies over the Growth, in both runs" (length offered, length reversed) (4, 4)
+
+-- The slots a COPIED TRIGGER declares, which CR 603.2's bindings narrow: Questing
+-- Beast's "target planeswalker THAT PLAYER controls" (Filter.ControlledByBound
+-- "thatPlayer"). Pawl.Engine.Engine.placeBorne bakes that map into the modal as
+-- the trigger goes on the stack, and CR 707.10 copies the bindings onto the copy,
+-- so the copy's slots have to be baked from the copy's own map before CR 707.10c
+-- can offer anything: an unbaked ControlledByBound admits nobody, which would
+-- leave the offer elided as "settled" and the copy silently on the original's
+-- target.
+--
+-- THREE SEATS with carol holding BOTH planeswalkers, on 9 and 6 loyalty: the two
+-- readings are 5 / 2 against 1 / 6, and no number is shared.
+copiedTriggerTargetSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+copiedTriggerTargetSpec s registry =
+  let pinWalker :: ObjectId -> Prompt.Prompt r -> r
+      pinWalker oid p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) asked
+        _ -> S.identityAnswer p
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        Spec.it s "CR 707.10c a copied trigger's slot is baked, so the offer is a real choice" $ do
+          beast <- S.printingOf s registry "Questing Beast"
+          engine <- S.printingOf s registry "Lithoform Engine"
+          karn <- S.printingOf s registry "Karn Liberated"
+          -- TWO PRINTINGS, not one twice: CR 704.5j would put one of a pair of
+          -- Karns into a graveyard before the trigger ever fired.
+          jace <- S.printingOf s registry "Jace Beleren"
+          forest <- S.printingOf s registry "Forest"
+          let (gs0, mine, _, others) = S.threePlayerCombat [beast, engine] [] [karn, jace]
+          case (mine, others) of
+            ([beastId, engineId], [firstWalker, secondWalker]) -> do
+              let loyal = S.addCounter CounterKind.Loyalty 6 secondWalker (S.addCounter CounterKind.Loyalty 9 firstWalker gs0)
+                  board = S.landsFor forest S.alice 2 loyal
+                  plan :: Prompt.Prompt r -> r
+                  plan p = case p of
+                    Prompt.ChooseDefender {} -> S.carol
+                    Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer S.carol) (NonEmpty.toList options))
+                    Prompt.DeclareBlockers {} -> Map.empty
+                    Prompt.ChooseTargets {} -> pinWalker firstWalker p
+                    _ -> S.aggressiveAnswer p
+                  atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) plan board
+                  fought = S.runPure plan atDamage Damage.dealCombatDamage
+                  placed = S.runPure plan fought Engine.settleForPriority
+              case (engineAbilityCopyingAbilities engineId placed, topOfStack placed) of
+                (Just copier, Just trigId) -> do
+                  let staged = S.runPure (pinTarget (Recipient.ToObject trigId)) placed {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+                      -- The Engine's ability, then the copy, then the trigger.
+                      afterEngine = resolveOne (pinWalker secondWalker) staged
+                      after = resolveOne S.identityAnswer (resolveOne S.identityAnswer afterEngine)
+                  Spec.assertEqWith s "CR 707.10c the copy dealt its damage to the walker alice re-targeted it at" (S.counterOf CounterKind.Loyalty secondWalker after) 2
+                  Spec.assertEqWith s "and the trigger itself still dealt its own to the walker it announced" (S.counterOf CounterKind.Loyalty firstWalker after) 5
+                  Spec.assertBool s (beastId /= engineId) "the Beast and the Engine are distinct objects"
+                (_, _) -> Spec.assertFailure s "the Beast's trigger should be on the stack and the Engine should declare a {2} ability"
+            _ -> Spec.assertFailure s "fixture should give alice a Beast and an Engine and carol two planeswalkers"
