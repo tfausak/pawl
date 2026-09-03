@@ -833,19 +833,37 @@ placeBorne srcId pending = do
           --
           -- `rejected` bounds the recursion, Combat.attemptAttackDeclaration's
           -- shape: a pure `Prompt r -> r` decider repeats its answer, so a repeat
-          -- is not re-asked a second time. What it degrades to is CR 603.3d's
-          -- removal -- the rule's answer for a required choice that cannot be
-          -- made, taken here for an interpreter that will not make one, since
-          -- announcing on their behalf is the one thing this may not do. Such an
-          -- interpreter costs exactly one extra prompt; one proposing FRESH
-          -- incoherent answers terminates on the finite set of announcements over
-          -- `sets`.
+          -- is not re-asked a second time. What it degrades to is removal from
+          -- the stack, which is NOT CR 603.3d's own: that rule removes an ability
+          -- for which "no legal choices can be made", a question about the board
+          -- and the `selectionPossible` branch above. This is a decider that will
+          -- not make one, and announcing on their behalf is the one thing this may
+          -- not do. Such an interpreter costs exactly one extra prompt.
+          --
+          -- Keyed on the answer NARROWED TO THE OFFER, which is what makes the
+          -- recursion terminate: Recipient is unbounded and chooseTargets does not
+          -- validate, so an interpreter naming a fresh object id every call never
+          -- repeats and the raw answer bounds nothing. `sets` is finite, so the
+          -- narrowed key is drawn from a finite set. attemptAttackDeclaration's
+          -- posture again -- it keys on the declaration it filtered to
+          -- `candidates` rather than on the raw answer. TargetSpec's "CR 603.3d an
+          -- announcement outside the offer, made afresh each time, is refused
+          -- rather than asked forever" is the proof.
+          --
+          -- The KEY only. What is judged and what is recorded are still the raw
+          -- answer: CR 601.2c makes an announcement naming something unoffered
+          -- illegal rather than short, so narrowing what is judged would silently
+          -- drop a target instead of asking again, and would drop the card
+          -- Target.drawFromPiles legitimately draws out of a pile and outside the
+          -- slot's own set.
           --
           -- Judged against `gs`, the board `sets` was offered from, so the offer
           -- and this check cannot disagree about one announcement.
           --
           -- Not implemented: Target.selectionLegal's other two conjuncts on this
-          -- road -- per-slot membership and the announced count (#3091).
+          -- road -- the announced count, and per-slot membership for the slots
+          -- Target.jointlyJudged skips. A jointly judged slot does get membership,
+          -- jointlyCoherent asking legalRecipientsGiven of each (#3091).
           attempt rejected = do
             -- Zero, there being no announcement to read: CR 601.2b's is made
             -- while casting a spell or activating an ability, and a triggered
@@ -854,9 +872,10 @@ placeBorne srcId pending = do
             if Target.jointlyCoherent (Just controller) bound srcId slots chosen gs
               then pure (Just chosen)
               else
-                if Set.member chosen rejected
-                  then pure Nothing
-                  else attempt (Set.insert chosen rejected)
+                let key = Map.intersectionWith Set.intersection chosen sets
+                 in if Set.member key rejected
+                      then pure Nothing
+                      else attempt (Set.insert key rejected)
       answered <- attempt Set.empty
       case answered of
         -- CR 603.3d: a required choice with no legal answer forthcoming.

@@ -563,8 +563,10 @@ designate pid oid =
 -- that raises it, so a temptation a "Whenever the Ring tempts you" ability sees
 -- and one the count remembers cannot come apart. Recorded outside the branch
 -- that designates, which is that rule's "even if some or all of those actions
--- were impossible": Pawl.RingSpec's "CR 701.54d a temptation with no creature to
--- choose still fires the trigger" proves it.
+-- were impossible": Pawl.RingSpec's "CR 701.54d a player with no creatures is
+-- still tempted" proves the EVENT is recorded on such a board. That it reaches a
+-- trigger is not proved -- the pool's one observer (Nazgul) is a creature its own
+-- controller would have to choose, so no creatureless board carries one.
 tempt :: PlayerId -> Game ()
 tempt pid = do
   gs0 <- State.get

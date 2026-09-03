@@ -91,6 +91,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -3162,7 +3163,7 @@ answeringItzquinth dealer victim p = case p of
 -- TWO BOARDS differing in exactly ONE thing: whether bob has a Wall of Stone. The
 -- same two Mountains pay the same {2} on both, and the same Itzquinth enters the
 -- same way, so neither answer is about mana or about the payment.
-itzquinthSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+itzquinthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 itzquinthSpec s registry = Spec.describe s "Announcing a trigger's targets (CR 603.3d)" $ do
   Spec.it s "CR 603.3d a trigger's announcement naming one creature in both slots is asked again" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -3197,3 +3198,51 @@ itzquinthSpec s registry = Spec.describe s "Announcing a trigger's targets (CR 6
     Spec.assertEqWith s "and on the board without it" (S.tappedCount S.alice ceased) 2
     Spec.assertEqWith s "the reflexive ability really reached the stack when a coherent answer existed" (length (GameState.stack placed)) 1
     Spec.assertEqWith s "and alice was asked twice for it: the incoherent answer was refused and the announcement asked again" asks 2
+
+  -- The same board, and an interpreter that answers OUTSIDE the offer with a value
+  -- it has never used before. Recipient is unbounded and Target.chooseTargets does
+  -- not validate its answer, so keying the refused announcements on the raw answer
+  -- would re-ask forever; Engine.placeBorne keys on the answer narrowed to the
+  -- offer, which is drawn from a finite set.
+  --
+  -- The Wall is still there, so a coherent announcement EXISTS on this board: the
+  -- removal below is the decider's refusal to make one and not CR 603.3d's own
+  -- "no legal choices can be made", which the case above already covers.
+  --
+  -- A regression here HANGS rather than fails, Pawl.ReplacementSpec's shape. This
+  -- group carries no Tasty.localOption budget, so what fences it is the --timeout
+  -- flake.nix's testFlags pass; run bare, the mutation never returns.
+  Spec.it s "CR 603.3d an announcement outside the offer, made afresh each time, is refused rather than asked forever" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    wall <- S.printingOf s registry "Wall of Stone"
+    itzquinth <- S.printingOf s registry "Itzquinth, Firstborn of Gishath"
+    let (wallId, withWall) = S.addCreature wall S.bob (S.landsInPlay mountain 2)
+        (dinoId, together) = S.entersWithTrigger itzquinth S.alice withWall
+        placed = S.runPure S.identityAnswer together Engine.settleForPriority
+        ((_, ceased), asks) = State.runState (Engine.runGame (answeringItzquinthAfresh dinoId) placed (Stack.resolveTop >> Engine.settleForPriority)) 0
+    -- The gameplay-level assertions first.
+    Spec.assertEqWith s "the reflexive ability is removed from the stack rather than announced forever" (length (GameState.stack ceased)) 0
+    Spec.assertEqWith s "so the Wall took no damage" (S.damageOf wallId ceased) (Just 0)
+    Spec.assertEqWith s "and neither did Itzquinth" (S.damageOf dinoId ceased) (Just 0)
+    -- The proxies last. The payment happened, so the removal is the announcement
+    -- rather than a gate that skipped the reflexive ability entirely.
+    Spec.assertEqWith s "alice paid {2}" (S.tappedCount S.alice ceased) 2
+    Spec.assertEqWith s "and was asked exactly twice: the second fresh answer narrows to the same offer as the first" asks 2
+
+-- CR 603.3d's announcement for Itzquinth's reflexive ability from an interpreter
+-- that will not make a legal one: the dealer slot is filled out of the offer, and
+-- the victim slot is named a FRESH object id -- one this board never held -- on every
+-- call, so no two answers are equal.
+answeringItzquinthAfresh :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+answeringItzquinthAfresh dealer p = case p of
+  Prompt.ChooseToPay {} -> pure PaymentDecision.Pays
+  Prompt.ChooseTargets _ _ _ asked -> do
+    asked_ <- State.get
+    State.modify' (+ 1)
+    let fresh = Recipient.ToObject (ObjectId.MkObjectId (1000 + Int.toNaturalSaturating asked_))
+        answer slot (_, offered) =
+          if slot == SlotName.MkSlotName (Text.pack "dealer")
+            then Set.filter ((==) (Just dealer) . Recipient.objectOf) offered
+            else Set.singleton fresh
+    pure (Map.mapWithKey answer asked)
+  _ -> pure (S.identityAnswer p)

@@ -15,6 +15,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -78,10 +79,32 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- A Set, not a sum with a Colorless arm: CR 105.2c says a colourless object
     -- has NO colour, and CR 105.4 denies that colourless is a colour at all.
     colors :: Set.Set Color.Color,
-    -- | CR 202.3 / 613.2a: the object's mana value, DERIVED from the mana cost at
-    -- the seed rather than stored as the cost itself -- colors above take the
-    -- same posture, and for the same reason: every reader wants the derived
-    -- number, and nothing in the layer system rewrites a mana cost.
+    -- | CR 202.1: the object's mana cost, copiable (CR 707.2 names it outright)
+    -- -- so a card that is a copy of something else is priced off what it
+    -- copies. The one reader is rule 702.34a's "[cost] equal to that card's mana
+    -- cost" (Pawl.Engine.Projection.applyModification's
+    -- Modification.GainFlashbackAtManaCost), which Pawl.CastSpec's "CR 707.2 a
+    -- graveyard card that is a copy is priced at the copy's mana cost" proves.
+    --
+    -- Beside manaValue below rather than replacing it: every other reader wants
+    -- the derived number, and CR 202.3b/c's back-face and melded overrides
+    -- (Pawl.Engine.Event.copiedSnapshot) rewrite the VALUE while leaving the cost
+    -- the face gives.
+    --
+    -- Carried, not folded: no Modification writes a mana cost, so no layer
+    -- touches this after the seed. Nothing when the object has no card behind it
+    -- and when the card's face prints no cost (Ancestral Vision), which CR 118.6
+    -- makes an unpayable cost rather than a free one.
+    manaCost :: Maybe ManaCost.ManaCost,
+    -- | CR 202.3 / 613.2a: the object's mana value, DERIVED at the seed rather
+    -- than computed by each reader off manaCost above -- colors takes the same
+    -- posture towards the cost, and for the same reason: almost every reader
+    -- wants the number.
+    --
+    -- Not redundant beside manaCost, and CR 202.3b/c is why: a copy of a
+    -- back-face-up nonmodal double-faced permanent or of a melded one has mana
+    -- value 0 whatever cost the snapshot carries, which
+    -- Pawl.Engine.Event.copiedSnapshot writes here and nowhere else.
     --
     -- Copiable (CR 707.2 names mana cost in its list), which is what earns it a
     -- place here rather than a read of the printed card: a Clone entering as a
