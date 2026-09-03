@@ -970,6 +970,7 @@ library engine
     Pawl.Engine.Replacement
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
+    Pawl.Engine.Restamp
     Pawl.Engine.Ring
     Pawl.Engine.Room
     Pawl.Engine.SacrificeRestriction
@@ -1293,6 +1294,7 @@ library test
     Pawl.ReplacementSpec
     Pawl.ReplaySpec
     Pawl.ResolveSpec
+    Pawl.RestampSpec
     Pawl.RingSpec
     Pawl.RoomSpec
     Pawl.SacrificeRestrictionSpec

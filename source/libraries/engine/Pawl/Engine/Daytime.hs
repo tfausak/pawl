@@ -32,9 +32,11 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Restamp as Restamp
 import Pawl.Types.Daytime (Daytime)
 import qualified Pawl.Types.Daytime as Daytime
 import Pawl.Types.Game (Game)
@@ -107,7 +109,8 @@ restrictsTransform pcs oid =
 -- Neither day nor night turns nothing over -- both rules name a designation, and
 -- CR 702.145d/g handle that state instead (`settle` below).
 --
--- Ascending, so the sweep's writes are deterministic.
+-- Ascending, so the answer is deterministic; `turnDue` below re-orders it into CR
+-- 613.7m's before anything is written.
 dueToTurn :: GameState -> [ObjectId]
 dueToTurn gs = case GameState.daytime gs of
   Nothing -> []
@@ -122,8 +125,9 @@ dueToTurn gs = case GameState.daytime gs of
 -- report whether any turned.
 --
 -- "That player transforms that permanent" names the controller as the actor and
--- gives them nothing to decide, so nobody is prompted -- the engine makes no
--- choice here because the rule leaves none. Both rules add "this happens
+-- gives them nothing to decide about WHICH permanents turn over, so this rule
+-- prompts nobody; the one question asked below belongs to CR 613.7m, which
+-- orders the stamps a batch receives and is a different rule. Both rules add "this happens
 -- immediately and isn't a state-based action", which is why `becomes` calls this
 -- itself rather than leaving it to the settle.
 --
@@ -176,12 +180,21 @@ turnDue record = do
   case dueToTurn gs of
     [] -> pure False
     due -> do
+      -- CR 613.7m, asked before the sweep writes anything: the permanents that
+      -- will actually take a stamp (Game.turnsTo), ordered by their controllers.
+      -- The sweep names each of them ITSELF -- a controller with two daybound
+      -- permanents holds them both at nightfall -- so this road asks the same
+      -- question Pawl.Engine.Resolve's instruction does.
+      ordered <- Restamp.order (filter (\oid -> Maybe.isJust (Game.turnsTo oid gs)) due)
       -- LEFT fold, where this was a right one before CR 613.7g's stamp: the fold
-      -- now hands out timestamps, so it must run the enumeration forwards for the
-      -- relative order to be the enumeration's.
-      let (now, g1) = Game.freshTimestamp gs
-          g2 = List.foldl' (flip (Game.turnFaceOver now)) g1 due
-      State.put (record (Game.facesTurned (GameState.objects g1) (GameState.objects g2) due) g2)
+      -- hands out timestamps, so it must run `ordered` forwards for the earlier
+      -- stamp to go to the permanent CR 613.7m put first.
+      State.modify'
+        ( \gs1 ->
+            let (now, g1) = Game.freshTimestamp gs1
+                g2 = List.foldl' (flip (Game.turnFaceOver now)) g1 ordered
+             in record (Game.facesTurned (GameState.objects g1) (GameState.objects g2) ordered) g2
+        )
       pure True
 
 -- | CR 731.1: "it becomes day" / "it becomes night" -- the game gains that
