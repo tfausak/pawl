@@ -21,12 +21,15 @@ data Moved = MkMoved
     -- is the constructor that says so. CR 730.3 restates the rule for a merged
     -- permanent (#874), so the field is the shared carrier rather than meld's.
     --
-    -- A FIELD ON THE EVENT rather than a second event: rule 712.21's first
-    -- clause makes the departure one event, so a "whenever a creature dies"
-    -- ability must see exactly one of these. What the extra arrivals are for is
-    -- CR 712.21c -- "if an effect can find the new object that a melded
+    -- A FIELD ON THE EVENT and not the only announcement: rule 712.21's first
+    -- clause makes the DEPARTURE one event, so a "whenever a creature dies"
+    -- ability must see exactly one of these, while each arrival after the
+    -- leading one also gets a GameEvent.CardArrived of its own so that rule's
+    -- Example fires a card-arrival ability twice. What the field itself is for
+    -- is CR 712.21c -- "if an effect can find the new object that a melded
     -- permanent becomes as it leaves the battlefield, it finds both cards" --
-    -- which Pawl.Engine.Event.eventBindings reads through `arrivals`.
+    -- which Pawl.Engine.Event.eventBindings reads through `arrivals` and binds
+    -- as one group off the single departure event.
     --
     -- A Seq and not a Set: the order is the one the cards arrived in, which is
     -- CR 712.21a's arrangement where the owner was asked for one

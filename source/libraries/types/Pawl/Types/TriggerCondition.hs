@@ -193,6 +193,11 @@ data TriggerCondition
   | -- | CR 603.6: "when this card is put into a graveyard from anywhere" (Serra
     -- Avatar). Self-scoped, and not a leaves-the-battlefield ability (CR 603.6c).
     SelfPutIntoGraveyardFromAnywhere
+  | -- | CR 603.6 read by a BYSTANDER: "whenever another card is put into a
+    -- graveyard from anywhere" (Planar Void), filtered over the arriving card.
+    -- CR 712.21's Example makes this the condition a melded permanent's death
+    -- fires TWICE.
+    CardPutIntoGraveyard (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6c narrowed to CR 700.4's "dies", the battlefield-to-graveyard
     -- pair (Doomed Traveler). Self-scoped, and a CR 603.10a look-back.
     SelfDies
