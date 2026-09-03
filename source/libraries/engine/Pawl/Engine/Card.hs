@@ -385,10 +385,12 @@ merge2 l r =
       -- Two halves defining the SAME box is left-biased, and no rule says
       -- otherwise: CR 613.4a applies both in layer 7a in timestamp order and CR
       -- 613.7a gives each the timestamp of the object it is on, so the two are
-      -- tied and CR 613 breaks the tie nowhere (CR 613.8's dependency clauses are
-      -- about a different question). Nothing is asked of a player either -- CR
-      -- 613 hands nobody a choice of order -- so the bias is where the rules run
-      -- out, as it is for the printed boxes above.
+      -- tied. CR 613.8's dependency system does not break the tie -- clause (c)
+      -- of CR 613.8a does admit a pair of characteristic-defining abilities, but
+      -- neither of a pair like this changes what the other does (clause (b)), and
+      -- CR 613.8b's fallback is timestamp order again. Nothing is asked of a
+      -- player either, since CR 613 hands nobody a choice of order, so the bias
+      -- is where the rules run out, as it is for the printed boxes above.
       Face.characteristicPT = case (snd powerBox, snd toughnessBox) of
         (Nothing, Nothing) -> Nothing
         -- CR 208.2's star stands in where one box has no ability behind it: the
