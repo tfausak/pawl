@@ -3,6 +3,7 @@ module Pawl.Types.ReplacementEffect where
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DrawCountR as DrawCountR
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.LifeLossR as LifeLossR
@@ -132,5 +133,13 @@ data ReplacementEffect effect
     -- Uses.Once on the carrier, which is what lets a one-shot shield and an
     -- unbounded one share this constructor.
     DrawR DrawR.DrawR
+  | -- | CR 121.2a / 614.1a: "if an opponent would draw two or more cards, instead
+    -- you and that player each draw a card" (Alms Collector). A separate arm from
+    -- DrawR because rule 121.2a parts the two event classes: this one watches the
+    -- INSTRUCTION and the number it names, DrawR watches one of the individual
+    -- draws CR 121.2 breaks that instruction into. CR 616.1g orders them -- the
+    -- instruction is settled before any draw inside it -- so a board carrying
+    -- both rows applies each once.
+    DrawCountR DrawCountR.DrawCountR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

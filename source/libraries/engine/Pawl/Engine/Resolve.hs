@@ -228,6 +228,7 @@ import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -1247,6 +1248,9 @@ replacementRowReads re = case re of
   -- A DrawR is one ControllerRelation and one amount of life. LifeLossR's answer,
   -- and for its reason.
   ReplacementEffect.DrawR {} -> ([], [])
+  -- A DrawCountR is one ControllerRelation, one threshold and one nullary rewrite.
+  -- DrawR's answer, and for its reason.
+  ReplacementEffect.DrawCountR {} -> ([], [])
   ReplacementEffect.PhaseR _ -> ([], [])
 
 -- A row's pattern Filter joined onto what its rewrite reads.
@@ -3939,6 +3943,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR _ -> []
   ReplacementEffect.DrawR _ -> []
+  ReplacementEffect.DrawCountR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination
@@ -6033,10 +6038,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     drawn <- fmap concat . Monad.forM drawers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
-          | n > 0 ->
-              -- CR 121.2: draw n one at a time, so each draw re-reads the library
-              -- top and the CR 104.3c empty-library loss is preserved.
-              Maybe.catMaybes <$> Monad.replicateM (Integer.toIntSaturating n) (Event.drawCardReturning pid)
+          | n > 0 -> do
+              -- CR 121.2a: the INSTRUCTION is its own replaceable event, and rule
+              -- 616.1g settles it before any of the individual draws below -- so
+              -- the count those draws run on is the one this loop leaves standing,
+              -- and a row that replaced the instruction outright leaves none.
+              outcome <- Event.applyReplacements (ProposedEvent.WouldDrawCards pid (Integer.toNaturalSaturating n))
+              case outcome >>= Replacement.asDrawCount of
+                Nothing -> pure []
+                -- CR 121.2: draw the settled count one at a time, so each draw
+                -- re-reads the library top and the CR 104.3c empty-library loss is
+                -- preserved.
+                Just (drawer, settled) ->
+                  Maybe.catMaybes <$> Monad.replicateM (Natural.toIntSaturating settled) (Event.drawCardReturning drawer)
         _ -> pure []
     -- CR 121.1's "and reveal IT": the cards the draw put into a hand, for a later
     -- clause of this resolution to name (#1899). The ids are the ones the CR 400.7
