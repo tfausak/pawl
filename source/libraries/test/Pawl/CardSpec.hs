@@ -920,6 +920,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> []
+  TriggerCondition.PlayerTookInitiative -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   -- CR 702.149a's Filter holds no Count for PermanentEnters' reason.
@@ -1173,6 +1175,7 @@ ownCounts effect = case effect of
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
+  Effect.TakeTheInitiative _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
@@ -1321,6 +1324,7 @@ ownQuantities effect = case effect of
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
   Effect.CreateEmblem _ -> []
   Effect.BecomeMonarch _ -> []
+  Effect.TakeTheInitiative _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
@@ -1520,6 +1524,7 @@ effectNestedEffects effect = case effect of
   Effect.CopySpell {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
+  Effect.TakeTheInitiative {} -> []
   Effect.Designate {} -> []
   Effect.SetClassLevel {} -> []
   Effect.DealDamage {} -> []
@@ -2127,6 +2132,7 @@ effectReplacements effect = case effect of
   Effect.ForbidAttack {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
+  Effect.TakeTheInitiative _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
@@ -3040,6 +3046,7 @@ effectMintedFaces effect = case effect of
   Effect.ForbidAttack {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
+  Effect.TakeTheInitiative _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
@@ -4107,6 +4114,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Pia Nalaar's "artifact creatures you control" from every corpus filter lint.
   TriggerCondition.PermanentsDealCombatDamageToPlayer f -> unframed [f]
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> []
+  TriggerCondition.PlayerTookInitiative -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   -- CR 702.149a names a quality the OTHER attackers must have, so this one DOES
@@ -4261,6 +4270,8 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.CreaturesDealtCombatDamageToInitiative -> []
+  TriggerCondition.PlayerTookInitiative -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
@@ -5456,6 +5467,7 @@ effectFilters effect = case effect of
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
+  Effect.TakeTheInitiative _ -> []
   Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect ref -> frame SourceHostFramed (objectRefFilters ref)
@@ -5706,6 +5718,7 @@ effectObjectRefs effect = case effect of
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> read_ [attacker]
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
+  Effect.TakeTheInitiative {} -> []
   Effect.Designate {} -> []
   Effect.SetClassLevel {} -> []
   Effect.Unsuspect ref -> read_ [ref]

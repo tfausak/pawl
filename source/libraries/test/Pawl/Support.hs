@@ -1442,6 +1442,10 @@ withEvents events gs =
 withMonarch :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 withMonarch pid gs = gs {GameState.monarch = Just pid}
 
+-- CR 726.1: the initiative, S.withMonarch's sibling one designation over.
+withInitiative :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+withInitiative pid gs = gs {GameState.initiative = Just pid}
+
 -- Seed a floating replacement directly into GameState (bypasses casting the
 -- spell that would install it; use when a test needs one active without a
 -- resolution).
@@ -1714,6 +1718,7 @@ oneMountainState mountain ph =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
+          GameState.initiative = Nothing,
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
           GameState.castsLastTurn = mempty,
