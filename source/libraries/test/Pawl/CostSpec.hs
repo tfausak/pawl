@@ -134,6 +134,19 @@ doorSpec s registry =
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice onField CostComponent.SacrificeThis gs1) "a controlled permanent pays"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice inHand CostComponent.SacrificeThis gs1)) "a card in hand does not"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob onField CostComponent.SacrificeThis gs1)) "another player's permanent does not"
+    -- CR 406.2 charged against the permanent the cost is on: SacrificeThis' two
+    -- conjuncts above, on the same three readings, and WITHOUT CR 101.2's
+    -- prohibition -- an effect forbidding a sacrifice says nothing about an
+    -- exile. Read here rather than at gameplay level because no board Brittle
+    -- Effigy can build separates them: Activate already withholds an ability
+    -- whose source this player does not control.
+    Spec.it s "CR 406.2 ExileThis needs a permanent this player controls" $ do
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+          (inHand, gs1) = S.addHandCard piker S.alice gs0
+      Spec.assertBool s (Cost.canPayComponent Map.empty S.alice onField CostComponent.ExileThis gs1) "a controlled permanent pays"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice inHand CostComponent.ExileThis gs1)) "a card in hand does not"
+      Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob onField CostComponent.ExileThis gs1)) "another player's permanent does not"
     -- CR 701.68b: "if a player is given the choice to blight but is unable to
     -- put N -1/-1 counters on a creature they control (usually because they
     -- control no creatures), they can't choose to blight."
@@ -1935,6 +1948,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   melokuSpec s registry
   barkhideTrollSpec s registry
   millikinSpec s registry
+  brittleEffigySpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -3203,3 +3217,110 @@ recordingOrders p = case p of
     State.modify' (<> [components])
     pure (Replay.defaultAnswer p)
   _ -> pure (S.identityAnswer p)
+
+-- Brittle Effigy {1} Artifact: "{4}, {T}, Exile this artifact: Exile target
+-- creature." The gate card for CostComponent's ExileThis -- CR 406.2 charged
+-- against the permanent the cost is ON, off the BATTLEFIELD, where
+-- ExileThisFromGraveyard names a graveyard and so cannot stand in for it.
+--
+-- alice controls the Effigy, settled and untapped, and exactly four untapped
+-- Plains -- the minimum that pays {4}, so the mana window has nothing to decide
+-- and a refusal below cannot be an unaffordable one. bob controls a Hill Giant
+-- and a Goblin Piker: two creatures, so the target (CR 601.2c, reached for an
+-- activated ability by CR 602.2b) is a real choice, and
+-- two DIFFERENT printings so which one the ability reached is visible by name.
+--
+-- bob owns both creatures and alice owns the Effigy, which is what keeps the two
+-- exiles apart: Game.zoneMembers indexes exile by OWNER (CR 108.3), so the cost's
+-- exile and the effect's land in different reads.
+brittleEffigyBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+brittleEffigyBoard effigy plains giant piker =
+  let (effigyId, g1) = S.addCreature effigy S.alice (Setup.emptyGame S.bothPlayers)
+      (giantId, g2) = S.addCreature giant S.bob g1
+      (pikerId, g3) = S.addCreature piker S.bob g2
+      withLands = S.landsFor plains S.alice 4 g3
+   in ( effigyId,
+        giantId,
+        pikerId,
+        withLands
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+brittleEffigySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brittleEffigySpec s registry = Spec.describe s "Brittle Effigy" $ do
+  -- CR 113.6m from the side that matters for a cost whose zone answer is
+  -- Nothing: the ability moves the object off the BATTLEFIELD, where CR 113.6's
+  -- default already had it, so the activation is offered there. Answering the
+  -- rule with the sibling's Just Zone.Graveyard would withhold it -- that is the
+  -- shape Pawl.SpeedSpec's Loxodon Surveyor case shows from the other side.
+  Spec.it s "CR 113.6m the ability is offered from the battlefield" $ do
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (effigyId, _, _, gs) = brittleEffigyBoard effigy plains giant piker
+    Spec.assertBool s (any (isActivateOf effigyId) (Action.legalActions S.alice gs)) "the activation is a legal action"
+    Spec.assertEqWith s "and the Effigy offers exactly one ability" (length (Activate.abilitiesFor effigyId gs)) 1
+  -- CR 601.2h: the cost is paid as the ability is activated, so the Effigy is in
+  -- exile with the ability still waiting on the stack. THE assertion this
+  -- component exists for -- read before the tap and the stack, which a payment
+  -- that moved nothing would still satisfy.
+  Spec.it s "CR 406.2 paying the cost exiles the Effigy before the ability resolves" $ do
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (effigyId, _, pikerId, gs) = brittleEffigyBoard effigy plains giant piker
+        after = S.runPure (targeting pikerId) gs (Activate.activateAbility S.alice effigyId (theAbility effigy))
+    Spec.assertEqWith s "the Effigy's owner has one card in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+    Spec.assertBool s (not (S.onBattlefield effigyId after)) "and it is off the battlefield"
+    Spec.assertEqWith s "with the ability still on the stack" (length (GameState.stack after)) 1
+  -- The whole card end to end: the cost's exile and the effect's exile are two
+  -- different moves reaching two different owners' exiles, and the creature the
+  -- target prompt did not name is untouched. The falsifier for a payment that
+  -- was offered and could not be carried out.
+  Spec.it s "CR 406.2 whole card: the cost exiles the Effigy and the ability exiles the chosen creature" $ do
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (effigyId, giantId, pikerId, gs) = brittleEffigyBoard effigy plains giant piker
+        after = S.runPure (targeting pikerId) gs (Activate.activateAbility S.alice effigyId (theAbility effigy) >> Stack.resolveTop)
+    Spec.assertBool s (not (S.onBattlefield pikerId after)) "the targeted Piker left the battlefield"
+    Spec.assertEqWith s "into its own owner's exile" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+    Spec.assertEqWith s "where the cost's own exile is alice's" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+    Spec.assertBool s (not (S.onBattlefield effigyId after)) "the Effigy is gone too"
+    Spec.assertBool s (S.onBattlefield giantId after) "and the creature the prompt did not name is untouched"
+  -- CR 601.2h's ordering prompt: {T} and "exile this artifact" are both
+  -- order-sensitive and not equal, so the payer is asked, and the two parts are
+  -- offered together in one pass. This is what makes ExileThis' orderSensitive
+  -- arm proven rather than a fence -- the two arms beside it, ReturnThis and
+  -- ReturnPermanents, each say at the site that their producer's cost carries no
+  -- second order-sensitive part.
+  Spec.it s "CR 601.2h the payer orders the tap against the exile" $ do
+    effigy <- S.printingOf s registry "Brittle Effigy"
+    plains <- S.printingOf s registry "Plains"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (effigyId, _, pikerId, gs) = brittleEffigyBoard effigy plains giant piker
+        ((_, after), asked) = State.runState (Engine.runGame (recordingOrdersTargeting pikerId) gs (Activate.activateAbility S.alice effigyId (theAbility effigy))) []
+    Spec.assertEqWith s "one ordering prompt, over both parts" (fmap length asked) [2]
+    Spec.assertBool s (not (S.onBattlefield effigyId after)) "and the exile half was still paid"
+
+-- recordingOrders with a target to name: CR 601.2c's target prompt and CR
+-- 601.2h's ordering prompt both come up while Brittle Effigy's ability is
+-- announced, so one answerer has to serve both.
+recordingOrdersTargeting :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[CostComponent.CostComponent Keyword.Keyword]] r
+recordingOrdersTargeting victim p = case p of
+  Prompt.OrderCostComponents _ _ _ components -> do
+    State.modify' (<> [components])
+    pure (Replay.defaultAnswer p)
+  _ -> pure (targeting victim p)
