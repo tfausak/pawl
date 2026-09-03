@@ -522,6 +522,11 @@ writeUntappedIn = Map.adjust (\o -> o {Object.tapped = TapState.Untapped})
 movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
   GameEvent.Moved (Moved.MkMoved zc _ _) -> Just zc
+  -- Not implemented: CR 712.21's second card DID change zones, so this could
+  -- answer its ZoneChange too. Its two engine callers are the graveyard
+  -- candidate sources below, whose business is a card bearing an ability that
+  -- functions from a graveyard; no meld pair in data/cards/ prints one (#3106).
+  GameEvent.CardArrived _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing
@@ -575,7 +580,6 @@ movedOf event = case event of
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
-  GameEvent.CardArrived _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent

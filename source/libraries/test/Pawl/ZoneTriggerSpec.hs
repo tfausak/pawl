@@ -882,11 +882,11 @@ serraAvatarSpec s registry =
 -- Three things separate it from the conditions on either side of it, one test
 -- each below:
 --
---   * a NON-battlefield origin fires it, CR 603.6c's last sentence again, so
---     PermanentDies would leave the discarded card in the graveyard.
 --   * the ARRIVING card is what the payload acts on -- "exile that card" reads
 --     CR 400.7e's `became` slot, and the departed id CR 400.7 deleted would move
 --     nothing.
+--   * a NON-battlefield origin fires it, CR 603.6c's last sentence again, so
+--     PermanentDies would leave the discarded card in the graveyard.
 --   * "another" excludes the Void's own arrival, and by CR 603.10's first
 --     sentence rather than by the Filter: a permanent put into a graveyard is
 --     not among the objects that exist immediately after the event that put it
