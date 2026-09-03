@@ -111,6 +111,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.CreatureDealtCombatDamageToMonarch
       " {\"type\":\"CreatureDealtCombatDamageToMonarch\"} "
+  -- CR 726.2: one or more creatures dealt combat damage to the player who has the
+  -- initiative, and a player took the initiative.
+  Spec.it s "CreaturesDealtCombatDamageToInitiative" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.CreaturesDealtCombatDamageToInitiative
+      " {\"type\":\"CreaturesDealtCombatDamageToInitiative\"} "
+  Spec.it s "PlayerTookInitiative" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.PlayerTookInitiative
+      " {\"type\":\"PlayerTookInitiative\"} "
   -- CR 702.179d: one or more opponents lost life during your turn.
   Spec.it s "OpponentLostLifeDuringYourTurn" $
     Common.assertCodec

@@ -20,6 +20,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Initiative as Initiative
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
@@ -76,6 +77,9 @@ depart reason pid = do
   let lose p = p {Player.status = Status.Departed reason}
   State.modify' (\gs -> gs {GameState.players = Map.adjust lose pid (GameState.players gs)})
   State.modify' (\gs -> Monarch.reassignOnDeparture pid (Game.stillPlayingInOrder gs) gs)
+  -- CR 726.4, the same clause one rule over and for the same reason: the active
+  -- player takes the initiative at the same time its holder leaves.
+  State.modify' (\gs -> Initiative.reassignOnDeparture pid (Game.stillPlayingInOrder gs) gs)
 
 -- CR 800.4: a multiplayer game can continue after players leave, and CR 800.1
 -- makes "multiplayer" mean a game that BEGINS with more than two players.

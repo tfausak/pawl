@@ -222,6 +222,7 @@ emptyGame order =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
+          GameState.initiative = Nothing,
           -- CR 731.1: "the game starts with neither designation".
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
@@ -686,6 +687,7 @@ restartGame perform exempt starter = do
             GameState.pendingControl = Map.empty,
             GameState.activeControl = Nothing,
             GameState.monarch = Nothing,
+            GameState.initiative = Nothing,
             -- CR 727.1 / 731.1: the restarted game is a new game, which starts
             -- with neither designation however the ended one finished.
             GameState.daytime = Nothing,
@@ -897,6 +899,7 @@ subgameStateFrom starter parent =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
+          GameState.initiative = Nothing,
           -- CR 729.1a / 731.1: the subgame is its own game, so it starts with
           -- neither designation and the main game's is untouched by it.
           GameState.daytime = Nothing,

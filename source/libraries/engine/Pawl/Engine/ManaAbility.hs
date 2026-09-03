@@ -252,6 +252,7 @@ manaProduced effect = case effect of
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
+  Effect.TakeTheInitiative {} -> Nothing
   Effect.Designate (Designate.MkDesignate _ _) -> Nothing
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
@@ -442,6 +443,7 @@ movesLibraryCard effect = case effect of
   -- ability for the same reason (CR 725.2).
   Effect.ArmDelayedTrigger {} -> False
   Effect.BecomeMonarch {} -> False
+  Effect.TakeTheInitiative {} -> False
   -- Every Pawl.Types.PlayerEffect is a continuous modification of what a player
   -- may do; none moves a card.
   Effect.AffectPlayers {} -> False

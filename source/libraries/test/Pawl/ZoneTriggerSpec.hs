@@ -1992,6 +1992,10 @@ representativeEvents cond =
         -- Event.eventTriggers instead -- PermanentsDie's posture below.
         TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> one combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
+        -- CR 726.2's pair, matched by Pawl.Engine.Initiative.inherentPending rather
+        -- than by Event.matchesTrigger, the monarch's condition above's posture.
+        TriggerCondition.CreaturesDealtCombatDamageToInitiative -> one combatDamage
+        TriggerCondition.PlayerTookInitiative -> one (GameEvent.TookInitiative S.bob)
         -- CR 702.179d's own event. Like the monarch's condition above it, this
         -- one is matched by Pawl.Engine.Speed.inherentPending rather than by
         -- Event.matchesTrigger, which answers False for it whatever the event --
@@ -2382,6 +2386,8 @@ everyTriggerCondition =
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
+    TriggerCondition.CreaturesDealtCombatDamageToInitiative,
+    TriggerCondition.PlayerTookInitiative,
     TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
     TriggerCondition.SelfRevealedForMiracle,
