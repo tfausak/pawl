@@ -3159,10 +3159,11 @@ becameSlotSpec s registry =
         -- The BEARER ARRIVAL argument is held constant at a present one, and is
         -- not a second dimension of the intersection: it is CR 400.7f's datum
         -- rather than a shape the event can take, and eventBindingSlots'
-        -- AttachedCreatureDies arm carries the argument that CR 704.5m makes it
-        -- present for every bearer a printing can put under that condition.
-        -- Holding it Nothing instead would pin the OTHER reading, under which no
-        -- card could read `became` there at all.
+        -- AttachedCreatureDies arm claims the slot on CR 704.5m's Aura, whose
+        -- arrival is present for every event that condition admits. Holding it
+        -- Nothing instead would pin the OTHER reading, under which no card could
+        -- read `became` there at all -- and CR 704.5n's Equipment bearer, which
+        -- has no arrival, is the over-claim that arm's own comment records.
         Spec.it s "CR 603.2 eventBindingSlots names exactly the keys eventBindings stamps for EVERY event a condition admits" $ do
           piker <- S.printingOf s registry "Goblin Piker"
           let bearerBecame = Just (ObjectId.MkObjectId 3)
@@ -5206,9 +5207,9 @@ kindredSpec s registry =
 --
 -- CR 700.4 is what makes the printed "dies" one of the departures the clause
 -- names; CR 603.10a is what lets the trigger see a host that has already left;
--- and CR 608.2h's Pawl.Types.LastKnown.attachedTo is what lets the MATCH see the
--- link, CR 704.5m having taken the Aura off the battlefield in the same
--- CR 117.5 batch.
+-- and CR 608.2h's Pawl.Types.LastKnown.attached -- the HOST's record of what was
+-- attached to it -- is what lets the MATCH see the link, CR 704.5m having taken
+-- the Aura off the battlefield in the same CR 117.5 batch.
 --
 -- AND CR 400.7f is what lets the PAYLOAD act. Its effect moves "this card" out
 -- of the graveyard, and CR 113.7a's source slot carries the battlefield id CR
@@ -5371,7 +5372,8 @@ screamsFromWithinSpec s registry =
 --
 -- CR 704.5n rather than CR 704.5m is what keeps the Equipment on the battlefield
 -- when its host dies, so its ability is read there, by `eventTriggers`'
--- `battlefieldAbilitiesOf` filter, off the live projection.
+-- `battlefieldAbilitiesOf` filter, off the live projection. That the CONDITION
+-- would match is skullclampSpec's, on the printing that reaches it.
 widowedBladeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 widowedBladeSpec s registry =
   let board = do
@@ -5385,13 +5387,11 @@ widowedBladeSpec s registry =
         pure (host, equipment, blade, S.attach equipment host g4)
       kill victim gs = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim] >> Engine.settleForPriority)
    in Spec.describe s "WidowedBlade" $ do
-        -- The gameplay board, and a REGRESSION FENCE rather than a proof:
-        -- granting this Equipment the Aura exception leaves the stack empty all
-        -- the same, because the condition never matches for a surviving
-        -- Equipment bearer (#3144) and the match is asked before CR 113.6m's
-        -- filter can matter. The leg below is what proves the gate; this one
-        -- says the board really is the one CR 113.6m is about, and becomes
-        -- discriminating the day #3144 lands.
+        -- The gameplay board, and the leg that proves the gate: the condition
+        -- DOES match for a surviving Equipment bearer -- skullclampSpec below is
+        -- that behaviour on its own card -- so what keeps the stack empty here
+        -- is CR 113.6m alone, and granting this Equipment the Aura exception
+        -- puts the trigger on it. The leg below is the same gate one level down.
         Spec.it s "CR 113.6m an Equipment gets no Aura exception, so its ability never triggers from the battlefield" $ do
           (host, equipment, _, gs) <- board
           let after = kill host gs

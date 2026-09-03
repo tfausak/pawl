@@ -12990,19 +12990,23 @@ eventBindingSlots cond = case cond of
   -- the same observation from the other side -- by the time the condition is
   -- asked, the live attachment is ALWAYS gone.
   --
-  -- Two shapes escape it, and neither is a hole this classification has to widen
-  -- for. An EQUIPMENT bearer stays on the battlefield under CR 704.5n, so no
-  -- `became` is minted for it -- but CR 113.6m's exception is the Aura's alone,
-  -- so an Equipment ability that moves itself out of a zone is pinned to that
-  -- zone and its condition is never asked from the battlefield at all
-  -- (data/cards/synthetic-widowed-blade.json is the case, proved in
-  -- Pawl.ZoneTriggerSpec). An effect that sends the Aura somewhere other
-  -- than its owner's graveyard in the same batch puts it where CR 400.7f cannot
-  -- look -- and there the rule's own answer is that the ability finds nothing, so
-  -- the payload moving nothing is correct rather than the silent no-op this lint
+  -- Two shapes escape it. An effect that sends the Aura somewhere other than its
+  -- owner's graveyard in the same batch puts it where CR 400.7f cannot look --
+  -- and there the rule's own answer is that the ability finds nothing, so the
+  -- payload moving nothing is correct rather than the silent no-op this lint
   -- exists to catch. That is what separates this arm from
   -- SelfLeavesTheBattlefield's floor, where a BOUNCE is an ordinary printed
   -- destination and the slot's absence is an ordinary printed case (#505).
+  --
+  -- Not implemented: the EQUIPMENT bearer, which CR 704.5n leaves standing, so
+  -- CR 400.7f mints no incarnation for it and this floor over-claims. Its
+  -- condition really is asked from the battlefield (Skullclamp,
+  -- data/cards/skullclamp.json), and the classification is per CONDITION and
+  -- cannot see the bearer's subtypes. Nothing in the pool reads the slot there:
+  -- Skullclamp's payload names none, and an Equipment ability that moved ITSELF
+  -- out of a zone would be pinned to that zone by CR 113.6m, whose exception is
+  -- the Aura's alone (data/cards/synthetic-widowed-blade.json, proved in
+  -- Pawl.ZoneTriggerSpec) (#3153).
   TriggerCondition.AttachedCreatureDies -> Set.fromList [Binding.became, Binding.departedPermanent]
   -- Empty, and for the opposite reason to the arm above: nothing MOVED, so there
   -- is no arrival for a payload to find. The tapped permanent is still the one
@@ -14624,12 +14628,13 @@ zonesTriggeredFrom cond = case cond of
   -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
   -- is for a condition that cannot trigger from the battlefield at all.
   TriggerCondition.AttachedCreatureMentors -> battlefield
-  -- CR 113.6's default from the Aura's side: CR 303.4's Aura is itself a
-  -- permanent on the battlefield, so its bearer watches from there, and CR
+  -- CR 113.6's default from the bearer's side, Aura or Equipment alike (CR
+  -- 303.4m): an Aura is itself a permanent on the battlefield and CR 704.5n
+  -- leaves an Equipment standing on it, so the bearer watches from there, and CR
   -- 113.6k's exception -- for a condition that cannot trigger from the
   -- battlefield at all -- does not apply. What DOES apply is CR 113.6m's Aura
   -- clause, read by zoneFunctionedFrom above, which is why this arm is reached
-  -- for Screams from Within at all.
+  -- for Screams from Within and Skullclamp but not for Synthetic Widowed Blade.
   TriggerCondition.AttachedCreatureDies -> battlefield
   -- The same default for the same reason, and more plainly: an Aura enchanting a
   -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
