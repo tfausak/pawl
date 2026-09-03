@@ -74,6 +74,7 @@ codec =
       Arm.nullary "SelfPutIntoGraveyardFromLibrary" TriggerCondition.SelfPutIntoGraveyardFromLibrary,
       Arm.nullary "SelfPutIntoGraveyardFromAnywhere" TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
       Arm.nullary "SelfDies" TriggerCondition.SelfDies,
+      Arm.payload "CardPutIntoGraveyard" filterCodec TriggerCondition.CardPutIntoGraveyard (\x -> case x of TriggerCondition.CardPutIntoGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "PermanentDies" filterCodec TriggerCondition.PermanentDies (\x -> case x of TriggerCondition.PermanentDies y -> Just y; _ -> Nothing),
       Arm.payload "PermanentsDie" filterCodec TriggerCondition.PermanentsDie (\x -> case x of TriggerCondition.PermanentsDie y -> Just y; _ -> Nothing),
       Arm.nullary "SelfLeavesTheBattlefield" TriggerCondition.SelfLeavesTheBattlefield,

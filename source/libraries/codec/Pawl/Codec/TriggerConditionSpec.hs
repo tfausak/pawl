@@ -374,6 +374,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfDies
       " {\"type\":\"SelfDies\"} "
+  -- CR 712.21's Example condition, which carries a Filter over the ARRIVING card
+  -- where PermanentDies below filters the departed permanent -- a separate tag,
+  -- since the two admit different events.
+  Spec.it s "CardPutIntoGraveyard round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.CardPutIntoGraveyard (Filter.Not Filter.IsSource))
+      " {\"type\":\"CardPutIntoGraveyard\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}} "
   -- The same written form read by a bystander, which carries a Filter where
   -- SelfDies above carries nothing -- so it is a separate tag, and "another"
   -- lives inside that Filter.
