@@ -83,6 +83,7 @@ costsOn attacker target gs =
       -- CR 613.11 puts these effects after every layer, so the subject set is
       -- read against the FULL projection rather than a partial one.
       view = Projection.project attacker gs
+      grants = Projection.controlGrants gs
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face -> case Face.attackCosts face of
@@ -141,7 +142,7 @@ costsOn attacker target gs =
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       fromCost source ac =
         if protects source ac
-          && Projection.affects source attacker (AttackCost.subject ac) view gs
+          && Projection.affectsUnder grants source attacker (AttackCost.subject ac) view gs
           then fmap ((,) source) (shareOf source ac)
           else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))

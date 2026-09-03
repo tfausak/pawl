@@ -48,10 +48,14 @@ additionalBlocks candidates gs =
       -- and unforced until some permanent actually prints a permission.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
+      -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       -- CR 613.11 puts this effect after every layer, so the affected set is read
       -- against the FULL projection.
       named source affected creature =
-        Projection.affects source creature affected (Projection.project creature gs) gs
+        Projection.affectsOn pcs grants source creature affected gs
       -- One reading of the source, shared by the gate and the amount below: CR
       -- 109.5's "you" and Filter.IsSource both mean the permanent printing the
       -- sentence, so both ask through the same Context.

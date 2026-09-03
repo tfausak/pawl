@@ -668,13 +668,34 @@ data Gathered = MkGathered
 affects :: ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affects source oid a partial gs = affectsGiven (fullView gs) source oid a partial gs
 
+-- affects for a caller asking it ONCE PER CANDIDATE against a board it already
+-- walked: one whole-board projection and one grant walk for the loop, where
+-- `affects` takes a fresh projection and two grant walks per candidate. The
+-- board and grants are the caller's thunks, so a loop that never reaches a
+-- candidate pays for neither.
+affectsOn :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
+affectsOn pcs grants source oid a gs = affectsWith grants (fullViewGiven pcs grants gs) source oid a (projectGiven pcs oid gs) gs
+
+-- affects for a caller asking about ONE object under many sources: the
+-- object's projection is the caller's, taken once, and the grant walk is shared
+-- across the sources.
+affectsUnder :: [ControlGrant] -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
+affectsUnder grants source oid a partial gs = affectsWith grants (fullViewGiven Map.empty grants gs) source oid a partial gs
+
 -- affects with the reader for the objects a filter reaches past the candidate --
 -- an ATTACHED candidate's host and the permanents attached TO a candidate (CR
 -- 701.3a, CR 303.4b), the CR 702.178a gate's board -- which
 -- every caller has to pick at the same depth as `partial`. See
 -- viewOfCharacteristics for why the depths must agree.
 affectsGiven :: Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
-affectsGiven peers source oid a partial gs = case a of
+affectsGiven peers source oid a partial gs = affectsWith (controlGrants gs) peers source oid a partial gs
+
+-- affectsGiven with the grant list PRECOMPUTED: every arm below reads the
+-- source's controller for CR 109.5's "you", and most read the candidate's too,
+-- so a caller asking this per (effect, object) pair -- the layer fold -- would
+-- otherwise take two controlGrants walks per pair.
+affectsWith :: [ControlGrant] -> Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
+affectsWith grants peers source oid a partial gs = case a of
   Affected.TheseObjects s -> Set.member oid s
   -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
   -- source, or one attached to a player, names no object (CR 702.5d's
@@ -683,28 +704,28 @@ affectsGiven peers source oid a partial gs = case a of
   Affected.Matching f ->
     let -- CR 109.5: "you" is the SOURCE's controller. Safe to force: controlGrants
         -- consults no liveness gate and so cannot re-enter this function.
-        perspective = controllerOf source gs
+        perspective = controllerOfGiven grants Set.empty source gs
      in Set.member oid (GameState.battlefield gs)
-          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
-    let perspective = controllerOf source gs
-     in Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+    let perspective = controllerOfGiven grants Set.empty source gs
+     in Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- Matching's body with that conjunct NEGATED rather than dropped.
   Affected.MatchingOffBattlefield f ->
-    let perspective = controllerOf source gs
+    let perspective = controllerOfGiven grants Set.empty source gs
      in not (Set.member oid (GameState.battlefield gs))
-          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (Filter.contextFor (Game.teams gs) perspective (Just source)) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
   -- the enchanted player's. The candidate's controller is bound once and used
-  -- twice, since controllerOf rebuilds controlGrants on every call.
+  -- twice.
   Affected.AttachedPlayerControls f -> case Game.lookupObject source gs >>= Object.attachedTo of
     Just (Recipient.ToPlayer pid) ->
-      let controller = controllerOf oid gs
+      let controller = controllerOfGiven grants Set.empty oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
-            && Filter.matches (Filter.contextFor (Game.teams gs) (controllerOf source gs) (Just source)) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
+            && Filter.matches (Filter.contextFor (Game.teams gs) (controllerOfGiven grants Set.empty source gs) (Just source)) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
 -- The characteristics view of an object: its CR 613 projection and its projected
@@ -712,6 +733,18 @@ affectsGiven peers source oid a partial gs = case a of
 -- zone, so a card in a hidden zone reads through this same view.
 viewOfObject :: ObjectId -> GameState -> Filter.View
 viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
+
+-- viewOfObject for a caller asking it of MANY objects of one state: one gather
+-- and one grant walk shared by every object asked, each projected on demand --
+-- projectAll's sharing without its whole-board eagerness, so a loop over a hand
+-- or a graveyard pays for nothing on the battlefield. Bind the partial
+-- application outside the loop, or nothing is shared.
+viewsOf :: GameState -> ObjectId -> Filter.View
+viewsOf gs =
+  let cands = gather gs
+      grants = controlGrants gs
+      viewOf oid = viewOfCharacteristics (Just . viewOf) oid (projectFrom cands oid gs) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs
+   in viewOf
 
 -- viewOfObject against a pre-projected board and a precomputed grant list. See
 -- projectGiven for what the board is and when it is valid.
@@ -736,6 +769,11 @@ viewOfSpell caster oid gs = viewOfCharacteristics (fullView gs) oid (project oid
 -- inside the fold (see viewOfCharacteristics).
 fullView :: GameState -> Count.ViewOf
 fullView gs oid = Just (viewOfObject oid gs)
+
+-- fullView against a pre-projected board and a precomputed grant list, for a
+-- reader that is handed one view per candidate of a loop (affectsOn).
+fullViewGiven :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> GameState -> Count.ViewOf
+fullViewGiven pcs grants gs oid = Just (viewOfObjectGiven pcs grants oid gs)
 
 -- CR 113.7a / 608.2h: `fullView`, except that the one object named by `src` is
 -- read from last known information once it no longer exists. Scoped to `src`
@@ -858,9 +896,14 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- through the running board, where Pawl.PowerToughnessSpec's Synthetic Withering
 -- Comparison case proves it.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
-viewUpTo bound cands gs oid =
+viewUpTo bound cands gs = viewUpToGiven (controlGrants gs) bound cands gs
+
+-- viewUpTo with the grant list PRECOMPUTED, which the layer fold holds once per
+-- object rather than once per peer this reader is asked about.
+viewUpToGiven :: [ControlGrant] -> Layer -> [Gathered] -> GameState -> Count.ViewOf
+viewUpToGiven grants bound cands gs oid =
   if Map.member oid (GameState.objects gs)
-    then Just (viewOfCharacteristics (viewUpTo bound cands gs) oid (noValueAt bound (projectUpTo bound cands oid gs)) (controllerOf oid gs) (countersOf oid gs) gs)
+    then Just (viewOfCharacteristics (viewUpToGiven grants bound cands gs) oid (noValueAt bound (projectUpTo bound cands oid gs)) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs)
     else Nothing
 
 -- The characteristics view of a printed card, from the FACE alone. The axes that
@@ -3719,13 +3762,14 @@ frozenStaticParts src gs =
       functioning = conditionHolds ungated gs
       setEffs = setLandSubtypeEffectsGiven functioning gs
       parts = permanentParts (abilitiesRemoved ungated gs) functioning setEffs (setSubtypeStripped ungated setEffs gs) gs src
+      grants = controlGrants gs
       applies c oid =
         let lyr = gLowest c
             partial = projectUpTo lyr cands oid gs
             decided = decisionsUpTo lyr cands oid gs
          in case gEffect c >>= (`Map.lookup` decided) of
               Just answer -> answer
-              Nothing -> affectsGiven (viewUpTo lyr cands gs) (gSource c) oid (gAffected c) partial gs
+              Nothing -> affectsWith grants (viewUpToGiven grants lyr cands gs) (gSource c) oid (gAffected c) partial gs
       -- One entry per ability rather than per part: the parts of an ability
       -- agree on both gAffected and gLowest, so whichever one Map.fromList keeps
       -- asks the same question. Lazy, so only the retained thunk is forced.
@@ -3902,12 +3946,13 @@ abilitiesRemoved = abilitiesRemovedBy (const True)
 abilitiesRemovedBy :: (Gathered -> Bool) -> [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemovedBy keep cands gs oid =
   let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c), keep c]
+      grants = controlGrants gs
       removesAt (lyr, cs) =
         let partial = projectUpTo lyr cands oid gs
             decided = decisionsUpTo lyr cands oid gs
             removes c = case gEffect c >>= (`Map.lookup` decided) of
               Just answer -> answer
-              Nothing -> affectsGiven (viewUpTo lyr cands gs) (gSource c) oid (gAffected c) partial gs
+              Nothing -> affectsWith grants (viewUpToGiven grants lyr cands gs) (gSource c) oid (gAffected c) partial gs
          in any removes cs
    in any removesAt (Map.toList byLowest)
 
@@ -4876,13 +4921,17 @@ projectDeciding admits cands = forObject
     writesByLayer = Map.fromListWith Set.union (fmap (\c -> (gLayer c, modificationWrites (gModification c))) cands)
     countsItsOwnLayer c = not (Set.disjoint (modificationReads (gModification c)) (Map.findWithDefault Set.empty (gLayer c) writesByLayer))
     forObject oid gs =
-      let applyLayer (partial, decided) lyr =
+      let -- One grant walk per projected object, shared by every affected-set
+          -- decision and every peer view the fold takes for it. A thunk,
+          -- so an object no effect is asked about pays nothing.
+          grants = controlGrants gs
+          applyLayer (partial, decided) lyr =
             let -- This layer's candidates, shared by the three readers below that
                 -- ask for them.
                 here = filter (\c -> gLayer c == lyr) cands
                 -- What a Count sees when nothing at this layer can move it: the
                 -- layers strictly below (CR 613.1).
-                bounded = viewUpTo lyr cands gs
+                bounded = viewUpToGiven grants lyr cands gs
                 -- CR 613.3: characteristic-defining abilities first, within the
                 -- layer they define -- subtype 4, colour 5, P/T 7a. Taken per
                 -- OBJECT, as the dependency scan seeds every snapshot the same.
@@ -4929,7 +4978,7 @@ projectDeciding admits cands = forObject
                 -- there because no effect on it can move any other's set.
                 appliesTo viewOf o ds pc c = case gEffect c of
                   Just k | Just answer <- Map.lookup k ds -> answer
-                  _ -> affectsGiven viewOf (gSource c) o (gAffected c) pc gs
+                  _ -> affectsWith grants viewOf (gSource c) o (gAffected c) pc gs
                 -- Fold every part of ONE effect landing in this layer, in the
                 -- order the card lists them (CR 613.6). The ViewOf is the SAME
                 -- for every object the effect reaches, so a count inside it
@@ -5142,7 +5191,7 @@ projectDeciding admits cands = forObject
                   Nothing -> ds
                   Just k
                     | gLayer c /= lyr || Map.member k ds -> ds
-                    | otherwise -> Map.insert k (affectsGiven bounded (gSource c) oid (gAffected c) seeded gs) ds
+                    | otherwise -> Map.insert k (affectsWith grants bounded (gSource c) oid (gAffected c) seeded gs) ds
              in if movableHere
                   then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits here))
                   else
@@ -5162,7 +5211,7 @@ projectDeciding admits cands = forObject
                     -- contiguity survives and effectUnits still finds each unit.
                     let decided' = List.foldl' remember decided cands
                         applies c = case gEffect c of
-                          Nothing -> affectsGiven bounded (gSource c) oid (gAffected c) seeded gs
+                          Nothing -> affectsWith grants bounded (gSource c) oid (gAffected c) seeded gs
                           Just k -> Map.findWithDefault False k decided'
                         ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
                      in (List.foldl' (applyUnit bounded oid) seeded ordered, decided')
