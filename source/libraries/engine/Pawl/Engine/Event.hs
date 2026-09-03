@@ -212,6 +212,7 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
+import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.WithCounters as WithCounters
@@ -12958,9 +12959,12 @@ eventBindingSlots cond = case cond of
   -- asked, the live attachment is ALWAYS gone.
   --
   -- Two shapes escape it, and neither is a hole this classification has to widen
-  -- for. An EQUIPMENT bearer stays on the battlefield under CR 704.5n, and no
-  -- printing carries this condition on one (gap #1894 records the query and the
-  -- card that would refute it). An effect that sends the Aura somewhere other
+  -- for. An EQUIPMENT bearer stays on the battlefield under CR 704.5n, so no
+  -- `became` is minted for it -- but CR 113.6m's exception is the Aura's alone,
+  -- so an Equipment ability that moves itself out of a zone is pinned to that
+  -- zone and its condition is never asked from the battlefield at all
+  -- (data/cards/synthetic-widowed-blade.json is the case, proved in
+  -- Pawl.ZoneTriggerSpec). An effect that sends the Aura somewhere other
   -- than its owner's graveyard in the same batch puts it where CR 400.7f cannot
   -- look -- and there the rule's own answer is that the ability finds nothing, so
   -- the payload moving nothing is correct rather than the silent no-op this lint
@@ -13588,7 +13592,7 @@ eventTriggers events gs =
       -- CR 113.6's battlefield default. Nothing in data/cards/ grants an ability
       -- that arms one; Pawl.Engine.Activate.abilitiesForGiven carries the same
       -- pairing and the same note.
-      battlefieldAbilitiesOf oid pc = filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
+      battlefieldAbilitiesOf oid pc = filter (functionsIn (PC.subtypes pc) (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
       -- controller each of them had THEN. The three readings the live board gets
@@ -13955,7 +13959,7 @@ eventTriggers events gs =
       -- other source answers for.
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) of
+          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -14027,7 +14031,7 @@ eventTriggers events gs =
               case Map.lookup (ZoneChange.object zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
                 Just lk ->
-                  case filter (functionsIn (Game.delayedAbilitiesOf (ZoneChange.object zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
+                  case filter (functionsIn (PC.subtypes (LastKnown.characteristics lk)) (Game.delayedAbilitiesOf (ZoneChange.object zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
                     [] -> Map.empty
                     abilities -> Map.singleton (ZoneChange.object zc) (LastKnown.controller lk, abilities)
         _ -> Map.empty
@@ -14057,7 +14061,7 @@ eventTriggers events gs =
       -- (#1479).
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) of
+          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -14082,7 +14086,7 @@ eventTriggers events gs =
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
-          Just face -> case filter (functionsIn (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) of
+          Just face -> case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) of
             [] -> Map.empty
             abilities -> Map.singleton spell (caster, abilities)
         GameEvent.Discarded {} -> Map.empty
@@ -14213,7 +14217,7 @@ eventTriggers events gs =
       revealedInHand event = case event of
         GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
           (Just obj, Just face) ->
-            case filter (functionsIn (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywords face)) of
+            case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywords face)) of
               [] -> Map.empty
               abilities -> Map.singleton oid (Object.owner obj, abilities)
           _ -> Map.empty
@@ -14371,11 +14375,16 @@ eventTriggers events gs =
 -- design.md section 1 puts on the rulebook's side of the line.
 --
 -- CR 113.6m's "unless" clause is read here in the one half a trigger condition
--- can satisfy -- the Aura half, `enchantedObjectLeaves` below. Screams from
--- Within's "when enchanted creature dies, return this card from your graveyard
--- to the battlefield" is the printing it decides: without the clause the effect
--- pins the ability to the graveyard, where the condition can never be checked,
--- and the card does nothing.
+-- can satisfy -- the Aura half, `enchantedObjectLeaves` below, gated on the
+-- bearer being an Aura. Screams from Within's "when enchanted creature dies,
+-- return this card from your graveyard to the battlefield" is the printing it
+-- decides: without the clause the effect pins the ability to the graveyard,
+-- where the condition can never be checked, and the card does nothing.
+--
+-- The SUBTYPES are the rule's own "if the object is an Aura" (CR 205.3h puts
+-- Aura among the enchantment types), and are projected rather than printed
+-- wherever the caller has a projection -- an object that becomes an Aura in
+-- layer 4 is one for CR 113.6m's purposes too.
 --
 -- The clause's "a previous part of its cost or effect specifies that the object
 -- is put into that zone" half belongs to the fold below rather than here, and
@@ -14397,9 +14406,9 @@ eventTriggers events gs =
 -- half not at all (#2502) -- so an ability whose own condition is what put the
 -- card in the graveyard is pinned there whether its return is immediate or
 -- delayed. No card in the pool writes either shape.
-zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
-zoneFunctionedFrom delayed ability =
-  if enchantedObjectLeaves (TriggeredAbility.condition ability)
+zoneFunctionedFrom :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
+zoneFunctionedFrom subtypes delayed ability =
+  if Set.member Subtype.Aura subtypes && enchantedObjectLeaves (TriggeredAbility.condition ability)
     then Nothing
     else
       Maybe.listToMaybe
@@ -14413,13 +14422,13 @@ zoneFunctionedFrom delayed ability =
 -- trigger condition" is satisfied by any of them -- the exception is about what
 -- the ability can be made to watch, and one watching condition is enough.
 --
--- The rule's "if the object is an Aura" is NOT checked, for want of the object:
--- this reads an ability, and the card's type line is not in hand. Inert rather
--- than wrong today -- Scryfall `o:"enchanted creature dies" o:"from your
--- graveyard to the battlefield"` (2026-08-19) returns Journey to Eternity, Reins
--- of the Vinesteed and Screams from Within, all three Auras -- and an Equipment
--- printed with this condition and a graveyard-recursion effect is the card that
--- would refute it (gap #1894).
+-- The rule's "if the object is an Aura" is asked SEPARATELY, by the caller
+-- above: this reads the condition alone, and `zoneFunctionedFrom` conjoins the
+-- bearer's projected subtypes (CR 205.3) with it. CR 303.4m is why the split is
+-- not a distinction without a difference -- an Equipment's "equipped creature"
+-- is the same attachment link and the same TriggerCondition, and the exception
+-- still does not reach it. Pawl.ZoneTriggerSpec's Synthetic Widowed Blade pair
+-- proves it.
 --
 -- The `_` is a decision, not an omission: CR 113.6m's exception names exactly one
 -- family of conditions, so a condition that says nothing about the enchanted
@@ -14454,8 +14463,8 @@ enchantedObjectLeaves condition = case condition of
 -- an ability whose condition already answers CR 113.6k, and if one did they
 -- would both say graveyard. The order is written down so a future card meets a
 -- decision rather than an accident.
-functionsIn :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> Zone -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Bool
-functionsIn delayed zone ability = case zoneFunctionedFrom delayed ability of
+functionsIn :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> Zone -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Bool
+functionsIn subtypes delayed zone ability = case zoneFunctionedFrom subtypes delayed ability of
   Just named -> zone == named
   Nothing -> Set.member zone (zonesTriggeredFrom (TriggeredAbility.condition ability))
 

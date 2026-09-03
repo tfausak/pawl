@@ -138,6 +138,7 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -5326,8 +5327,79 @@ screamsFromWithinSpec s registry =
         Spec.it s "CR 113.6m control: an ordinary graveyard-recursion trigger is still pinned to the graveyard" $ do
           squee <- S.printingOf s registry "Squee, Goblin Nabob"
           screams <- S.printingOf s registry "Screams from Within"
-          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap (Event.zoneFunctionedFrom (Face.delayedAbilities (S.combinedFace squee))) (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
-          Spec.assertEqWith s "the Aura's names no zone at all" (fmap (Event.zoneFunctionedFrom (Face.delayedAbilities (S.combinedFace screams))) (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
+          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine (S.combinedFace squee))) (Face.delayedAbilities (S.combinedFace squee))) (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
+          Spec.assertEqWith s "the Aura's names no zone at all" (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine (S.combinedFace screams))) (Face.delayedAbilities (S.combinedFace screams))) (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
+
+-- CR 113.6m's Aura clause read the other way round: the exception is granted
+-- "if the object is an Aura", so the SAME trigger condition on a non-Aura gets
+-- the rule's main sentence instead. CR 303.4m is what makes the pair possible --
+-- "an ability of a permanent that refers to the enchanted [object] refers to
+-- whatever object that permanent is attached to, even if the permanent with the
+-- ability isn't an Aura" -- so an Equipment's "equipped creature dies" is the
+-- same attachment link and the same TriggerCondition.AttachedCreatureDies.
+--
+-- Synthetic Widowed Blade ({2} Artifact -- Equipment, "Equipped creature gets
+-- +2/+0. / Whenever equipped creature dies, return Synthetic Widowed Blade from
+-- your graveyard to the battlefield. / Equip {2}",
+-- data/cards/synthetic-widowed-blade.json) is the producer. Synthetic because no
+-- printing discriminates the two readings: Scryfall `o:/equipped creature dies/
+-- -t:aura` (2026-09-02) returns the Equipment family -- Eater of Virtue, Sword
+-- of the Realms, Resurrection Orb, Oathkeeper, Forebear's Blade and the rest --
+-- and every one of them moves the equipped CREATURE or re-attaches itself, never
+-- moving the Equipment out of a zone, which is what CR 113.6m is about. An
+-- Equipment printed with a graveyard-recursion effect on this condition is the
+-- card that would replace this one.
+--
+-- The move names the TRIGGER SOURCE slot rather than Screams from Within's
+-- `became`, and that is the modelling the rule forces rather than a difference
+-- of convenience: the Equipment is pinned to the graveyard, so the object its
+-- ability moves is the graveyard card itself, where CR 400.7's replacement is
+-- what leaves an Aura triggering from the battlefield naming a different
+-- incarnation. It is also why this card is the FIRST in the pool to reach
+-- CR 113.6m's Aura clause at all -- Pawl.Engine.EffectZone.zoneFunctionedFrom
+-- answers Nothing for a move that names any other slot, so every printed Aura
+-- with this condition answers Nothing through the fold whether the clause is
+-- read or not, and only a bearer whose ability names its own source can tell
+-- the exception's two sides apart.
+--
+-- CR 704.5n rather than CR 704.5m is what keeps the Equipment on the battlefield
+-- when its host dies, so its ability is read there, by `eventTriggers`'
+-- `battlefieldAbilitiesOf` filter, off the live projection.
+widowedBladeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+widowedBladeSpec s registry =
+  let board = do
+        blade <- S.printingOf s registry "Synthetic Widowed Blade"
+        hillGiant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (host, g1) = S.addCreature hillGiant S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g2) = S.addCreature hillGiant S.alice g1
+            (_, g3) = S.addCreature piker S.bob g2
+            (equipment, g4) = S.addCreature blade S.alice g3
+        pure (host, equipment, blade, S.attach equipment host g4)
+      kill victim gs = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim] >> Engine.settleForPriority)
+   in Spec.describe s "WidowedBlade" $ do
+        -- The proving leg. The discriminating quantity is what the stack holds
+        -- after the equipped creature dies: nothing, because the ability
+        -- functions only in the graveyard. Granting the Aura exception to this
+        -- Equipment puts its trigger there instead.
+        Spec.it s "CR 113.6m an Equipment gets no Aura exception, so its ability never triggers from the battlefield" $ do
+          (host, equipment, _, gs) <- board
+          let after = kill host gs
+          Spec.assertEqWith s "CR 113.6m the Equipment's ability is pinned to the graveyard, so the stack is empty" (fmap (\oid -> fmap Object.source (Game.lookupObject oid after)) (GameState.stack after)) []
+          -- The preconditions the assertion rests on, AFTER it so neither can
+          -- absorb a mutation aimed at the subtype gate.
+          Spec.assertEqWith s "the equipped Hill Giant really died" (Game.lookupObject host after) Nothing
+          Spec.assertBool s (Maybe.isJust (Game.lookupObject equipment after)) "and CR 704.5n left the Equipment on the battlefield, where its ability was read"
+        -- The pair, one level down and differing in exactly one thing: the same
+        -- ability, read once with the card's own subtypes and once with Aura
+        -- added. Nothing else about the ability moves.
+        Spec.it s "CR 113.6m the same ability answers differently once its bearer is an Aura" $ do
+          blade <- S.printingOf s registry "Synthetic Widowed Blade"
+          let face = S.combinedFace blade
+              zonesWith subtypes = fmap (Event.zoneFunctionedFrom subtypes (Face.delayedAbilities face)) (Face.triggeredAbilities face)
+          Spec.assertEqWith s "as an Equipment the ability functions only in the graveyard" (zonesWith (TypeLine.subtypes (Face.typeLine face))) [Just Zone.Graveyard]
+          Spec.assertEqWith s "as an Aura the exception applies and it names no zone" (zonesWith (Set.insert Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) [Nothing]
+          Spec.assertBool s (not (Set.member Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) "and the printed card really is no Aura"
 
 -- CR 113.6m's FINAL sentence, over a whole card: "the same is true if the effect
 -- of that ability creates a delayed triggered ability whose effect moves the
@@ -5525,6 +5597,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   soulshiftSpec s registry
   hauntSpec s registry
   screamsFromWithinSpec s registry
+  widowedBladeSpec s registry
   prizedAmalgamSpec s registry
   banewaspAfflictionSpec s registry
   strippedTriggerSpec s registry
