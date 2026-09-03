@@ -11821,8 +11821,15 @@ reactsToAbilityTriggering cond = case cond of
 -- unioned in at the call site so that eventBindingSlots below stays the single
 -- statement of which slots a condition makes available, which is what the card
 -- lint reads.
-eventBindings :: GameState -> Maybe ObjectId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
-eventBindings gs bearerBecame cond event = case (cond, event) of
+--
+-- THE THIRD ARGUMENT is CR 109.5 / 603.3a's "you", the ability's controller --
+-- matchesTriggerGiven's own third argument, and read the same way at both call
+-- sites (eventTriggers' `ctrl`, delayedPending's `DelayedTrigger.controller`).
+-- Most arms never read it; DamageToPlayerPrevented below does, to re-ask the
+-- condition's relation of a record a wider shield stamped for more than one
+-- player (#3079).
+eventBindings :: GameState -> Maybe ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
+eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- CR 603.2b's "that player": the active player, on whose turn the step began.
   -- Shizuko, Caller of Autumn's "at the beginning of each player's upkeep, THAT
   -- PLAYER adds {G}{G}{G}" is the reader, and the seat it names is nobody the
@@ -12194,16 +12201,26 @@ eventBindings gs bearerBecame cond event = case (cond, event) of
   -- you", so what was stopped on the way to a permanent is no part of "that
   -- many".
   --
-  -- Not implemented: the relation is not re-asked here, so one application
-  -- covering TWO players where the relation admits only one reports both their
-  -- shares (#3079). Nothing in data/cards/ prints such a shield -- every
-  -- multi-recipient one covers its own controller and objects.
+  -- RE-ASKED against the relation, exactly as matchesTrigger's own arm asks it
+  -- (CR 109.5): a shield admitting more than one player (Synthetic Impartial
+  -- Ward's "any player") stamps every one of their entries into one
+  -- DamagePrevented record, and only the share addressed to a player THIS
+  -- relation admits is "that much" -- a wider shield's other recipients are no
+  -- part of it. `you` is the ability's controller, threaded in from the two
+  -- call sites below exactly as matchesTriggerGiven already receives it.
   --
   -- The recipient is NOT bound alongside it. Every payload this CONDITION
   -- carries acts on the ability's own source (Selfless Squire counters itself),
   -- and the player the recipient names here is CR 109.5's "you", already bound.
-  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented prevented) ->
-    Binding.setEventAmount (sum (Map.filterWithKey (\recipient _ -> Maybe.isJust (Target.playerOf recipient)) (DamagePrevented.amounts prevented))) Map.empty
+  (TriggerCondition.DamageToPlayerPrevented relation, GameEvent.DamagePrevented prevented) ->
+    Binding.setEventAmount
+      ( sum
+          ( Map.filterWithKey
+              (\recipient _ -> maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Target.playerOf recipient))
+              (DamagePrevented.amounts prevented)
+          )
+      )
+      Map.empty
   -- CR 615.13's "that much" once more, off the same event and into the same
   -- reserved slot: the Vindicator deals what its own prevention stopped. The
   -- WHOLE record here where the arm above takes the player share, this condition
@@ -14316,7 +14333,7 @@ eventTriggers events gs =
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) (TriggeredAbility.condition ab) event) Nothing
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) ctrl (TriggeredAbility.condition ab) event) Nothing
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -15459,7 +15476,7 @@ delayedPending grouped gs =
           -- delayed entry watches, not for a bearer's own departure, and the
           -- entry's captured environment (CR 603.7c) is where what it knows about
           -- its own object comes from.
-          (Map.union (eventBindings gs Nothing (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
+          (Map.union (eventBindings gs Nothing (DelayedTrigger.controller entry) (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
           -- CR 603.7a: what tells the ability this becomes apart from one its
           -- source simply has, once it is on the stack.
           (Just (DelayedTrigger.createdAt entry))
