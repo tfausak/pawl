@@ -1178,8 +1178,9 @@ boundSiblings declared slot =
 -- than off the trigger's, and reject an announcement the rule allows. Harness the
 -- Storm's twin slot is the shape (its filter names `thatSpell`), and that half is
 -- a REGRESSION FENCE rather than a proven behaviour: every card in the pool whose
--- slot filter names a seed is on a triggered ability, and no trigger reaches
--- selectionLegal at all (#2472), so dropping `declared` reddens nothing.
+-- slot filter names a seed is on a triggered ability, whose announcement reaches
+-- jointlyCoherent alone (Pawl.Engine.Engine.placeBorne) and is re-derived there
+-- under the trigger's own bindings, so dropping `declared` reddens nothing.
 --
 -- The FILTER half is what only the JOINT CHECK reads, never legalSetsGiven's
 -- second pass. That pass is a WIDENING -- it offers the union over what a named
@@ -1401,11 +1402,12 @@ piledOffer perspective gs = Set.map replace
 -- selectionLegal at CR 601.2c (a cast, an activation) and by
 -- Pawl.Engine.Resolve's own gate at CR 707.10c's re-target.
 --
--- A TRIGGER's placement judges nothing, so a card the draw named that the slot
--- refuses stands as the target and CR 608.2b counters the ability at resolution,
--- where CR 603.3d removes it from the stack at once (gap #2472). Riftsweeper is
--- the pool's one triggered exile slot and its "face-up exiled card" is offered no
--- pile, so no card reaches it.
+-- A TRIGGER's placement (Pawl.Engine.Engine.placeBorne) judges the announcement
+-- for CR 601.2c's coherence and for nothing else, so a card the draw named that
+-- the slot's own filter refuses stands as the target and CR 608.2b counters the
+-- ability at resolution (gap #3091). Riftsweeper is the pool's one triggered
+-- exile slot and its "face-up exiled card" is offered no pile, so no card reaches
+-- it.
 --
 -- Elided at one member and skipped at none, the posture the three randomness
 -- prompts over a candidate list take (Pawl.Engine.Resolve's RandomObject and
@@ -1529,9 +1531,10 @@ selectionLegal perspective seed source x slots sets chosen gs =
        in Set.isSubsetOf picked legal && size >= demanded && size <= hi
 
 -- CR 601.2c's JOINT CHECK on its own: every jointly judged slot re-derived
--- against what the whole announcement chose, under `seed`. Two callers, and
+-- against what the whole announcement chose, under `seed`. Three callers, and
 -- between them the moments an announcement over declared slots is accepted --
--- selectionLegal above (CR 601.2e's cast and CR 602.2's activation), and
+-- selectionLegal above (CR 601.2e's cast and CR 602.2's activation),
+-- Pawl.Engine.Engine.placeBorne (CR 603.3d's placement) and
 -- Pawl.Engine.Resolve.chooseNewTargetsFor (CR 707.10c's re-target). The
 -- re-derivation is exactly the one CR 608.2b will make at resolution, so a
 -- selection this admits cannot be one resolution then drops.
@@ -1539,6 +1542,9 @@ selectionLegal perspective seed source x slots sets chosen gs =
 -- Only the WHICH question, never the how many: a count is measured against
 -- slotCapacities by the caller that has one, and CR 707.10c's caller has no
 -- count to judge at all.
+--
+-- Not implemented: CR 603.3d's caller measures none either, its announcement
+-- being judged by this check alone (#3091).
 jointlyCoherent :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyCoherent perspective seed source slots chosen gs =
   let pcs = Projection.projectAll gs
@@ -1587,12 +1593,12 @@ jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
 -- one chooseTargets would offer, so an assignment this search accepts is one a
 -- caster could really announce. Every slot a sibling FILTER names in
 -- `data/cards/` is counted exactly one -- Bioshift's, Fate Transfer's and
--- Resourceful Defense's `from`, Fall of the Hammer's `dealer`, and Synthetic
--- Hammer Refrain's `dealer` per occurrence -- so for those the range is one size
--- and the product is a handful of re-derivations; Measured Refrain's gauge, the
--- pool's one bound-named slot, is "up to two" and pays the subsets of size zero,
--- one and two. None of those is counted "any number", which is the count that
--- would make this every subset of the slot's candidates.
+-- Resourceful Defense's `from`, Fall of the Hammer's and Itzquinth's `dealer`,
+-- and Synthetic Hammer Refrain's `dealer` per occurrence -- so for those the
+-- range is one size and the product is a handful of re-derivations; Measured
+-- Refrain's gauge, the pool's one bound-named slot, is "up to two" and pays the
+-- subsets of size zero, one and two. None of those is counted "any number", which
+-- is the count that would make this every subset of the slot's candidates.
 jointlyFillableGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
   Map.null readers || any coherent assignments
