@@ -5378,10 +5378,13 @@ widowedBladeSpec s registry =
         pure (host, equipment, blade, S.attach equipment host g4)
       kill victim gs = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [victim] >> Engine.settleForPriority)
    in Spec.describe s "WidowedBlade" $ do
-        -- The proving leg. The discriminating quantity is what the stack holds
-        -- after the equipped creature dies: nothing, because the ability
-        -- functions only in the graveyard. Granting the Aura exception to this
-        -- Equipment puts its trigger there instead.
+        -- The gameplay board, and a REGRESSION FENCE rather than a proof:
+        -- granting this Equipment the Aura exception leaves the stack empty all
+        -- the same, because the condition never matches for a surviving
+        -- Equipment bearer (#3144) and the match is asked before CR 113.6m's
+        -- filter can matter. The leg below is what proves the gate; this one
+        -- says the board really is the one CR 113.6m is about, and becomes
+        -- discriminating the day #3144 lands.
         Spec.it s "CR 113.6m an Equipment gets no Aura exception, so its ability never triggers from the battlefield" $ do
           (host, equipment, _, gs) <- board
           let after = kill host gs

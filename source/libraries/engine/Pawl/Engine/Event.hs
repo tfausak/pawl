@@ -8770,8 +8770,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- than defensive: CR 704.5m takes the Aura off the battlefield in the very SBA
   -- batch that buried its host, and CR 117.5 places triggers only after that
   -- batch settles, so by the time this is asked the live link is ALWAYS gone.
-  -- The live read is kept ahead of it for the Equipment-shaped case, where
-  -- CR 704.5n leaves the bearer standing.
+  --
+  -- Not implemented: an EQUIPMENT bearer, which CR 704.5n leaves standing. The
+  -- live read ahead of the fallback was meant for it, but CR 704.5n has already
+  -- cleared Object.attachedTo by the time CR 117.5 places triggers, and a
+  -- surviving bearer has no last-known entry -- so neither read finds the link
+  -- and the trigger never matches. CR 603.10a's look-back at the attachment as of
+  -- the event is what would answer, and matchesTrigger takes only the post-batch
+  -- GameState (#3144).
   TriggerCondition.AttachedCreatureDies -> case event of
     GameEvent.Moved (Moved.MkMoved zc _ _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
