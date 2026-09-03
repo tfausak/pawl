@@ -137,7 +137,7 @@ data Prompt r where
   -- making it? Exercises reverses them, Declines keeps them, and the mana they
   -- made stays in the pool (CR 106.4). The list is the sources whose abilities
   -- were activated, so the prompt exists only where the rule offers something
-  -- to reverse. All or nothing rather than a subset (#3134).
+  -- to reverse. All or nothing rather than a subset (gap #3134).
   ReverseManaAbilities :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 605.3b: which mana the source produces, asked as the mana ability
   -- resolves. A ManaOption is the whole mana one activation adds together with
