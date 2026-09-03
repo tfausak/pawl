@@ -370,6 +370,13 @@ data PlayerEffect
     -- applicable permission is enough because there is nothing for a second to
     -- outvote.
     CastAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
+  | -- | CR 601.1a / 601.3b / Scout's Warning: this player may PLAY a matching
+    -- card as though it had flash -- CastAsThoughItHadFlash's sibling, widened
+    -- from casting to CR 601.1a's whole verb (a land is played, never cast),
+    -- read from both Pawl.Engine.Cast.timingOk and
+    -- Pawl.Engine.Action.landTimingOk, where CastAsThoughItHadFlash reaches
+    -- only the former.
+    MayPlayAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
   | -- | CR 701.6a / 613.11 / Spider-Punk: the spells and the abilities on the
     -- stack controlled by the players this effect's scope names can't be
     -- countered.

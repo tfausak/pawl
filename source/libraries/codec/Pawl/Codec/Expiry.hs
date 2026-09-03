@@ -23,5 +23,6 @@ codec =
       Arm.payload "AtTurnOf" PlayerId.codec Expiry.AtTurnOf (\x -> case x of Expiry.AtTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOfTurnOf" AfterTurn.codec Expiry.AtEndOfTurnOf (\x -> case x of Expiry.AtEndOfTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOf" PhaseSelector.codec Expiry.AtEndOf (\x -> case x of Expiry.AtEndOf y -> Just y; _ -> Nothing),
-      Arm.payload "WhenPaid" PaidExpiry.codec Expiry.WhenPaid (\x -> case x of Expiry.WhenPaid y -> Just y; _ -> Nothing)
+      Arm.payload "WhenPaid" PaidExpiry.codec Expiry.WhenPaid (\x -> case x of Expiry.WhenPaid y -> Just y; _ -> Nothing),
+      Arm.nullary "WhenUsed" Expiry.WhenUsed
     ]

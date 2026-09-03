@@ -2280,6 +2280,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
+  PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
   PlayerEffect.CastFromGraveyard f -> PlayerEffect.CastFromGraveyard (Filter.rewrite pairs f)
@@ -3220,6 +3221,7 @@ rewriteDuration pairs duration = case duration of
   -- Cost arm carries a subtype word outside a Filter, and the Filters a cost's
   -- non-mana components hold are matched where the cost is paid.
   Duration.UntilPaid _ -> duration
+  Duration.UntilUsed -> duration
 
 -- CR 612.1 through the counters a CR 122.5 move carries: the count is the only
 -- place a subtype word can hide, since the kind is a CounterKind and Every,

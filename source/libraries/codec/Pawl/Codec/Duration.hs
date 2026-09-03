@@ -19,5 +19,6 @@ codec =
       Arm.nullary "UntilEndOfYourNextTurn" Duration.UntilEndOfYourNextTurn,
       Arm.payload "ForAsLongAs" Condition.codec Duration.ForAsLongAs (\x -> case x of Duration.ForAsLongAs y -> Just y; _ -> Nothing),
       Arm.nullary "UntilEndOfCombat" Duration.UntilEndOfCombat,
-      Arm.payload "UntilPaid" (Cost.codec Keyword.codec) Duration.UntilPaid (\x -> case x of Duration.UntilPaid y -> Just y; _ -> Nothing)
+      Arm.payload "UntilPaid" (Cost.codec Keyword.codec) Duration.UntilPaid (\x -> case x of Duration.UntilPaid y -> Just y; _ -> Nothing),
+      Arm.nullary "UntilUsed" Duration.UntilUsed
     ]

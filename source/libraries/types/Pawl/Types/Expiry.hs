@@ -81,4 +81,10 @@ data Expiry
     -- Licid taken by Confiscate after it animated itself is the board that tells
     -- the two apart.
     WhenPaid PaidExpiry.PaidExpiry
+  | -- | CR 611.2a / Quicken, Scout's Warning: ends the moment the effect it
+    -- carries is exercised, not at a moment the clock could name. Also ends at
+    -- cleanup like AtCleanup, since every printed producer also says "this
+    -- turn"; Pawl.Engine.PlayerEffect.consumedByCast/consumedByLandPlay are the
+    -- only readers that end it early.
+    WhenUsed
   deriving (Eq, Ord, Show)

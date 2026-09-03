@@ -1092,6 +1092,10 @@ durationSlots duration = case duration of
   -- there is no binding environment for it to name.
   Duration.UntilPaid _ -> Map.empty
   Duration.UntilEndOfCombat -> Map.empty
+  -- No slot either: Expiry.WhenUsed reads the effect's own Filter, which is
+  -- walked wherever that effect's payload is (Pawl.Engine.PlayerEffect), not
+  -- here.
+  Duration.UntilUsed -> Map.empty
 
 -- Every slot ONE target slot reads: its pool's, its filter's, and its CR 202.3
 -- computed bound's. Its own name is not among them -- this is what the slot
@@ -1560,6 +1564,7 @@ durationSlotsAreExhaustive duration = case duration of
   -- durationSlots' answer: a Cost reads no slot, so its enumeration is complete.
   Duration.UntilPaid _ -> True
   Duration.UntilEndOfCombat -> True
+  Duration.UntilUsed -> True
 
 -- conditionSlots' mirror: both sides are a Quantity.
 conditionSlotsAreExhaustive :: Condition.Type.Condition -> Bool

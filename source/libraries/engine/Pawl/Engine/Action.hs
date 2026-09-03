@@ -146,14 +146,17 @@ legalActions pid gs =
       -- is the one this play would put onto the battlefield (CR 712.12), resolved
       -- the way Cast.proposedFace resolves the half being cast.
       --
-      -- Not implemented: the CR 613.11 player axis's "as though it had flash"
-      -- (CR 601.3b, PlayerEffect.mayCastAsThoughItHadFlash), which Cast.timingOk
-      -- reads beside Cast.instantSpeed for a cast. A printing whose permission
-      -- says PLAY rather than cast -- Scout's Warning -- would move this window
-      -- too, by CR 601.1a (#1938).
+      -- The CR 613.11 player axis's "as though it had flash" (CR 601.3b),
+      -- which Cast.timingOk reads beside Cast.instantSpeed for a cast:
+      -- PlayerEffect.mayPlayAsThoughItHadFlash is that axis's PLAY-scoped
+      -- reader, since a cast-scoped grant (Vedalken Orrery) says "cast" and
+      -- never widens a land play (CR 305.1). A printing whose permission says
+      -- PLAY rather than cast -- Scout's Warning -- moves this window too, by
+      -- CR 601.1a.
       landTimingOk (oid, mName) =
         Turn.sorcerySpeedWindow pid gs
           || maybe False (\card -> Cast.flashOn oid (Game.resolveFace mName card) gs) (Game.cardOf oid gs)
+          || PlayerEffect.mayPlayAsThoughItHadFlash pid oid gs
       lands = if canPlayLand then fmap (uncurry Action.Play) (filter landTimingOk (playableLands pid gs)) else []
       -- CR 709.3: one action per castable HALF, so choosing a half is choosing
       -- an action and the engine never asks which one. CR 702.37d adds one more

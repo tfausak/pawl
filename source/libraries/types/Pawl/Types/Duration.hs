@@ -61,4 +61,8 @@ data Duration
     -- Licid even though both outlast every window -- an Expiry.Never cannot be
     -- keyed on, so the performer could not find the effects the payment ends.
     UntilPaid (Cost.Cost Keyword.Keyword)
+  | -- | CR 611.2a / Quicken: "the next ... you ... this turn", stored as
+    -- Expiry.WhenUsed. Nullary: no printed sentence in the pool narrows WHICH
+    -- use ends it beyond the effect's own Filter.
+    UntilUsed
   deriving (Eq, Ord, Show)
