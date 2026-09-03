@@ -5266,8 +5266,8 @@ sacrifice pid oid = do
         -- recorded, and no destruction is substituted.
         --
         -- The SECOND of the two gates, and it earns its place at the funnel:
-        -- Effect.Sacrifice names a target or a bound group and consults no
-        -- candidate list at all, which is how Lightning Skelemental's "at the
+        -- Effect.Sacrifice names its victims through an ObjectRef and consults
+        -- no candidate list at all, which is how Lightning Skelemental's "at the
         -- beginning of the end step, sacrifice this creature" reaches here.
         -- Pawl.SacrificeRestrictionSpec proves that path goes through this arm
         -- and no other -- gating only the candidate list leaves it green.
