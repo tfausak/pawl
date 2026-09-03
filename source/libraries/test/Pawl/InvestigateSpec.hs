@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Pawl.Engine.Resolve over investigate (CR 701.30), suspect (CR 701.58), the
+-- Pawl.Engine.Resolve over investigate (CR 701.16a), suspect (CR 701.60), the
 -- token-making effects around them, and the effects that reveal or cast at
 -- random. The machinery is Pawl.ResolveSpec.
 module Pawl.InvestigateSpec where
@@ -307,6 +307,84 @@ eliminateTheImpossibleSpec s registry = Spec.describe s "EliminateTheImpossible"
         Spec.assertEqWith s "and alice's own attacker did not, so the sweep is opponents-only" (S.powerToughnessOf attackerId after) (Just (2, 1))
         Spec.assertEqWith s "and alice investigated" (fmap (`S.soleFaceName` after) (filter (/= detectiveId) (S.tokensOf after))) [CardName.MkCardName $ Text.pack "Clue Token"]
       other -> Spec.assertFailure s ("expected one token and one attacker, got " <> show other)
+
+-- Angelic Sleuth {2}{W} Creature -- Angel Advisor 2/3, flying (New Capenna
+-- Commander; name, cost, type line, power, toughness and oracle text checked
+-- against Scryfall 2026-09-03), data/cards/angelic-sleuth.json:
+--
+--   Flying
+--   Whenever another permanent you control leaves the battlefield, if it had
+--   counters on it, investigate.
+--
+-- CR 122.1's bare sum read as a Boolean and aimed by AgainstSlot at
+-- Pawl.Engine.Binding's departedPermanent, exactly as Resourceful Defense's
+-- own intervening "if" in Pawl.PutCounterSpec -- the SAME
+-- Quantity.ObjectCountersOfAnyKind arm, a different clause behind it. The
+-- resolution itself is CR 701.16a's plain Create, proved gameplay-level
+-- already by investigateSpec above; this group's subject is the trigger
+-- condition's two-part filter -- "another" (Filter.Not IsSource) and "you
+-- control" (Filter.ControlledBy) -- and the intervening "if" gating it.
+--
+-- One board for every case: alice's Sleuth, one of alice's own Pikers as the
+-- bystander the positive and negative cases kill, and one of bob's as the
+-- opponent's-permanent case. Lethal damage (10, past any body on this board)
+-- is what sends a permanent to the graveyard; S.identityAnswer suffices
+-- throughout since Create's quantity is a literal 1 with no target slot.
+angelicSleuthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+angelicSleuthSpec s registry = Spec.describe s "AngelicSleuth" $ do
+  let board = do
+        sleuth <- S.printingOf s registry "Angelic Sleuth"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (sleuthId, g1) = S.addCreature sleuth S.alice (Setup.emptyGame S.bothPlayers)
+            (victimId, g2) = S.addCreature piker S.alice g1
+            (opponentId, g3) = S.addCreature piker S.bob g2
+        pure (sleuthId, victimId, opponentId, g3)
+      -- Lethal damage, state-based actions, then gather and resolve whatever
+      -- trigger that produced.
+      killAndResolve oid gs =
+        let died = S.settleSba (S.markDamage oid 10 gs)
+            settled = S.runPure S.identityAnswer died Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+  -- THE CASE THIS UNIT EXISTS FOR: another permanent alice controls leaves
+  -- with a counter on it.
+  Spec.it s "CR 122.1 another permanent's counter triggers an investigate" $ do
+    (sleuthId, victimId, _, built) <- board
+    let before = S.addCounter CounterKind.PlusOnePlusOne 2 victimId built
+    Spec.assertEqWith s "the Piker carries two +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne victimId before) 2
+    let (settled, after) = killAndResolve victimId before
+    Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack settled)) 1
+    Spec.assertEqWith s "alice investigated: one Clue token" (fmap (`S.soleFaceName` after) (S.tokensOf after)) [CardName.MkCardName (Text.pack "Clue Token")]
+    Spec.assertEqWith s "and the Piker is off the battlefield" (S.onBattlefield victimId after) False
+    Spec.assertBool s (Set.member sleuthId (GameState.battlefield after)) "and the Sleuth itself is untouched"
+  -- CR 603.4's "otherwise it does nothing", on a board differing from the
+  -- first case in exactly one thing: the same Piker, carrying no counters.
+  Spec.it s "CR 603.4 a permanent with no counters investigates nothing" $ do
+    (_, victimId, _, before) <- board
+    Spec.assertEqWith s "no counters on it at all" (S.counterOf CounterKind.PlusOnePlusOne victimId before) 0
+    let (settled, after) = killAndResolve victimId before
+    Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+    Spec.assertEqWith s "no Clue" (S.tokensOf after) []
+  -- "Another": the Sleuth carries the same two counters and dies the same
+  -- lethal way, and Filter.Not IsSource is what keeps its own departure from
+  -- triggering it. Without this case a filter that dropped the IsSource
+  -- clause would still pass the case above.
+  Spec.it s "the Sleuth's own departure does not trigger itself" $ do
+    (sleuthId, _, _, built) <- board
+    let before = S.addCounter CounterKind.PlusOnePlusOne 2 sleuthId built
+    Spec.assertEqWith s "the Sleuth carries two +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne sleuthId before) 2
+    let (settled, after) = killAndResolve sleuthId before
+    Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+    Spec.assertEqWith s "no Clue" (S.tokensOf after) []
+  -- "You control": bob's Piker carries the same counters and dies the same
+  -- way, and Filter.ControlledBy You is what keeps an opponent's permanent
+  -- from triggering it.
+  Spec.it s "CR 603.6c an opponent's departing permanent does not trigger it" $ do
+    (_, _, opponentId, built) <- board
+    let before = S.addCounter CounterKind.PlusOnePlusOne 2 opponentId built
+    Spec.assertEqWith s "bob's Piker carries two +1/+1 counters" (S.counterOf CounterKind.PlusOnePlusOne opponentId before) 2
+    let (settled, after) = killAndResolve opponentId before
+    Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+    Spec.assertEqWith s "no Clue" (S.tokensOf after) []
 
 -- CR 701.60b read as a number, proved by Repeat Offender {1}{B} Creature -- Human
 -- Assassin 2/1, "{2}{B}: If this creature is suspected, put a +1/+1 counter on
@@ -1020,6 +1098,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   investigateSpec s registry
   personOfInterestSpec s registry
   eliminateTheImpossibleSpec s registry
+  angelicSleuthSpec s registry
   repeatOffenderSpec s registry
   runeBrandJugglerSpec s registry
   randomRevealSpec s registry
