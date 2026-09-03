@@ -111,7 +111,13 @@ ignore pid oid = do
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
       payment <- Cost.pay Resolve.performManaAbility PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
-        Payment.Unpaid -> State.put before
+        -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a mana
+        -- ability tapped in the window this payment opened may have shuffled
+        -- or revealed, and this reject-not-repair restore must not undo that
+        -- too.
+        Payment.Unpaid -> do
+          gs <- State.get
+          State.put (Cost.keepingLibraryActions gs before)
         -- The payment's bound slots are dropped: CR 116.2d's special action puts
         -- nothing on the stack, so there is no resolving object whose effects
         -- could read one.

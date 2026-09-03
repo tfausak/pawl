@@ -1667,7 +1667,13 @@ attemptAttackDeclaration perform pid rejected = do
             -- CR 508.1's preamble: the declaration is illegal and the game returns
             -- to the moment before it. Reachable by an ordinary player who
             -- declares more attackers than they can pay for.
-            State.put before
+            --
+            -- Through Cost.keepingLibraryActions rather than a bare State.put:
+            -- CR 733.1's last sentence -- a mana ability the toll's window
+            -- tapped may have shuffled or revealed, and this restore must not
+            -- undo that too.
+            gsFailed <- State.get
+            State.put (Cost.keepingLibraryActions gsFailed before)
             -- And then the declaration is made again, normally a smaller attack
             -- the player can afford. CombatEffectSpec's "CR 508.1 the rewound
             -- declaration is made again: two Pikers under a Ghostly Prison
@@ -2124,7 +2130,13 @@ attemptBlockDeclaration perform pid attacking rejected = do
         -- declaration is made again: the taxed blocker is dropped and the free
         -- one blocks" is the proof; the case beside it is what a repeated answer
         -- does instead.
-        Monad.unless paid (State.put before)
+        --
+        -- Through Cost.keepingLibraryActions rather than a bare State.put: CR
+        -- 733.1's last sentence -- a mana ability the toll's window tapped may
+        -- have shuffled or revealed, and this restore must not undo that too.
+        Monad.unless paid $ do
+          gsFailed <- State.get
+          State.put (Cost.keepingLibraryActions gsFailed before)
         gs2 <- State.get
         if not paid && again
           then attemptBlockDeclaration perform pid attacking (Set.insert chosen rejected)

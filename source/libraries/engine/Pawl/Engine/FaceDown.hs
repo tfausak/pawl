@@ -257,7 +257,13 @@ turnFaceUp perform pid procedure oid = do
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
         payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
-          Payment.Unpaid -> State.put before
+          -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason: a
+          -- mana ability tapped in the window this payment opened may have
+          -- shuffled or revealed, and this reject-not-repair restore must not
+          -- undo that too.
+          Payment.Unpaid -> do
+            gs <- State.get
+            State.put (Cost.keepingLibraryActions gs before)
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
           -- turning a permanent face up resolves nothing.
           Payment.Paid _ -> performTurnFaceUp (Just procedure) oid

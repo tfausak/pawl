@@ -2004,7 +2004,14 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed
                         -- -- which is what takes the spell back off the stack.
-                        Payment.Unpaid -> reject
+                        -- Not the bare `reject` every other rejection here uses:
+                        -- CR 733.1's last sentence, Cost.keepingLibraryActions'
+                        -- reason -- a mana ability tapped in the window this
+                        -- payment opened may have shuffled or revealed, and
+                        -- this restore must not undo that too.
+                        Payment.Unpaid -> do
+                          failedGs <- State.get
+                          State.put (Cost.keepingLibraryActions failedGs before)
                         -- WHICH of the candidate costs was paid is `castFor`
                         -- above, and it lives no longer than this announcement:
                         -- the one rule that asks (CR 702.34a) asks as the cast
