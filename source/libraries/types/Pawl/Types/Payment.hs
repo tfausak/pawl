@@ -10,9 +10,13 @@ import Pawl.Types.SlotName (SlotName)
 --
 -- Runtime-only: a Payment is never card data and never serialized.
 --
--- Unpaid is always a COMPLETE no-op: Pawl.Engine.Cost.pay restores the state it was
--- entered with before returning it, so a caller never has to unwind a partial
--- payment (mana spent, one component paid, the next one rejected).
+-- Unpaid unwinds the whole payment: Pawl.Engine.Cost.pay puts back the state it
+-- was entered with before returning it, so a caller never has to unwind a
+-- partial payment (mana spent, one component paid, the next one rejected). At CR
+-- 118.12's moment it is not a complete no-op, CR 733.1 leaving the mana abilities
+-- the payer activated in the CR 605.3a window to that player -- one who keeps
+-- them keeps the mana, the taps and CR 405.6c's other effects
+-- (Cost.reverseIllegal).
 --
 -- Paid carries the slots the payment BOUND -- CR 608.2h's "the sacrificed
 -- creature", whose power Jarad, Golgari Lich Lord reads after the payment put it

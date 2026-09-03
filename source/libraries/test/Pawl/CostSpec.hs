@@ -80,7 +80,9 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
@@ -1949,6 +1951,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   millikinSpec s registry
   brittleEffigySpec s registry
   hanweirBattlementsSpec s registry
+  reversalSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
 -- `granted` is True, with priority in her own precombat main phase so a sorcery
@@ -2496,8 +2499,10 @@ tappingNothing p = case p of
   _ -> S.identityAnswer p
 
 -- How many mana this source put in alice's pool. The observable that says the
--- cost was PAID: Cost.pay restores the entry state for an unpaid one, so a
--- refused payment adds nothing and taps nothing.
+-- cost was PAID: Cost.pay restores the entry state for an unpaid one at CR
+-- 601.2h's moment, so a refused payment adds nothing and taps nothing. (CR
+-- 118.12's moment is where rule 733.1 lets the payer keep what the window made
+-- -- reversalSpec below.)
 pooledFrom :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Int
 pooledFrom answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana S.manaPerformer oid)) of
   Mana.Type.MkMana units -> length units
@@ -3455,3 +3460,111 @@ hanweirBattlementsSpec s registry = Spec.describe s "Hanweir Battlements" $ do
         Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId after) "CR 702.10 the targeted Piker gained haste"
         Spec.assertEqWith s "and the Battlements paid its own {T}" (fmap Object.tapped (Game.lookupObject battlementsId after)) (Just TapState.Tapped)
         Spec.assertEqWith s "leaving the stack empty" (length (GameState.stack after)) 0
+
+-- How many mana units a player has floating. Duplicated per this suite's
+-- convention of group-local helpers (ManaSpec carries its own).
+poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
+poolSize pid gs = case Game.poolOf pid gs of
+  Mana.Type.MkMana units -> length units
+
+-- alice holds Mana Leak with two Islands to cast it; bob has a Goblin Piker on
+-- the stack under it, an Ancient Tomb and one Island. Returns the Tomb and the
+-- state after alice has cast the Leak at the Piker.
+--
+-- Bob's mana is exactly {C}{C} plus {U}, so CR 118.12's {3} IS payable and the
+-- gate is really offered (Cost.canPay) -- and paying it needs BOTH sources, so a
+-- payer who taps the Tomb alone has made a legal choice that cannot pay.
+--
+-- The Piker reaches the stack before the Leak, so it holds the lower object id
+-- and S.identityAnswer's ChooseTargets aims the Leak at it (CounterspellSpec's
+-- manaLeakHand, and the same reason).
+reversalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+reversalBoard island ancientTomb manaLeak piker =
+  let (tombId, withTomb) = S.addCreature ancientTomb S.bob (S.landsInPlay island 2)
+      (_, withBob) = S.addCreature island S.bob withTomb
+      (_, onStack) = S.spellOnStack piker S.bob withBob
+      (gs, leakId) = S.handOne manaLeak onStack
+   in (tombId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
+
+-- Resolve the Leak with bob paying CR 118.12's {3}, tapping the Tomb when `taps`
+-- says so and nothing else either way, and answering CR 733.1's question with
+-- `decision`. The Int counts the CR 733.1 questions raised.
+--
+-- Bob is named on both prompts rather than answered for whoever asks, so an
+-- engine that put either question to the wrong player falls through to the
+-- declining fallback instead of passing.
+attemptLeak :: Bool -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
+attemptLeak taps decision tombId cast =
+  let ((_, after), asked) = State.runState (Engine.runGame answerer cast Stack.resolveTop) 0
+   in (after, asked)
+  where
+    answerer :: Prompt.Prompt r -> State.State Int r
+    answerer p = case p of
+      Prompt.ChooseToPay _ player _ _ _ _ | player == S.bob -> pure PaymentDecision.Pays
+      Prompt.ChooseManaSource _ player candidates
+        | player == S.bob ->
+            pure (if taps && elem tombId (NonEmpty.toList candidates) then Just tombId else Nothing)
+      Prompt.ReverseManaAbilities _ player _ | player == S.bob -> do
+        State.modify' (+ 1)
+        pure decision
+      _ -> pure (S.identityAnswer p)
+
+-- Mana Leak "Counter target spell unless its controller pays {3}", paid off an
+-- Ancient Tomb "{T}: Add {C}{C}. This land deals 2 damage to you."
+--
+-- CR 733.1: an action a player starts and cannot legally complete is reversed
+-- and its payments cancelled, but "each player may also reverse any legal mana
+-- abilities that player activated while making the illegal play" -- so that half
+-- is a question, not the engine's to settle. CR 118.12's payment is the moment
+-- pawl can honour the answer (Cost.pay says which cannot and why), and Ancient
+-- Tomb is the sharpest producer for it: keeping the activation keeps two
+-- colorless floating (CR 106.4), the land tapped (CR 107.5) and CR 405.6c's 2
+-- damage charged, so all three ride on one answer.
+--
+-- One board and one cast throughout. The first two cases differ in NOTHING but
+-- bob's answer to that question; the third differs only in whether he tapped
+-- anything at all.
+reversalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+reversalSpec s registry = Spec.describe s "Reversal" $ do
+  Spec.it s "CR 733.1 the payer may keep the mana ability they activated while making the illegal play" $ do
+    island <- S.printingOf s registry "Island"
+    ancientTomb <- S.printingOf s registry "Ancient Tomb"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (tombId, cast) = reversalBoard island ancientTomb manaLeak piker
+        (after, asked) = attemptLeak True OptionalDecision.Declines tombId cast
+    Spec.assertEqWith s "CR 106.4 the two colorless the Tomb made stay in bob's pool" (poolSize S.bob after) 2
+    Spec.assertEqWith s "CR 107.5 and the Tomb stays tapped, alone" (S.tappedCount S.bob after) 1
+    Spec.assertEqWith s "CR 405.6c and the 2 damage the same activation charged stands" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "CR 118.12a the {3} still went unpaid, so the Piker is countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "CR 608.2n and Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "bob was asked once whether to reverse it" asked 1
+
+  Spec.it s "CR 733.1 the payer who reverses it gets the mana, the tap and the damage back" $ do
+    island <- S.printingOf s registry "Island"
+    ancientTomb <- S.printingOf s registry "Ancient Tomb"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (tombId, cast) = reversalBoard island ancientTomb manaLeak piker
+        (after, asked) = attemptLeak True OptionalDecision.Exercises tombId cast
+    Spec.assertEqWith s "CR 733.1 nothing of bob's is floating" (poolSize S.bob after) 0
+    Spec.assertEqWith s "the Tomb is untapped again" (S.tappedCount S.bob after) 0
+    Spec.assertEqWith s "and the damage is undone with it" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "CR 118.12a the Piker is countered either way" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and the same one question was raised" asked 1
+
+  -- The control, and the elision CR 733.1 itself states: what the rule offers
+  -- back is the mana abilities the player ACTIVATED, so a window that activated
+  -- none leaves nothing to decide. Bob still says he will pay -- the same board,
+  -- the same gate, the same refusal -- and taps nothing.
+  Spec.it s "CR 733.1 a window that activated nothing asks nobody" $ do
+    island <- S.printingOf s registry "Island"
+    ancientTomb <- S.printingOf s registry "Ancient Tomb"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (tombId, cast) = reversalBoard island ancientTomb manaLeak piker
+        (after, asked) = attemptLeak False OptionalDecision.Declines tombId cast
+    Spec.assertEqWith s "CR 733.1 nobody was asked whether to reverse anything" asked 0
+    Spec.assertEqWith s "nothing of bob's was tapped" (S.tappedCount S.bob after) 0
+    Spec.assertEqWith s "nothing is floating" (poolSize S.bob after) 0
+    Spec.assertEqWith s "CR 118.12a and the Piker is countered all the same" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
