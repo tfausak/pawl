@@ -1572,6 +1572,7 @@ library types
     Pawl.Types.LookAt
     Pawl.Types.Loyalty
     Pawl.Types.Mana
+    Pawl.Types.ManaAbilityPerformer
     Pawl.Types.ManaAddition
     Pawl.Types.ManaCost
     Pawl.Types.ManaCount

@@ -55,6 +55,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -233,8 +234,8 @@ turnableFaceUp pid gs =
 --
 -- Everything from the status write on is performTurnFaceUp below, which the
 -- effect road shares.
-turnFaceUp :: PlayerId -> TurnUpProcedure -> ObjectId -> Game ()
-turnFaceUp pid procedure oid = do
+turnFaceUp :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> TurnUpProcedure -> ObjectId -> Game ()
+turnFaceUp perform pid procedure oid = do
   before <- State.get
   if not (canTurnFaceUp pid procedure oid before)
     then pure ()
@@ -254,7 +255,7 @@ turnFaceUp pid procedure oid = do
         -- the payability gate above. Discarded, Pawl.Engine.Activate's reason: rule
         -- 702.150a asks about the player who CAST the object.
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
-        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+        payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           Payment.Unpaid -> State.put before
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:

@@ -168,7 +168,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     forest <- S.printingOf s registry "Forest"
     let wax = CardName.MkCardName (Text.pack "Wax")
         (gs, oid) = S.handOne (Printing.MkPrinting CardSpec.splitCard) (S.landsInPlay forest 1)
-        after = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid wax Facing.FaceUp)
+        after = S.runPure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid wax Facing.FaceUp)
     case GameState.stack after of
       [] -> Spec.assertFailure s "expected the spell on the stack"
       top : _ -> do
@@ -503,7 +503,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let base = S.landsInPlay forest 7
         (_, gs) = S.addLibraryCard panglacialWurm S.alice base
-        after = snd (Engine.runGamePure castFirstOption gs (Cast.castWhileSearching S.alice))
+        after = snd (Engine.runGamePure castFirstOption gs (Cast.castWhileSearching S.manaPerformer S.alice))
         onStack = length (filter (nameOnStack (CardName.MkCardName $ Text.pack "Panglacial Wurm") after) (GameState.stack after))
     Spec.assertEqWith s "Panglacial is on the stack" onStack 1
     Spec.assertEqWith s "Panglacial left the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
@@ -2734,7 +2734,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     plains <- S.printingOf s registry "Plains"
     rally <- S.printingOf s registry "Rally the Troops"
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
-        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertBool s (S.castable S.bob bobsRally attacked) "castable"
     Spec.assertBool s (elem (A.Cast bobsRally (S.printingName rally) Facing.FaceUp) (Action.legalActions S.bob attacked)) "and offered as a legal action"
   -- CR 306.6 / CR 508.1b: the same board, with the attack aimed at bob's
@@ -2760,7 +2760,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
             target : _ -> target
             [] -> NonEmpty.head options
           _ -> S.aggressiveAnswer p
-        attacked = S.runPure atPlaneswalker loyal (Combat.declareAttackers S.alice)
+        attacked = S.runPure atPlaneswalker loyal (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith
       s
       "the Piker really was declared, attacking the planeswalker"
@@ -2785,7 +2785,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     plains <- S.printingOf s registry "Plains"
     rally <- S.printingOf s registry "Rally the Troops"
     let (_, alicesRally, _, board) = rallyBoard piker plains rally
-        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertBool s (not (S.castable S.alice alicesRally attacked)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf alicesRally) (Action.legalActions S.alice attacked))) "and not offered"
   -- Both of Rally's clauses fail in the declare blockers step, and this case
@@ -2806,7 +2806,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     bolt <- S.printingOf s registry "Lightning Bolt"
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
         (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob board))
-        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
+        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.manaPerformer S.alice)
         later = attacked {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
     Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
     Spec.assertBool s (not (S.castable S.bob bobsRally later)) "not castable"
@@ -2834,7 +2834,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     let (_, _, _, board) = rallyBoard piker plains rally
         (bobsBelated, withBelated) = S.addHandCard belated S.bob board
         (boltId, withBolt) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob withBelated))
-        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.alice)
+        attacked = S.runPure S.aggressiveAnswer withBolt (Combat.declareAttackers S.manaPerformer S.alice)
         later = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer withBolt
     Spec.assertBool s (S.castable S.bob bobsBelated attacked) "castable in the step the attack was declared"
     Spec.assertEqWith s "the engine reached the next step" (GameState.phase later) (Phase.Combat CombatStep.DeclareBlockers)
@@ -2884,7 +2884,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     -- The control twin: the SAME board with a real declaration makes it
     -- castable, so what the assertions above measure is the declaration and not
     -- something else about the fixture.
-    let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+    let declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertBool s (S.castable S.bob bobsRally declared) "declared instead, it IS castable"
 
   -- CR 117.1a is not what is stopping it: an unrestricted instant with the
@@ -2908,7 +2908,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     plains <- S.printingOf s registry "Plains"
     rally <- S.printingOf s registry "Rally the Troops"
     let (bobsRally, _, bobsPiker, board) = rallyBoard piker plains rally
-        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+        attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
         cast = S.runPure S.identityAnswer attacked (S.cast S.bob bobsRally)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
     Spec.assertEqWith s "tapped before" (tapStateOf bobsPiker attacked) (Just TapState.Tapped)
@@ -3263,7 +3263,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     waxWane <- S.printingOf s registry "Wax"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid waxName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId resolved) (Just (4, 3))
   -- The half that carries the weight. One Plains, an enchantment, and no
@@ -3283,7 +3283,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     waxWane <- S.printingOf s registry "Wane"
     let (prisonId, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
         (gs, oid) = S.handOne waxWane withPrison
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid waneName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertBool s (S.onBattlefield prisonId gs) "the Prison starts on the battlefield"
     Spec.assertBool s (not (S.onBattlefield prisonId resolved)) "and Wane destroys it"
@@ -3312,7 +3312,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     waxWane <- S.printingOf s registry "Wax"
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid waxName Facing.FaceUp))
     -- CR 709.4a: "Each split card has two names." BOTH of them, asked one at a
     -- time, and the "Wax//Wane" the combined Face renders them as is not among
     -- them -- that string is how the CR's own Examples write the pair and not a
@@ -3389,7 +3389,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     let (_, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
         (_, withInterdiction) = S.addCreature interdiction S.alice withPrison
         (gs, oid) = S.handOne waxWane withInterdiction
-        after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName Facing.FaceUp))
+        after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid waneName Facing.FaceUp))
     -- Not asserted: what CR 601.2b-i do afterwards. castSpell announces, prices
     -- and pays for a spell the redirect has already moved off the stack, and
     -- which of the two defensible readings is right is not implemented (#816).
@@ -3448,7 +3448,7 @@ wearTearSpec s registry = Spec.describe s "WearTear" $ do
         (_, withSphere) = S.addCreature sphere S.alice board
         (_, withPrison) = S.addCreature ghostlyPrison S.alice withSphere
         (gs, oid) = S.handOne wearTear withPrison
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid fusedName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid fusedName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the Prison starts on the battlefield" (S.countOnBattlefieldByName prisonName S.alice gs) 1
     Spec.assertEqWith s "and Tear, the RIGHT half, destroys it" (S.countOnBattlefieldByName prisonName S.alice resolved) 0
@@ -3582,7 +3582,7 @@ boundedFuseXSpec s registry = Spec.describe s "BoundedFuseX" $ do
     sphere <- S.printingOf s registry "Chromatic Sphere"
     blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
     let (spellId, board) = boundedBoard mountain plains piker sphere blaze 1
-        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.alice spellId boundedFusedName Facing.FaceUp; Stack.resolveTop)
+        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.manaPerformer S.alice spellId boundedFusedName Facing.FaceUp; Stack.resolveTop)
     Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "carol took nothing" (S.lifeOf S.carol after) (Just 20)
     Spec.assertEqWith s "and alice gained nothing" (S.lifeOf S.alice after) (Just 20)
@@ -3598,7 +3598,7 @@ boundedFuseXSpec s registry = Spec.describe s "BoundedFuseX" $ do
     sphere <- S.printingOf s registry "Chromatic Sphere"
     blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
     let (spellId, board) = boundedBoard mountain plains piker sphere blaze 2
-        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.alice spellId boundedFusedName Facing.FaceUp; Stack.resolveTop)
+        after = S.runPure (answerBoundedX 2) board (do Cast.castSpell S.manaPerformer S.alice spellId boundedFusedName Facing.FaceUp; Stack.resolveTop)
     Spec.assertEqWith s "bob took two" (S.lifeOf S.bob after) (Just 18)
     Spec.assertEqWith s "carol took two" (S.lifeOf S.carol after) (Just 18)
     Spec.assertEqWith s "and alice gained two" (S.lifeOf S.alice after) (Just 22)
@@ -3613,7 +3613,7 @@ boundedFuseXSpec s registry = Spec.describe s "BoundedFuseX" $ do
     sphere <- S.printingOf s registry "Chromatic Sphere"
     blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
     let (spellId, board) = boundedBoard mountain plains piker sphere blaze 1
-        after = S.runPure (answerBoundedX 3) board (do Cast.castSpell S.alice spellId blazeName Facing.FaceUp; Stack.resolveTop)
+        after = S.runPure (answerBoundedX 3) board (do Cast.castSpell S.manaPerformer S.alice spellId blazeName Facing.FaceUp; Stack.resolveTop)
     Spec.assertEqWith s "bob took three" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "carol took three" (S.lifeOf S.carol after) (Just 17)
     -- The right half was never cast, so its life gain never happened.
@@ -3629,7 +3629,7 @@ boundedFuseXSpec s registry = Spec.describe s "BoundedFuseX" $ do
     sphere <- S.printingOf s registry "Chromatic Sphere"
     blaze <- S.printingOf s registry "Synthetic Bounded Blaze"
     let (spellId, board) = boundedBoard mountain plains piker sphere blaze 1
-        castAt n = S.runPure (answerBoundedX n) board (do Cast.castSpell S.alice spellId bountyName Facing.FaceUp; Stack.resolveTop)
+        castAt n = S.runPure (answerBoundedX n) board (do Cast.castSpell S.manaPerformer S.alice spellId bountyName Facing.FaceUp; Stack.resolveTop)
         after = castAt 2
         within = castAt 1
     Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice after) (Just 20)
@@ -3687,7 +3687,7 @@ victorTriggered :: Printing.Printing -> Printing.Printing -> Printing.Printing -
 victorTriggered plains victor victim =
   let (heroId, board) = S.addGraveyardCard victim S.alice (S.landsInPlay plains 6)
       (gs, victorCard) = S.handOne victor board
-      cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice victorCard victorName Facing.FaceUp)
+      cast = S.runPure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice victorCard victorName Facing.FaceUp)
       entered = S.runPure S.identityAnswer cast Stack.resolveTop
       -- CR 603.3b: the enters trigger goes onto the stack the next time a player
       -- would receive priority.
@@ -3936,7 +3936,7 @@ daredevilExiled mountain plains daredevil faith =
   let lands = S.landsFor plains S.alice 3 (S.landsFor mountain S.alice 2 S.threePlayerGame)
       (_, stocked) = S.addGraveyardCard faith S.bob lands
       (handId, board) = S.addHandCard daredevil S.alice stocked
-      cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice handId daredevilName Facing.FaceUp)
+      cast = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice handId daredevilName Facing.FaceUp)
       entered = S.runPure S.identityAnswer cast Stack.resolveTop
       -- CR 603.3b/603.3d: the enters trigger goes onto the stack the next time a
       -- player would receive priority, and its target is chosen there.
@@ -3957,7 +3957,7 @@ daredevilFaithCast :: Printing.Printing -> Printing.Printing -> Printing.Printin
 daredevilFaithCast mountain plains daredevil faith =
   let exiled = daredevilExiled mountain plains daredevil faith
    in case exiledNamed renewedFaithName exiled of
-        [exiledId] -> S.runPure S.identityAnswer exiled (Cast.castSpell S.alice exiledId renewedFaithName Facing.FaceUp)
+        [exiledId] -> S.runPure S.identityAnswer exiled (Cast.castSpell S.manaPerformer S.alice exiledId renewedFaithName Facing.FaceUp)
         -- Left to the caller's own assertion about the stack: a board that never
         -- exiled the card is one where nothing was cast either.
         _ -> exiled
@@ -3984,7 +3984,7 @@ daredevilRedOnly mountain daredevil faith =
       (_, stocked) = S.addGraveyardCard faith S.bob lands
       (handFaithId, withFaith) = S.addHandCard faith S.alice stocked
       (handId, board) = S.addHandCard daredevil S.alice withFaith
-      cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice handId daredevilName Facing.FaceUp)
+      cast = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice handId daredevilName Facing.FaceUp)
       entered = S.runPure S.identityAnswer cast Stack.resolveTop
       placed = S.runPure S.identityAnswer entered Engine.settleForPriority
       after = S.runPure S.identityAnswer placed Stack.resolveTop
@@ -4005,7 +4005,7 @@ daredevilTwoFaiths mountain plains daredevil faith =
       (_, stocked) = S.addGraveyardCard faith S.bob lands
       (handFaithId, withFaith) = S.addHandCard faith S.alice stocked
       (handId, board) = S.addHandCard daredevil S.alice withFaith
-      cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice handId daredevilName Facing.FaceUp)
+      cast = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice handId daredevilName Facing.FaceUp)
       entered = S.runPure S.identityAnswer cast Stack.resolveTop
       placed = S.runPure S.identityAnswer entered Engine.settleForPriority
    in (handFaithId, S.runPure S.identityAnswer placed Stack.resolveTop)
@@ -4078,7 +4078,7 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
     let (handFaithId, board) = daredevilTwoFaiths mountain plains daredevil faith
     case exiledNamed renewedFaithName board of
       [exiledId] -> do
-        let cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice exiledId renewedFaithName Facing.FaceUp)
+        let cast = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice exiledId renewedFaithName Facing.FaceUp)
             after = S.runPure S.identityAnswer cast Stack.resolveTop
         Spec.assertBool s (not (null (GameState.stack cast))) "the exiled Faith really was cast"
         Spec.assertEqWith s "and it resolved, so alice gained its 6 life" (S.lifeOf S.alice after) (Just 26)
@@ -4087,7 +4087,7 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
         -- The other half of the pair, cast from alice's hand on this same board:
         -- the replacement names one object, not the card's name, so this Faith
         -- goes where CR 608.2n sends it.
-        let fromHand = S.runPure S.identityAnswer after (Cast.castSpell S.alice handFaithId renewedFaithName Facing.FaceUp)
+        let fromHand = S.runPure S.identityAnswer after (Cast.castSpell S.manaPerformer S.alice handFaithId renewedFaithName Facing.FaceUp)
             resolved = S.runPure S.identityAnswer fromHand Stack.resolveTop
         Spec.assertBool s (not (null (GameState.stack fromHand))) "the hand Faith really was cast"
         Spec.assertEqWith s "CR 608.2n: the hand copy goes to alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
@@ -4124,7 +4124,7 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
       Nothing -> Spec.assertFailure s "expected the Faith to be exiled"
       Just exiledId -> do
         Spec.assertEqWith s "two Mountains paid for the Daredevil" (S.tappedCount S.alice board) 2
-        let cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice exiledId renewedFaithName Facing.FaceUp)
+        let cast = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice exiledId renewedFaithName Facing.FaceUp)
             after = S.runPure S.identityAnswer cast Stack.resolveTop
         Spec.assertBool s (not (null (GameState.stack cast))) "the Faith really was cast"
         Spec.assertEqWith s "CR 118.14: the {2}{W} was paid, and alice gains the 6 life" (S.lifeOf S.alice after) (Just 26)

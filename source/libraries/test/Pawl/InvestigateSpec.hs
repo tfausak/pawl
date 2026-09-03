@@ -237,14 +237,14 @@ personOfInterestSpec s registry = Spec.describe s "PersonOfInterest" $ do
     -- blocked": the very creature that cannot block the Person alone can block it
     -- alongside the other, and the block survives a real declare blockers step.
     (entered, poiId, _, blockers) <- board 0 2 S.alice
-    let gs = S.runPure S.aggressiveAnswer entered (Combat.declareAttackers S.alice)
+    let gs = S.runPure S.aggressiveAnswer entered (Combat.declareAttackers S.manaPerformer S.alice)
     case (S.tokensOf gs, blockers) of
       ([tokenId], [first, second]) -> do
         Spec.assertEqWith s "the Person has menace and the Detective does not" (Projection.hasKeyword Keyword.Menace poiId gs, Projection.hasKeyword Keyword.Menace tokenId gs) (True, False)
         Spec.assertEqWith s "the Person is attacking" (S.attackerDeclarationsOf gs) [poiId]
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton first (Set.singleton poiId)) gs)) "one blocker is illegal"
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, Set.singleton poiId), (second, Set.singleton poiId)]) gs) "two are legal"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "and both block" (Combat.blockersOf poiId after) (Set.fromList [first, second])
       other -> Spec.assertFailure s ("expected one token and two blockers, got " <> show other)
   Spec.it s "CR 701.60c a suspected creature can't block, where the Detective beside it can" $ do
@@ -252,13 +252,13 @@ personOfInterestSpec s registry = Spec.describe s "PersonOfInterest" $ do
     -- only thing separating the two creatures bob could block with. Both are his,
     -- both entered this turn, and only one is suspected.
     (entered, poiId, attackers, _) <- board 1 0 S.bob
-    let gs = S.runPure S.aggressiveAnswer entered (Combat.declareAttackers S.alice)
+    let gs = S.runPure S.aggressiveAnswer entered (Combat.declareAttackers S.manaPerformer S.alice)
     case (S.tokensOf gs, attackers) of
       ([tokenId], [attackerId]) -> do
         Spec.assertEqWith s "alice's Piker is attacking" (S.attackerDeclarationsOf gs) [attackerId]
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton poiId (Set.singleton attackerId)) gs)) "the Person cannot block"
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton tokenId (Set.singleton attackerId)) gs) "the Detective can"
-        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "so only the Detective blocks" (Combat.blockersOf attackerId after) (Set.singleton tokenId)
       other -> Spec.assertFailure s ("expected one token and one attacker, got " <> show other)
 
@@ -286,7 +286,7 @@ eliminateTheImpossibleSpec s registry = Spec.describe s "EliminateTheImpossible"
         (_, gs2) = S.addCreature island S.alice entered
         (_, gs3) = S.addCreature island S.alice gs2
         (spellId, gs4) = S.addHandCard eliminate S.alice gs3
-        declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.alice)
+        declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.manaPerformer S.alice)
     case (S.tokensOf declared, attackers) of
       ([detectiveId], [attackerId]) -> do
         let after = S.runPure S.identityAnswer declared (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority)
@@ -298,7 +298,7 @@ eliminateTheImpossibleSpec s registry = Spec.describe s "EliminateTheImpossible"
         Spec.assertEqWith s "after: neither is suspected" (suspectedOf poiId after, suspectedOf detectiveId after) (Just False, Just False)
         Spec.assertEqWith s "CR 701.60c: and the menace it had is gone" (Projection.hasKeyword Keyword.Menace poiId after, Projection.hasKeyword Keyword.Menace detectiveId after) (False, False)
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton poiId (Set.singleton attackerId)) after) "CR 701.60c: so the Person can block"
-        let blocked = S.runPure S.aggressiveAnswer after Combat.declareBlockers
+        let blocked = S.runPure S.aggressiveAnswer after (Combat.declareBlockers S.manaPerformer)
         Spec.assertBool s (Set.member poiId (Combat.blockersOf attackerId blocked)) "and it does block"
         -- The two clauses either side of the ending, so a card file that dropped
         -- one fails here: the -2/-0 reaches both of bob's creatures, and the

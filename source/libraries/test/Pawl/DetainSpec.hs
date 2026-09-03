@@ -157,13 +157,13 @@ attackSpec s registry = Spec.describe s "Attack" $ do
   -- offered, so exactly one attacker means exactly one was offered.
   Spec.it s "CR 508.1c the detained creature does not end up among the attackers" $ do
     (_, control, resolved) <- arresterBoard s registry "Prodigal Sorcerer"
-    let after = S.runPure S.aggressiveAnswer (bobAttacks resolved) (Combat.declareAttackers S.bob)
+    let after = S.runPure S.aggressiveAnswer (bobAttacks resolved) (Combat.declareAttackers S.manaPerformer S.bob)
     Spec.assertEqWith s "only the twin attacked" (declaredAttackers after) [control]
   -- The pair: the same board with the trigger never placed. Both attack, so the
   -- case above cannot be passing because bob could never have attacked at all.
   Spec.it s "with nothing detained both twins attack" $ do
     (victim, control, board) <- undetainedBoard s registry "Prodigal Sorcerer"
-    let after = S.runPure S.aggressiveAnswer (bobAttacks board) (Combat.declareAttackers S.bob)
+    let after = S.runPure S.aggressiveAnswer (bobAttacks board) (Combat.declareAttackers S.manaPerformer S.bob)
     Spec.assertEqWith s "both attacked" (Set.fromList (declaredAttackers after)) (Set.fromList [victim, control])
 
 -- CR 701.35a's second clause, through CR 509.1b.

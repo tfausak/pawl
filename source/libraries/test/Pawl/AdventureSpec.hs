@@ -127,7 +127,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     let board = snd (S.addCreature thalia S.alice (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 2))))
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
     Spec.assertEqWith s "the Adventure is on the stack" (length (GameState.stack cast)) 1
     Spec.assertEqWith s "both Mountains paid {R} plus Thalia's {1}" (S.tappedCount S.alice cast) 2
   -- CR 715.3d: "Instead of putting a spell that was cast as an Adventure into
@@ -138,7 +138,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 1)
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertBool s (S.onBattlefield bonesplitterId gs) "the Bonesplitter starts on the battlefield"
     Spec.assertBool s (not (S.onBattlefield bonesplitterId resolved)) "and Battle Display destroys it"
@@ -176,7 +176,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     let (_, oneArtifact) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
         (_, board) = S.addCreature bonesplitter S.alice oneArtifact
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         namesOffered g = [n | A.Cast _ n _ <- Action.legalActions S.alice g]
     Spec.assertEqWith
@@ -203,11 +203,11 @@ spec s registry = Spec.describe s "Adventure" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (_, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     case Game.zoneMembers Zone.Exile S.alice resolved of
       [exiledId] -> do
-        let recast = snd (Engine.runGamePure S.identityAnswer resolved (Cast.castSpell S.alice exiledId shieldbreakerName Facing.FaceUp))
+        let recast = snd (Engine.runGamePure S.identityAnswer resolved (Cast.castSpell S.manaPerformer S.alice exiledId shieldbreakerName Facing.FaceUp))
             entered = snd (Engine.runGamePure S.identityAnswer recast Stack.resolveTop)
             knights =
               [ o
@@ -253,7 +253,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         -- The only target leaves the battlefield while the spell is on the
         -- stack, so every filled slot is illegal at CR 608.2b.
         gone = snd (Engine.runGamePure S.identityAnswer cast (Event.changeZone bonesplitterId Zone.Graveyard))

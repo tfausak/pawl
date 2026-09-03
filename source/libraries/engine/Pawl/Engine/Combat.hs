@@ -47,6 +47,7 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -1419,8 +1420,8 @@ announceAttackTarget pid oid options = case options of
 -- player cannot comply with is illegal and the game returns to the moment before
 -- it, and the declaration is still owed -- so it is made again, which is
 -- attemptAttackDeclaration's recursion.
-declareAttackers :: PlayerId -> Game ()
-declareAttackers pid = do
+declareAttackers :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> Game ()
+declareAttackers perform pid = do
   gs <- State.get
   -- No defending player means no attack is possible: either the beginning of
   -- combat step's turn-based action has not run, or it ran on a turn with no
@@ -1432,7 +1433,7 @@ declareAttackers pid = do
   -- declarableTargets), and the entire group of attacking creatures is still
   -- judged as a whole.
   Monad.unless (null (Defender.defendingPlayers gs)) $
-    attemptAttackDeclaration pid Set.empty
+    attemptAttackDeclaration perform pid Set.empty
 
 -- One attempt at CR 508.1's declaration, plus the preamble's retry. Two steps can
 -- make the attempt fail: CR 508.1c/508.1d judge the declaration illegal, and CR
@@ -1453,8 +1454,8 @@ declareAttackers pid = do
 --
 -- No legal attackers means no prompt: declining is then the only legal answer, CR
 -- 508.1d's instances being minted from the candidate list.
-attemptAttackDeclaration :: PlayerId -> Set (Map ObjectId AttackTarget.AttackTarget) -> Game ()
-attemptAttackDeclaration pid rejected = do
+attemptAttackDeclaration :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> Set (Map ObjectId AttackTarget.AttackTarget) -> Game ()
+attemptAttackDeclaration perform pid rejected = do
   gs <- State.get
   let legal = legalAttackers pid gs
       -- CR 508.1c's aimed-at restriction, gathered ONCE for the whole pass and
@@ -1519,7 +1520,7 @@ attemptAttackDeclaration pid rejected = do
     -- CombatEffectSpec's "CR 508.1d an illegal declaration is rewound and asked
     -- again, not replaced by the ceiling's" is the proof.
     if not allowed && again
-      then attemptAttackDeclaration pid (Set.insert proposal rejected)
+      then attemptAttackDeclaration perform pid (Set.insert proposal rejected)
       else do
         -- A declaration already rewound once and offered again degrades to
         -- forcedAttackDeclaration. The whole answer is replaced rather than
@@ -1660,7 +1661,7 @@ attemptAttackDeclaration pid rejected = do
         paid <-
           if null owed
             then pure True
-            else Cost.payToll pid owed
+            else Cost.payToll perform pid owed
         if not paid
           then do
             -- CR 508.1's preamble: the declaration is illegal and the game returns
@@ -1672,7 +1673,7 @@ attemptAttackDeclaration pid rejected = do
             -- declaration is made again: two Pikers under a Ghostly Prison
             -- become one" is the proof; the case beside it is what a repeated
             -- answer does instead.
-            Monad.when again (attemptAttackDeclaration pid (Set.insert proposal rejected))
+            Monad.when again (attemptAttackDeclaration perform pid (Set.insert proposal rejected))
           else
             -- CR 508.1k: each chosen creature becomes an attacking creature. After
             -- the payment, which is the rules' own order.
@@ -1972,8 +1973,8 @@ putOntoBattlefieldBlocking oid attacker = do
 -- player's objects, so legalBlockers finds nothing. At two seats CR 800.4a never
 -- runs (CR 800.1), but CR 104.2a has ended the game, which Engine.playGame's loop
 -- reads before calling this again.
-declareBlockers :: Game ()
-declareBlockers = do
+declareBlockers :: ManaAbilityPerformer.ManaAbilityPerformer -> Game ()
+declareBlockers perform = do
   -- CR 506.7b's boundary, raised BEFORE the short-circuit below and before any
   -- prompt, the rule opening the window "regardless of whether any blockers are
   -- actually declared". Turn.afterBlockersDeclared is the reader.
@@ -2000,7 +2001,7 @@ declareBlockers = do
       -- an attacker on them.
       case attackersOn pid start of
         [] -> pure ()
-        theirs -> attemptBlockDeclaration pid theirs Set.empty
+        theirs -> attemptBlockDeclaration perform pid theirs Set.empty
     -- CR 509.1h's other half, performed once CR 509.1g has assigned the blockers:
     -- every attacking creature the declaration named no blockers for became an
     -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader.
@@ -2046,8 +2047,8 @@ recordDeclaredBlockers oids g =
 -- step here, so the interpreter's own map IS the declaration -- and bounds the
 -- recursion exactly as it does for attackers: a repeat degrades to
 -- forcedBlockDeclaration rather than being rewound a second time.
-attemptBlockDeclaration :: PlayerId -> [ObjectId] -> Set (Map ObjectId (Set ObjectId)) -> Game ()
-attemptBlockDeclaration pid attacking rejected = do
+attemptBlockDeclaration :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> [ObjectId] -> Set (Map ObjectId (Set ObjectId)) -> Game ()
+attemptBlockDeclaration perform pid attacking rejected = do
   gs <- State.get
   let candidates = legalBlockers pid gs
   Monad.unless (null candidates) $ do
@@ -2068,7 +2069,7 @@ attemptBlockDeclaration pid attacking rejected = do
     -- CombatEffectSpec's "CR 509.1c an illegal declaration is rewound and asked
     -- again, not replaced by the ceiling's" is the proof.
     if not allowed && again
-      then attemptBlockDeclaration pid attacking (Set.insert chosen rejected)
+      then attemptBlockDeclaration perform pid attacking (Set.insert chosen rejected)
       else do
         -- A declaration already rewound once and offered again degrades to
         -- forcedBlockDeclaration -- always legal, and equal to "no blocks"
@@ -2111,7 +2112,7 @@ attemptBlockDeclaration pid attacking rejected = do
         paid <-
           if null owed
             then pure True
-            else Cost.payToll pid owed
+            else Cost.payToll perform pid owed
         -- CR 509.1's preamble: a declaration the defending player cannot pay for
         -- is illegal and the game returns to the moment before it. That is
         -- `before` and no more: Cost.payToll restores what a half-paid toll
@@ -2126,7 +2127,7 @@ attemptBlockDeclaration pid attacking rejected = do
         Monad.unless paid (State.put before)
         gs2 <- State.get
         if not paid && again
-          then attemptBlockDeclaration pid attacking (Set.insert chosen rejected)
+          then attemptBlockDeclaration perform pid attacking (Set.insert chosen rejected)
           else do
             let declaration = if paid then legal else forcedBlockDeclaration pid gs2
             -- The pairs the declaration states, blocker-major, which is the order

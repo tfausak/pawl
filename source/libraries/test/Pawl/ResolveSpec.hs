@@ -481,7 +481,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
       Nothing -> Spec.assertFailure s "Kill Shot's printing carries no 'target' slot"
       Just theSlot -> do
         let (board, mine, theirs) = S.combatBoardOf [piker] [piker]
-            declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
+            declared = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
             legal = Target.legalRecipients Nothing S.noSource theSlot declared
         case (mine, theirs) of
           (attacker : _, defender : _) -> do

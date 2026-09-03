@@ -16,6 +16,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -108,7 +109,7 @@ ignore pid oid = do
       -- symbol into it, so no prompt is raised today. A printing that did would
       -- be the one to refute that.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure cost
-      payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay Resolve.performManaAbility PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         Payment.Unpaid -> State.put before
         -- The payment's bound slots are dropped: CR 116.2d's special action puts

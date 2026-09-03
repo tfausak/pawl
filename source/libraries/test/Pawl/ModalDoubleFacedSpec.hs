@@ -202,7 +202,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
     birgi <- S.printingOf s registry "Birgi, God of Storytelling"
     mountain <- S.printingOf s registry "Mountain"
     let (gs, oid) = S.handOne birgi (S.landsInPlay mountain 5)
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid harnfelName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid harnfelName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     -- CR 712.8f's first half: the SPELL on the stack has only the
     -- characteristics of the face that's up, which is already how a chosen half
@@ -231,7 +231,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
     birgi <- S.printingOf s registry "Birgi, God of Storytelling"
     mountain <- S.printingOf s registry "Mountain"
     let (gs, oid) = S.handOne birgi (S.landsInPlay mountain 5)
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid birgiName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid birgiName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "three Mountains paid {2}{R}, and two are left" (S.tappedCount S.alice cast) 3
     case nonLand resolved of
@@ -252,7 +252,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
     birgi <- S.printingOf s registry "Birgi, God of Storytelling"
     mountain <- S.printingOf s registry "Mountain"
     let (gs, oid) = S.handOne birgi (S.landsInPlay mountain 5)
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid harnfelName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid harnfelName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     case nonLand resolved of
       [permId] -> do
@@ -274,7 +274,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
     birgi <- S.printingOf s registry "Birgi, God of Storytelling"
     mountain <- S.printingOf s registry "Mountain"
     let (gs, oid) = S.handOne birgi (S.landsInPlay mountain 5)
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid birgiName Facing.FaceUp))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid birgiName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         transformAll = Effect.Transform (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))
         turned = S.runPure S.identityAnswer resolved (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty transformAll)

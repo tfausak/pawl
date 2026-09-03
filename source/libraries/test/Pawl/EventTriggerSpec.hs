@@ -5914,7 +5914,7 @@ aloeAlchemistSpec s registry =
               (maidenId, g2) = S.addCreature maiden S.bob g1
               (aloeId, g3) = S.addHandCard aloe S.alice g2
               gs = sorcerySpeed g3
-              plotted = S.runPure (aimAt pikerId) gs (Plot.plot S.alice aloeId)
+              plotted = S.runPure (aimAt pikerId) gs (Plot.plot S.manaPerformer S.alice aloeId)
               after = S.runPure (aimAt pikerId) plotted Engine.priorityLoop
           Spec.assertEqWith s "the Piker started 2/1" (S.powerToughnessOf pikerId gs) (Just (2, 1))
           Spec.assertBool s (any isPlotted (S.eventsOf after)) "CR 702.170a the plot recorded its event"
@@ -5938,7 +5938,7 @@ aloeAlchemistSpec s registry =
               (_, g2) = S.addExiledCard aloe S.alice g1
               (djinnId, g3) = S.addHandCard djinn S.alice g2
               gs = sorcerySpeed g3
-              plotted = S.runPure (aimAt pikerId) gs (Plot.plot S.alice djinnId)
+              plotted = S.runPure (aimAt pikerId) gs (Plot.plot S.manaPerformer S.alice djinnId)
               after = S.runPure (aimAt pikerId) plotted Engine.priorityLoop
           Spec.assertBool s (any isPlotted (S.eventsOf after)) "the Djinn really became plotted, so there was an event to match"
           Spec.assertEqWith s "both cards are in exile, so the Alchemist was there to be offered" (length (GameState.exile after)) 2

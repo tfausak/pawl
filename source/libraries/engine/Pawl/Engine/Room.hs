@@ -39,6 +39,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -166,8 +167,8 @@ unlockable pid gs =
 -- change, so damage, counters, attachments, the CR 613.7d timestamp and every
 -- continuous effect naming the permanent ride through untouched, and no
 -- enters-the-battlefield ability is offered the newly opened door's text.
-unlock :: PlayerId -> ObjectId -> CardName -> Game ()
-unlock pid oid half = do
+unlock :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> CardName -> Game ()
+unlock perform pid oid half = do
   before <- State.get
   if not (canUnlock pid oid half before)
     then pure ()
@@ -179,7 +180,7 @@ unlock pid oid half = do
         -- printed Room half holds such a symbol -- Scryfall `t:room`,
         -- 2026-09-01 -- so no prompt is raised today.
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (unlockCostOf face)
-        payment <- Cost.pay PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+        payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           Payment.Unpaid -> State.put before
           -- Dropped, Pawl.Engine.Ignore's reason: CR 116.2m's special action
