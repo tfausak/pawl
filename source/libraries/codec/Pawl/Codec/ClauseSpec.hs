@@ -126,7 +126,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
                   PayGate.offeredAt = Nothing
                 }
           )
-          (Seq.singleton (Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing)))
+          (Seq.singleton (Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing)))
       )
       " {\"effects\":[{\"type\":\"Counter\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}}],\"payGate\":{\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfNotPaid\"}}} "
   -- CR 701.46a: adapt's "if this permanent has no +1/+1 counters on it".

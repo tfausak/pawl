@@ -615,7 +615,7 @@ effectObjectRefs effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
   -- CR 614.9's two sides, the damage's old recipient and its new one.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ from to _) -> [from, to]
-  Effect.Counter (Counter.MkCounter ref _) -> [ref]
+  Effect.Counter (Counter.MkCounter ref _ _) -> [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
   Effect.RemoveCounters {} -> []
   -- CR 122.5's two sides, either of which may name a group.
@@ -1893,8 +1893,8 @@ boundSlots effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
-  -- countered this way".
-  Effect.Counter (Counter.MkCounter _ mSlot) -> foldMap Set.singleton mSlot
+  -- countered this way", and the permanents whose abilities were (CR 113.7).
+  Effect.Counter (Counter.MkCounter _ mSlot mSources) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources
   Effect.PutCounters {} -> Set.empty
   Effect.PutCountersFrom {} -> Set.empty
   Effect.RemoveCounters {} -> Set.empty
@@ -7881,8 +7881,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Monad.forM_ mNew $ \newId ->
                 State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
       _ -> pure ()
-  Effect.Counter (Counter.MkCounter ref mSlot) -> do
+  Effect.Counter (Counter.MkCounter ref mSlot mSources) -> do
     gs <- State.get
+    let named = objectRefObjects legal resolving controller source gs ref
+        -- CR 113.7: each named ability's source, read BEFORE the funnel runs --
+        -- CR 608.2n makes a countered ability cease, so afterwards there is no
+        -- object left to walk from.
+        sourceOf = Map.fromList (Maybe.mapMaybe (\oid -> fmap ((,) oid) (Game.abilitySourceOf oid gs)) named)
     -- CR 701.6a: counter each named object through the single funnel, which picks
     -- that rule's ending from each object's own kind. A player recipient or an
     -- illegal target (CR 608.2b) counters nothing. The whole set goes as ONE
@@ -7891,11 +7896,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- The funnel is handed THIS effect's source and controller, which Baral,
     -- Chief of Compliance reads off the event: by the CR 117.5 trigger scan the
     -- controller can no longer be asked for exactly (see Pawl.Types.Countering).
-    countered <- Event.counterReturning source controller (objectRefObjects legal resolving controller source gs ref)
+    countered <- Event.counterReturning source controller named
     -- CR 701.6a's "countered this way" is what the funnel COUNTERED, never what
     -- the sweep named. Bound onto this effect's SOURCE, and bound even at zero.
     Monad.forM_ mSlot $ \slot ->
       State.modify' (bindAmountSlot source slot (Natural.length countered))
+    -- CR 113.7: the PERMANENTS whose abilities the funnel countered, for Green
+    -- Slime's "if a permanent's ability is countered this way, destroy that
+    -- permanent". The funnel's answer walked to its sources, never the sweep's;
+    -- a countered spell has no source. Read off the board AFTER the funnel, so a
+    -- source that has left the battlefield -- sacrificed to activate the ability
+    -- (CR 113.7a) -- is no permanent and is not bound. Bound onto `resolving` as a
+    -- GROUP, Destroy's `permanents` shape and for its reason; nothing is bound
+    -- when nothing qualifies, so the rider finds an unbound slot and does nothing.
+    --
+    -- The battlefield conjunct is the rule's word "permanent" and a REGRESSION
+    -- FENCE rather than a proved behaviour: Event.destroy refuses a card in a
+    -- graveyard on its own, so dropping the conjunct leaves the suite green
+    -- (Pawl.CounterspellSpec's Golden Egg case).
+    Monad.forM_ mSources $ \slot -> do
+      after <- State.get
+      let permanents = Set.toList (Set.fromList (filter (\src -> Set.member src (GameState.battlefield after)) (Maybe.mapMaybe (\oid -> Map.lookup oid sourceOf) countered)))
+      Monad.unless (null permanents) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList permanents)))
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

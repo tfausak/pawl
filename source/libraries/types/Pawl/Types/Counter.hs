@@ -26,8 +26,17 @@ import qualified Pawl.Types.SlotName as SlotName
 -- THE RESOLUTION'S OWN count, not a look-back at GameState.events: "this way"
 -- is CR 608.2's one resolution, so a countering by anything else is not in it.
 -- The events that resolution recorded are a different question (#541).
+--
+-- `sources` is where the PERMANENTS whose abilities were countered are written
+-- (CR 113.7), as a group for a later effect of the same resolution to name --
+-- Green Slime's "if a permanent's ability is countered this way, destroy that
+-- permanent". Destroy's `permanents` shape, and the funnel's answer walked to
+-- its sources: a countered spell has none, and a source that has already left
+-- the battlefield is no permanent, so neither is in it. Absent for a countering
+-- that never looks back this way.
 data Counter = MkCounter
   { ref :: ObjectRef.ObjectRef,
-    slot :: Maybe SlotName.SlotName
+    slot :: Maybe SlotName.SlotName,
+    sources :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

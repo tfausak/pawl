@@ -307,6 +307,9 @@ data Filter keyword
     -- 113.3c's triggered one -- Squelch's "target activated ability".
     -- Uncharacteristic and immutable for IsToken's reason.
     IsActivatedAbility
+  | -- | CR 113.7 / 113.7a: the candidate is an ability on the stack whose SOURCE,
+    -- read with last known information, matches the nested filter (Green Slime).
+    FromSource (Filter keyword)
   | -- | CR 110.5: the candidate is tapped; "untapped" is @Not IsTapped@ (#163). A
     -- STATUS rather than a characteristic, so nothing in CR 613 projects it.
     IsTapped

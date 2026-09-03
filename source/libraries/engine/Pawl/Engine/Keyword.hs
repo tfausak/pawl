@@ -2689,7 +2689,7 @@ ward cost =
           PayGate.perCounter = Nothing,
           PayGate.offeredAt = Nothing
         }
-    effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing)
+    effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing Nothing)
 
 -- CR 702.147a's TRIGGERED half. CR 508.3a is what "attacks" means, so the
 -- condition is mentor's and provoke's SelfAttacks EveryTime.

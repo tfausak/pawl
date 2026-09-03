@@ -914,7 +914,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing))
+      (Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing))
       " {\"type\":\"Counter\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}}} "
   -- Swift Silence's "counter all other spells. Draw a card for each spell
   -- countered this way": the swept set and the slot the count is bound at, which
@@ -924,7 +924,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Counter (Counter.MkCounter (ObjectRef.EachSpell (Filter.Not Filter.IsSource)) (Just (SlotName.MkSlotName (Text.pack "countered")))))
+      (Effect.Counter (Counter.MkCounter (ObjectRef.EachSpell (Filter.Not Filter.IsSource)) (Just (SlotName.MkSlotName (Text.pack "countered"))) Nothing))
       " {\"type\":\"Counter\",\"value\":{\"ref\":{\"type\":\"EachSpell\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}},\"slot\":\"countered\"}} "
   -- CR 701.24: an ObjectRef, tagged InSlot around the slot name.
   -- Riftsweeper's shape -- the library is derived from the objects it names (CR
