@@ -41,21 +41,7 @@ data ObjectRef
     -- EachCardInYourLibrary, exile's EachCardExiledWithSource -- and a FILTERED
     -- sweep of a zone is written on the arm for that zone: the battlefield's is
     -- here, and a graveyard's, a hand's, the stack's and the linked exile set's
-    -- are on their own arms.
-    --
-    -- Not implemented: a library's FILTERED sweep. EachCardInYourLibrary below
-    -- takes the whole zone and states no characteristic, so a card cannot say
-    -- "exile all Mountain cards from your library" (#2416). A SEARCH is not the
-    -- shape that would fill it: CR 701.23b lets the searcher find fewer than
-    -- all the matching
-    -- cards, which is a choice under Pawl.Types.Effect's Search -- but Caldera
-    -- Breaker's "exile all Mountain cards from your library" names no search and
-    -- offers no choice, so CR 701.23b does not reach it and Search cannot say it.
-    -- TopOfLibraryUntil below is not one, since it names a PREFIX of a library
-    -- that a count of matches ends rather than the
-    -- cards in it that match, and EachCardFromAmong is not one either, since it
-    -- names the matches in a GROUP an earlier clause bound rather than the
-    -- matches in whatever zone those cards happen to sit in.
+    -- are on their own arms, a library's included.
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
@@ -109,7 +95,9 @@ data ObjectRef
     -- 701.20a) that shows the hand, which Ignorant Bliss does not and does not
     -- need. ChosenCardInHand below does carry a Filter, and that is not this
     -- arm's question either: one card chosen out of a hand tells nobody which of
-    -- the others matched.
+    -- the others matched. Nor is EachCardInYourLibrary's stated Filter: that arm
+    -- reaches only its own controller's zone, whose ORDER no player may see (CR
+    -- 401.2), so the matches leaving tells nobody anything about what stayed.
     --
     -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
@@ -128,17 +116,32 @@ data ObjectRef
     -- Pawl.Types.EachCardInHand's header says why this one may have them and what
     -- answers the CR 400.2 visibility question there.
     EachCardInHand EachCardInHand.EachCardInHand
-  | -- | Every card in the resolving controller's library -- Leveler's "exile all
-    -- cards from your library" (CR 400.12). EachCardInYourHand's arm over CR
-    -- 400.1's other hidden zone, nullary for its reasons (CR 400.2, CR 109.5).
+  | -- | Every card in the resolving controller's library that the optional Filter
+    -- matches -- Leveler's "exile all cards from your library" bare (CR 400.12's
+    -- instruction to a zone), Caldera Breaker's "exile all Mountain cards from
+    -- your library" stated (CR 109.2a, the word "card" beside the name of a
+    -- zone). EachCardInYourHand's arm over CR 400.1's other hidden zone, and only
+    -- the resolving controller's for its reasons (CR 400.2, CR 109.5).
+    --
+    -- The Filter is OPTIONAL for EachCardExiledWithSource's reason:
+    -- Pawl.Types.Filter has no tautological arm, so "all cards from your library"
+    -- has no other spelling.
+    --
+    -- A FILTER over a hidden zone, which EachCardInYourHand declines: what makes
+    -- it legitimate here is that a sweep states no count and hands out no choice,
+    -- so which cards matched is read off what left the zone and the zone's own
+    -- order is never shown. CR 401.2's order survives untouched -- the matches
+    -- leave and the rest stay where they were.
     --
     -- NOT a search, which is why it is an arm here rather than a use of
-    -- Pawl.Types.Effect.Search: CR 701.23a's search finds a card matching a
-    -- description and no producer states one, so CR 701.23b and CR 701.23f's
-    -- search triggers do not reach it and CR 701.24 shuffles nothing. Proved by
-    -- Pawl.MassEffectSpec's "CR 701.23a a sweep is not a search, and CR 701.24
-    -- shuffles nothing".
-    EachCardInYourLibrary
+    -- Pawl.Types.Effect.Search: CR 701.23a's search LOOKS AT the zone and FINDS
+    -- cards, and neither producer's text says either word, so CR 701.23b's "isn't
+    -- required to find" and CR 701.23f's search triggers do not reach it and CR
+    -- 701.24 shuffles nothing. A stated characteristic does not make it one:
+    -- rule 701.23b governs a player who is SEARCHING, and this instruction never
+    -- asks anyone to. Proved by Pawl.MassEffectSpec's "CR 701.23a a sweep is not
+    -- a search, and CR 701.24 shuffles nothing".
+    EachCardInYourLibrary (Maybe (Filter.Filter Keyword.Keyword))
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
     -- card". EachMatching's sibling with CR 109.2's battlefield default switched
@@ -204,8 +207,7 @@ data ObjectRef
     --
     -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, which is
     -- EachCardInGraveyard's reason: a card wanting a filtered sweep of one more
-    -- zone gets one more arm, and a library's is the one still unwritten
-    -- (gap #2416).
+    -- zone gets one more arm.
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle -- which is the whole difference between this and Cancel's targeted
@@ -352,13 +354,12 @@ data ObjectRef
     -- taken from its head (CR 121.1) and both carry a Quantity, and they differ
     -- only in what that Quantity counts -- cards there, MATCHES here.
     --
-    -- NOT the filtered sweep of a library the arms above still lack (gap #2416),
-    -- and that is the difference. A sweep would have to read
-    -- every card in a hidden zone (CR 400.2) and report which ones matched; this
-    -- walks the pile from the top and stops, so which cards it names is a
-    -- POSITION question that a Filter only terminates. Every card the walk names
-    -- is then shown by the effect reading it (CR 701.20a), where the cards a
-    -- sweep passed over would not be.
+    -- NOT EachCardInYourLibrary's filtered sweep, and that is the difference: a
+    -- sweep names every card in the zone that matches, where this walks the pile
+    -- from the top and stops, so which cards it names is a POSITION question
+    -- that a Filter only terminates. Every card the walk names is then shown by
+    -- the effect reading it (CR 701.20a), where the cards a sweep passed over
+    -- are not.
     --
     -- The card that completes the count is in the set, which is what "until you
     -- reveal a nonland card" says: the walk stops having revealed it, not before
@@ -482,9 +483,12 @@ data ObjectRef
     -- by CR 701.20a's reveal, CR 701.20e's look, CR 701.17c's mill or a move, and
     -- it sits wherever that effect left it -- which for a look or a reveal is the
     -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
-    -- offer a choice there: a library still has no filtered sweep (gap #2416).
-    -- TopOfLibraryUntil's walk is not one either -- it names a prefix, which
-    -- stops at the match that completes its count rather than at the deepest one.
+    -- offer a choice there: EachCardInYourLibrary's filtered sweep names every
+    -- match in the whole zone and asks nobody anything, where a group is the
+    -- handful an earlier clause picked out by POSITION and this arm asks which
+    -- of them is taken. TopOfLibraryUntil's walk is not one either -- it names a
+    -- prefix, which stops at the match that completes its count rather than at
+    -- the deepest one.
     -- Where the batch DID move to a graveyard, Midnight Tilling writes the same
     -- sentence as ChosenCardInGraveyard narrowed by Filter.IsBound; this arm
     -- reads the slot directly instead, so it needs no such sweep.
@@ -521,8 +525,9 @@ data ObjectRef
     --
     -- The SLOT reaches where no zone-keyed arm does, for the arm above's reason:
     -- the group sits wherever the effect that bound it left the cards, which for
-    -- CR 701.20a's reveal and CR 701.20e's look is the LIBRARY, and a library has
-    -- no filtered sweep (gap #2416).
+    -- CR 701.20a's reveal and CR 701.20e's look is the LIBRARY --
+    -- EachCardInYourLibrary's sweep names every match in the whole zone rather
+    -- than the handful an earlier clause bound.
     --
     -- A READ, not a question, which is the whole difference from the arm above:
     -- "all" states no count and hands out no choice, so CR 608.2d has nobody to

@@ -1,0 +1,319 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": {
+        "deals that much damage": {
+          "condition": {
+            "type": "Reflexive"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "DealDamage",
+                        "value": {
+                          "parts": [
+                            {
+                              "quantity": {
+                                "type": "Count",
+                                "value": {
+                                  "aggregation": {
+                                    "type": "Members"
+                                  },
+                                  "filter": {
+                                    "type": "IsBound",
+                                    "value": "exiled"
+                                  },
+                                  "scope": {
+                                    "type": "OverBound",
+                                    "value": "exiled"
+                                  }
+                                }
+                              },
+                              "ref": {
+                                "type": "InSlot",
+                                "value": "target"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Planeswalker"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "Opponent"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "keywords": [
+        {
+          "type": "Trample"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Caldera Breaker",
+      "power": {
+        "type": "Literal",
+        "value": 6
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 6
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "EachCardInYourLibrary",
+                            "value": {
+                              "type": "HasSubtype",
+                              "value": {
+                                "type": "Mountain"
+                              }
+                            }
+                          },
+                          "slot": "exiled",
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      },
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "name": "deals that much damage"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": {
+            "type": "SelfDies"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "EachCardExiledWithSource"
+                          },
+                          "riders": {
+                            "underOwner": true
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      },
+                      {
+                        "type": "Conjure",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "manaCost": [
+                                  {
+                                    "type": "Variable"
+                                  },
+                                  {
+                                    "type": "OfType",
+                                    "value": {
+                                      "type": "Colored",
+                                      "value": {
+                                        "type": "Red"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "OfType",
+                                    "value": {
+                                      "type": "Colored",
+                                      "value": {
+                                        "type": "Red"
+                                      }
+                                    }
+                                  }
+                                ],
+                                "name": "Volcanic Geyser",
+                                "spell": {
+                                  "modes": [
+                                    {
+                                      "clauses": [
+                                        {
+                                          "effects": [
+                                            {
+                                              "type": "DealDamage",
+                                              "value": {
+                                                "parts": [
+                                                  {
+                                                    "quantity": {
+                                                      "type": "InSlot",
+                                                      "value": "X"
+                                                    },
+                                                    "ref": {
+                                                      "type": "InSlot",
+                                                      "value": "target"
+                                                    }
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ],
+                                      "targetSlots": {
+                                        "target": {
+                                          "pool": {
+                                            "type": "AnyTarget"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                },
+                                "typeLine": {
+                                  "types": [
+                                    {
+                                      "type": "Instant"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "destination": {
+                            "type": "Library"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 4
+                          }
+                        }
+                      },
+                      {
+                        "type": "Shuffle",
+                        "value": {
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Golem"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
