@@ -4081,7 +4081,7 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
   -- Two boards ONE attachment apart: the same Collar on the uncrewed Consulate
   -- Dreadnought and on a Goblin Piker beside it. A Bonesplitter rides the
   -- Vehicle throughout so the masked half is on the same board as the visible
-  -- one, and the printed numbers -- 7/11, 2/1, +2/+0 -- share no value.
+  -- one.
   Spec.it s "CR 301.5f an equipped-creature grant reaches a host that stopped being a creature with nothing" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -4122,13 +4122,14 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
         (equip, g3) = S.addCreature bonesplitter S.alice g2
         (aura, g4) = S.addCreature strength S.alice g3
         onEquip = (S.addCounter CounterKind.Hone 1 equip (S.attach aura pikerId (S.attach equip pikerId g4))) {GameState.priority = Just S.alice}
-        onAura = case Activate.abilitiesFor defenseId onEquip of
-          [only] -> S.runPure (honeMoveAnswer equip aura) onEquip (Activate.activateAbility S.alice defenseId only >> Stack.resolveTop)
-          _ -> onEquip
-    Spec.assertEqWith s "on the Aura the counter gives nothing: 2 printed + the Bonesplitter's 2 + Unholy Strength's 2" (Projection.powerOf pikerId onAura) (Just 6)
-    Spec.assertEqWith s "on the Equipment it was the +1 it would have been" (Projection.powerOf pikerId onEquip) (Just 7)
-    Spec.assertEqWith s "the counter did move onto the Aura" (S.counterOf CounterKind.Hone aura onAura) 1
-    Spec.assertEqWith s "and off the Equipment" (S.counterOf CounterKind.Hone equip onAura) 0
+    case Activate.abilitiesFor defenseId onEquip of
+      [only] -> do
+        let onAura = S.runPure (honeMoveAnswer equip aura) onEquip (Activate.activateAbility S.alice defenseId only >> Stack.resolveTop)
+        Spec.assertEqWith s "on the Aura the counter gives nothing: 2 printed + the Bonesplitter's 2 + Unholy Strength's 2" (Projection.powerOf pikerId onAura) (Just 6)
+        Spec.assertEqWith s "on the Equipment it was the +1 it would have been" (Projection.powerOf pikerId onEquip) (Just 7)
+        Spec.assertEqWith s "the counter did move onto the Aura" (S.counterOf CounterKind.Hone aura onAura) 1
+        Spec.assertEqWith s "and off the Equipment" (S.counterOf CounterKind.Hone equip onAura) 0
+      _ -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
 
   -- The whole card. Dwalin, Weaponmaster {1}{R/W} Legendary Creature -- Dwarf
   -- Warrior 2/1, "First strike" / "Whenever Dwalin enters or attacks, put a hone

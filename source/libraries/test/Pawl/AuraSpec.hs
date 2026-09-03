@@ -328,8 +328,9 @@ fortificationSpec s registry = Spec.describe s "Fortification" $ do
   -- recipient is Recipient.ToObject and not ToCreature even though the Arbor is
   -- a creature too, because rule 301.6 names the host as a land.
   --
-  -- CR 301.5a through CR 301.6: "fortified land" is Affected.Attached, so the
-  -- Garrison's own static ability reaches the Arbor once it lands. The
+  -- CR 301.5a through CR 301.6: "fortified land" names a type the way CR 301.5f's
+  -- "equipped creature" does, so the Garrison's affected set asks for a LAND with
+  -- the Garrison attached, and reaches the Arbor once it lands. The
   -- state-based pass at the end is CR 704.5p's: a Fortification is one of the
   -- three permanent kinds that rule does NOT detach.
   Spec.it s "CR 702.67a whole card: fortifying attaches the Garrison to the land and grants it indestructible" $ do
