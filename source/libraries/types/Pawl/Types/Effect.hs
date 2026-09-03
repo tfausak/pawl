@@ -58,13 +58,13 @@ import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
+import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
@@ -139,7 +139,7 @@ data Effect card ability
     -- that has changed hands since is not sacrificed at all, where CR 701.54c's
     -- "the blocking creature's controller sacrifices it" instructs whoever holds
     -- it now.
-    Sacrifice SlotSacrifice.SlotSacrifice
+    Sacrifice SacrificeEffect.SacrificeEffect
   | -- | CR 701.3 / 702.6a: attach this permanent (the effect's source) to the
     -- slot's target.
     Attach SlotName.SlotName

@@ -255,6 +255,7 @@ import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scaling as Scaling
@@ -270,7 +271,6 @@ import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SpellCast as SpellCast
@@ -5313,7 +5313,7 @@ effectFilters effect = case effect of
   Effect.RestartGame mRef -> frame SourceHostFramed (concatMap objectRefFilters (Maybe.maybeToList mRef))
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.Sacrifice _ -> []
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> frame SourceHostFramed (objectRefFilters ref)
   -- The riders reach a Filter by TWO roads one level further down than the
   -- ObjectRef: CR 122.6's counters are keyed by CounterKind, and CR 122.1b's
   -- keyword counter carries a whole Keyword; and each count is a Quantity, which
@@ -5618,7 +5618,7 @@ effectObjectRefs effect = case effect of
   Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
   Effect.ControlPlayerNextTurn {} -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
-  Effect.Sacrifice {} -> []
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
   -- THE gather that asks, and the one that elides the random arm (#1733).
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
   Effect.Draw {} -> []
@@ -7387,8 +7387,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- DECLARING one is the mistake.
   Spec.it s "the shadowing lint accepts a delayed ability that only reads the slot" $ do
     let tokens = SlotName.MkSlotName (Text.pack "tokens")
-        reads_ = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = tokens, SlotSacrifice.sacrificer = Sacrificer.EffectController}] []]
-        declares = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = tokens, SlotSacrifice.sacrificer = Sacrificer.EffectController}] [tokens]]
+        reads_ = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot tokens, SacrificeEffect.sacrificer = Sacrificer.EffectController}] []]
+        declares = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot tokens, SacrificeEffect.sacrificer = Sacrificer.EffectController}] [tokens]]
     Spec.assertBool s (not (shadowsSlots (Set.singleton tokens) [reads_])) "reading a Create's slot is legal"
     Spec.assertBool s (shadowsSlots (Set.singleton tokens) [declares]) "declaring a target slot under the same name is not"
   -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
@@ -7585,7 +7585,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any takesSeveral modals) "the pool has a slot that takes more than one target"
     Spec.assertEqWith s "no multi-target slot is read one at a time" (fmap fst (filter (modalCountsOffend . snd) modals)) []
   -- The rejecting direction, which the sweep above cannot show: a mode whose slot
-  -- takes two targets and whose only reader is Effect.Sacrifice, a bare SlotName.
+  -- takes two targets and whose only reader is Effect.TurnFaceUp, a bare SlotName.
   Spec.it s "the lint itself catches a multi-target slot read one at a time" $ do
     let slot = SlotName.MkSlotName (Text.pack "creature")
         modeReading targetSlot readers =
@@ -7609,7 +7609,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             )
     Spec.assertBool
       s
-      (modalCountsOffend (modeWith two (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController})))
+      (modalCountsOffend (modeWith two (Effect.TurnFaceUp slot)))
       "a two-target slot read as one object offends"
     Spec.assertBool
       s
@@ -7617,7 +7617,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and the same slot read through an ObjectRef does not"
     Spec.assertBool
       s
-      (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController}))))
+      (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.TurnFaceUp slot))))
       "nor does a one-target slot read as one object"
     -- CR 601.2c's "any number of target ...", which states no maximum to compare
     -- against: an unbounded slot is plural, so the same one-object reader offends.
@@ -7627,7 +7627,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- players" the sweep above walks.
     Spec.assertBool
       s
-      (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController})))
+      (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.TurnFaceUp slot)))
       "an unbounded slot read as one object offends too"
     -- The OTHER slot-naming arm of a number, on the offending board's own slot:
     -- an amount read is no arity claim, so the two-target slot is legal beside
@@ -7659,7 +7659,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and one number reading the slot both ways offends"
     Spec.assertBool
       s
-      (modalCountsOffend (modeReading two [amountReader, Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController}]))
+      (modalCountsOffend (modeReading two [amountReader, Effect.TurnFaceUp slot]))
       "as does an object read beside an amount read of the same slot"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
@@ -8240,9 +8240,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- the instruction is skipped in silence. In Resolve's own arm order, so
         -- the enumeration is checkable by reading down that file.
         --
-        -- Two shapes of singular reader are deliberately absent. Effect.Sacrifice
-        -- reads slotGroup first and sacrifices every member, so a group is what
-        -- it wants rather than what defeats it. Effect.ControlPlayerNextTurn,
+        -- One shape of singular reader is deliberately absent:
+        -- Effect.ControlPlayerNextTurn,
         -- MonarchTarget's InSlot and ExchangeSides' WithController match
         -- Recipient.ToPlayer, and no binder in boundPlurally mints a player slot.
         --
@@ -9885,7 +9884,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                                           PayGate.offeredAt = Nothing
                                         }
                                   )
-                                  (Seq.singleton (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = slot, SlotSacrifice.sacrificer = Sacrificer.EffectController}))
+                                  (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot slot, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
                               )
                           )
                           Map.empty

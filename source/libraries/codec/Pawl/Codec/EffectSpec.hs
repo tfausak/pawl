@@ -120,6 +120,7 @@ import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
+import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
@@ -129,7 +130,6 @@ import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -336,8 +336,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = SlotName.MkSlotName (Text.pack "self"), SlotSacrifice.sacrificer = Sacrificer.EffectController})
-      " {\"type\":\"Sacrifice\",\"value\":{\"slot\":\"self\"}} "
+      (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")), SacrificeEffect.sacrificer = Sacrificer.EffectController})
+      " {\"type\":\"Sacrifice\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"self\"}}} "
   Spec.it s "Attach" $
     Common.assertJsonCodec
       s
