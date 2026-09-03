@@ -130,8 +130,8 @@ data Effect card ability
     -- the CR 616.1 loop so a regeneration shield (CR 701.19a) can catch it; the
     -- Regenerability is CR 701.19c's rider.
     Destroy Destroy.Destroy
-  | -- | CR 701.21 / 701.21a: a player is instructed to sacrifice the permanent
-    -- the slot names, moving it to its owner's graveyard and consulting neither
+  | -- | CR 701.21 / 701.21a: a player is instructed to sacrifice the permanents
+    -- the ObjectRef names, moving each to its owner's graveyard and consulting neither
     -- indestructible nor a regeneration shield. WHICH player is the payload's
     -- Sacrificer, because rule 701.21a lets only a permanent's controller
     -- sacrifice it and the two printed templates address different seats: an

@@ -66,8 +66,8 @@ data Binding = MkBinding
     --
     -- A Seq and not a Set: the order is the one the objects were produced in --
     -- mint order for tokens, the batch's own order for a move or a destruction -- and it is not an
-    -- ObjectId ordering. Effect.Sacrifice acts in it. The ObjectRef readers do
-    -- not depend on it -- CR 611.2c's continuous effects freeze a SET
+    -- ObjectId ordering. Effect.Sacrifice acts in it, one member at a time. The
+    -- OTHER ObjectRef readers do not depend on it -- CR 611.2c's continuous effects freeze a SET
     -- and the one-shots are CR 608.2f-simultaneous batches -- but ordering the
     -- field arbitrarily would be inventing an order the game does not have.
     objects :: Maybe (Seq.Seq ObjectId.ObjectId)
