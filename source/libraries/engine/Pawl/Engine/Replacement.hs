@@ -1635,8 +1635,9 @@ readsApplier re = case re of
   -- extra card to different seats. LifeLossRewrite.ExileFromTopOfYourLibrary's
   -- answer, and for its reason. Unlike that one this is a PROVED behaviour rather
   -- than a fence: Alms Collector is not legendary, so two of them under different
-  -- controllers stand at once (Pawl.ReplacementSpec's "CR 616.1 the second
-  -- collector's controller is asked nothing, its instruction now naming one card").
+  -- controllers stand at once, and Pawl.ReplacementSpec's "CR 616.1 two collectors
+  -- under different controllers are told apart, and the drawer chooses" is what
+  -- proves the drawer is asked which one applies.
   ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR _ _ DrawCountRewrite.EachDrawOne) -> True
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this

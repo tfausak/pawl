@@ -2625,7 +2625,7 @@ apply batch candidate event =
     -- two draws itself.
     --
     -- Cancelling is what CR 121.6c asks for as well as CR 614.6: a draw effect's
-    -- additional action ("draw three cards, then discard one") is not performed on
+    -- additional action ("draw three cards, then reveal them") is not performed on
     -- cards drawn as a result of the replacement, and Pawl.Engine.Resolve binds its
     -- slot from what the instruction returns -- nothing, once the event is gone.
     --
@@ -2635,7 +2635,8 @@ apply batch candidate event =
     -- controller has left the game draws nobody the extra card and the instructed
     -- player still draws one, which is CR 614.6's "instructions that can't be
     -- carried out are simply ignored"; the same filter collapses the two to one
-    -- draw for a row that named its own controller, whom no printing names.
+    -- draw where the row's controller IS the instructed player, which the pool's
+    -- one producer never is -- its pattern is ControllerRelation.Opponents.
     --
     -- Each of these is an individual draw through `drawCard`, so CR 616.1g's inner
     -- events still raise their own WouldDraw and a per-draw row (Words of Worship)
