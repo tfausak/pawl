@@ -121,16 +121,21 @@ instances candidates targets gs =
                 -- below is printed on the card stating the requirement.
                 concatMap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements
               else []
+      -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       -- CR 613.11 puts these effects after every layer, so the affected set is
       -- read against the FULL projection -- the opposite of
       -- Projection.affects's callers inside the layer fold, which read
       -- characteristics as of their own layer.
       named source subject creature =
-        Projection.affects
+        Projection.affectsOn
+          pcs
+          grants
           source
           creature
           subject
-          (Projection.project creature gs)
           gs
       -- CR 612.1: a hacked "Swamps attack each combat if able" requires Islands.
       fromRequirement source changes requirement =

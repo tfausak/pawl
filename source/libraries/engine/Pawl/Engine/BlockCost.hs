@@ -62,6 +62,7 @@ costsOn blocker gs =
       -- CR 613.11 puts these effects after every layer, so the subject set is
       -- read against the FULL projection rather than a partial one.
       view = Projection.project blocker gs
+      grants = Projection.controlGrants gs
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face -> case Face.blockCosts face of
@@ -96,7 +97,7 @@ costsOn blocker gs =
               generic n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)])) []
            in Maybe.maybeToList (fmap generic (Quantity.evaluate (Projection.fullView gs) context gs source quantity))
       fromCost source bc =
-        if Projection.affects source blocker (BlockCost.subject bc) view gs
+        if Projection.affectsUnder grants source blocker (BlockCost.subject bc) view gs
           then fmap ((,) source) (shareOf source bc)
           else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))

@@ -3019,9 +3019,10 @@ playerRefPlayers legal controller gs ref = case ref of
 battlefieldMatching :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 battlefieldMatching legal resolving controller source gs filter_ =
   let context = (effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
+      viewOf = Projection.viewsOf gs
       matching =
         filter
-          (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+          (\oid -> Filter.matches context (viewOf oid) filter_)
           (Set.toList (GameState.battlefield gs))
       order = Game.apnapOrder gs
       last_ = length order
@@ -3134,7 +3135,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           Nothing -> inLibrary
           Just filter_ ->
             let context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
-             in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) inLibrary
+                viewOf = Projection.viewsOf gs
+             in filter (\oid -> Filter.matches context (viewOf oid) filter_) inLibrary
   -- CR 607.2a's linked set: the cards GameState.exiledWith files against this
   -- effect's SOURCE. The relation, not a zone sweep, is the membership test, so a
   -- card exiled by a second copy of the same printing is not named; a stated
@@ -3150,9 +3152,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- Writhing Township" is that printing, and this is the ref its Meld reads.
   ObjectRef.EachCardExiledWithSource mFilter ->
     let context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
+        viewOf = Projection.viewsOf gs
         stated oid = case mFilter of
           Nothing -> True
-          Just filter_ -> Filter.matches context (Projection.viewOfObject oid gs) filter_
+          Just filter_ -> Filter.matches context (viewOf oid) filter_
      in filter
           (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just source && stated oid)
           (Set.toList (GameState.exile gs))
@@ -3163,16 +3166,18 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- order the rules already read. Read LIVE (CR 608.2c).
   ObjectRef.EachSpell filter_ ->
     let context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
+        viewOf = Projection.viewsOf gs
      in filter
-          (\oid -> Game.isSpell oid gs && Filter.matches context (Projection.viewOfObject oid gs) filter_)
+          (\oid -> Game.isSpell oid gs && Filter.matches context (viewOf oid) filter_)
           (GameState.stack gs)
   -- CR 405.1's whole zone: the arm above without Game.isSpell, since a sentence
   -- naming spells AND abilities names everything the stack holds. Same order,
   -- top first (CR 405.2), and read LIVE (CR 608.2c).
   ObjectRef.EachOnStack filter_ ->
     let context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
+        viewOf = Projection.viewsOf gs
      in filter
-          (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+          (\oid -> Filter.matches context (viewOf oid) filter_)
           (GameState.stack gs)
   -- Names players and so no objects at all.
   ObjectRef.EachPlayer -> []
@@ -3220,7 +3225,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
         viewOf = effectViewOf source legal gs
         context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
         wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
-        matches oid = Filter.matches context (Projection.viewOfObject oid gs) filter_
+        viewOfCard = Projection.viewsOf gs
+        matches oid = Filter.matches context (viewOfCard oid) filter_
         walkDown remaining oids =
           if remaining <= (0 :: Natural)
             then []
@@ -3273,11 +3279,12 @@ zoneScopePlayers bindings controller gs scope =
 -- would answer False for on every candidate.
 graveyardCardsOf :: Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 graveyardCardsOf context gs pid filter_ =
-  List.sort
-    ( filter
-        (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
-        (Game.zoneMembers Zone.Graveyard pid gs)
-    )
+  let viewOf = Projection.viewsOf gs
+   in List.sort
+        ( filter
+            (\oid -> Filter.matches context (viewOf oid) filter_)
+            (Game.zoneMembers Zone.Graveyard pid gs)
+        )
 
 -- The cards in the named graveyards matching the filter, for
 -- ChosenCardInGraveyard's TheController chooser -- ObjectRef.EachCardInGraveyard
@@ -3307,9 +3314,10 @@ handChoosers legal controller gs player =
 -- own order, which no rule reads (CR 402.3). Narrowing must not reorder.
 handCardsOf :: Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 handCardsOf context gs pid filter_ =
-  filter
-    (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
-    (Game.zoneMembers Zone.Hand pid gs)
+  let viewOf = Projection.viewsOf gs
+   in filter
+        (\oid -> Filter.matches context (viewOf oid) filter_)
+        (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -4174,7 +4182,8 @@ fromAmongMembers legal resolving chosen slot = do
 matchingFromAmong :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId] -> [ObjectId]
 matchingFromAmong legal resolving controller source gs filter_ members =
   let context = effectContext (Game.teams gs) controller source legal (slotBindings resolving gs)
-   in filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) members
+      viewOf = Projection.viewsOf gs
+   in filter (\oid -> Filter.matches context (viewOf oid) filter_) members
 
 -- The printed "from among them", a CR 608.2d choice: the candidates are the
 -- members of a GROUP an earlier clause of this resolution bound rather than a
@@ -6064,7 +6073,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- across every miller, as no Quantity has a per-player reader.
     Monad.forM_ mTally $ \tally ->
       let tallyContext = Filter.contextFor (Game.teams gs) Nothing Nothing
-          counted oid = Filter.matches tallyContext (Projection.viewOfObject oid gs) (MillTally.filter tally)
+          viewOfMilled = Projection.viewsOf gs
+          counted oid = Filter.matches tallyContext (viewOfMilled oid) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
   -- CR 701.20a: show the named cards to every player. CR 701.20b keeps them where
   -- they are, so the GameEvent.Revealed the funnel appends IS the whole effect.

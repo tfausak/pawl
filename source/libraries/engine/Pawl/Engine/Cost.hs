@@ -1202,7 +1202,8 @@ countersOn kind oid gs =
 discardCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates slots pid oid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
-      matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
+      viewOf = Projection.viewsOf gs
+      matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter (\candidate -> candidate /= oid && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
 
 -- The cards this player may put onto the battlefield to pay a CR 118.12
@@ -1234,7 +1235,8 @@ putOntoBattlefieldCandidates = discardCandidates
 exileCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates slots pid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
-      matches candidate = Filter.matches context (Projection.viewOfObject candidate gs) criterion
+      viewOf = Projection.viewsOf gs
+      matches candidate = Filter.matches context (viewOf candidate) criterion
    in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
 
 -- The one card an ExileTopFromGraveyard component takes: the TOP matching card
@@ -1260,8 +1262,9 @@ topExileCandidate slots pid criterion gs =
 tapCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 tapCandidates slots pid oid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) (Just oid) slots
+      viewOf = Projection.viewsOf gs
       matches candidate =
-        Filter.matches context (Projection.viewOfObject candidate gs) criterion
+        Filter.matches context (viewOf candidate) criterion
    in List.sort (filter matches (Set.toList (GameState.battlefield gs)))
 
 -- The permanents this player may return to hand to pay a ReturnPermanents
