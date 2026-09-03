@@ -6,6 +6,9 @@
 -- sibling modules named in Main.hs, which all describe under the same name.
 module Pawl.ResolveSpec where
 
+-- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
+-- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
+
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -65,11 +68,10 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
--- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
--- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -3181,8 +3183,71 @@ wormsSpec s registry =
           Spec.assertEqWith s "CR 118.3 the cost was offered to the two seats who could pay it and not to carol" [d | Response.ChoseToPay d <- asked] [PaymentDecision.Declines, PaymentDecision.Declines]
           Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length [c | Response.ChoseClause c <- asked]) 3
 
+-- CR 701.21a's second sentence -- "a player can't sacrifice ... something that's
+-- a permanent they don't control" -- which is what separates an ordinary printed
+-- "sacrifice it" from CR 701.54c's "[that permanent]'s controller sacrifices it".
+-- Thatcher Revolt's delayed ability instructs ALICE, so a token bob has stolen by
+-- the end step is not sacrificed at all, where the emblem Pawl.Engine.Ring mints
+-- names the permanent's own controller and always is.
+--
+-- A PAIR of boards differing in exactly one thing, whether bob casts Ray of
+-- Command, so "the token survived" cannot be read as "the delayed ability never
+-- fired".
+--
+-- Ray of Command and not a permanent control-changer: CR 611.2c's duration has to
+-- reach the end step from the main phase, and "until end of turn" does.
+sacrificerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+sacrificerSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      -- The end step entered the way the delayed ability reads it: its
+      -- TriggerCondition.StepBegins matches the EVENT, so the fixture records one
+      -- beside setting the phase. TurnScope.EachTurn, so alice's own will do.
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      ended gs = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer (beginEndStep gs) Engine.settleForPriority)) Engine.priorityLoop)
+      -- FILTERED from the offered set rather than hand-built, the
+      -- Prompt.ChooseTargets posture: a recipient the prompt never offered is a
+      -- different recipient, and CR 608.2b drops it with no error.
+      targeting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      targeting target p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just target) . Recipient.objectOf) sets
+        _ -> S.identityAnswer p
+      standing gs = filter (`Set.member` GameState.battlefield gs) (S.tokensOf gs)
+      -- alice casts Thatcher Revolt off three Mountains, which arms its delayed
+      -- ability; bob holds Ray of Command and the four Islands to cast it with.
+      revoltBoard = do
+        thatcher <- S.printingOf s registry "Thatcher Revolt"
+        ray <- S.printingOf s registry "Ray of Command"
+        mountain <- S.printingOf s registry "Mountain"
+        island <- S.printingOf s registry "Island"
+        let (withRevolt, revoltId) = S.handOne thatcher (S.landsInPlay mountain 3)
+            (rayId, g1) = S.addHandCard ray S.bob (S.landsFor island S.bob 4 withRevolt)
+            cast = S.runPure S.identityAnswer g1 (S.cast S.alice revoltId)
+        pure (rayId, S.runPure S.identityAnswer cast Stack.resolveTop)
+   in Spec.describe s "CR 701.21a who a sacrifice instruction addresses" $ do
+        Spec.it s "CR 701.21a a stolen token is not sacrificed by the player who was told to sacrifice it" $ do
+          (rayId, armed) <- revoltBoard
+          case standing armed of
+            stolen : _ -> do
+              let cast = S.runPure (targeting stolen) armed (S.cast S.bob rayId)
+                  taken = S.runPure (targeting stolen) cast Stack.resolveTop
+                  withSteal = ended taken
+                  -- The control leg: the same armed board, with the steal uncast.
+                  without = ended armed
+              Spec.assertEqWith
+                s
+                "CR 701.21a the stolen token stands and the two alice still controls do not"
+                (elem stolen (standing withSteal), length (standing withSteal))
+                (True, 1)
+              Spec.assertEqWith s "and with the steal uncast the same instruction takes all three" (standing without) []
+              -- Anti-vacuity: the steal really happened, and the three tokens
+              -- really were alice's before it.
+              Spec.assertEqWith s "CR 613.1b bob controlled the stolen token when the end step began" (Projection.controllerOf stolen taken) (Just S.bob)
+              Spec.assertEqWith s "CR 111.7 alice made three tokens and controlled all of them" (length (standing armed), List.nub (fmap (`Projection.controllerOf` armed) (standing armed))) (3, [Just S.alice])
+            _ -> Spec.assertFailure s "fixture should have made three tokens"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
   resolveSpec s registry
   wormsSpec s registry
+  sacrificerSpec s registry

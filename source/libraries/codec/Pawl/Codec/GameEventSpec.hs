@@ -498,3 +498,11 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.CoinFlipped CoinFlipped.MkCoinFlipped {CoinFlipped.flipper = PlayerId.MkPlayerId 5, CoinFlipped.won = Just False})
       " {\"type\":\"CoinFlipped\",\"value\":{\"flipper\":5,\"won\":false}} "
+  -- CR 701.54d. One player id, Scried's payload: rule 701.54d names the tempted
+  -- player, and the emblem and the designation are state rather than log.
+  Spec.it s "RingTempted" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.RingTempted (PlayerId.MkPlayerId 7))
+      " {\"type\":\"RingTempted\",\"value\":7} "

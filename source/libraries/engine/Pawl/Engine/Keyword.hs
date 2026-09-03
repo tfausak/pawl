@@ -108,10 +108,12 @@ import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
@@ -2657,7 +2659,7 @@ decayedSacrifice =
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
-    effect = Effect.Sacrifice Binding.triggerSource
+    effect = Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = Binding.triggerSource, SlotSacrifice.sacrificer = Sacrificer.EffectController}
 
 -- CR 702.39a's provoke, the first minted payload that creates a CR 509.1c blocking
 -- REQUIREMENT rather than changing a characteristic.
@@ -3245,7 +3247,7 @@ vanishingLastCounter =
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
-    effect = Effect.Sacrifice Binding.triggerSource
+    effect = Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = Binding.triggerSource, SlotSacrifice.sacrificer = Sacrificer.EffectController}
 
 -- CR 702.32a's SECOND ability, on vanishingUpkeep's trigger condition exactly.
 -- Rule 702.32a states NO intervening "if", so this fires on every one of its
@@ -3281,7 +3283,7 @@ fading =
         Nothing
         Optionality.Mandatory
         Nothing
-        (Seq.singleton (Effect.Sacrifice Binding.triggerSource))
+        (Seq.singleton (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = Binding.triggerSource, SlotSacrifice.sacrificer = Sacrificer.EffectController}))
     removeClause =
       Clause.MkClause
         Nothing
@@ -3351,7 +3353,7 @@ cumulativeUpkeep cost =
         Nothing
         Optionality.Mandatory
         (Just gate)
-        (Seq.singleton (Effect.Sacrifice Binding.triggerSource))
+        (Seq.singleton (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = Binding.triggerSource, SlotSacrifice.sacrificer = Sacrificer.EffectController}))
     gate =
       PayGate.MkPayGate
         { PayGate.payer = PlayerRef.Relative PlayerRelation.You,

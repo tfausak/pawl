@@ -64,6 +64,7 @@ import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
@@ -129,10 +130,16 @@ data Effect card ability
     -- the CR 616.1 loop so a regeneration shield (CR 701.19a) can catch it; the
     -- Regenerability is CR 701.19c's rider.
     Destroy Destroy.Destroy
-  | -- | CR 701.21 / 701.21a: the slot's target permanent is sacrificed -- its
-    -- controller moves it to its owner's graveyard, consulting neither
-    -- indestructible nor a regeneration shield.
-    Sacrifice SlotName.SlotName
+  | -- | CR 701.21 / 701.21a: a player is instructed to sacrifice the permanent
+    -- the slot names, moving it to its owner's graveyard and consulting neither
+    -- indestructible nor a regeneration shield. WHICH player is the payload's
+    -- Sacrificer, because rule 701.21a lets only a permanent's controller
+    -- sacrifice it and the two printed templates address different seats: an
+    -- ordinary "sacrifice it" instructs this effect's controller, so a permanent
+    -- that has changed hands since is not sacrificed at all, where CR 701.54c's
+    -- "the blocking creature's controller sacrifices it" instructs whoever holds
+    -- it now.
+    Sacrifice SlotSacrifice.SlotSacrifice
   | -- | CR 701.3 / 702.6a: attach this permanent (the effect's source) to the
     -- slot's target.
     Attach SlotName.SlotName

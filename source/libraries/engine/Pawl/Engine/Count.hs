@@ -637,6 +637,7 @@ snapshotView gs shape event = case event of
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a

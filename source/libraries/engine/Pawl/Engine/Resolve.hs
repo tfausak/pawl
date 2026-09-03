@@ -247,6 +247,7 @@ import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -257,6 +258,7 @@ import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
@@ -861,7 +863,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The three slot fields are DEFINITIONS, not reads; they belong to boundSlots
   -- below.
   Effect.Destroy {} -> Map.empty
-  Effect.Sacrifice slot -> oneSlot slot
+  Effect.Sacrifice payload -> oneSlot (SlotSacrifice.slot payload)
   Effect.TurnFaceDown {} -> Map.empty
   Effect.TurnFaceUp slot -> oneSlot slot
   Effect.RemoveFromCombat _ -> Map.empty
@@ -3468,6 +3470,31 @@ recipientSeat gs recipient = case recipient of
   Recipient.ToPlayer pid -> Just pid
   _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerWithLastKnown oid gs
 
+-- CR 701.21a: which player one Effect.Sacrifice instructs, as the function that
+-- performs it. The rule's second sentence -- "a player can't sacrifice ...
+-- something that's a permanent they don't control" -- is what makes the two arms
+-- observably different rather than two spellings of one thing.
+--
+-- EffectController hands Event.sacrifice this effect's controller and lets that
+-- rule REFUSE, which is the printed "sacrifice it": Ray of Command stealing a
+-- Thatcher Revolt token before its delayed "sacrifice those tokens" turns on
+-- leaves the token on the battlefield, and Pawl.ResolveSpec's "CR 701.21a a
+-- stolen token is not sacrificed by the player who was told to sacrifice it" is
+-- the proof.
+--
+-- PermanentController reads the controller off the permanent instead, live (CR
+-- 613.1b's layer 2), which is the printed "[that permanent]'s controller
+-- sacrifices it" -- CR 701.54c's three-temptation tier, whose blocker its own
+-- controller sacrifices. Rule 701.21a can never refuse this arm, by construction.
+-- Nothing to do for an object that is gone or has no controller (CR 400.7), which
+-- is also how the funnel answers.
+sacrificerFor :: Sacrificer.Sacrificer -> PlayerId -> ObjectId -> Game ()
+sacrificerFor sacrificer controller oid = case sacrificer of
+  Sacrificer.EffectController -> Event.sacrifice controller oid
+  Sacrificer.PermanentController -> do
+    gs <- State.get
+    Monad.forM_ (Projection.controllerOf oid gs) (\pid -> Event.sacrifice pid oid)
+
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING
 -- stack object's live bindings rather than out of `chosen`, which projects CR
 -- 601.2c's targets only. Live is what lets a later effect of the same resolution
@@ -5325,7 +5352,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- iterations (CR 101.3).
     Monad.forM_ mPermanents $ \slot ->
       Monad.unless (null destroyed) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList (fmap fst destroyed))))
-  Effect.Sacrifice slot -> do
+  Effect.Sacrifice (SlotSacrifice.MkSlotSacrifice slot sacrificer) -> do
     -- A slot a Create bound to a GROUP names every token at once, so all of them
     -- are sacrificed, in mint order. Read off the resolving object's live
     -- bindings rather than out of `chosen`: a group binding is never a target, so
@@ -5334,16 +5361,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 603.7c's zone check applies per MEMBER rather than to the whole word: a
     -- member that is gone is simply not affected, and the rest still are.
     bound <- State.gets (slotGroup slot resolving)
+    let sacrificeOne = sacrificerFor sacrificer controller
     case bound of
       -- One at a time rather than as one event (#757).
-      Just victims -> Monad.mapM_ (Event.sacrifice controller) victims
+      Just victims -> Monad.mapM_ sacrificeOne victims
       Nothing -> case legalOne slot legal of
         Just recipient -> case Recipient.objectOf recipient of
           Nothing -> pure () -- a player recipient cannot be sacrificed
           -- CR 701.21: through the single funnel, which is NOT Event.destroy (CR
-          -- 701.21a). The sacrificing player is this effect's controller; the
-          -- funnel's CR 701.21a guard makes any other case a no-op.
-          Just target -> Event.sacrifice controller target
+          -- 701.21a).
+          Just target -> sacrificeOne target
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> pure ()
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) ->
