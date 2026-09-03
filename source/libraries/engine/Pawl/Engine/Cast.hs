@@ -340,7 +340,7 @@ castAimable pid oid gs = case Game.faceOf oid gs of
         enchant = Card.enchantSlotMapGiven (Projection.enchantOf oid gs)
         slotsOf mi = Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal)
         objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
-        setsOf slots = Target.legalSets (Just pid) Map.empty oid slots gs
+        setsOf slots = Target.legalSets (Just pid) False Map.empty oid slots gs
      in fmap (fmap objectsOf . setsOf . slotsOf) (Set.toList (Target.fillableModes (Just pid) Map.empty oid enchant modal gs))
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
@@ -1888,7 +1888,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                   -- "CR 601.2c the joint check re-derives a jointly judged slot
                   -- against the announced X" is what proves the two agree.
                   let seed = Binding.fromChoices Map.empty mAmount Seq.empty
-                      sets = Target.legalSets (Just pid) seed sid slots bestowedGs
+                      sets = Target.legalSets (Just pid) False seed sid slots bestowedGs
                   chosen <- Target.chooseTargets decider pid sid (Maybe.fromMaybe 0 mAmount) slots sets
                   if not (Target.selectionLegal (Just pid) seed sid (Maybe.fromMaybe 0 mAmount) slots sets chosen bestowedGs)
                     then reject

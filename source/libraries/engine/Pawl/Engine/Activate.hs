@@ -575,12 +575,15 @@ recipientObjects = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
 candidateSlotsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Set.Set ModeIndex.ModeIndex -> GameState -> [Map.Map SlotName (Set.Set ObjectId)]
 candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
   let slotsOf mi = Modal.modesTargetSlots (Seq.singleton mi) modal
-      -- CR 601.2b's announcement is judged MADE here, and empty.
-      -- Not implemented: an activated ability's announced X never reaches a target
-      -- slot's CR 202.3 computed bound, so such a slot admits nothing and this gate
-      -- has nothing to be permissive about (#2672). Pawl.Engine.Cast is the half
-      -- that is built.
-      setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) False Map.empty srcId slots gs
+      -- CR 601.2b's announcement has NOT been made at this point, which is what
+      -- `unannounced` says: a slot's CR 202.3 computed bound reading the X states
+      -- no bound here rather than an unmeetable one, so the gate is measured
+      -- against every recipient the announcement could still reach (Blighted
+      -- Nightmare's graveyard slot). This call and activateAbility's PRE-X one
+      -- agree, which they must: one is the offer gate and the other is what
+      -- affordableX measures the cost against, and a gate and an announcement may
+      -- not disagree about what a cost is.
+      setsOf slots = Target.legalSetsGiven pcs grants pools (Just pid) True Map.empty srcId slots gs
    in fmap (fmap recipientObjects . setsOf . slotsOf) (Set.toList fillable)
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
@@ -589,15 +592,14 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
 -- adjustments CR 601.2f's totalling reads. Advisory, never a clamp -- see
 -- Prompt.ChooseX.
 --
--- NO CEILING is handed to the climb, and that is CR 101.1 having nothing to say
--- here rather than an oversight: Pawl.Types.Face.maximumX bounds the X a SPELL's
--- controller announces, and no activated ability in `data/cards/` states a
--- ceiling of its own. Not implemented: an ability that does (Blighted
--- Nightmare) (#1985). What that leaves is Cost.greatestPayableX's other ground
--- for terminating -- a demand that grows -- which every {X} in an activation
--- cost in the pool has.
-affordableX :: [Map.Map SlotName (Set.Set ObjectId)] -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX aimable family pid srcId gs cost = Cost.greatestPayableX Nothing (\x -> payableCostAt aimable x family pid srcId gs cost) cost
+-- `mCeiling` is CR 101.1's, evaluated off the ABILITY being activated rather than
+-- off the face (Cost.ceilingOf over ActivatedAbility.maximumX) and passed straight
+-- through: it bounds the search as well as the announcement, which is what makes
+-- Blighted Nightmare's blight route terminate -- CostComponent.BlightX's demand
+-- never grows (Cost.demandGrowsWithX), so the climb has no other ground to stop
+-- on. Cast.affordableX takes the same argument off Face.maximumX.
+affordableX :: Maybe Natural -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX mCeiling aimable family pid srcId gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt aimable x family pid srcId gs cost) cost
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
@@ -835,17 +837,53 @@ activateAbility pid srcId ability = do
           -- be (aimingSomewhere). Read off `gs`, the same pre-stack board
           -- Target.chooseTargets is offered from, so one binding serves both.
           slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
-          -- Not implemented: the seed is empty, so a slot's CR 202.3 computed bound
-          -- cannot read the X announced two lines down (#2672). Splitting the map
-          -- in two is what it would take -- this one is measured BEFORE the
-          -- announcement on purpose, the cost bound below needing it.
-          sets = Target.legalSets (Just pid) Map.empty srcId slots gs
-          aimable = [fmap recipientObjects sets]
+          -- The PRE-X map, and it says so: `unannounced` is True, so a slot's CR
+          -- 202.3 computed bound reading the X states no bound rather than an
+          -- unmeetable one, and the lookahead measures the cost against every
+          -- recipient the announcement could still reach. candidateSlotsGiven's
+          -- call is the same one, for the reason its own note gives.
+          --
+          -- The map CR 601.2c is ANSWERED from is the second one below, taken once
+          -- the X exists.
+          unannouncedSets = Target.legalSets (Just pid) True Map.empty srcId slots gs
+          aimableUnannounced = [fmap recipientObjects unannouncedSets]
+          -- CR 101.1: the ceiling this ABILITY's own words put on the value about
+          -- to be announced -- Blighted Nightmare's "X can't be greater than the
+          -- greatest toughness among creatures you control". Read HERE and once,
+          -- the timing CR 601.2b fixes through 602.2b, so a creature that leaves in
+          -- response cannot shrink it.
+          --
+          -- Off the SOURCE permanent (`srcId`) rather than the ability object: CR
+          -- 113.7 makes that permanent the ability's source, and it is the object
+          -- every other quantity on this road is evaluated against. It is still in
+          -- its zone here, the activation cost being unpaid until below.
+          mCeiling = Cost.ceilingOf pid srcId (ActivatedAbility.maximumX ability) gs
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX aimable family pid srcId gs printedCost)))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX mCeiling aimableUnannounced family pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
+          -- CR 101.1, and CR 101.2 for its direction, exactly as Cast.castProposed
+          -- reads a face's: the ability's printed sentence overrides the rule that
+          -- would otherwise leave X free, and a "can't" beats the permission.
+          -- REJECT rather than clamp, which is this whole step's posture.
+          overCeiling = case (mCeiling, mAmount) of
+            (Just c, Just x) -> x > c
+            _ -> False
+          -- CR 601.2c's slots and their legal recipients as the announcement
+          -- ACTUALLY made can reach them, seeded with CR 601.2b's X: a slot's own
+          -- CR 202.3 computed bound reads it (Blighted Nightmare's "creature card
+          -- with mana value X or less"), and `unannounced` is False because the
+          -- value exists by now. Cast.castProposed's shape exactly, and
+          -- Binding.fromChoices is the same writer CR 601.2i stamps the ability
+          -- object with below, so the offer and the record cannot spell one X two
+          -- ways.
+          --
+          -- The SAME seed reaches Target.selectionLegal's joint check below, so a
+          -- slot offered against the announced X is not re-judged against no X.
+          seed = Binding.fromChoices Map.empty mAmount Seq.empty
+          sets = Target.legalSets (Just pid) False seed srcId slots gs
+          aimable = [fmap recipientObjects sets]
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
       -- game returns to the moment before it started. The X just named is where
       -- that can first become true: `activatable` measured the cost at CR
@@ -854,6 +892,11 @@ activateAbility pid srcId ability = do
       -- way (aimingSomewhere); what the player actually aims at is charged
       -- below, and a choice that reduces nothing loses the ability at the
       -- payment rather than here.
+      --
+      -- Measured against the POST-X map, which the earlier gates could not be:
+      -- once the value is named the candidate set is exact, so a cost reading a
+      -- bound slot is priced against what CR 601.2c will actually offer rather
+      -- than against the wider pre-announcement lookahead.
       --
       -- Asked with the same predicate that floor was asked with, so a gate and an
       -- announcement cannot disagree about what a cost is. That matters beyond
@@ -868,7 +911,7 @@ activateAbility pid srcId ability = do
       -- Asked unconditionally rather than only when there is an {X}, which buys
       -- one predicate over one cost instead of two spellings of when the gate
       -- applies.
-      if not (payableCost aimable family pid srcId gs announcedAtX)
+      if overCeiling || not (payableCost aimable family pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 118.13a's announcement, which names an activated ability's
@@ -909,11 +952,7 @@ activateAbility pid srcId ability = do
           -- an activation cost.
           (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
           chosen <- Target.chooseTargets decider pid abilId (Maybe.fromMaybe 0 mAmount) slots sets
-          -- Not implemented: the seed is empty here for the same reason it is
-          -- empty above -- the announcement's X does not reach a slot on this
-          -- road at all, so there is nothing yet for the joint check to re-derive
-          -- a CR 202.3 computed bound against (#2672).
-          if not (Target.selectionLegal (Just pid) Map.empty srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
+          if not (Target.selectionLegal (Just pid) seed srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so

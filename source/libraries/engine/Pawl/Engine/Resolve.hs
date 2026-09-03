@@ -4486,7 +4486,7 @@ chooseNewTargetsFor controller copyId = do
           -- own road seeds no target either (Pawl.Engine.Cast.castProposed). The
           -- second pass below is what relates one re-chosen slot to another.
           seed = Map.withoutKeys (Object.bindings copy) (Map.keysSet slots)
-          fresh = Target.legalSets (Just controller) seed copyId slots gs
+          fresh = Target.legalSets (Just controller) False seed copyId slots gs
           -- CR 406.4: what this player may not name specifically is offered as
           -- the pile it sits in, exactly as at CR 601.2c. The targets already
           -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting

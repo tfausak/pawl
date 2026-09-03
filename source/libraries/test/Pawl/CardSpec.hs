@@ -1352,7 +1352,10 @@ ownQuantities effect = case effect of
 -- intervening "if", one field over.
 activatedAbilityCounts :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 activatedAbilityCounts ability =
-  foldMap conditionCounts (ActivatedAbility.condition ability)
+  -- CR 101.1's ceiling on the X this ability's own activation announces, the
+  -- cardCounts treatment of Face.maximumX one type over (Blighted Nightmare).
+  concatMap quantityCounts (ActivatedAbility.maximumX ability)
+    <> foldMap conditionCounts (ActivatedAbility.condition ability)
     <> concatMap effectCounts (Modal.allEffects (ActivatedAbility.modal ability))
     <> concatMap conditionCounts (modalClauseConditions (ActivatedAbility.modal ability))
 
@@ -2780,6 +2783,7 @@ oneEffectActivated mana effect =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -2804,6 +2808,7 @@ modalActivated modes =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.maximumX = [],
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -5834,6 +5839,9 @@ activatedAbilityFilters ability =
   -- the cost is answered, and Unframed's promise holds (Synthetic Spiteful
   -- Altar). See SlotlessCostFramed for the positions where it does not.
   unframed (costFilters (ActivatedAbility.cost ability))
+    -- CR 101.1's ceiling on this ability's own X, through a Count -- cardFilters'
+    -- treatment of Face.maximumX one type over (Blighted Nightmare).
+    <> frame Unframed (concatMap quantityFilters (ActivatedAbility.maximumX ability))
     -- CR 702.178a's "as long as" gate, the triggeredAbilityFilters treatment of
     -- CR 603.4's intervening "if" one field over.
     <> frame Unframed (concatMap conditionFilters (Maybe.maybeToList (ActivatedAbility.condition ability)))
@@ -6850,21 +6858,32 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- tie to the number). A printing with neither would climb forever, so it is a
   -- card-data error rather than an engine one, and this is where it is caught.
   --
-  -- Over the SPELL costs alone, `spellCostsOf`'s scope: an activated ability's X
-  -- is announced through CR 602.2b against its own cost and gets no ceiling from
-  -- the face (#1985), so the sweep would have nothing to check it against.
+  -- Over the SPELL costs and the ACTIVATION costs alike: CR 602.2b routes an
+  -- activation through rule 601.2b, so an ability announcing an X the board
+  -- cannot refuse needs the same ceiling, read off the ability rather than off
+  -- the face (Pawl.Types.ActivatedAbility.maximumX). The two halves are checked
+  -- against two different fields for that reason, and neither can stand in for
+  -- the other.
   Spec.it s "CR 101.1 every printing whose X the board cannot refuse states a maximum for it" $ do
     ps <- S.allPrintings s
     let unrefusable c = declaresVariable c && not (Cost.demandGrowsWithX c)
         unrefusableX = any unrefusable . spellCostsOf
-        unbounded f = unrefusableX f && null (Face.maximumX f)
+        unrefusableAbility ab = unrefusable (ActivatedAbility.cost ab)
+        unbounded f =
+          (unrefusableX f && null (Face.maximumX f))
+            || any (\ab -> unrefusableAbility ab && null (ActivatedAbility.maximumX ab)) (Face.activatedAbilities f)
         offenders = filter (anyFace unbounded . Printing.card) ps
-    -- Guards the sweep against passing vacuously: the pool must hold a card
-    -- whose X reaches a cost only through a component with no growing demand.
+    -- Guards each half against passing vacuously: the pool must hold a spell and
+    -- an ability whose X reaches a cost only through a component with no growing
+    -- demand (Soul Immolation's blight X, Blighted Nightmare's).
     Spec.assertBool
       s
       (any (anyFace unrefusableX . Printing.card) ps)
       "the pool has a printing whose X the board cannot refuse"
+    Spec.assertBool
+      s
+      (any (anyFace (any unrefusableAbility . Face.activatedAbilities) . Printing.card) ps)
+      "and an activated ability whose X the board cannot refuse"
     Spec.assertEqWith s "every one of them states a maximum" (fmap (S.nameOf . Printing.card) offenders) []
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
@@ -9660,11 +9679,29 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "the Refrain's slot names its bound as well"
       (manaValueAtMostAmountCounts (S.combinedFace measured))
       (1, 0)
+    -- The pool's seventh author, and the first on an ACTIVATED ability: Blighted
+    -- Nightmare's bound is the X announced through CR 602.2b, which its activator
+    -- names one step before CR 601.2c chooses the target
+    -- (Pawl.Engine.Activate.activateAbility's post-announcement map).
+    nightmare <- S.printingOf s registry "Blighted Nightmare"
+    Spec.assertEqWith
+      s
+      "the Nightmare's slot names its bound as well"
+      (manaValueAtMostAmountCounts (S.combinedFace nightmare))
+      (1, 0)
+    -- The eighth, the same position on the paper printing: Tameshi, Reality
+    -- Architect's {X}{W} announces through the same road.
+    tameshi <- S.printingOf s registry "Tameshi, Reality Architect"
+    Spec.assertEqWith
+      s
+      "Tameshi's slot names its bound as well"
+      (manaValueAtMostAmountCounts (S.combinedFace tameshi))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueAtMostAmountCounts . S.combinedFace) ps))
-      6
+      8
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the SAME atom, buried under all three combinators, in a target
     -- slot that names no amount -- the position a card author would most plausibly
@@ -9863,7 +9900,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- may carry is a separate question and is not tagged with it.
         alternatively = base {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing sacrificeCost]}
         -- CR 602.2b, paid as the ability is activated -- after CR 601.2c too.
-        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost (spellOf []) [] Activator.Controller Nothing Nothing]}
+        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost [] (spellOf []) [] Activator.Controller Nothing Nothing]}
         -- CR 116.2d: a special action uses no stack (CR 116.1), so no
         -- announcement could answer in any engine.
         ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn sacrificeCost]}
