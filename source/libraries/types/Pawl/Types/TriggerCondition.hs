@@ -61,10 +61,10 @@ data TriggerCondition
     CreatureDealtCombatDamageToMonarch
   | -- | CR 726.2: one or more creatures a player controls dealt combat damage to
     -- the player who has the initiative. Borne by no card; matched only via
-    -- Pawl.Engine.Initiative.inherentMatch.
+    -- Pawl.Engine.Initiative.inherentPending.
     CreaturesDealtCombatDamageToInitiative
   | -- | CR 726.2: a player took the initiative. Borne by no card; matched only
-    -- via Pawl.Engine.Initiative.inherentMatch.
+    -- via Pawl.Engine.Initiative.inherentPending.
     PlayerTookInitiative
   | -- | CR 702.179d: "whenever one or more opponents lose life during your
     -- turn". Borne by no card; matched via Pawl.Engine.Speed.inherentPending.

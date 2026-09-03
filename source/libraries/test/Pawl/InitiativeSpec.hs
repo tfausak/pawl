@@ -26,6 +26,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Departure as Departure.Type
@@ -120,6 +122,39 @@ board island piker undercity =
 combatDamageTo :: PlayerId -> ObjectId -> GameEvent.GameEvent
 combatDamageTo holder damager =
   GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer holder) 2 False False False 0 Nothing DamageKind.Combat)
+
+-- A REAL combat, where `combatDamageTo` above is a hand-written event: alice
+-- attacks bob with `mine`, bob blocks with `theirs`, carol holds `hers` and never
+-- joins. Positioned at the declare attackers step with bob named the sole
+-- defending player, which CR 703.4h's turn-based action would otherwise have
+-- filled in; every seat owns Undercity, as `board`'s seats do.
+combatBoard :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> [Printing.Printing] -> ([ObjectId], [ObjectId], [ObjectId], GameState.GameState)
+combatBoard undercity mine theirs hers =
+  let (base, ours, yours, theirsToo) = S.threePlayerCombat mine theirs hers
+      staged =
+        base
+          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = (GameState.combat base) {Combat.Type.defenders = [S.bob]}
+          }
+   in (ours, yours, theirsToo, owningUndercity undercity [S.alice, S.bob, S.carol] staged)
+
+-- `answering` plus a combat aimed at bob: attack with everything, block with
+-- everything, and divide a trampler's damage the way CR 510.1c and CR 702.19b
+-- together require -- each blocker's own threshold first, the excess through to
+-- bob. The thresholds the prompt offers ARE CR 510.1c's lethal amounts, so
+-- nothing here restates a creature's toughness. Written out rather than left to
+-- S.identityAnswer, which never names a player recipient and would put the whole
+-- assignment on the blocker.
+tramplingAtBob :: Prompt.Prompt r -> r
+tramplingAtBob p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    let toBlockers = Map.delete (Recipient.ToPlayer S.bob) thresholds
+     in Map.insert (Recipient.ToPlayer S.bob) (n - sum (Map.elems toBlockers)) toBlockers
+  Prompt.DeclareAttackers {} -> S.attackTo S.bob p
+  Prompt.DeclareBlockers {} -> S.attackTo S.bob p
+  Prompt.ChooseDefender {} -> S.attackTo S.bob p
+  Prompt.ChooseAttackTarget {} -> S.attackTo S.bob p
+  _ -> answering p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Initiative" $ do
@@ -225,6 +260,96 @@ spec s registry = Spec.describe s "Initiative" $ do
     -- before the damage, so every entry here is the damage's doing.
     Spec.assertEqWith s "CR 726.2 exactly one take was recorded for bob's two creatures" (takings after) [S.bob]
     Spec.assertEqWith s "and he holds the initiative" (GameState.initiative after) (Just S.bob)
+
+  -- CR 603.10, first sentence: the trigger condition is checked against the
+  -- objects that exist IMMEDIATELY AFTER the damage, and the CR 704.5g
+  -- destruction that kills a trampler its blocker traded with is a later event.
+  -- Engine.performSettle runs that state-based action before the trigger scan, so
+  -- a live read of the damager found an id Event.placeObject had already retired,
+  -- and the hand-off never happened; see #3132.
+  --
+  -- A REAL combat, not a hand-written damage event, because the fixture that
+  -- rewrites the log is exactly the fixture that cannot produce this board: alice
+  -- attacks bob with War Mammoth (3/3 trample) and bob blocks with Boggart Brute
+  -- (3/2), so the Mammoth assigns the Brute its lethal 2 and tramples 1 through,
+  -- and the Brute's 3 kills the Mammoth in the same step. Both die together.
+  Spec.it s "CR 726.2 a trampler that trades with its blocker still hands the initiative over" $ do
+    undercity <- S.printingOf s registry "Undercity"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    brute <- S.printingOf s registry "Boggart Brute"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (mine, theirs, _, base) = combatBoard undercity [mammoth] [brute] [piker]
+        held = S.withInitiative S.bob base
+        after = resolveAll tramplingAtBob (S.fightWith tramplingAtBob held)
+    Spec.assertEqWith s "bob held the initiative going in" (GameState.initiative held) (Just S.bob)
+    -- The board this case is about: the damager is GONE by the time the scan
+    -- runs. Neither this nor the life total can tell the two readings apart --
+    -- the Mammoth dies and bob loses 1 under both -- so they pin the board rather
+    -- than prove the rule.
+    Spec.assertEqWith s "CR 704.5g the Mammoth traded with the Brute, so both are off the battlefield" (fmap (\oid -> S.onBattlefield oid after) (mine <> theirs)) [False, False]
+    Spec.assertEqWith s "CR 702.19b and 1 point trampled through to bob" (S.lifeOf S.bob after) (Just 19)
+    -- The rule: alice's dead Mammoth still took the initiative for her, and CR
+    -- 726.2's third ability then ventured her.
+    Spec.assertEqWith s "CR 726.2/726.3 alice has the initiative" (GameState.initiative after) (Just S.alice)
+    Spec.assertEqWith s "CR 701.49d and, having taken it, she entered Undercity" (dungeonNamesOf S.alice after) ["\"Undercity\""]
+    Spec.assertEqWith s "CR 726.2 exactly one take was recorded, naming her" (takings after) [S.alice]
+    Spec.assertEqWith s "and carol, who never joined the combat, ventured into nothing" (dungeonNamesOf S.carol after) []
+    Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
+
+  -- CR 726.2's grouping is by CONTROLLER, so two players' creatures connecting in
+  -- ONE damage step are TWO triggers, both controlled by the holder (CR 726.2's
+  -- "the player who had the initiative at the time the abilities triggered"). CR
+  -- 603.3b lets her order her own two, and the stack resolves them last-first, so
+  -- the take recorded LAST is the one that stands.
+  --
+  -- The case above the previous one -- two of ONE player's creatures -- is the
+  -- paired control: same shape, one controller, one trigger.
+  Spec.it s "CR 726.2 two players' creatures connecting in one step are two takes, and the last one stands" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    undercity <- S.printingOf s registry "Undercity"
+    sneak <- S.printingOf s registry "Aarakocra Sneak"
+    let (bobs, carols, base) = board island piker undercity
+        (_, entering) = S.entersWithTrigger sneak S.alice base
+        hers = resolveAll answering entering
+        after = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.alice carols] hers)
+    -- The rule, read at gameplay level: BOTH opponents ventured, so both triggers
+    -- resolved. A grouping that collapsed the two controllers into one leaves
+    -- whichever of them lost the race in no dungeon at all.
+    Spec.assertEqWith s "CR 701.49d bob and carol each entered Undercity" (dungeonNamesOf S.bob after, dungeonNamesOf S.carol after) (["\"Undercity\""], ["\"Undercity\""])
+    Spec.assertEqWith s "CR 726.2 two takes were recorded, one per controller" (List.sort (takings after)) [S.bob, S.carol]
+    -- CR 726.3: one designation, and it is the LAST take's -- the two abilities
+    -- resolve one after the other and the second hand-off moves it again.
+    Spec.assertEqWith s "CR 726.3 the designation is the last take's" (GameState.initiative after) (Maybe.listToMaybe (reverse (takings after)))
+    Spec.assertEqWith s "alice's own marker did not move" (markerOf S.alice after) (Just RoomIndex.topmost)
+
+  -- CR 510.4 / CR 726.2: a first-strike damage step and the regular one are TWO
+  -- batches, and each ends in a settle -- so the hand-off from the first has
+  -- already resolved when the second is scanned, and the second is asked about the
+  -- NEW holder. Two batches, two takes.
+  --
+  -- The paired control is the same two damage events delivered in ONE batch, where
+  -- carol's creature hits a bob who does not yet have the initiative and triggers
+  -- nothing. The boards differ in nothing but the batching.
+  Spec.it s "CR 726.2 two damage batches are two takes, where the same two hits in one batch are one" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    undercity <- S.printingOf s registry "Undercity"
+    sneak <- S.printingOf s registry "Aarakocra Sneak"
+    let (bobs, carols, base) = board island piker undercity
+        (_, entering) = S.entersWithTrigger sneak S.alice base
+        hers = resolveAll answering entering
+        firstStrike = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs] hers)
+        regular = resolveAll answering (S.withEvents [combatDamageTo S.bob carols] firstStrike)
+        fused = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.bob carols] hers)
+    Spec.assertEqWith s "the first batch handed it to bob" (GameState.initiative firstStrike) (Just S.bob)
+    Spec.assertEqWith s "CR 726.2 the second batch, asked about the new holder, handed it to carol" (GameState.initiative regular) (Just S.carol)
+    Spec.assertEqWith s "CR 701.49d so carol ventured too" (dungeonNamesOf S.carol regular) ["\"Undercity\""]
+    Spec.assertEqWith s "and the second batch recorded her take" (takings regular) [S.carol]
+    -- The control: in ONE batch carol's hit lands on a bob who is still not the
+    -- holder, so only bob's take is recorded and carol ventures into nothing.
+    Spec.assertEqWith s "CR 726.2 fused into one batch it is bob's take alone" (takings fused) [S.bob]
+    Spec.assertEqWith s "and carol, who hit a bob without the initiative, ventured into nothing" (dungeonNamesOf S.carol fused) []
 
   -- CR 726.5: "if the player who currently has the initiative is instructed to
   -- take the initiative, this causes the last triggered ability in 726.2 to

@@ -8,9 +8,9 @@ import qualified Data.Text as Text
 -- one namespace. The dataflow lint checks every reference resolves, so a
 -- dangling name is a failing test rather than a silent no-op. Resolving is not
 -- yet the whole guarantee: a slot a Create bound to a whole GROUP of tokens is
--- read by Effect.Sacrifice and by every ObjectRef-taking opcode, but the
--- remaining bare-SlotName opcodes still project the slot's single target, so one
--- of those naming a group resolves and does nothing (#760).
+-- read by every ObjectRef-taking opcode, but the remaining bare-SlotName opcodes
+-- still project the slot's single target, so one of those naming a group
+-- resolves and does nothing (#760).
 newtype SlotName = MkSlotName
   { unwrap :: Text.Text
   }

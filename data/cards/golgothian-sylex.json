@@ -1,0 +1,416 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": {
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsToken"
+                                  }
+                                },
+                                {
+                                  "type": "Or",
+                                  "value": [
+                                    {
+                                      "type": "HasName",
+                                      "value": "Amulet of Kroog"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Argivian Archaeologist"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Argivian Blacksmith"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Argothian Pixies"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Argothian Treefolk"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Armageddon Clock"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Artifact Blast"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Artifact Possession"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Artifact Ward"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ashnod's Altar"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ashnod's Battle Gear"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ashnod's Transmogrant"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Atog"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Battering Ram"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Bronze Tablet"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Candelabra of Tawnos"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Circle of Protection: Artifacts"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Citanul Druid"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Clay Statue"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Clockwork Avian"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Colossus of Sardia"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Coral Helm"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Crumble"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Cursed Rack"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Damping Field"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Detonate"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Drafna's Restoration"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Dragon Engine"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Dwarven Weaponsmith"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Energy Flux"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Feldon's Cane"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Gaea's Avenger"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Gate to Phyrexia"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Goblin Artisans"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Golgothian Sylex"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Grapeshot Catapult"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Haunting Wind"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Hurkyl's Recall"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ivory Tower"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Jalum Tome"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Martyrs of Korlis"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Mightstone"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Millstone"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Mishra's Factory"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Mishra's War Machine"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Mishra's Workshop"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Obelisk of Undoing"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Onulet"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Orcish Mechanics"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ornithopter"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Phyrexian Gremlins"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Power Artifact"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Powerleech"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Priest of Yawgmoth"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Primal Clay"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "The Rack"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Rakalite"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Reconstruction"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Reverse Polarity"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Rocket Launcher"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Sage of Lat-Nam"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Shapeshifter"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Shatterstorm"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Staff of Zegon"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Strip Mine"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Su-Chi"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Tablet of Epityr"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Tawnos's Coffin"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Tawnos's Wand"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Tawnos's Weaponry"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Tetravus"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Titania's Song"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Transmute Artifact"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Triskelion"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Urza's Avenger"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Urza's Chalice"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Urza's Mine"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Urza's Miter"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Urza's Power Plant"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Urza's Tower"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Wall of Spears"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Weakstone"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Xenic Poltergeist"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Yawgmoth Demon"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Yotian Soldier"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "sacrificer": {
+                            "type": "PermanentController"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Golgothian Sylex",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
