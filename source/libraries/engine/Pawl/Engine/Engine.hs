@@ -812,29 +812,69 @@ placeBorne srcId pending = do
         Nothing -> fmap Seq.sort (Game.choose (Prompt.ChooseModes decider controller abilId legal selection))
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability is
       -- placed. A mode with no target slots asks nothing.
-      --
-      -- Not implemented: Target.jointlyCoherent, which is what judges an answer
-      -- whose slots read each other as CR 601.2c's one act (#2472). Every such
-      -- slot in the pool is on a spell.
       let slots = Modal.modesTargetSlots chosenModes modal
           sets = Target.legalSets (Just controller) bound srcId slots gs
-      -- Zero, there being no announcement to read: CR 601.2b's is made while
-      -- casting a spell or activating an ability, and a triggered ability is
-      -- neither, so no slot of one can count by an X.
-      chosen <- Target.chooseTargets decider controller abilId 0 slots sets
-      -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
-      -- placed, so "this creature" resolves as an ordinary slot read even after
-      -- the source has left. CR 603.7c: a delayed ability's CAPTURED environment
-      -- (its "it") rides alongside the choices made now, and the two DO collide,
-      -- the captured environment carrying the arming spell's OWN reserved slots.
-      -- Binding.mergeBinding is left-biased per FIELD, so placement-time bindings
-      -- must be the LEFT argument; backwards, the arming spell's mode or X wins.
-      -- unionWith, not Map.union, which would drop the whole captured entry.
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
-      -- CR 601.2c through CR 603.3d: each chosen object became a target, which is
-      -- what CR 702.21a's ward watches. Nothing here can reject the placement
-      -- afterwards -- CR 603.3d's removal is the `selectionPossible` branch above.
-      Event.becameTarget abilId StackObjectKind.Ability controller chosen
+          -- CR 603.3d's "identical to the process ... listed in rules 601.2c-d",
+          -- and 601.2c's "all at once": an answer whose slots read each other is
+          -- judged WHOLE, exactly as a cast's is (Target.selectionLegal's third
+          -- conjunct) and a copy's re-target is (Resolve.chooseNewTargetsFor).
+          -- Itzquinth's victim slot excludes whatever its dealer slot names, and
+          -- the offer is the union over the dealer's candidates, so membership in
+          -- `sets` alone would admit one Dinosaur in both slots.
+          --
+          -- RE-ASKED rather than reversed. CR 603.3d imports rules 601.2c-d and
+          -- stops there, so 601.2e's return-to-before-the-proposal is not the
+          -- trigger's remedy, and CR 733.2's redo has no priority holder to hand
+          -- the action back to. The rule's own removal is the `selectionPossible`
+          -- branch above -- "no legal choices CAN be made", which is a question
+          -- about the board and not about the answer.
+          --
+          -- `rejected` bounds the recursion, Combat.attemptAttackDeclaration's
+          -- shape: a pure `Prompt r -> r` decider repeats its answer, so a repeat
+          -- is not re-asked a second time. What it degrades to is CR 603.3d's
+          -- removal -- the rule's answer for a required choice that cannot be
+          -- made, taken here for an interpreter that will not make one, since
+          -- announcing on their behalf is the one thing this may not do. Such an
+          -- interpreter costs exactly one extra prompt; one proposing FRESH
+          -- incoherent answers terminates on the finite set of announcements over
+          -- `sets`.
+          --
+          -- Judged against `gs`, the board `sets` was offered from, so the offer
+          -- and this check cannot disagree about one announcement.
+          --
+          -- Not implemented: Target.selectionLegal's other two conjuncts on this
+          -- road -- per-slot membership and the announced count (#3091).
+          attempt rejected = do
+            -- Zero, there being no announcement to read: CR 601.2b's is made
+            -- while casting a spell or activating an ability, and a triggered
+            -- ability is neither, so no slot of one can count by an X.
+            chosen <- Target.chooseTargets decider controller abilId 0 slots sets
+            if Target.jointlyCoherent (Just controller) bound srcId slots chosen gs
+              then pure (Just chosen)
+              else
+                if Set.member chosen rejected
+                  then pure Nothing
+                  else attempt (Set.insert chosen rejected)
+      answered <- attempt Set.empty
+      case answered of
+        -- CR 603.3d: a required choice with no legal answer forthcoming.
+        Nothing -> State.modify' (Game.cease abilId)
+        Just chosen -> do
+          -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it
+          -- is placed, so "this creature" resolves as an ordinary slot read even
+          -- after the source has left. CR 603.7c: a delayed ability's CAPTURED
+          -- environment (its "it") rides alongside the choices made now, and the
+          -- two DO collide, the captured environment carrying the arming spell's
+          -- OWN reserved slots. Binding.mergeBinding is left-biased per FIELD, so
+          -- placement-time bindings must be the LEFT argument; backwards, the
+          -- arming spell's mode or X wins. unionWith, not Map.union, which would
+          -- drop the whole captured entry.
+          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
+          -- CR 601.2c through CR 603.3d: each chosen object became a target, which
+          -- is what CR 702.21a's ward watches. Raised only on an announcement the
+          -- joint check accepted, so a re-asked answer never made anything a
+          -- target.
+          Event.becameTarget abilId StackObjectKind.Ability controller chosen
 
 -- CR 101.4 / 603.3b: the players who control a pending trigger, active player
 -- first and then the rest in turn order, grouped by controller because the
