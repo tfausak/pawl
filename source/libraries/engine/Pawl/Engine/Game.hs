@@ -1121,6 +1121,7 @@ castOf event = case event of
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
 
 -- The discarding player an event describes, if it is a discard (CR 701.9a).
 --
@@ -1186,6 +1187,7 @@ discardOf event = case event of
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
 
 -- The permanent an event describes ENTERING THE BATTLEFIELD, if it is one. CR
 -- 400.7's zone change with a destination of Zone.Battlefield, which is what the
@@ -1257,6 +1259,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
 
 -- The RECIPIENT an event describes damage being dealt to, if it describes one --
 -- CR 120.1's four recipients, undivided. damagedPlayer and damagedObject below
@@ -1341,6 +1344,7 @@ damageDealt event = case event of
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
 
 -- The PLAYER an event describes being dealt damage, if it describes one. CR
 -- 120.1's damage with a Recipient.ToPlayer, which is the only recipient CR 120.3a
@@ -1459,6 +1463,7 @@ lifeGainOf event = case event of
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
 
 -- CR 119.3 / 608.2i: how much life this player has gained this turn. The log fold
 -- lifeGainOf exists for. The turn scope is GameState.events itself:

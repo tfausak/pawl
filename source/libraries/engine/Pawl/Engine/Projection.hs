@@ -3028,6 +3028,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfBlocksOneOrMore f -> TriggerCondition.SelfBlocksOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlocked -> condition
   TriggerCondition.SelfBecomesBlockedBy f -> TriggerCondition.SelfBecomesBlockedBy (Filter.rewrite pairs f)
+  TriggerCondition.PermanentBecomesBlockedBy f -> TriggerCondition.PermanentBecomesBlockedBy (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> condition
   TriggerCondition.SelfAttacksUnblocked -> condition
@@ -3068,6 +3069,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.LoseControlOfBound _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
+  TriggerCondition.RingTemptsPlayer _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition

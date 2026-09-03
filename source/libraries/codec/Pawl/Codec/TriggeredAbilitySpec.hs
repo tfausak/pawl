@@ -34,8 +34,10 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SlotSacrifice as SlotSacrifice
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -125,7 +127,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn),
                   TriggeredAbility.modal =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "token")))))) Map.empty))
+                      (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice SlotSacrifice.MkSlotSacrifice {SlotSacrifice.slot = SlotName.MkSlotName (Text.pack "token"), SlotSacrifice.sacrificer = Sacrificer.EffectController})))) Map.empty))
                       (ModeSelection.ChooseExactly 1),
                   TriggeredAbility.intervening = Nothing,
                   TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -144,7 +146,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             )
           ]
       )
-      " {\"each combat\":{\"condition\":{\"type\":\"StepBegins\",\"value\":{\"phase\":{\"type\":\"Combat\",\"value\":{\"type\":\"BeginningOfCombat\"}},\"scope\":{\"type\":\"EachTurn\"}}},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Untap\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"AttackedThisTurn\"}}}]}]}]}},\"sacrifice it\":{\"condition\":{\"type\":\"StepBegins\",\"value\":{\"phase\":{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},\"scope\":{\"type\":\"EachTurn\"}}},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Sacrifice\",\"value\":\"token\"}]}]}]}}} "
+      " {\"each combat\":{\"condition\":{\"type\":\"StepBegins\",\"value\":{\"phase\":{\"type\":\"Combat\",\"value\":{\"type\":\"BeginningOfCombat\"}},\"scope\":{\"type\":\"EachTurn\"}}},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Untap\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"AttackedThisTurn\"}}}]}]}]}},\"sacrifice it\":{\"condition\":{\"type\":\"StepBegins\",\"value\":{\"phase\":{\"type\":\"Ending\",\"value\":{\"type\":\"EndStep\"}},\"scope\":{\"type\":\"EachTurn\"}}},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Sacrifice\",\"value\":{\"slot\":\"token\"}}]}]}]}}} "
   -- CR 603.4: an ability stating no intervening "if" leaves only the two
   -- required keys.
   Spec.it s "an all-default value omits every optional key" $

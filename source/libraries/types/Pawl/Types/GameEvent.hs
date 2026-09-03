@@ -420,4 +420,11 @@ data GameEvent
     -- outcome is CR 705.3's. Pawl.Types.CoinFlipped says why the outcome is an
     -- optional field rather than a second constructor.
     CoinFlipped CoinFlipped.CoinFlipped
+  | -- | CR 701.54d: the Ring tempted this player. Recorded by
+    -- Pawl.Engine.Ring.tempt after CR 701.54a's actions, "even if some or all of
+    -- those actions were impossible", so a player with no creature to choose
+    -- writes one just the same. The player alone: the emblem and the Ring-bearer
+    -- designation are state a reader can look at, and nothing else in the log
+    -- says a temptation happened.
+    RingTempted PlayerId.PlayerId
   deriving (Eq, Ord, Show)

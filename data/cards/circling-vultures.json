@@ -55,7 +55,9 @@
                     "effects": [
                       {
                         "type": "Sacrifice",
-                        "value": "self"
+                        "value": {
+                          "slot": "self"
+                        }
                       }
                     ],
                     "payGate": {
