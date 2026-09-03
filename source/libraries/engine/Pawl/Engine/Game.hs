@@ -745,16 +745,6 @@ turnFacing facing oid gs =
 -- gate because that rule turns a permanent over from a STATIC ability rather than
 -- from an ability on the stack.
 --
--- Four ways nothing happens, and none is an error:
---
---   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
---     PERMANENT, which CR 110.1 makes an object on the battlefield.
---   * the id names nothing at all, or nothing with a card behind it (CR 113.7a).
---   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
---     CR 701.27d's instant or sorcery face.
---   * CR 712.4c / 712.9: more than one card represents the permanent, a melded
---     one being neither transformable nor convertible.
---
 -- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
 -- "when a double-faced permanent transforms or converts, it doesn't become a new
 -- object. Any effects that applied to that permanent will continue to apply to
@@ -776,16 +766,40 @@ turnFacing facing oid gs =
 -- turning-over and Pawl.Engine.Projection's abilityRemovalAfter rests on two
 -- objects never sharing a timestamp.
 --
--- Not implemented: CR 613.7m's APNAP order over the permanents one instruction
--- restamps at once (#2571). They are stamped in the order the caller's fold
--- enumerated them.
+-- CR 613.7m's APNAP order over the permanents one instruction restamps at once is
+-- the CALLER's: every road hands the ids to Pawl.Engine.Restamp.order first, and
+-- this fold takes them in that order.
 --
 -- Reads the object's OWN card (cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
 turnFaceOver :: Timestamp.Timestamp -> ObjectId -> GameState -> GameState
-turnFaceOver now oid gs
-  | not (Set.member oid (GameState.battlefield gs)) = gs
+turnFaceOver now oid gs = case (turnsTo oid gs, lookupObject oid gs) of
+  (Just name, Just object) ->
+    let (ts, stamped) = freshTimestamp gs
+     in stamped {GameState.objects = Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
+  _ -> gs
+
+-- | CR 701.27a asked rather than performed: the face this permanent WOULD turn
+-- to, or Nothing where the turn is declined. `turnFaceOver` above is the only
+-- performer and asks this, so the four ways nothing happens are stated once, and
+-- none of them is an error:
+--
+--   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
+--     PERMANENT, which CR 110.1 makes an object on the battlefield.
+--   * the id names nothing at all, or nothing with a card behind it (CR 113.7a).
+--   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
+--     CR 701.27d's instant or sorcery face.
+--   * CR 712.4c / 712.9: more than one card represents the permanent, a melded
+--     one being neither transformable nor convertible.
+--
+-- Read ahead of the act by every road that restamps a batch, which must know
+-- which of the ids it swept will actually take a CR 613.7m stamp before it asks
+-- their controller to order them (Pawl.Engine.Restamp.order): a permanent that
+-- declines the turn takes no stamp and so is no part of that choice.
+turnsTo :: ObjectId -> GameState -> Maybe CardName.CardName
+turnsTo oid gs
+  | not (Set.member oid (GameState.battlefield gs)) = Nothing
   | otherwise = case (lookupObject oid gs, cardOf oid gs) of
       -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be
       -- transformed or converted. Any instructions to do so are ignored", and CR
@@ -795,8 +809,8 @@ turnFaceOver now oid gs
       -- nothing about the pair it came from, so the cards representing it are the
       -- only thing left that does.
       --
-      -- In turnFaceOver rather than in Pawl.Engine.Resolve's turnOver because
-      -- this is the one writer every road reaches: Pawl.Engine.Daytime's CR
+      -- Here rather than in Pawl.Engine.Resolve's gathering because this is what
+      -- the one writer every road reaches asks: Pawl.Engine.Daytime's CR
       -- 702.145c/f sweep comes straight here, and a melded permanent whose
       -- combined face printed nightbound would otherwise turn over that way. CR
       -- 701.28a's convert is a third road and needs nothing of its own -- it
@@ -809,13 +823,9 @@ turnFaceOver now oid gs
       -- Pawl.MeldSpec's "CR 712.4c a melded permanent refuses the turn its own
       -- card would allow", which melds into a double-faced card -- card data the
       -- opcode carries -- so that this guard is the only thing refusing.
-      (Just object, _) | not (Seq.null (componentsOf (Object.source object))) -> gs
-      (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
-        Nothing -> gs
-        Just name ->
-          let (ts, stamped) = freshTimestamp gs
-           in stamped {GameState.objects = Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
-      _ -> gs
+      (Just object, _) | not (Seq.null (componentsOf (Object.source object))) -> Nothing
+      (Just object, Just card) -> Card.turnedOver (Object.face object) card
+      _ -> Nothing
 
 -- CR 701.27a over a swept set, from the other side: which of these ids ACTUALLY
 -- turned over. `turnFaceOver` above declines five ways -- an id naming nothing on
