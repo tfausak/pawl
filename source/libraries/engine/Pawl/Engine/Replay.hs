@@ -62,6 +62,7 @@ encode p answer = case p of
   Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
   Prompt.ChooseExtraManaSource {} -> Response.ChoseExtraManaSource answer
+  Prompt.ReverseManaAbilities {} -> Response.ReversedManaAbilities answer
   Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseManaToSpend {} -> Response.ChoseManaToSpend answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
@@ -110,7 +111,6 @@ encode p answer = case p of
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseRiot {} -> Response.ChoseRiot answer
   Prompt.ChooseUnleash {} -> Response.ChoseUnleash answer
-  Prompt.ReverseManaAbilities {} -> Response.ReversedManaAbilities answer
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseRevealOnEntry {} -> Response.ChoseRevealOnEntry answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
@@ -216,6 +216,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseExtraManaSource {} -> case response of
     Response.ChoseExtraManaSource oid -> Just oid
+    _ -> Nothing
+  Prompt.ReverseManaAbilities {} -> case response of
+    Response.ReversedManaAbilities d -> Just d
     _ -> Nothing
   Prompt.ChooseManaToSpend {} -> case response of
     Response.ChoseManaToSpend unit -> Just unit
@@ -345,9 +348,6 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseUnleash {} -> case response of
     Response.ChoseUnleash d -> Just d
-    _ -> Nothing
-  Prompt.ReverseManaAbilities {} -> case response of
-    Response.ReversedManaAbilities d -> Just d
     _ -> Nothing
   Prompt.ChoosePayLifeOnEntry {} -> case response of
     Response.ChosePayLifeOnEntry d -> Just d
@@ -573,6 +573,10 @@ defaultAnswer p = case p of
   -- The cost is already covered, so floating more is the eventful answer and
   -- closing the window is the quiet one.
   Prompt.ChooseExtraManaSource {} -> Nothing
+  -- CR 733.1: reversing them, which is the half that leaves the board as the
+  -- illegal action found it -- a transcript that ran out cannot float mana into
+  -- a game that never made it.
+  Prompt.ReverseManaAbilities {} -> OptionalDecision.Exercises
   -- Every offered yield is producible: tapForMana only offers what the source
   -- can make.
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
@@ -744,10 +748,6 @@ defaultAnswer p = case p of
   -- CR 702.98a: declining, for ChooseRiot's reason -- it is the half that puts no
   -- counter on the board.
   Prompt.ChooseUnleash {} -> OptionalDecision.Declines
-  -- CR 733.1: reversing them, which is the half that leaves the board as the
-  -- illegal action found it -- a transcript that ran out cannot float mana into
-  -- a game that never made it.
-  Prompt.ReverseManaAbilities {} -> OptionalDecision.Exercises
   -- CR 614.1c: declining, for ChooseRiot's reason above and one more. Declining
   -- is the branch the card itself states as the default -- "if you don't, it
   -- enters tapped" -- and it is the half that spends nothing, so a transcript

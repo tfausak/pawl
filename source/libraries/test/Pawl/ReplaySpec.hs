@@ -278,9 +278,9 @@ combatReplaySpec s =
           Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChooseRiot decider S.alice oid)) OptionalDecision.Declines
         -- CR 614.1c / 119.4: the other as-enters "may", and the one that costs
         -- something. A separate Response constructor for ChooseRiot's reason
-        -- carried one step further: three OptionalDecision-valued prompts now
-        -- exist, and a transcript that answered any of them must not be read as an
-        -- answer to another -- so both of the others are rejected explicitly.
+        -- carried one step further: an OptionalDecision-valued prompt has
+        -- siblings, and a transcript that answered any of them must not be read as
+        -- an answer to another -- so both of the others are rejected explicitly.
         Spec.it s "ChoosePayLifeOnEntry records and replays an OptionalDecision, and rejects the other as-enters mays" $ do
           let p = Prompt.ChoosePayLifeOnEntry decider S.alice oid 3
           Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
@@ -290,7 +290,7 @@ combatReplaySpec s =
         -- CR 614.1c: a transcript that runs short spends no life.
         Spec.it s "defaultAnswer declines the life payment" $
           Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChoosePayLifeOnEntry decider S.alice oid 3)) OptionalDecision.Declines
-        -- CR 303.4k: the fourth OptionalDecision-valued prompt, and the first
+        -- CR 303.4k: another OptionalDecision-valued prompt, and the first
         -- that is NOT an as-enters one -- Gift of Doom's "as this Aura is turned
         -- face up, you may attach it to a creature". The three above are rejected
         -- explicitly for the reason ChoosePayLifeOnEntry rejects the other two: a
@@ -307,7 +307,7 @@ combatReplaySpec s =
         -- CR 303.4k: a transcript that runs short moves no permanent.
         Spec.it s "defaultAnswer declines the turn-up attachment" $
           Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChooseTurnUpAttachment decider S.alice oid)) OptionalDecision.Declines
-        -- CR 508.1g / 701.43d: the fifth OptionalDecision-valued prompt, and the
+        -- CR 508.1g / 701.43d: another OptionalDecision-valued prompt, and the
         -- first asked in COMBAT rather than as something enters or turns face up.
         -- The others are rejected explicitly for ChoosePayLifeOnEntry's reason,
         -- and the boards a mix-up produces differ by a whole untap step.
@@ -317,11 +317,30 @@ combatReplaySpec s =
             Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
           Spec.assertEqWith s "a riot answer is not an answer to it" (Replay.decode p (Response.ChoseRiot OptionalDecision.Exercises)) Nothing
           Spec.assertEqWith s "nor is a turn-up attachment" (Replay.decode p (Response.ChoseTurnUpAttachment OptionalDecision.Exercises)) Nothing
+          Spec.assertEqWith s "nor is a reversal of the mana window" (Replay.decode p (Response.ReversedManaAbilities OptionalDecision.Exercises)) Nothing
           Spec.assertEqWith s "nor is a printed may" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
         -- CR 508.1g: a transcript that runs short pays no optional cost, so the
         -- attacker keeps its next untap step.
         Spec.it s "defaultAnswer declines the exert" $
           Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChooseExert decider S.alice oid)) OptionalDecision.Declines
+        -- CR 733.1: the OptionalDecision-valued prompt asked while an illegal
+        -- payment is being reversed, and the only arm of Replay.defaultAnswer
+        -- that answers Exercises rather than Declines. The others are
+        -- rejected explicitly for ChoosePayLifeOnEntry's reason, and the boards a
+        -- mix-up produces differ by a tapped source and the mana it made.
+        Spec.it s "ReverseManaAbilities records and replays an OptionalDecision, and rejects every other may" $ do
+          let p = Prompt.ReverseManaAbilities decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [])
+          Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
+          Spec.assertEqWith s "a riot answer is not an answer to it" (Replay.decode p (Response.ChoseRiot OptionalDecision.Exercises)) Nothing
+          Spec.assertEqWith s "nor is an exert" (Replay.decode p (Response.ChoseExert OptionalDecision.Exercises)) Nothing
+          Spec.assertEqWith s "nor is a printed may" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 733.1: a transcript that runs short REVERSES them, the one may
+        -- whose short answer is Exercises -- it is the half that leaves the board
+        -- as the illegal action found it, and a transcript that ran out must not
+        -- float mana into a game that never made it.
+        Spec.it s "defaultAnswer reverses the mana abilities" $
+          Spec.assertEqWith s "exercises" (Replay.defaultAnswer (Prompt.ReverseManaAbilities decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| []))) OptionalDecision.Exercises
         -- CR 614.1c / 105.1: a colour chosen as a permanent enters. Every one of
         -- the five is round-tripped, because a codec that collapsed two of them
         -- would replay a Painter's Servant naming blue as one naming white --
