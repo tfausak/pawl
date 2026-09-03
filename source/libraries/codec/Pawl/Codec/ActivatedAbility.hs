@@ -10,6 +10,7 @@ import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Modal as Modal
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -21,6 +22,9 @@ import qualified Pawl.Types.Activator as Activator.Type
 codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (ActivatedAbility.ActivatedAbility card ability)
 codec cardCodec abilityCodec = Fields.object $ do
   cost <- Fields.required "cost" (Cost.codec Keyword.codec) ActivatedAbility.cost
+  -- CR 101.1: the ceilings this ability's own words put on CR 602.2b's announced
+  -- X (Pawl.Types.ActivatedAbility), emitted only for an ability that states one.
+  maximumX <- Fields.defaulted "maximumX" [] (Common.list Quantity.codec) ActivatedAbility.maximumX
   modal <- Fields.required "modal" (Modal.codec cardCodec abilityCodec) ActivatedAbility.modal
   -- CR 602.5: emitted only for a restricted ability, so the absence of the key
   -- is CR 602.2's default -- no "activate only ..." rider at all.
@@ -37,6 +41,7 @@ codec cardCodec abilityCodec = Fields.object $ do
   pure
     ActivatedAbility.MkActivatedAbility
       { ActivatedAbility.cost = cost,
+        ActivatedAbility.maximumX = maximumX,
         ActivatedAbility.modal = modal,
         ActivatedAbility.restrictions = restrictions,
         ActivatedAbility.activator = activator,

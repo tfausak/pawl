@@ -1543,7 +1543,7 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     Spec.assertEqWith
       s
       "its legal set is the one creature"
-      (Target.legalSets Nothing Map.empty spellId slots gs)
+      (Target.legalSets Nothing False Map.empty spellId slots gs)
       (Map.singleton Card.enchantSlot (Set.singleton (Recipient.ToCreature creature)))
   -- CR 601.2c: a spell whose required target has no legal choice cannot be
   -- cast at all. Reading only Mode.targetSlots would call this castable and

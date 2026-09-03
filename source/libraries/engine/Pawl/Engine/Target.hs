@@ -158,12 +158,12 @@ legalRecipients perspective source slot gs =
 -- `unannounced` is CR 700.2a's fillability gate saying it is asking ahead of the
 -- announcement, and the only thing it changes is that a computed bound reading a
 -- number the seed cannot supply states no bound rather than an unmeetable one
--- (Filter.boundUnannounced). True at exactly one call site,
--- fillableModesGiven's, which is where the argument for it lives; False
--- everywhere else, which leaves such a bound vacuously False. That is right at CR
--- 601.2c and CR 608.2b, where the announcement is made and answers it, and it is
--- what makes Pawl.Engine.Activate's pre-X call a KNOWN gap rather than a silent
--- widening (#2672).
+-- (Filter.boundUnannounced). True at the call sites that ask AHEAD of the
+-- announcement -- fillableModesGiven's, which is where the argument for it lives,
+-- and Pawl.Engine.Activate's two pre-X maps (candidateSlotsGiven and
+-- activateAbility's lookahead); False everywhere else, which leaves such a bound
+-- vacuously False. That is right at CR 601.2c and CR 608.2b, where the
+-- announcement is made and answers it.
 legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> TargetSlot -> GameState -> Set Recipient
 legalRecipientsGiven pcs grants pools perspective unannounced bindings source slot gs =
   -- The SAME thunk both halves read, so the whole-board projection is taken at
@@ -1091,14 +1091,19 @@ aimings slots =
 -- -- CR 601.2b's announced X for a cast (Stir the Grave's bound), CR 603.2's
 -- trigger bindings for a triggered ability being placed (Harness the Storm's cast
 -- spell, Venerable Warsinger's event amount), CR 707.10's copied decisions minus
--- the targets CR 707.10c is re-choosing (Resolve.chooseNewTargetsFor), and empty
--- for an activation, whose X does not reach a slot yet (#2672). It joins the
--- per-slot bindings the two passes below build, so an atom that reads a slot
+-- the targets CR 707.10c is re-choosing (Resolve.chooseNewTargetsFor), and CR
+-- 602.2b's announced X for an activation (Blighted Nightmare's bound). It joins
+-- the per-slot bindings the two passes below build, so an atom that reads a slot
 -- cannot tell the two apart.
-legalSets :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
-legalSets perspective seed source slots gs =
+--
+-- `unannounced` is legalSetsGiven's own, forwarded: False at CR 601.2c and CR
+-- 608.2b, where the announcement is made and answers a computed bound, and True
+-- only for a caller looking ahead of it -- Pawl.Engine.Activate's pre-X map,
+-- which is measured before the ChooseX it feeds.
+legalSets :: Maybe PlayerId -> Bool -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
+legalSets perspective unannounced seed source slots gs =
   let pcs = Projection.projectAll gs
-   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective False seed source slots gs
+   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective unannounced seed source slots gs
 
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
 --
@@ -1496,10 +1501,10 @@ pileMembers perspective pile gs =
 -- WHICH recipients were named, not how many.
 --
 -- `seed` is the announcement's OWN bindings, the same map the offer was computed
--- against (legalSets) -- CR 601.2b's X for a cast, and nothing at all for an
--- activation, whose X does not reach a slot yet (#2672). The joint check joins it
--- UNDER the chosen targets, exactly as legalSetsGiven's second pass does, so the
--- re-derivation reads the same environment the offer did: a slot's CR 202.3
+-- against (legalSets) -- CR 601.2b's X, for a cast and for an activation alike
+-- (CR 602.2b). The joint check joins it UNDER the chosen targets, exactly as
+-- legalSetsGiven's second pass does, so the re-derivation reads the same
+-- environment the offer did: a slot's CR 202.3
 -- computed bound reading Binding.variableX (Pawl.TargetSpec's "CR 601.2c the
 -- joint check re-derives a jointly judged slot against the announced X") is
 -- answerable here rather than vacuously unmeetable, and the offer and this
