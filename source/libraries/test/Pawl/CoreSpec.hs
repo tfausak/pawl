@@ -1,7 +1,8 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers the VM core: Pawl.Types.Program (the suspension interpreter) and
--- Pawl.Engine.Quantity (numeric evaluation).
+-- Covers the VM core: Pawl.Types.Program (the suspension interpreter),
+-- Pawl.Engine.Quantity (numeric evaluation) and Pawl.Engine.Star (CR 208.2's
+-- printed star).
 module Pawl.CoreSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -13,6 +14,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -204,7 +206,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
   Spec.it s "substituteStar replaces Star everywhere, including inside Plus" $ do
     Spec.assertEq
       s
-      ( Quantity.substituteStar
+      ( Star.substituteStar
           (Quantity.Type.Literal 7)
           (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star))
       )

@@ -93,6 +93,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -1674,9 +1675,23 @@ cardAuthoredEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card
 cardAuthoredEffects card =
   cardResolutionEffects card <> concatMap effectWithNested (concat (handActions card))
 
+-- Both slots of a face's characteristic-defining P/T: one printed ability, which
+-- Pawl.Codec.Face writes into each box's slot, or -- on CR 709.4c's combined view
+-- of a split card -- one half's ability per box (Pawl.Engine.Card.definedBox).
+-- The walks below want the quantities themselves.
+characteristicQuantities :: Face.Face Card.Type.Card -> [Quantity.Type.Quantity]
+characteristicQuantities card = case Face.characteristicPT card of
+  Nothing -> []
+  -- ONE quantity where the two slots agree, which every printed face's do: the
+  -- lints below compare a count of what a card mentions against a count of the
+  -- atoms in its encoded JSON, and the wire carries the ability once.
+  Just cda
+    | CharacteristicPT.power cda == CharacteristicPT.toughness cda -> [CharacteristicPT.power cda]
+    | otherwise -> [CharacteristicPT.power cda, CharacteristicPT.toughness cda]
+
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
-  concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
+  concatMap quantityCounts (characteristicQuantities card)
     -- CR 101.1's ceiling on CR 601.2b's X, which every printing states as a
     -- per-board amount (Soul Immolation's "the greatest toughness among
     -- creatures you control").
@@ -2860,7 +2875,7 @@ powerToughnessSlots card =
   Set.unions
     [ maybe Set.empty (QuantitySlot.slots . Power.unwrap) (Face.power card),
       maybe Set.empty (QuantitySlot.slots . Toughness.unwrap) (Face.toughness card),
-      maybe Set.empty QuantitySlot.slots (Face.characteristicPT card)
+      Set.unions (fmap QuantitySlot.slots (characteristicQuantities card))
     ]
 
 -- Every face a card MINTS, transitively: the faces of every token (CR 111.1)
@@ -5867,7 +5882,7 @@ cardFilters card =
   frame
     Unframed
     ( concatMap keywordFilters (Set.toList (Face.keywords card))
-        <> concatMap quantityFilters (Maybe.maybeToList (Face.characteristicPT card))
+        <> concatMap quantityFilters (characteristicQuantities card)
         <> concatMap quantityFilters (Face.maximumX card)
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
@@ -10824,15 +10839,18 @@ realSplitCardSpec s registry = Spec.describe s "RealSplitCard" $ do
 -- loyalty, defense, and the characteristic-defining ability a printed star stands
 -- for. Every producer is synthetic, because no printing carries any of them on a
 -- split half -- Scryfall `is:split (t:creature or t:planeswalker or t:battle)` and
--- `is:split is:permanent -t:room`, 2026-08-21, no hit against 137 split printings,
--- of which 30 are Rooms and the rest instants and sorceries. A printed split card
--- with a creature half is what would refute that.
+-- `is:split pow=*`, 2026-09-02, no hit -- nor `is:split is:permanent -t:room`,
+-- so the split printings that ARE permanents are Rooms, which print no P/T box.
+-- A printed split card with a creature half is what would refute that.
 --
--- Each card puts its box on the RIGHT half alone, which is what makes these proofs
--- rather than restatements: merge2 is a record UPDATE over the left half, so a
--- line that fell out of it -- or one written `Face.power l` -- answers Nothing,
--- and the permanent is a 0/0 (CR 208.5), a planeswalker with no loyalty counters
--- (CR 306.5b) or a battle with no defense counters (CR 310.4b).
+-- Every card but the twinned pair puts its box on the RIGHT half alone, which is
+-- what makes those proofs rather than restatements: merge2 is a record UPDATE
+-- over the left half, so a line that fell out of it -- or one written
+-- `Face.power l` -- answers Nothing, and the permanent is a 0/0 (CR 208.5), a
+-- planeswalker with no loyalty counters (CR 306.5b) or a battle with no defense
+-- counters (CR 310.4b). Synthetic Twinned Colossus // Synthetic Twinned Titan
+-- prints a P/T box on BOTH halves, each half defining one of the two boxes, which
+-- is the pair CR 709.4c combines.
 --
 -- The precondition every case asserts on the board: the PERMANENT shows CR 709.4's
 -- combined view and not CR 709.3b's single half. Naming the half is what casting
@@ -10863,6 +10881,22 @@ splitBoxSpec s registry = Spec.describe s "SplitBox" $ do
         -- COMBINED cost, {1}{U} plus {2}{R}. Five, so the CDA and the combined
         -- cost are both load bearing -- the right half alone reads three.
         Spec.assertEqWith s "the combined mana value, 2 + 3" (S.powerToughnessOf oid after) (Just (5, 5))
+        Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
+  Spec.it s "CR 709.4c the combined view keeps a P/T-defining ability from EACH half" $ do
+    forest <- S.printingOf s registry "Forest"
+    printing <- S.printingOf s registry "Synthetic Twinned Colossus"
+    case castHalf forest printing "Synthetic Twinned Colossus" of
+      (_, Nothing) -> Spec.assertFailure s "expected one nonland permanent"
+      (after, Just oid) -> do
+        -- CR 709.4c gives the combined card "each ability in the text box of each
+        -- half", and these two define DISJOINT boxes: the left half's star is in
+        -- its power box and counts the four Forests castHalf put out, the right
+        -- half's is in its toughness box and counts the one creature on the
+        -- battlefield -- itself. CR 604.3 lets each override the number the other
+        -- half prints in that box, which is a 2 both times, so every one of the
+        -- four readings is a different number. Keeping the left half's ability
+        -- alone reads 4/2.
+        Spec.assertEqWith s "the left half's power and the right half's toughness" (S.powerToughnessOf oid after) (Just (4, 1))
         Spec.assertEqWith s "and it is the halves combined" (Set.size (Projection.namesOf oid after)) 2
   Spec.it s "CR 306.5b the combined view has the one half's printed loyalty" $ do
     forest <- S.printingOf s registry "Forest"

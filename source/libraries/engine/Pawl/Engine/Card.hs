@@ -20,9 +20,11 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Counterability as Counterability
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
@@ -37,12 +39,15 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- CR 708.2: what a face-down object's characteristics ARE -- "no characteristics
@@ -353,8 +358,14 @@ merge2 l r =
       -- is not idempotent: a characteristic printed once and belonging to both
       -- halves, which is exactly what CR 709.5a's shared type line is, survives
       -- unionTypeLines and would be doubled here.
-      Face.power = firstJust (Face.power l) (Face.power r),
-      Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
+      --
+      -- The power and toughness boxes are picked by definedBox rather than by
+      -- firstJust, because CR 709.4c reaches THEM through the ability that
+      -- defines them: the half whose characteristic-defining ability covers a box
+      -- takes that box, and only where neither half's does is the left bias above
+      -- what settles it. See characteristicPT below.
+      Face.power = fmap Power.MkPower (fst powerBox),
+      Face.toughness = fmap Toughness.MkToughness (fst toughnessBox),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
       Face.defense = firstJust (Face.defense l) (Face.defense r),
       -- The same left bias, and vacuous today: CR 313.2 keeps a vanguard card in
@@ -363,12 +374,29 @@ merge2 l r =
       Face.vanguard = firstJust (Face.vanguard l) (Face.vanguard r),
       -- CR 709.4c reaches this one where it does not reach the four above: a
       -- characteristic-defining ability IS "an ability in the text box" (CR
-      -- 604.3), so the combined view has BOTH halves'. One slot holds one of
-      -- them. Not implemented: a combined view carrying the P/T-defining
-      -- abilities of two halves at once (#2019) -- which CR 613.4a would then
-      -- have no order to apply them in anyway, since CR 613.7a gives both the
-      -- object's own timestamp.
-      Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
+      -- 604.3), so the combined view has BOTH halves' -- one per box, which is
+      -- the shape CR 208.2a's "[This creature's] [power or toughness] is equal
+      -- to . . ." template prints. Two halves defining DISJOINT boxes (*/2 //
+      -- 2/*) is the case the rules settle whole: each ability defines a box the
+      -- other says nothing about, so there is nothing for CR 613.4a to order.
+      -- Pawl.CardSpec's SplitBox group proves it on Synthetic Twinned Colossus //
+      -- Synthetic Twinned Titan.
+      --
+      -- Two halves defining the SAME box is left-biased, and no rule says
+      -- otherwise: CR 613.4a applies both in layer 7a in timestamp order and CR
+      -- 613.7a gives each the timestamp of the object it is on, so the two are
+      -- tied. CR 613.8's dependency system does not break the tie -- clause (c)
+      -- of CR 613.8a does admit a pair of characteristic-defining abilities, but
+      -- neither of a pair like this changes what the other does (clause (b)), and
+      -- CR 613.8b's fallback is timestamp order again. Nothing is asked of a
+      -- player either, since CR 613 hands nobody a choice of order, so the bias
+      -- is where the rules run out, as it is for the printed boxes above.
+      Face.characteristicPT = case (snd powerBox, snd toughnessBox) of
+        (Nothing, Nothing) -> Nothing
+        -- CR 208.2's star stands in where one box has no ability behind it: the
+        -- seed substitutes it into that box and leaves the box as it found it,
+        -- number or star (Pawl.Engine.Projection.seedCharacteristicPT).
+        (p, t) -> Just CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = Maybe.fromMaybe Quantity.Star p, CharacteristicPT.toughness = Maybe.fromMaybe Quantity.Star t},
       -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
       -- the combined view has BOTH halves', and CR 702.102b hands the pair to a
       -- fused split spell. Concatenated rather than left-biased for that reason,
@@ -412,6 +440,41 @@ merge2 l r =
           -- that payload over this view, so a fused spell reads rule 702.102d's
           -- ordering and every other reader of `combined` is untouched.
     }
+  where
+    powerBox = definedBox l r (fmap Power.unwrap . Face.power) CharacteristicPT.power
+    toughnessBox = definedBox l r (fmap Toughness.unwrap . Face.toughness) CharacteristicPT.toughness
+
+-- CR 709.4c / 604.3: one printed power or toughness box of a split card's
+-- combined view, paired with the characteristic-defining ability that defines
+-- it -- `box` reads that box off a half and `slot` reads the same box's ability
+-- out of a half's pair.
+--
+-- A half DEFINES a box when it declares a CDA and prints CR 208.2's star there,
+-- which is where pawl puts the two together (Projection.seedCharacteristicPT
+-- substitutes into a star and nowhere else). Such a half takes the box, because
+-- CR 604.3 lets a CDA "add to or override information found elsewhere on that
+-- object" -- so the other half's printed number in that box is overridden rather
+-- than combined with, and the two halves of a */2 // 2/* card each keep the one
+-- box they define. Where neither half defines the box, it travels with its own
+-- half's ability, left first: substituting into a box that holds no star is the
+-- identity, so which ability rides along is unobservable there.
+definedBox ::
+  Face.Face Card.Card ->
+  Face.Face Card.Card ->
+  (Face.Face Card.Card -> Maybe Quantity.Quantity) ->
+  (CharacteristicPT.CharacteristicPT -> Quantity.Quantity) ->
+  (Maybe Quantity.Quantity, Maybe Quantity.Quantity)
+definedBox l r box slot
+  | defines leftBox leftAbility = (leftBox, leftAbility)
+  | defines rightBox rightAbility = (rightBox, rightAbility)
+  | Maybe.isJust leftBox = (leftBox, leftAbility)
+  | otherwise = (rightBox, rightAbility)
+  where
+    leftBox = box l
+    rightBox = box r
+    leftAbility = fmap slot (Face.characteristicPT l)
+    rightAbility = fmap slot (Face.characteristicPT r)
+    defines b ability = Maybe.isJust ability && any Star.containsStar b
 
 -- CR 202.1b: "Some objects have no mana cost. This normally includes all land
 -- cards." So Nothing is no mana cost at all, not a zero one, and two Nothings
