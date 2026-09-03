@@ -77,7 +77,6 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Battle as Battle
@@ -776,13 +775,7 @@ filterSpec s registry = Spec.describe s "Filter" $ do
         let (spell, gs1) = S.addHandCard graft S.alice (S.attachTo song (Recipient.ToObject host) gs0)
             queued =
               gs1
-                { GameState.remaining =
-                    Seq.fromList
-                      [ Phase.Combat CombatStep.DeclareBlockers,
-                        Phase.Combat CombatStep.CombatDamage,
-                        Phase.Combat CombatStep.EndOfCombat,
-                        Phase.PostcombatMain
-                      ]
+                { GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.DeclareAttackers)
                 }
             declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) queued
             onto destination =
@@ -833,13 +826,7 @@ filterSpec s registry = Spec.describe s "Filter" $ do
             (second, gs2) = S.addHandCard graft S.alice gs1
             queued =
               gs2
-                { GameState.remaining =
-                    Seq.fromList
-                      [ Phase.Combat CombatStep.DeclareBlockers,
-                        Phase.Combat CombatStep.CombatDamage,
-                        Phase.Combat CombatStep.EndOfCombat,
-                        Phase.PostcombatMain
-                      ]
+                { GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.DeclareAttackers)
                 }
             declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) queued
             onto spell destination gs =
@@ -1003,13 +990,7 @@ runToEndOfCombat answer gs =
     (Phase.Combat CombatStep.EndOfCombat)
     answer
     gs
-      { GameState.remaining =
-          Seq.fromList
-            [ Phase.Combat CombatStep.DeclareBlockers,
-              Phase.Combat CombatStep.CombatDamage,
-              Phase.Combat CombatStep.EndOfCombat,
-              Phase.PostcombatMain
-            ]
+      { GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.DeclareAttackers)
       }
 
 -- carol protects alice's Siege, alice attacks it with a Goblin Piker, and carol

@@ -19,7 +19,6 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -4602,14 +4601,7 @@ bobsCombat gs =
   gs
     { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
       GameState.combat = Combat.emptyCombat,
-      GameState.remaining =
-        Seq.fromList
-          [ Phase.Combat CombatStep.DeclareAttackers,
-            Phase.Combat CombatStep.DeclareBlockers,
-            Phase.Combat CombatStep.CombatDamage,
-            Phase.Combat CombatStep.EndOfCombat,
-            Phase.PostcombatMain
-          ]
+      GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.BeginningOfCombat)
     }
 
 -- CR 506.2 / 802.2: bob in his declare attackers step with both opponents

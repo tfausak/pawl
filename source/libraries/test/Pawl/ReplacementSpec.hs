@@ -43,7 +43,6 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
-import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -571,7 +570,7 @@ fatigueSpec s registry = Spec.describe s "Fatigue" $ do
 -- The turn's schedule after the precombat main phase, so a board positioned in
 -- that phase still runs its own combat.
 afterPrecombatMain :: Seq.Seq Phase.Phase
-afterPrecombatMain = Seq.drop 1 (Seq.dropWhileL (/= Phase.PrecombatMain) (Seq.fromList Turn.allPhases))
+afterPrecombatMain = S.phasesAfter Phase.PrecombatMain
 
 -- Run whole steps until `done` holds of the board, the game ends, or the bound
 -- runs out. The bound is three turns' worth of steps, so a skip that dropped

@@ -454,17 +454,7 @@ castingDefender p = case p of
 -- The schedule Engine.advance leaves once the precombat main phase is current:
 -- everything after it in an ordinary turn (Turn.allPhases).
 afterPrecombatMain :: Seq Phase
-afterPrecombatMain =
-  Seq.fromList
-    [ Phase.Combat CombatStep.BeginningOfCombat,
-      Phase.Combat CombatStep.DeclareAttackers,
-      Phase.Combat CombatStep.DeclareBlockers,
-      Phase.Combat CombatStep.CombatDamage,
-      Phase.Combat CombatStep.EndOfCombat,
-      Phase.PostcombatMain,
-      Phase.Ending EndingStep.EndStep,
-      Phase.Ending EndingStep.Cleanup
-    ]
+afterPrecombatMain = S.phasesAfter Phase.PrecombatMain
 
 -- alice, in her precombat main phase with priority, controlling five untapped
 -- Mountains (exactly the {3}{R}{R} activation), an Aggravated Assault, and one
