@@ -177,6 +177,7 @@ import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -2341,7 +2342,12 @@ rewriteEffect pairs effect = case effect of
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried mPermanents)
-  Effect.Sacrifice _ -> effect
+  -- CR 612.1: the ref may carry a Filter of printed card text, so a text-changer
+  -- reaches it exactly as Destroy's above. A REGRESSION FENCE rather than a
+  -- proven behaviour: Golgothian Sylex is the only card whose sacrifice carries a
+  -- Filter at all, and CR 206.3b's names are not words CR 612.2's two families
+  -- can swap, so mutating this line reddens nothing.
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer) -> Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect (rewriteObjectRef pairs ref) sacrificer)
   -- CR 612.1: the ref carries a Filter of printed card text, so a text-changer
   -- reaches it exactly as Destroy's above. The listed characteristics hold no word
   -- this rewrites: a type line is CR 205's, not CR 201.4a's changeable text.

@@ -29,29 +29,24 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
-import qualified Pawl.Types.DamageEvent as DamageEvent
-import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
-import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
-import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Optionality as Optionality
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
@@ -124,22 +119,11 @@ initiativeAbilities = [upkeepVenture, combatHandoff, takeVenture]
 -- The holder is the seat the TurnScope is read against: CR 726.2 makes these
 -- abilities "controlled by the player who had the initiative at the time the
 -- abilities triggered", so they are the "you" CR 109.5 would give a printed one.
-beginsHoldersUpkeep :: PlayerId -> GameState -> GameEvent -> Bool
-beginsHoldersUpkeep holder gs event = case (TriggeredAbility.condition upkeepVenture, event) of
+beginsHoldersUpkeep :: PlayerId -> GameState -> LoggedEvent.LoggedEvent -> Bool
+beginsHoldersUpkeep holder gs logged = case (TriggeredAbility.condition upkeepVenture, LoggedEvent.event logged) of
   (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active)) ->
     began == wanted && Event.turnScopeAdmits (Game.teams gs) scope active holder
   _ -> False
-
--- CR 726.2, second ability: the creature this event has dealt combat damage with
--- to the holder, if any.
-damagerOf :: PlayerId -> GameState -> GameEvent -> Maybe ObjectId
-damagerOf holder gs event = case event of
-  GameEvent.DamageDealt ev
-    | DamageEvent.kind ev == DamageKind.Combat
-        && DamageEvent.target ev == Recipient.ToPlayer holder
-        && Projection.isCreatureOf (DamageEvent.source ev) gs ->
-        Just (DamageEvent.source ev)
-  _ -> Nothing
 
 -- CR 726.2: the inherent triggers that fire on this batch of events, as ordinary
 -- PendingTriggers whose source is TriggerSource.Sourceless -- which is what lets
@@ -165,10 +149,15 @@ damagerOf holder gs event = case event of
 -- Pawl.Engine.Damage.dealWave brackets a CR 510.2 combat damage step as one wave
 -- and each damage step ends in a settle, so the batch scanned here is that step's
 -- damage: a first-strike step and the regular step are separate batches and
--- rightly trigger twice. That is where this parts company with
--- Monarch.inherentMonarchPending, whose per-damager reading of the identically
--- worded CR 725.2 is #3129.
-inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
+-- rightly trigger twice.
+--
+-- That is where this parts company with Monarch.inherentMonarchPending, and the
+-- divergence is the two RULES' own: CR 725.2 prints "whenever A CREATURE deals
+-- combat damage to the monarch, ITS controller becomes the monarch", one trigger
+-- per damaging creature, where CR 726.2 prints "whenever ONE OR MORE creatures a
+-- player controls deal combat damage", one per controller. Neither reading is a
+-- generalisation of the other and neither module may borrow the other's.
+inherentPending :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 inherentPending events gs = held <> takes
   where
     held = case GameState.initiative gs of
@@ -176,15 +165,19 @@ inherentPending events gs = held <> takes
       Just holder -> upkeeps holder <> handoffs holder
     sourceless controller ability bindings = PendingTrigger.MkPendingTrigger TriggerSource.Sourceless controller ability bindings Nothing
     upkeeps holder = fmap (\_ -> sourceless holder upkeepVenture Map.empty) (filter (beginsHoldersUpkeep holder gs) events)
+    -- Each pair is a damaging creature and who controlled it AS THE DAMAGE WAS
+    -- DEALT (Event.combatDamagerAgainst, which is also what screens the event
+    -- shape), so a creature the same step's state-based actions have already
+    -- destroyed is still one of "those creatures".
     handoffs holder =
-      let damagers = Maybe.mapMaybe (damagerOf holder gs) events
-          sameController a b = Projection.controllerOf a gs == Projection.controllerOf b gs
-       in fmap (\oid -> sourceless holder combatHandoff (Binding.setTriggerSource oid Map.empty)) (List.nubBy sameController damagers)
+      let damagers = Maybe.mapMaybe (Event.combatDamagerAgainst holder gs) events
+          sameController a b = snd a == snd b
+       in fmap (\(oid, _) -> sourceless holder combatHandoff (Binding.setTriggerSource oid Map.empty)) (List.nubBy sameController damagers)
     -- A PARTIAL case with a wildcard, Speed.inherentPending's posture: this
     -- matcher answers about one event shape, and a new GameEvent constructor is
     -- not an event rule 726.2 names.
     takes = Maybe.mapMaybe taker events
-    taker event = case event of
+    taker logged = case LoggedEvent.event logged of
       GameEvent.TookInitiative pid -> Just (sourceless pid takeVenture Map.empty)
       _ -> Nothing
 

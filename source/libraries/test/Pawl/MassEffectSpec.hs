@@ -4892,6 +4892,78 @@ apocalypseChimeSpec s registry =
           Spec.assertBool s (S.onBattlefield tokenId after) "CR 111.1 bob's token of that same listed card survives"
           Spec.assertBool s (S.onBattlefield pikerId after) "and alice's Goblin Piker, whose name is not on the list, survives"
 
+-- Golgothian Sylex {4} Artifact -- "{1}, {T}: Each nontoken permanent with a
+-- name originally printed in the Antiquities expansion is sacrificed by its
+-- controller." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com, 2026-09-03.)
+--
+-- CR 206.3b prints the whole name list, so the sweep is Apocalypse Chime's
+-- Filter.Or of Filter.HasName. What is new is the OPCODE: CR 701.21a as an
+-- EachMatching rather than a bound slot, and CR 701.21a's "its controller" as
+-- Sacrificer.PermanentController, so each match is sacrificed by whoever
+-- controls it rather than by the player who activated the ability.
+--
+-- The board tells apart the readings a wrong opcode or a wrong sacrificer takes:
+--
+--   * ITS controller versus the ability's. carol's Yotian Soldier is not alice's
+--     to sacrifice, so CR 701.21a's second sentence would refuse an
+--     EffectController reading and leave it on the battlefield. bob's Vengeful
+--     Tracker then says the same thing a second way, in life totals: it names
+--     the seat that sacrificed, so alice's two artifacts and carol's one damage
+--     the two seats separately rather than one seat four times.
+--   * A SACRIFICE versus a destruction. bob's Mishra's Workshop carries an
+--     indestructible counter (CR 122.1b), which CR 701.21a leaves out of the
+--     way. It is also a LAND, so "each nontoken permanent" is read wider than
+--     the artifacts around it.
+--   * NONTOKEN versus every permanent (CR 111.1). carol's token is built from
+--     the same Ornithopter card, so its name matches too and only that conjunct
+--     tells the two apart.
+--   * A LISTED name versus every permanent. alice's Goblin Piker is not on CR
+--     206.3b's list, and neither is bob's Vengeful Tracker.
+--
+-- The Sylex is on its own list, so it sacrifices itself; that is the printed
+-- card rather than a fixture convenience, and it is alice's second artifact for
+-- the Tracker to see.
+golgothianSylexSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+golgothianSylexSpec s registry =
+  Spec.describe s "GolgothianSylex" $ do
+    Spec.it s "CR 206.3b each listed nontoken permanent is sacrificed by its own controller" $ do
+      sylex <- S.printingOf s registry "Golgothian Sylex"
+      plains <- S.printingOf s registry "Plains"
+      piker <- S.printingOf s registry "Goblin Piker"
+      tracker <- S.printingOf s registry "Vengeful Tracker"
+      workshop <- S.printingOf s registry "Mishra's Workshop"
+      ornithopter <- S.printingOf s registry "Ornithopter"
+      soldier <- S.printingOf s registry "Yotian Soldier"
+      let (sylexId, g1) = S.addCreature sylex S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
+          (thopterId, g2) = S.addCreature ornithopter S.alice g1
+          (pikerId, g3) = S.addCreature piker S.alice g2
+          (trackerId, g4) = S.addCreature tracker S.bob g3
+          (shopId, g5) = S.addCreature workshop S.bob g4
+          (soldierId, g6) = S.addCreature soldier S.carol (S.addCounter (CounterKind.Keyword Keyword.Indestructible) 1 shopId g5)
+          (tokenId, g7) = S.addToken (Printing.card ornithopter) S.carol g6
+          board =
+            g7
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      case soleActivatedAbility sylex of
+        Nothing -> Spec.assertFailure s "Golgothian Sylex should print exactly one activated ability"
+        Just ability -> do
+          let after = S.runPure S.identityAnswer board (Activate.activateAbility S.alice sylexId ability >> Engine.priorityLoop)
+          Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible shopId board) "the fixture really made bob's Mishra's Workshop indestructible"
+          Spec.assertBool s (not (S.onBattlefield soldierId after)) "CR 701.21a carol's Yotian Soldier was sacrificed by carol, whose permanent it is"
+          Spec.assertBool s (not (S.onBattlefield shopId after)) "CR 701.21a bob's indestructible Mishra's Workshop was sacrificed, a sacrifice being no destruction"
+          Spec.assertBool s (not (S.onBattlefield thopterId after)) "and alice's Ornithopter, a listed nontoken permanent, went too"
+          Spec.assertBool s (not (S.onBattlefield sylexId after)) "as did the Sylex, whose own name CR 206.3b lists"
+          Spec.assertBool s (S.onBattlefield tokenId after) "CR 111.1 carol's token of that same listed card survives"
+          Spec.assertBool s (S.onBattlefield pikerId after) "and alice's Goblin Piker, whose name is not on the list, survives"
+          Spec.assertBool s (S.onBattlefield trackerId after) "and so does bob's Vengeful Tracker"
+          Spec.assertEqWith s "CR 701.21a the Tracker names each sacrificing seat: alice for two artifacts, carol for one" (lives after) (Just 16, Just 20, Just 18)
+          Spec.assertEqWith s "everyone started at 20" (lives board) (Just 20, Just 20, Just 20)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   plummetSpec s registry
@@ -4931,3 +5003,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   actOnImpulseSpec s registry
   communeWithLavaSpec s registry
   apocalypseChimeSpec s registry
+  golgothianSylexSpec s registry

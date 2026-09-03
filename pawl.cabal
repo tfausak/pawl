@@ -739,6 +739,8 @@ library codec
     Pawl.Codec.Sacrifice
     Pawl.Codec.SacrificeAnyNumber
     Pawl.Codec.SacrificeAnyNumberSpec
+    Pawl.Codec.SacrificeEffect
+    Pawl.Codec.SacrificeEffectSpec
     Pawl.Codec.Sacrificer
     Pawl.Codec.SacrificeRestriction
     Pawl.Codec.SacrificeRestrictionSpec
@@ -772,8 +774,6 @@ library codec
     Pawl.Codec.SlotCountSpec
     Pawl.Codec.SlotName
     Pawl.Codec.SlotNameSpec
-    Pawl.Codec.SlotSacrifice
-    Pawl.Codec.SlotSacrificeSpec
     Pawl.Codec.Source
     Pawl.Codec.SourceSpec
     Pawl.Codec.SpecialAction
@@ -1715,6 +1715,7 @@ library types
     Pawl.Types.Rounding
     Pawl.Types.Sacrifice
     Pawl.Types.SacrificeAnyNumber
+    Pawl.Types.SacrificeEffect
     Pawl.Types.Sacrificer
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling
@@ -1732,7 +1733,6 @@ library types
     Pawl.Types.SlotArity
     Pawl.Types.SlotCount
     Pawl.Types.SlotName
-    Pawl.Types.SlotSacrifice
     Pawl.Types.Source
     Pawl.Types.SpecialAction
     Pawl.Types.SpeedDecrease
