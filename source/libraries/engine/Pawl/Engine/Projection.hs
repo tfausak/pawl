@@ -284,12 +284,14 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- [cost] read off the RECEIVING object rather than written on the granter
         -- -- "the flashback cost is equal to that card's mana cost".
         --
-        -- Read from the FACE (CR 202.1) rather than from `pc`:
-        -- ProjectedCharacteristics carries a mana VALUE and no mana cost, and no
-        -- layer changes a mana cost in any case. Nothing when the card has none
-        -- (Ancestral Vision), which is CR 118.6's unpayable cost, exactly what
-        -- Cost.mana's own Maybe means -- and honest, since no cost equal to no
-        -- mana cost can be paid.
+        -- Read from `pc` rather than from the face, which is CR 707.2's copiable
+        -- mana cost: a card in a graveyard that is a copy of something else is
+        -- priced at what it copies, since the fold is seeded from
+        -- copiableCharacteristics and the layer-1 snapshot carries the cost. No
+        -- layer writes one, so for everything that is copying nothing this is the
+        -- printed face's cost. Nothing when there is none (Ancestral Vision),
+        -- which is CR 118.6's unpayable cost, exactly what Cost.mana's own Maybe
+        -- means -- and honest, since no cost equal to no mana cost can be paid.
         --
         -- An {X} copied out of the mana cost stays an {X}, per CR 107.3a: CR
         -- 107.3g's zero settles the card's own mana VALUE where it lies (CR
@@ -297,11 +299,8 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- CR 601.2a has put the spell on the stack. Pawl.CastSpec's "CR 107.3a
         -- a granted flashback {X}{R} announces X rather than treating it as 0"
         -- proves it, with Lier granting Blaze its own {X}{R}.
-        --
-        -- Not implemented: CR 707.2's copiable mana cost, since the read is of
-        -- the printed face (#2414).
         Modification.GainFlashbackAtManaCost ->
-          let cost = Cost.MkCost (Game.faceOf oid gs >>= Face.manaCost) []
+          let cost = Cost.MkCost (PC.manaCost pc) []
            in pc {PC.keywords = Map.insertWith (+) (Keyword.Type.Flashback cost) 1 (PC.keywords pc)}
         -- CR 613.1f layer 6 / CR 702.5c: an APPEND, since "if an Aura has
         -- multiple instances of enchant, all of them apply" -- the printed
@@ -1513,6 +1512,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.keywords = Map.empty,
         PC.colors = Set.empty,
         -- No card, so no mana cost to read -- which is not CR 202.3a's 0 (#674).
+        PC.manaCost = Nothing,
         PC.manaValue = Nothing,
         PC.power = Nothing,
         PC.toughness = Nothing,
@@ -1553,6 +1553,12 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- CR 702: a printed keyword appears once; layer 6 adds multiplicity.
             PC.keywords = Map.fromSet (const 1) (Face.keywords face),
             PC.colors = printedColorsOf face,
+            -- CR 202.1: the printed cost of the face the object is showing, so CR
+            -- 708.2a's face-down substitution leaves a face-down object with none.
+            -- `face` rather than Game.manaCostFacesOf below: CR 712.8e lends a
+            -- transformed permanent its front face's mana VALUE and not its cost,
+            -- and CR 202.3c's melded sum is a number no single cost states.
+            PC.manaCost = Face.manaCost face,
             -- CR 202.3, derived here so the rest of the fold reads a number.
             -- Game.manaCostFacesOf rather than `face`: CR 712.8e reads a transformed
             -- permanent's mana value off its FRONT face's cost, and CR 708.2a's
