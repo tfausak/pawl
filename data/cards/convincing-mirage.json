@@ -48,7 +48,24 @@
       "staticAbilities": [
         {
           "affected": {
-            "type": "Attached"
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Land"
+                  }
+                },
+                {
+                  "type": "HasAttached",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
           },
           "modifications": [
             {

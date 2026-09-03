@@ -4625,7 +4625,7 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
     -- blocking creature this combat") is the only such printing in
     -- data/cards/: the other two files carrying a Face.blockCosts entry,
     -- oppressive-rays.json and synthetic-blocking-tithe.json, are Auras
-    -- (Affected.Attached), which Ashaya can never reach.
+    -- whose subject is the enchanted creature, which Ashaya can never reach.
     --
     -- Both extras go under BOB, since CR 509.1a chooses blockers from the
     -- DEFENDING player's creatures and Ashaya animates its own controller's.

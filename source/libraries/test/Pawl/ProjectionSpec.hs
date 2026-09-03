@@ -96,6 +96,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
@@ -3964,6 +3965,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   levelerSpec s registry
   supertypeSpec s registry
 
+-- Resourceful Defense's two target slots are both Pool.Permanents over the same
+-- board, so no predicate could tell them apart and the slot NAME settles which
+-- is which; the offered set is FILTERED rather than a recipient hand-built, so CR
+-- 608.2b's re-read at resolution still finds what was named. The counter answer
+-- is verbatim, so an answerer cannot re-derive a legal one after a mutation.
+-- Pawl.MoveCounterSpec's defenseAnswer is the same shape, duplicated rather than
+-- hoisted into Pawl.Support.
+honeMoveAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+honeMoveAnswer giver taker p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let target
+                | slot == SlotName.MkSlotName (Text.pack "from") = Just giver
+                | slot == SlotName.MkSlotName (Text.pack "to") = Just taker
+                | otherwise = Nothing
+           in Set.filter ((==) target . Recipient.objectOf) offered
+      )
+      asked
+  Prompt.ChooseMovedCounters {} -> Map.singleton CounterKind.Hone 1
+  _ -> S.identityAnswer p
+
 -- CR 122.1j: "A hone counter on an Equipment gives +1/+0 to any creature that
 -- Equipment is attached to." CR 613.1g's layer 7, and CR 613.4c's 7c within it,
 -- exactly where CR 122.1a's +1/+1 counters land -- but the counter is on the
@@ -4022,9 +4045,8 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
   -- so a +1/+0 landing on one and no +1/+0 at all read the same Nothing.
   -- honeAffected states the clause because rule 122.1j does; mutating the
   -- conjunct away leaves the suite green, and it is a fence rather than a proven
-  -- line. The clause IS observable for a modification CR 208.3 does not mask --
-  -- Basilisk Collar's granted deathtouch, say -- which is #3143's board and not
-  -- this counter's.
+  -- line. The clause IS observable for a modification CR 208.3 does not mask,
+  -- which the Basilisk Collar case below is and this counter's +1/+0 is not.
   --
   -- Consulate Dreadnought ({1} Artifact -- Vehicle 7/11, "Crew 6", checked
   -- against api.scryfall.com 2026-09-03) is the host: a permanent with printed
@@ -4047,30 +4069,67 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     Spec.assertEqWith s "the Equipment is attached in the window this board reads" (Projection.hostOf equip onVehicle) (Just vehicle)
     Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Projection.hostOf equip (S.settleSba onVehicle)) Nothing
 
-  -- CR 122.1j's BEARER clause: "a hone counter on an Equipment". Synthetic Honed
-  -- Binding ({1}{W} Enchantment -- Aura, "Enchant creature" / "When this Aura
-  -- enters, put a hone counter on it") is the producer, and synthetic because
-  -- only two printings make hone counters -- Dwalin, Weaponmaster and Sting,
-  -- Bilbo's Sword -- and both put them on Equipment (Scryfall o:/hone counter/,
-  -- 2026-09-03). Nothing in rule 122.1j forbids the card.
+  -- CR 301.5f: an ability referring to the "equipped creature" refers to
+  -- whatever CREATURE the permanent is attached to, so inside CR 704.5n's window
+  -- -- still attached to a host that has stopped being one -- it names nothing.
+  -- CR 303.4m says the same of "enchanted creature". Basilisk Collar ({1}
+  -- Artifact -- Equipment, "Equipped creature has deathtouch and lifelink",
+  -- "Equip {2}", checked against api.scryfall.com 2026-09-03) is the OBSERVABLE
+  -- half: a keyword grant, which CR 208.3 does not mask the way it masks the
+  -- P/T clause the case above reads.
   --
-  -- Two boards ONE attachment apart: the same single counter on the Aura and on
-  -- the Bonesplitter beside it, both attached to the same Piker.
-  Spec.it s "CR 122.1j whole card: a hone counter on an Aura gives the enchanted creature nothing" $ do
+  -- Two boards ONE attachment apart: the same Collar on the uncrewed Consulate
+  -- Dreadnought and on a Goblin Piker beside it. A Bonesplitter rides the
+  -- Vehicle throughout so the masked half is on the same board as the visible
+  -- one.
+  Spec.it s "CR 301.5f an equipped-creature grant reaches a host that stopped being a creature with nothing" $ do
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    piker <- S.printingOf s registry "Goblin Piker"
+    collar <- S.printingOf s registry "Basilisk Collar"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let base = Setup.emptyGame S.bothPlayers
+        (vehicle, g1) = S.addCreature dreadnought S.alice base
+        (pikerId, g2) = S.addCreature piker S.alice g1
+        (collarId, g3) = S.addCreature collar S.alice g2
+        (equip, g4) = S.addCreature bonesplitter S.alice g3
+        withBonesplitter = S.attach equip vehicle g4
+        onVehicle = S.attach collarId vehicle withBonesplitter
+        onPiker = S.attach collarId pikerId withBonesplitter
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch vehicle onVehicle)) "the uncrewed Vehicle is no creature, so it is not the equipped creature and the Collar grants it nothing"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch pikerId onPiker) "the same Collar on a creature does grant deathtouch"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Lifelink vehicle onVehicle)) "and the Collar's other keyword is gone with it"
+    Spec.assertEqWith s "CR 208.3 masks the P/T half on the same host: the Bonesplitter's +2/+0 reads Nothing either way" (Projection.powerOf vehicle onVehicle) Nothing
+    Spec.assertEqWith s "the Collar is attached in the window this board reads" (Projection.hostOf collarId onVehicle) (Just vehicle)
+    Spec.assertEqWith s "CR 704.5n closes it on the next state-based pass" (Projection.hostOf collarId (S.settleSba onVehicle)) Nothing
+
+  -- CR 122.1j's BEARER clause: "a hone counter on an Equipment". Regular
+  -- printings throughout -- Resourceful Defense's "{4}{W}: Move any number of
+  -- counters from target permanent you control onto a second target permanent
+  -- you control" (CR 122.5 permits the move, and rule 122.1j does not forbid the
+  -- destination) carries the counter off the Bonesplitter and onto an Unholy
+  -- Strength enchanting the same creature.
+  --
+  -- Two boards ONE move apart: the same single counter on the Equipment and on
+  -- the Aura, with both attached to the same Piker either way.
+  Spec.it s "CR 122.1j whole card: a hone counter moved onto an Aura gives the enchanted creature nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    defense <- S.printingOf s registry "Resourceful Defense"
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    binding <- S.printingOf s registry "Synthetic Honed Binding"
-    let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (equip, g2) = S.addCreature bonesplitter S.alice g1
-        (aura, g3) = S.entersWithTrigger binding S.alice (S.attach equip pikerId g2)
-        enchanted = S.attach aura pikerId g3
-        placed = S.runPure S.identityAnswer enchanted Engine.placePendingTriggers
-        onAura = S.runPure S.identityAnswer placed Stack.resolveTop
-        onEquip = S.addCounter CounterKind.Hone 1 equip enchanted
-    Spec.assertEqWith s "2 printed + the Bonesplitter's 2, and nothing from the Aura's counter" (Projection.powerOf pikerId onAura) (Just 4)
-    Spec.assertEqWith s "the same counter on the Equipment beside it is the +1 it would have been" (Projection.powerOf pikerId onEquip) (Just 5)
-    Spec.assertEqWith s "the Aura's own trigger did put the counter on it" (S.counterOf CounterKind.Hone aura onAura) 1
+    strength <- S.printingOf s registry "Unholy Strength"
+    let (defenseId, g1) = S.addCreature defense S.alice (S.landsInPlay plains 5)
+        (pikerId, g2) = S.addCreature piker S.alice g1
+        (equip, g3) = S.addCreature bonesplitter S.alice g2
+        (aura, g4) = S.addCreature strength S.alice g3
+        onEquip = (S.addCounter CounterKind.Hone 1 equip (S.attach aura pikerId (S.attach equip pikerId g4))) {GameState.priority = Just S.alice}
+    case Activate.abilitiesFor defenseId onEquip of
+      [only] -> do
+        let onAura = S.runPure (honeMoveAnswer equip aura) onEquip (Activate.activateAbility S.alice defenseId only >> Stack.resolveTop)
+        Spec.assertEqWith s "on the Aura the counter gives nothing: 2 printed + the Bonesplitter's 2 + Unholy Strength's 2" (Projection.powerOf pikerId onAura) (Just 6)
+        Spec.assertEqWith s "on the Equipment it was the +1 it would have been" (Projection.powerOf pikerId onEquip) (Just 7)
+        Spec.assertEqWith s "the counter did move onto the Aura" (S.counterOf CounterKind.Hone aura onAura) 1
+        Spec.assertEqWith s "and off the Equipment" (S.counterOf CounterKind.Hone equip onAura) 0
+      _ -> Spec.assertFailure s "expected Resourceful Defense to offer exactly its one printed activated ability"
 
   -- The whole card. Dwalin, Weaponmaster {1}{R/W} Legendary Creature -- Dwarf
   -- Warrior 2/1, "First strike" / "Whenever Dwalin enters or attacks, put a hone

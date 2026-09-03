@@ -3494,7 +3494,7 @@ presenceOfGondSpec s registry = Spec.describe s "Presence of Gond" $ do
 
 -- alice's Aura, bob's settled Prodigal Sorcerer, carol as the third seat. The
 -- two boards this builds differ in exactly one thing: whether the Aura is
--- attached (CR 303.4m is what Affected.Attached reads).
+-- attached (CR 303.4m is what the Aura's HasAttached IsSource conjunct reads).
 gondBoard :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 gondBoard gond sorcerer attached =
   let (sorcererId, g0) = S.addCreature sorcerer S.bob S.threePlayerGame

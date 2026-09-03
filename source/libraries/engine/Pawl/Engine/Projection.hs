@@ -4089,9 +4089,10 @@ staticLives functioning changes lowest sa =
 -- none. CR 208.3a says as much of the rules themselves: such an effect "is
 -- created even though it doesn't do anything unless that permanent becomes a
 -- creature". Stated because rule 122.1j states it, and because the same
--- conjunct on a modification CR 208.3 does not mask is observable (#3143).
--- Pawl.ProjectionSpec's "CR 208.3 leaves a hone counter's host nothing to read
--- the bonus off" is the board that shows the masking.
+-- conjunct on a modification CR 208.3 does not mask is observable, which
+-- Pawl.ProjectionSpec's Basilisk Collar case proves. Its "CR 208.3 leaves a hone
+-- counter's host nothing to read the bonus off" is the board that shows the
+-- masking.
 honeAffected :: Affected.Affected
 honeAffected =
   Affected.Matching
