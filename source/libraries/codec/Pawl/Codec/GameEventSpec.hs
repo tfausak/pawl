@@ -80,6 +80,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> ",\"others\":[]}}"
       )
+  -- CR 712.21's second card, whose destination differs from the departure's
+  -- origin the same way a Moved event's does -- and which carries no snapshot.
+  Spec.it s "CardArrived" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.CardArrived (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 3) Zone.Battlefield Zone.Graveyard))
+      "{\"type\":\"CardArrived\",\"value\":{\"departed\":1,\"object\":3,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}}}"
   -- A NONZERO toxic value and a PRESENT lifelink payee, so the CR 702.164b and
   -- CR 702.15b riders round-trip rather than getting defaulted past.
   Spec.it s "DamageDealt" $

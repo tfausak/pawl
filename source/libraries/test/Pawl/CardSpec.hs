@@ -903,6 +903,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
+  TriggerCondition.CardPutIntoGraveyard _ -> []
   TriggerCondition.PermanentDies _ -> []
   TriggerCondition.PermanentsDie _ -> []
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
@@ -3817,6 +3818,10 @@ objectRefFilters ref = case ref of
   -- ownership and control the card prints are conjuncts of that Filter, which is
   -- what this traversal hands to the Filter lints.
   ObjectRef.ChosenPermanent f -> unframed [f]
+  -- The arm above with the source riding along: the Filter still says which
+  -- counterpart may be picked and nothing about the source, so it is framed the
+  -- same way.
+  ObjectRef.SourceAndChosenPermanent f -> unframed [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4048,6 +4053,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.3b's names a PlayerRelation; the Saga is found through CR 714.2d's
   -- final chapter number rather than through a Filter.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
+  TriggerCondition.CardPutIntoGraveyard f -> unframed [f]
   TriggerCondition.PermanentDies f -> unframed [f]
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- so it is swept the same way -- answering [] here would exempt Vengeful
@@ -4260,6 +4266,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
+  TriggerCondition.CardPutIntoGraveyard _ -> []
   TriggerCondition.PermanentDies _ -> []
   TriggerCondition.PermanentsDie _ -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
@@ -5519,6 +5526,7 @@ chooserRef ref = case ref of
   ObjectRef.RandomCardInHand {} -> True
   ObjectRef.AnyNumberMatching {} -> True
   ObjectRef.ChosenPermanent {} -> True
+  ObjectRef.SourceAndChosenPermanent {} -> True
 
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
@@ -5533,6 +5541,7 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardInHand {} -> True
     ObjectRef.ChosenCardFromAmong {} -> True
     ObjectRef.ChosenPermanent {} -> True
+    ObjectRef.SourceAndChosenPermanent {} -> True
     ObjectRef.AnyNumberMatching {} -> True
     _ -> False
   AsksRevealArm -> case ref of
@@ -8102,6 +8111,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- TRUE where the arm above is False, which is the whole difference
           -- between them: the ref names exactly one permanent however many match.
           ObjectRef.ChosenPermanent _ -> True
+          -- FALSE where the arm above is True: the ref names the source
+          -- ALONGSIDE the one permanent it picks, so a per-player count over it
+          -- moves two.
+          ObjectRef.SourceAndChosenPermanent _ -> False
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.
@@ -8630,6 +8643,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
         anyNumber = ObjectRef.AnyNumberMatching anyCard
         onePermanent = ObjectRef.ChosenPermanent anyCard
+        sourceAndOne = ObjectRef.SourceAndChosenPermanent anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
         reveals ref = Effect.Reveal (Reveal.MkReveal ref Nothing)
         inert :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Bool]
@@ -8673,6 +8687,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       "one chosen permanent is asked by the move gather alone"
       (inert [Effect.Transform onePermanent, moves onePermanent, reveals onePermanent, Effect.Tap onePermanent])
+      [True, False, True, True]
+    -- The arm above with the source named alongside the choice, and the same row:
+    -- Hanweir Battlements' "exile them" is a move, so the MoveToZone gather is
+    -- again the only site that asks it. Asserted separately rather than folded
+    -- into the row above because the two arms are distinct constructors, and one
+    -- missing from chooserRef or from asksFor would answer False everywhere with
+    -- no -Werror to name it.
+    Spec.assertEqWith
+      s
+      "the source with one chosen permanent is asked by the move gather alone"
+      (inert [Effect.Transform sourceAndOne, moves sourceAndOne, reveals sourceAndOne, Effect.Tap sourceAndOne])
       [True, False, True, True]
     -- CR 701.28a's convert, classified with Transform because it IS Transform's
     -- gather (Pawl.Engine.Resolve.turnPermanentsOver): the same four card-shaped

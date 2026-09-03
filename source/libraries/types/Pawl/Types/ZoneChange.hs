@@ -16,7 +16,9 @@ import qualified Pawl.Types.Zone as Zone
 -- ONE resulting id, and CR 712.21 is where that stops being the whole answer: a
 -- melded permanent's departure mints one card per component, and `object` names
 -- the first of them. Pawl.Types.Moved's `others` carries the rest, and
--- Moved.arrivals is the plural read.
+-- Moved.arrivals is the plural read; each of the rest is also named by a
+-- GameEvent.CardArrived of its own, which carries a ZoneChange of this same
+-- shape with the departing id repeated.
 --
 -- The two are the same value in the PROPOSED event Pawl.Engine.Replacement resolves
 -- (Pawl.Types.ProposedEvent.WouldChangeZone): nothing has moved yet, so the

@@ -37,6 +37,7 @@ import qualified Pawl.Codec.SpellWasCast as SpellWasCast
 import qualified Pawl.Codec.StepBegan as StepBegan
 import qualified Pawl.Codec.Transformed as Transformed
 import qualified Pawl.Codec.VentureMarkerEntered as VentureMarkerEntered
+import qualified Pawl.Codec.ZoneChange as ZoneChange
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -45,6 +46,10 @@ codec :: Codec.Codec GameEvent.GameEvent
 codec =
   Arm.tagged
     [ Arm.payload "Moved" Moved.codec GameEvent.Moved (\x -> case x of GameEvent.Moved y -> Just y; _ -> Nothing),
+      -- CR 712.21's second card. A bare ZoneChange and no snapshot: the
+      -- characteristics CR 608.2h wants are the departing permanent's, which the
+      -- Moved event beside this one already carries.
+      Arm.payload "CardArrived" ZoneChange.codec GameEvent.CardArrived (\x -> case x of GameEvent.CardArrived y -> Just y; _ -> Nothing),
       Arm.payload "DamageDealt" DamageEvent.codec GameEvent.DamageDealt (\x -> case x of GameEvent.DamageDealt y -> Just y; _ -> Nothing),
       Arm.payload "DamagePrevented" DamagePrevented.codec GameEvent.DamagePrevented (\x -> case x of GameEvent.DamagePrevented y -> Just y; _ -> Nothing),
       Arm.payload "StepBegan" StepBegan.codec GameEvent.StepBegan (\x -> case x of GameEvent.StepBegan y -> Just y; _ -> Nothing),

@@ -873,6 +873,86 @@ serraAvatarSpec s registry =
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered exiled)) []
           Spec.assertBool s (Set.member avatarName (namesIn Zone.Exile S.alice exiled)) "it is in exile"
 
+-- Planar Void ({B} Enchantment): "Whenever another card is put into a graveyard
+-- from anywhere, exile that card." Oracle text verified against Scryfall
+-- 2026-09-02. The bystander reading of the condition Serra Avatar prints
+-- self-scoped above, and the pool's producer for CR 712.21's Example, whose meld
+-- board is Pawl.MeldSpec's.
+--
+-- Three things separate it from the conditions on either side of it, one test
+-- each below:
+--
+--   * the ARRIVING card is what the payload acts on -- "exile that card" reads
+--     CR 400.7e's `became` slot, and the departed id CR 400.7 deleted would move
+--     nothing.
+--   * a NON-battlefield origin fires it, CR 603.6c's last sentence again, so
+--     PermanentDies would leave the discarded card in the graveyard.
+--   * "another" excludes the Void's own arrival, and by CR 603.10's first
+--     sentence rather than by the Filter: a permanent put into a graveyard is
+--     not among the objects that exist immediately after the event that put it
+--     there.
+planarVoidSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+planarVoidSpec s registry =
+  let namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+      pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      voidName = CardName.MkCardName (Text.pack "Planar Void")
+      -- Planar Void on alice's battlefield, with priority so
+      -- Engine.settleForPriority has somewhere to give a trigger.
+      withVoid = do
+        void <- S.printingOf s registry "Planar Void"
+        let (voidId, gs) = S.addCreature void S.alice (Setup.emptyGame S.bothPlayers)
+        pure (voidId, gs {GameState.priority = Just S.alice})
+      fireTrigger gs =
+        let placed = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in (placed, S.runPure S.identityAnswer placed Stack.resolveTop)
+   in Spec.describe s "Planar Void" $ do
+        -- The gameplay-level proof: a creature dies with the Void out, and the
+        -- card it became is exiled out of the graveyard rather than left there.
+        Spec.it s "CR 603.6 whole card: a destroyed creature's card is exiled out of the graveyard" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          (_, board) <- withVoid
+          let (pikerId, gs) = S.addCreature piker S.alice board
+              died = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [pikerId])
+              (placed, after) = fireTrigger died
+          Spec.assertBool s (Set.member pikerName (namesIn Zone.Exile S.alice after)) "CR 603.6 the arriving card was exiled"
+          Spec.assertBool s (not (Set.member pikerName (namesIn Zone.Graveyard S.alice after))) "and left the graveyard"
+          -- The proxies, kept after the behaviour: the card really did reach the
+          -- graveyard first, and exactly one trigger did the exiling.
+          Spec.assertBool s (Set.member pikerName (namesIn Zone.Graveyard S.alice died)) "setup: it died into the graveyard"
+          Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack placed)) 1
+        -- "FROM ANYWHERE" doing real work: a discarded card never left the
+        -- battlefield, so PermanentDies would say nothing about it.
+        Spec.it s "CR 603.6 a card put into the graveyard from the HAND is exiled too" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          (_, board) <- withVoid
+          let (handCard, gs) = S.addHandCard piker S.alice board
+              discarded = S.runPure S.identityAnswer gs (Event.changeZone handCard Zone.Graveyard)
+              (placed, after) = fireTrigger discarded
+          Spec.assertBool s (Set.member pikerName (namesIn Zone.Exile S.alice after)) "CR 603.6 the discarded card was exiled"
+          Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack placed)) 1
+        -- The printed "another", and the negative half of the pair above: the
+        -- SAME board minus the second permanent. CR 603.10's first sentence is
+        -- what declines it -- the Void is not on the battlefield immediately
+        -- after the event that put it into the graveyard -- so nothing is
+        -- gathered at all and its own card stays where it landed.
+        Spec.it s "CR 603.10 the Void's OWN arrival in the graveyard triggers nothing" $ do
+          (voidId, board) <- withVoid
+          let died = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable [voidId])
+              settled = S.runPure S.identityAnswer died Engine.settleForPriority
+              -- Resolved as well as settled, so the exile assertion below is
+              -- about a trigger that DIDN'T FIRE rather than one that merely sat
+              -- on the stack unresolved. Stack.resolveTop over the empty stack
+              -- this board leaves is a no-op.
+              after = S.runPure S.identityAnswer settled Stack.resolveTop
+          Spec.assertBool s (not (Set.member voidName (namesIn Zone.Exile S.alice after))) "CR 603.10 it does not exile its own card"
+          Spec.assertBool s (Set.member voidName (namesIn Zone.Graveyard S.alice after)) "CR 603.10 which stays in the graveyard"
+          -- The proxies, kept after the behaviour: nothing was gathered and
+          -- nothing reached the stack, so the card above is unexiled because the
+          -- condition declined rather than because a trigger went unresolved.
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered died)) []
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack settled)) 0
+
 -- CR 603.6c: leaves-the-battlefield abilities "trigger when a permanent moves
 -- from the battlefield to another zone ... written as, but aren't limited to,
 -- 'When [this object] leaves the battlefield, . . .' or 'Whenever [something]
@@ -2041,6 +2121,11 @@ representativeEvents cond =
         -- public, so CR 400.7e never withholds anything and one event says as
         -- much as any list would.
         TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> one (moved Zone.Hand Zone.Graveyard)
+        -- BOTH events this condition admits, which is the whole reason it
+        -- exists: CR 712.21's second card is announced by a CardArrived event
+        -- rather than a Moved one, and the floor has to hold for each.
+        TriggerCondition.CardPutIntoGraveyard _ ->
+          moved Zone.Hand Zone.Graveyard NonEmpty.:| [GameEvent.CardArrived (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard)]
         TriggerCondition.SelfDies -> one (moved Zone.Battlefield Zone.Graveyard)
         TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- The same one event, and NOT because the batch reading matches nothing:
@@ -2287,6 +2372,7 @@ everyTriggerCondition :: [TriggerCondition.TriggerCondition]
 everyTriggerCondition =
   [ TriggerCondition.SelfEnters,
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
+    TriggerCondition.CardPutIntoGraveyard Filter.Type.IsSource,
     TriggerCondition.PermanentDies Filter.Type.IsSource,
     TriggerCondition.PermanentsDie Filter.Type.IsSource,
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn),
@@ -5409,6 +5495,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   droughtUpkeepSpec s registry
   commandZoneTriggerSpec s registry
   serraAvatarSpec s registry
+  planarVoidSpec s registry
   diesTriggerSpec s registry
   permanentDiesSpec s registry
   permanentsDieSpec s registry
