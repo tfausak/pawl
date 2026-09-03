@@ -3,6 +3,9 @@
     {
       "activatedAbilities": [
         {
+          "activator": {
+            "type": "AnyPlayer"
+          },
           "cost": {
             "mana": [
               {

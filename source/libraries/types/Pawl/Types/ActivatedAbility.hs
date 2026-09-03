@@ -2,6 +2,7 @@ module Pawl.Types.ActivatedAbility where
 
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
@@ -14,11 +15,6 @@ import qualified Pawl.Types.Modal as Modal
 --
 -- An activation cost is a Pawl.Types.Cost, the same type a spell's cost takes
 -- (CR 118.1).
---
--- Not implemented: WHO may activate. CR 602.1a's default -- the source's
--- controller -- is what Pawl.Engine.Activate enforces for every ability here, so
--- Glittering Lion's "Any player may activate this ability" is absent and that
--- card runs stricter than printed (#2213).
 data ActivatedAbility card ability = MkActivatedAbility
   { cost :: Cost.Cost Keyword.Keyword,
     modal :: Modal.Modal card ability,
@@ -28,6 +24,16 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- states for equip (702.6a), level up (702.87a) and outlast (702.107a), plus
     -- a handful of printed windows.
     restrictions :: [ActivationRestriction.ActivationRestriction],
+    -- | CR 602.1b: WHO may activate this ability, which is CR 602.2's default
+    -- unless the ability says otherwise -- Glittering Lion's "Any player may
+    -- activate this ability".
+    --
+    -- A SEPARATE field from `restrictions` above rather than another arm of that
+    -- list, because the two clauses compose and point opposite ways: a rider
+    -- narrows the window, this widens the permission, and Endbringer's Revel
+    -- prints both at once. A list arm would also make "no clause at all" and
+    -- "only the controller" two different values for one fact.
+    activator :: Activator.Activator,
     -- | The "as long as" clause of a static ability that GRANTS this one, or
     -- Nothing for an ability the object simply has, which is nearly all of them.
     --

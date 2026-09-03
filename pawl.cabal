@@ -93,6 +93,8 @@ library codec
     Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
+    Pawl.Codec.Activator
+    Pawl.Codec.ActivatorSpec
     Pawl.Codec.ActiveAttackProhibition
     Pawl.Codec.ActiveAttackProhibitionSpec
     Pawl.Codec.ActiveAttackRequirement
@@ -1327,6 +1329,7 @@ library types
     Pawl.Types.ActivatedAbilitySource
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
+    Pawl.Types.Activator
     Pawl.Types.ActiveAttackProhibition
     Pawl.Types.ActiveAttackRequirement
     Pawl.Types.ActiveBlockProhibition

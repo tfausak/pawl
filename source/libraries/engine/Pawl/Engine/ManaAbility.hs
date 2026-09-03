@@ -497,7 +497,7 @@ refReachesLibrary ref = case ref of
   -- proven line: rule 605.1a classifies ACTIVATED abilities, and every printing
   -- of this arm puts it under a triggered ability or a spell, so no card in the
   -- pool can tell True from False here. Kept because the rule states it.
-  ObjectRef.EachCardInYourLibrary -> True
+  ObjectRef.EachCardInYourLibrary _ -> True
   ObjectRef.InSlot _ -> False
   ObjectRef.EachMatching _ -> False
   ObjectRef.EachCardInGraveyard {} -> False
