@@ -530,3 +530,6 @@ refReachesLibrary ref = case ref of
   -- The battlefield again, the arm above's answer: taking one match instead
   -- of a subset changes nothing about which zone the ref reaches.
   ObjectRef.ChosenPermanent _ -> False
+  -- The battlefield once more, the arm above's answer: naming the source
+  -- alongside the match adds no zone, the source being a permanent too.
+  ObjectRef.SourceAndChosenPermanent _ -> False

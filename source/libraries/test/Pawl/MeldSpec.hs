@@ -48,9 +48,11 @@ import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaType as ManaType
@@ -58,6 +60,7 @@ import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -75,6 +78,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- The offered set FILTERED rather than a hand-built recipient, so CR 608.2b's
 -- re-read at resolution cannot drop a target the engine never offered.
@@ -260,10 +264,10 @@ spec s registry = Spec.describe s "Meld" $ do
   -- split that makes CR 701.42c come out right in the token case below: when the
   -- meld refuses, the cards are already where the exile left them.
   --
-  -- Not implemented: the printed "exile them" is ONE instruction over both
-  -- permanents (CR 608.2f), where the card file writes two Pawl.Types.Effect's
-  -- MoveToZone effects and the meld reads what they exiled rather than a slot
-  -- (#2498).
+  -- ONE exile: the printed "exile them" is one instruction over both permanents,
+  -- written as one Pawl.Types.Effect MoveToZone over
+  -- Pawl.Types.ObjectRef's SourceAndChosenPermanent. The case below is what
+  -- proves the batch; this one proves what comes out of it.
   Spec.it s "CR 701.42a the melding ability exiles the pair and puts one permanent onto the battlefield" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
@@ -296,6 +300,55 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "and the Garrison's" (fmap Object.owner (Game.lookupObject gId after)) Nothing
         Spec.assertEqWith s "and nothing is left in exile" (Game.zoneMembers Zone.Exile S.alice after) []
         Spec.assertEqWith s "setup: the pair was on the battlefield before the ability resolved" (S.countOnBattlefieldByName townshipName S.alice board) 0
+      abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+  -- CR 608.2f: "some spells and abilities include actions taken on multiple
+  -- players and/or objects. In most cases, each such action is processed
+  -- simultaneously." The printed "exile them" is one such action over two
+  -- permanents, so the two departures share ONE Pawl.Types.EventGroup -- which is
+  -- what CR 603.2c's batch conditions and CR 603.10a's look-back read, and what
+  -- two separate move instructions could not produce however they were ordered.
+  --
+  -- The board is the melding case above's, and the LOG is what the batch is read
+  -- off: the batch arms Pawl.Types.TriggerCondition has over a DEPARTURE are
+  -- PermanentsDie and PermanentsReturnedToHand, and an exile satisfies neither,
+  -- so no ability a card could print observes this one.
+  Spec.it s "CR 608.2f the pair leaves the battlefield in one event" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (gId, g2) = S.addCreature garrison S.alice g1
+        board = readyFor mountain g2
+    case Projection.abilitiesOf bId board of
+      [_, _, melding] -> do
+        let after = S.runPure S.identityAnswer board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+            -- Every departure from the battlefield to exile the log holds, each
+            -- paired with the group it was stamped with.
+            departures =
+              Maybe.mapMaybe
+                ( \logged -> case LoggedEvent.event logged of
+                    GameEvent.Moved m
+                      | ZoneChange.from (Moved.change m) == Zone.Battlefield,
+                        ZoneChange.to (Moved.change m) == Zone.Exile ->
+                          Just (LoggedEvent.group logged, ZoneChange.departed (Moved.change m))
+                    _ -> Nothing
+                )
+                (Foldable.toList (GameState.events after))
+        Spec.assertEqWith
+          s
+          "CR 608.2f both halves departed, and the two departures carry one EventGroup"
+          (List.sort (fmap snd departures), length (List.nub (fmap fst departures)))
+          (List.sort [bId, gId], 1)
+        -- The control the assertion above needs: this log DOES mint more than one
+        -- group, so "one distinct group" is a claim about the exile rather than
+        -- about a log that never advances the counter.
+        Spec.assertBool
+          s
+          (length (List.nub (fmap LoggedEvent.group (Foldable.toList (GameState.events after)))) > 1)
+          "the log carries more than one EventGroup"
+        -- And the batch still melds: the slot the one move bound is what CR
+        -- 701.42a's opcode reads (CR 400.7j).
+        Spec.assertEqWith s "and the pair still melds into Hanweir, the Writhing Township" (S.countOnBattlefieldByName townshipName S.alice after) 1
       abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
   -- CR 608.2d: "a creature named Hanweir Garrison" is a choice announced while
   -- the effect is applied, and with two of them it is a real one. The two boards
