@@ -4,6 +4,7 @@ import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CounterR as CounterR
 import qualified Pawl.Codec.DamageR as DamageR
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Codec.DrawCountR as DrawCountR
 import qualified Pawl.Codec.DrawR as DrawR
 import qualified Pawl.Codec.EntryR as EntryR
 import qualified Pawl.Codec.LifeLossR as LifeLossR
@@ -38,5 +39,6 @@ codec effectCodec =
       Arm.payload "UntapR" UntapRewrite.codec ReplacementEffect.UntapR (\x -> case x of ReplacementEffect.UntapR y -> Just y; _ -> Nothing),
       Arm.payload "LifeLossR" LifeLossR.codec ReplacementEffect.LifeLossR (\x -> case x of ReplacementEffect.LifeLossR y -> Just y; _ -> Nothing),
       Arm.payload "DrawR" DrawR.codec ReplacementEffect.DrawR (\x -> case x of ReplacementEffect.DrawR y -> Just y; _ -> Nothing),
+      Arm.payload "DrawCountR" DrawCountR.codec ReplacementEffect.DrawCountR (\x -> case x of ReplacementEffect.DrawCountR y -> Just y; _ -> Nothing),
       Arm.payload "PhaseR" PhasePattern.codec ReplacementEffect.PhaseR (\x -> case x of ReplacementEffect.PhaseR y -> Just y; _ -> Nothing)
     ]

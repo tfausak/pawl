@@ -21,6 +21,8 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DrawCountR as DrawCountR
+import qualified Pawl.Types.DrawCountRewrite as DrawCountRewrite
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -182,6 +184,13 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       codec
       (ReplacementEffect.DrawR (DrawR.MkDrawR ControllerRelation.Yours (DrawRewrite.GainLife 5)))
       " {\"type\":\"DrawR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"GainLife\",\"value\":5}}} "
+  -- CR 121.2a: Alms Collector, the one DrawCountR producer.
+  Spec.it s "DrawCountR (Alms Collector)" $
+    Common.assertCodec
+      s
+      codec
+      (ReplacementEffect.DrawCountR (DrawCountR.MkDrawCountR ControllerRelation.Opponents 2 DrawCountRewrite.EachDrawOne))
+      " {\"type\":\"DrawCountR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"atLeast\":2,\"rewrite\":{\"type\":\"EachDrawOne\"}}} "
   -- A fixed kind, a real filter, and CR 614.16's AddMore.
   Spec.it s "CounterR (Hardened Scales)" $
     Common.assertCodec

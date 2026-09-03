@@ -354,6 +354,10 @@ library codec
     Pawl.Codec.DiscardedSpec
     Pawl.Codec.DiscardSpec
     Pawl.Codec.Draw
+    Pawl.Codec.DrawCountR
+    Pawl.Codec.DrawCountRewrite
+    Pawl.Codec.DrawCountRewriteSpec
+    Pawl.Codec.DrawCountRSpec
     Pawl.Codec.DrawR
     Pawl.Codec.DrawRewrite
     Pawl.Codec.DrawRewriteSpec
@@ -1484,6 +1488,8 @@ library types
     Pawl.Types.DiscardCause
     Pawl.Types.Discarded
     Pawl.Types.Draw
+    Pawl.Types.DrawCountR
+    Pawl.Types.DrawCountRewrite
     Pawl.Types.DrawR
     Pawl.Types.DrawRewrite
     Pawl.Types.Drew

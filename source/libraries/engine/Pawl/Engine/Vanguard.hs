@@ -13,7 +13,8 @@
 -- printed ability off a command-zone object asks it, rather than growing its own
 -- reading of rule 313. Those walks are Pawl.Engine.Event's triggered gather,
 -- Pawl.Engine.Projection's static and replacement gathers, and
--- Pawl.Engine.CombatRestriction.inForce.
+-- Pawl.Engine.CombatRestriction.inForce, and Pawl.Engine.Activate's
+-- zoneAbilitiesOf for the activated ones.
 --
 -- There is no GameSettings field for "this is a Vanguard game", and CR 902 asks
 -- for none: every rule in it is stated of a player's vanguard CARD, so having one
@@ -23,12 +24,12 @@
 -- no rule pawl implements asks whether a game is a Vanguard game without also
 -- naming the card (#175).
 --
+-- All three of rule 902.7's limbs are done; the activated one is
+-- Pawl.Engine.Activate's command-zone arm, proved on Barrin in
+-- Pawl.VanguardSpec.
+--
 -- WHAT IS NOT IMPLEMENTED:
 --
---   * CR 902.7's third limb, "its activated abilities may be activated":
---     Pawl.Engine.Activate reads abilities from the battlefield, a hand and a
---     graveyard and answers the empty list for the command zone, so a vanguard
---     that prints one is mute (#2888). The triggered and static limbs are done.
 --   * CR 902.2's deck construction, as with every other format: pawl validates no
 --     deck (#940), so a game where one player brought a vanguard and another did
 --     not is playable here and is not a legal Vanguard game.

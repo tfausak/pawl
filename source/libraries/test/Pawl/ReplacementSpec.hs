@@ -3160,6 +3160,159 @@ emptyLibraryBoard plains wordsOfWorship arm =
         then S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice enchantment (theAbility wordsOfWorship) >> Stack.resolveTop)
         else g1
 
+-- CR 121.2a / 616.1g: Alms Collector ({3}{W} Creature -- Cat Cleric, 3/4, "Flash /
+-- If an opponent would draw two or more cards, instead you and that player each
+-- draw a card." -- name, cost, type line, power, toughness and Oracle text checked
+-- against api.scryfall.com 2026-09-02).
+--
+-- The pool's one DrawCountR producer, and the INSTRUCTION event class end to end.
+-- Words of Worship above watches one of CR 121.2's individual draws; this row
+-- watches the instruction that names how many of them there are, which CR 616.1g
+-- settles first.
+--
+-- Every board is three-seated, so "an opponent" (CR 102.2) is not the seat that
+-- cast the spell: carol casts Ancestral Recall at bob while ALICE holds the
+-- collector, which a rewrite reading the resolution's controller rather than the
+-- row's would get wrong here and right on a two-player board by accident.
+--
+-- Every number is distinct -- an instruction naming three cards, four cards in
+-- bob's library, three in alice's, two in carol's, one card drawn each -- so no two
+-- readings land on the same count.
+almsCollectorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+almsCollectorSpec s registry = Spec.describe s "Alms Collector (CR 121.2a)" $ do
+  Spec.it s "CR 121.2a an opponent's instruction to draw three becomes one card each" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    collector <- S.printingOf s registry "Alms Collector"
+    recall <- S.printingOf s registry "Ancestral Recall"
+    let (gs, held) = collectorBoard island piker collector recall True
+        after = S.runPure (atPlayerAnswer S.bob) gs (S.cast S.carol held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "CR 121.2a bob's instruction to draw three left him one card" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "CR 614.1a and alice, whose collector applied, drew the other" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "carol, who cast it, drew none of them" (S.handSize S.carol after) 0
+    Spec.assertEqWith s "CR 121.2 one card left bob's library of four" (length (Game.zoneMembers Zone.Library S.bob after)) 3
+  -- The CONTROL: the same board with no collector on it, so the only difference is
+  -- the row.
+  Spec.it s "CR 121.2 with no collector the same instruction draws all three" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    collector <- S.printingOf s registry "Alms Collector"
+    recall <- S.printingOf s registry "Ancestral Recall"
+    let (gs, held) = collectorBoard island piker collector recall False
+        after = S.runPure (atPlayerAnswer S.bob) gs (S.cast S.carol held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "bob drew all three" (S.handSize S.bob after) 3
+    Spec.assertEqWith s "and alice drew nothing" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "three cards left bob's library of four" (length (Game.zoneMembers Zone.Library S.bob after)) 1
+  -- CR 102.2 / 109.5: "an opponent", read against the row's own controller, and
+  -- alice is not her own opponent. The same spell and the same count, the other
+  -- target.
+  Spec.it s "CR 102.2 the collector's controller draws her own three cards in full" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    collector <- S.printingOf s registry "Alms Collector"
+    recall <- S.printingOf s registry "Ancestral Recall"
+    let (gs, held) = collectorBoard island piker collector recall True
+        after = S.runPure (atPlayerAnswer S.alice) gs (S.cast S.carol held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "CR 102.2 alice's own instruction is not an opponent's, so she drew three" (S.handSize S.alice after) 3
+    Spec.assertEqWith s "and bob drew nothing" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "her library of three is empty" (length (Game.zoneMembers Zone.Library S.alice after)) 0
+  -- CR 614.1a: "two or more". An instruction naming ONE card does not meet the
+  -- row's condition, so it is left alone -- Greed ({3}{B} Enchantment, "{2}{B}, Pay
+  -- 2 life: Draw a card"), the one-card instruction the Bloodletter group above
+  -- uses, put under bob's control so its drawer is alice's opponent.
+  Spec.it s "CR 614.1a an opponent's one-card instruction is under the threshold" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    collector <- S.printingOf s registry "Alms Collector"
+    greed <- S.printingOf s registry "Greed"
+    let (_, g1) = S.addCreature collector S.alice S.threePlayerGame
+        (bobsGreed, g2) = S.addCreature greed S.bob g1
+        g3 = snd (S.addLibraryCard piker S.alice (snd (S.addLibraryCard piker S.bob g2)))
+        ready = inMainPhase S.alice (S.landsFor swamp S.bob 3 g3)
+        after = S.runPure S.identityAnswer ready (Activate.activateAbility S.bob bobsGreed (theAbility greed) Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "CR 614.1a bob drew his one card" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "and alice, the instruction being under the threshold, drew nothing" (S.handSize S.alice after) 0
+  -- CR 616.1g: "one replacement effect may apply to an event, and another may apply
+  -- to an event contained within the first". The instruction is the outer event and
+  -- each draw it leaves is an inner one, so Words of Worship still meets alice's
+  -- half of the collector's rewrite.
+  --
+  -- CR 121.2c puts alice's draw first, she being the active player, which is what
+  -- lets it be the draw the once-only row (CR 614.3) meets.
+  Spec.it s "CR 616.1g a per-draw row still applies to a draw the instruction was replaced with" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    collector <- S.printingOf s registry "Alms Collector"
+    recall <- S.printingOf s registry "Ancestral Recall"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    let (gs, held) = collectorBoard island piker collector recall True
+        (enchantment, g1) = S.addCreature wordsOfWorship S.alice gs
+        armed = S.runPure S.identityAnswer (S.landsFor plains S.alice 1 g1) (Activate.activateAbility S.alice enchantment (theAbility wordsOfWorship) Monad.>> Stack.resolveTop)
+        after = S.runPure (atPlayerAnswer S.bob) armed (S.cast S.carol held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "CR 614.6 alice's half of the rewrite was itself replaced, so she gained 5" (S.lifeOf S.alice after) (Just 25)
+    Spec.assertEqWith s "and drew nothing" (S.handSize S.alice after) 0
+    Spec.assertEqWith s "CR 121.2a bob still drew the one card the replacement left him" (S.handSize S.bob after) 1
+  -- CR 616.1 through Replacement.readsApplier: two collectors under DIFFERENT
+  -- controllers are not value-equal, because which one applies decides who gets the
+  -- extra card. So the affected player -- bob, whom the instruction names -- is
+  -- asked, and the answer is pinned by source id rather than by candidate order.
+  --
+  -- bob casts it at himself, so that alice and carol both hold a matching row and
+  -- the pair differs in nothing but its controller.
+  Spec.it s "CR 616.1 two collectors under different controllers are told apart, and the drawer chooses" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    collector <- S.printingOf s registry "Alms Collector"
+    recall <- S.printingOf s registry "Ancestral Recall"
+    let (alices, g1) = S.addCreature collector S.alice S.threePlayerGame
+        (carols, g2) = S.addCreature collector S.carol g1
+        g3 = stockLibraries piker g2
+        (held, g4) = S.addHandCard recall S.bob g3
+        ready = inMainPhase S.alice (S.landsFor island S.bob 1 g4)
+        cast = S.cast S.bob held Monad.>> Stack.resolveTop
+        toAlice = S.runPure (collectorRaceAnswer alices) ready cast
+        toCarol = S.runPure (collectorRaceAnswer carols) ready cast
+        asked = answersFor (collectorRaceAnswer alices) ready cast
+    Spec.assertEqWith s "CR 616.1 taking alice's collector hands alice the card" (S.handSize S.alice toAlice) 1
+    Spec.assertEqWith s "and carol none of it" (S.handSize S.carol toAlice) 0
+    Spec.assertEqWith s "CR 616.1 taking carol's hands carol the card instead" (S.handSize S.carol toCarol) 1
+    Spec.assertEqWith s "and alice none of it" (S.handSize S.alice toCarol) 0
+    Spec.assertEqWith s "CR 121.2a either way bob's instruction of three left him one card" (S.handSize S.bob toAlice) 1
+    Spec.assertBool s (wasAskedToReplace asked) "a ChooseReplacement was raised"
+
+-- Aim a spell's player slot at one seat -- Ancestral Recall's "target player".
+atPlayerAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+atPlayerAnswer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer pid))) sets
+  _ -> S.identityAnswer p
+
+-- atPlayerAnswer aimed at bob, plus a CR 616.1 race answered by the candidate whose
+-- SOURCE is `preferred` -- by id, so the assertion does not depend on the engine's
+-- canonical candidate order. raceAnswer above is the same shape over a creature
+-- target rather than a player one.
+collectorRaceAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+collectorRaceAnswer preferred p = case p of
+  Prompt.ChooseReplacement _ _ entries -> maybe 0 Int.toNaturalSaturating (List.findIndex ((== preferred) . ReplacementEntry.source) entries)
+  _ -> atPlayerAnswer S.bob p
+
+-- Four cards for bob, three for alice, two for carol: distinct depths, so a hand
+-- size and a library size cannot agree by coincidence, and no seat is decked out
+-- from under an assertion (CR 104.3c).
+stockLibraries :: Printing.Printing -> GameState.GameState -> GameState.GameState
+stockLibraries piker gs =
+  let stock pid n g = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (n :: Int)]
+   in stock S.bob 4 (stock S.alice 3 (stock S.carol 2 gs))
+
+-- alice holds the collector when `collecting`, carol holds Ancestral Recall and the
+-- Island to cast it, and the libraries are stocked by stockLibraries.
+collectorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
+collectorBoard island piker collector recall collecting =
+  let g0 = S.threePlayerGame
+      g1 = if collecting then snd (S.addCreature collector S.alice g0) else g0
+      (held, g2) = S.addHandCard recall S.carol (stockLibraries piker g1)
+   in (inMainPhase S.alice (S.landsFor island S.carol 1 g2), held)
+
 -- CR 614.6 with CR 119.4: Ashiok, Wicked Manipulator ({3}{B}{B} Legendary
 -- Planeswalker -- Ashiok, loyalty 5, "If you would pay life while your library
 -- has at least that many cards in it, exile that many cards from the top of your
@@ -7405,6 +7558,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   decoratedGriffinSpec s registry
   worshipSpec s registry
   wordsOfWorshipSpec s registry
+  almsCollectorSpec s registry
   bloodletterSpec s registry
   ashiokSpec s registry
   divineDeflectionSpec s registry
