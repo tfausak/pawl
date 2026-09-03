@@ -162,14 +162,20 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       CostComponent.BlightX
       " {\"type\":\"BlightX\"} "
-  -- CR 406.2's two halves: the one that names the object the cost is on, and
-  -- the one that names a count and a criterion.
+  -- CR 406.2's halves: the two that name the object the cost is on, one per
+  -- zone, and the one that names a count and a criterion.
   Spec.it s "ExileThisFromGraveyard" $
     Common.assertCodec
       s
       codec
       CostComponent.ExileThisFromGraveyard
       " {\"type\":\"ExileThisFromGraveyard\"} "
+  Spec.it s "ExileThis" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.ExileThis
+      " {\"type\":\"ExileThis\"} "
   Spec.it s "ExileCardsFromGraveyard" $
     Common.assertCodec
       s

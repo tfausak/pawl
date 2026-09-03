@@ -428,6 +428,26 @@ data CostComponent keyword
     -- second zone would be a second constructor rather than a parameter, so no arm
     -- of that reading is ever unreachable.
     ExileThisFromGraveyard
+  | -- | CR 406.2 as a cost, from the OTHER zone: exile the permanent the cost is
+    -- on, off the battlefield. Brittle Effigy's "{4}, {T}, Exile this artifact:
+    -- Exile target creature" is the printing. A cost by CR 118.1's general
+    -- reading, ExileThisFromGraveyard's argument above unchanged.
+    --
+    -- The second CONSTRUCTOR that arm calls for rather than a zone parameter on
+    -- it, so Pawl.Engine.Cost.zoneOfComponent's CR 113.6m match stays
+    -- per-constructor. What THIS arm answers there is Nothing and not Just
+    -- Zone.Battlefield, SacrificeThis' and ReturnThis' answer and for their
+    -- reason: CR 113.6's default already put the ability on the battlefield.
+    --
+    -- SacrificeThis' shape: it names ONE object, the object the cost is on, so
+    -- folding it into a count-plus-criterion form would invent a CR 601.2h prompt
+    -- the rules do not have. A cost exiling some OTHER card is
+    -- ExileCardsFromGraveyard below.
+    --
+    -- NOT read against CR 101.2's "can't be sacrificed", ReturnThis' call above
+    -- and for its reason: an effect forbidding a sacrifice says nothing about an
+    -- exile, so copying that guard here would run STRICTER than printed.
+    ExileThis
   | -- | CR 406.2 again, in its CHOOSING form: exile this many cards matching the
     -- Filter from the paying player's graveyard. Headless Skaab's "As an
     -- additional cost to cast this spell, exile a creature card from your
