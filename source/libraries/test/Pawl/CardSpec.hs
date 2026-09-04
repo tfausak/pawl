@@ -4705,7 +4705,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 614.9's twin, patterned by the same type and read the same way.
   PlayerEffect.DamageCantBeRedirected pattern_ -> damagePatternFilters pattern_
   -- CR 701.23 names no quality of the libraries it stops being searched.
-  PlayerEffect.CantSearchLibraries -> []
+  PlayerEffect.CantSearchLibraries _ -> []
   -- CR 702.16a's quality is a chosen card NAME, read off the source's
   -- Object.chosenNames rather than written by the card, so this arm carries no
   -- Filter for the same reason the two chosen-name prohibitions above carry
@@ -4773,7 +4773,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- a damage event too, so Pawl.Engine.PlayerEffect.unredirectable's board-wide
   -- fold is exact only while EachPlayer is the one scope a card may write.
   PlayerEffect.DamageCantBeRedirected _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
-  PlayerEffect.CantSearchLibraries -> False
+  PlayerEffect.CantSearchLibraries _ -> False
   PlayerEffect.HasProtectionFromChosenName -> False
   PlayerEffect.CantBecomeMonarch -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
@@ -4835,7 +4835,7 @@ unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
 unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_) || Maybe.isJust (DamagePattern.whichSource pattern_)
   PlayerEffect.DamageCantBeRedirected pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_) || Maybe.isJust (DamagePattern.whichSource pattern_)
-  PlayerEffect.CantSearchLibraries -> False
+  PlayerEffect.CantSearchLibraries _ -> False
   PlayerEffect.HasProtectionFromChosenName -> False
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.IncreaseSpellCost {} -> False

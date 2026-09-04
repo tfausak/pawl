@@ -5038,10 +5038,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             --
             -- The prohibition names LIBRARIES (Leonin Arbiter), so it removes
             -- that one zone rather than the whole instruction: a prohibited
-            -- searcher still looks through the graveyard the same card named. See
-            -- Pawl.Engine.PlayerEffect.prohibitsSearching, which takes no library
-            -- (#1269).
-            prohibited <- State.gets (PlayerEffect.prohibitsSearching searcher)
+            -- searcher still looks through the graveyard the same card named.
+            --
+            -- Asked per (searcher, owner) pair and handed this resolution's own
+            -- controller, because a prohibition narrows on both axes: whose
+            -- library is looked through, and who controls the spell or ability
+            -- causing the look (Ashiok, Dream Render). CR 113.7's source is the
+            -- resolving object, so its controller is the cause's.
+            prohibited <- State.gets (PlayerEffect.prohibitsSearching searcher owner controller)
             -- The printed "and/or": the searcher picks which of the zones the
             -- card names to look through -- Delivery Moogle's "your library
             -- and/or graveyard" -- and the rest of the instruction, the shuffle
