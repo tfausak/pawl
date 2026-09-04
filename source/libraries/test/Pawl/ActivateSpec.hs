@@ -4229,7 +4229,7 @@ abilityCeilingSpec s registry = Spec.describe s "AbilityCeilingAndBoundSlot" $ d
     Spec.assertEqWith s "and the mana value 3 one the announced 1 excluded is still in the graveyard" (graveyardNames S.alice after) [S.printingName ball]
 
 -- CR 602.5's rider over a fact about the board rather than a window: Barbarian
--- Ring (Torment) prints "Threshold -- {R}, {T}, Sacrifice this land: It deals 2
+-- Ring (Modern Horizons 3) prints "Threshold -- {R}, {T}, Sacrifice this land: It deals 2
 -- damage to any target. Activate only if there are seven or more cards in your
 -- graveyard." Oracle text checked against Scryfall 2026-09-03. "Threshold" is an
 -- ability word (CR 207.2c) and carries no rules meaning; the sentence after the
