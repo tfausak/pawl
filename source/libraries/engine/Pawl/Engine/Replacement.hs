@@ -721,10 +721,10 @@ applies gs event candidate =
         -- board on which the rewrite would change nothing.
         --
         -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the three
-        -- src-derived arms below it: the only producer installs a FLOATING row
-        -- from an activated ability, so its "you" was baked when the ability
-        -- resolved and survives the source leaving the battlefield or changing
-        -- hands. See matchesCandidatePlayer (#2662).
+        -- src-derived arms below it: both producers install a FLOATING row from an
+        -- activated ability, so the "you" was baked when the ability resolved and
+        -- survives the source leaving the battlefield or changing hands -- which
+        -- Ring of Ma'rûf's own cost makes it do. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
           matchesCandidatePlayer gs src (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
         -- CR 121.2a: whose draw INSTRUCTIONS the row watches (CR 109.5's "you"),
@@ -2730,9 +2730,9 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- not because the resource is inexhaustible; `breaches` is where the count is
   -- actually read, once per proposal.
   ReplacementEffect.LifeLossR {} -> Nothing
-  -- CR 614.1a: a life gain is not a supply a batch can run out of, and the
-  -- question never arrives besides -- `contested` above filters by
-  -- WouldDealDamage, which no DrawR row matches.
+  -- The question never arrives: `contested` above filters by WouldDealDamage,
+  -- which no DrawR row matches. A life gain is no supply in any case; CR 400.11b's
+  -- pool IS one, and `bringInto` is where its own exhaustion is read.
   ReplacementEffect.DrawR {} -> Nothing
   -- The instruction class one rule up, and the same answer for the same reason:
   -- `contested` asks only about a damage batch.
