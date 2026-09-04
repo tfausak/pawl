@@ -208,6 +208,15 @@ overwritten by another's, and restoring it injected a different unit's
 in-flight code into the tree --- a corruption no build catches, because both
 sides compile.
 
+**Seed every worktree's `dist-newstyle` before its first build.** Measured
+2026-09-04 on a loaded machine: a cold `cabal build all` in a fresh worktree
+took 463s; seeded with `cp -a` from a checkout 80 files behind `origin/main`,
+414s with 843 of 1528 modules recompiled; seeded from a build at the same
+commit, 24s with none. The copy is an APFS clone and costs nothing. Name the
+donor in the brief: the most recently merged unit's worktree if it has not
+been reaped yet, else the primary checkout. Reap the donor after the copy,
+not before.
+
 **Builds are counted, machine-wide.** The GHC job semaphore shares compile
 slots; it does not stop several worktrees running `cabal` at once, and with
 three going an 8 GB machine is unusable. Every `cabal` invocation in every

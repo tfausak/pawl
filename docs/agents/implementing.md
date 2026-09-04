@@ -37,6 +37,12 @@ Copy `cabal.project.local` in from the primary checkout, as a BARE command of
 its own, and confirm it is there. The worktree-isolation guard refuses a
 compound command wholesale, and its error names the other half.
 
+Then copy `dist-newstyle` the same way, from the donor the brief names or else
+the primary checkout: `cp -a /abs/path/to/donor/dist-newstyle
+./dist-newstyle`, before anything runs `cabal`. A same-commit donor makes the
+first build a relink; a donor behind your commit still keeps every module
+downstream of nothing that changed. Never build in the donor.
+
 ## Running the suite
 
     cabal test --test-options '--timeout 15s --hide-successes'
