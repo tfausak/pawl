@@ -34,8 +34,10 @@ data PreventAllDamage effect = MkPreventAllDamage
     -- beside DealtBy this field names the SOURCE and the two are read together,
     -- which is @whatRecipient@'s own note. That alternation is exactly how
     -- Pawl.Types.PreventNextDamage reads its pair. A shield writing NEITHER
-    -- surrounds nothing (CR 615.1) and installs no row at all, which
-    -- Pawl.CardSpec's shieldNamingNothingOffends rejects.
+    -- covers EVERY recipient (Pay No Heed), the row's Nothing recipient having
+    -- meant that all along; it names a SOURCE instead, since a shield naming
+    -- neither end is Fog's shape and is authored as an Effect.Replace. That is
+    -- Pawl.CardSpec's shieldNamingNothingOffends.
     ref :: Maybe ObjectRef.ObjectRef,
     -- | CR 611.2c's LIVE description of the objects one shared shield covers --
     -- Pack Leader's "to Dogs you control", which is not a set swept when the

@@ -2524,14 +2524,22 @@ isDamageR replacement = case replacement of
 -- for a description, leaving a shield or redirection that names nothing with no
 -- row to install and the card silently doing less than it printed.
 --
--- Not implemented: a shield covering EVERY recipient, which is what a card naming
--- only its source needs (Burrenton Forge-Tender's "prevent all damage a red
--- source of your choice would deal this turn"). @whatRecipient@ describes
--- permanents and the unbounded shield has no player half, so "everything" has no
--- spelling and such a card would install nothing at all (#2101). Until it does,
--- this lint is what stops one being written.
+-- The UNBOUNDED shield has a fourth spelling, which is why its arm below reads
+-- one more field than the other two: a card may name only the SOURCE and leave
+-- the recipient side empty (Pay No Heed's "prevent all damage a source of your
+-- choice would deal this turn"), and that shield covers every recipient rather
+-- than none. It still has to name that source, because CR 609.7a's chosen id is
+-- the only thing the opcode bakes that card data cannot write itself: a shield
+-- naming neither a recipient nor a chosen source is Fog's and Luminesce's shape,
+-- authored directly as an Effect.Replace carrying a DamageR.
 shieldNamingNothingOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 shieldNamingNothingOffends effect = case effect of
+  -- CR 615.7's counted shield has no source-only spelling to admit here: no
+  -- printing counts an amount down while naming only a source. The recipient-less
+  -- printings that name one -- Pilgrim of Justice, Penance, Opal-Eye's first
+  -- ability -- are CR 615.8's "the next time ... would deal damage", a rewrite
+  -- pawl does not have (gap #3206), and this arm is what keeps one out of the
+  -- corpus meanwhile.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref whatRecipient whoRecipient _ _ _) ->
     Maybe.isNothing ref && Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient
   -- `direction` IS read here, because it decides whether `whatRecipient` can
@@ -2543,11 +2551,14 @@ shieldNamingNothingOffends effect = case effect of
   -- description onto each row, never making a row of its own, so a by-direction
   -- shield with no ref installs nothing however it describes its recipients.
   -- `whatSource` is not a substitute on either side -- that one narrows a row
-  -- rather than creating one, and `And []` is its ordinary value.
-  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient direction _ _ _) ->
+  -- rather than creating one, and `And []` is its ordinary value. `chosenSource`
+  -- IS one, but only beside DealtTo: that branch installs the source-only
+  -- shield's lone row, where the by-direction branch folds over the ids the ref
+  -- named and has nothing to fold.
+  Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref whatRecipient direction chosenSource _ _) ->
     Maybe.isNothing ref && case direction of
       DamageDirection.DealtBy -> True
-      DamageDirection.DealtTo -> Maybe.isNothing whatRecipient
+      DamageDirection.DealtTo -> Maybe.isNothing whatRecipient && Maybe.isNothing chosenSource
   -- CR 614.9's redirection covers a side the same two ways -- Carom names it,
   -- Harm's Way describes it -- and one saying neither installs nothing.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from whatRecipient whoRecipient _ _) ->
@@ -9461,6 +9472,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any isByDirectionShield (shieldsOf dovin)) "setup: Dovin prints a by-direction shield"
     Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf dovin))) "and naming only the source it watches is accepted"
     Spec.assertEqWith s "while stripping that name rejects both of Dovin's shields" (length (filter (shieldNamingNothingOffends . strip) (shieldsOf dovin))) (2 :: Int)
+    -- CR 609.7a's chosen source is the fourth spelling: Pay No Heed names no
+    -- recipient at all and is accepted, where the same shield with that choice
+    -- removed says nothing about either end of the damage event and is rejected.
+    payNoHeed <- S.printingOf s registry "Pay No Heed"
+    let unchoose effect = case effect of
+          Effect.PreventAllDamage shield -> Effect.PreventAllDamage shield {PreventAllDamage.chosenSource = Nothing}
+          other -> other
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf payNoHeed))) "the real Pay No Heed names only the source of your choice"
+    Spec.assertBool s (any (shieldNamingNothingOffends . unchoose) (shieldsOf payNoHeed)) "and the same shield with that choice removed is rejected"
     -- The cell the lint reads `direction` for: beside DealtBy the description is
     -- the OTHER end of the damage event rather than a second spelling of the
     -- covered side, and Pawl.Engine.Resolve's by-direction branch folds over the
