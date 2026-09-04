@@ -331,6 +331,11 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.assertBool s (not (Filter.matches self noPower (Filter.Type.PowerAtMost 99))) "no power"
     Spec.assertBool s (Filter.matches self noPower (Filter.Type.Not (Filter.Type.PowerAtLeast 99))) "where the negation of PowerAtLeast admits it"
 
+  Spec.it s "ToughnessGreaterThanPower compares both projected characteristics strictly" $ do
+    Spec.assertBool s (Filter.matches self (blackCreature {Filter.toughness = Just 3}) Filter.Type.ToughnessGreaterThanPower) "3 > 2"
+    Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ToughnessGreaterThanPower)) "2 is not > 2"
+    Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.toughness = Nothing}) Filter.Type.ToughnessGreaterThanPower)) "no toughness"
+
   -- CR 702.134a's comparison, whose bound is the Context's source power rather
   -- than a literal the atom carries. blackCreature is power 2 and
   -- devoidBigCreature power 5, so one source power between them tells the two

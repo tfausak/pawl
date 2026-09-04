@@ -58,12 +58,14 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Sickness as Sickness
@@ -79,6 +81,30 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
         after = S.fightWith S.aggressiveAnswer gs
     -- A Piker is a 2/1, and bob starts at 20.
     Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
+  Spec.it s "CR 510.1a Tapestry Warden substitutes toughness only where greater than power" $ do
+    warden <- S.printingOf s registry "Tapestry Warden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = S.combatBoardOf [warden, piker] []
+        after = S.runCombat S.aggressiveAnswer gs
+    -- The 3/4 Warden assigns 4; the 2/1 Piker still assigns 2.
+    Spec.assertEqWith s "defender took six" (S.lifeOf S.bob after) (Just 14)
+  Spec.it s "CR 613.11 Tapestry Warden compares power and toughness after characteristic effects" $ do
+    warden <- S.printingOf s registry "Tapestry Warden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [warden, piker] []
+    case mine of
+      [_, pikerId] -> do
+        let after = S.runCombat S.aggressiveAnswer (withToughnessBoost pikerId gs)
+        -- The final 2/3 Piker joins the Warden in assigning with toughness.
+        Spec.assertEqWith s "defender took seven" (S.lifeOf S.bob after) (Just 13)
+      _ -> Spec.assertFailure s "fixture should have two attackers"
+  Spec.it s "CR 510.1d Tapestry Warden substitutes toughness for a blocker too" $ do
+    warden <- S.printingOf s registry "Tapestry Warden"
+    let (gs, mine, _) = S.combatBoard warden 1 1
+        after = S.fightWith S.aggressiveAnswer gs
+    case mine of
+      [] -> Spec.assertFailure s "fixture should have an attacker"
+      attacker : _ -> Spec.assertEqWith s "attacker took four" (S.damageOf attacker after) (Just 4)
   Spec.it s "CR 509 a blocked attacker does not damage the player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 1
@@ -979,6 +1005,21 @@ withFear oid gs =
             ContinuousEffect.timestamp = ts,
             ContinuousEffect.expiry = Expiry.AtCleanup,
             ContinuousEffect.modification = Modification.GainKeyword Keyword.Fear,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- A layer-7c effect that turns Goblin Piker's 2/1 into a 2/3, so Tapestry
+-- Warden's CR 613.11 rules effect must see the finished characteristics.
+withToughnessBoost :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withToughnessBoost oid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = oid,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
+            ContinuousEffect.modification = Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 0) (Quantity.Literal 2)),
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}

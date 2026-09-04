@@ -268,6 +268,7 @@ layer m = case m of
   Modification.AddColor _ -> Layer.Color
   Modification.AddChosenColor -> Layer.Color
   Modification.SwitchPowerToughness -> Layer.SwitchPT
+  Modification.AssignCombatDamageWithToughness -> Layer.Rules
   -- CR 613.1f, GainKeyword's arm: no rule 613 sublayer is CR 702.184c's own,
   -- so this joins the other ability-shaping grants at layer 6. Nothing else
   -- in the layer system reads or writes PC.grantsStationToughness, so
@@ -506,6 +507,9 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- CR 613.4d.
         Modification.SwitchPowerToughness ->
           pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
+        -- CR 510.1a: a bare marker, read only while assigning combat damage.
+        Modification.AssignCombatDamageWithToughness ->
+          pc {PC.assignsCombatDamageWithToughness = True}
         -- CR 702.184c: a SET, not an accumulation -- the fact is a bare marker
         -- with no count and no source to prefer among several grants.
         Modification.GrantsStationToughness ->
@@ -580,6 +584,7 @@ cardTypesAfter m types = case m of
   Modification.SetBasePowerToughness {} -> types
   Modification.ModifyPowerToughness {} -> types
   Modification.SwitchPowerToughness -> types
+  Modification.AssignCombatDamageWithToughness -> types
   Modification.GrantsStationToughness -> types
   Modification.SetLandSubtype _ -> types
   Modification.SetLandSubtypeToChosen -> types
@@ -1608,6 +1613,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.enchant = [],
         PC.subtypeWordChanges = [],
         PC.textChangedKeywords = Map.empty,
+        PC.assignsCombatDamageWithToughness = False,
         -- CR 702.184c: an ability on the stack grants nothing to its
         -- controller's station abilities of its own.
         PC.grantsStationToughness = False
@@ -1690,6 +1696,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- The seed is CR 613.1's starting point, before layer 3 has run.
             PC.subtypeWordChanges = [],
             PC.textChangedKeywords = Map.empty,
+            -- CR 613.1's starting point, before rules-changing effects.
+            PC.assignsCombatDamageWithToughness = False,
             -- CR 613.1's starting point, before layer 6 has run:
             -- applyModification's GrantsStationToughness arm is the only writer.
             PC.grantsStationToughness = False
@@ -1848,6 +1856,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.AddChosenColor -> Just m
         Modification.SwitchPowerToughness -> Just m
         -- No quantity to freeze: a bare marker.
+        Modification.AssignCombatDamageWithToughness -> Just m
         Modification.GrantsStationToughness -> Just m
 
 -- Every Quantity a modification carries, in order. A new Quantity field goes here
@@ -1887,6 +1896,7 @@ quantitiesOf m = case m of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
+  Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
 -- CR 305.7: does this modification SET a land's subtype, and so strip the land's
@@ -1934,6 +1944,7 @@ setsLandSubtype m = case m of
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
+  Modification.AssignCombatDamageWithToughness -> False
   Modification.SetColor _ -> False
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
@@ -2184,6 +2195,7 @@ rewriteModification pairs m =
         Modification.LoseKeywordFamily _ -> acc
         Modification.SwitchPowerToughness -> acc
         -- Nothing to rewrite: a bare marker naming no subtype word.
+        Modification.AssignCombatDamageWithToughness -> acc
         Modification.GrantsStationToughness -> acc
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
         -- hacked Aspect of Wolf counts the new type. rewriteQuantity is the same
@@ -4021,6 +4033,7 @@ removesAbilities m = case m of
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
   -- A grant, GainKeyword's answer above: not a removal.
+  Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
   Modification.AddLandSubtype _ -> False
   Modification.ChangeSubtypeWord {} -> False
@@ -4473,6 +4486,7 @@ filterReads f = case f of
   Filter.Type.HasKeywordFamily _ -> Set.singleton Keywords
   Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
   Filter.Type.PowerAtMost _ -> Set.singleton PowerA
+  Filter.Type.ToughnessGreaterThanPower -> Set.singleton PowerA
   -- The same aspect, covering BOTH powers the atom compares: Aspect names an
   -- aspect of one object's projection, with no way to say "the source's".
   Filter.Type.PowerLessThanSource -> Set.singleton PowerA
@@ -4703,6 +4717,7 @@ filterReadsPeers f = case f of
   Filter.Type.HasKeywordFamily _ -> False
   Filter.Type.PowerAtLeast _ -> False
   Filter.Type.PowerAtMost _ -> False
+  Filter.Type.ToughnessGreaterThanPower -> False
   -- The SOURCE's power arrives on the Context, which affectsGiven builds with
   -- Filter.contextFor -- no projection of a second object is read.
   Filter.Type.PowerLessThanSource -> False
@@ -4848,6 +4863,9 @@ modificationWrites m = case m of
   Modification.AddChosenColor -> Set.singleton Colors
   Modification.SetController _ -> Set.singleton Controller
   Modification.SetControllerToSource -> Set.singleton Controller
+  -- Writes a rules marker which, like grantsStationToughness below, has no
+  -- dedicated Aspect and no reader inside the layer fold.
+  Modification.AssignCombatDamageWithToughness -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.grantsStationToughness, which Aspect has no
   -- finer grain for than Keywords -- an ability-shaping write with no reader
   -- inside the layer fold at all (Quantity.StationMeasure reads it OUTSIDE
@@ -4883,6 +4901,7 @@ modificationReads m = case m of
   Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
   -- Carries no Quantity: a bare marker.
+  Modification.AssignCombatDamageWithToughness -> Set.empty
   Modification.GrantsStationToughness -> Set.empty
   Modification.SetLandSubtype _ -> Set.empty
   Modification.SetLandSubtypeToChosen -> Set.empty
@@ -5599,6 +5618,15 @@ powerGiven pcs oid gs = PC.power (projectGiven pcs oid gs)
 toughnessOf :: ObjectId -> GameState -> Maybe Integer
 toughnessOf oid gs = PC.toughness (project oid gs)
 
+-- CR 510.1a: the projected characteristic this creature uses to assign combat
+-- damage. A card can substitute toughness; power remains the rules default.
+combatDamageAmountOf :: ObjectId -> GameState -> Maybe Integer
+combatDamageAmountOf oid gs =
+  let pc = project oid gs
+   in if PC.assignsCombatDamageWithToughness pc
+        then PC.toughness pc
+        else PC.power pc
+
 -- CR 702: an object's keyword abilities after the layer fold, counted per
 -- keyword. Most readers want hasKeyword or totalToxic.
 keywordsOf :: ObjectId -> GameState -> Map Keyword Natural
@@ -6269,6 +6297,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
   -- Hands out no Keyword at all.
+  Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
 
 -- Does this modification write a card type or subtype that intrinsicReplacementsOf
@@ -6327,6 +6356,7 @@ grantsMintingType m = case m of
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
   -- Writes no card type or subtype at all.
+  Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
 
 -- CR 306.5b / 310.4b: the card types intrinsicReplacementsOf mints a CR 614.1c row

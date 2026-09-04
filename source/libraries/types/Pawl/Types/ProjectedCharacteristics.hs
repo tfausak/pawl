@@ -236,6 +236,8 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     --
     -- Not copiable, for subtypeWordChanges' reason and by the same construction.
     textChangedKeywords :: Map.Map Keyword.Keyword Natural.Natural,
+    -- | CR 510.1a: does this creature assign combat damage equal to toughness?
+    assignsCombatDamageWithToughness :: Bool,
     -- | CR 702.184c: does this object's controller's station abilities read a
     -- tapped creature's toughness instead of its power?
     -- Modification.GrantsStationToughness's only writer. Read by

@@ -344,6 +344,8 @@ data Modification ability
     -- on whatever 7a, 7b and 7c already produced, not on the printed box.
     -- Carries no payload: two applications return the object to normal for free.
     SwitchPowerToughness
+  | -- | CR 510.1a: this creature assigns combat damage equal to its toughness.
+    AssignCombatDamageWithToughness
   | -- | CR 702.184c: while this object's controller controls it, that player's
     -- station abilities read the tapped creature's toughness where it exceeds
     -- its power (Tapestry Warden). Self-only, like DestructionR: a fact about the

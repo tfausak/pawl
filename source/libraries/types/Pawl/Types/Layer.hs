@@ -19,4 +19,5 @@ data Layer
   | SetPT -- layer 7b
   | ModifyPT -- layer 7c
   | SwitchPT -- layer 7d
+  | Rules -- 613.11, after objects' characteristics
   deriving (Eq, Ord, Show)

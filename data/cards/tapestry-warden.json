@@ -31,6 +31,36 @@
           "affected": {
             "type": "Matching",
             "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "ToughnessGreaterThanPower"
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "AssignCombatDamageWithToughness"
+            }
+          ]
+        },
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
               "type": "IsSource"
             }
           },

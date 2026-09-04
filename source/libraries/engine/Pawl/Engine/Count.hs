@@ -272,6 +272,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasKeywordFamily _ -> predicate
   Filter.Type.PowerAtLeast _ -> predicate
   Filter.Type.PowerAtMost _ -> predicate
+  Filter.Type.ToughnessGreaterThanPower -> predicate
   Filter.Type.PowerLessThanSource -> predicate
   Filter.Type.PowerGreaterThanSource -> predicate
   Filter.Type.PowerIsAmountInSlot _ -> predicate
