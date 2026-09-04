@@ -2048,6 +2048,7 @@ replacementEntryEffects replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> []
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
+  ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.PhaseR _ -> []
@@ -2071,6 +2072,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> []
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
+  ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.PhaseR _ -> []
@@ -2092,6 +2094,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> []
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
+  ReplacementEffect.LifeGainR {} -> []
   ReplacementEffect.DrawR {} -> []
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.PhaseR _ -> []
@@ -2112,6 +2115,7 @@ idleTokenRowOffends replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
   ReplacementEffect.PhaseR _ -> False
@@ -2293,6 +2297,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
 
@@ -2336,6 +2341,10 @@ engineOnlyOffends replacement = case replacement of
   -- rewrite that is a printed floor, a printed scaling or a printed instead-clause
   -- name nothing an engine has to bake -- so nothing here is engine-only.
   ReplacementEffect.LifeLossR {} -> False
+  -- Boon Reflection writes this arm whole -- CR 109.5's relation and a printed
+  -- scaling name nothing an engine has to bake. LifeLossR's answer, and for its
+  -- reason.
+  ReplacementEffect.LifeGainR {} -> False
   -- Words of Worship writes this arm whole -- CR 109.5's relation and a printed
   -- amount of life name nothing an engine has to bake -- so nothing here is
   -- engine-only. LifeLossR's answer, and for its reason.
@@ -2410,6 +2419,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.TokenR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
   ReplacementEffect.PhaseR _ -> False
@@ -2440,6 +2450,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
   ReplacementEffect.PhaseR _ -> False
@@ -2479,6 +2490,7 @@ shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
   ReplacementEffect.PhaseR _ -> False
@@ -5032,6 +5044,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> unframed [turnUpPattern] <> turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
+  ReplacementEffect.LifeGainR {} -> []
   -- The pattern is one ControllerRelation; the wish filter a FromOutsideTheGame
   -- rewrite carries is the one Filter a draw row can hold (Ring of Maʼrûf), and
   -- it is CR 400.11c's, so it takes the same framing Effect.FromOutsideTheGame's

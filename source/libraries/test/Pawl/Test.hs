@@ -215,6 +215,8 @@ import qualified Pawl.Codec.LayoutSpec
 import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
 import qualified Pawl.Codec.LifeChangeSpec
+import qualified Pawl.Codec.LifeGainRSpec
+import qualified Pawl.Codec.LifeGainRewriteSpec
 import qualified Pawl.Codec.LifeLossCauseSpec
 import qualified Pawl.Codec.LifeLossPatternSpec
 import qualified Pawl.Codec.LifeLossRSpec
@@ -799,6 +801,8 @@ spec s registry = do
   Pawl.Codec.LifeChangeSpec.spec s
   Pawl.Codec.LifeLossCauseSpec.spec s
   Pawl.Codec.LifeLossPatternSpec.spec s
+  Pawl.Codec.LifeGainRSpec.spec s
+  Pawl.Codec.LifeGainRewriteSpec.spec s
   Pawl.Codec.LifeLossRSpec.spec s
   Pawl.Codec.LifeLossRewriteSpec.spec s
   Pawl.Codec.LimitUnlessSpec.spec s

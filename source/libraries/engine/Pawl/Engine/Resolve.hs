@@ -1284,6 +1284,8 @@ replacementRowReads re = case re of
   -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and no arm
   -- of LifeLossRewrite carries a Filter or a Quantity: no read at all.
   ReplacementEffect.LifeLossR {} -> ([], [])
+  -- One ControllerRelation and one Scaling: no read at all, LifeLossR's answer.
+  ReplacementEffect.LifeGainR {} -> ([], [])
   -- The pattern is one ControllerRelation; a Filter can only ride the REWRITE, and
   -- drawRewriteReads below is what reports it.
   ReplacementEffect.DrawR (DrawR.MkDrawR _ rewrite) -> drawRewriteReads rewrite
@@ -4016,6 +4018,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.TurnUpR _ -> []
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR _ -> []
+  ReplacementEffect.LifeGainR _ -> []
   ReplacementEffect.DrawR _ -> []
   ReplacementEffect.DrawCountR _ -> []
   ReplacementEffect.PhaseR _ -> []
@@ -6645,16 +6648,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Event.simultaneously . Monad.forM_ gainers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
-          | n > 0 -> Event.changeLife pid n
+          -- Through Event.resolveLifeGain, CR 614.1's funnel for the gain class,
+          -- LoseLife's road above one direction over: a LifeGainR row resizes the
+          -- gain and the SETTLED amount is what moves the total.
+          | n > 0 -> do
+              settled <- Event.resolveLifeGain pid (Integer.toNaturalSaturating n)
+              Event.changeLife pid (toInteger settled)
         _ -> pure ()
   -- CR 701.12c: both sides reach each other's PREVIOUS total, so both deltas are
   -- read off the same game state before either is written. Written as a gain and
   -- a loss rather than two assignments, which is what puts a LifeGained and a
   -- LifeLost in the log.
   --
-  -- The LOWERED side goes through changeLifeByDelta, so it is proposed as a life
-  -- loss and CR 701.12c's "replacement effects may modify these gains and losses"
-  -- is reachable; ReplacementSpec's Bloodletter group proves it.
+  -- BOTH sides go through changeLifeByDelta, so each is proposed -- the lowered
+  -- one as a life loss, the raised one as a life gain -- and CR 701.12c's
+  -- "replacement effects may modify these gains and losses" is reachable;
+  -- ReplacementSpec's Bloodletter group proves the loss half.
   --
   -- Not implemented: CR 701.12c's deferral to CR 119.7-8, under which an
   -- exchange that would raise a player who can't gain life doesn't happen.
@@ -6692,8 +6701,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- state before any life moves (CR 608.2f).
   --
   -- Each delta goes through changeLifeByDelta, which proposes a DOWNWARD one as a
-  -- life loss, since rule 119.5 spells a lower total as the player losing "the
-  -- necessary amount of life".
+  -- life loss and an UPWARD one as a life gain, since rule 119.5 spells a lower
+  -- total as the player losing "the necessary amount of life" and a higher one as
+  -- their gaining it.
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -6717,8 +6727,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- FILTERED, NOT TRUSTED, all-or-nothing: only a whole permutation is a
   -- legal answer, so a bad one falls back to redistributing among nobody.
   --
-  -- A LOWERED total goes through changeLifeByDelta, the ExchangeLifeTotals arm's
-  -- road: rule 119.5's loss, proposed so a replacement reaches it (CR 614.1).
+  -- Every total goes through changeLifeByDelta, the ExchangeLifeTotals arm's
+  -- road: rule 119.5's loss or gain, proposed so a replacement reaches it (CR
+  -- 614.1).
   --
   -- Not implemented: CR 119.7-8's own restrictions on a player who can't gain or
   -- lose life (vacuous, as for ExchangeLifeTotals) (#3078), nor CR 810.9f's "not
@@ -9452,8 +9463,11 @@ bindAmountSlot holder slot n gs =
 -- a life loss and goes through Event.resolveLifeLoss first, CR 614.1's funnel for
 -- the class, so a replacement watching life loss reaches it and the SETTLED loss
 -- is what moves the total -- which is why a player may end up somewhere other
--- than the total the effect named. An upward delta is a life GAIN and proposes
--- nothing here (#3086).
+-- than the total the effect named. An upward delta is a life GAIN and goes
+-- through Event.resolveLifeGain, the same funnel one direction over -- CR 119.5
+-- spelling a higher total as the player gaining "the necessary amount of life",
+-- and CR 701.12c saying out loud that "replacement effects may modify these gains
+-- and losses".
 --
 -- The one road for every arm that arrives at a TOTAL rather than at an amount:
 -- Effect.SetLifeTotal, Effect.ExchangeLifeTotals and
@@ -9464,7 +9478,9 @@ changeLifeByDelta pid delta =
     then do
       settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid (Integer.toNaturalSaturating (negate delta))
       Event.changeLife pid (negate (toInteger settled))
-    else Event.changeLife pid delta
+    else do
+      settled <- Event.resolveLifeGain pid (Integer.toNaturalSaturating delta)
+      Event.changeLife pid (toInteger settled)
 
 -- CR 701.23: do to a found card what the search said -- a move for every
 -- destination and, for one of them, a CR 701.20a reveal first, through the CR

@@ -941,11 +941,16 @@ splitExcess gs event =
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = processDamage events >>= recordLifelinkGains
 
--- applyDamage minus lifelink's gain RECORDS, returning the survivors so the
--- caller can record those where its own bracket does not reach. The gain
--- itself -- the life total -- is written here, by `gainOne`, since CR 120.4c
--- processes it with the damage's other results (see the note on `lost`).
-processDamage :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+-- applyDamage minus lifelink's gain RECORDS, returning the SETTLED gains so the
+-- caller can record those where its own bracket does not reach. The gain itself
+-- -- the life total -- is written here, since CR 120.4c processes it with the
+-- damage's other results (see the note on `lost`).
+--
+-- Settled and not the raw damage: each gain goes through Event.resolveLifeGain,
+-- CR 614.1's funnel for the class, so a LifeGainR row resizes it -- and the
+-- record has to name what the player actually gained, or a "whenever you gain
+-- life" trigger would read the amount before the replacement.
+processDamage :: [DamageEvent.DamageEvent] -> Game [(PlayerId, Natural)]
 processDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
   -- The state the whole batch is read against: recipients are classified off it
@@ -1032,34 +1037,13 @@ processDamage events = do
         -- `counterResults` below performs CR 120.3b/d/g's counters, and for the
         -- same reason.
         Recipient.ToPlayer _ -> g
-      -- CR 120.3f: lifelink damage gains its source's controller that much life,
-      -- IN ADDITION to the damage's other results. A pass of its own over the same
-      -- survivors, deliberately not a branch inside markOne: "in addition" is
-      -- then structural, and no arm of CR 120.3 above can be turned into
-      -- "instead" by an edit here. Run below, ahead of the life-loss pass, for
-      -- the reason stated there.
-      --
-      -- Every survivor, whatever it was dealt to. CR 702.15b hangs the gain off
-      -- the SOURCE, so which of CR 120.3's results the damage had is none of this
-      -- pass's business.
-      --
-      -- One adjustment per event rather than one per player: CR 702.15e makes
-      -- simultaneous lifelink sources cause SEPARATE life gain events (CR
-      -- 119.9-10), and summing them first would be one event.
-      --
-      -- Over `survivors`, so CR 615.6's prevented event gains nobody anything --
-      -- the same reading toxic's arm above takes.
-      gainOne g ev = case DamageEvent.dealtByLifelink ev of
-        Nothing -> g
-        Just pid ->
-          let gain player = player {Player.life = Player.life player + toInteger (DamageEvent.amount ev)}
-           in g {GameState.players = Map.adjust gain pid (GameState.players g)}
       -- CR 903.10a: the running tally of COMBAT damage each commander has dealt
       -- each player, kept under the commander's OWNER (Player.commanderDamage).
       --
-      -- A pass of its own rather than a line inside markOne, for `gainOne`'s reason:
-      -- the tally is not one of CR 120.3's results at all -- it is a record CR
-      -- 903.10a keeps beside them -- so no arm of markOne can turn it off.
+      -- A pass of its own rather than a line inside markOne, for the lifelink
+      -- gain pass's reason: the tally is not one of CR 120.3's results at all --
+      -- it is a record CR 903.10a keeps beside them -- so no arm of markOne can
+      -- turn it off.
       --
       -- Asked of `board`, the pre-batch state the rest of applyDamage classifies
       -- against, so every event in one batch reads the same answer to "was the
@@ -1241,17 +1225,44 @@ processDamage events = do
                       Recipient.ToObject oid -> onObject oid
                       Recipient.ToPlayer pid -> place poison (Event.putPlayerCounters cause pid PlayerCounterKind.Poison)
                       Recipient.ToPile _ -> pure ()
-  -- CR 120.3f's gain, performed HERE and not in the fold below, because CR 120.4c
-  -- processes the damage into ALL of its results as one event and the life-loss
-  -- pass that follows reads the resulting total off the live board (see the note
-  -- on `lost`). Writing the gain afterwards let a floor row (Worship) fire on a
+  -- CR 120.3f: lifelink damage gains its source's controller that much life, IN
+  -- ADDITION to the damage's other results. A pass of its own over the same
+  -- survivors, deliberately not a branch inside `markOne`: "in addition" is then
+  -- structural, and no arm of CR 120.3 above can be turned into "instead" by an
+  -- edit here.
+  --
+  -- Every survivor, whatever it was dealt to. CR 702.15b hangs the gain off the
+  -- SOURCE, so which of CR 120.3's results the damage had is none of this pass's
+  -- business. Over `survivors`, so CR 615.6's prevented event gains nobody
+  -- anything -- the same reading toxic's arm above takes.
+  --
+  -- Performed HERE and not in the fold below, because CR 120.4c processes the
+  -- damage into ALL of its results as one event and the life-loss pass that
+  -- follows reads the resulting total off the live board (see the note on
+  -- `lost`). Writing the gain afterwards let a floor row (Worship) fire on a
   -- drain a simultaneous gain covered; see #2563.
   --
   -- Ahead of `markOne` and `tallyOne` too, which changes nothing they can see:
   -- those write GameState.objects and Player.commanderDamage, and this writes
   -- Player.life. The RECORD lands later still, in recordLifelinkGains, after
   -- the damage that caused it.
-  State.modify' (\gs -> List.foldl' gainOne gs survivors)
+  --
+  -- Over `lifelinkGains` -- one proposal per (source, gainer) -- rather than per
+  -- damage event, which is CR 702.15e's grain: one source dealing damage to
+  -- several recipients at the same time causes ONE life gain event, so it is one
+  -- event a LifeGainR row is spent on under CR 614.5, and two sources are two.
+  -- The pure fold this replaced adjusted per event, which no board could tell
+  -- apart while nothing watched the gain; a replacement can.
+  --
+  -- Through Event.resolveLifeGain, CR 614.1's funnel for the class, and the
+  -- SETTLED amount is what moves the total and what the record names.
+  gains <-
+    Monad.forM (lifelinkGains survivors) $ \(pid, total) -> do
+      settled <- Event.resolveLifeGain pid total
+      Monad.when (settled > 0) . State.modify' $ \gs ->
+        let gain player = player {Player.life = Player.life player + toInteger settled}
+         in gs {GameState.players = Map.adjust gain pid (GameState.players gs)}
+      pure (pid, settled)
   -- CR 120.4c: "damage that's been dealt is processed into its results, as
   -- modified by replacement effects that interact with those results (such as
   -- life loss or counters)". This is that step for CR 120.3a's life loss, and the
@@ -1284,8 +1295,8 @@ processDamage events = do
   -- less than 1, so Worship's effect is not applied" -- and Pawl.ReplacementSpec's
   -- Worship group proves it with a lifelink blocker in place of its Awe Strike.
   --
-  -- The DAMAGE is untouched: `gainOne`, `tallyOne` and the DamageDealt record
-  -- below all still read DamageEvent.amount. CR 120.4b dealt it, and this
+  -- The DAMAGE is untouched: the lifelink gain pass, `tallyOne` and the
+  -- DamageDealt record below all still read DamageEvent.amount. CR 120.4b dealt it, and this
   -- replaces a RESULT of it -- Worship's ruling, "any damage rendered useless by
   -- Worship was still dealt".
   --
@@ -1381,11 +1392,11 @@ processDamage events = do
   -- Faith puts on no counter), which is the rule as well.
   State.modify' $ \gs ->
     gs {GameState.pendingPreventionRiders = GameState.pendingPreventionRiders gs <> Seq.fromList (filter (Maybe.isJust . Prevention.rider) prevented)}
-  pure survivors
+  pure gains
 
--- CR 120.3f's gain, RECORDED -- processDamage's `gainOne` performs it -- so that
--- "whenever you gain life" sees lifelink (CR 702.15b) and not only an effect
--- that says the words. The record lands here and the gain itself earlier, which
+-- CR 120.3f's gain, RECORDED -- processDamage performs it and hands back what
+-- it settled -- so that "whenever you gain life" sees lifelink (CR 702.15b) and
+-- not only an effect that says the words. The record lands here and the gain itself earlier, which
 -- is the split `lifeLostBy` there already has.
 --
 -- A function of its own, run AFTER processDamage and so after any bracket a
@@ -1422,27 +1433,27 @@ processDamage events = do
 -- directions.
 --
 -- Whom the damage was dealt to is none of this function's business, exactly as
--- it is none of `gainOne`'s: CR 702.15b hangs the gain off the SOURCE, so damage
--- to a creature or a planeswalker gains life just as damage to a player does.
+-- it is none of processDamage's gain pass's: CR 702.15b hangs the gain off the
+-- SOURCE, so damage to a creature or a planeswalker gains life just as damage to
+-- a player does.
 -- `lifeLostBy` scopes to a player recipient because CR 120.3a does; this one
 -- must not.
 --
 -- CR 119.9's zero guard, stated HERE rather than left to the callers, and the
--- same posture `lifeLostBy` takes. No producer in the pool builds a 0-amount
--- event today -- CR 510.1a makes `attackerAssignment` drop a creature assigning
--- 0 or less, and Resolve's DealDamage arm guards its own quantity -- so this
--- restates the rule at the site that writes the record instead of resting on
--- an invariant two modules away.
-recordLifelinkGains :: [DamageEvent.DamageEvent] -> Game ()
-recordLifelinkGains survivors =
+-- same posture `lifeLostBy` takes. It is live rather than a restatement now that
+-- the amounts are SETTLED: a rewrite that resized a gain to nothing would leave a
+-- 0 here, and rule 119.9 says no life gain event has occurred.
+recordLifelinkGains :: [(PlayerId, Natural)] -> Game ()
+recordLifelinkGains gains =
   State.modify' $ \gs ->
     List.foldl'
       (\g (pid, total) -> Event.recordEvent (GameEvent.LifeGained (LifeChange.MkLifeChange pid total)) g)
       gs
-      (lifelinkGains survivors)
+      (filter ((> 0) . snd) gains)
 
 -- One (source, gainer) pair's damage, summed, in the order the sources first
--- appear in the batch. The grouping recordLifelinkGains above records.
+-- appear in the batch. What processDamage proposes, one entry per CR 702.15e
+-- life gain event.
 lifelinkGains :: [DamageEvent.DamageEvent] -> [(PlayerId, Natural)]
 lifelinkGains survivors =
   let keyed =
@@ -1510,5 +1521,5 @@ dealCombatDamage = do
 dealWave :: (ObjectId -> Bool) -> Game ()
 dealWave assigns = do
   assignment <- gatherCombatDamage assigns
-  survivors <- Event.simultaneously (processDamage assignment)
-  recordLifelinkGains survivors
+  gains <- Event.simultaneously (processDamage assignment)
+  recordLifelinkGains gains
