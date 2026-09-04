@@ -888,6 +888,7 @@ modificationCounts modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
   -- Payload-free, so there is no Count to sweep.
+  Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
 -- Every Count reachable from a StaticAbility: its modifications' P/T quantities,
@@ -3429,6 +3430,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasName _ -> 0
   Filter.Type.PowerAtLeast _ -> 0
   Filter.Type.PowerAtMost _ -> 0
+  Filter.Type.ToughnessGreaterThanPower -> 0
   Filter.Type.PowerLessThanSource -> 0
   Filter.Type.PowerGreaterThanSource -> 0
   Filter.Type.PowerIsAmountInSlot _ -> 0
@@ -4206,6 +4208,7 @@ modificationFilters modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
   -- Payload-free, so there is no Filter to sweep.
+  Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
 -- Four Filter positions, not two: the affected set, each modification's own
@@ -4597,6 +4600,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasKeywordFamily _ -> []
   Filter.Type.PowerAtLeast _ -> []
   Filter.Type.PowerAtMost _ -> []
+  Filter.Type.ToughnessGreaterThanPower -> []
   Filter.Type.PowerLessThanSource -> []
   Filter.Type.PowerGreaterThanSource -> []
   -- Not one either, though it names a slot: the slot holds an AMOUNT

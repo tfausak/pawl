@@ -67,6 +67,7 @@ testCharacteristics =
       -- A different keyword from `keywords` above, so a codec arm reading the
       -- wrong field would not round trip to the same JSON.
       PC.textChangedKeywords = Map.singleton Keyword.Trample 1,
+      PC.assignsCombatDamageWithToughness = True,
       PC.grantsStationToughness = True
     }
 
@@ -84,6 +85,7 @@ testCharacteristicsJson =
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}],"
     <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}],"
+    <> "\"assignsCombatDamageWithToughness\":true,"
     <> "\"grantsStationToughness\":true}"
 
 -- | Every field but the two required ones at its default.
@@ -111,6 +113,7 @@ minimalCharacteristics =
       PC.enchant = [],
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
+      PC.assignsCombatDamageWithToughness = False,
       PC.grantsStationToughness = False
     }
 

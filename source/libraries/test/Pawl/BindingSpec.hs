@@ -42,6 +42,7 @@ sampleSnapshot =
       PC.enchant = [],
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
+      PC.assignsCombatDamageWithToughness = False,
       PC.grantsStationToughness = False
     }
 
