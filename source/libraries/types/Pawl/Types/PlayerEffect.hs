@@ -110,7 +110,9 @@ data PlayerEffect
     CantBeCountered (Filter.Filter Keyword.Keyword)
   | -- | CR 615.12 / 613.11 / Spider-Punk: damage matching the pattern can't be
     -- prevented. Pawl.ReplacementSpec's questingBeastSpec proves the pattern's
-    -- source and kind limbs against each other.
+    -- source and kind limbs against each other. Pawl.CardSpec lints the pool
+    -- for a narrowed PlayerScope, which is what makes
+    -- Pawl.Engine.PlayerEffect.unpreventable's board-wide fold exact.
     --
     -- Not implemented: Whippoorwill's recipient limb has no site to bake a
     -- recipient into this pattern (#845).

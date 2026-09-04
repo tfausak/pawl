@@ -74,7 +74,7 @@ data EntryRewrite effect
     -- characteristic-defining ability where that is Nothing (Wood Elemental).
     --
     -- Not implemented: CR 702.82a's devour, which is this shape with a
-    -- per-permanent multiplier; no devour card is in the pool.
+    -- per-permanent multiplier (#877).
     SacrificeAnyNumber SacrificeAnyNumber.SacrificeAnyNumber
   | -- | CR 702.136a via CR 614.1c: riot, minted from the projection rather than
     -- written by a card.
