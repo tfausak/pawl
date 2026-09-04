@@ -36,6 +36,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Pile as Pile
 import Pawl.Types.PlayerEffect (PlayerEffect)
@@ -380,7 +381,12 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- no chosen name here even for a source that will have one, and
             -- HasChosenName is vacuously False. Pawl.CardSpec's position lint is
             -- what keeps a card out of the slot.
-            Filter.sourceChosenNames = Set.empty
+            Filter.sourceChosenNames = Set.empty,
+            -- Nothing, for the reason one field up: CR 702.16k's chosen player is
+            -- read off a PROTECTION quality, and a target slot's filter is
+            -- neither of the four positions rule 702.16 reads one in.
+            -- Pawl.CardSpec's position lint is what keeps a card out of the slot.
+            Filter.carrierChosenPlayer = Nothing
           }
       evaluated = amount >>= Quantity.evaluate (Projection.fullView gs) base gs source
    in -- CR 202.3 / 601.2c: the slot's own computed mana-value bound, evaluated
@@ -600,7 +606,17 @@ targetable pcs rowsOf perspective source sourceView gs recipient =
             -- What it asks OF THE SOURCE is `stops (Just f)` above, down to the
             -- Context: rule 702.16b's ability is the CANDIDATE's, so CR 109.5
             -- fixes its "you" as the candidate's controller too.
-            protects = Filter.matches (Filter.contextFor (Game.teams gs) controller (Just source)) sourceView
+            --
+            -- CR 702.16k's chosen player is the CANDIDATE's, and so does not go
+            -- in `source`: rule 702.16b's quality is matched against the aiming
+            -- object, which is what `source` and `sourceView` carry, while the
+            -- ability doing the protecting belongs to `oid`.
+            protects =
+              Filter.matches
+                (Filter.contextFor (Game.teams gs) controller (Just source))
+                  { Filter.carrierChosenPlayer = Game.lookupObject oid gs >>= Object.chosenPlayer
+                  }
+                sourceView
             -- The conjuncts are in cost order, and the order is the whole reason
             -- `sourceView` costs nothing on an ordinary board: no hexproof or
             -- protection ability at all reads no controller, a hexproof ability

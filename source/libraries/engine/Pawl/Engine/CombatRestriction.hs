@@ -741,7 +741,13 @@ cantBeBlockedBy defending blockers attackers gs =
               wanted = if null changes then criterion else Filter.rewrite changes criterion
               -- Lazy in the power, which a filter naming no source-power atom
               -- never forces.
-              context attacker = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs)
+              -- CR 702.16k: the carrier of rule 702.16f's minted row IS the
+              -- attacker (Affected.Matching Filter.IsSource), so the chosen
+              -- player comes off the same object the power does.
+              context attacker =
+                (Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs))
+                  { Filter.carrierChosenPlayer = Game.lookupObject attacker gs >>= Object.chosenPlayer
+                  }
               matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
               barred attacker = fmap (\blocker -> (blocker, attacker)) (filter (matched attacker) blockers)
            in concatMap barred (filter (named source subject) attackers)

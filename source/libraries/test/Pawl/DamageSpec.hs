@@ -2743,6 +2743,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   toxicSpec s registry
   lifelinkSpec s registry
   protectionSpec s registry
+  trueNameNemesisSpec s registry
   lastKnownRiderSpec s registry
   creaturePlaneswalkerSpec s registry
   excessDamageSpec s registry
@@ -2811,6 +2812,73 @@ protectionSpec s registry = Spec.describe s "Protection" $ do
     Spec.assertEqWith s "CR 510.2 while the same 2 marks bob's Hill Giant in the row beside it" (fmap (\oid -> S.damageOf oid plainAfter) plainIds) [Just 2]
     Spec.assertEqWith s "and the Piker died to each blocker, so both blocks really happened" (S.creaturesInPlay S.alice protectedAfter, S.creaturesInPlay S.alice plainAfter) (0, 0)
     Spec.assertEqWith s "both blockers outlived the 2 they blocked" (S.creaturesInPlay S.bob protectedAfter, S.creaturesInPlay S.bob plainAfter) (1, 1)
+
+-- CR 702.16k with CR 614.1c. True-Name Nemesis, {1}{U}{U} Creature -- Merfolk
+-- Rogue 3/1, whole text: "As this creature enters, choose a player. / This
+-- creature has protection from the chosen player." (oracle checked on Scryfall)
+--
+-- The first card whose protection quality is a PLAYER rather than a
+-- characteristic value, and the first replacement position that reads a choice
+-- the source made as it entered: Filter.OfChosenPlayer answers off
+-- Filter.Context.carrierChosenPlayer, which
+-- Pawl.Engine.Replacement.candidateContext fills.
+--
+-- THREE SEATS, and the pair of boards differs in exactly one thing: WHOM the
+-- ChoosePlayer answer names. The damage source is the same Goblin Piker bob
+-- controls on both, so two seats would collapse "the chosen player" onto the
+-- only opponent and the assertion would pass under a hard-coded "an opponent".
+--
+-- Noncombat damage rather than a block, which keeps CR 702.16f out of the way and
+-- lets the Nemesis (3/1) take a lethal 2 without a state-based pass deciding the
+-- case: the MARKS are what discriminate, and CR 615.6 leaves none where the
+-- shield fired.
+trueNameNemesisSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+trueNameNemesisSpec s registry =
+  let noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing DamageKind.Noncombat
+      -- alice casts the Nemesis off three Islands on a three-seat board and
+      -- answers CR 614.12a's choice with `who`. It must be CAST: S.addCreature
+      -- puts an object straight onto the battlefield without running the entry
+      -- loop, so it would choose nobody -- Pawl.ReplacementSpec's Stuffy Doll
+      -- group is where that road is proved.
+      --
+      -- The answer is pinned to a PlayerId by identity rather than by an index
+      -- into the offer, so an answerer cannot repair the assertion by searching
+      -- the candidate list for a legal seat after a mutation.
+      castNemesis :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> Maybe (GameState.GameState, ObjectId.ObjectId)
+      castNemesis nemesis island who =
+        let (withCard, oid) = S.handOne nemesis (S.landsFor island S.alice 3 S.threePlayerGame)
+            step :: Prompt.Prompt r -> r
+            step p = case p of
+              Prompt.ChoosePlayer {} -> who
+              _ -> S.identityAnswer p
+            after = S.runPure step withCard (S.cast S.alice oid >> Stack.resolveTop)
+            entered = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield withCard)) of
+              o : _ -> Just o
+              [] -> Nothing
+         in fmap (\o -> (after, o)) entered
+   in Spec.describe s "True-Name Nemesis (CR 702.16k)" $ do
+        Spec.it s "CR 702.16k bob's damage is prevented when bob was chosen and marked when carol was" $ do
+          nemesis <- S.printingOf s registry "True-Name Nemesis"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let hit who = case castNemesis nemesis island who of
+                Just (gs, nemesisId) ->
+                  let (pikerId, board) = S.addCreature piker S.bob gs
+                   in Just (nemesisId, S.runPure S.identityAnswer board (Damage.applyDamage [noncombat pikerId nemesisId 2]))
+                Nothing -> Nothing
+          case (hit S.bob, hit S.carol) of
+            (Just (chosenBobId, chosenBob), Just (chosenCarolId, chosenCarol)) -> do
+              Spec.assertEqWith s "CR 615.6 bob was chosen, so bob's Piker marks nothing on the Nemesis" (S.damageOf chosenBobId chosenBob) (Just 0)
+              -- The same board, the same Piker, the same 2 -- one different answer.
+              Spec.assertEqWith s "CR 120.3e carol chosen instead, so the same 2 is marked" (S.damageOf chosenCarolId chosenCarol) (Just 2)
+              -- The discriminator behind both: without the stamp the first row
+              -- would pass for having chosen nobody rather than for the shield.
+              Spec.assertEqWith
+                s
+                "CR 614.1c and each board's Nemesis really remembers the seat it was told"
+                (Game.lookupObject chosenBobId chosenBob >>= Object.chosenPlayer, Game.lookupObject chosenCarolId chosenCarol >>= Object.chosenPlayer)
+                (Just S.bob, Just S.carol)
+            _ -> Spec.assertFailure s "the Nemesis did not reach the battlefield"
 
 -- Fill every target slot with whichever of the two named permanents that slot's
 -- own filter admits. Prey Upon's slots are disjointly filtered by controller, so

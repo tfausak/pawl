@@ -77,6 +77,7 @@ codec keywordCodec =
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),
       Arm.payload "SameControllerAsBound" SlotName.codec Filter.SameControllerAsBound (\x -> case x of Filter.SameControllerAsBound y -> Just y; _ -> Nothing),
       Arm.nullary "HasChosenName" Filter.HasChosenName,
+      Arm.nullary "OfChosenPlayer" Filter.OfChosenPlayer,
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.payload "IsAttackingPlayer" PlayerRelation.codec Filter.IsAttackingPlayer (\x -> case x of Filter.IsAttackingPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsAttackingPlaneswalker" PlayerRelation.codec Filter.IsAttackingPlaneswalker (\x -> case x of Filter.IsAttackingPlaneswalker y -> Just y; _ -> Nothing),
