@@ -611,6 +611,11 @@ targetable pcs rowsOf perspective source sourceView gs recipient =
             -- in `source`: rule 702.16b's quality is matched against the aiming
             -- object, which is what `source` and `sourceView` carry, while the
             -- ability doing the protecting belongs to `oid`.
+            --
+            -- Not implemented: rule 702.16b's and rule 702.16k's "spells or
+            -- abilities the specified player controls" judged against the
+            -- ABILITY's controller, where `sourceView` is the source OBJECT's
+            -- (#3202).
             protects =
               Filter.matches
                 (Filter.contextFor (Game.teams gs) controller (Just source))
