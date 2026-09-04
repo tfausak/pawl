@@ -974,7 +974,6 @@ library engine
     Pawl.Engine.Monarch
     Pawl.Engine.MoveDuration
     Pawl.Engine.Mulligan
-    Pawl.Engine.OutsideTheGame
     Pawl.Engine.Phasing
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot

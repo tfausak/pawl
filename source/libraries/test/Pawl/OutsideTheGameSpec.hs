@@ -1,8 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers: Pawl.Engine.OutsideTheGame (CR 400.11's pool and the road into the
--- game), the two fields that carry it -- Pawl.Types.Deck's sideboard (CR 103.2a)
+-- Covers: Pawl.Engine.Event's CR 400.11 group -- `eligible`, `bringInto`,
+-- `bringIn` and `bringInFrom`, the pool and the roads into the game -- the two
+-- fields that carry it -- Pawl.Types.Deck's sideboard (CR 103.2a)
 -- and Pawl.Types.Player's outsideTheGame -- Pawl.Engine.Setup.createDeck's copy
 -- between them, and Pawl.Engine.Resolve's two arms:
 -- Effect.FromOutsideTheGame and Effect.ExileThisSpell (CR 608.2n). Also
@@ -11,8 +12,8 @@
 -- applyCrossings with Pawl.Engine.Engine.playSubgame between them.
 --
 -- Gameplay-level but for the CR 103.2a setup case and the CR 729.4 group that
--- follows it, which reach OutsideTheGame.eligible and OutsideTheGame.bringInto
--- directly on a board Setup.subgameStateFrom built -- the main game those cases
+-- follows it, which reach Event.eligible and Event.bringInto directly on a board
+-- Setup.subgameStateFrom built -- the main game those cases
 -- read is played out through the stack, but the wish inside the subgame is
 -- called rather than cast. Every other case casts a printed wish and resolves it
 -- through the stack, so what is asserted is the whole path from card JSON to the
@@ -25,8 +26,9 @@
 -- handover), then Burning Wish reaching the resolving Shahrazad itself (CR
 -- 729.5).
 --
--- Not implemented: Ring of Ma'ruf is not in data/cards/, so nothing here reaches
--- outside the game through a draw replacement (#2470).
+-- The last group takes the OTHER road in: Ring of Ma'rûf's CR 614.6 draw
+-- replacement, whose rewrite reaches the same `bringInto` the resolution arm
+-- does.
 module Pawl.OutsideTheGameSpec where
 
 import qualified Data.Foldable as Foldable
@@ -37,10 +39,11 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -51,6 +54,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -136,7 +140,7 @@ eventIndex :: (GameEvent.GameEvent -> Bool) -> GameState.GameState -> Maybe Int
 eventIndex predicate gs = List.findIndex (predicate . LoggedEvent.event) (Foldable.toList (GameState.events gs))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
+spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
   -- CR 400.11c and CR 701.20a: the gate. A card outside the game reaches the hand
   -- and nothing else does.
   Spec.it s "CR 400.11c Burning Wish puts the sorcery it revealed from outside the game into her hand" $ do
@@ -330,7 +334,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         -- it names cannot matter: no candidate outside the game is any of them.
         bind o = o {Object.bindings = Map.insert slot (Binding.toObject wishId) (Object.bindings o)}
         gs = board {GameState.objects = Map.adjust bind wishId (GameState.objects board)}
-        bringing predicate = snd (Engine.runGamePure exercising gs (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) wishId S.alice))
+        bringing predicate = snd (Engine.runGamePure exercising gs (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) wishId S.alice))
         atom = Filter.And [Filter.HasCardType CardType.Sorcery, Filter.IsBound slot]
     Spec.assertEqWith s "the slot names an object before either filter runs" (fmap Object.bindings (Game.lookupObject wishId gs)) (Just (Map.singleton slot (Binding.toObject wishId)))
     -- THE BEHAVIOUR: "a sorcery that IS the bound object" admits nothing, so the
@@ -339,21 +343,21 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     Spec.assertEqWith s "where the same wish without the atom brings the sorcery in" (List.sort (printingsIn Zone.Hand S.alice (bringing (Filter.HasCardType CardType.Sorcery)))) (List.sort [wish, signInBlood])
     -- And the offer itself, one step nearer the atom: the atom is False for a
     -- candidate with no identity, so the conjunction admits nobody.
-    Spec.assertEqWith s "nothing was even offered" (length (OutsideTheGame.eligible atom wishId S.alice gs)) 0
-    Spec.assertEqWith s "where the sorcery filter offers the one card" (length (OutsideTheGame.eligible (Filter.HasCardType CardType.Sorcery) wishId S.alice gs)) 1
+    Spec.assertEqWith s "nothing was even offered" (length (Event.eligible atom wishId S.alice gs)) 0
+    Spec.assertEqWith s "where the sorcery filter offers the one card" (length (Event.eligible (Filter.HasCardType CardType.Sorcery) wishId S.alice gs)) 1
   -- CR 729.4: a subgame's own view of the main game. Alice's creature sits
   -- on the PARENT's battlefield; Setup.subgameStateFrom moves it into
   -- GameState.outsideObjects (CR 729.4, "all objects in the main game ... are
   -- considered outside the subgame"), and a wish cast IN the subgame can reach
   -- it just as it reaches the sideboard pool. Called at the unit level --
-  -- `OutsideTheGame.bringInto` directly -- rather than through a printed wish,
+  -- `Event.bringInto` directly -- rather than through a printed wish,
   -- since Living Wish's own casting is not this unit's concern.
   Spec.it s "CR 729.4/729.4a a wish cast in a subgame reaches a main-game creature" $ do
     bear <- S.printingOf s registry "Prodigal Sorcerer"
     let (bearId, parent) = S.addCreature bear S.alice (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
-        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bearId S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bearId S.alice))
     Spec.assertEqWith s "CR 729.4/400.11c: the main-game creature arrives in her subgame hand" (printingsIn Zone.Hand S.alice after) [bear]
     Spec.assertEqWith s "CR 729.4a: the crossing is recorded for the outer frame to apply" (Foldable.toList (GameState.broughtIn after)) [bearId]
     Spec.assertEqWith s "and it is no longer offered" (Map.member bearId (GameState.outsideObjects after)) False
@@ -368,7 +372,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         parent = parent1 {GameState.players = Map.adjust stock S.alice (GameState.players parent1)}
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
-        offered = OutsideTheGame.eligible predicate bearId S.alice sub
+        offered = Event.eligible predicate bearId S.alice sub
         isPool candidate = case candidate of
           OutsideCard.InPool _ -> True
           OutsideCard.InAnotherGame _ -> False
@@ -376,7 +380,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         answer p = case p of
           Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find isPool (NonEmpty.toList candidates))
           _ -> S.identityAnswer p
-        after = snd (Engine.runGamePure answer sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bearId S.alice))
+        after = snd (Engine.runGamePure answer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bearId S.alice))
     Spec.assertEqWith s "the pool and the main game were both on offer" (length offered) 2
     Spec.assertEqWith s "the pool card is what arrived" (printingsIn Zone.Hand S.alice after) [dragon]
     Spec.assertEqWith s "the main-game creature is untouched: the answer did not take it" (Map.member bearId (GameState.outsideObjects after)) True
@@ -389,7 +393,7 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     let (bobsBearId, parent) = S.addCreature bear S.bob (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
-        after = snd (Engine.runGamePure S.identityAnswer sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bobsBearId S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bobsBearId S.alice))
     Spec.assertEqWith s "alice's hand stays empty: bob's creature is not hers to reach" (printingsIn Zone.Hand S.alice after) []
     Spec.assertEqWith s "and bob's card is untouched" (Map.member bobsBearId (GameState.outsideObjects after)) True
   -- CR 708.2 over CR 729.4: what a subgame's wish sees of a FACE-DOWN main-game
@@ -433,8 +437,8 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
         preferManifest p = case p of
           Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== OutsideCard.InAnotherGame manifestedId) (NonEmpty.toList candidates))
           _ -> S.identityAnswer p
-        wishing predicate = snd (Engine.runGamePure preferManifest sub (OutsideTheGame.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) manifestedId S.alice))
-        offeredOuter predicate = [oid | OutsideCard.InAnotherGame oid <- OutsideTheGame.eligible predicate manifestedId S.alice sub]
+        wishing predicate = snd (Engine.runGamePure preferManifest sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) manifestedId S.alice))
+        offeredOuter predicate = [oid | OutsideCard.InAnotherGame oid <- Event.eligible predicate manifestedId S.alice sub]
     -- CR 708.2a's 2/2 creature is what the creature-or-land wish reaches, and CR
     -- 708.9's reveal is what arrives: the card itself, not the 2/2.
     Spec.assertEqWith s "CR 708.2a/729.4: the creature-or-land wish takes the manifest, and CR 708.9 hands it over as the sorcery card underneath" (printingsIn Zone.Hand S.alice (wishing creatureOrLand)) [signInBlood]
@@ -692,3 +696,68 @@ spec s registry = Spec.describe s "Pawl.Engine.OutsideTheGame" $ do
     Spec.assertEqWith s "CR 729.4/729.5: the wish really took the resolving Shahrazad, which came back to alice's main-game library" (length (filter (== shahrazad) (printingsIn Zone.Library S.alice after))) 1
     Spec.assertEqWith s "CR 400.7/608.2n: and so it is in no main-game graveyard" (printingsIn Zone.Graveyard S.alice after) []
     Spec.assertEqWith s "CR 729.1a: the subgame did not decide the main game" (GameState.result after) Nothing
+
+  -- CR 614.6 / 400.11c: Ring of Ma'rûf ({5} Artifact, "{5}, {T}, Exile this
+  -- artifact: The next time you would draw a card this turn, instead put a card
+  -- you own from outside the game into your hand." -- name, cost, type line and
+  -- Oracle text checked against api.scryfall.com 2026-09-04, paper printing
+  -- `arn`).
+  --
+  -- The second road into the game, and the only printing that takes it --
+  -- Scryfall o:"outside the game" o:"would draw", 2026-09-04, one hit: an
+  -- activated ability installs a floating row (CR 614.3) and the next draw is
+  -- CANCELLED, so no card leaves the library and the card arrives from the pool
+  -- instead.
+  --
+  -- A PAIR of boards differing in one thing -- whether the ability was activated
+  -- -- so "the draw was replaced" and "she drew normally" are told apart by WHICH
+  -- printing is in her hand, not merely by how many cards are.
+  --
+  -- Every number distinct: five lands, two library cards, one card in the pool.
+  Spec.it s "CR 400.11c a draw replaced by a wish brings the card in from outside the game" $ do
+    plains <- S.printingOf s registry "Plains"
+    ring <- S.printingOf s registry "Ring of Ma'rûf"
+    piker <- S.printingOf s registry "Goblin Piker"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let (armed, ringId) = ringBoard plains ring piker signInBlood True
+        after = S.runPure S.identityAnswer armed (Event.drawCard S.alice)
+    -- The fixture's own precondition: the cost really exiled the artifact, which
+    -- is what says the ability was activated and resolved at all.
+    Spec.assertEqWith s "setup: the activation cost exiled the Ring, so the ability was paid for and resolved" (Set.member ringId (GameState.battlefield armed)) False
+    -- THE BEHAVIOUR, ahead of every proxy: the card in hand is the one from the
+    -- pool and not the one off the top of her library.
+    Spec.assertEqWith s "CR 400.11c the card she owns outside the game is what reached her hand" (printingsIn Zone.Hand S.alice after) [signInBlood]
+    Spec.assertEqWith s "CR 614.6 the draw never happened, so nothing left her library" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+    Spec.assertEqWith s "CR 400.11b and the pool is spent" (Map.size (poolOf S.alice after)) 0
+  -- The CONTROL: the same board with the ability never activated, so the only
+  -- difference is the floating row.
+  Spec.it s "CR 121.1 with no row installed the same board draws off her library" $ do
+    plains <- S.printingOf s registry "Plains"
+    ring <- S.printingOf s registry "Ring of Ma'rûf"
+    piker <- S.printingOf s registry "Goblin Piker"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    let (unarmed, _) = ringBoard plains ring piker signInBlood False
+        after = S.runPure S.identityAnswer unarmed (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 121.1 she drew the library card" (printingsIn Zone.Hand S.alice after) [piker]
+    Spec.assertEqWith s "which came off her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "CR 400.11b and nothing was taken out of the pool" (Map.size (poolOf S.alice after)) 1
+
+-- alice with five untapped lands, a Ring of Ma'rûf on the battlefield, two
+-- library cards of one printing and one card of another outside the game, with
+-- the Ring's ability activated and resolved when `arm` is True and untouched when
+-- it is False. One builder for both legs, so the two boards differ in that alone.
+--
+-- Five lands for the {5}, with the {T} and the exile beside it; CR 113.6m is what
+-- keeps that ability working on the battlefield alone. The ObjectId returned is
+-- the Ring's, so a case can read what the cost did to it.
+ringBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
+ringBoard plains ring stock outside arm =
+  let (ringId, g1) = S.addCreature ring S.alice (S.landsInPlay plains 5)
+      g2 = stockLibrary stock 2 S.alice g1
+      (outsideId, g3) = Game.intern outside g2
+      pool p = p {Player.outsideTheGame = Map.singleton outsideId 1}
+      g4 = g3 {GameState.players = Map.adjust pool S.alice (GameState.players g3)}
+      final = case Face.activatedAbilities (S.combinedFace ring) of
+        ability : _ | arm -> S.runPure S.identityAnswer g4 (Activate.activateAbility S.alice ringId ability >> Stack.resolveTop)
+        _ -> g4
+   in (final, ringId)

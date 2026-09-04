@@ -76,7 +76,7 @@ data Deck = MkDeck
     -- A MULTISET and not `dungeons`' set, which is the one place this field parts
     -- from the one above it. CR 100.4a caps a sideboard at fifteen CARDS and
     -- applies CR 100.2a's four-card limit across deck and sideboard together, so
-    -- two copies of a card are two cards; and Pawl.Engine.OutsideTheGame spends
+    -- two copies of a card are two cards; and Pawl.Engine.Event.bringIn spends
     -- them, so the second Burning Wish of a game can find the second copy and only
     -- the second copy. A dungeon is a supply nothing spends (CR 309.5b), which is what lets
     -- that field forget its counts.

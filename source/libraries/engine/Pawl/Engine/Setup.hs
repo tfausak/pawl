@@ -809,7 +809,7 @@ subgameStateFrom starter parent =
       -- effect or a definition, so CR 729.1b does not reach it: CR 708.2 makes
       -- the listed characteristics the object's own COPIABLE VALUES, which
       -- travel with the object the way CR 108.3's ownership does.
-      -- Pawl.Engine.OutsideTheGame.eligible is what reads it, and
+      -- Pawl.Engine.Event.eligible is what reads it, and
       -- Pawl.OutsideTheGameSpec's "CR 708.2/729.4 a manifested main-game sorcery
       -- is offered to a subgame's wish as a creature and not as a sorcery" is
       -- the proof.
@@ -983,7 +983,7 @@ applyCrossings finalSub parent =
       -- keyed on the KEY and not the value.
       leave g oid = case Map.lookup oid (GameState.objects g) of
         -- Unreachable: `mine` holds only ids GameState.objects answered for, and
-        -- no id crosses twice -- OutsideTheGame.bringInFrom drops the entry it
+        -- no id crosses twice -- Event.bringInFrom drops the entry it
         -- spent, so a second wish cannot reach the same card.
         Nothing -> g
         Just obj ->
@@ -1209,7 +1209,7 @@ funnelBack finalSub parent =
       -- CR 400.11b / 729.5: a card a wish inside the subgame took out of a
       -- player's sideboard pool "remains in the game until the game ends", and
       -- rule 729.5 puts it into their main-game library above. So the pool that
-      -- comes back is the SUBGAME's, which OutsideTheGame.bringIn already spent
+      -- comes back is the SUBGAME's, which Event.bringIn already spent
       -- it from; keeping the parent's would leave that card in the library and
       -- still outside the game at once.
       --
@@ -1234,7 +1234,7 @@ funnelBack finalSub parent =
       --
       -- This arm restores only what the sideboard road spent (CR 400.11a and
       -- CR 400.11c). A card the same player took from the MAIN GAME instead
-      -- (OutsideTheGame.bringInFrom)
+      -- (Event.bringInFrom)
       -- comes back nowhere: applyCrossings deleted the main game's copy, and
       -- objectsLeaveWith deleted the subgame's, so nothing represents it in
       -- either game. That is the two rules read together rather than an oversight

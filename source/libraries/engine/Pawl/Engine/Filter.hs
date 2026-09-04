@@ -861,12 +861,12 @@ data Context = MkContext
     -- until it took its context from the caller, and Resolve's Effect.Search arm
     -- until it did the same.
     --
-    -- Pawl.Engine.OutsideTheGame.eligible is a further in-resolution caller and is
+    -- Pawl.Engine.Event.eligible is a further in-resolution caller and is
     -- NOT one of #2141's, honest for a reason of its own rather than for the
     -- reason above: its candidates are cards outside the game, which CR 400.11c
     -- keeps every spell and ability from affecting, so no slot of the resolution
     -- can name one. Pawl.Engine.Projection.viewOfCard fills no `identity` --
-    -- nothing mints an object until Pawl.Engine.OutsideTheGame.bringInto does --
+    -- nothing mints an object until Pawl.Engine.Event.bringInto does --
     -- so IsBound is False for every candidate there whatever this map holds. The
     -- other readers cannot reach it either: SameNameAsBound reads slotNames
     -- rather than this map and carries its own lint, SameControllerAsBound reads

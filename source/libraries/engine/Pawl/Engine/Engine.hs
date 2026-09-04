@@ -1754,7 +1754,7 @@ playGame =
 -- CR 729.4 runs the other way too: a subgame's wish reaches the main game's
 -- cards, and CR 729.4a takes each one it finds out of the main game.
 -- Setup.subgameStateFrom hands the subgame a SNAPSHOT of those cards rather than
--- the parent itself, OutsideTheGame.bringInFrom records which of them crossed,
+-- the parent itself, Event.bringInFrom records which of them crossed,
 -- and their departures are applied to the parent below, once the subgame has
 -- ended -- exact rather than late, since CR 729.1a discontinued the main game
 -- throughout. Setup.applyCrossings carries that argument in full.

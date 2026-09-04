@@ -134,7 +134,7 @@ data Player = MkPlayer
     -- nothing else can reach these in the meantime.
     --
     -- COUNTED and not a set, which is where this parts from `dungeons` above: this
-    -- is a STOCK. Pawl.Engine.OutsideTheGame.bringIn spends an entry, because a card
+    -- is a STOCK. Pawl.Engine.Event.bringIn spends an entry, because a card
     -- brought into the game is in the game (CR 400.11b) and the next Burning Wish
     -- cannot find that same copy again. A dungeon card is never spent (CR 309.5b),
     -- so its field forgets its counts.
@@ -143,7 +143,7 @@ data Player = MkPlayer
     -- game too: CR 309.2 keeps them out of deck and sideboard both, CR 701.49a
     -- chooses among them by a rule of its own rather than by a card's filter, and
     -- CR 309.2d forbids anything else from bringing one in. One map would have
-    -- Pawl.Engine.OutsideTheGame offering dungeon cards to Burning Wish.
+    -- Pawl.Engine.Event.eligible offering dungeon cards to Burning Wish.
     --
     -- Where the rest of what is outside the game will land: CR 727.2's restart
     -- cards (#135) and CR 707.13's copy created outside the game (#888). CR
