@@ -2474,15 +2474,16 @@ isDamageR replacement = case replacement of
   _ -> False
 
 -- CR 615.1: a prevention effect acts like a "shield" around whatever it's
--- affecting, so one affecting nothing is not a prevention effect at all. Each
--- field that says what a shield covers is independently optional -- a card NAMES
--- its recipients (Mending Hands' "any target"), DESCRIBES them (Divine
--- Deflection's "you and/or permanents you control"), or names a SOURCE instead
--- (Dovin, Hand of Control's "dealt by target permanent") -- so no schema can say
--- that at least one has to be there, and Pawl.Engine.Resolve's two arms build one
--- row per named object and one row for a description, leaving a shield that names
--- nothing with no row to install and the card silently doing less than it
--- printed.
+-- affecting, so one affecting nothing is not a prevention effect at all, and CR
+-- 614.9's redirection covers a side the same way. Each field that says what a
+-- shield covers is independently optional -- a card NAMES its recipients
+-- (Mending Hands' "any target", Carom's "target creature"), DESCRIBES them
+-- (Divine Deflection's and Harm's Way's "you and/or permanents you control"),
+-- or names a SOURCE instead (Dovin, Hand of Control's "dealt by target
+-- permanent") -- so no schema can say that at least one has to be there, and
+-- Pawl.Engine.Resolve's three arms build one row per named object and one row
+-- for a description, leaving a shield or redirection that names nothing with no
+-- row to install and the card silently doing less than it printed.
 --
 -- Not implemented: a shield covering EVERY recipient, which is what a card naming
 -- only its source needs (Burrenton Forge-Tender's "prevent all damage a red

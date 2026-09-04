@@ -91,8 +91,10 @@ data DamageRewrite
   | -- | CR 614.9's redirection with a REMAINING amount, PreventNext's counted twin
     -- -- Harm's Way's "the next 2 damage ... is dealt to any target instead".
     -- The Natural is rewritten in place as it is spent and the row dropped at 0,
-    -- CR 615.7's shape; a redirect, not a prevention (CR 615.1a), so `prevents`
-    -- refuses it as it does Redirect. Engine-baked for Redirect's reason.
+    -- CR 615.7's shape borrowed onto a rule-614 rewrite (that rule governs only
+    -- preventions; the redirect's countdown rests on Harm's Way's rulings). A
+    -- redirect, not a prevention (CR 615.1a), so `prevents` refuses it as it
+    -- does Redirect. Engine-baked for Redirect's reason.
     RedirectNext Natural.Natural Recipient.Recipient
   | -- | CR 614.9's redirection with a PRINTED destination: the damage is dealt
     -- instead to the one permanent on the battlefield this Filter describes.
