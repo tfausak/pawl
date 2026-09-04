@@ -46,6 +46,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
@@ -2183,6 +2184,11 @@ representativeEvents cond =
         -- the singular's), CR 603.2c's once-per-batch scoping living in
         -- Event.eventTriggers instead -- PermanentsDie's posture below.
         TriggerCondition.PermanentsReturnedToHand _ -> one (moved Zone.Battlefield Zone.Hand)
+        -- The zone read on the DEPARTURE side instead: every destination is
+        -- admitted, and the floor is the same for all of them, so one event says
+        -- as much as a list would -- SelfPutIntoGraveyardFromAnywhere's reasoning
+        -- pointed the other way. Empty either way: this condition binds nothing.
+        TriggerCondition.CardLeavesGraveyard {} -> one (moved Zone.Graveyard Zone.Exile)
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -2465,6 +2471,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentLeavesTheBattlefield Filter.Type.IsSource,
     TriggerCondition.PermanentReturnedToHand Filter.Type.IsSource,
     TriggerCondition.PermanentsReturnedToHand Filter.Type.IsSource,
+    TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard Filter.Type.IsSource TurnScope.EachTurn),
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
@@ -2932,6 +2939,83 @@ permanentsReturnedToHandSpec s registry =
               after = resolveWholeStack (S.runPure S.identityAnswer gone Engine.settleForPriority)
           Spec.assertEqWith s "alice holds Retract, Tameshi, the Sol Ring, Tameshi's draw and the Ledger's" (S.handSize S.alice after) 5
           Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (length (returnGroups gone)) 1
+
+-- CR 603.10a's third look-back family: Kishla Skimmer {G}{U} Creature -- Bird
+-- Scout, 2/2, "Flying / Whenever a card leaves your graveyard during your turn,
+-- draw a card. This ability triggers only once each turn."
+-- (data/cards/kishla-skimmer.json; name, cost, type line and Oracle text checked
+-- against Scryfall 2026-09-04.)
+--
+-- Reassembling Skeleton supplies the departure -- "{1}{B}: Return this card from
+-- your graveyard to the battlefield tapped" -- because it is one activation from
+-- the graveyard at instant speed, which is what lets all three boards below share
+-- an event and differ in one thing each: the second in whose turn it is, the
+-- third in whose graveyard the card left.
+--
+-- THE LOOK-BACK is the point of the first case. CR 400.7 minted the returned card
+-- a fresh battlefield id and the graveyard no longer holds anything, so a
+-- condition that scanned the graveyard for the card would find nothing; the
+-- assertion that the Skeleton is standing on the battlefield when the draw
+-- happens is what says the trigger read the departure rather than the zone.
+kishlaSkimmerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kishlaSkimmerSpec s registry =
+  let settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      skeletonName = CardName.MkCardName (Text.pack "Reassembling Skeleton")
+      -- alice's Kishla Skimmer on the battlefield and one card in her library, so
+      -- a draw is observable and CR 104.3c cannot decide the game first. The
+      -- Skeleton and the two Swamps that pay for it belong to `owner`, whose turn
+      -- it is when `active` says so.
+      board skimmer skeleton swamp forest active owner =
+        let base =
+              (S.landsFor swamp owner 2 (Setup.emptyGame S.bothPlayers))
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = active,
+                  GameState.priority = Just owner
+                }
+            withSkimmer = snd (S.addCreature skimmer S.alice base)
+         in S.addGraveyardCard skeleton owner (snd (S.addLibraryCard forest S.alice withSkimmer))
+      -- Activate the Skeleton's graveyard ability, resolve it so the card leaves
+      -- the graveyard, settle so CR 603.3 places whatever triggered, and resolve
+      -- that too.
+      raise active owner k = do
+        skimmer <- S.printingOf s registry "Kishla Skimmer"
+        skeleton <- S.printingOf s registry "Reassembling Skeleton"
+        swamp <- S.printingOf s registry "Swamp"
+        forest <- S.printingOf s registry "Forest"
+        let (gyId, staged) = board skimmer skeleton swamp forest active owner
+        case Activate.abilitiesFor gyId staged of
+          [ability] ->
+            let returned = resolveTop (S.runPure S.identityAnswer staged (Activate.activateAbility owner gyId ability))
+             in k returned (resolveTop (settle returned))
+          abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
+   in Spec.describe s "CardLeavesGraveyard" $ do
+        -- The proving case.
+        Spec.it s "CR 603.10a a card leaving alice's graveyard on her own turn draws her a card"
+          . raise S.alice S.alice
+          $ \returned after -> do
+            Spec.assertEqWith s "CR 603.10a the Skimmer's trigger drew alice a card" (S.handSize S.alice after) 1
+            -- The preconditions, AFTER the assertion so neither can absorb a
+            -- mutation aimed at the condition.
+            Spec.assertEqWith s "the card that left is on the battlefield, not in the graveyard the trigger would have scanned" (S.countOnBattlefieldByName skeletonName S.alice returned) 1
+            Spec.assertEqWith s "nothing was in alice's hand before the trigger resolved" (S.handSize S.alice returned) 0
+            Spec.assertEqWith s "and the trigger was the one object on the stack" (length (GameState.stack (settle returned))) 1
+        -- "During your turn", one difference from the case above: bob is the
+        -- active player, and alice activates her own Skeleton at instant speed.
+        Spec.it s "CR 603.10a the same departure on bob's turn draws nothing"
+          . raise S.bob S.alice
+          $ \returned after -> do
+            Spec.assertEqWith s "the Skimmer's trigger did not fire, so alice drew nothing" (S.handSize S.alice after) 0
+            Spec.assertEqWith s "off the same departure the case above draws on" (S.countOnBattlefieldByName skeletonName S.alice returned) 1
+            Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack (settle returned))) 0
+        -- "Your graveyard", one difference from the proving case: the card leaves
+        -- bob's graveyard, on alice's turn, while alice's Skimmer watches.
+        Spec.it s "CR 400.3 a card leaving bob's graveyard on alice's turn draws nothing"
+          . raise S.alice S.bob
+          $ \returned after -> do
+            Spec.assertEqWith s "the Skimmer watches its controller's graveyard alone, so alice drew nothing" (S.handSize S.alice after) 0
+            Spec.assertEqWith s "off the same departure, out of bob's graveyard" (S.countOnBattlefieldByName skeletonName S.bob returned) 1
+            Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack (settle returned))) 0
 
 -- What PermanentReturnedToHand's bindings are FOR -- Warped Devotion {2}{B}
 -- Enchantment, "Whenever a permanent is returned to a player's hand, that
@@ -5860,6 +5944,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   permanentLeavesTheBattlefieldSpec s registry
   permanentReturnedToHandSpec s registry
   permanentsReturnedToHandSpec s registry
+  kishlaSkimmerSpec s registry
   warpedDevotionSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
