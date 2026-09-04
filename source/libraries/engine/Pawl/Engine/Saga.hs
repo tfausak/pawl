@@ -222,7 +222,7 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 -- modifying one entry compete for a CR 616.1e order chosen by the applying
 -- player, so the counter-placing row could be applied before the number was
 -- chosen.
-entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
+entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 entryReplacementsOf pc
   | not (isSaga pc) = []
   -- CR 614.1c on both branches: the entering object is the ability's own source.

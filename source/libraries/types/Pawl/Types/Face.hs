@@ -162,7 +162,7 @@ data Face card = MkFace
     -- (Pawl.Engine.Projection.boardAsEntering). A row functioning from one of the
     -- four other zones is read off this list directly, as every off-battlefield
     -- ability walk in that module reads a printed face.
-    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect card (GrantedAbility.GrantedAbility card))],
+    replacementEffects :: [PrintedReplacement.PrintedReplacement card (Effect.Effect card (GrantedAbility.GrantedAbility card))],
     -- | CR 603: this face's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility card (GrantedAbility.GrantedAbility card)],

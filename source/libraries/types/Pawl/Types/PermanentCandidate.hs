@@ -24,7 +24,7 @@ import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 data PermanentCandidate = MkPermanentCandidate
   { source :: ObjectId.ObjectId,
     provenance :: ReplacementProvenance.ReplacementProvenance,
-    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
+    effect :: ReplacementEffect.ReplacementEffect Card.Card (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     ordinal :: InstanceOrdinal.InstanceOrdinal
   }
   deriving (Eq, Ord, Show)

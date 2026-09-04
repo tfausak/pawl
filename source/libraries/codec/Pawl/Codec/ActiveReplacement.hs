@@ -30,7 +30,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- can name several.
 codec :: Codec.Codec ActiveReplacement.ActiveReplacement
 codec = Fields.object $ do
-  effect <- Fields.required "effect" (ReplacementEffect.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) ActiveReplacement.effect
+  effect <- Fields.required "effect" (ReplacementEffect.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) ActiveReplacement.effect
   source <- Fields.required "source" ObjectId.codec ActiveReplacement.source
   controller <- Fields.required "controller" PlayerId.codec ActiveReplacement.controller
   timestamp <- Fields.required "timestamp" Timestamp.codec ActiveReplacement.timestamp

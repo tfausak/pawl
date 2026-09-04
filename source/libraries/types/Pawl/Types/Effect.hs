@@ -280,7 +280,7 @@ data Effect card ability
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition asked as the event
     -- would happen (CR 614.1). Targetless.
-    Replace (Replace.Replace (Effect card ability))
+    Replace (Replace.Replace card (Effect card ability))
   | -- | CR 614.10a: each player the PlayerRef names skips their next occurrence
     -- of this step or phase (Fatigue, Stonehorn Dignitary).
     SkipNextPhase SkipNextPhase.SkipNextPhase

@@ -19,7 +19,7 @@ codec :: Codec.Codec PermanentCandidate.PermanentCandidate
 codec = Fields.object $ do
   source <- Fields.required "source" ObjectId.codec PermanentCandidate.source
   provenance <- Fields.required "provenance" ReplacementProvenance.codec PermanentCandidate.provenance
-  effect <- Fields.required "effect" (ReplacementEffect.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) PermanentCandidate.effect
+  effect <- Fields.required "effect" (ReplacementEffect.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) PermanentCandidate.effect
   ordinal <- Fields.required "ordinal" InstanceOrdinal.codec PermanentCandidate.ordinal
   pure
     PermanentCandidate.MkPermanentCandidate

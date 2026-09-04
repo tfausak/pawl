@@ -7598,6 +7598,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   turnTheBladeSpec s registry
   turnTheBladeLastKnownSpec s registry
   testOfFaithSpec s registry
+  queenAllenalSpec s registry
+  quinaSpec s registry
   decoratedGriffinSpec s registry
   worshipSpec s registry
   wordsOfWorshipSpec s registry
@@ -11889,3 +11891,114 @@ hurrJackalSpec s registry = Spec.describe s "Hurr Jackal (CR 701.19c)" $ do
       Spec.assertEqWith s "nothing reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
       Spec.assertEqWith s "and the prohibition really is off the board" (GameState.unregeneratables bobsTurn) []
       Spec.assertEqWith s "bob's turn really did begin" (GameState.activePlayer bobsTurn) S.bob
+
+-- Queen Allenal of Ruadach, {G}{W}{W} Legendary Creature -- Elf Noble */*: "If
+-- one or more creature tokens would be created under your control, those tokens
+-- plus a 1/1 white Soldier creature token are created instead." Two things one
+-- card proves: a token replacement scoped by WHAT the token is
+-- (Pawl.Types.TokenPattern.whatToken), and one that APPENDS a differently-shaped
+-- token to the event rather than resizing it (Pawl.Types.TokenR.plus).
+--
+-- Dragon Fodder ({1}{R}, two 1/1 Goblins) is the creature-token maker, and
+-- Eliminate the Impossible ({1}{U}, investigate) the negative: a Clue is a
+-- token and not a creature token, so the same Queen on the same lands appends
+-- nothing. Both boards carry both colours of mana so neither cast fails for
+-- want of it.
+queenAllenalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.1a)" $ do
+  let board mountain island queen =
+        let lands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) (S.landsInPlay mountain 2) [1 .. (2 :: Int)]
+         in S.addCreature queen S.alice lands
+      soldierName = CardName.MkCardName (Text.pack "Soldier Token")
+      goblinName = CardName.MkCardName (Text.pack "Goblin Token")
+      clueName = CardName.MkCardName (Text.pack "Clue Token")
+      namedTokens name gs = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just name) (S.tokensOf gs)
+  Spec.it s "CR 614.1a two Goblins would be created, so two Goblins plus a Soldier are" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
+    let (queenId, g1) = board mountain island queen
+        (g2, spellId) = S.handOne dragonFodder g1
+        after = castAndResolve S.identityAnswer g2 spellId
+    Spec.assertEqWith s "one Soldier the spell never named" (S.countOnBattlefieldByName soldierName S.alice after) 1
+    Spec.assertEqWith s "and the two Goblins it did" (S.countOnBattlefieldByName goblinName S.alice after) 2
+    -- The appended token is the card the ROW printed, not a third Goblin.
+    case namedTokens soldierName after of
+      [soldier] -> do
+        Spec.assertEqWith s "a 1/1" (S.powerToughnessOf soldier after) (Just (1, 1))
+        Spec.assertEqWith s "and white" (Projection.colorsOf soldier after) (Set.singleton Color.White)
+        Spec.assertEqWith s "under alice's control (CR 111.2)" (Projection.controllerOf soldier after) (Just S.alice)
+      other -> Spec.assertFailure s ("expected exactly one Soldier, got " <> show (length other))
+    -- The Queen's own CR 604.3 box, read live: herself and three tokens.
+    Spec.assertEqWith s "the Queen counts the creatures she controls" (S.powerToughnessOf queenId after) (Just (4, 4))
+  -- The negative, one thing different: the token is a Clue, and "creature
+  -- tokens" does not say Clue.
+  Spec.it s "CR 614.1a a Clue is not a creature token, so nothing is appended" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
+    eliminate <- S.printingOf s registry "Eliminate the Impossible"
+    let (_, g1) = board mountain island queen
+        (g2, spellId) = S.handOne eliminate g1
+        after = castAndResolve S.identityAnswer g2 spellId
+    Spec.assertEqWith s "no Soldier" (S.countOnBattlefieldByName soldierName S.alice after) 0
+    Spec.assertEqWith s "the Clue was created, so the spell did resolve" (S.countOnBattlefieldByName clueName S.alice after) 1
+  -- CR 616.1: the append is INSIDE the one creation event, which is what the
+  -- order against Doubling Season observes. Queen first: two Goblins plus a
+  -- Soldier, then doubled -- two Soldiers. Season first: four Goblins, then
+  -- the Soldier joins them -- one Soldier. A rider that created the Soldier as a
+  -- second event would answer one Soldier both ways.
+  Spec.it s "CR 616.1 racing Doubling Season: the Soldier is doubled only when the Queen applies first" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    dragonFodder <- S.printingOf s registry "Dragon Fodder"
+    let (queenId, g1) = board mountain island queen
+        (seasonId, g2) = S.addCreature doublingSeason S.alice g1
+        (g3, spellId) = S.handOne dragonFodder g2
+        queenFirst = castAndResolve (raceAnswer queenId queenId) g3 spellId
+        seasonFirst = castAndResolve (raceAnswer seasonId queenId) g3 spellId
+    Spec.assertEqWith s "Queen then Season: (2 Goblins + 1 Soldier) * 2 -- two Soldiers" (S.countOnBattlefieldByName soldierName S.alice queenFirst) 2
+    Spec.assertEqWith s "and four Goblins" (S.countOnBattlefieldByName goblinName S.alice queenFirst) 4
+    Spec.assertEqWith s "Season then Queen: 2 Goblins * 2, plus one Soldier" (S.countOnBattlefieldByName soldierName S.alice seasonFirst) 1
+    Spec.assertEqWith s "and four Goblins" (S.countOnBattlefieldByName goblinName S.alice seasonFirst) 4
+  -- The card's ruling: "Anything else specified in the effect creating the
+  -- tokens (such as tapped, attacking, ...) applies to both the original tokens
+  -- and the Soldier." Hero of Bladehold's "create two 1/1 white Soldier creature
+  -- tokens that are tapped and attacking" is the effect; only the Hero is
+  -- declared, so every attacker but the Hero arrived through the event.
+  Spec.it s "the creating effect's riders reach the appended token: tapped and attacking" $ do
+    hero <- S.printingOf s registry "Hero of Bladehold"
+    queen <- S.printingOf s registry "Queen Allenal of Ruadach"
+    case S.combatBoardOf [hero, queen] [] of
+      (gs, [heroId, _], _) -> do
+        let declareOnlyHero :: Prompt.Prompt r -> r
+            declareOnlyHero p = case p of
+              Prompt.DeclareAttackers _ _ ids -> filter (== heroId) ids
+              _ -> S.identityAnswer p
+            declared = S.runPure declareOnlyHero gs Engine.runStep
+            soldiers = namedTokens soldierName declared
+            attacking oid = Map.member oid (Combat.Type.attackers (GameState.combat declared))
+            tapped oid = fmap Object.tapped (Game.lookupObject oid declared) == Just TapState.Tapped
+        Spec.assertEqWith s "the Hero's two Soldiers and the Queen's one" (length soldiers) 3
+        Spec.assertEqWith s "every one of them attacking (CR 508.4)" (length (filter attacking soldiers)) 3
+        Spec.assertEqWith s "and every one of them tapped (CR 110.5b)" (length (filter tapped soldiers)) 3
+      _ -> Spec.assertFailure s "fixture should give alice a Hero and a Queen"
+
+-- Quina, Qu Gourmet, {2}{G} Legendary Creature -- Qu 2/3: "If one or more
+-- tokens would be created under your control, those tokens plus a 1/1 green
+-- Frog creature token are created instead." The append with NO kind: the same
+-- Clue that slips past the Queen above brings a Frog here.
+quinaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+quinaSpec s registry = Spec.describe s "Quina, Qu Gourmet (CR 614.1a)" $ do
+  Spec.it s "CR 614.1a any token at all: a Clue plus a Frog" $ do
+    island <- S.printingOf s registry "Island"
+    quina <- S.printingOf s registry "Quina, Qu Gourmet"
+    eliminate <- S.printingOf s registry "Eliminate the Impossible"
+    let (_, g1) = S.addCreature quina S.alice (S.landsInPlay island 2)
+        (g2, spellId) = S.handOne eliminate g1
+        after = castAndResolve S.identityAnswer g2 spellId
+    Spec.assertEqWith s "one Frog" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Frog Token")) S.alice after) 1
+    Spec.assertEqWith s "beside the Clue" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Clue Token")) S.alice after) 1

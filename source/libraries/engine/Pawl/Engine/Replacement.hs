@@ -28,6 +28,7 @@ module Pawl.Engine.Replacement where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -37,6 +38,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -50,6 +52,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Card as Card.Type
 import Pawl.Types.ControllerRelation (ControllerRelation)
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CopyException as CopyException
@@ -120,6 +123,7 @@ import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -414,7 +418,7 @@ collect sources floating =
 -- "prevent that damage and remove that many +1/+1 counters from it", where
 -- Pawl.Types.RemoveCounters names a slot and Pawl.Types.PutCounters (Stormwild
 -- Capridor) names an ObjectRef and needs no binding.
-printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Maybe PreventionRider.PreventionRider
+printedRider :: ObjectId -> Maybe PlayerId -> ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Maybe PreventionRider.PreventionRider
 printedRider src you re = case re of
   ReplacementEffect.DamageR damageR
     | not (Seq.null (DamageR.riders damageR)),
@@ -445,7 +449,7 @@ printedRider src you re = case re of
 -- replacement's position mid-loop. What the ordinal DOES prove is the duplicate
 -- itself -- dropping it to a constant reddens Pawl.ReplacementSpec's two
 -- "CR 702.136b riot twice" cases.
-numberInstances :: [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))))]
+numberInstances :: [(ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)))] -> [(InstanceOrdinal.InstanceOrdinal, (ObjectId, ReplacementProvenance.ReplacementProvenance, ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))))]
 numberInstances =
   let step seen row =
         let n = Map.findWithDefault 0 row seen
@@ -617,8 +621,13 @@ applies gs event candidate =
                 && matchesPermanent gs Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
         -- effect source's controller. CR 102.2's Opponents has no producer today.
-        (ReplacementEffect.TokenR (TokenR.MkTokenR pat _), ProposedEvent.WouldCreateTokens pid _ _) ->
+        --
+        -- And WHAT is being created (Queen Allenal of Ruadach's "creature
+        -- tokens"): "one or more" is ANY lot matching, each judged as its token
+        -- would exist (CR 614.12) since none is minted yet.
+        (ReplacementEffect.TokenR (TokenR.MkTokenR pat _ _), ProposedEvent.WouldCreateTokens pid lots) ->
           matchesPlayer gs src (TokenPattern.whose pat) pid
+            && any (matchesTokenLot (candidateContext gs candidate) (TokenPattern.whatToken pat) pid) lots
         -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
         -- names exactly which one -- and, for a player-scoped skip, whose.
         --
@@ -1305,6 +1314,18 @@ candidateContext gs candidate =
     { Filter.sourceAttachedTo = Projection.hostOf (ReplacementCandidate.source candidate) gs
     }
 
+-- CR 614.12 for a token that does not exist yet: a lot's token is judged off
+-- the characteristics it would have on the battlefield -- its given text, or
+-- for CR 707.1's copy token the copiable values it takes (CR 707.2). The
+-- controller is the event's player (CR 111.2), which is what lets a lot say
+-- "under your control" on the Filter axis too.
+matchesTokenLot :: Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerId -> TokenLot.TokenLot -> Bool
+matchesTokenLot context filter_ pid lot =
+  let view = case TokenLot.copy lot of
+        Just snapshot -> Count.viewOfSnapshot (Just pid) True Map.empty snapshot
+        Nothing -> (Projection.viewOfCard (NonEmpty.head (Card.Type.faces (TokenLot.card lot)))) {Filter.controller = Just pid}
+   in Filter.matches context view filter_
+
 -- The counters `oid` is so far entering with, empty outside an entry (see
 -- GameState.enteringCounters).
 enteringCountersOf :: GameState -> ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
@@ -1357,7 +1378,7 @@ bucketOf candidate = case ReplacementCandidate.origin candidate of
   ReplacementOrigin.Other -> bucketOfEffect (ReplacementCandidate.effect candidate)
 
 -- CR 616.1b-e: which bucket an effect that is NOT CR 614.15's falls in.
-bucketOfEffect :: ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> ReplacementBucket
+bucketOfEffect :: ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> ReplacementBucket
 bucketOfEffect re = case re of
   ReplacementEffect.ZoneChangeR {} -> ReplacementBucket.Other
   -- CR 616.1c: entering as a copy is its own, HIGHER bucket. The split only
@@ -1478,7 +1499,7 @@ bucketOfEffect re = case re of
 -- bucketOfEffect and Event.apply. A wildcard defaulting to False would hand an
 -- author who teaches Event.apply a new controller-reading rewrite an unasked choice
 -- instead of a build failure.
-readsApplier :: ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
+readsApplier :: ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Bool
 readsApplier re = case re of
   -- The destination zone is the effect's own field, and the pattern is matched
   -- before Event.apply runs (Rest in Peace, Leyline of the Void). CR 701.20's
@@ -1779,7 +1800,7 @@ chooserOf gs event = case event of
   -- CR 616.1's affected player is the one the event happens to, which for a
   -- counter put on a PLAYER is that player -- not the one putting it.
   ProposedEvent.WouldPutPlayerCounters _ pid _ _ -> Just pid
-  ProposedEvent.WouldCreateTokens pid _ _ -> Just pid
+  ProposedEvent.WouldCreateTokens pid _ -> Just pid
   -- CR 616.1's "affected player": a step or phase beginning affects no object,
   -- so the player whose turn it is chooses among applicable skips.
   ProposedEvent.WouldBeginPhase _ pid -> Just pid
@@ -2729,9 +2750,9 @@ asLifeLoss event = case event of
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
-asTokens :: ProposedEvent -> Maybe (PlayerId, Card, Natural)
+asTokens :: ProposedEvent -> Maybe (PlayerId, Seq.Seq TokenLot.TokenLot)
 asTokens event = case event of
-  ProposedEvent.WouldCreateTokens pid card n -> Just (pid, card, n)
+  ProposedEvent.WouldCreateTokens pid lots -> Just (pid, lots)
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing

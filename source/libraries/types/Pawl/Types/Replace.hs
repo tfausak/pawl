@@ -12,7 +12,7 @@ import qualified Pawl.Types.Uses as Uses
 --
 -- Parametric in the EFFECT for Pawl.Types.DamageR's reason, and instantiated at
 -- `Effect card` where Pawl.Types.Effect declares the arm that holds it.
-data Replace effect = MkReplace
+data Replace card effect = MkReplace
   { duration :: Duration.Duration,
     uses :: Uses.Uses,
     origin :: ReplacementOrigin.ReplacementOrigin,
@@ -32,6 +32,6 @@ data Replace effect = MkReplace
     -- against the same board -- see that field for which one, and why CR 614.12a
     -- leaves the two segments no room to differ on it.
     condition :: Maybe Condition.Condition,
-    effect :: ReplacementEffect.ReplacementEffect effect
+    effect :: ReplacementEffect.ReplacementEffect card effect
   }
   deriving (Eq, Ord, Show)
