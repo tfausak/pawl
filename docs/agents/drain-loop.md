@@ -208,14 +208,18 @@ overwritten by another's, and restoring it injected a different unit's
 in-flight code into the tree --- a corruption no build catches, because both
 sides compile.
 
-**Seed every worktree's `dist-newstyle` before its first build.** Measured
-2026-09-04 on a loaded machine: a cold `cabal build all` in a fresh worktree
-took 463s; seeded with `cp -a` from a checkout 80 files behind `origin/main`,
-414s with 843 of 1528 modules recompiled; seeded from a build at the same
-commit, 24s with none. The copy is an APFS clone and costs nothing. Name the
-donor in the brief: the most recently merged unit's worktree if it has not
-been reaped yet, else the primary checkout. Reap the donor after the copy,
-not before.
+**Keep the warm worktree at `origin/main`, and seed every dispatch from it.**
+`script/warm-worktree.sh refresh` resets `.claude/worktrees/warm` to
+`origin/main` and builds it through the lock; run it after every merge, in the
+background, since the build is incremental and the lane does not wait on it.
+`script/warm-worktree.sh seed DIR` clones its `dist-newstyle` into a fresh
+worktree, which `implementing.md` tells the agent to do before its first
+build. Measured 2026-09-04 on a loaded machine: a cold `cabal build all` in a
+fresh worktree took 463s; seeded from a build 80 files behind, 414s with 843
+of 1528 modules recompiled; seeded from a build at the same commit, 24s with
+none. A donor that has fallen behind still pays off, so a missed refresh is a
+slower dispatch, not a broken one. The warm worktree is never reaped and
+never dispatched into.
 
 **Builds are counted, machine-wide.** The GHC job semaphore shares compile
 slots; it does not stop several worktrees running `cabal` at once, and with
@@ -233,17 +237,19 @@ while it holds a lock slot. Tell agents to run `cabal` in the foreground with
 a generous timeout, to split long runs by `--pattern`, and never to `pkill`
 by pattern; a run at 0% CPU for ten minutes is killed by its own PID.
 
-**Reap after every merge.** A finished unit leaves a worktree under
-`.claude/worktrees/`, its placeholder `worktree-agent-*` branch, the unit's own
-branch, and often a `cabal` process stalled on the semaphore at 0% CPU. None of
-it goes away on its own, and a stalled `cabal` keeps a build slot the live lanes
-need. Once a unit's PR is merged, from the primary checkout: `git worktree
+**Reap after every merge, then refresh the warm worktree.** A finished unit
+leaves a worktree under `.claude/worktrees/`, its placeholder
+`worktree-agent-*` branch, the unit's own branch, and often a `cabal` process
+stalled on the semaphore at 0% CPU. None of it goes away on its own, and a
+stalled `cabal` keeps a build slot the live lanes need. Once a unit's PR is merged, from the primary checkout: `git worktree
 remove --force` its worktree (unlock first), `git worktree prune`, `git fetch
 --prune`, then delete every local branch whose upstream is `[gone]` or that has
 no commit beyond `origin/main`, skipping any branch a live worktree has checked
 out. Kill a stalled `cabal` by its PID after `lsof -p <pid> -d cwd` shows a
 finished worktree, never by pattern. Leave any branch you did not create that
-still carries commits, and say so; the owner keeps review branches.
+still carries commits, and say so; the owner keeps review branches. The warm
+worktree is exempt from all of this: leave it, and run
+`script/warm-worktree.sh refresh` in the background once the reap is done.
 
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
 be up to date, so every merge invalidates every other armed PR and the queue

@@ -37,11 +37,11 @@ Copy `cabal.project.local` in from the primary checkout, as a BARE command of
 its own, and confirm it is there. The worktree-isolation guard refuses a
 compound command wholesale, and its error names the other half.
 
-Then copy `dist-newstyle` the same way, from the donor the brief names or else
-the primary checkout: `cp -a /abs/path/to/donor/dist-newstyle
-./dist-newstyle`, before anything runs `cabal`. A same-commit donor makes the
-first build a relink; a donor behind your commit still keeps every module
-downstream of nothing that changed. Never build in the donor.
+Then, before anything runs `cabal`, seed `dist-newstyle` from the warm
+worktree: `/abs/path/to/primary/script/warm-worktree.sh seed "$PWD"`. It
+refuses if the warm build is missing, in which case build cold and say so in
+the PR. Never build in the warm worktree yourself; the orchestrator refreshes
+it.
 
 ## Running the suite
 

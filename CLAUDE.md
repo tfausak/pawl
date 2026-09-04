@@ -62,9 +62,10 @@ to agents as written. What it doesn't say:
 - A fresh `git worktree` has no gitignored `cabal.project.local`, so `pedantic`
   and `-Werror` are off and a green build says nothing about CI. Copy it in
   from the primary checkout before the first build --- by absolute path, never
-  by `cd`ing there. Copy `dist-newstyle` in the same way (`cp -a`, an instant
-  clone on APFS): GHC reuses every module whose source is unchanged, so the
-  first build costs only the donor's distance from your commit.
+  by `cd`ing there. Then `script/warm-worktree.sh seed <your worktree>`, which
+  clones a finished build of `origin/main` in: GHC reuses every module whose
+  source is unchanged, so the first build costs only your own diff. The
+  script does the `cabal.project.local` copy too.
 
 - Working in a worktree, NEVER `cd` to the primary checkout, not even to read.
   The isolation guard redirects `git` but not `python`, `grep`, `sed` or
