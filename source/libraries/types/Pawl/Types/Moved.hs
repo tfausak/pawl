@@ -28,7 +28,7 @@ data Moved = MkMoved
     -- Example fires a card-arrival ability twice. What the field itself is for
     -- is CR 712.21c -- "if an effect can find the new object that a melded
     -- permanent becomes as it leaves the battlefield, it finds both cards" --
-    -- which Pawl.Engine.Event.eventBindings reads through `arrivals` and binds
+    -- which Pawl.Engine.Event.Binding.eventBindings reads through `arrivals` and binds
     -- as one group off the single departure event.
     --
     -- A Seq and not a Set: the order is the one the cards arrived in, which is

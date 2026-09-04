@@ -62,7 +62,7 @@ data Binding = MkBinding
     -- the guarantee is a lint rather than a type: a card reaching it would have
     -- to declare a delayed ability's target slot under a name its own Create or
     -- MoveToZone defines, which Pawl.CardSpec rejects.
-    -- Pawl.Engine.Resolve.slotGroup records which way it would fail anyway.
+    -- Pawl.Engine.Resolve.Slots.slotGroup records which way it would fail anyway.
     --
     -- A Seq and not a Set: the order is the one the objects were produced in --
     -- mint order for tokens, the batch's own order for a move or a destruction -- and it is not an

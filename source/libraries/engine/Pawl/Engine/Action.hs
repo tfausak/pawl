@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn

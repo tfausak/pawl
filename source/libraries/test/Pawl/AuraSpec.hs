@@ -44,8 +44,9 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
-import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
@@ -2361,7 +2362,7 @@ handNames pid gs = Maybe.mapMaybe (fmap S.nameOf . flip Game.cardOf gs) (Game.zo
 -- the recording.
 --
 -- `other` is a creature the Aura could equally well enchant. Nothing should ever
--- ask: Pawl.Engine.Resolve.putFound seeds the entry with the host the effect
+-- ask: Pawl.Engine.Resolve.Effect.putFound seeds the entry with the host the effect
 -- named, so CR 303.4f's choice is not this move's. An answer of `other` is how a
 -- seed that went missing shows up as a wrong board rather than as a silence.
 mageAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r

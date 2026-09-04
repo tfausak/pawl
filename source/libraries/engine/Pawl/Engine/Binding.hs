@@ -92,7 +92,7 @@ you = SlotName.MkSlotName (Text.pack "you")
 
 -- CR 603.2: the reserved slot under which the PLAYER an event trigger's event
 -- names is bound -- "that player" in CR 702.70a's poisonous. Stamped by
--- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the ability's
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered, so the ability's
 -- payload reads an ordinary slot rather than a "the damaged player" opcode.
 --
 -- Distinct from `you` (CR 109.5, the ability's CONTROLLER): the player the
@@ -104,7 +104,7 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- is how this stays readable at resolution. `you`'s "no card's targetSlots may
 -- name it" rule applies here too, under the same sweep. That an effect reading
 -- this slot sits under a condition that binds it is enforced by
--- Pawl.Engine.Event.eventBindingSlots, whose arms are the enumeration of the
+-- Pawl.Engine.Event.Binding.eventBindingSlots, whose arms are the enumeration of the
 -- conditions that stamp it -- CR 400.3's owner under the returned-to-hand
 -- condition among them. Reading it under any other is a failing test.
 --
@@ -212,7 +212,7 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- slot is the bearer's own arrival, which CR 704.5m minted a pass later. Screams
 -- from Within's "return this card" is the reader, and it is the Endless
 -- Cockroaches shape once more -- two incarnations of one card -- so the same
--- slot rather than a fresh one. Pawl.Engine.Event.eventTriggers is what supplies
+-- slot rather than a fresh one. Pawl.Engine.Event.Trigger.eventTriggers is what supplies
 -- the id, off the batch.
 --
 -- Collapsing them either way is a silent wrong answer, not a type error:
@@ -228,7 +228,7 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- Event.eventBindingSlots names, and a counter-removal condition is not one.
 -- No CARD may bind it, which Pawl.CardSpec's reservedBindings sweep enforces.
 --
--- Stamped by Pawl.Engine.Event.eventBindings alongside `triggerPlayer`, and not
+-- Stamped by Pawl.Engine.Event.Binding.eventBindings alongside `triggerPlayer`, and not
 -- a target -- same CR 608.2b posture as that slot, including the "no card's
 -- targetSlots may name it" sweep and the eventBindingSlots check on reads. A
 -- condition that binds it only SOMETIMES is rejected by that same lint: CR
@@ -239,14 +239,14 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- ONE object usually, SEVERAL for a melded permanent leaving the battlefield:
 -- CR 712.21c makes an effect that finds what it became find both cards. The
 -- shape follows -- a recipient for one (setBecame), a group for several
--- (setBecameGroup) -- and Pawl.Engine.Event.setBecameArrivals is where the
+-- (setBecameGroup) -- and Pawl.Engine.Event.Binding.setBecameArrivals is where the
 -- choice is made and justified.
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
 -- CR 603.2: the reserved slot under which the AMOUNT an event trigger's event
 -- names is bound -- the printed words "that much". Stamped by
--- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the payload
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered, so the payload
 -- reads an ordinary Quantity.InSlot rather than a "how much was prevented" or
 -- "how much was gained" opcode.
 --
@@ -269,7 +269,7 @@ became = SlotName.MkSlotName (Text.pack "became")
 --     damage to each player".
 --
 -- No ability bears two conditions, so they can never collide on one object, and
--- Pawl.Engine.Event.eventBindingSlots is what tells the card lint which of them
+-- Pawl.Engine.Event.Binding.eventBindingSlots is what tells the card lint which of them
 -- makes the slot available.
 --
 -- A NUMBER, where triggerPlayer and became are references, so this is the first
@@ -280,7 +280,7 @@ became = SlotName.MkSlotName (Text.pack "became")
 -- does.
 --
 -- Read out of Pawl.Types.GameState.ambientAmounts too, and written there by
--- Pawl.Engine.Resolve.runPreventionRider, which is CR 615.5's own channel: a
+-- Pawl.Engine.Resolve.Effect.runPreventionRider, which is CR 615.5's own channel: a
 -- rider whose shielded recipient is a player has no object at all to be bound
 -- on. Nothing writes THIS name onto a battlefield permanent any more: the
 -- prevention stamp was the one such writer and it is gone, and
@@ -330,7 +330,7 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 -- source permanent does not.
 --
 -- The permanent is in a graveyard by the time the ability resolves, so every
--- read of it is CR 608.2h's last known information; Pawl.Engine.Resolve.effectViewOf
+-- read of it is CR 608.2h's last known information; Pawl.Engine.Resolve.Slots.effectViewOf
 -- is what licenses that for this slot.
 --
 -- Not needed for "sacrifice this": CR 113.7's `triggerSource` already names that
@@ -351,7 +351,7 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 -- Unlike sacrificedPermanent, the permanent is still on the battlefield when the
 -- ability resolves -- CR 601.2h taps it, and tapping is not a zone change -- so
 -- CR 608.2h's first clause applies and every read is CURRENT information.
--- Pawl.Engine.Resolve.effectViewOf needs no arm for this slot; the ordinary
+-- Pawl.Engine.Resolve.Slots.effectViewOf needs no arm for this slot; the ordinary
 -- Projection.viewWithLastKnown road answers it.
 --
 -- Not needed for {T}: CR 107.5 taps the SOURCE, which CR 113.7's `triggerSource`
@@ -371,7 +371,7 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- trigger WATCHED is bound -- the printed "it" in Resourceful Defense's "whenever
 -- a permanent you control leaves the battlefield, if it had counters on it, put
 -- those counters on target permanent you control". Stamped by
--- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered, alongside
 -- `triggerPlayer` and `became`.
 --
 -- ZoneChange.departed, NOT ZoneChange.object, and the two are the whole reason
@@ -394,11 +394,11 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- redundancy SelfPutIntoGraveyardFromAnywhere's empty floor declines.
 --
 -- Every read of it is CR 608.2h's last known information --
--- Pawl.Engine.Resolve.effectViewOf is what licenses that for this slot, exactly
+-- Pawl.Engine.Resolve.Slots.effectViewOf is what licenses that for this slot, exactly
 -- as it does for `sacrificedPermanent`, and for the same reason: the object is
 -- gone by construction, so viewWithLastKnown's blank answer for a non-source id
 -- would leave the clause permanently unanswerable. The trigger's own intervening
--- "if" needs no arm there, Pawl.Engine.Event.interveningHolds and
+-- "if" needs no arm there, Pawl.Engine.Event.Trigger.interveningHolds and
 -- Pawl.Engine.Stack's CR 608.2a re-check both reading the unscoped view already.
 --
 -- Not a target (CR 115.10a; nothing was chosen), so the same CR 608.2b posture
@@ -412,7 +412,7 @@ departedPermanent = SlotName.MkSlotName (Text.pack "thatDepartedPermanent")
 -- CR 601.2i: the reserved slot under which a cast trigger's WATCHED SPELL is
 -- bound -- the printed "it" in Presence of the Master's "whenever a player casts
 -- an enchantment spell, counter it", and "that spell" wherever a card spells the
--- word out. Stamped by Pawl.Engine.Event.eventBindings as the trigger is
+-- word out. Stamped by Pawl.Engine.Event.Binding.eventBindings as the trigger is
 -- gathered, alongside `triggerPlayer` and `became`, so the payload reads an
 -- ordinary slot rather than a "the spell that was cast" opcode.
 --
@@ -467,7 +467,7 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 -- Bound for an ACTIVATED ability only. A triggered ability has no activation to
 -- ask about, and CR 605.3b's mana ability never reaches the stack.
 --
--- NOT a CR 609.7a referent, and Pawl.Engine.Resolve.referentsOfBindings drops it
+-- NOT a CR 609.7a referent, and Pawl.Engine.Resolve.Effect.referentsOfBindings drops it
 -- by name for every carrier that reads a binding environment: this slot exists so
 -- a card can read the activation's payment record, not because printed text names
 -- the ability as some other object, and counting it would undo rule 609.7a's stop
@@ -478,7 +478,7 @@ thisAbility = SlotName.MkSlotName (Text.pack "thisAbility")
 -- CR 601.2c: the reserved slot under which the SPELL OR ABILITY THAT DID THE
 -- TARGETING is bound -- rule 702.21a's "that spell or ability", which ward
 -- counters and whose controller ward offers the cost to. Stamped by
--- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered, alongside
 -- `castSpell` and the rest.
 --
 -- For BOTH sides of rule 601.2c's announcement, which is why it is worded over
@@ -512,7 +512,7 @@ targetingObject = SlotName.MkSlotName (Text.pack "thatTargetingObject")
 
 -- CR 509.3d: the reserved slot under which the CREATURE THAT BLOCKED the bearer
 -- is bound -- rule 702.25a's "the blocking creature". Stamped by
--- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered, alongside
 -- `triggerPlayer`, `became` and `castSpell`, so flanking's payload is an
 -- ordinary slot read rather than a "the creature that blocked me" opcode.
 --
@@ -535,7 +535,7 @@ blockingCreature = SlotName.MkSlotName (Text.pack "thatBlocker")
 
 -- CR 509.3b: `blockingCreature`'s mirror -- the reserved slot under which the
 -- CREATURE THE BEARER BLOCKED is bound, Loyal Sentry's "that creature". Stamped
--- by Pawl.Engine.Event.eventBindings off the same GameEvent.BecameBlocking,
+-- by Pawl.Engine.Event.Binding.eventBindings off the same GameEvent.BecameBlocking,
 -- read from the BLOCKING side, so the bearer is the blocker and this names the
 -- attacker.
 --
@@ -551,7 +551,7 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 
 -- CR 506.5: the reserved slot under which the creature that was declared as an
 -- attacker is bound -- rule 702.83a's "that creature", the one exalted pumps.
--- Stamped by Pawl.Engine.Event.eventBindings off GameEvent.AttackerDeclared --
+-- Stamped by Pawl.Engine.Event.Binding.eventBindings off GameEvent.AttackerDeclared --
 -- the same event whose CR 508.5 defending player annihilator reads through
 -- `triggerPlayer`, though this condition binds only the creature: rule 702.83a
 -- names no player.
@@ -577,7 +577,7 @@ attackingCreature :: SlotName
 attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 
 -- CR 508.3d / 508.3e: the reserved slot under which the player who DECLARED the
--- attackers is bound. Stamped by Pawl.Engine.Event.eventBindings off
+-- attackers is bound. Stamped by Pawl.Engine.Event.Binding.eventBindings off
 -- GameEvent.AttackersDeclared and GameEvent.BecameAttacked as the trigger is
 -- gathered.
 --
@@ -607,7 +607,7 @@ attackingPlayer = SlotName.MkSlotName (Text.pack "thatAttackingPlayer")
 
 -- CR 120.1: the reserved slot under which the OBJECT THAT DEALT the damage --
 -- its source -- is bound: Aragorn, Hornburg Hero's "double the number of +1/+1
--- counters on IT". Stamped by Pawl.Engine.Event.eventBindings off the same
+-- counters on IT". Stamped by Pawl.Engine.Event.Binding.eventBindings off the same
 -- GameEvent.DamageDealt the condition matched, so the payload is an ordinary slot
 -- read rather than a "the creature that hit them" opcode.
 --
@@ -637,7 +637,7 @@ combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
 
 -- CR 702.134c: the reserved slot under which the creature that WAS MENTORED is
 -- bound -- Aegis of the Legion's "put a shield counter on that creature". Stamped
--- by Pawl.Engine.Event.eventBindings off GameEvent.Mentored, alongside
+-- by Pawl.Engine.Event.Binding.eventBindings off GameEvent.Mentored, alongside
 -- `blockingCreature` and the rest, so the payload is an ordinary slot read rather
 -- than a "the creature my equipped creature mentored" opcode.
 --
@@ -721,7 +721,7 @@ setBecame oid = Map.insert became (toObject oid)
 
 -- setBecame for CR 712.21c's plural: the SEVERAL cards a melded permanent became
 -- as it left the battlefield, bound as a group so an ObjectRef.InSlot reader acts
--- on each of them. Pawl.Engine.Event.setBecameArrivals is the one caller and says
+-- on each of them. Pawl.Engine.Event.Binding.setBecameArrivals is the one caller and says
 -- why the shape differs from setBecame's.
 setBecameGroup :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecameGroup oids = Map.insert became (toObjects oids)
@@ -797,7 +797,7 @@ targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 -- Pawl.Engine.Filter.Context's slotObjects holds -- `slotObjects` below is the
 -- whole, group binding included.
 --
--- No CR 608.2b legality filter, unlike Pawl.Engine.Resolve.effectContext's
+-- No CR 608.2b legality filter, unlike Pawl.Engine.Resolve.Slots.effectContext's
 -- version: what this is read for is CR 603.4's two intervening-"if" checks, and
 -- what they aim at is a slot the EVENT bound (Binding.became), which was never
 -- chosen and so was never a target to become illegal.
@@ -845,7 +845,7 @@ objectsOf slot m = Binding.objects =<< Map.lookup slot m
 
 -- Every GROUP binding an environment holds, keyed by slot: objectsOf over the
 -- whole map, for a reader that wants them all at once rather than one name at a
--- time. What Pawl.Engine.Resolve.effectContext puts in
+-- time. What Pawl.Engine.Resolve.Slots.effectContext puts in
 -- Pawl.Engine.Filter.Context's slotObjects so that CR 115.10a's group is visible
 -- to the IsBound atom.
 groupsOf :: Map SlotName Binding -> Map SlotName (Seq ObjectId)

@@ -77,6 +77,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -215,7 +216,7 @@ heldBy pid oid gs = Maybe.fromMaybe pid (Projection.controllerOf oid gs)
 -- player's control, plus -- CR 702.26g -- the ones that phased out indirectly
 -- while attached to them.
 --
--- Reads the stored player and not Pawl.Engine.Projection.controllerOf, because
+-- Reads the stored player and not Pawl.Engine.Projection.View.controllerOf, because
 -- rule 702.26a asks who controlled the permanent WHEN IT PHASED OUT, and CR
 -- 702.26e has taken the live answer away in the meantime -- a phased-out
 -- permanent is not in the set of objects a continuous effect affects.

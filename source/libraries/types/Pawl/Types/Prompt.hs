@@ -350,7 +350,7 @@ data Prompt r where
   -- entries' indices. At Pawl.Engine.Engine.orderPending it is CR 603.3b's
   -- stack order, the last named resolving first, elided unless two or more
   -- and observable (Pawl.Engine.Engine.orderInert, CR 117.3b); at
-  -- Pawl.Engine.Event.delayedPending it is CR 101.4c's asking order, the first
+  -- Pawl.Engine.Event.Trigger.delayedPending it is CR 101.4c's asking order, the first
   -- named asked first, elided on the count alone.
   OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerEntry.TriggerEntry] -> Prompt [Natural.Natural]
   -- | CR 615.7: the order a shield is offered two or more simultaneous damage

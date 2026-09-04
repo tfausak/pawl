@@ -10,6 +10,7 @@ module Pawl.Engine.ManaRider where
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaRider as ManaRider

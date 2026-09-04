@@ -36,7 +36,7 @@
 
 # A traversal whose job is to be revisited when a payload gains a field cannot
 # write `{}`, which is what this hint asks for.
-- ignore: {name: "Use record patterns", within: [Pawl.Engine.Resolve.objectRefQuantities, Pawl.Engine.Resolve.objectRefPlayerRefs]}
+- ignore: {name: "Use record patterns", within: [Pawl.Engine.Resolve.Slots.objectRefQuantities, Pawl.Engine.Resolve.Slots.objectRefPlayerRefs]}
 
 # Prefer using monomorphic, total conversion functions.
 - functions:

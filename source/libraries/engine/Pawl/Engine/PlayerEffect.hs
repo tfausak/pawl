@@ -41,6 +41,8 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.Rewrite as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityKind as AbilityKind
@@ -185,7 +187,7 @@ playersInScope perspective gs scope =
 
 -- CR 707.2a: the player abilities this permanent's copiable rules text gives it
 -- -- its copy snapshot's when it has one, its printed face's otherwise. The
--- Pawl.Engine.Projection.staticAbilitiesOf of this axis, and written here rather
+-- Pawl.Engine.Projection.View.staticAbilitiesOf of this axis, and written here rather
 -- than beside it so that Pawl.Engine.Projection goes on never seeing
 -- Pawl.Types.PlayerEffect; the one read of Binding.copyOf both share is
 -- Projection.copiableSnapshotOf.
@@ -383,7 +385,7 @@ applying pid gs =
       -- text-changing effect changes the words printed on an OBJECT, and this
       -- carrier has none behind it. The words a stored effect holds were fixed by
       -- the spell that made it, whose own text a swap reaches while it is still on
-      -- the stack (Pawl.Engine.Projection.rewriteEffect).
+      -- the stack (Pawl.Engine.Projection.Rewrite.rewriteEffect).
       --
       -- The SOURCE is the object that resolved (ActivePlayerEffect.source), so a
       -- stored effect answers Filter.IsSource about itself -- which is what Lava

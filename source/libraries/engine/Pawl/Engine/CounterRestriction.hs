@@ -31,6 +31,8 @@ module Pawl.Engine.CounterRestriction where
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.Rewrite as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Face as Face

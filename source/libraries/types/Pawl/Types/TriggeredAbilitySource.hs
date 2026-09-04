@@ -26,11 +26,11 @@ data TriggeredAbilitySource = MkTriggeredAbilitySource
     -- is, and it is the only thing on the stack that tells the two kinds apart:
     -- CR 701.27f and CR 701.28e measure a delayed ability's transform or
     -- convert from its creation and every other ability's from CR 613.7d's
-    -- placement stamp (Pawl.Engine.Resolve.alreadyTurnedFor).
+    -- placement stamp (Pawl.Engine.Resolve.Effect.alreadyTurnedFor).
     --
     -- Carried on the object rather than looked up, the entry it came from being
     -- gone by resolution: an entry with no stated duration is retired as it
-    -- fires (Pawl.Engine.Event.delayedPending).
+    -- fires (Pawl.Engine.Event.Trigger.delayedPending).
     createdAt :: Maybe Timestamp.Timestamp
   }
   deriving (Eq, Ord, Show)

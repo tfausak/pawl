@@ -10,7 +10,7 @@ import qualified Pawl.Types.Quantity as Quantity
 -- The depth is a Quantity rather than a Natural, so Commune with Lava's "exile
 -- the top X cards of your library" is sayable beside Act on Impulse's literal
 -- three. A computed depth is read when the effect executes (CR 608.2c), and
--- Pawl.Engine.Resolve.objectRefObjects clamps an unevaluable or negative answer
+-- Pawl.Engine.Resolve.Slots.objectRefObjects clamps an unevaluable or negative answer
 -- to zero (CR 107.1b).
 --
 -- A depth that a FILTER ends instead of a number is

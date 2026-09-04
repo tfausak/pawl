@@ -18,7 +18,7 @@
 --
 -- So what this file exercises is that mark's lifecycle: Pawl.Engine.Resolve's
 -- SetClassLevel arm writes it, Pawl.Engine.Quantity's ClassLevel arm reads it back
--- through Pawl.Engine.Filter's view, Pawl.Engine.Projection.abilitiesFromCharacteristics
+-- through Pawl.Engine.Filter's view, Pawl.Engine.Projection.View.abilitiesFromCharacteristics
 -- gates the next bar on it, and Pawl.Engine.Projection.gatherStatic gates the
 -- section's continuous effect on it.
 --

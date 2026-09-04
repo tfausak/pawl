@@ -28,7 +28,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- setting of "without paying".
 --
 -- CR 118.9a allows a spell only ONE alternative cost, so the two cost riders are
--- never both meaningful at once; Pawl.Engine.Resolve.offerCast reads
+-- never both meaningful at once; Pawl.Engine.Resolve.Effect.offerCast reads
 -- `withoutPayingManaCost` first, and no producer sets both. Rule 702.94a's
 -- miracle is what sets this one, carried here rather than on the card for this
 -- type's own reason: the cost is not a characteristic, and the same card cast

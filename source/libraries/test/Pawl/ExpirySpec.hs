@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -719,7 +720,7 @@ garlandCondition =
 -- that player controls for as long as they're the monarch." Two rules meet, and
 -- the card is the only printing in the pool that exercises either:
 --
---   * CR 603.2 binds the newly crowned player (Pawl.Engine.Event.eventBindings),
+--   * CR 603.2 binds the newly crowned player (Pawl.Engine.Event.Binding.eventBindings),
 --     which is what "that player" and "they" both name; and
 --   * CR 611.2b's duration outlives the resolution that stored it, so the
 --     condition is BAKED to that seat as the duration begins -- an unbaked slot

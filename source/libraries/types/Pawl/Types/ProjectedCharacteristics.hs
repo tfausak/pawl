@@ -154,13 +154,13 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- CR 613.6's per-ability decision point instead of by emptying a list here.
     --
     -- Here at all because CR 707.2 names rules text among the copiable values:
-    -- without it Pawl.Engine.Projection.copiableCharacteristics has nowhere to
+    -- without it Pawl.Engine.Projection.View.copiableCharacteristics has nowhere to
     -- put the copied object's static abilities, and a copy reads the COPIER's
     -- printed face (CR 707.2a). A GRANTED instance is not copiable, which falls
     -- out of where each is written -- the seed here, the grant in the gathered
     -- list -- exactly as `enchant` below argues.
     --
-    -- Pawl.Engine.Projection.staticAbilitiesOf is the reader, and it answers
+    -- Pawl.Engine.Projection.View.staticAbilitiesOf is the reader, and it answers
     -- this field without building the rest of the record.
     staticAbilities :: [StaticAbility.StaticAbility Card.Card],
     -- | CR 613.10 / 613.11: the object's player-affecting static abilities --

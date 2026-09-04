@@ -964,6 +964,9 @@ library engine
     Pawl.Engine.Engine
     Pawl.Engine.EntryRestriction
     Pawl.Engine.Event
+    Pawl.Engine.Event.Binding
+    Pawl.Engine.Event.Match
+    Pawl.Engine.Event.Trigger
     Pawl.Engine.Exile
     Pawl.Engine.Expiry
     Pawl.Engine.FaceDown
@@ -988,12 +991,16 @@ library engine
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot
     Pawl.Engine.Projection
+    Pawl.Engine.Projection.Rewrite
+    Pawl.Engine.Projection.View
     Pawl.Engine.Quantity
     Pawl.Engine.QuantitySlot
     Pawl.Engine.Rad
     Pawl.Engine.Replacement
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
+    Pawl.Engine.Resolve.Effect
+    Pawl.Engine.Resolve.Slots
     Pawl.Engine.Restamp
     Pawl.Engine.Ring
     Pawl.Engine.Room
@@ -1252,20 +1259,28 @@ library test
   hs-source-dirs: source/libraries/test
   -- cabal-gild: discover source/libraries/test
   exposed-modules:
+    Pawl.AbilitySlotLintSpec
     Pawl.ActivateSpec
     Pawl.AdventureSpec
+    Pawl.AttackKeywordTriggerSpec
     Pawl.AuraSpec
     Pawl.BattleSpec
     Pawl.BindingSpec
+    Pawl.BoardEffectSpec
     Pawl.Cards
     Pawl.CardSpec
     Pawl.CardsSpec
+    Pawl.CardTriggerSpec
     Pawl.CaseSpec
+    Pawl.CastPermissionSpec
+    Pawl.CastProhibitionSpec
+    Pawl.CastRestrictionSpec
     Pawl.CastSpec
     Pawl.ClassSpec
     Pawl.CodecIntegrationSpec
     Pawl.CoinSpec
     Pawl.ColorSpec
+    Pawl.CombatCostSpec
     Pawl.CombatEffectSpec
     Pawl.CombatSpec
     Pawl.CommanderSpec
@@ -1274,10 +1289,12 @@ library test
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
+    Pawl.CounterKeywordTriggerSpec
     Pawl.CounterRestrictionSpec
     Pawl.CounterspellSpec
     Pawl.CountSpec
     Pawl.CrewSpec
+    Pawl.DamageReplacementSpec
     Pawl.DamageSpec
     Pawl.DaytimeSpec
     Pawl.DecideSpec
@@ -1285,21 +1302,29 @@ library test
     Pawl.DetainSpec
     Pawl.DiceSpec
     Pawl.DungeonSpec
+    Pawl.EffectLintSpec
     Pawl.EngineSpec
+    Pawl.EntryReplacementSpec
     Pawl.EntryRestrictionSpec
     Pawl.EventSpec
     Pawl.EventTriggerSpec
     Pawl.ExileSpec
     Pawl.ExpirySpec
     Pawl.FaceDownSpec
+    Pawl.FilterPositionLintSpec
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.GoadSpec
     Pawl.InitiativeSpec
     Pawl.InvestigateSpec
     Pawl.KeywordTriggerSpec
+    Pawl.LeavesTriggerSpec
     Pawl.LibraryOrderSpec
+    Pawl.LifeReplacementSpec
+    Pawl.LifeTriggerSpec
+    Pawl.ManaSourceSpec
     Pawl.ManaSpec
+    Pawl.ManaSymbolSpec
     Pawl.MassEffectSpec
     Pawl.MeldSpec
     Pawl.ModalDoubleFacedSpec
@@ -1309,9 +1334,11 @@ library test
     Pawl.OmenSpec
     Pawl.OutsideTheGameSpec
     Pawl.PhasingSpec
+    Pawl.PlaneswalkerCombatSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
+    Pawl.PreventionSpec
     Pawl.ProjectionSpec
     Pawl.PutCounterSpec
     Pawl.RadSpec
@@ -1325,6 +1352,7 @@ library test
     Pawl.SacrificeRestrictionSpec
     Pawl.SagaSpec
     Pawl.SetupSpec
+    Pawl.ShieldCounterSpec
     Pawl.SpecialActionSpec
     Pawl.SpeedSpec
     Pawl.SplitSecondSpec

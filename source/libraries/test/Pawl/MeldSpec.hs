@@ -33,7 +33,8 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -1199,7 +1200,7 @@ transforming = turningOver Effect.Transform
 
 -- CR 701.28a's word for the same instruction, which that rule routes through
 -- rules 701.27a-f and 712.9-10 unchanged. A SEPARATE opcode reaching one
--- Pawl.Engine.Resolve.turnPermanentsOver, so a case run through both asserts
+-- Pawl.Engine.Resolve.Effect.turnPermanentsOver, so a case run through both asserts
 -- that the shared path is shared rather than that two implementations agree.
 converting :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
 converting = turningOver Effect.Convert

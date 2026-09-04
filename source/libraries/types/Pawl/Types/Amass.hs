@@ -7,7 +7,7 @@ import qualified Pawl.Types.Subtype as Subtype
 -- variables, "amass [subtype] N".
 --
 -- The subtype is a printed WORD, so CR 612.1 reaches it and
--- Pawl.Engine.Projection.rewriteEffect swaps it; the Army type beside it is the
+-- Pawl.Engine.Projection.Rewrite.rewriteEffect swaps it; the Army type beside it is the
 -- rulebook's and appears nowhere here. CR 701.47d's older amass without a subtype
 -- has Oracle errata reading "amass Zombies N", so every printing writes one.
 --

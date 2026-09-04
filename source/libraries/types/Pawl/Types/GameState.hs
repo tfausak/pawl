@@ -262,7 +262,7 @@ data GameState = MkGameState
     haunting :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 607.2's linked set as a relation: the object each exiled card is
     -- linked to, keyed by the exiled incarnation and written by
-    -- Pawl.Engine.Resolve.applyEffectWith (rule 607.2a) and Pawl.Engine.Event's
+    -- Pawl.Engine.Resolve.Effect.applyEffectWith (rule 607.2a) and Pawl.Engine.Event's
     -- zone change funnel (rule 607.2b) as a difference over GameState.exile,
     -- never a case over the opcode. Cleaned up by key only.
     --
@@ -274,7 +274,7 @@ data GameState = MkGameState
     exiledWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 406.4: which pile each face-down exiled card is in, a name drawn from
     -- nextTimestamp and shared by every card one execution of one instruction
-    -- exiled (Pawl.Engine.Resolve.recordExilePile). Cleaned up by key only.
+    -- exiled (Pawl.Engine.Resolve.Effect.recordExilePile). Cleaned up by key only.
     exilePiles :: Map.Map ObjectId.ObjectId Timestamp.Timestamp,
     -- | CR 500.7: the extra turns created and not yet taken, most recently
     -- created first, each carrying the steps that turn skips (CR 500.11).

@@ -31,7 +31,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Compares as Compares

@@ -1,7 +1,7 @@
 module Pawl.Types.SlotArity where
 
 -- | HOW MANY recipients an effect can read out of one slot -- the arity half of
--- the D4 dataflow lint's read side (Pawl.Engine.Resolve.slotsOf).
+-- the D4 dataflow lint's read side (Pawl.Engine.Resolve.Slots.slotsOf).
 --
 -- CR 601.2c lets one instance of the word "target" take several, so a slot's
 -- binding is a set; but most opcodes name one object or one player and have

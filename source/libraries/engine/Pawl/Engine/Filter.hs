@@ -139,7 +139,7 @@ data View = MkView
     castFrom :: Maybe Zone.Zone,
     -- CR 115.1: what the candidate TARGETS, for a spell or ability on the stack
     -- -- the recipients CR 601.2c (602.2b, 603.3d) chose, read live off the
-    -- object's target-slot bindings by Pawl.Engine.Projection.targetsOfStackObject
+    -- object's target-slot bindings by Pawl.Engine.Projection.View.targetsOfStackObject
     -- so that CR 115.7's change-of-target is seen at once. The union over the
     -- slots: TargetsSource and TargetsPlayer ask membership, never arity.
     --
@@ -326,7 +326,7 @@ data View = MkView
     -- second projection, so unlike `attachedToView` it needs no laziness
     -- argument -- an ObjectId is not a characteristic. Deliberately NOT narrowed
     -- to a host on the battlefield the way `attachedToView` is; see
-    -- Pawl.Engine.Projection.viewOfCharacteristics.
+    -- Pawl.Engine.Projection.View.viewOfCharacteristics.
     attachedTo :: Maybe ObjectId.ObjectId,
     -- CR 701.3a: could the SUBJECT of the attach now being performed -- the
     -- permanent an Effect.AttachTarget is moving -- legally be attached to this
@@ -392,7 +392,7 @@ data View = MkView
     activatedAbility :: Bool,
     -- CR 113.7: the view of the object this ability came from, for
     -- Filter.FromSource's nest to be matched against. Filled only by
-    -- Pawl.Engine.Projection.viewOfCharacteristics, through CR 113.7a's last
+    -- Pawl.Engine.Projection.View.viewOfCharacteristics, through CR 113.7a's last
     -- known information once the source has left. Nothing for every candidate
     -- that is not an ability on the stack, where the atom is vacuously False.
     abilitySource :: Maybe View,
@@ -401,7 +401,7 @@ data View = MkView
     tapped :: Bool,
     -- | CR 110.5's other status category, and read exactly as `tapped` above is:
     -- status is not a characteristic (CR 110.5a), so no projection writes it and
-    -- Pawl.Engine.Projection.viewOfCharacteristics reads Object.facing straight
+    -- Pawl.Engine.Projection.View.viewOfCharacteristics reads Object.facing straight
     -- off the object.
     --
     -- Scoped to the BATTLEFIELD there, unlike `tapped` and like `transformed`
@@ -415,7 +415,7 @@ data View = MkView
     faceDown :: Bool,
     -- | CR 708.12's "the characteristics of that object ignoring any continuous
     -- effects": the view of the CARD REPRESENTING the candidate, built off its
-    -- printed face by Pawl.Engine.Projection.viewOfCard, for
+    -- printed face by Pawl.Engine.Projection.View.viewOfCard, for
     -- Filter.RepresentedByCard's nest to be matched against.
     --
     -- Read through Pawl.Engine.Game.faceUpFaceOf rather than Game.faceOf, which
@@ -428,7 +428,7 @@ data View = MkView
     -- `attachedToView` shape: an object with no card behind it -- a token, an
     -- ability on the stack, a player -- is represented by no card at all, and the
     -- atom is vacuously False there rather than falling back on a projection the
-    -- rule excludes. Nothing at Pawl.Engine.Projection.viewOfCard's own site too,
+    -- rule excludes. Nothing at Pawl.Engine.Projection.View.viewOfCard's own site too,
     -- where the candidate IS a printed face and a nest would recur forever.
     representedCard :: Maybe View,
     -- | CR 406.3's "exiled face down", which the line above is emphatically not:
@@ -446,7 +446,7 @@ data View = MkView
     -- | CR 701.27g's "transformed permanent": a double-faced permanent on the
     -- battlefield with its back face up. Not a characteristic either (CR
     -- 712.8d/e make which face is up the thing characteristics are read off), so
-    -- no projection writes it -- Pawl.Engine.Projection.viewOfCharacteristics
+    -- no projection writes it -- Pawl.Engine.Projection.View.viewOfCharacteristics
     -- reads the CURRENT face off the object and the battlefield off the board.
     --
     -- False for every candidate with no object on the battlefield behind it: a
@@ -566,7 +566,7 @@ data View = MkView
     -- read outside the layer fold.
     --
     -- Bounded like attachedToView, and for the same reason: the condition is
-    -- asked through the reader Pawl.Engine.Projection.viewOfCharacteristics was
+    -- asked through the reader Pawl.Engine.Projection.View.viewOfCharacteristics was
     -- handed, so a filter forcing this from inside the fold reads the board at
     -- that caller's own layer rather than restarting the projection (CR 613.1).
     nonManaActivatedAbility :: Bool,
@@ -840,7 +840,7 @@ data Context = MkContext
     -- key -- so `Map.member` and "names something" are the same question.
     --
     -- Non-empty only where the caller supplies it. Pawl.Engine.Resolve's
-    -- effectContext, Pawl.Engine.Event.interveningHolds (CR 603.4's
+    -- effectContext, Pawl.Engine.Event.Trigger.interveningHolds (CR 603.4's
     -- intervening-"if"), Pawl.Engine.Stack (CR 608.2a's re-check of that same
     -- clause) and Pawl.Engine.Replacement.candidateContext are the producers --
     -- the last of them off the snapshot ActiveReplacement.slots holds, the
@@ -865,7 +865,7 @@ data Context = MkContext
     -- NOT one of #2141's, honest for a reason of its own rather than for the
     -- reason above: its candidates are cards outside the game, which CR 400.11c
     -- keeps every spell and ability from affecting, so no slot of the resolution
-    -- can name one. Pawl.Engine.Projection.viewOfCard fills no `identity` --
+    -- can name one. Pawl.Engine.Projection.View.viewOfCard fills no `identity` --
     -- nothing mints an object until Pawl.Engine.Event.bringInto does --
     -- so IsBound is False for every candidate there whatever this map holds. The
     -- other readers cannot reach it either: SameNameAsBound reads slotNames
@@ -883,7 +883,7 @@ data Context = MkContext
     -- sourcePower's reason -- this module holds no game state and cannot read an
     -- object's names -- and by two callers: Pawl.Engine.Target.admittedGiven,
     -- where a target slot's Filter is matched, and
-    -- Pawl.Engine.Resolve.effectContext, which is what all but two of a
+    -- Pawl.Engine.Resolve.Slots.effectContext, which is what all but two of a
     -- resolution's positions go through (Bifurcate's search filter). The two
     -- that do not are slotObjects' pair above, and are its elision rather than
     -- this field's: a caller building a bare contextFor has neither map.
@@ -929,7 +929,7 @@ data Context = MkContext
     slotControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
     -- `slotObjects` above's player half, filled from the same map by the same
-    -- caller (Pawl.Engine.Resolve.effectContext), and by
+    -- caller (Pawl.Engine.Resolve.Slots.effectContext), and by
     -- Pawl.Engine.Target.slotContext. Those two and no others: every other builder
     -- of this record leaves it empty, which Pawl.Engine.Count.slotPlayers' elision
     -- paragraph is about.
@@ -952,7 +952,7 @@ data Context = MkContext
     -- keyed by slot -- "that much" as the trigger's own event stamped it
     -- (Pawl.Engine.Binding.eventAmount), the X a caster just named
     -- (Pawl.Engine.Binding.variableX), and the amount an effect of the resolution
-    -- itself stamped on a slot (Pawl.Engine.Resolve.bindAmountSlot).
+    -- itself stamped on a slot (Pawl.Engine.Resolve.Effect.bindAmountSlot).
     --
     -- TWO readers. It is a channel THROUGH the context to Pawl.Engine.Quantity's
     -- InSlot arm, which Pawl.Engine.Target.slotContext evaluates a target slot's
@@ -963,7 +963,7 @@ data Context = MkContext
     -- PowerIsAmountInSlot atom compares a candidate's power against, which is a
     -- read `matches` makes directly.
     --
-    -- TWO fillers with it: Pawl.Engine.Resolve.effectContext supplies the
+    -- TWO fillers with it: Pawl.Engine.Resolve.Slots.effectContext supplies the
     -- resolving object's own stamped amounts, which is the position that atom is
     -- written in.
     --
@@ -982,15 +982,15 @@ data Context = MkContext
     -- Supplied by the caller for sourcePower's reason -- this module holds no game
     -- state and cannot read an object's attachment -- and by five:
     -- Pawl.Engine.Projection.conditionHolds for CR 604.2's "as long as" clause,
-    -- Pawl.Engine.Event.interveningHolds for CR 603.4's "if" clause,
+    -- Pawl.Engine.Event.Trigger.interveningHolds for CR 603.4's "if" clause,
     -- Pawl.Engine.Stack for CR 608.2a's re-check of that same clause,
-    -- Pawl.Engine.Resolve.objectRefObjects for an effect naming the host, and
+    -- Pawl.Engine.Resolve.Slots.objectRefObjects for an effect naming the host, and
     -- Pawl.Engine.PlayerEffect.matchesObjectFrom for a printed player ability's
     -- own criterion (Oppressive Rays), which takes it off the row
     -- Pawl.Engine.PlayerEffect.applying returns.
     --
     -- No laziness ARGUMENT, unlike sourcePower and defendingPlayer: filling it is a
-    -- map lookup and a Recipient read (Pawl.Engine.Projection.hostOf), with no
+    -- map lookup and a Recipient read (Pawl.Engine.Projection.View.hostOf), with no
     -- projection behind it at all, so a filter that omits the atom saves nothing by
     -- leaving it unforced.
     --
@@ -1564,7 +1564,7 @@ matches context view predicate = case predicate of
 -- CR 612.1: swap subtype words wherever they appear in a Filter. A text-changing
 -- effect reaches any word printed on the object, and a Filter carried by an
 -- effect is part of that text -- so this is the shape
--- Pawl.Engine.Projection.rewriteModification already has, for the type THIS
+-- Pawl.Engine.Projection.Rewrite.rewriteModification already has, for the type THIS
 -- module owns. Pawl.Engine.Resolve threads one call per Filter-carrying effect
 -- arm rather than learning what is inside each one.
 --
@@ -1953,7 +1953,7 @@ rewriteKeyword pairs keyword = case keyword of
 --
 -- A CR 118.12 cost offered as a clause resolves is printed in that same text box
 -- and takes the same descent -- Lithophage's "unless you sacrifice a Mountain",
--- through Pawl.Engine.Projection.rewritePayGate.
+-- through Pawl.Engine.Projection.Rewrite.rewritePayGate.
 --
 -- Here rather than in Pawl.Engine.Projection beside the ability rewriters, because
 -- rewriteKeyword above needs it too and Pawl.Engine.Filter cannot import
@@ -2411,7 +2411,7 @@ statesAQuality predicate = case predicate of
 -- lint would bless an atom the engine can never answer.
 --
 -- The catch-all is BEHAVIOURAL, not a convenience:
--- Pawl.Engine.Resolve.replacementRowReads walks a waiting replacement's Filters
+-- Pawl.Engine.Resolve.Slots.replacementRowReads walks a waiting replacement's Filters
 -- through here to decide which of the installing resolution's bindings that row
 -- CAPTURES, so an atom this function does not report is a slot the row does not
 -- carry and the atom then answers vacuously False at the event. No -Werror
@@ -2473,7 +2473,7 @@ overBoundSlots f predicate = case predicate of
 -- mode's target slots, which is what makes the card dataflow lint see a slot
 -- named in a FILTER rather than in an effect: a card reading "that player" under
 -- a condition that never binds one is then a failing test rather than a slot that
--- silently admits nothing. Pawl.Engine.Resolve.replacementRowReads is the second,
+-- silently admits nothing. Pawl.Engine.Resolve.Slots.replacementRowReads is the second,
 -- behavioural consumer -- see overBoundSlots above.
 boundSlots :: Filter.Filter Keyword.Type.Keyword -> Set.Set SlotName.SlotName
 boundSlots = Const.getConst . overBoundSlots (Const.Const . Set.singleton)

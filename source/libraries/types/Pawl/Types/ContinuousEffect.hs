@@ -12,7 +12,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- sweep drops it (Pawl.Engine.Expiry; CR 514.2, 611.2a, 611.2b); `affected` is
 -- its fixed set (CR 611.2c). Static-ability effects are NOT stored here -- they
 -- are re-derived each projection, from the object's copiable static abilities
--- (Pawl.Engine.Projection.staticAbilitiesOf).
+-- (Pawl.Engine.Projection.View.staticAbilitiesOf).
 --
 -- Made by a spell or ability RESOLVING, all but one of them. The exception is
 -- the one clause that turns a static ability's effect into a stored one:

@@ -43,6 +43,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
@@ -3156,7 +3157,7 @@ tapForManaWith perform inFlight oid = do
               -- happens.
               --
               -- The performer runs it against no ability object, CR 605.3b
-              -- leaving one uncreated; Pawl.Engine.Resolve.performManaAbility is
+              -- leaving one uncreated; Pawl.Engine.Resolve.Effect.performManaAbility is
               -- where the source stands in for it.
               perform oid controller (ManaOption.effects chosen)
               pure True

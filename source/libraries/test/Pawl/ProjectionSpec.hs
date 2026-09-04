@@ -31,6 +31,8 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.Rewrite as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 -- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Engine.Filter already claims
 -- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
 -- aliased Subtype.Type below for the same reason, against Pawl.Engine.Subtype.
@@ -1381,7 +1383,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- rewrite that reached only Mode.effects would leave this assertion at Swamp.
   --
   -- Pawl.TriggerSpec's whole-card case is the end-to-end proof, through
-  -- Pawl.Engine.Event.stateTriggers.
+  -- Pawl.Engine.Event.Trigger.stateTriggers.
   Spec.it s "CR 612.1 hacking Barbarian Outcast swaps the land type inside its triggered ability" $ do
     barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
     let base = Setup.emptyGame S.bothPlayers

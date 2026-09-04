@@ -31,10 +31,13 @@ import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Binding as Event
+import qualified Pawl.Engine.Event.Trigger as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -816,7 +819,7 @@ outcastHackBoard s registry hacked = do
 -- appears in its text box)". A triggered ability is printed in that text box
 -- exactly as an activated ability is, so a hacked Outcast asks about ISLANDS.
 --
--- The reader this proves out is Pawl.Engine.Event.stateTriggers, which takes the
+-- The reader this proves out is Pawl.Engine.Event.Trigger.stateTriggers, which takes the
 -- ability from Projection.triggeredAbilitiesOf (the projection's post-layer
 -- list) and hands its CR 603.8 condition to Condition.holds -- so the swap has
 -- to land in the projection, at CR 613.1c layer 3, to be seen here.
@@ -1596,7 +1599,7 @@ tokenGroupMoveSpec s registry =
               Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers armed)) 1
             other -> Spec.assertFailure s ("expected exactly three Elemental tokens, got " <> show (length other))
         -- THE PROVING CASE. Before Effect.MoveToZone's InSlot arm read a group
-        -- binding, the slot held no single object (Pawl.Engine.Resolve.slotOne
+        -- binding, the slot held no single object (Pawl.Engine.Resolve.Effect.slotOne
         -- answers Nothing for a group) and "exile them" moved NOBODY, while the
         -- three tokens were still minted and the ability was still spent -- so
         -- only the after-count discriminates.
@@ -1638,7 +1641,7 @@ tokenGroupMoveSpec s registry =
 --
 -- tokenGroupReadSpec's SINGULAR, and the whole reason it is a separate group: a
 -- Create binds one token into the binding's target field and several into its
--- objects group (Pawl.Engine.Resolve.bindSlot and bindObjectsSlot), and the two
+-- objects group (Pawl.Engine.Resolve.Effect.bindSlot and bindObjectsSlot), and the two
 -- are read back by different routes. Salt Road Skirmish's "they" reads the group,
 -- which has always been live; this card's "it" reads the single target, which the
 -- ability path once fixed before its effect fold began -- so CR 608.2c's "in the
@@ -2140,7 +2143,7 @@ interveningSpec s registry =
           Spec.assertEqWith s "no damage on resolution" (S.lifeOf S.alice after) (Just 20)
 
 -- CR 603.4 / 303.4b: an intervening "if" that reads the SOURCE's own host, which is
--- Filter.IsHostOfSource in the position Pawl.Engine.Event.interveningHolds answers.
+-- Filter.IsHostOfSource in the position Pawl.Engine.Event.Trigger.interveningHolds answers.
 --
 -- Ray of Frost ({1}{U} Enchantment -- Aura, "Flash / Enchant creature / When this
 -- Aura enters, if enchanted creature is red, tap it. / As long as enchanted

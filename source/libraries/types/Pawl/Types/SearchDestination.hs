@@ -44,7 +44,7 @@ data SearchDestination
     -- controller to choose a host. A search whose filter
     -- does not name Filter.CanAttachToSubject can still reach this arm and find a
     -- card the fixed host can't legally hold; CR 303.4i then leaves it in the
-    -- library, which is what Pawl.Engine.Resolve.putFound does.
+    -- library, which is what Pawl.Engine.Resolve.Effect.putFound does.
     --
     -- The WHOLE of the card's two sentences, not just the first: "If this
     -- creature is still on the battlefield, put that Aura card onto the

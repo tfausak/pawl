@@ -78,7 +78,7 @@ substituteStar star quantity = case quantity of
 -- calculations descend for substituteStar's reason: 1+* is a star box, and the
 -- star is what a characteristic-defining ability fills in later.
 --
--- Asked by Pawl.Engine.Resolve.bakeTokenCharacteristics, which must tell a star
+-- Asked by Pawl.Engine.Resolve.Effect.bakeTokenCharacteristics, which must tell a star
 -- (keep it -- CR 208.2's value arrives at layer 7a, so there is nothing to settle
 -- at creation) from a computed box (settle it -- CR 111.3 defines the token's
 -- values once, as the effect resolves), and by Pawl.Engine.Card's CR 709.4c

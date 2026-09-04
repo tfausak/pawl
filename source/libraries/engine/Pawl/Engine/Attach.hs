@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter.Type

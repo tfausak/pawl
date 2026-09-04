@@ -118,7 +118,7 @@ data TriggerCondition
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" (Seifer,
     -- Balamb Rival), once per pair; only AttackTarget.OfPlayer matches. Both
-    -- players are bound -- see Pawl.Engine.Event.eventBindingSlots.
+    -- players are bound -- see Pawl.Engine.Event.Binding.eventBindingSlots.
     PlayerAttacksPlayer PlayerAttacksPlayer.PlayerAttacksPlayer
   | -- | CR 702.105a: dethrone -- SelfAttacks narrowed to the player with the
     -- most life, or tied for most. Only AttackTarget.OfPlayer satisfies it.
@@ -282,7 +282,7 @@ data TriggerCondition
   | -- | The arm above read per permanent: "whenever one or more [kind] counters
     -- are put on a [permanent]" (Wickersmith's Tools). Naming one permanent, it
     -- binds it -- Auntie Ool, Cursewretch's "that creature", under CR 400.7e's
-    -- `became` (Pawl.Engine.Event.eventBindingSlots) -- where the batch arm above
+    -- `became` (Pawl.Engine.Event.Binding.eventBindingSlots) -- where the batch arm above
     -- cannot.
     PermanentGetsCounters CounterPlacement.CounterPlacement
   | -- | CR 601.2i: "whenever you cast a [type] spell" (Young Pyromancer), the
@@ -290,7 +290,7 @@ data TriggerCondition
     SpellCast SpellCast.SpellCast
   | -- | CR 601.2i read off the spell being cast -- "when you cast this spell"
     -- (Desolation Twin). Self-scoped, which is what lets
-    -- Pawl.Engine.Event.zonesTriggeredFrom answer CR 113.6k totally.
+    -- Pawl.Engine.Event.Trigger.zonesTriggeredFrom answer CR 113.6k totally.
     SelfCast
   | -- | CR 601.2c: "whenever this permanent becomes the target of a spell or
     -- ability [a player] controls" -- CR 702.21a's ward, once per instance of
@@ -410,8 +410,8 @@ data TriggerCondition
   | -- | CR 603.12's reflexive triggered ability: "when you do" (The Fugitive
     -- Doctor). Nullary, and it matches no GameEvent -- the arm runs only when
     -- the action it hangs off actually happened, CR 701.28e's ignored convert
-    -- being the one that does not (Pawl.Engine.Resolve.applyClauseEffects), so
-    -- Pawl.Engine.Event.delayedPending fires it once at the next gather.
+    -- being the one that does not (Pawl.Engine.Resolve.Effect.applyClauseEffects), so
+    -- Pawl.Engine.Event.Trigger.delayedPending fires it once at the next gather.
     --
     -- Not implemented: CR 603.12a's first sentence, "once for each of those
     -- times", which rule 603.12's other printed form ("when [something happens]

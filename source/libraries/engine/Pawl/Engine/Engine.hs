@@ -40,9 +40,12 @@ import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Rad as Rad
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Resolve.Effect as Resolve
+import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Saga as Saga

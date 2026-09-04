@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -111,7 +112,7 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- have held it. CR 114.4 is what makes either do anything at all on an object in
 -- the command zone -- "abilities of emblems function in the command zone" -- and
 -- Pawl.Engine.Projection.gatherGiven, Pawl.Engine.Projection.replacementsAffecting,
--- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event.eventTriggers each
+-- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event.Trigger.eventTriggers each
 -- walk the command zone for exactly that, all four through
 -- Pawl.Engine.Vanguard.functionsFromCommandZone.
 --

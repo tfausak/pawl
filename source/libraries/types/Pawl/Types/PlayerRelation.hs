@@ -30,7 +30,7 @@ data PlayerRelation
     --
     -- Not a licence to name a DEPARTED seat. As a predicate this arm judges a
     -- candidate the caller already holds, and the callers that fold a player SET
-    -- instead (Pawl.Engine.Count.playersFor, Pawl.Engine.Resolve.playerRefPlayers)
+    -- instead (Pawl.Engine.Count.playersFor, Pawl.Engine.Resolve.Slots.playerRefPlayers)
     -- answer off Game.stillPlaying, which CR 102.1 has already narrowed to the
     -- players still in the game -- the roster Opponent is filtered from there.
     AnyPlayer

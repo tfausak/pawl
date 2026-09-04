@@ -9,7 +9,7 @@ module Pawl.Types.DamageDirection where
 -- pawl's shields already have, one row per relation, rather than a third
 -- constructor meaning "both".
 --
--- Cashed by Pawl.Engine.Resolve.installDamageRow into
+-- Cashed by Pawl.Engine.Resolve.Effect.installDamageRow into
 -- Pawl.Types.DamagePattern's two baked halves: 'DealtTo' writes the recipient
 -- into @whichRecipient@, 'DealtBy' writes the object into @whichSource@ and
 -- names no recipient, so a by-direction shield describing none covers a player

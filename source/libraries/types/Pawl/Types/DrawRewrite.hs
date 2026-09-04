@@ -13,7 +13,7 @@ import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 --
 -- A shape per rewrite rather than a general list of effects: the two printings
 -- replace a draw with two different things, and an arm naming which one keeps
--- Pawl.Engine.Replacement.readsApplier and Pawl.Engine.Resolve.replacementRowReads
+-- Pawl.Engine.Replacement.readsApplier and Pawl.Engine.Resolve.Slots.replacementRowReads
 -- able to classify a row without running it.
 data DrawRewrite
   = -- | CR 614.1a: Words of Worship's "you gain 5 life instead".

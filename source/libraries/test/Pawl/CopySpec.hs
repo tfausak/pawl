@@ -65,6 +65,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -2293,7 +2294,7 @@ zadaSpec s registry =
         Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just zadaId) . Recipient.objectOf) offered) asked
         _ -> S.identityAnswer p
       -- What each object on the stack targets, top first, read live off its
-      -- bindings the way Pawl.Engine.Resolve.targetsOnStack does.
+      -- bindings the way Pawl.Engine.Resolve.Effect.targetsOnStack does.
       stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))))) (GameState.stack gs)
    in Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.it s "CR 707.10d Zada copies the spell once per creature it could target, each copy on a different one" $ do
