@@ -10,7 +10,7 @@
 -- Pawl.Engine.Combat imports Pawl.Engine.Cost, so the two combat-record readers
 -- CR 506.7g and CR 508.3b share with the casting side moved down to
 -- Pawl.Engine.Turn, beside the other two windows these arms ask about.
--- CR 602.5b's board condition is the one arm that reads no window at all, and it
+-- CR 602.5's board condition is the one arm that reads no window at all, and it
 -- imports Pawl.Engine.Condition and Pawl.Engine.Projection, neither of which
 -- reaches back here.
 --
@@ -62,7 +62,7 @@ restrictionsOk pid srcId restrictions gs = all (restrictionMet pid srcId gs) res
 
 -- Does the game state satisfy this one printed clause?
 --
--- The SOURCE's id rides along for the OnlyIf arm alone: CR 602.5b's board
+-- The SOURCE's id rides along for the OnlyIf arm alone: CR 602.5's board
 -- condition is a Pawl.Types.Condition, and Pawl.Engine.Condition.holds evaluates
 -- every Quantity in one against an object. Every other arm reads a phase, a turn
 -- or the combat record and ignores it.

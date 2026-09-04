@@ -209,7 +209,9 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- more cards are in your graveyard." -- is carried too, and this case does not
   -- reach it: three Islands pay Think Twice's {2}{U} flashback with no reduction,
   -- and the Scholar is never activated here. Pawl.ActivateSpec's
-  -- PrintedActivationThresholdReduction group is what proves that half.
+  -- PrintedActivationThresholdReduction group is what proves that half. The
+  -- reduction's filter is Filter.WasCastFrom, proved by Pawl.PlayerEffectSpec's
+  -- Patrician Geist group.
   Spec.it s "conjure puts a card into the conjuring player's graveyard, castable out of it" $ do
     islandPrinting <- S.printingOf s registry "Island"
     scholar <- S.printingOf s registry "Shellfish Scholar"

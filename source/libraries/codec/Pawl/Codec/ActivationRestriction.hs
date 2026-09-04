@@ -8,7 +8,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 
 -- | Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a
--- window, CR 102.1's DuringTurn a scope and CR 602.5b's OnlyIf a condition;
+-- window, CR 102.1's DuringTurn a scope and CR 602.5's OnlyIf a condition;
 -- SorcerySpeed, AttackedThisStep,
 -- AfterBlockersDeclared and BeforeCombatDamage still render as bare tags.
 --
