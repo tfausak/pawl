@@ -1219,9 +1219,9 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "two Islands: the additional cost is {1}"
-      (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor (S.printingName dreamsGrip) richSpell rich) rich)
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor S.alice (S.printingName dreamsGrip) richSpell rich) rich)
       (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.Type.components = []}))
-    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
+    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor S.alice (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
   -- CR 702.42 states no limit on how many entwine abilities an object has --
   -- contrast CR 702.41b for affinity and CR 702.43b for modular, which each say
   -- what multiple instances do -- and CR 118.8a's "any number of additional
@@ -1276,7 +1276,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "five Forests: the additional cost is {1}{G} plus {2}"
-      (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor (S.printingName braid) spellId gs) gs)
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor S.alice (S.printingName braid) spellId gs) gs)
       ( Just
           ( Cost.Type.MkCost
               { Cost.Type.mana =
@@ -1299,7 +1299,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
         (_, gs) = S.addCreature piker S.bob gs0
-    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor (S.printingName chaosCharm) spellId gs) gs) Nothing
+    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor S.alice (S.printingName chaosCharm) spellId gs) gs) Nothing
 
 -- Burst Lightning's one mode is "Burst Lightning deals 2 damage to any target",
 -- slot "target" (CR 702.33 / data/cards/burst-lightning.json), plus "Kicker {4}"
@@ -1707,7 +1707,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     firebolt <- S.printingOf s registry "Firebolt"
     let (fromHand, handBoard) = inHandWith mountain firebolt 6
         (fromGraveyard, graveyardBoard) = inGraveyardWith mountain firebolt 6
-        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) oid gs)
+        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) oid gs)
     Spec.assertEqWith
       s
       "from hand, the printed {R} and nothing else"
@@ -1867,7 +1867,7 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
         (onMountains, mountainBoard) = inGraveyardWith mountain bolt 3
         blueBoard = withGrant onIslands islandBoard
         redBoard = withGrant onMountains mountainBoard
-        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor (S.printingName bolt) oid gs)
+        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName bolt) oid gs)
     Spec.assertEqWith
       s
       "the flashback {2}{U} is the only candidate offered"
@@ -1927,7 +1927,7 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
     Spec.assertEqWith
       s
       "the granted flashback cost is {X}{R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName blaze) inGraveyard granted))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName blaze) inGraveyard granted))
       [Just (ManaCost.MkManaCost [ManaSymbol.Variable, theRed])]
 
 -- CR 702.34a's OTHER conditional, the one on its second static ability: "IF THE
@@ -1986,7 +1986,7 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
     Spec.assertEqWith
       s
       "both costs are on offer from the graveyard"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard permitted))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard permitted))
       [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed]), Just (ManaCost.MkManaCost [theRed])]
     Spec.assertEqWith s "the flashback cast dealt its 2" (S.lifeOf S.alice flashedBack) (Just 18)
     Spec.assertEqWith s "and the card was exiled (CR 702.34a)" (boltsIn Zone.Exile flashedBack) 1
@@ -2117,7 +2117,7 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
     Spec.assertEqWith
       s
       "CR 603.3d: the reflexive ability targeted it, so it has flashback {2}{R}{G}"
-      (fmap (\o -> fmap Cost.Type.mana (Cost.costsFor boltName o after)) buried)
+      (fmap (\o -> fmap Cost.Type.mana (Cost.costsFor S.alice boltName o after)) buried)
       [[Just granted]]
     Spec.assertBool s (all (\o -> S.castable S.alice o after) buried) "and alice may cast it from her graveyard"
     -- CR 118.12's payment really happened, which the collapse never reaches: the
@@ -2148,7 +2148,7 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
     Spec.assertEqWith
       s
       "CR 601.2b: both flashback costs are on offer, the granted one first by Ord"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard board))
       [Just granted, Just printed]
     -- CR 702.34a's SECOND static ability, asked of the cost a first-only read
     -- never returns: paying the PRINTED {4}{R} must exile the card too.
@@ -2228,7 +2228,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     Spec.assertEqWith
       s
       "both flashback costs are on offer, the granted {R} beside the printed {4}{R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard board))
       [Just printed, Just granted]
   -- The discriminating twin: same Mountain, same Firebolt, same graveyard, same
   -- phase and priority. One thing differs, and it is Lier -- so the grant is a
@@ -2241,7 +2241,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     Spec.assertEqWith
       s
       "and the granted cost is gone with the granter"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard board))
       [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed])]
   -- The other half of rule 702.34a: its FIRST static ability is a casting
   -- permission (Keyword.permissionsFor), so a card printing no flashback of its
@@ -2264,7 +2264,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
           _ -> S.identityAnswer p
         after = S.runPure answer (S.runPure answer board (S.cast S.alice inGraveyard)) Stack.resolveTop
         boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName bolt)) (Game.zoneMembers zone S.alice gs))
-    Spec.assertEqWith s "Lightning Bolt prints no flashback, so without Lier the graveyard offers no cost at all" (Cost.costsFor (S.printingName bolt) withoutLier bare) []
+    Spec.assertEqWith s "Lightning Bolt prints no flashback, so without Lier the graveyard offers no cost at all" (Cost.costsFor S.alice (S.printingName bolt) withoutLier bare) []
     Spec.assertEqWith s "the granted flashback paid {R} and the spell dealt its 3" (S.lifeOf S.alice after) (Just 17)
     Spec.assertEqWith s "and CR 702.34a exiled the card" (boltsIn Zone.Exile after) 1
     Spec.assertEqWith s "rather than returning it to the graveyard" (boltsIn Zone.Graveyard after) 0
@@ -2396,7 +2396,7 @@ mirrorOfTheFallenSpec s registry = Spec.describe s "MirrorOfTheFallen" $ do
     Spec.assertEqWith
       s
       "with the Mirror still on the stack the grant prices the card at its own printed {2}{R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName soil) subject onStack))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName soil) subject onStack))
       [Just printed]
     -- Gameplay level, and FIRST among the reads of `resolved`: one Mountain
     -- cannot pay {2}{R}, so under the printed reading there is no cast at all and
@@ -2408,7 +2408,7 @@ mirrorOfTheFallenSpec s registry = Spec.describe s "MirrorOfTheFallen" $ do
     Spec.assertEqWith
       s
       "CR 707.2: once it is a copy, the only flashback cost offered is Lightning Bolt's {R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName soil) subject copiedBoard))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName soil) subject copiedBoard))
       [Just copied]
     -- CR 707.2b: the original is untouched -- bob's Lightning Bolt is still in
     -- his graveyard, so nothing above turned on the copy having consumed it.
@@ -2608,7 +2608,7 @@ jumpStartSpec s registry = Spec.describe s "JumpStart" $ do
     directCurrent <- S.printingOf s registry "Direct Current"
     let (fromHand, handBoard) = inHandWith mountain directCurrent 3
         (fromGraveyard, graveyardBoard) = inGraveyardWith mountain directCurrent 3
-        costsOf oid gs = fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor (S.printingName directCurrent) oid gs)
+        costsOf oid gs = fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor S.alice (S.printingName directCurrent) oid gs)
         printed = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, theRed, theRed])
     Spec.assertEqWith s "from hand, the printed {1}{R}{R} and no components" (costsOf fromHand handBoard) [(printed, [])]
     Spec.assertEqWith

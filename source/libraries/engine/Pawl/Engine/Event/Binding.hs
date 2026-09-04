@@ -1,4 +1,4 @@
--- What a trigger condition binds off the event it matched (CR 603.6a, CR
+-- What a trigger condition binds off the event it matched (CR 603.2, CR
 -- 603.10): the slot map a matched trigger carries onto the stack, read from the
 -- event alone with no game state. Split out of Pawl.Engine.Event for size; it
 -- sits below Pawl.Engine.Event.Match and Pawl.Engine.Event.Trigger.

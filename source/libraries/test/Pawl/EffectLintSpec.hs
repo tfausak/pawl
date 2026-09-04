@@ -830,6 +830,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.AddActivationCost {} -> False
   PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
+  PlayerEffect.CantActivateAbilities -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
   PlayerEffect.CantPlayLandChosenName -> False
@@ -847,9 +848,8 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CastOnlyAtSorcerySpeed -> False
   PlayerEffect.CantPlayLands -> False
-  PlayerEffect.CastFromGraveyard _ -> False
-  PlayerEffect.CastFromTopOfLibrary _ -> False
-  PlayerEffect.PlayLandsFromGraveyard -> False
+  PlayerEffect.CastFrom _ -> False
+  PlayerEffect.PlayLandsFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False
@@ -889,6 +889,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.AddActivationCost {} -> False
   PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
+  PlayerEffect.CantActivateAbilities -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
   PlayerEffect.CantPlayLandChosenName -> False
@@ -906,9 +907,8 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CastOnlyAtSorcerySpeed -> False
   PlayerEffect.CantPlayLands -> False
-  PlayerEffect.CastFromGraveyard _ -> False
-  PlayerEffect.CastFromTopOfLibrary _ -> False
-  PlayerEffect.PlayLandsFromGraveyard -> False
+  PlayerEffect.CastFrom _ -> False
+  PlayerEffect.PlayLandsFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False

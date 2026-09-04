@@ -35,18 +35,22 @@ import qualified Pawl.Types.Zone as Zone
 -- face is chosen -- see Pawl.Engine.Card.landFaces).
 --
 -- THREE SOURCES, because CR 305.1's "from their hand" is the rule's own
--- allowance and CR 101.1 lets a card widen it. The hand needs no permission; the
--- graveyard is a CR 613.11 player-axis grant (Crucible of Worlds, Yawgmoth's
--- Will), and exile is the object-borne permission CR 715.3d and
--- Effect.GrantPlayFromExile write. That split is the same one
--- Pawl.Engine.Cast.castableZones draws for the cast side, and the exile source
--- is read through that module's own zoneCandidates so the two can never disagree
--- about where to look -- CR 601.3's permission names a PLAYER, and exile is
--- filed by owner, so a land somebody else owns has to be reachable.
+-- allowance and CR 101.1 lets a card widen it. The player's OWN hand needs no
+-- permission; the granted piles are a CR 613.11 player-axis grant, which names
+-- both the zone and whose copy of it (Crucible of Worlds and Yawgmoth's Will
+-- their own graveyard, Sen Triplets an opponent's hand); and exile is the
+-- object-borne permission CR 715.3d and Effect.GrantPlayFromExile write. That
+-- split is the same one Pawl.Engine.Cast.castableZones draws for the cast side,
+-- and the exile source is read through that module's own zoneCandidates so the
+-- two can never disagree about where to look -- CR 601.3's permission names a
+-- PLAYER, and exile is filed by owner, so a land somebody else owns has to be
+-- reachable.
 --
--- Not implemented: a fourth source, the top of the library, which the CAST side
--- reaches (Pawl.Engine.Cast.castZones) and which Future Sight's land half would
--- need here (#3224).
+-- Not implemented: the top of a LIBRARY, which the CAST side reaches
+-- (Pawl.Engine.Cast.castZones) and which Future Sight's land half would need
+-- here. The grant can now say it -- PlayLandsFrom carries the zone -- so what is
+-- missing is the narrowing to the top card, which on the cast side is
+-- Cast.zoneCandidates' (#3224).
 --
 -- Reading the OBJECT-BORNE permission with Cast.permitsPlayFromExile and not
 -- Cast.permitsCastFromExile is the whole of what makes this the PLAY side: the
@@ -86,17 +90,17 @@ playableLands pid gs =
       -- CR 305.1's own zone, which needs no permission.
       fromHand = Game.zoneMembers Zone.Hand pid gs
       -- The whole pile or none of it: the grant narrows no land (see
-      -- Pawl.Types.PlayerEffect.PlayLandsFromGraveyard), so it is asked once
-      -- rather than per card, and CR 400.1's per-player zone is the "your
-      -- graveyard" both printings say.
-      fromGraveyard =
-        if PlayerEffect.mayPlayLandsFromGraveyard pid gs
-          then Game.zoneMembers Zone.Graveyard pid gs
-          else []
+      -- Pawl.Types.PlayerEffect.PlayLandsFrom), so it is asked once per pile
+      -- rather than per card, and WHOSE pile is the grant's own answer -- CR
+      -- 400.1's per-player zone being what its reference names.
+      --
+      -- Nubbed, because two grants naming one pile would otherwise offer every
+      -- land in it twice.
+      fromGranted = List.nub (concatMap (\(zone, owner) -> Game.zoneMembers zone owner gs) (PlayerEffect.playLandPiles pid gs))
       -- Per card instead, because CR 715.3d's permission is state on ONE exiled
       -- incarnation naming ONE player.
       fromExile = filter (\oid -> Cast.permitsPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)
-   in concatMap playable (fromHand <> fromGraveyard <> fromExile)
+   in concatMap playable (List.nub (fromHand <> fromGranted <> fromExile))
 
 -- The cards in this player's hand whose own text grants CR 116.2e's special
 -- action: Circling Vultures' "you may discard this card any time you could cast

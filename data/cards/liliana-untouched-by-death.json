@@ -247,11 +247,24 @@
                             "type": "UntilEndOfTurn"
                           },
                           "effect": {
-                            "type": "CastFromGraveyard",
+                            "type": "CastFrom",
                             "value": {
-                              "type": "HasSubtype",
-                              "value": {
-                                "type": "Zombie"
+                              "from": {
+                                "player": {
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                "zone": {
+                                  "type": "Graveyard"
+                                }
+                              },
+                              "matching": {
+                                "type": "HasSubtype",
+                                "value": {
+                                  "type": "Zombie"
+                                }
                               }
                             }
                           },

@@ -56,6 +56,7 @@ import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -78,6 +79,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -200,6 +202,7 @@ import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
@@ -595,11 +598,22 @@ playerRefPositions =
     ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
     ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
     ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
-    ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (SlotName.MkSlotName (Text.pack "oc")) (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"])
+    ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (SlotName.MkSlotName (Text.pack "oc")) (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"]),
+    -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
+    -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
+    -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
+    -- traversal is what the AffectPlayers arm delegates to and a missing arm
+    -- there answers [] rather than failing to compile.
+    ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []))), [plantedPlayer "ap-cast"]),
+    ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
+    -- And an arm carrying none, so the traversal is shown answering nothing where
+    -- there is nothing to answer.
+    ("affect-players-cant-cast", affecting PlayerEffect.CantCastSpells, [])
   ]
   where
     one = Quantity.Type.Literal 1
     playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
+    affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
 
 -- The same list one type in, for the four ObjectRef arms that count PER SEAT
 -- (CR 400.1's per-player zones). Resolve.objectRefPlayerRefs is what owes these.
@@ -3617,6 +3631,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- and whose components carry one of their own ("sacrifice a SWAMP").
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components _) -> f : concatMap costComponentFilters components
   PlayerEffect.CantCastSpells -> []
+  PlayerEffect.CantActivateAbilities -> []
   PlayerEffect.CantCastMoreThan _ -> []
   -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
   -- the source entered, which is not a Filter and is not written by the card.
@@ -3680,13 +3695,13 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 305.1's unrestricted prohibition narrows nothing: every land is stopped.
   PlayerEffect.CantPlayLands -> []
   -- CR 601.3's zone permission, narrowed by the card's own qualities exactly as
-  -- the timing permission beside it is (Yawgmoth's Will's is `And []`).
-  PlayerEffect.CastFromGraveyard f -> [f]
-  -- The same permission one zone over (Garruk's Horde's "creature spells").
-  PlayerEffect.CastFromTopOfLibrary f -> [f]
+  -- the timing permission beside it is (Yawgmoth's Will's is `And []`, Garruk's
+  -- Horde's "creature spells"). WHOSE zone rides beside the Filter and is no
+  -- quality of the card, so it is not a position this lint sweeps.
+  PlayerEffect.CastFrom grant -> [CastFromZone.matching grant]
   -- CR 305.1's play-side permission narrows nothing: a land play has already
   -- fixed the card type, and Crucible of Worlds' sentence says no more.
-  PlayerEffect.PlayLandsFromGraveyard -> []
+  PlayerEffect.PlayLandsFrom _ -> []
   -- CR 118.9's standing alternative cost, narrowed by the spell's own qualities
   -- exactly as the zone permission above is (Omniscience's is `And []`).
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> [f]

@@ -16,6 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
@@ -643,7 +644,11 @@ effectPlayerRefs effect = case effect of
   Effect.EndCombatPhase -> []
   Effect.GainControl {} -> []
   Effect.ArmDelayedTrigger {} -> []
-  Effect.AffectPlayers {} -> []
+  -- CR 400.1's zone reference, which lives inside the permission payloads rather
+  -- than in a field of the opcode -- so the walk is
+  -- Pawl.Engine.PlayerEffect.playerRefsIn's and this arm joins it in, which is
+  -- what puts Sen Triplets' "that player's hand" slot into slotsOf's answer.
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ _ playerEffect) -> PlayerEffect.playerRefsIn playerEffect
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ _ defender) -> [defender]

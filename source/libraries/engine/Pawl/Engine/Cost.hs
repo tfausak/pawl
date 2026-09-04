@@ -169,8 +169,8 @@ faceDownCost =
 -- ahead of the zone case, that ability functioning in any zone the card could be
 -- played from. Defined in terms of candidateCostsFor below so the two cannot
 -- drift.
-costsFor :: CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
-costsFor name oid gs = fmap CandidateCost.cost (candidateCostsFor name oid gs)
+costsFor :: PlayerId -> CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
+costsFor pid name oid gs = fmap CandidateCost.cost (candidateCostsFor pid name oid gs)
 
 -- costsFor's list with WHICH ability offered each candidate recorded -- the fact
 -- CR 702.34a's "if the flashback cost was paid", CR 702.133a's jump-start clause
@@ -178,8 +178,8 @@ costsFor name oid gs = fmap CandidateCost.cost (candidateCostsFor name oid gs)
 -- GRAVEYARD arm tags the first two, and `bestowed` below tags from every zone,
 -- which is the zone half of rule 702.103a; CR 702.127a's aftermath asks about the
 -- ZONE instead and needs no tag of its own.
-candidateCostsFor :: CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
-candidateCostsFor name oid gs = case Game.lookupObject oid gs of
+candidateCostsFor :: PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
+candidateCostsFor pid name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]
   Just obj -> case Object.source obj of
@@ -197,16 +197,18 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
             -- CR 604.2: an alternative cost whose "as long as" clause does not
             -- hold is not offered at all.
             --
-            -- CR 109.5's "you" is the OWNER: CR 400.1 files a hand and a graveyard
-            -- by player and Cast.zoneCandidates hands out only the caster's own, so
-            -- owner and caster coincide wherever this is asked. The graveyard arm's
-            -- CR 601.3 permission below reads the owner for the same reason.
+            -- CR 109.5's "you" is the CASTER, who a card in a hand or a graveyard
+            -- has no controller to supply (CR 108.4). The two coincided while
+            -- Cast.zoneCandidates handed out only the caster's own pile; a
+            -- permission naming somebody else's hand separates them (see #2169), and
+            -- the CR 601.3 permission and the CR 118.9 grant below read the caster
+            -- for the same reason.
             available alternative = case AlternativeCost.condition alternative of
               Nothing -> True
               Just cond ->
                 Condition.holds
                   (Projection.fullView gs)
-                  (Filter.contextFor (Game.teams gs) (Just (Object.owner obj)) (Just oid))
+                  (Filter.contextFor (Game.teams gs) (Just pid) (Just oid))
                   gs
                   oid
                   cond
@@ -298,7 +300,7 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                       -- UNTAGGED: an effect's permission states no cost, so
                       -- neither rule 702.34a's clause nor rule 702.133a's is
                       -- satisfied by paying it.
-                      <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then fmap untagged (printed : alternatives) else [])
+                      <> (if PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then fmap untagged (printed : alternatives) else [])
               -- CR 702.170d: a PLOTTED card is cast "without paying its mana
               -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
               -- rule 702.170d being the only thing permitting this cast. The zone's
@@ -328,7 +330,7 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
               -- ManaCost, which has no variable to prompt for.
               Zone.Hand ->
                 fmap untagged (printed : alternatives)
-                  <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost (Object.owner obj) oid gs]
+                  <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs]
               _ -> fmap untagged (printed : alternatives)
     -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
     -- the stack, so it is never announced and there is no cost to offer for it.
@@ -1615,6 +1617,10 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         -- mana ability too. Here rather than in Mana.manaSourcesGiven, because this
         -- is what BOTH of CR 605.3a's windows consult -- sickness's position above.
         && not (Detain.detained oid gs)
+        -- CR 602.5's player-axis prohibition (Sen Triplets), read here for
+        -- detain's reason: the sentence carves no mana ability out where CR
+        -- 702.61b does, so both of CR 605.3a's windows owe it.
+        && not (PlayerEffect.prohibitsActivatingGiven effects)
         -- CR 602.5's printed "activate only ..." rider, which CR 605.1's own sentence
         -- keeps on a mana ability -- a timing restriction does not stop an ability
         -- being one. Here for sickness's and detain's reason, and it is the reason

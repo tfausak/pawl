@@ -955,7 +955,7 @@ lilianaSpec s registry =
           Spec.assertBool s (not (S.castable S.alice zombieId after)) "and the Zombie no longer is"
           Spec.assertBool s (any (S.isCastOf evangelId) (Action.legalActions S.alice after)) "the Cleric is offered"
           Spec.assertBool s (not (any (S.isCastOf zombieId) (Action.legalActions S.alice after))) "while the Zombie is not"
-          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice evangelId after) "the typed question agrees"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Graveyard evangelId after) "the typed question agrees"
           Spec.assertEqWith s "and exactly one restriction is stored" (length (GameState.playerEffects after)) 1
 
         -- CR 612.2 again from the other side, and the reason the counts are TWO

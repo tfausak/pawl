@@ -26,6 +26,7 @@ import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -331,8 +332,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
-  PlayerEffect.CastFromGraveyard f -> PlayerEffect.CastFromGraveyard (Filter.rewrite pairs f)
-  PlayerEffect.CastFromTopOfLibrary f -> PlayerEffect.CastFromTopOfLibrary (Filter.rewrite pairs f)
+  PlayerEffect.CastFrom grant -> PlayerEffect.CastFrom grant {CastFromZone.matching = Filter.rewrite pairs (CastFromZone.matching grant)}
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
   -- The rest name no word a subtype pair could reach. The two chosen-name arms
   -- carry nothing at all -- CR 201.4's names are read off the source's
@@ -340,6 +340,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- could not touch a card name even if they did. A count, a mana filter and a
   -- player scope are not words either.
   PlayerEffect.CantCastSpells -> effect
+  PlayerEffect.CantActivateAbilities -> effect
   PlayerEffect.CantCastMoreThan _ -> effect
   PlayerEffect.CantCastChosenName -> effect
   PlayerEffect.CantPlayLandChosenName -> effect
@@ -360,7 +361,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantBecomeMonarch -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.CantPlayLands -> effect
-  PlayerEffect.PlayLandsFromGraveyard -> effect
+  PlayerEffect.PlayLandsFrom _ -> effect
   -- A counter KIND is not a word CR 612.2's subtype pairs could reach either.
   PlayerEffect.CantGetCounters _ -> effect
   -- Nor is a coin's face, or the two flags beside it.

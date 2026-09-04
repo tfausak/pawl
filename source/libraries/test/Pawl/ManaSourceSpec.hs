@@ -416,7 +416,7 @@ villageRitesSpec s registry = Spec.describe s "A cost's own sacrifice and its so
     piker <- S.printingOf s registry "Goblin Piker"
     let pays victims =
           let (gs, oid) = S.handOne rites (alicePermanents (tower : replicate victims piker))
-           in any (\cost -> Cost.canPay S.alice oid cost gs) (Cost.costsFor (S.printingName rites) oid gs)
+           in any (\cost -> Cost.canPay S.alice oid cost gs) (Cost.costsFor S.alice (S.printingName rites) oid gs)
     Spec.assertBool s (not (pays 1)) "one Piker is not enough"
     Spec.assertBool s (pays 2) "two are"
 

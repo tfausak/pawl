@@ -64,6 +64,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -1823,17 +1824,17 @@ soulImmolationSpec s registry = Spec.describe s "Soul Immolation" $ do
 -- prohibit half scoped to a ZONE, which PlayerEffect.CantCastMatching's Filter
 -- states through Filter.IsInZone.
 --
--- "From anywhere other than their hands" is `Not (IsInZone Hand)`, read at the
--- cast gate against the card WHERE IT LIES: CR 601.2 casts a spell "from where it
--- is", and Pawl.Engine.Cast.castable runs before CR 601.2a moves the card to the
--- stack.
+-- "From anywhere other than their hands" is `Not (And [IsInZone Hand, OwnedBy
+-- You])`, read at the cast gate against the card WHERE IT LIES: CR 601.2 casts a
+-- spell "from where it is", and Pawl.Engine.Cast.castable runs before CR 601.2a
+-- moves the card to the stack.
 --
--- "THEIR hands" is the caster's own, which is Hand simply: pawl's hand is indexed
--- by owner (Pawl.Engine.Game.zoneMembers, CR 108.3) and Pawl.Engine.Cast's
--- zoneCandidates offers a player only their own, so no cast from another player's
--- hand exists to tell the two readings apart. Not implemented: the possessive,
--- which wants an OwnedBy conjunct beside the zone atom and a card granting such a
--- cast (#2169).
+-- The POSSESSIVE is the OwnedBy conjunct, and CR 109.5's "you" under it is the
+-- CASTER (Pawl.Engine.PlayerEffect.matchesObjectFor) rather than the card's own
+-- controller, which a card in a hand has none of. Nothing on this board tells the
+-- two readings apart, every seat casting out of its own hand; the Sen Triplets
+-- group below is where alice casts out of bob's and both wrong readings allow it.
+-- See #2169.
 --
 -- Think Twice {1}{U} Instant "Draw a card." / "Flashback {2}{U}" is the spell,
 -- and an INSTANT so that neither seat's cast turns on whose turn it is. SIX
@@ -2062,6 +2063,190 @@ drannithBoard island thinkTwice =
 
 withMagistrate :: Printing.Printing -> GameState.GameState -> GameState.GameState
 withMagistrate magistrate gs = snd (S.addCreature magistrate S.alice gs)
+
+-- Sen Triplets {2}{W}{U}{B} Legendary Artifact Creature -- Human Wizard 3/3 (ARB
+-- 109): "At the beginning of your upkeep, choose target opponent. This turn, that
+-- player can't cast spells or activate abilities and plays with their hand
+-- revealed. You may play lands and cast spells from that player's hand this
+-- turn."
+--
+-- The LAST sentence is the only thing in the pool that lets one player cast a
+-- card out of another's hand, and it is what moved CR 601.3's owner test off
+-- Pawl.Engine.Cast.zoneCandidates and into the permission: that list now offers
+-- every player's hand, and PlayerEffect.CastFrom's zone reference is what says
+-- whose. See #2169.
+--
+-- Not implemented: the third clause, "plays with their hand revealed". Nothing in
+-- pawl computes a per-player view of the board, so every answerer already sees
+-- every hand and an arm stating it would have no reader (#3237).
+--
+-- Think Twice {1}{U} Instant is the spell each seat holds, and an INSTANT so no
+-- seat's cast turns on whose turn it is: the trigger resolves in alice's upkeep,
+-- where CR 307.1 would refuse a sorcery under any implementation. SIX Islands per
+-- seat, alice's opponents included, so no refusal below is for want of mana.
+-- THREE seats, so "target opponent" is a real choice and carol is the seat the
+-- grant does not name.
+senTripletsBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+senTripletsBoard island thinkTwice triplets =
+  let gs1 = S.landsFor island S.alice 6 S.threePlayerGame
+      gs2 = S.landsFor island S.bob 6 gs1
+      gs3 = S.landsFor island S.carol 6 gs2
+      gs4 = snd (S.addCreature triplets S.alice gs3)
+      (bobSpell, gs5) = S.addHandCard thinkTwice S.bob gs4
+      (carolSpell, gs6) = S.addHandCard thinkTwice S.carol gs5
+      (aliceSpell, gs7) = S.addHandCard thinkTwice S.alice gs6
+      (bobLand, gs8) = S.addHandCard island S.bob gs7
+      -- CR 104.3c: Think Twice draws, and a seat drawing from an empty library
+      -- loses before any assertion runs.
+      stocked = List.foldl' (\g pid -> snd (S.addLibraryCard island pid g)) gs8 [S.alice, S.bob, S.carol]
+   in (aliceSpell, bobSpell, carolSpell, bobLand, aliceOnTurn stocked)
+
+-- CR 603.3d: the trigger's target is chosen as it goes on the stack, so the
+-- answerer is needed at the settle and not only at the resolution. bob is the
+-- opponent named; carol is the one left out.
+answerSenTriplets :: Prompt.Prompt r -> r
+answerSenTriplets p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (Recipient.ToPlayer S.bob ==) sets
+  _ -> S.identityAnswer p
+
+-- alice's upkeep begins, the trigger goes on the stack naming bob, and it
+-- resolves. Left in the UPKEEP, which is where the instant cases below want it;
+-- the land case moves to a main phase, the grant lasting the whole turn.
+senTripletsResolved :: GameState.GameState -> GameState.GameState
+senTripletsResolved gs =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      begun = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep})
+      onStack = snd (Engine.runGamePure answerSenTriplets begun Engine.settleForPriority)
+   in S.runPure answerSenTriplets onStack Stack.resolveTop
+
+-- CR 605.3a's offer, which Action.legalActions makes through its own constructor
+-- because CR 605.3b keeps a mana ability off the stack. Enumerated rather than
+-- wildcarded, so a new Action constructor is named by -Werror.
+manaActivationOffer :: A.Action -> Bool
+manaActivationOffer action = case action of
+  A.ActivateManaAbility _ -> True
+  A.Pass -> False
+  A.Play {} -> False
+  A.Cast {} -> False
+  A.Activate {} -> False
+  A.TurnFaceUp {} -> False
+  A.Unlock {} -> False
+  A.DiscardFromHand _ -> False
+  A.Ignore _ -> False
+  A.Plot _ -> False
+  A.Foretell _ -> False
+  A.EndEffect _ -> False
+
+-- Take ONE named action and pass at every other prompt. Pinned to the action
+-- rather than to a kind of action, since this board offers alice a card of her
+-- own beside the one in bob's hand -- and taken through the real priority loop,
+-- so the OFFER is what the cast rests on: S.cast performs a cast without asking
+-- Action.legalActions, which would leave the gameplay assertions green under a
+-- mutation that removed the offer.
+takeOnly :: A.Action -> Prompt.Prompt r -> r
+takeOnly wanted p = case p of
+  Prompt.ChooseAction _ _ actions -> if elem wanted actions then wanted else A.Pass
+  _ -> S.identityAnswer p
+
+senTripletsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+senTripletsSpec s registry =
+  let board = do
+        island <- S.printingOf s registry "Island"
+        thinkTwice <- S.printingOf s registry "Think Twice"
+        triplets <- S.printingOf s registry "Sen Triplets"
+        pure (senTripletsBoard island thinkTwice triplets, S.printingName thinkTwice)
+   in Spec.describe s "Sen Triplets" $ do
+        -- THE PROVING CASE. The control comes first: before the trigger resolves,
+        -- the same board offers alice nothing out of bob's hand, so the offer
+        -- below is the permission's rather than the widened candidate list's.
+        Spec.it s "CR 601.3 alice casts a spell out of bob's hand, and the card goes to bob's graveyard" $ do
+          ((_, bobSpell, _, _, open), name) <- board
+          let after = senTripletsResolved open
+              resolved = S.runPure (takeOnly (A.Cast bobSpell name Facing.FaceUp)) (after {GameState.priority = Just S.alice}) Engine.priorityLoop
+          -- The GAMEPLAY assertions first, so no offer count absorbs a mutation
+          -- ahead of them. CR 601.2a: alice controls the spell, so Think Twice's
+          -- draw is hers -- two cards, the one she held and the one she drew.
+          Spec.assertEqWith s "alice drew the card" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 2
+          Spec.assertEqWith s "and bob's hand is one card lighter" (length (Game.zoneMembers Zone.Hand S.bob resolved)) 1
+          -- CR 400.3: the card goes to its OWNER's graveyard, whoever cast it.
+          Spec.assertEqWith s "the card is in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+          Spec.assertEqWith s "and not in alice's" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice open)) "before the trigger, bob's card is not offered to alice"
+          Spec.assertBool s (elem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice after)) "with the grant, bob's card is offered to alice"
+        -- CR 109.5 / PlayerScope.You: the grant is alice's, and the hand it names
+        -- is bob's. Two copies of one card in the two opponents' hands differ in
+        -- nothing but whose hand they are in.
+        Spec.it s "CR 601.3 the grant names bob's hand alone" $ do
+          ((_, bobSpell, carolSpell, _, open), name) <- board
+          let after = senTripletsResolved open
+          Spec.assertBool s (notElem (A.Cast carolSpell name Facing.FaceUp) (offeredTo S.alice after)) "alice is not offered the identical card in carol's hand"
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.carol after)) "and carol is not offered the card in bob's"
+        -- The FIRST clause, on the same board and the same object: bob may not
+        -- cast the very card alice is offered. One card, two seats, two answers --
+        -- and carol, whom the trigger did not name, still casts hers.
+        Spec.it s "CR 601.3 bob can't cast spells this turn while carol still can" $ do
+          ((_, bobSpell, carolSpell, _, open), name) <- board
+          let after = senTripletsResolved open
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.bob after)) "bob may not cast his own card"
+          Spec.assertBool s (elem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.bob open)) "though he may on the board where the trigger has not resolved"
+          Spec.assertBool s (elem (A.Cast carolSpell name Facing.FaceUp) (offeredTo S.carol after)) "and carol, unnamed, casts hers"
+        -- The SECOND clause. CR 605.1a makes an Island's "{T}: Add {U}" a mana
+        -- ability, which CR 605.3b keeps off the stack -- so it is offered through
+        -- Action.ActivateManaAbility rather than Action.Activate, and the
+        -- prohibition has to reach that road too: CR 602.5 states no carve-out
+        -- where CR 702.61b writes one for split second.
+        Spec.it s "CR 602.5 bob can't activate abilities this turn, mana abilities included" $ do
+          ((_, _, _, _, open), _) <- board
+          let after = senTripletsResolved open
+              manaOffers pid gs = filter manaActivationOffer (offeredTo pid gs)
+          Spec.assertEqWith s "bob is offered no mana ability at all" (manaOffers S.bob after) []
+          Spec.assertEqWith s "off six Islands he was offered six before the trigger" (length (manaOffers S.bob open)) 6
+          Spec.assertEqWith s "and carol, unnamed, still has her six" (length (manaOffers S.carol after)) 6
+        -- The LAND half of the last sentence, a separate permission because CR
+        -- 305.1 makes playing a land a special action rather than a cast. In a
+        -- MAIN phase, CR 305.1's own window, where the cases above sit in upkeep.
+        Spec.it s "CR 305.1 alice may play a land out of bob's hand" $ do
+          ((_, _, _, bobLand, open), _) <- board
+          let after = (senTripletsResolved open) {GameState.phase = Phase.PrecombatMain}
+              controlledBy pid gs = length (filter (\o -> Projection.controllerOf o gs == Just pid) (Set.toList (GameState.battlefield gs)))
+              played = S.runPure (takeOnly (A.Play bobLand Nothing)) (after {GameState.priority = Just S.alice}) Engine.priorityLoop
+          -- The GAMEPLAY assertions first, so no offer count absorbs a mutation
+          -- ahead of them. CR 305.1: the land enters under the player who PLAYED
+          -- it, so alice's side of the battlefield grows and bob's does not.
+          Spec.assertEqWith s "alice controlled six Islands and the Triplets" (controlledBy S.alice after) 7
+          Spec.assertEqWith s "and eight afterwards" (controlledBy S.alice played) 8
+          Spec.assertEqWith s "bob still controls his own six" (controlledBy S.bob played) 6
+          Spec.assertEqWith s "and his hand is one card lighter" (length (Game.zoneMembers Zone.Hand S.bob played)) 1
+          Spec.assertBool s (notElem (A.Play bobLand Nothing) (offeredTo S.alice open)) "before the trigger the land in bob's hand is not offered"
+          Spec.assertBool s (elem (A.Play bobLand Nothing) (offeredTo S.alice after)) "with the grant it is"
+        -- CR 514.2: the grant is stored with an until-end-of-turn expiry, so
+        -- cleanup takes it and the same board refuses the same cast.
+        Spec.it s "CR 514.2 the permission ends at cleanup" $ do
+          ((_, bobSpell, _, _, open), name) <- board
+          let after = senTripletsResolved open
+              ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice ended)) "alice is no longer offered bob's card"
+          Spec.assertEqWith s "and nothing is stored" (GameState.playerEffects ended) []
+        -- Drannith Magistrate's possessive, which nothing could observe until this
+        -- card existed: BOB controls it, so alice is his opponent, and "from
+        -- anywhere other than THEIR hands" refuses her cast out of his hand while
+        -- leaving her cast out of her own alone. A transcription reading `Not
+        -- (IsInZone Hand)` allows both, and one reading OwnedBy at the CARD's own
+        -- perspective allows both too -- a hand card's controller is its owner, so
+        -- "owned by you" is vacuous there (CR 108.4 / 109.5).
+        Spec.it s "CR 601.3a Drannith Magistrate stops the cross-hand cast and leaves the own-hand cast alone" $ do
+          ((aliceSpell, bobSpell, _, _, open), name) <- board
+          magistrate <- S.printingOf s registry "Drannith Magistrate"
+          let after = senTripletsResolved open
+              policed = snd (S.addCreature magistrate S.bob after)
+              offered oid gs = elem (A.Cast oid name Facing.FaceUp) (offeredTo S.alice gs)
+          Spec.assertBool s (not (offered bobSpell policed)) "alice may not cast out of bob's hand under his Magistrate"
+          Spec.assertBool s (offered aliceSpell policed) "while her own hand is untouched"
+          Spec.assertBool s (offered bobSpell after) "and the one permanent is the whole difference"
 
 -- What this player is offered with priority in hand, the shape
 -- Pawl.SpecialActionSpec's Damping Engine cases use: legalActions answers for the
@@ -2524,3 +2709,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   avenInterrupterSpec s registry
   terrorOfThePeaksSpec s registry
   shellOfTheLastKappaSpec s registry
+  senTripletsSpec s registry

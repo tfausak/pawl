@@ -646,29 +646,29 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- EnteredFrom's, for CR 400.3's reason, and is read the same way for CR 603.4's;
   -- the caster half is CR 601.2a's.
   --
-  -- What makes the one reference exact is a road pawl does not have rather than
-  -- anything about Magic. CR 400.3 puts a card only in its OWNER's library, hand
-  -- or graveyard, and Cast.zoneCandidates offers a player only their own copy of
-  -- such a zone, so wherever a spell is cast out of one, the caster, the zone's
-  -- owner and the card's owner are the same seat; CR 400.1's shared zones can only
-  -- take PlayerRef.EachPlayer (Pawl.Codec.InZone.undividedShared), where all three
-  -- conjuncts are vacuous. Pawl.PlayerEffectSpec's "CR 400.1 the grant does not
-  -- reach the copy in bob's graveyard" proves that premise. So Breathless Knight's
-  -- "you cast it from A graveyard" IS PlayerRef.Relative You here -- an EachPlayer
+  -- What makes the one reference exact is the POOL rather than anything about
+  -- Magic. CR 400.3 puts a card only in its OWNER's library, hand or graveyard, so
+  -- the zone's owner and the card's owner are always one seat; CR 400.1's shared
+  -- zones can only take PlayerRef.EachPlayer (Pawl.Codec.InZone.undividedShared),
+  -- where all three conjuncts are vacuous. Every card that READS this reference
+  -- reads a graveyard or exile, and every CR 601.3 permission over a graveyard in
+  -- data/cards/ names PlayerRef.Relative You, so wherever a spell those cards can
+  -- see is cast, the caster is the owner too. Breathless Knight's "you cast it
+  -- from A graveyard" is therefore PlayerRef.Relative You here -- an EachPlayer
   -- reference would read "anyone cast it", which is weaker -- and Fblthp, the
   -- Lost's agentless "was cast from your library" is that same seat named from the
   -- other side.
   --
-  -- Not implemented: the one road that could separate them is CR 608.2g's offered
-  -- cast, where Cast.castableWhenOffered asks no zone at all, so an effect naming
-  -- a card in an opponent's graveyard casts it from there. No card in data/cards/
-  -- offers such a cast, which leaves the caster conjunct and the owner conjunct a
-  -- regression fence rather than a proved pair: mutating either away leaves the
-  -- suite green, and the reference splits in three the day one lands (#2689).
-  -- Jetsam (Flotsam // Jetsam), which offers a cast from each opponent's
-  -- graveyard, is the printing that would refute this; Havengul Lich would reach
-  -- it through the CR 601.3 permission road instead, which refuses in two places
-  -- and would have to widen both (#2795).
+  -- Not implemented: the caster and the zone's owner really can differ now, so the
+  -- conjuncts are a regression fence rather than a proved trio -- mutating either
+  -- away leaves the suite green. TWO roads reach it. Sen Triplets grants a cast
+  -- out of an opponent's HAND (Pawl.Types.CastFromZone), and no card in
+  -- data/cards/ reads a hand here; and CR 608.2g's offered cast asks no zone at
+  -- all (Cast.castableWhenOffered), so an effect naming a card in an opponent's
+  -- graveyard would cast it from there. The reference splits in three the day
+  -- either gets a reader (#2689). Jetsam (Flotsam // Jetsam) is the printing on
+  -- the second road; Havengul Lich would reach the first through the CR 601.3
+  -- permission road, which still refuses at the one-object permission (#2795).
   --
   -- An object that reached the battlefield any OTHER way answers 0 rather than
   -- Nothing, `spells` coming up empty: a permanent put there by an effect was not
