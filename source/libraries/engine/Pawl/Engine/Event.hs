@@ -376,9 +376,10 @@ simultaneouslyPure body = closeEventGroup . body . openEventGroup
 -- instruction doing nothing, and CR 603.2 has no event to fire on then.
 --
 -- AFTER the write, which is what makes CR 701.27e's "immediately after it does
--- so" fall out twice over: the names sampled here are the turned permanent's, and
--- recordEvent's own sample of the battlefield sees the back face's abilities, so a
--- trigger printed on the face just turned to is among the candidates that fire.
+-- so" fall out twice over: the characteristics sampled here are the turned
+-- permanent's, and recordEvent's own sample of the battlefield sees the back
+-- face's abilities, so a trigger printed on the face just turned to is among the
+-- candidates that fire.
 --
 -- ONE event group for the whole set (CR 608.2f): Moonmist transforms every Human
 -- at once, and CR 603.10a must not be able to tell two of them apart.
@@ -389,7 +390,7 @@ recordTransformed oids gs = case oids of
     simultaneouslyPure
       ( \g0 ->
           List.foldl'
-            (\g oid -> recordEvent (GameEvent.Transformed (Transformed.MkTransformed oid (Projection.namesOf oid g))) g)
+            (\g oid -> recordEvent (GameEvent.Transformed (Transformed.MkTransformed oid (Projection.project oid g))) g)
             g0
             oids
       )
@@ -10378,7 +10379,77 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 708.2a admits none; a permanent with no name matches nothing, which is
   -- the rule's own answer rather than a guard.
   TriggerCondition.SelfTransformedInto name -> case event of
-    GameEvent.Transformed (Transformed.MkTransformed oid names) -> oid == bearer && Set.member name names
+    GameEvent.Transformed (Transformed.MkTransformed oid pc) -> oid == bearer && Set.member name (PC.names pc)
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.CardArrived _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+  -- CR 701.27e's OTHER written form, read by a bystander: "whenever a permanent
+  -- you control transforms into a non-Human creature" (Cult of the Waxing Moon).
+  -- PermanentTurnedFaceUp's shape against SelfTurnedFaceUp's, one rule along --
+  -- the bearer frames the match rather than being it, contributing CR 109.5's
+  -- perspective and the Filter.Context's source and nothing else.
+  --
+  -- The CHARACTERISTICS come off the event and everything else off the board,
+  -- which is what Count.overlaySnapshot is for: CR 701.27e pins the specified
+  -- characteristic to the instant the turn finished, while control and what a
+  -- permanent is attached to are no characteristics at all (CR 109.3 names both)
+  -- and have to be read as they stand. A wholly live read would answer wrong for
+  -- a permanent that turned twice before the CR 117.5 scan, which is the argument
+  -- Pawl.Types.Transformed makes for carrying the sample.
+  --
+  -- viewWithLastKnown rather than viewOfObject, PermanentTurnedFaceUp's reason:
+  -- a permanent that turned over and left before the CR 117.5 boundary is still
+  -- read as it was on the battlefield (CR 608.2h).
+  TriggerCondition.PermanentTransforms f -> case event of
+    GameEvent.Transformed (Transformed.MkTransformed oid pc) -> case Projection.viewWithLastKnown oid gs oid of
+      Nothing -> False
+      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Count.overlaySnapshot pc view) f
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -11880,6 +11951,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.SelfTransformedInto _ -> False
+  -- The bystander form of the same event, and False for the same reason.
+  TriggerCondition.PermanentTransforms _ -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
   TriggerCondition.SelfEvolves -> False
@@ -13065,6 +13138,12 @@ eventBindingSlots cond = case cond of
   -- source slot already names, and the face it turned into is a NAME rather than
   -- an object for a slot to hold.
   TriggerCondition.SelfTransformedInto _ -> Set.empty
+  -- A deliberate empty too, and the arm below is where the difference would
+  -- show if a card asked for one: Cult of the Waxing Moon's payload names the
+  -- permanent that turned over nowhere, so there is no subject to claim a slot
+  -- for. Norn's Inquisitor's "put a +1/+1 counter on it" is what would take CR
+  -- 400.7e's slot, exactly as Pine Walker does below.
+  TriggerCondition.PermanentTransforms _ -> Set.empty
   -- The SAME event read by a bystander, and here the answer is NOT empty. CR
   -- 113.7a's source slot names the WATCHER rather than the permanent that turned
   -- over, so the subject needs a slot of its own, and Pine Walker's "untap that
@@ -13329,6 +13408,9 @@ looksBack condition = case condition of
   -- permanent "doesn't become a new object", so there is no departure for CR
   -- 603.10a to look back at.
   TriggerCondition.SelfTransformedInto _ -> False
+  -- The bystander form of that same claim: CR 712.18's permanent is still
+  -- there, whoever is watching it.
+  TriggerCondition.PermanentTransforms _ -> False
   -- CR 702.112b's designation is given to a permanent that stays where it is, so
   -- there is no departure here either.
   TriggerCondition.PermanentBecomesDesignated {} -> False
@@ -13496,6 +13578,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   TriggerCondition.SelfTransformedInto _ -> False
+  TriggerCondition.PermanentTransforms _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
   TriggerCondition.SelfEvolves -> False
   TriggerCondition.AttachedCreatureMentors -> False
@@ -14791,6 +14874,9 @@ zonesTriggeredFrom cond = case cond of
   -- CR 701.27a transforms a PERMANENT, which CR 110.1 puts on the battlefield
   -- alone, so CR 113.6k never reaches this either.
   TriggerCondition.SelfTransformedInto _ -> battlefield
+  -- CR 113.6's default for the watcher's side, PermanentTurnedFaceUp's reason
+  -- below: Cult of the Waxing Moon is a creature watching from the battlefield.
+  TriggerCondition.PermanentTransforms _ -> battlefield
   -- CR 113.6's default, one object over: the WATCHER is an ordinary permanent
   -- doing its watching from the battlefield -- Aven Farseer is a creature -- so CR
   -- 113.6k's exception, which is for a condition that cannot trigger from the
@@ -15090,6 +15176,9 @@ controllerTurnScoped cond = case cond of
   -- permanent whenever it can be activated, and CR 702.145c's sweep fires on
   -- whosever turn it becomes night.
   TriggerCondition.SelfTransformedInto _ -> False
+  -- The watcher's side of that answer, and False for the same reason, the
+  -- watcher not being the permanent that turned over.
+  TriggerCondition.PermanentTransforms _ -> False
   -- The same rule from the watcher's side, and doubly so: CR 702.37e lets any
   -- player take the action on any turn, and the watcher is not even the player
   -- taking it.
@@ -15427,6 +15516,10 @@ stateTriggers gs
               -- 712.18 leaves the permanent on its new face thereafter, so a
               -- state read would fire it again on every settle.
               TriggerCondition.SelfTransformedInto _ -> False
+              -- And the bystander's form of it is an EVENT trigger for the
+              -- same reason: a board showing a permanent on its back face
+              -- says nothing about when it turned over.
+              TriggerCondition.PermanentTransforms _ -> False
               -- And the watcher's form is an EVENT trigger for the same reason,
               -- more plainly still: a board on which some permanent is face up
               -- says nothing about which of them was ever TURNED over, so there

@@ -892,3 +892,34 @@ viewOfSnapshot mController isToken counters snapshot =
       -- outlives the object exactly as a keyword or a P/T does.
       Filter.grantsStationToughness = PC.grantsStationToughness snapshot
     }
+
+-- | The live view of an object with a sample's CHARACTERISTICS written over it,
+-- for an event whose object is still there to be asked about but whose
+-- characteristics the rule pins to the moment of the event -- CR 701.27e's "has
+-- the specified characteristic immediately after it does so", read by
+-- Pawl.Engine.Event's TriggerCondition.PermanentTransforms arm.
+--
+-- Not viewOfSnapshot alone, and that is the whole point: CR 109.3 names an
+-- object's controller and what an Aura enchants among the things that are NOT
+-- characteristics, and a zone is no more one (CR 400.1), so a snapshot has
+-- nothing to say about them and a Filter naming one would go silently False --
+-- Filter.IsAttachedToSource is the shape that would. Those come from the live
+-- view, and only the axes viewOfSnapshot reads off a ProjectedCharacteristics
+-- are overwritten -- which is why the sampled view is built by that function
+-- rather than by a second field list that could come to disagree with it.
+overlaySnapshot :: PC.ProjectedCharacteristics -> Filter.View -> Filter.View
+overlaySnapshot snapshot live =
+  let sampled = viewOfSnapshot (Filter.controller live) (Filter.token live) (Filter.counters live) snapshot
+   in live
+        { Filter.names = Filter.names sampled,
+          Filter.cardTypes = Filter.cardTypes sampled,
+          Filter.supertypes = Filter.supertypes sampled,
+          Filter.colors = Filter.colors sampled,
+          Filter.subtypes = Filter.subtypes sampled,
+          Filter.keywords = Filter.keywords sampled,
+          Filter.power = Filter.power sampled,
+          Filter.toughness = Filter.toughness sampled,
+          Filter.manaValue = Filter.manaValue sampled,
+          Filter.nonManaActivatedAbility = Filter.nonManaActivatedAbility sampled,
+          Filter.grantsStationToughness = Filter.grantsStationToughness sampled
+        }

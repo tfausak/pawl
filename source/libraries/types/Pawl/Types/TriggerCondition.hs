@@ -322,13 +322,13 @@ data TriggerCondition
     -- the names the event carries. Self-scoped plus the name, which is what
     -- tells the turn to a face from the turn away from it.
     --
-    -- Not implemented: the bystander form CR 701.27e also admits, a card
-    -- watching another permanent transform (Corruption of Towashi, Neglected
-    -- Heirloom). The event carries everything such a condition would read, so
-    -- what is missing there is the arm rather than the record (#2050). A
-    -- condition naming a characteristic rather than a name (Cult of the Waxing
-    -- Moon) needs the record widened as well (#3051).
+    -- PermanentTransforms below is the same event read by a bystander -- the
+    -- pair SelfTurnedFaceUp and PermanentTurnedFaceUp make one rule over.
     SelfTransformedInto CardName.CardName
+  | -- | CR 701.27e read by a bystander: a permanent the Filter admits turned over
+    -- (Cult of the Waxing Moon), matched against the characteristics the event
+    -- SAMPLED rather than the board's.
+    PermanentTransforms (Filter.Filter Keyword.Keyword)
   | -- | CR 708.7's other written form read by a bystander (Aven Farseer),
     -- filtered and read live after CR 708.8 restores the copiable values.
     PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
