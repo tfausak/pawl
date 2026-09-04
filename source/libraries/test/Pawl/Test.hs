@@ -389,6 +389,7 @@ import qualified Pawl.Codec.TransformedSpec
 import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TriggerLimitSpec
+import qualified Pawl.Codec.TriggerSourceSpec
 import qualified Pawl.Codec.TriggeredAbilitySourceSpec
 import qualified Pawl.Codec.TriggeredAbilitySpec
 import qualified Pawl.Codec.TurnFaceDownSpec
@@ -971,6 +972,7 @@ spec s registry = do
   Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
   Pawl.Codec.TriggerLimitSpec.spec s
+  Pawl.Codec.TriggerSourceSpec.spec s
   Pawl.Codec.TriggeredAbilitySourceSpec.spec s
   Pawl.Codec.TriggeredAbilitySpec.spec s
   Pawl.Codec.TurnFaceDownSpec.spec s

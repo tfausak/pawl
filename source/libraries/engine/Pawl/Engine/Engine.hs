@@ -103,7 +103,6 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
-import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -543,10 +542,6 @@ placePendingTriggers = do
   State.modify' $ \g ->
     g
       { GameState.scannedThrough = Natural.length (GameState.events g),
-        -- CR 702.179d's "this ability triggers only once each turn", marked as the
-        -- trigger is GATHERED rather than as it resolves, so an instance countered
-        -- on the stack has still spent the turn's one. Cleared at beginTurnOf.
-        GameState.speedIncreasedThisTurn = List.foldl' (flip Set.insert) (GameState.speedIncreasedThisTurn g) (fmap PendingTrigger.controller revving),
         -- CR 603.10's per-group samples are spent with the batch they were taken
         -- for. Cleared rather than left standing, which bounds both the map and
         -- the game states its unforced thunks retain.
@@ -596,7 +591,7 @@ reactions incoming = do
       -- around the lot: a batch is "the abilities that have triggered since the
       -- last time a player received priority" (CR 603.3b), which can have
       -- triggered off different events at different moments.
-      State.modify' (\g -> List.foldl' (flip Event.recordEvent) g (Maybe.mapMaybe triggeredEvent batch))
+      State.modify' (\g -> List.foldl' (flip Event.recordEvent) g (fmap triggeredEvent batch))
       gs <- State.get
       let fresh = Event.reactionTriggers (Event.unscannedGrouped gs) gs
       -- The round's own events are consumed here, CR 603.10's samples with them.
@@ -614,21 +609,16 @@ reactions incoming = do
 -- (Pawl.Types.TriggerLimit), applied to one gathered batch: drop every entry
 -- whose ability carries the rider and has already triggered this turn. No stored
 -- flag -- the record is CR 603.3b's own log, and GameState.events is cleared at
--- the turn handoff, which makes "in the log" mean "this turn". CR 702.179d's twin
--- (GameState.speedIncreasedThisTurn) is a stored flag; see Pawl.Engine.Speed for
--- why a sourceless trigger needs it. Keyed on the SOURCE and the CONDITION, so
--- two permanents with the same printed ability spend separate limits (CR 113.7)
--- and one that leaves and returns re-arms (CR 400.7), while a change of CONTROL
--- spends nothing. Spent on TRIGGERING.
---
--- Not implemented: a SOURCELESS trigger is never limited here, the log holding
--- no record of one (#1026); and two DISTINCT abilities on one source that share
--- a trigger condition are one key, so an unlimited one firing can spend a
--- limited one's turn (#1664).
+-- the turn handoff, which makes "in the log" mean "this turn". CR 702.179d's
+-- inherent twin is limited here like any other, the log recording a sourceless
+-- trigger too. Keyed on the SOURCE and the ABILITY, so two permanents with the
+-- same printed ability spend separate limits (CR 113.7), one that leaves and
+-- returns re-arms (CR 400.7), and two DISTINCT abilities of one source spend
+-- separate limits; a change of CONTROL spends nothing. Spent on TRIGGERING.
 withinTurnLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
 withinTurnLimit gs = go (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
   where
-    spentKey record = (AbilityTriggered.source record, AbilityTriggered.condition record)
+    spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
     go _ [] = []
     go spent (pending : rest) = case limitedKey pending of
       Nothing -> pending : go spent rest
@@ -636,14 +626,38 @@ withinTurnLimit gs = go (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTr
         | Set.member key spent -> go spent rest
         | otherwise -> pending : go (Set.insert key spent) rest
 
--- The key one pending trigger spends, or Nothing when it spends none -- because
--- its ability prints no rider, or because it is sourceless.
-limitedKey :: PendingTrigger.PendingTrigger -> Maybe (ObjectId.ObjectId, TriggerCondition.TriggerCondition)
+-- What ONE INSTANCE of a triggered ability is, for the rider's purposes: what it
+-- hangs on and which ability it is -- the discriminator Pawl.Types.TriggerEntry
+-- carries, and its haddock argues for the ability VALUE over an ordinal -- plus
+-- the controller for a SOURCELESS ability and only for one. Rule 725.2 and rule
+-- 702.179d give each player their own instance of one inherent ability with no
+-- object to tell them apart, where an object-borne ability is CR 113.7's one
+-- instance whoever controls it.
+--
+-- The controller component is a REGRESSION FENCE rather than a proven behaviour:
+-- rule 702.179d's is the only sourceless ability printing the rider and it fires
+-- for the active player alone, so no board can have two players spend it in one
+-- turn, and dropping the component leaves the suite green.
+--
+-- Not implemented: two VALUE-IDENTICAL limited abilities on one source are one
+-- instance here, so one spends the other's turn (#3198).
+type LimitKey = (TriggerSource.TriggerSource, Maybe PlayerId, TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))
+
+limitKey :: TriggerSource.TriggerSource -> PlayerId -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> LimitKey
+limitKey src ctrl ability =
+  ( src,
+    case src of
+      TriggerSource.Sourceless -> Just ctrl
+      TriggerSource.OfObject _ -> Nothing,
+    ability
+  )
+
+-- The key one pending trigger spends, or Nothing when its ability prints no
+-- rider.
+limitedKey :: PendingTrigger.PendingTrigger -> Maybe LimitKey
 limitedKey pending = case TriggeredAbility.limit (PendingTrigger.ability pending) of
   TriggerLimit.Unlimited -> Nothing
-  TriggerLimit.OncePerTurn -> case PendingTrigger.source pending of
-    TriggerSource.Sourceless -> Nothing
-    TriggerSource.OfObject oid -> Just (oid, TriggeredAbility.condition (PendingTrigger.ability pending))
+  TriggerLimit.OncePerTurn -> Just (limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending))
 
 -- `triggeredEvent` read back: the record an event carries if it is one ability
 -- triggering (CR 603.3b), and nothing otherwise.
@@ -700,22 +714,18 @@ abilityTriggeredOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
--- CR 603.3b's record of one ability triggering: its source (CR 113.7), its
--- controller as it triggered (CR 603.3a) and its trigger condition. Nothing for a
--- SOURCELESS ability, which is the one shape the event cannot describe, there
--- being no id to name (#1026).
-triggeredEvent :: PendingTrigger.PendingTrigger -> Maybe GameEvent.GameEvent
-triggeredEvent pending = case PendingTrigger.source pending of
-  TriggerSource.Sourceless -> Nothing
-  TriggerSource.OfObject oid ->
-    Just
-      ( GameEvent.AbilityTriggered
-          AbilityTriggered.MkAbilityTriggered
-            { AbilityTriggered.source = oid,
-              AbilityTriggered.controller = PendingTrigger.controller pending,
-              AbilityTriggered.condition = TriggeredAbility.condition (PendingTrigger.ability pending)
-            }
-      )
+-- CR 603.3b's record of one ability triggering: what it hangs on (CR 113.7), its
+-- controller as it triggered (CR 603.3a) and WHICH ABILITY it is. Every pending
+-- trigger gets one, a SOURCELESS inherent ability included -- the record names a
+-- Pawl.Types.TriggerSource, so there is no id it lacks.
+triggeredEvent :: PendingTrigger.PendingTrigger -> GameEvent.GameEvent
+triggeredEvent pending =
+  GameEvent.AbilityTriggered
+    AbilityTriggered.MkAbilityTriggered
+      { AbilityTriggered.source = PendingTrigger.source pending,
+        AbilityTriggered.controller = PendingTrigger.controller pending,
+        AbilityTriggered.ability = PendingTrigger.ability pending
+      }
 
 -- Put one triggered ability from the ordered batch on the stack. What it hangs
 -- on decides how: an ability BORNE by an object goes through placeBorne, where
@@ -1425,9 +1435,6 @@ beginTurnOf pid gs =
             -- cleanup -- cleanup is still part of this turn, and CR 514.1's
             -- discard is itself an event of it.
             GameState.events = Seq.empty,
-            -- CR 702.179d's "only once each turn", cleared beside the log for the
-            -- same reason: a new turn starts with nobody's ability spent.
-            GameState.speedIncreasedThisTurn = Set.empty,
             -- CR 121.1's per-turn draw tally, cleared for EVERY player: a player
             -- draws on turns that are not theirs, so "each turn" is the whole map.
             GameState.drawsThisTurn = Map.empty,

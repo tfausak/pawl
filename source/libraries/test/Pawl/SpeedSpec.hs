@@ -48,7 +48,9 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -57,6 +59,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.Zone as Zone
 
 -- This player's speed, as Player.speed holds it -- Nothing for a player who has
@@ -356,7 +359,7 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
         gs = atSpeed 3 S.alice (S.settleSba withSpell)
         after = castOnce S.alice spellId gs
     Spec.assertEqWith s "alice is at 3 before the spell" (speedOf S.alice gs) (Just (Just 3))
-    Spec.assertEqWith s "no inherent trigger was spent (CR 702.179d)" (foldr (:) [] (GameState.speedIncreasedThisTurn after)) []
+    Spec.assertEqWith s "no inherent trigger was spent (CR 702.179d)" (inherentTriggersSpent after) []
     Spec.assertEqWith s "the effect pushed her past 4, uncapped" (speedOf S.alice after) (Just (Just 5))
     Spec.assertEqWith s "and the max speed ability still makes two mana at 5" (pooledBy biggestYield racewayId after) 2
     Spec.assertEqWith s "two activated abilities at 5" (length (Projection.abilitiesOf racewayId after)) 2
@@ -535,7 +538,7 @@ cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
     -- opponent losing life, and nothing here loses any -- so the set of players
     -- whose inherent trigger was spent this turn is empty, and the increases below
     -- have no other author.
-    Spec.assertEqWith s "no inherent trigger was spent (CR 702.179d)" (foldr (:) [] (GameState.speedIncreasedThisTurn after)) []
+    Spec.assertEqWith s "no inherent trigger was spent (CR 702.179d)" (inherentTriggersSpent after) []
     Spec.assertEqWith s "alice's 1 became 3" (speedOf S.alice after) (Just (Just 3))
     Spec.assertEqWith s "and bob's none became 2, CR 702.179c's other reading" (speedOf S.bob after) (Just (Just 2))
   -- CR 702.179c's SECOND reading on its own, with rule 702.179's own machinery
@@ -679,6 +682,16 @@ resolveTrigger :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Gam
 resolveTrigger answer gs =
   let placed = S.runPure answer gs Engine.placePendingTriggers
    in S.runPure answer placed Stack.resolveTop
+
+-- CR 702.179d's "only once each turn" allowance, read the way
+-- Engine.withinTurnLimit spends it: the players whose SOURCELESS ability is in
+-- this turn's CR 603.3b log.
+inherentTriggersSpent :: GameState.GameState -> [PlayerId.PlayerId]
+inherentTriggersSpent gs =
+  [ AbilityTriggered.controller record
+  | GameEvent.AbilityTriggered record <- S.eventsOf gs,
+    AbilityTriggered.source record == TriggerSource.Sourceless
+  ]
 
 -- Put this player at exactly this speed, bypassing CR 702.179d's climb. Every
 -- case that uses it is about what READS speed (CR 702.178a's gate, CR 702.179e's

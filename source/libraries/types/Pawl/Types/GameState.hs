@@ -223,10 +223,6 @@ data GameState = MkGameState
     -- ordinal onto GameEvent.Drew; cleared for every player at turn handoff,
     -- and after CR 103.3's opening hands.
     drawsThisTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
-    -- | CR 702.179d: the players whose inherent speed-increase ability has
-    -- triggered this turn; stored because the limit is on the trigger, not on
-    -- a logged event. Cleared at turn handoff.
-    speedIncreasedThisTurn :: Set.Set PlayerId.PlayerId,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
     -- controlled; last created wins (CR 723.1a), promoted to activeControl at
     -- that player's turn (CR 723.1b).
