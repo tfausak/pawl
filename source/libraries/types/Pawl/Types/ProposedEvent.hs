@@ -1,7 +1,7 @@
 module Pawl.Types.ProposedEvent where
 
+import qualified Data.Sequence as Seq
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -13,6 +13,7 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -91,7 +92,10 @@ data ProposedEvent
     -- Pawl.Types.PlayerCounterKind is its own type. One arm would have to admit
     -- a +1/+1 counter on a player.
     WouldPutPlayerCounters CounterCause.CounterCause PlayerId.PlayerId PlayerCounterKind.PlayerCounterKind Natural.Natural
-  | WouldCreateTokens PlayerId.PlayerId Card.Card Natural.Natural
+  | -- | CR 111.1: this player would create these tokens, lot by lot. A sequence
+    -- of lots rather than one card and a count so that a CR 614.1a append
+    -- (Pawl.Types.TokenR.plus) stays inside the ONE event a later row scales.
+    WouldCreateTokens PlayerId.PlayerId (Seq.Seq TokenLot.TokenLot)
   | -- | CR 500.11 / 614.10: a step or phase would begin, on this player's turn.
     -- Raised by Engine.runStep before anything about the step is observable, so
     -- a skip that takes it leaves no trace -- CR 614.10 stops a step, phase or

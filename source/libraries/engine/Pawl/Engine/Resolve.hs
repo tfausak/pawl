@@ -275,6 +275,8 @@ import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.Toughness as Toughness
@@ -1249,7 +1251,7 @@ conditionSlots condition = case condition of
 -- the ones carrying neither Filter nor Quantity say so rather than falling
 -- through. Not implemented: the nested EFFECTS an EntryR rewrite or a DamageR
 -- rider carries read slots of their own and are not walked (gap #1962).
-replacementRowReads :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+replacementRowReads :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 replacementRowReads re = case re of
   -- The rewrite is a Zone and two Bools (Pawl.Types.ZoneChangeR): nothing that can
   -- name a slot, so the pattern is the whole of it.
@@ -1262,12 +1264,13 @@ replacementRowReads re = case re of
   ReplacementEffect.DestructionR _ -> ([], [])
   -- The rewrite is one Scaling, which is a constructor and a Natural.
   ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> ([CounterPattern.onWhat pat], [])
-  ReplacementEffect.TokenR _ -> ([], [])
+  -- The pattern's Filter over what the token is; the scaling is a number and
+  -- the appended token is card data of its own, so neither reads a slot.
+  ReplacementEffect.TokenR (TokenR.MkTokenR pat _ _) -> ([TokenPattern.whatToken pat], [])
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ rewrite) -> addFilter pat (turnUpRewriteReads rewrite)
   ReplacementEffect.UntapR _ -> ([], [])
   -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and no arm
-  -- of LifeLossRewrite carries a Filter or a Quantity: no read at all. TokenR's
-  -- answer, and for its reason.
+  -- of LifeLossRewrite carries a Filter or a Quantity: no read at all.
   ReplacementEffect.LifeLossR {} -> ([], [])
   -- A DrawR is one ControllerRelation and one amount of life. LifeLossR's answer,
   -- and for its reason.
@@ -1337,7 +1340,7 @@ turnUpRewriteReads rewrite = case rewrite of
 -- CR 614.1c's WithCounters and CR 702.37b's are the two rewrites that can carry
 -- one. The two capture sites take Map.keysSet, so the arity reaches only slotsOf's
 -- Replace arm.
-replacementRowSlots :: ReplacementEffect.ReplacementEffect (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
+replacementRowSlots :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
 replacementRowSlots re =
   let (filters, quantities) = replacementRowReads re
    in joinSlots (fmap filterSlotsOf filters <> fmap quantitySlots quantities)
@@ -3973,7 +3976,7 @@ referredToSources gs =
 -- No wildcard: an arm of Pawl.Types.ReplacementEffect that later bakes an id must
 -- answer here, or its object silently leaves the pool. Every arm answering []
 -- names things by Filter and by slot alone, which replacementRowSlots reports.
-referentsOfReplacement :: ReplacementEffect.ReplacementEffect effect -> [ObjectId]
+referentsOfReplacement :: ReplacementEffect.ReplacementEffect card effect -> [ObjectId]
 referentsOfReplacement re = case re of
   ReplacementEffect.ZoneChangeR _ -> []
   ReplacementEffect.EntryR _ -> []

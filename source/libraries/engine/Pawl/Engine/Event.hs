@@ -199,6 +199,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
@@ -2767,10 +2768,18 @@ apply batch candidate event =
     -- Unreachable: `applies` admits CounterR only against the three counter events
     -- above.
     (ReplacementEffect.CounterR {}, _) -> pure (Just event)
-    -- CR 614.16: Doubling Season scales token creation.
-    (ReplacementEffect.TokenR (TokenR.MkTokenR _ scaling), ProposedEvent.WouldCreateTokens pid card n) -> do
+    -- CR 614.16: Doubling Season scales token creation. CR 614.1a: Queen Allenal
+    -- of Ruadach's "those tokens plus a 1/1 white Soldier creature token are
+    -- created instead" appends a lot to the SAME event -- scaled first, then
+    -- appended, so a row applied after this one (CR 616.1) scales the Soldier
+    -- too, and the creating effect's riders reach it (Queen Allenal's ruling).
+    -- Pawl.ReplacementSpec's Queen Allenal group is the proof, both orders.
+    (ReplacementEffect.TokenR (TokenR.MkTokenR _ scaling plus), ProposedEvent.WouldCreateTokens pid lots) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
-      pure (Just (ProposedEvent.WouldCreateTokens pid card (Replacement.scale scaling n)))
+      let scaleLot factor lot = lot {TokenLot.count = Replacement.scale factor (TokenLot.count lot)}
+          scaled = maybe lots (\factor -> fmap (scaleLot factor) lots) scaling
+          appended = maybe scaled (\card -> scaled Seq.|> TokenLot.MkTokenLot {TokenLot.card = card, TokenLot.copy = Nothing, TokenLot.count = 1}) plus
+      pure (Just (ProposedEvent.WouldCreateTokens pid appended))
     -- Unreachable: `applies` admits TokenR only against WouldCreateTokens.
     (ReplacementEffect.TokenR {}, _) -> pure (Just event)
     -- CR 614.1b / 614.10: a skip is "instead of doing X, do nothing", so the
@@ -3493,9 +3502,9 @@ resolveLifeLoss cause pid n =
       pure (maybe 0 snd (outcome >>= Replacement.asLifeLoss))
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
-resolveTokens :: PlayerId -> Card -> Natural -> Game (Maybe (PlayerId, Card, Natural))
-resolveTokens pid card n = do
-  outcome <- applyReplacements (ProposedEvent.WouldCreateTokens pid card n)
+resolveTokens :: PlayerId -> Seq.Seq TokenLot.TokenLot -> Game (Maybe (PlayerId, Seq.Seq TokenLot.TokenLot))
+resolveTokens pid lots = do
+  outcome <- applyReplacements (ProposedEvent.WouldCreateTokens pid lots)
   pure (outcome >>= Replacement.asTokens)
 
 -- CR 500.11 / 614.10: settle whether a step or phase begins at all, on the turn
@@ -5364,77 +5373,81 @@ createTokens controller card copy n tapped entering = do
   if List.notElem controller (Game.stillPlaying gs)
     then pure []
     else do
-      resolved <- resolveTokens controller card n
+      resolved <- resolveTokens controller (Seq.singleton TokenLot.MkTokenLot {TokenLot.card = card, TokenLot.copy = copy, TokenLot.count = n})
       case resolved of
         Nothing -> pure []
-        Just (owner, tokenCard, count) -> do
+        Just (owner, lots) -> do
           -- CR 111.5's rollback point below, captured AFTER resolveTokens rather
           -- than before it: rule 614.3's use counts are spent by a replacement
           -- that applied to the creation event, and rule 111.5 unmakes the token
           -- rather than the event.
           unminted <- State.get
-          -- Interned ONCE for the whole event, not once per token: `count`
-          -- tokens created by one effect are copies of one set of
-          -- effect-defined characteristics (CR 111.3), so they name one entry.
-          tokenId <- State.state (Game.intern (Printing.MkPrinting tokenCard))
-          let mkObj ts =
-                Object.MkObject
-                  { Object.owner = owner,
-                    Object.enteredUnder = Nothing,
-                    Object.source = Source.OfToken tokenId,
-                    Object.zone = Zone.Battlefield,
-                    -- CR 110.5b: untapped unless an effect says otherwise, which
-                    -- is why the caller supplies this rather than the default
-                    -- being taken and the token tapped after.
-                    Object.tapped = tapped,
-                    -- CR 110.5b: face up, for the same rule's reason. No effect
-                    -- in the pool creates a token face down.
-                    Object.facing = Facing.FaceUp,
-                    Object.exiledFaceDown = False,
-                    Object.damage = 0,
-                    Object.sickness = Sickness.Sick,
-                    -- CR 707.2 / 111.3: a token copy's copiable values are the
-                    -- copied permanent's, stamped into the layer-1 snapshot the
-                    -- projection starts from -- the same binding the CR 614.1c
-                    -- entry rewrite writes, and the same read
-                    -- (Projection.copiableCharacteristics) on the way out.
-                    -- Written HERE rather than after the entry loop because CR
-                    -- 614.12 asks for the characteristics the permanent would
-                    -- have on the battlefield, and for this token those are the
-                    -- copy's from the instant it exists.
-                    Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) copy,
-                    Object.counters = Map.empty,
-                    Object.counterTimestamps = Map.empty,
-                    Object.attachedTo = Nothing,
-                    Object.chosenColor = Nothing,
-                    Object.chosenSubtype = Nothing,
-                    Object.chosenNames = Set.empty,
-                    Object.chosenPlayer = Nothing,
-                    Object.timestamp = ts,
-                    Object.face = Nothing,
-                    Object.turnedOverAt = Nothing,
-                    Object.worldSince = Nothing,
-                    Object.playableFromExile = Nothing,
-                    Object.plotted = Nothing,
-                    Object.foretold = Nothing,
-                    Object.ringBearerFor = Nothing,
-                    Object.protector = Nothing,
-                    Object.ventureRoom = Nothing,
-                    Object.classLevel = Nothing,
-                    Object.unlockedHalves = Set.empty,
-                    Object.designations = Set.empty,
-                    Object.kicked = Map.empty,
-                    Object.bestowed = False,
-                    Object.phyrexianLifePaid = 0,
-                    Object.manaSpent = Mana.MkMana [],
-                    Object.announcedX = Nothing,
-                    Object.castFrom = Nothing,
-                    Object.detainedUntil = Set.empty,
-                    Object.goadedBy = Set.empty,
-                    Object.doesNotUntapNext = False,
-                    Object.exertedBy = Set.empty
-                  }
-          ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
+          -- ONE lot came in; several come out when a CR 614.1a append (Queen
+          -- Allenal of Ruadach) put another shape into the event. Every lot is
+          -- minted here, in the one batch, before any token runs its entry loop.
+          ids <- fmap concat . Monad.forM (Foldable.toList lots) $ \lot -> do
+            -- Interned ONCE per lot, not once per token: a lot's tokens are
+            -- copies of one set of effect-defined characteristics (CR 111.3), so
+            -- they name one entry.
+            tokenId <- State.state (Game.intern (Printing.MkPrinting (TokenLot.card lot)))
+            let mkObj ts =
+                  Object.MkObject
+                    { Object.owner = owner,
+                      Object.enteredUnder = Nothing,
+                      Object.source = Source.OfToken tokenId,
+                      Object.zone = Zone.Battlefield,
+                      -- CR 110.5b: untapped unless an effect says otherwise, which
+                      -- is why the caller supplies this rather than the default
+                      -- being taken and the token tapped after.
+                      Object.tapped = tapped,
+                      -- CR 110.5b: face up, for the same rule's reason. No effect
+                      -- in the pool creates a token face down.
+                      Object.facing = Facing.FaceUp,
+                      Object.exiledFaceDown = False,
+                      Object.damage = 0,
+                      Object.sickness = Sickness.Sick,
+                      -- CR 707.2 / 111.3: a token copy's copiable values are the
+                      -- copied permanent's, stamped into the layer-1 snapshot the
+                      -- projection starts from -- the same binding the CR 614.1c
+                      -- entry rewrite writes, and the same read
+                      -- (Projection.copiableCharacteristics) on the way out.
+                      -- Written HERE rather than after the entry loop because CR
+                      -- 614.12 asks for the characteristics the permanent would
+                      -- have on the battlefield, and for this token those are the
+                      -- copy's from the instant it exists.
+                      Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (TokenLot.copy lot),
+                      Object.counters = Map.empty,
+                      Object.counterTimestamps = Map.empty,
+                      Object.attachedTo = Nothing,
+                      Object.chosenColor = Nothing,
+                      Object.chosenSubtype = Nothing,
+                      Object.chosenNames = Set.empty,
+                      Object.chosenPlayer = Nothing,
+                      Object.timestamp = ts,
+                      Object.face = Nothing,
+                      Object.turnedOverAt = Nothing,
+                      Object.worldSince = Nothing,
+                      Object.playableFromExile = Nothing,
+                      Object.plotted = Nothing,
+                      Object.foretold = Nothing,
+                      Object.ringBearerFor = Nothing,
+                      Object.protector = Nothing,
+                      Object.ventureRoom = Nothing,
+                      Object.classLevel = Nothing,
+                      Object.unlockedHalves = Set.empty,
+                      Object.designations = Set.empty,
+                      Object.kicked = Map.empty,
+                      Object.bestowed = False,
+                      Object.phyrexianLifePaid = 0,
+                      Object.manaSpent = Mana.MkMana [],
+                      Object.announcedX = Nothing,
+                      Object.castFrom = Nothing,
+                      Object.detainedUntil = Set.empty,
+                      Object.goadedBy = Set.empty,
+                      Object.doesNotUntapNext = False,
+                      Object.exertedBy = Set.empty
+                    }
+            Monad.replicateM (Natural.toIntSaturating (TokenLot.count lot)) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           minted <- State.get
           -- CR 111.5: "if a spell or ability would create a token, but a rule or
           -- effect states that a permanent with one or more of that token's

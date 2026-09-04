@@ -1760,6 +1760,7 @@ library types
     Pawl.Types.TeamId
     Pawl.Types.Teams
     Pawl.Types.Timestamp
+    Pawl.Types.TokenLot
     Pawl.Types.TokenPattern
     Pawl.Types.TokenR
     Pawl.Types.TopOfLibrary

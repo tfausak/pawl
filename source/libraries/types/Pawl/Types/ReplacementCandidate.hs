@@ -28,7 +28,7 @@ import qualified Pawl.Types.Uses as Uses
 -- bucketOf answer CR 616.1a without the rules core asking what an effect IS.
 data ReplacementCandidate = MkReplacementCandidate
   { identity :: CandidateId.CandidateId,
-    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
+    effect :: ReplacementEffect.ReplacementEffect Card.Card (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)),
     source :: ObjectId.ObjectId,
     -- | CR 109.5's "you" for this instance, from whichever of the two segments
     -- can answer it: a permanent's static ability derives it from `source`'s

@@ -92,4 +92,4 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
   where
     -- The effect codec the card boundary would pass in (CR 615.5's riders ride
     -- the DamageR arm underneath).
-    codec = PrintedReplacement.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
+    codec = PrintedReplacement.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))

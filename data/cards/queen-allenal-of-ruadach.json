@@ -1,0 +1,150 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Count",
+        "value": {
+          "aggregation": {
+            "type": "Members"
+          },
+          "filter": {
+            "type": "And",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              },
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              }
+            ]
+          },
+          "scope": {
+            "type": "InZone",
+            "value": {
+              "player": {
+                "type": "EachPlayer"
+              },
+              "zone": {
+                "type": "Battlefield"
+              }
+            }
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Queen Allenal of Ruadach",
+      "power": {
+        "type": "Star"
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "TokenR",
+            "value": {
+              "matching": {
+                "whatToken": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                "whose": {
+                  "type": "Yours"
+                }
+              },
+              "plus": {
+                "faces": [
+                  {
+                    "colorIndicator": [
+                      {
+                        "type": "White"
+                      }
+                    ],
+                    "name": "Soldier Token",
+                    "power": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "toughness": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "typeLine": {
+                      "subtypes": [
+                        {
+                          "type": "Soldier"
+                        }
+                      ],
+                      "types": [
+                        {
+                          "type": "Creature"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elf"
+          },
+          {
+            "type": "Noble"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

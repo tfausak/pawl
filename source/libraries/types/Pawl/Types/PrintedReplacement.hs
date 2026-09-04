@@ -18,7 +18,7 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- Parametric in the EFFECT, passing Pawl.Types.ReplacementEffect's parameter
 -- through for the reason Pawl.Types.DamageR gives.
-data PrintedReplacement effect = MkPrintedReplacement
+data PrintedReplacement card effect = MkPrintedReplacement
   { -- | The ability's "as long as" clause -- Jared Carthalion, True Heir's "while
     -- you're the monarch" -- or Nothing for one that functions from wherever CR
     -- 604.2 leaves it functioning, which is every other producer in the pool.
@@ -48,7 +48,7 @@ data PrintedReplacement effect = MkPrintedReplacement
     -- event would happen. What differs is CR 109.5's "you" -- that row bakes its
     -- controller, this one reads it live off the battlefield.
     condition :: Maybe Condition.Condition,
-    effect :: ReplacementEffect.ReplacementEffect effect,
+    effect :: ReplacementEffect.ReplacementEffect card effect,
     -- | CR 113.6b: the zones this row STATES its ability functions in -- Nexus of
     -- Fate's "would be put into a graveyard from anywhere" -- and empty for a row
     -- that states none, which is every other producer in the pool.

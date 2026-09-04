@@ -22,19 +22,21 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 --
 -- The effect codec is a PARAMETER rather than an import, for the reason
 -- Pawl.Types.DamageR gives: the DamageR arm carries CR 615.5's riders and the
--- EntryR arm CR 614.1c's as-enters effects.
+-- EntryR arm CR 614.1c's as-enters effects. The card codec is one for
+-- Pawl.Codec.Create's: the TokenR arm's appended token is card data.
 codec ::
-  (Typeable.Typeable effect, Eq effect) =>
+  (Typeable.Typeable card, Eq card, Typeable.Typeable effect, Eq effect) =>
+  Codec.Codec card ->
   Codec.Codec effect ->
-  Codec.Codec (ReplacementEffect.ReplacementEffect effect)
-codec effectCodec =
+  Codec.Codec (ReplacementEffect.ReplacementEffect card effect)
+codec cardCodec effectCodec =
   Arm.tagged
     [ Arm.payload "ZoneChangeR" ZoneChangeR.codec ReplacementEffect.ZoneChangeR (\x -> case x of ReplacementEffect.ZoneChangeR y -> Just y; _ -> Nothing),
       Arm.payload "EntryR" (EntryR.codec effectCodec) ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
       Arm.payload "DamageR" (DamageR.codec effectCodec) ReplacementEffect.DamageR (\x -> case x of ReplacementEffect.DamageR y -> Just y; _ -> Nothing),
       Arm.payload "DestructionR" DestructionRewrite.codec ReplacementEffect.DestructionR (\x -> case x of ReplacementEffect.DestructionR y -> Just y; _ -> Nothing),
       Arm.payload "CounterR" CounterR.codec ReplacementEffect.CounterR (\x -> case x of ReplacementEffect.CounterR y -> Just y; _ -> Nothing),
-      Arm.payload "TokenR" TokenR.codec ReplacementEffect.TokenR (\x -> case x of ReplacementEffect.TokenR y -> Just y; _ -> Nothing),
+      Arm.payload "TokenR" (TokenR.codec cardCodec) ReplacementEffect.TokenR (\x -> case x of ReplacementEffect.TokenR y -> Just y; _ -> Nothing),
       Arm.payload "TurnUpR" TurnUpR.codec ReplacementEffect.TurnUpR (\x -> case x of ReplacementEffect.TurnUpR y -> Just y; _ -> Nothing),
       Arm.payload "UntapR" UntapRewrite.codec ReplacementEffect.UntapR (\x -> case x of ReplacementEffect.UntapR y -> Just y; _ -> Nothing),
       Arm.payload "LifeLossR" LifeLossR.codec ReplacementEffect.LifeLossR (\x -> case x of ReplacementEffect.LifeLossR y -> Just y; _ -> Nothing),

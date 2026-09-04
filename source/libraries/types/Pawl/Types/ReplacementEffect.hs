@@ -69,15 +69,18 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- parameter, so a card writing a rider onto anything but a prevention is a lint's
 -- job rather than the type's.
 --
+-- Parametric in the CARD for Pawl.Types.Create's reason: the token TokenR
+-- appends (Pawl.Types.TokenR.plus) is card data nested inside card data.
+--
 -- The sole rules-casing site is Pawl.Engine.Replacement (CR 616.1's loop).
 -- Pawl.Codec also cases on every constructor, but only as the JSON data boundary.
-data ReplacementEffect effect
+data ReplacementEffect card effect
   = ZoneChangeR ZoneChangeR.ZoneChangeR
   | EntryR (EntryR.EntryR effect)
   | DamageR (DamageR.DamageR effect)
   | DestructionR DestructionRewrite.DestructionRewrite
   | CounterR CounterR.CounterR
-  | TokenR TokenR.TokenR
+  | TokenR (TokenR.TokenR card)
   | -- | CR 614.1e: "As [this permanent] is turned face up . . ." A separate arm
     -- from EntryR and not a widening of it, because CR 614.1c's event class and
     -- this one are different events -- a permanent that turns face up does not

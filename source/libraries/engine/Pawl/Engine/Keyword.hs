@@ -1351,7 +1351,7 @@ foretellCost keywords =
 -- paid" and rule 702.133a's jump-start clause each ask about; rule 702.127a asks
 -- only whether the cast came from a graveyard. Pawl.Engine.Cast installs what this
 -- returns without ever inspecting it.
-castFromGraveyardReplacementsOf :: Set Keyword -> Maybe Keyword -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
+castFromGraveyardReplacementsOf :: Set Keyword -> Maybe Keyword -> [ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 castFromGraveyardReplacementsOf keywords castFor =
   let paidFor keyword = castFor == Just keyword
    in -- The cost the cast PAID FOR, and not merely a flashback the card has:
@@ -1374,7 +1374,7 @@ castFromGraveyardReplacementsOf keywords castFor =
         -- which a permission offering the printed cost alone is not.
         <> [castFromGraveyardExile | hasJumpStart keywords, paidFor Keyword.JumpStart]
 
-castFromGraveyardExile :: ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
+castFromGraveyardExile :: ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
 castFromGraveyardExile =
   ReplacementEffect.ZoneChangeR
     ( ZoneChangeR.MkZoneChangeR
@@ -1456,12 +1456,12 @@ livingMetal =
 -- "Minted" rather than "entry" because CR 702.37b's megamorph rides the same
 -- function with a CR 614.1e replacement, so this answers with rows of two event
 -- classes; the CR 616.1 loop matches each against the event it is offered.
-mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
+mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toAscList counts)
 
 -- Exhaustive for abilitiesFor's reason: the next keyword that rewrites an entry
 -- must break this build rather than silently produce nothing.
-mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
+mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Riot))
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.

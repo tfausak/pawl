@@ -17,7 +17,7 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- Rest in Peace's rewrite, borrowed from Pawl.Codec.ReplacementEffectSpec, since
 -- what this module is about is the RECORD around the effect rather than the
 -- effect itself.
-effect :: ReplacementEffect.ReplacementEffect a
+effect :: ReplacementEffect.ReplacementEffect card a
 effect =
   ReplacementEffect.ZoneChangeR
     ( ZoneChangeR.MkZoneChangeR

@@ -21,15 +21,16 @@ import qualified Pawl.Types.Replace as Replace
 -- The effect codec is a PARAMETER rather than an import, for the reason
 -- Pawl.Types.DamageR gives.
 codec ::
-  (Typeable.Typeable effect, Eq effect) =>
+  (Typeable.Typeable card, Eq card, Typeable.Typeable effect, Eq effect) =>
+  Codec.Codec card ->
   Codec.Codec effect ->
-  Codec.Codec (Replace.Replace effect)
-codec effectCodec = Fields.object $ do
+  Codec.Codec (Replace.Replace card effect)
+codec cardCodec effectCodec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec Replace.duration
   uses <- Fields.required "uses" Uses.codec Replace.uses
   origin <- Fields.required "origin" ReplacementOrigin.codec Replace.origin
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) Replace.condition
-  effect <- Fields.required "effect" (ReplacementEffect.codec effectCodec) Replace.effect
+  effect <- Fields.required "effect" (ReplacementEffect.codec cardCodec effectCodec) Replace.effect
   pure
     Replace.MkReplace
       { Replace.duration = duration,

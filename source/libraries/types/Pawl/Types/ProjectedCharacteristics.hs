@@ -179,7 +179,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two
     -- and singled out by the same named removal (Glittering Lion).
-    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card))],
+    replacementEffects :: [PrintedReplacement.PrintedReplacement Card.Card (Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card))],
     -- | CR 603 layer 6: the object's triggered abilities after the layer system,
     -- the same projection posture as activatedAbilities: seeded from the card,
     -- added to by CR 613.1f's grant (Sixth Sense), emptied by the same two. CR

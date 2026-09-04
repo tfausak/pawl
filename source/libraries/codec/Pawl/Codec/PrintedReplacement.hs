@@ -20,12 +20,13 @@ import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 -- The effect codec is a PARAMETER rather than an import, for the reason
 -- Pawl.Types.DamageR gives.
 codec ::
-  (Typeable.Typeable effect, Eq effect) =>
+  (Typeable.Typeable card, Eq card, Typeable.Typeable effect, Eq effect) =>
+  Codec.Codec card ->
   Codec.Codec effect ->
-  Codec.Codec (PrintedReplacement.PrintedReplacement effect)
-codec effectCodec = Fields.object $ do
+  Codec.Codec (PrintedReplacement.PrintedReplacement card effect)
+codec cardCodec effectCodec = Fields.object $ do
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) PrintedReplacement.condition
-  effect <- Fields.required "effect" (ReplacementEffect.codec effectCodec) PrintedReplacement.effect
+  effect <- Fields.required "effect" (ReplacementEffect.codec cardCodec effectCodec) PrintedReplacement.effect
   functionsFrom <- Fields.defaulted "functionsFrom" Set.empty (Common.set Zone.codec) PrintedReplacement.functionsFrom
   name <- Fields.defaulted "name" Nothing (Common.maybe AbilityName.codec) PrintedReplacement.name
   pure

@@ -234,7 +234,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
     Common.assertCodec
       s
       codec
-      (ReplacementEffect.TokenR (TokenR.MkTokenR TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours} (Scaling.Multiply 2)))
+      (ReplacementEffect.TokenR (TokenR.MkTokenR TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours, TokenPattern.whatToken = Filter.And []} (Just (Scaling.Multiply 2)) Nothing))
       " {\"type\":\"TokenR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"}},\"scaling\":{\"type\":\"Multiply\",\"value\":2}}} "
   -- CR 614.1b: a skip carries a pattern and no rewrite, so the payload is the
   -- pattern itself rather than the usual two-element array. whosePhase =
@@ -275,4 +275,4 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   where
     -- CR 615.5: the DamageR arm carries riders, so the codec takes the effect
     -- codec the card boundary would pass it.
-    codec = ReplacementEffect.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
+    codec = ReplacementEffect.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec))
