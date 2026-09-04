@@ -63,6 +63,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost
@@ -2974,13 +2975,32 @@ rewriteDrawRewrite pairs rewrite = case rewrite of
   DrawRewrite.GainLife _ -> rewrite
   DrawRewrite.FromOutsideTheGame payload -> DrawRewrite.FromOutsideTheGame payload {FromOutsideTheGame.filter = Filter.rewrite pairs (FromOutsideTheGame.filter payload)}
 
+-- CR 612.1 through CR 707.9's "except ..." clause. Exhaustive for
+-- rewriteReplacementEffect's reason.
+--
+-- NO BOARD OBSERVES IT, the ChoiceByCoinFlip arm's position below: only a
+-- keyword that CARRIES a word changes, and neither producer of the CR 707.9a arm
+-- names one (Dack's Duplicate grants haste and dethrone, Omni-Changeling
+-- changeling). The arm is the rule rather than a proven behaviour -- an
+-- "except it has islandwalk" would be what proves it. CR 707.9b's pair is two
+-- literals and names nothing.
+rewriteCopyException :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CopyException.CopyException -> CopyException.CopyException
+rewriteCopyException pairs exception = case exception of
+  CopyException.SetPowerToughness _ -> exception
+  CopyException.GainKeywords keywords -> CopyException.GainKeywords (Set.map (Filter.rewriteKeyword pairs) keywords)
+
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
 rewriteEntryRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 rewriteEntryRewrite pairs rewrite = case rewrite of
-  -- CR 707.9's exceptions set power and toughness; only the "which permanents"
-  -- clause names a word.
-  EntryRewrite.AsCopy c -> EntryRewrite.AsCopy c {AsCopy.eligible = Filter.rewrite pairs (AsCopy.eligible c)}
+  -- The "which permanents" clause names a word, and so does CR 707.9a's gained
+  -- ability -- a keyword, and a keyword may carry one (rewriteCopyException).
+  EntryRewrite.AsCopy c ->
+    EntryRewrite.AsCopy
+      c
+        { AsCopy.eligible = Filter.rewrite pairs (AsCopy.eligible c),
+          AsCopy.exceptions = fmap (rewriteCopyException pairs) (AsCopy.exceptions c)
+        }
   -- CR 702.14a's word again, this time inside a keyword an option grants.
   EntryRewrite.ChoiceOf os -> EntryRewrite.ChoiceOf (fmap (\o -> o {EntryOption.keywords = Set.map (Filter.rewriteKeyword pairs) (EntryOption.keywords o)}) os)
   -- The same word again, in an option a coin picks rather than a player. NO

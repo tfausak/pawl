@@ -1,17 +1,20 @@
 module Pawl.Codec.CopyExceptionSpec where
 
 import qualified Data.Either as Either
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CopyException as CopyException
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 
--- CR 707.9: the "except ..." clause of a copy effect. One constructor -- and
--- the printed card it comes from, Quicksilver Gargantuan, is square, so the
--- asymmetric case below is what actually pins the array's order.
+-- CR 707.9: the "except ..." clause of a copy effect. Quicksilver Gargantuan,
+-- the printed card CR 707.9b's arm comes from, is square, so the asymmetric case
+-- below is what actually pins the pair's order -- as Dack's Duplicate's two
+-- unequal keywords pin the CR 707.9a arm's ascending array.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
   Spec.it s "SetPowerToughness round-trips" $
@@ -27,6 +30,13 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       CopyException.codec
       (CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 4 5))
       " {\"type\":\"SetPowerToughness\",\"value\":{\"power\":4,\"toughness\":5}} "
+
+  Spec.it s "GainKeywords round-trips, ascending by keyword" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      (CopyException.GainKeywords (Set.fromList [Keyword.Dethrone, Keyword.Haste]))
+      " {\"type\":\"GainKeywords\",\"value\":[{\"type\":\"Haste\"},{\"type\":\"Dethrone\"}]} "
 
   Spec.it s "rejects a payload of the wrong length" $
     Spec.assertBool
