@@ -1045,10 +1045,10 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
 -- transforms into a non-Human creature, create a 2/2 green Wolf creature token."
 --
 -- It is the producer because its filter names all three axes the arm has to get
--- right at once -- one control question, which no sample can answer, and two
--- characteristics, which the board can only be trusted for while nothing has
--- turned again -- and because the token is a quantity nothing else on these
--- boards can produce.
+-- right at once -- one control question, which no ProjectedCharacteristics
+-- carries (CR 109.3), and two characteristics, which the board can only be
+-- trusted for while nothing has turned again -- and because the token is a
+-- quantity nothing else on these boards can produce.
 --
 -- Every case turns the permanent over with the same `sweep` and asserts the same
 -- count. The first three differ from each other in one thing apiece; the last is
@@ -1076,8 +1076,9 @@ bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
     Spec.assertEqWith s "and Aang really did turn over" (faceNameOf aangId turned) (Just aangBack)
   -- The same board with the Aang moved one seat: CR 109.5's "you" is the Cult's
   -- controller, so a permanent BOB controls turning over is not a permanent alice
-  -- controls. Control is no characteristic (CR 109.3) and rides no sample, which
-  -- is why the arm reads it off the board and this case is what proves it does.
+  -- controls. Control is no characteristic (CR 109.3), so it rides no sample and
+  -- the arm reads it off the board; this board cannot tell the two reads apart,
+  -- and the one that could is the arm's own elision (#2050).
   Spec.it s "CR 109.5 a permanent bob controls turning over makes none" $ do
     cult <- S.printingOf s registry "Cult of the Waxing Moon"
     aang <- S.printingOf s registry "Aang, at the Crossroads"
