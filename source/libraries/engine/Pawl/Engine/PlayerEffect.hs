@@ -703,10 +703,10 @@ prohibitsPlayingLand pid names gs =
 -- whoever owns the library and whatever caused the look, while Ashiok, Dream
 -- Render reaches only an opponent's own library and only a search that
 -- opponent's own spell or ability caused. Both narrowings are read from the
--- PROHIBITED player as CR 109.5's "you" -- see
--- Pawl.Types.CantSearchLibraries.
+-- PROHIBITED player, which is NOT CR 109.5's "you" -- that rule would make them
+-- Ashiok's controller. See Pawl.Types.CantSearchLibraries.
 --
--- The cause is the CONTROLLER of the resolving object (CR 113.7), which
+-- The cause is the CONTROLLER of the object being followed (CR 405.4), which
 -- Pawl.Engine.Resolve holds while it follows the instruction.
 --
 -- A DISJUNCTION for CR 101.2's reason.
