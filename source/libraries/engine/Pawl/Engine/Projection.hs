@@ -2314,7 +2314,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect
   PlayerEffect.DamageCantBeRedirected _ -> effect
-  PlayerEffect.CantSearchLibraries -> effect
+  PlayerEffect.CantSearchLibraries _ -> effect
   -- CR 702.16a's quality here is a chosen card NAME, and CR 612.2's second
   -- sentence keeps a subtype swap off a name.
   PlayerEffect.HasProtectionFromChosenName -> effect

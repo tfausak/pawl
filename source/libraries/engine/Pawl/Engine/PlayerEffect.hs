@@ -47,6 +47,7 @@ import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
+import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import Pawl.Types.CardName (CardName)
 import Pawl.Types.CostAdjustments (CostAdjustments)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -549,7 +550,7 @@ prohibitsCasting pid oid name variable gs =
         -- a spell for either.
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- CR 601.3a's other quality shape: a Filter over the spell's own
@@ -679,7 +680,7 @@ prohibitsPlayingLand pid names gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- CR 305.1 once more: Damping Engine's own cast half stops no land play,
@@ -694,18 +695,27 @@ prohibitsPlayingLand pid names gs =
         PlayerEffect.StateCoinFlip _ -> False
    in any prohibits (applying pid gs)
 
--- CR 701.23: does any effect prohibit `pid` from searching a library?
+-- CR 701.23: does any effect prohibit `pid` from searching `owner`'s library,
+-- where the search is caused by a spell or ability `causeController` controls?
 --
--- Takes no library, unlike the two prohibitions above taking a name: no printed
--- effect narrows WHICH library (#1269). Asked of the SEARCHER, who need not own
--- the library being read -- an unqualified "can't search" stops them either way.
--- See Pawl.Types.PlayerEffect.CantSearchLibraries.
+-- Three players and not one, because a printed prohibition narrows on both of
+-- the other two axes: Leonin Arbiter says "libraries" and stops the searcher
+-- whoever owns the library and whatever caused the look, while Ashiok, Dream
+-- Render reaches only an opponent's own library and only a search that
+-- opponent's own spell or ability caused. Both narrowings are read from the
+-- PROHIBITED player as CR 109.5's "you" -- see
+-- Pawl.Types.CantSearchLibraries.
+--
+-- The cause is the CONTROLLER of the resolving object (CR 113.7), which
+-- Pawl.Engine.Resolve holds while it follows the instruction.
 --
 -- A DISJUNCTION for CR 101.2's reason.
-prohibitsSearching :: PlayerId -> GameState -> Bool
-prohibitsSearching pid gs =
+prohibitsSearching :: PlayerId -> PlayerId -> PlayerId -> GameState -> Bool
+prohibitsSearching pid owner causeController gs =
   let prohibits effect = case effect of
-        PlayerEffect.CantSearchLibraries -> True
+        PlayerEffect.CantSearchLibraries narrowing ->
+          inScope owner pid gs (CantSearchLibraries.library narrowing)
+            && inScope causeController pid gs (CantSearchLibraries.cause narrowing)
         -- CR 702.16 states no clause about searching, its consequences being
         -- targeting, enchanting, equipping, blocking and damage.
         PlayerEffect.HasProtectionFromChosenName -> False
@@ -771,7 +781,7 @@ prohibitsCounters pid kind gs =
         -- flip came out. CR 122.1's counters are placed by an effect that has
         -- already resolved or by a rule, so none of them reaches one -- Silence
         -- stops the spell, never the counters a resolved one puts on a player.
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
@@ -856,7 +866,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
@@ -1079,7 +1089,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1119,7 +1129,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1162,7 +1172,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1309,7 +1319,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1362,7 +1372,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1403,7 +1413,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -1509,7 +1519,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CantBeCountered _ -> Nothing
   PlayerEffect.DamageCantBePrevented _ -> Nothing
   PlayerEffect.DamageCantBeRedirected _ -> Nothing
-  PlayerEffect.CantSearchLibraries -> Nothing
+  PlayerEffect.CantSearchLibraries _ -> Nothing
   PlayerEffect.HasProtectionFromChosenName -> Nothing
   PlayerEffect.CantBecomeMonarch -> Nothing
   PlayerEffect.CantCastMatching _ -> Nothing
@@ -1630,7 +1640,7 @@ mayCastFromGraveyard pid oid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- A PROHIBITION, and CR 601.3 asks the two halves separately:
@@ -1711,7 +1721,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- The PROHIBITIONS, read at their own gate (prohibitsCasting above): CR
@@ -1772,7 +1782,7 @@ mayPlayLandsFromGraveyard pid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantBecomeMonarch -> False
         -- The PROHIBITIONS, which prohibitsPlayingLand above is what reads: CR
@@ -1856,7 +1866,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
@@ -1911,7 +1921,7 @@ protectedFromGiven rows oid gs =
         -- Every other arm is about casting, playing, countering, searching,
         -- paying, keeping mana or how a coin flip came out. None of them says
         -- anything about which objects may reach this player.
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
@@ -1978,7 +1988,7 @@ protectionCarriers gs =
   let carrier pid (source, effect) = case effect of
         PlayerEffect.HasProtectionFromChosenName -> fmap (\oid -> (pid, oid)) source
         PlayerEffect.CantBeTargetedBy _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
@@ -2067,7 +2077,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -2147,7 +2157,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantBeCountered _ -> current
         PlayerEffect.DamageCantBePrevented _ -> current
         PlayerEffect.DamageCantBeRedirected _ -> current
-        PlayerEffect.CantSearchLibraries -> current
+        PlayerEffect.CantSearchLibraries _ -> current
         PlayerEffect.HasProtectionFromChosenName -> current
         PlayerEffect.CantBecomeMonarch -> current
         PlayerEffect.CantCastMatching _ -> current
@@ -2212,7 +2222,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -2268,7 +2278,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -2341,7 +2351,7 @@ cantBeCountered pid oid gs =
         -- the stack. The two travel together on one card and share nothing.
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
@@ -2401,7 +2411,7 @@ unpreventable gs =
   let says (src, effect) = case effect of
         PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -2464,7 +2474,7 @@ unredirectable gs =
   let says (src, effect) = case effect of
         PlayerEffect.DamageCantBeRedirected pattern_ -> Just (src, pattern_)
         PlayerEffect.DamageCantBePrevented _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
@@ -2545,7 +2555,7 @@ statedFlips pid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
-        PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing

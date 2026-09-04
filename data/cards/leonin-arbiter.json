@@ -20,7 +20,15 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "CantSearchLibraries"
+            "type": "CantSearchLibraries",
+            "value": {
+              "cause": {
+                "type": "EachPlayer"
+              },
+              "library": {
+                "type": "EachPlayer"
+              }
+            }
           },
           "scope": {
             "type": "EachPlayer"

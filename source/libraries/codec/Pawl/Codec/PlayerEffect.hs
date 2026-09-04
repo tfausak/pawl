@@ -2,6 +2,7 @@ module Pawl.Codec.PlayerEffect where
 
 import qualified Pawl.Codec.AddActivationCost as AddActivationCost
 import qualified Pawl.Codec.AddSpellCost as AddSpellCost
+import qualified Pawl.Codec.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.IncreaseActivationCost as IncreaseActivationCost
@@ -47,7 +48,7 @@ codec =
       Arm.payload "CantBeCountered" filterCodec PlayerEffect.CantBeCountered (\x -> case x of PlayerEffect.CantBeCountered y -> Just y; _ -> Nothing),
       Arm.payload "DamageCantBePrevented" DamagePattern.codec PlayerEffect.DamageCantBePrevented (\x -> case x of PlayerEffect.DamageCantBePrevented y -> Just y; _ -> Nothing),
       Arm.payload "DamageCantBeRedirected" DamagePattern.codec PlayerEffect.DamageCantBeRedirected (\x -> case x of PlayerEffect.DamageCantBeRedirected y -> Just y; _ -> Nothing),
-      Arm.nullary "CantSearchLibraries" PlayerEffect.CantSearchLibraries,
+      Arm.payload "CantSearchLibraries" CantSearchLibraries.codec PlayerEffect.CantSearchLibraries (\x -> case x of PlayerEffect.CantSearchLibraries y -> Just y; _ -> Nothing),
       Arm.nullary "HasProtectionFromChosenName" PlayerEffect.HasProtectionFromChosenName,
       Arm.nullary "CantBecomeMonarch" PlayerEffect.CantBecomeMonarch,
       Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching (\x -> case x of PlayerEffect.CantCastMatching y -> Just y; _ -> Nothing),

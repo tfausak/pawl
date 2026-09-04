@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
+import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
@@ -332,8 +333,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      PlayerEffect.CantSearchLibraries
-      " {\"type\":\"CantSearchLibraries\"} "
+      (PlayerEffect.CantSearchLibraries (CantSearchLibraries.MkCantSearchLibraries PlayerScope.EachPlayer PlayerScope.EachPlayer))
+      " {\"type\":\"CantSearchLibraries\",\"value\":{\"library\":{\"type\":\"EachPlayer\"},\"cause\":{\"type\":\"EachPlayer\"}}} "
   -- CR 702.16c / Runed Halo.
   Spec.it s "HasProtectionFromChosenName" $
     Common.assertCodec

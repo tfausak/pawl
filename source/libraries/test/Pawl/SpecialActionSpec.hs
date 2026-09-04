@@ -963,8 +963,8 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     Spec.assertEqWith s "the Forest left the library" (S.countByName (S.printingName forest) S.alice after) 0
     Spec.assertEqWith s "and is the tenth on the battlefield" (S.countOnBattlefieldByName (S.printingName forest) S.alice after) 10
     Spec.assertEqWith s "the search was offered this time" asked ["search", "shuffle"]
-    Spec.assertBool s (not (PlayerEffect.prohibitsSearching S.alice afterIgnore)) "alice paid, so she is not prohibited"
-    Spec.assertBool s (PlayerEffect.prohibitsSearching S.bob afterIgnore) "bob did not, so he still is"
+    Spec.assertBool s (not (PlayerEffect.prohibitsSearching S.alice S.alice S.alice afterIgnore)) "alice paid, so she is not prohibited"
+    Spec.assertBool s (PlayerEffect.prohibitsSearching S.bob S.bob S.bob afterIgnore) "bob did not, so he still is"
   -- CR 514.2: "until end of turn" ends at cleanup, which is the one caller of
   -- Expiry.dropAtCleanup. Asserted by casting the SAME spell on the swept state
   -- and watching it stop searching again.

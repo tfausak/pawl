@@ -58,6 +58,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -1689,12 +1690,70 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "she cannot search her library, but the graveyard find still happens"
       (namesIn Zone.Hand S.alice settled)
       [Just (CardName.MkCardName (Text.pack "Bonesplitter"))]
-    Spec.assertBool s (PlayerEffect.prohibitsSearching S.alice settled) "alice never paid the Arbiter's {2}, so she was prohibited throughout"
+    Spec.assertBool s (PlayerEffect.prohibitsSearching S.alice S.alice S.alice settled) "alice never paid the Arbiter's {2}, so she was prohibited throughout"
     Spec.assertEqWith
       s
       "and the library she could not search is untouched"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [moogleStar board, moogleCrucible board])
+  -- Ashiok, Dream Render -- "{1}{U/B}{U/B} Legendary Planeswalker -- Ashiok.
+  -- Spells and abilities your opponents control can't cause their controller to
+  -- search their library. -1: Target player mills four cards. Then exile each
+  -- opponent's graveyard." The whole-card proof that CR 101.2's prohibition is
+  -- narrowed on BOTH of the axes Leonin Arbiter leaves open: whose library is
+  -- searched, and who controls the spell that causes the search.
+  --
+  -- The first two cases share one board and differ in exactly the CASTER of
+  -- Fertilid's Favor, whose "target player searches their library" makes the
+  -- searcher the TARGET rather than the controller -- so the cause changes hands
+  -- while the searcher and the library stay bob's.
+  Spec.it s "CR 101.2 whole card: Ashiok, Dream Render stops the opponent's own spell searching his own library" $ do
+    board <- favorBoard s registry S.bob
+    let after = resolveFavor board S.bob
+    Spec.assertEqWith
+      s
+      "bob's own Favor caused the search, so the Swamp is still in his library"
+      (Game.zoneMembers Zone.Library S.bob after)
+      [favorSwamp board]
+    Spec.assertEqWith s "and nothing reached the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Swamp")) S.bob after) 0
+    -- The precondition the case above rests on, asserted AFTER it: bob's Favor
+    -- was cast and did resolve, so "the Swamp stayed put" is CR 101.2's answer
+    -- rather than a cast that never happened.
+    Spec.assertEqWith
+      s
+      "and the Favor bob cast resolved -- the prohibition is what stopped the find"
+      (namesIn Zone.Graveyard S.bob after)
+      [Just (CardName.MkCardName (Text.pack "Fertilid's Favor"))]
+  -- The cause axis, on the board above with alice casting the same Favor at the
+  -- same bob. Ashiok says "spells and abilities your OPPONENTS control", and
+  -- alice's own spell is not one -- so bob searches, and an engine reading the
+  -- prohibition without its cause leaves the Swamp where the case above does.
+  Spec.it s "CR 101.2 whole card: Ashiok, Dream Render lets its own controller's spell make an opponent search" $ do
+    board <- favorBoard s registry S.alice
+    let after = resolveFavor board S.alice
+    Spec.assertEqWith
+      s
+      "alice's Favor is not a spell bob controls, so the search happened and the Swamp left his library"
+      (Game.zoneMembers Zone.Library S.bob after)
+      []
+    Spec.assertEqWith s "and CR 701.23a's find put it onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Swamp")) S.bob after) 1
+  -- The library axis, which needs a search whose owner is not its searcher:
+  -- Extract's "search target player's library". Bob's own spell causes it, so
+  -- Ashiok's cause half is satisfied and only "THEIR library" is left to stop
+  -- it -- and alice's library is not bob's.
+  Spec.it s "CR 101.2 whole card: Ashiok, Dream Render leaves another player's library searchable" $ do
+    board <- ashiokExtractBoard s registry
+    let after = resolveAshiokExtract board
+    Spec.assertEqWith
+      s
+      "Ashiok reaches only bob's own library, so his Extract still searched alice's"
+      (Game.zoneMembers Zone.Library S.alice after)
+      []
+    Spec.assertEqWith
+      s
+      "and the card it found is in exile"
+      (namesIn Zone.Exile S.alice after)
+      [Just (CardName.MkCardName (Text.pack "Crucible of Worlds"))]
   -- The printed "and/or" itself: alice takes the LIBRARY half alone and declines
   -- the find there. The graveyard is the zone CR 400.2 makes public and CR
   -- 701.23b therefore cannot decline in -- which is exactly why the choice
@@ -2702,6 +2761,94 @@ withArbiter :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> MoogleBoard 
 withArbiter s registry board = do
   arbiter <- S.printingOf s registry "Leonin Arbiter"
   pure board {moogleState = snd (S.addCreature arbiter S.bob (moogleState board))}
+
+-- Ashiok, Dream Render's board for Fertilid's Favor -- "{3}{G} Instant. Target
+-- player searches their library for a basic land card, puts it onto the
+-- battlefield tapped, then shuffles. Put two +1/+1 counters on up to one target
+-- artifact or creature." The Favor is the one printing whose SEARCHER is a
+-- target slot, which is what lets the cause change hands while the searcher does
+-- not.
+--
+-- Four Forests apiece pay the {3}{G} whichever seat casts it, and bob's library
+-- holds one Swamp -- a basic land, so the filter admits it, and the only card
+-- there, so "still in the library" and "onto the battlefield" are the same fact
+-- read twice. Nothing on the battlefield is an artifact or a creature, so the
+-- Favor's second target slot offers nothing and its "up to one" takes none.
+--
+-- Parameterised on the CASTER alone.
+data FavorBoard = MkFavorBoard
+  { favorState :: GameState.GameState,
+    favorSpell :: ObjectId.ObjectId,
+    favorSwamp :: ObjectId.ObjectId
+  }
+
+favorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> PlayerId.PlayerId -> m FavorBoard
+favorBoard s registry caster = do
+  forest <- S.printingOf s registry "Forest"
+  swamp <- S.printingOf s registry "Swamp"
+  ashiok <- S.printingOf s registry "Ashiok, Dream Render"
+  favor <- S.printingOf s registry "Fertilid's Favor"
+  let g1 = S.landsFor forest S.bob 4 (S.landsInPlay forest 4)
+      (ashiokId, g2) = S.addCreature ashiok S.alice g1
+      -- CR 306.5b's printed loyalty, which S.addCreature does not place: a
+      -- planeswalker at zero loyalty is gone to CR 704.5i before the search, and
+      -- the prohibition with it.
+      g3 = S.addCounter CounterKind.Loyalty 5 ashiokId g2
+      (swampId, g4) = S.addLibraryCard swamp S.bob g3
+      (favorId, g5) = S.addHandCard favor caster g4
+   in pure (MkFavorBoard g5 favorId swampId)
+
+-- CR 601.2c's answer FILTERED out of the offer rather than built, so a slot the
+-- engine never offered cannot be smuggled in; the find is pinned to the Swamp by
+-- id, so a prohibited search cannot repair itself with another card. The shuffle
+-- reverses whatever it is offered, which is what makes a shuffle visible.
+favorAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+favorAnswer swamp p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+  Prompt.Search {} -> [swamp]
+  Prompt.Shuffle offered -> reverse offered
+  _ -> S.identityAnswer p
+
+-- The cast and its one resolution, and nothing else: the narrowest path that
+-- shows the search.
+resolveFavor :: FavorBoard -> PlayerId.PlayerId -> GameState.GameState
+resolveFavor board caster =
+  S.runPure (favorAnswer (favorSwamp board)) (favorState board) (S.cast caster (favorSpell board) >> Stack.resolveTop)
+
+-- The library axis's board: Extract -- "{U} Sorcery. Search target player's
+-- library for a card and exile it. That player then shuffles." -- in bob's hand
+-- off one Island, Ashiok under alice, and one Crucible of Worlds as the only
+-- card in alice's library. Bob controls the spell, so Ashiok's cause half admits
+-- it and the library half is the only thing left to answer.
+data AshiokExtractBoard = MkAshiokExtractBoard
+  { ashiokExtractState :: GameState.GameState,
+    ashiokExtractSpell :: ObjectId.ObjectId,
+    ashiokExtractCrucible :: ObjectId.ObjectId
+  }
+
+ashiokExtractBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m AshiokExtractBoard
+ashiokExtractBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  crucible <- S.printingOf s registry "Crucible of Worlds"
+  ashiok <- S.printingOf s registry "Ashiok, Dream Render"
+  extract <- S.printingOf s registry "Extract"
+  let g1 = S.landsFor island S.bob 1 (Setup.emptyGame S.bothPlayers)
+      (ashiokId, g2) = S.addCreature ashiok S.alice g1
+      g3 = S.addCounter CounterKind.Loyalty 5 ashiokId g2
+      (crucibleId, g4) = S.addLibraryCard crucible S.alice g3
+      (extractId, g5) = S.addHandCard extract S.bob g4
+   in pure (MkAshiokExtractBoard g5 extractId crucibleId)
+
+ashiokExtractAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+ashiokExtractAnswer crucible p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.alice) sets
+  Prompt.Search {} -> [crucible]
+  Prompt.Shuffle offered -> reverse offered
+  _ -> S.identityAnswer p
+
+resolveAshiokExtract :: AshiokExtractBoard -> GameState.GameState
+resolveAshiokExtract board =
+  S.runPure (ashiokExtractAnswer (ashiokExtractCrucible board)) (ashiokExtractState board) (S.cast S.bob (ashiokExtractSpell board) >> Stack.resolveTop)
 
 -- findPinned, plus the printed "and/or" answered with a fixed set of zones and a
 -- REVERSING shuffle. Alice's library holds two cards, so an order that came back

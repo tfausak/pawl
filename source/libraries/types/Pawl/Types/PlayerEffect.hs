@@ -3,6 +3,7 @@ module Pawl.Types.PlayerEffect where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
+import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
@@ -505,17 +506,15 @@ data PlayerEffect
     -- object -- which is why it sits here rather than in
     -- Pawl.Types.Modification.
     --
-    -- WHICH library is not carried, and Leonin Arbiter's sentence names none
-    -- either: it stops the player from searching a library, whoever owns it,
-    -- which is exactly what an unqualified prohibition on the SEARCHER does. It
-    -- is a prohibition on LIBRARIES, so Pawl.Engine.Resolve removes that one zone
-    -- from a Search.zones naming others rather than stopping the instruction. A
-    -- card that prohibited searching only some libraries would want a filter here
-    -- (#1269).
+    -- It is a prohibition on LIBRARIES, so Pawl.Engine.Resolve removes that one
+    -- zone from a Search.zones naming others rather than stopping the
+    -- instruction.
     --
     -- WHOSE searching is the carrier's PlayerScope, as for every arm here:
-    -- Leonin Arbiter says "players" with no possessive, so EachPlayer.
-    CantSearchLibraries
+    -- Leonin Arbiter says "players" with no possessive, so EachPlayer. WHICH
+    -- library and WHICH cause are the payload's, anchored to that prohibited
+    -- player instead -- see Pawl.Types.CantSearchLibraries.
+    CantSearchLibraries CantSearchLibraries.CantSearchLibraries
   | -- | CR 725 / 101.2 / Jared Carthalion, True Heir: this player can't become the
     -- monarch.
     --
