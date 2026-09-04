@@ -2009,14 +2009,16 @@ remainingOf rewrite = case rewrite of
   DamageRewrite.Redirect _ -> Nothing
   DamageRewrite.RedirectMatching _ -> Nothing
 
--- CR 614.9 over CR 615.7's counted shape: how much of this damage event the
--- candidate's rewrite will actually MOVE, where that is less than the whole
--- event. Harm's Way's "the next 2 damage ... is dealt to any target instead"
--- meeting a 5-damage event moves 2 and leaves 3 on the original recipient, and
--- that residue is a second EVENT rather than a smaller one -- which is what
--- separates this from PreventNext, whose residue is the same event shrunk and
--- is handled inside its own arm of Event.apply. Event.loop splits the event on
--- this answer before applying the candidate to the covered part.
+-- CR 614.9 over the counted shape CR 615.7 states for preventions -- the
+-- redirect's own countdown rests on Harm's Way's rulings: how much of this
+-- damage event the candidate's rewrite will actually MOVE, where that is less
+-- than the whole event. Harm's Way's "the next 2 damage ... is dealt to any
+-- target instead" meeting a 5-damage event moves 2 and leaves 3 on the original
+-- recipient, and that residue is a second EVENT rather than a smaller one --
+-- which is what separates this from PreventNext, whose residue is the same
+-- event shrunk and is handled inside its own arm of Event.apply. Event.loop
+-- splits the event on this answer before applying the candidate to the covered
+-- part.
 --
 -- Nothing for every rewrite that takes the event whole, for a counted redirect
 -- large enough to cover all of it, and for one CR 614.9's guard has made inert
@@ -2547,15 +2549,16 @@ askOne batch (pid, positions) = do
           moved = Map.fromList (zip positions permuted)
       pure (fmap (\(i, e) -> Map.findWithDefault e i moved) (zip [0 ..] batch))
 
--- The batch positions one chooser's prevention shields have to be allocated
--- across, one entry per chooser, in CR 616.1's APNAP order.
+-- The batch positions one chooser's countdowns -- prevention shields, and
+-- Harm's Way's counted redirection -- have to be allocated across, one entry
+-- per chooser, in CR 616.1's APNAP order.
 --
--- A shield is CONTESTED when it admits two or more of the batch's events (CR
+-- A countdown is CONTESTED when it admits two or more of the batch's events (CR
 -- 615.7) and cannot cover all of them -- the comparison being made in the unit
--- the shield's OWN rule counts, which `contestedResource` below supplies: damage
--- for CR 615.7's counted shield, whole events for CR 122.1c's shield counters. A
--- shield large enough to cover the lot prevents all of it whatever the order, so
--- there is nothing to ask.
+-- its OWN rule counts, which `contestedResource` below supplies: damage for CR
+-- 615.7's counted shield and for the counted redirect, whole events for CR
+-- 122.1c's shield counters. One large enough to cover the lot takes all of it
+-- whatever the order, so there is nothing to ask.
 --
 -- Several shields contribute ONE question per CHOOSER, over the union of what
 -- they contest: the order the batch is settled in is a single fact about the
@@ -2653,7 +2656,8 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     -- Harm's Way's counted redirection is the same resource in the same unit:
     -- "Harm's Way will redirect just 2 of that damage ... You choose which 2
     -- damage is redirected" (its Oracle rulings), which is CR 615.7's
-    -- allocation on a rule-614 rewrite.
+    -- allocation on a rule-614 rewrite. The CR states the counted allocation
+    -- only for preventions; the redirect's rests on those rulings.
     --
     -- Not implemented: splitting the countdown by POINT across two
     -- simultaneous events -- the ruling's "1 damage ... to each of two

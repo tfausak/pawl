@@ -2520,6 +2520,14 @@ rewriteEffect pairs effect = case effect of
   -- word, and IsSource holds none -- and every redirect in data/cards/ writes
   -- UntilEndOfTurn, on which rewriteDuration is the identity too. So mutating any
   -- of those three lines reddens nothing.
+  --
+  -- Two halves outside that group, added with Harm's Way: the counted `amount`
+  -- goes through rewriteQuantity, the shape PreventNextDamage's quantity takes
+  -- above, and the recipient description `whatRecipient` through Filter.rewrite,
+  -- which a subtype swap genuinely reaches -- a card covering "Goblins you
+  -- control" would be its producer; Harm's Way's ControlledBy names no word, so
+  -- both are regression fences too. `whoRecipient` is a PlayerRelation and
+  -- holds no word.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount from whatRecipient whoRecipient to chosenSource) ->
     Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (fmap (rewriteQuantity pairs) amount) (fmap (rewriteObjectRef pairs) from) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
   Effect.Counter (Counter.MkCounter ref mSlot mSources) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources)

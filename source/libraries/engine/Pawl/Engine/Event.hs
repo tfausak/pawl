@@ -1325,17 +1325,31 @@ loop asOf batch applied prevented exiledBy shuffling event = do
         -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
         -- is non-empty and `choose` always picks. Total rather than partial.
         Nothing -> pure (Just event, [], prevented, exiledBy, shuffling)
-        -- CR 614.9 over CR 615.7's countdown: the chosen effect covers only
-        -- PART of this event (Harm's Way's remaining 2 against a 5), so the
-        -- event is split here and the candidate applied to the covered half,
-        -- while the residue -- "any remaining damage is dealt normally" --
-        -- continues through the loop as an event of its own. It carries the
-        -- applied set INCLUDING this candidate, which is CR 614.5: one effect
-        -- applies to one event once, and the residue is the rest of that same
-        -- event rather than a new one -- so a Furnace of Rath that already
-        -- doubled it does not double the residue again. The covered half's own
-        -- thread runs first, the residue's after it, both against whatever
-        -- prompts they raise in that order.
+        -- CR 614.9 over a countdown (CR 615.7's shape, which that rule states
+        -- only for preventions; Harm's Way's rulings supply the redirect's):
+        -- the chosen effect covers only PART of this event (Harm's Way's
+        -- remaining 2 against a 5), so the event is split here and the
+        -- candidate applied to the covered half, while the residue -- "any
+        -- remaining damage is dealt normally" -- continues through the loop as
+        -- an event of its own. It carries the applied set INCLUDING this
+        -- candidate, which is CR 614.5: one effect applies to one event once,
+        -- and the residue is the rest of that same event rather than a new one
+        -- -- so a Furnace of Rath that already doubled it does not double the
+        -- residue again. The covered half's own thread runs first, the
+        -- residue's after it, both against whatever prompts they raise in that
+        -- order.
+        --
+        -- CR 614.5's other direction is not kept: an effect the covered half's
+        -- continuation applies is not recorded for the residue, so it may apply
+        -- to both halves. Harmless for every rewrite in the tree, each being
+        -- distributive over a split (a doubling of 2 and of 3 is a doubling of
+        -- 5); a non-distributive rewrite reaching both halves would be what
+        -- refutes it, and none has a producer.
+        --
+        -- Not implemented: rejoining the two halves when the redirect's
+        -- destination IS the residue's recipient, so the one permanent is dealt
+        -- two events where the rules deal one and a "whenever this is dealt
+        -- damage" trigger fires twice (#3190).
         Just candidate
           | Just covered <- Replacement.partialCoverage gs candidate event,
             Just (front, rest) <- Replacement.splitDamage covered event -> do
@@ -2566,9 +2580,11 @@ apply batch candidate event =
         pure . Just $ case Replacement.redirectDestination gs dest of
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
-      -- The arm above with CR 615.7's countdown: Harm's Way moves as much of
-      -- THIS event as it has left and writes the rest back, PreventNext's
-      -- arithmetic on a rule-614 rewrite. The event arriving here never exceeds
+      -- The arm above with a countdown: Harm's Way moves as much of THIS event
+      -- as it has left and writes the rest back, PreventNext's CR 615.7
+      -- arithmetic borrowed onto a rule-614 rewrite (that rule governs only
+      -- preventions; the redirect's rests on Harm's Way's rulings). The event
+      -- arriving here never exceeds
       -- the remainder -- `loop` split anything larger on
       -- Replacement.partialCoverage and sent the residue on as an event of its
       -- own -- so the whole of it moves, and `min` is the guard for the one
