@@ -249,16 +249,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerAttacks PlayerRelation.AnyPlayer)
       " {\"type\":\"PlayerAttacks\",\"value\":{\"type\":\"AnyPlayer\"}} "
-  -- CR 508.3c, the arm above with a Filter beside the relation -- Hermes,
-  -- Overseer of Elpis' "whenever you attack with one or more Birds". A named
-  -- object rather than a bare payload, so the floor Aurelia, the Law Above
-  -- wants (#2226) becomes a third key and not a new wire shape.
+  -- CR 508.3c, the arm above with a Filter and a floor beside the relation --
+  -- Hermes, Overseer of Elpis' "whenever you attack with one or more Birds". A
+  -- named object rather than a bare payload, which is what let the floor become
+  -- a third key rather than a new wire shape.
   Spec.it s "PlayerAttacksWith" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.HasSubtype Subtype.Bird)))
-      " {\"type\":\"PlayerAttacksWith\",\"value\":{\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Bird\"}}}} "
+      (TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.HasSubtype Subtype.Bird) 1))
+      " {\"type\":\"PlayerAttacksWith\",\"value\":{\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Bird\"}},\"attackers\":1}} "
   -- CR 508.3e, whose payload names BOTH subjects -- Seifer, Balamb Rival's
   -- You/AnyPlayer and Lulu, Stern Guardian's Opponent/You. The two keys hold
   -- DIFFERENT relations in each case, so a codec that crossed them would not

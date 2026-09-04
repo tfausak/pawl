@@ -2436,9 +2436,13 @@ everyTriggerCondition =
     TriggerCondition.PlayerAttacks PlayerRelation.You,
     TriggerCondition.PlayerAttacks PlayerRelation.Opponent,
     TriggerCondition.PlayerAttacks PlayerRelation.AnyPlayer,
-    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.Type.And [])),
-    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.Opponent (Filter.Type.And [])),
-    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.AnyPlayer (Filter.Type.And [])),
+    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.Type.And []) 1),
+    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.Opponent (Filter.Type.And []) 1),
+    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.AnyPlayer (Filter.Type.And []) 1),
+    -- The floor above one, Military Intelligence's: a fourth row rather than a
+    -- fourth relation, since the count and the relation are independent fields
+    -- and only the count is new.
+    TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith PlayerRelation.You (Filter.Type.And []) 2),
     TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.You PlayerRelation.AnyPlayer),
     TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.Opponent PlayerRelation.AnyPlayer),
     TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.AnyPlayer PlayerRelation.AnyPlayer),
@@ -2519,7 +2523,7 @@ everyTriggerCondition =
     TriggerCondition.AttachedCreatureDies,
     TriggerCondition.AttachedCreatureBecomesTapped,
     TriggerCondition.SelfTrains,
-    -- ALL THREE relations, on the PlayerAttacksWith trio's reasoning above: an
+    -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
     -- eventBindings arm that had cased on the relation and stamped nothing under
     -- one of them would go unseen if only one were listed. Vengeful Tracker
     -- prints the Opponent form and Mayhem Devil the AnyPlayer one.

@@ -231,8 +231,9 @@ yourRingBearer =
 -- 701.54a gives a player at most one Ring-bearer ("until another creature becomes
 -- your Ring-bearer"), which `designate`'s scoped clear enforces, and
 -- `yourRingBearer` admits only a creature carrying that designation under the
--- emblem's controller -- so the admitted set is empty or a singleton and the two
--- arities are the same number. CR 508.3a's last sentence holds too -- "such
+-- emblem's controller -- so the admitted set is empty or a singleton and, at the
+-- printed floor of one, the two arities are the same number. CR 508.3a's last
+-- sentence holds too -- "such
 -- abilities won't trigger if a creature is put onto the battlefield attacking" --
 -- because that arm is read off Combat.declaredAttackers, which CR 508.4 keeps
 -- Pawl.Engine.Combat.putOntoBattlefieldAttacking out of.
@@ -266,7 +267,8 @@ theRingLootsOnAttack =
         TriggerCondition.PlayerAttacksWith
           PlayerAttacksWith.MkPlayerAttacksWith
             { PlayerAttacksWith.player = PlayerRelation.You,
-              PlayerAttacksWith.filter = yourRingBearer
+              PlayerAttacksWith.filter = yourRingBearer,
+              PlayerAttacksWith.attackers = 1
             },
       TriggeredAbility.modal =
         Modal.MkModal

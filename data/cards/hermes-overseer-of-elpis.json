@@ -121,6 +121,7 @@
           "condition": {
             "type": "PlayerAttacksWith",
             "value": {
+              "attackers": 1,
               "filter": {
                 "type": "HasSubtype",
                 "value": {
