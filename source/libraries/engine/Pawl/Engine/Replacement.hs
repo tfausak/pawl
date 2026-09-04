@@ -2654,6 +2654,11 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     -- "Harm's Way will redirect just 2 of that damage ... You choose which 2
     -- damage is redirected" (its Oracle rulings), which is CR 615.7's
     -- allocation on a rule-614 rewrite.
+    --
+    -- Not implemented: splitting the countdown by POINT across two
+    -- simultaneous events -- the ruling's "1 damage ... to each of two
+    -- different recipients". `orderBatch` asks an order, and the first event
+    -- takes what it can (#3188).
     DamageRewrite.RedirectNext remaining _ -> Just (remaining, sum . fmap DamageEvent.amount)
     -- CR 122.1c: one counter per application, so a batch of n events demands n
     -- of them, and the permanent's counters are the supply.
