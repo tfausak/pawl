@@ -1431,6 +1431,105 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     Spec.assertBool s (Maybe.isNothing (Game.lookupObject fodder armed) && Set.member fireEater (GameState.battlefield armed)) "setup: the gate ate the spare Piker and left the Fire-Eater standing"
     Spec.assertEqWith s "the answer recorded is the fallback, not the ability alice named" (chosenSourcesIn (answersFor (choosePlayerAndSource S.alice abilityId) armed rest)) [fireEater]
 
+-- CR 615.1's shield that names ONLY a source, whose producer is Pay No Heed ({W}
+-- Instant: "Prevent all damage a source of your choice would deal this turn";
+-- name, cost, type line and Oracle text checked against api.scryfall.com
+-- 2026-09-04).
+--
+-- Auriok Replica above with its "to you" struck out, which is the whole of the
+-- difference: that shield covers the one player its resolution named, this one
+-- covers EVERY recipient -- DamagePattern's Nothing on all three recipient
+-- halves -- so the chosen source's damage to a creature, to the shield's
+-- controller and to her opponent is prevented alike.
+--
+-- Two seats, because the shield's own text names nobody: there is no relational
+-- reading for a third seat to separate, and bob is here to show the shield
+-- reaching a recipient no "you" could.
+payNoHeedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+payNoHeedSpec s registry = Spec.describe s "Pay No Heed (CR 615.1)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  -- The chosen source is deliberately NOT the head of CR 609.7a's pool --
+  -- alice's Plains, the three creatures and the spell itself, sorted ascending --
+  -- so an engine ignoring the answer would shield the Plains and every assertion
+  -- below would read the other way round.
+  Spec.it s "CR 615.1 a shield naming only its source covers every recipient" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    payNoHeed <- S.printingOf s registry "Pay No Heed"
+    let base = S.landsInPlay plains 1
+        (victim, g1) = S.addCreature pikerPrinting S.alice base
+        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
+        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        (g4, spellId) = S.handOne payNoHeed g3
+        shielded = castAndResolve (chooseDamageSourceOf omega) g4 spellId
+        strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
+    -- THE gameplay assertions: the chosen source is prevented against both kinds
+    -- of recipient CR 120.3 admits, and against a player the shield's controller
+    -- has no relation to. Before this the card installed no row at all and every
+    -- one of them landed in full.
+    Spec.assertEqWith s "the chosen source's 3 to a creature is prevented whole" (S.damageOf victim (strike omega (Recipient.ToCreature victim) 3 shielded)) (Just 0)
+    Spec.assertEqWith s "and its 4 to the shield's controller too" (S.lifeOf S.alice (strike omega (Recipient.ToPlayer S.alice) 4 shielded)) (Just 20)
+    Spec.assertEqWith s "and its 5 to her opponent, whom no recipient half of this row names" (S.lifeOf S.bob (strike omega (Recipient.ToPlayer S.bob) 5 shielded)) (Just 20)
+    -- Their twins on the same board, differing in the SOURCE alone: the shield
+    -- watches one object, so the case cannot pass on an engine that shielded
+    -- everything.
+    Spec.assertEqWith s "the unchosen source's 2 marks the same creature" (S.damageOf victim (strike alpha (Recipient.ToCreature victim) 2 shielded)) (Just 2)
+    Spec.assertEqWith s "and its 6 lands on the shield's controller in full" (S.lifeOf S.alice (strike alpha (Recipient.ToPlayer S.alice) 6 shielded)) (Just 14)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "alice was asked which source, and answered omega" (chosenSourcesIn (answersFor (chooseDamageSourceOf omega) g4 (S.cast S.alice spellId >> Stack.resolveTop))) [omega]
+
+-- CR 615.9's PROPERTIES on the source a player chooses, whose producer is
+-- Burrenton Forge-Tender ({W} Creature -- Kithkin Wizard 1/1: "Protection from
+-- red / Sacrifice this creature: Prevent all damage a red source of your choice
+-- would deal this turn"; name, cost, type line, P/T and Oracle text checked
+-- against api.scryfall.com 2026-09-04).
+--
+-- Pay No Heed above with one word added, and that word is the whole group: every
+-- other prevention shield in data\/cards\/ writes the trivial `And []` there, so
+-- until this card nothing proved CR 609.7a's candidate set was narrowed by a
+-- prevention's printed properties at all.
+--
+-- Two seats: the card names nobody, and both red sources are bob's, so control
+-- is not what the assertions discriminate on.
+burrentonForgeTenderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+burrentonForgeTenderSpec s registry = Spec.describe s "Burrenton Forge-Tender (CR 615.9)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+  Spec.it s "CR 615.9 only a source with the printed properties can be chosen" $ do
+    forgeTender <- S.printingOf s registry "Burrenton Forge-Tender"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let base = Setup.emptyGame S.bothPlayers
+        (tender, g1) = S.addCreature forgeTender S.alice base
+        -- A WHITE permanent, and so no candidate: the second Forge-Tender is
+        -- alice's own, which keeps the reading off control as well.
+        (spare, g2) = S.addCreature forgeTender S.alice g1
+        (alpha, g3) = S.addCreature pikerPrinting S.bob g2
+        (omega, g4) = S.addCreature pikerPrinting S.bob g3
+        activate = Activate.activateAbility S.alice tender (theAbility forgeTender) Monad.>> Stack.resolveTop
+        shieldAgainst src = S.runPure (chooseDamageSourceOf src) g4 activate
+        shielded = shieldAgainst omega
+        -- The same board answered with the white creature, which CR 615.9's
+        -- properties keep out of the offered set: the answerer falls back to the
+        -- head of the red candidates, which is alpha.
+        narrowed = shieldAgainst spare
+        strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToPlayer S.alice) n])
+    -- THE gameplay assertions: the chosen red source is shielded and the other
+    -- red one is not, so the shield watches ONE object and not a colour.
+    Spec.assertEqWith s "the chosen red source's 4 is prevented" (S.lifeOf S.alice (strike omega 4 shielded)) (Just 20)
+    Spec.assertEqWith s "and the other red source's 2 lands in full" (S.lifeOf S.alice (strike alpha 2 shielded)) (Just 18)
+    -- The narrowing itself: naming a white permanent gets alice the fallback, and
+    -- the fallback is red. An engine offering every permanent would have baked
+    -- the white one, whose damage the row's red predicate then refuses, and this
+    -- 5 would land.
+    Spec.assertEqWith s "a white source is not offered, so the fallback shields the red one" (S.lifeOf S.alice (strike alpha 5 narrowed)) (Just 20)
+    Spec.assertEqWith s "and the white source alice named deals its 3 unprevented" (S.lifeOf S.alice (strike spare 3 narrowed)) (Just 17)
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "alice was asked which source, and answered omega" (chosenSourcesIn (answersFor (chooseDamageSourceOf omega) g4 activate)) [omega]
+    Spec.assertEqWith s "and the twin's answer recorded is the red fallback, not the white creature she named" (chosenSourcesIn (answersFor (chooseDamageSourceOf spare) g4 activate)) [alpha]
+
 -- CR 609.7b's PROPERTY-named source on a shield covering a PLAYER, whose
 -- producer is Scarecrow ({5} Artifact Creature -- Scarecrow, 2/2: "{6}, {T}:
 -- Prevent all damage that would be dealt to you this turn by creatures with
@@ -7965,6 +8064,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   mendingHandsSpec s registry
   healingGraceSpec s registry
   auriokReplicaSpec s registry
+  payNoHeedSpec s registry
+  burrentonForgeTenderSpec s registry
   scarecrowSpec s registry
   packLeaderSpec s registry
   wardingChantSpec s registry
