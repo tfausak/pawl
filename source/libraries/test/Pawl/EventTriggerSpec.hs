@@ -4351,9 +4351,11 @@ hermesSpec s registry =
 -- read as equality passes the two-attacker board, and a dropped floor passes
 -- both the two- and the three-attacker boards.
 --
--- The draw is read as HAND CONTENTS by identity rather than as a hand size,
--- because the library is stocked with distinct cards and a second resolution
--- would move a second, nameable card.
+-- The draw is read as the HAND'S CONTENTS rather than as a hand size, because
+-- the library is stocked with distinctly named cards and a second resolution
+-- would move a second, nameable one. By name and not by object id: CR 400.7
+-- makes a drawn card a new object, so the id the library held is not the id the
+-- hand holds and only the name carries across the move.
 militaryIntelligenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 militaryIntelligenceSpec s registry =
   let -- Declares exactly the creatures `plan` names, each attacking bob,
@@ -4365,10 +4367,6 @@ militaryIntelligenceSpec s registry =
         _ -> S.aggressiveAnswer p
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
-      -- handNames below rather than the hand's object ids: CR 400.7 makes a
-      -- drawn card a new object, so the id the library held is not the id the
-      -- hand holds and only the name carries across the move. The four stocked
-      -- cards are distinctly named, so a name says which one was drawn.
       libraryOf = Game.zoneMembers Zone.Library S.alice
       -- alice holds the enchantment and three Settled untapped creatures; bob
       -- holds two of his own, so the last board can declare two without alice's.

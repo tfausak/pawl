@@ -233,9 +233,9 @@ yourRingBearer =
 -- `yourRingBearer` admits only a creature carrying that designation under the
 -- emblem's controller -- so the admitted set is empty or a singleton and, at the
 -- printed floor of one, the two arities are the same number. CR 508.3a's last
--- sentence holds too -- "such
--- abilities won't trigger if a creature is put onto the battlefield attacking" --
--- because that arm is read off Combat.declaredAttackers, which CR 508.4 keeps
+-- sentence holds too -- "such abilities won't trigger if a creature is put onto
+-- the battlefield attacking" -- because that arm is read off
+-- Combat.declaredAttackers, which CR 508.4 keeps
 -- Pawl.Engine.Combat.putOntoBattlefieldAttacking out of.
 --
 -- The declaring player is PlayerRelation.You, CR 109.5's -- the emblem's
