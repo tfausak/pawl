@@ -4,12 +4,18 @@ import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
 import qualified Pawl.ActivateSpec
 import qualified Pawl.AdventureSpec
+import qualified Pawl.AttackKeywordTriggerSpec
 import qualified Pawl.AuraSpec
 import qualified Pawl.BattleSpec
 import qualified Pawl.BindingSpec
+import qualified Pawl.BoardEffectSpec
 import qualified Pawl.CardSpec
+import qualified Pawl.CardTriggerSpec
 import qualified Pawl.CardsSpec
 import qualified Pawl.CaseSpec
+import qualified Pawl.CastPermissionSpec
+import qualified Pawl.CastProhibitionSpec
+import qualified Pawl.CastRestrictionSpec
 import qualified Pawl.CastSpec
 import qualified Pawl.ClassSpec
 import qualified Pawl.Codec.AbilityKindSpec
@@ -420,6 +426,7 @@ import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
 import qualified Pawl.CoinSpec
 import qualified Pawl.ColorSpec
+import qualified Pawl.CombatCostSpec
 import qualified Pawl.CombatEffectSpec
 import qualified Pawl.CombatSpec
 import qualified Pawl.CommanderSpec
@@ -429,9 +436,11 @@ import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
+import qualified Pawl.CounterKeywordTriggerSpec
 import qualified Pawl.CounterRestrictionSpec
 import qualified Pawl.CounterspellSpec
 import qualified Pawl.CrewSpec
+import qualified Pawl.DamageReplacementSpec
 import qualified Pawl.DamageSpec
 import qualified Pawl.DaytimeSpec
 import qualified Pawl.DecideSpec
@@ -441,6 +450,7 @@ import qualified Pawl.DetainSpec
 import qualified Pawl.DiceSpec
 import qualified Pawl.DungeonSpec
 import qualified Pawl.EngineSpec
+import qualified Pawl.EntryReplacementSpec
 import qualified Pawl.EntryRestrictionSpec
 import qualified Pawl.EventSpec
 import qualified Pawl.EventTriggerSpec
@@ -482,8 +492,13 @@ import qualified Pawl.JsonSchema.PatternSpec
 import qualified Pawl.JsonSchema.SchemaSpec
 import qualified Pawl.JsonSchema.ValidateSpec
 import qualified Pawl.KeywordTriggerSpec
+import qualified Pawl.LeavesTriggerSpec
 import qualified Pawl.LibraryOrderSpec
+import qualified Pawl.LifeReplacementSpec
+import qualified Pawl.LifeTriggerSpec
+import qualified Pawl.ManaSourceSpec
 import qualified Pawl.ManaSpec
+import qualified Pawl.ManaSymbolSpec
 import qualified Pawl.MassEffectSpec
 import qualified Pawl.MeldSpec
 import qualified Pawl.ModalDoubleFacedSpec
@@ -493,9 +508,11 @@ import qualified Pawl.MulliganSpec
 import qualified Pawl.OmenSpec
 import qualified Pawl.OutsideTheGameSpec
 import qualified Pawl.PhasingSpec
+import qualified Pawl.PlaneswalkerCombatSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
+import qualified Pawl.PreventionSpec
 import qualified Pawl.ProjectionSpec
 import qualified Pawl.PutCounterSpec
 import qualified Pawl.RadSpec
@@ -510,6 +527,7 @@ import qualified Pawl.RoomSpec
 import qualified Pawl.SacrificeRestrictionSpec
 import qualified Pawl.SagaSpec
 import qualified Pawl.SetupSpec
+import qualified Pawl.ShieldCounterSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.SpecialActionSpec
@@ -573,12 +591,19 @@ testTree registry =
         -- whole "pawl" group, because that same precedence would silently make
         -- an agent's --timeout ineffective suite-wide.
         --
-        -- Pawl.ReplacementSpec guards CR 616.1's termination, where a
+        -- Pawl.ReplacementSpec and its five siblings guard CR 616.1's termination, where a
         -- regression hangs rather than fails; the fuller rationale is at that
         -- module's `spec`. Slowest case 0.02s, so five seconds.
         <> fmap
           (Tasty.localOption (Tasty.mkTimeout 5000000))
-          (Writer.execWriter (Pawl.ReplacementSpec.spec tasty registry))
+          ( Writer.execWriter $ do
+              Pawl.ReplacementSpec.spec tasty registry
+              Pawl.PreventionSpec.spec tasty registry
+              Pawl.LifeReplacementSpec.spec tasty registry
+              Pawl.DamageReplacementSpec.spec tasty registry
+              Pawl.EntryReplacementSpec.spec tasty registry
+              Pawl.ShieldCounterSpec.spec tasty registry
+          )
           -- Pawl.EngineSpec, wired above, guards the same failure mode one level
           -- up: it asserts that a whole game terminates. Its budget is the looser
           -- one because each case plays out one or two complete games rather than
@@ -600,6 +625,7 @@ spec s registry = do
   Pawl.CaseSpec.spec s registry
   Pawl.ClassSpec.spec s registry
   Pawl.CastSpec.spec s registry
+  Pawl.CastRestrictionSpec.spec s registry
   Pawl.CoinSpec.spec s registry
   Pawl.Codec.AbilityKindSpec.spec s
   Pawl.Codec.AbilityNameSpec.spec s
@@ -1009,6 +1035,8 @@ spec s registry = do
   Pawl.CodecIntegrationSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatEffectSpec.spec s registry
+  Pawl.PlaneswalkerCombatSpec.spec s registry
+  Pawl.CombatCostSpec.spec s registry
   Pawl.CombatSpec.spec s registry
   Pawl.CommanderSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
@@ -1037,6 +1065,8 @@ spec s registry = do
   Pawl.DiceSpec.spec s registry
   Pawl.EventSpec.spec s registry
   Pawl.EventTriggerSpec.spec s registry
+  Pawl.LifeTriggerSpec.spec s registry
+  Pawl.CardTriggerSpec.spec s registry
   Pawl.ExileSpec.spec s registry
   Pawl.ExpirySpec.spec s registry
   Pawl.Extra.BuilderSpec.spec s
@@ -1075,9 +1105,14 @@ spec s registry = do
   Pawl.InitiativeSpec.spec s registry
   Pawl.InvestigateSpec.spec s registry
   Pawl.KeywordTriggerSpec.spec s registry
+  Pawl.AttackKeywordTriggerSpec.spec s registry
+  Pawl.CounterKeywordTriggerSpec.spec s registry
   Pawl.LibraryOrderSpec.spec s registry
   Pawl.ManaSpec.spec s registry
+  Pawl.ManaSourceSpec.spec s registry
+  Pawl.ManaSymbolSpec.spec s registry
   Pawl.MassEffectSpec.spec s registry
+  Pawl.BoardEffectSpec.spec s registry
   Pawl.MeldSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
@@ -1091,6 +1126,8 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlayerEffectSpec.spec s registry
+  Pawl.CastProhibitionSpec.spec s registry
+  Pawl.CastPermissionSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry
   Pawl.RadSpec.spec s registry
@@ -1124,3 +1161,4 @@ spec s registry = do
   Pawl.ZoneChangeSpec.spec s registry
   Pawl.ZoneReplacementSpec.spec s registry
   Pawl.ZoneTriggerSpec.spec s registry
+  Pawl.LeavesTriggerSpec.spec s registry

@@ -8,7 +8,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import qualified Pawl.CastSpec as CastSpec
+import qualified Pawl.CastRestrictionSpec as CastSpec
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine

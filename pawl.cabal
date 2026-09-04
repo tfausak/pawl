@@ -1259,18 +1259,25 @@ library test
   exposed-modules:
     Pawl.ActivateSpec
     Pawl.AdventureSpec
+    Pawl.AttackKeywordTriggerSpec
     Pawl.AuraSpec
     Pawl.BattleSpec
     Pawl.BindingSpec
+    Pawl.BoardEffectSpec
     Pawl.Cards
     Pawl.CardSpec
     Pawl.CardsSpec
+    Pawl.CardTriggerSpec
     Pawl.CaseSpec
+    Pawl.CastPermissionSpec
+    Pawl.CastProhibitionSpec
+    Pawl.CastRestrictionSpec
     Pawl.CastSpec
     Pawl.ClassSpec
     Pawl.CodecIntegrationSpec
     Pawl.CoinSpec
     Pawl.ColorSpec
+    Pawl.CombatCostSpec
     Pawl.CombatEffectSpec
     Pawl.CombatSpec
     Pawl.CommanderSpec
@@ -1279,10 +1286,12 @@ library test
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
+    Pawl.CounterKeywordTriggerSpec
     Pawl.CounterRestrictionSpec
     Pawl.CounterspellSpec
     Pawl.CountSpec
     Pawl.CrewSpec
+    Pawl.DamageReplacementSpec
     Pawl.DamageSpec
     Pawl.DaytimeSpec
     Pawl.DecideSpec
@@ -1291,6 +1300,7 @@ library test
     Pawl.DiceSpec
     Pawl.DungeonSpec
     Pawl.EngineSpec
+    Pawl.EntryReplacementSpec
     Pawl.EntryRestrictionSpec
     Pawl.EventSpec
     Pawl.EventTriggerSpec
@@ -1303,8 +1313,13 @@ library test
     Pawl.InitiativeSpec
     Pawl.InvestigateSpec
     Pawl.KeywordTriggerSpec
+    Pawl.LeavesTriggerSpec
     Pawl.LibraryOrderSpec
+    Pawl.LifeReplacementSpec
+    Pawl.LifeTriggerSpec
+    Pawl.ManaSourceSpec
     Pawl.ManaSpec
+    Pawl.ManaSymbolSpec
     Pawl.MassEffectSpec
     Pawl.MeldSpec
     Pawl.ModalDoubleFacedSpec
@@ -1314,9 +1329,11 @@ library test
     Pawl.OmenSpec
     Pawl.OutsideTheGameSpec
     Pawl.PhasingSpec
+    Pawl.PlaneswalkerCombatSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
+    Pawl.PreventionSpec
     Pawl.ProjectionSpec
     Pawl.PutCounterSpec
     Pawl.RadSpec
@@ -1330,6 +1347,7 @@ library test
     Pawl.SacrificeRestrictionSpec
     Pawl.SagaSpec
     Pawl.SetupSpec
+    Pawl.ShieldCounterSpec
     Pawl.SpecialActionSpec
     Pawl.SpeedSpec
     Pawl.SplitSecondSpec
