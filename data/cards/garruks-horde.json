@@ -34,11 +34,24 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "CastFromTopOfLibrary",
+            "type": "CastFrom",
             "value": {
-              "type": "HasCardType",
-              "value": {
-                "type": "Creature"
+              "from": {
+                "player": {
+                  "type": "Relative",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                "zone": {
+                  "type": "Library"
+                }
+              },
+              "matching": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
               }
             }
           },

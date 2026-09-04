@@ -88,6 +88,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -1228,9 +1229,9 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "two Islands: the additional cost is {1}"
-      (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor (S.printingName dreamsGrip) richSpell rich) rich)
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor S.alice (S.printingName dreamsGrip) richSpell rich) rich)
       (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.Type.components = []}))
-    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
+    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor S.alice (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
   -- CR 702.42 states no limit on how many entwine abilities an object has --
   -- contrast CR 702.41b for affinity and CR 702.43b for modular, which each say
   -- what multiple instances do -- and CR 118.8a's "any number of additional
@@ -1285,7 +1286,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "five Forests: the additional cost is {1}{G} plus {2}"
-      (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor (S.printingName braid) spellId gs) gs)
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor S.alice (S.printingName braid) spellId gs) gs)
       ( Just
           ( Cost.Type.MkCost
               { Cost.Type.mana =
@@ -1308,7 +1309,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
         (_, gs) = S.addCreature piker S.bob gs0
-    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor (S.printingName chaosCharm) spellId gs) gs) Nothing
+    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor S.alice (S.printingName chaosCharm) spellId gs) gs) Nothing
 
 -- Burst Lightning's one mode is "Burst Lightning deals 2 damage to any target",
 -- slot "target" (CR 702.33 / data/cards/burst-lightning.json), plus "Kicker {4}"
@@ -1716,7 +1717,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     firebolt <- S.printingOf s registry "Firebolt"
     let (fromHand, handBoard) = inHandWith mountain firebolt 6
         (fromGraveyard, graveyardBoard) = inGraveyardWith mountain firebolt 6
-        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) oid gs)
+        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) oid gs)
     Spec.assertEqWith
       s
       "from hand, the printed {R} and nothing else"
@@ -1876,7 +1877,7 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
         (onMountains, mountainBoard) = inGraveyardWith mountain bolt 3
         blueBoard = withGrant onIslands islandBoard
         redBoard = withGrant onMountains mountainBoard
-        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor (S.printingName bolt) oid gs)
+        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName bolt) oid gs)
     Spec.assertEqWith
       s
       "the flashback {2}{U} is the only candidate offered"
@@ -1936,7 +1937,7 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
     Spec.assertEqWith
       s
       "the granted flashback cost is {X}{R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName blaze) inGraveyard granted))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName blaze) inGraveyard granted))
       [Just (ManaCost.MkManaCost [ManaSymbol.Variable, theRed])]
 
 -- CR 702.34a's OTHER conditional, the one on its second static ability: "IF THE
@@ -1995,7 +1996,7 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
     Spec.assertEqWith
       s
       "both costs are on offer from the graveyard"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard permitted))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard permitted))
       [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed]), Just (ManaCost.MkManaCost [theRed])]
     Spec.assertEqWith s "the flashback cast dealt its 2" (S.lifeOf S.alice flashedBack) (Just 18)
     Spec.assertEqWith s "and the card was exiled (CR 702.34a)" (boltsIn Zone.Exile flashedBack) 1
@@ -2126,7 +2127,7 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
     Spec.assertEqWith
       s
       "CR 603.3d: the reflexive ability targeted it, so it has flashback {2}{R}{G}"
-      (fmap (\o -> fmap Cost.Type.mana (Cost.costsFor boltName o after)) buried)
+      (fmap (\o -> fmap Cost.Type.mana (Cost.costsFor S.alice boltName o after)) buried)
       [[Just granted]]
     Spec.assertBool s (all (\o -> S.castable S.alice o after) buried) "and alice may cast it from her graveyard"
     -- CR 118.12's payment really happened, which the collapse never reaches: the
@@ -2157,7 +2158,7 @@ fugitiveDoctorSpec s registry = Spec.describe s "FugitiveDoctor" $ do
     Spec.assertEqWith
       s
       "CR 601.2b: both flashback costs are on offer, the granted one first by Ord"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard board))
       [Just granted, Just printed]
     -- CR 702.34a's SECOND static ability, asked of the cost a first-only read
     -- never returns: paying the PRINTED {4}{R} must exile the card too.
@@ -2237,7 +2238,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     Spec.assertEqWith
       s
       "both flashback costs are on offer, the granted {R} beside the printed {4}{R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard board))
       [Just printed, Just granted]
   -- The discriminating twin: same Mountain, same Firebolt, same graveyard, same
   -- phase and priority. One thing differs, and it is Lier -- so the grant is a
@@ -2250,7 +2251,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     Spec.assertEqWith
       s
       "and the granted cost is gone with the granter"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard board))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName firebolt) inGraveyard board))
       [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed])]
   -- The other half of rule 702.34a: its FIRST static ability is a casting
   -- permission (Keyword.permissionsFor), so a card printing no flashback of its
@@ -2273,7 +2274,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
           _ -> S.identityAnswer p
         after = S.runPure answer (S.runPure answer board (S.cast S.alice inGraveyard)) Stack.resolveTop
         boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName bolt)) (Game.zoneMembers zone S.alice gs))
-    Spec.assertEqWith s "Lightning Bolt prints no flashback, so without Lier the graveyard offers no cost at all" (Cost.costsFor (S.printingName bolt) withoutLier bare) []
+    Spec.assertEqWith s "Lightning Bolt prints no flashback, so without Lier the graveyard offers no cost at all" (Cost.costsFor S.alice (S.printingName bolt) withoutLier bare) []
     Spec.assertEqWith s "the granted flashback paid {R} and the spell dealt its 3" (S.lifeOf S.alice after) (Just 17)
     Spec.assertEqWith s "and CR 702.34a exiled the card" (boltsIn Zone.Exile after) 1
     Spec.assertEqWith s "rather than returning it to the graveyard" (boltsIn Zone.Graveyard after) 0
@@ -2405,7 +2406,7 @@ mirrorOfTheFallenSpec s registry = Spec.describe s "MirrorOfTheFallen" $ do
     Spec.assertEqWith
       s
       "with the Mirror still on the stack the grant prices the card at its own printed {2}{R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName soil) subject onStack))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName soil) subject onStack))
       [Just printed]
     -- Gameplay level, and FIRST among the reads of `resolved`: one Mountain
     -- cannot pay {2}{R}, so under the printed reading there is no cast at all and
@@ -2417,7 +2418,7 @@ mirrorOfTheFallenSpec s registry = Spec.describe s "MirrorOfTheFallen" $ do
     Spec.assertEqWith
       s
       "CR 707.2: once it is a copy, the only flashback cost offered is Lightning Bolt's {R}"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName soil) subject copiedBoard))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName soil) subject copiedBoard))
       [Just copied]
     -- CR 707.2b: the original is untouched -- bob's Lightning Bolt is still in
     -- his graveyard, so nothing above turned on the copy having consumed it.
@@ -2617,7 +2618,7 @@ jumpStartSpec s registry = Spec.describe s "JumpStart" $ do
     directCurrent <- S.printingOf s registry "Direct Current"
     let (fromHand, handBoard) = inHandWith mountain directCurrent 3
         (fromGraveyard, graveyardBoard) = inGraveyardWith mountain directCurrent 3
-        costsOf oid gs = fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor (S.printingName directCurrent) oid gs)
+        costsOf oid gs = fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor S.alice (S.printingName directCurrent) oid gs)
         printed = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, theRed, theRed])
     Spec.assertEqWith s "from hand, the printed {1}{R}{R} and no components" (costsOf fromHand handBoard) [(printed, [])]
     Spec.assertEqWith
@@ -4374,6 +4375,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   multiTargetCastSpec s registry
   soulImmolationSpec s registry
   drannithMagistrateSpec s registry
+  senTripletsSpec s registry
   teferiSorcerySpeedSpec s registry
   grafdiggersCageCastSpec s registry
   avenInterrupterSpec s registry
@@ -4898,6 +4900,187 @@ drannithBoard island thinkTwice =
 
 withMagistrate :: Printing.Printing -> GameState.GameState -> GameState.GameState
 withMagistrate magistrate gs = snd (S.addCreature magistrate S.alice gs)
+
+-- Sen Triplets {2}{W}{U}{B} Legendary Artifact Creature -- Human Wizard 3/3 (ARB
+-- 109): "At the beginning of your upkeep, choose target opponent. This turn, that
+-- player can't cast spells or activate abilities and plays with their hand
+-- revealed. You may play lands and cast spells from that player's hand this
+-- turn."
+--
+-- The LAST sentence is the only thing in the pool that lets one player cast a
+-- card out of another's hand, and it is what moved CR 601.3's owner test off
+-- Pawl.Engine.Cast.zoneCandidates and into the permission: that list now offers
+-- every player's hand, and PlayerEffect.CastFrom's zone reference is what says
+-- whose. See #2169.
+--
+-- The third clause, "plays with their hand revealed", is NOT transcribed. Nothing
+-- in pawl computes a per-player view of the board, so every answerer already sees
+-- every hand and an arm stating it would have no reader (#1412).
+--
+-- Think Twice {1}{U} Instant is the spell each seat holds, and an INSTANT so no
+-- seat's cast turns on whose turn it is: the trigger resolves in alice's upkeep,
+-- where CR 307.1 would refuse a sorcery under any implementation. SIX Islands per
+-- seat, alice's opponents included, so no refusal below is for want of mana.
+-- THREE seats, so "target opponent" is a real choice and carol is the seat the
+-- grant does not name.
+senTripletsBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+senTripletsBoard island thinkTwice triplets =
+  let gs1 = S.landsFor island S.alice 6 S.threePlayerGame
+      gs2 = S.landsFor island S.bob 6 gs1
+      gs3 = S.landsFor island S.carol 6 gs2
+      gs4 = snd (S.addCreature triplets S.alice gs3)
+      (bobSpell, gs5) = S.addHandCard thinkTwice S.bob gs4
+      (carolSpell, gs6) = S.addHandCard thinkTwice S.carol gs5
+      (aliceSpell, gs7) = S.addHandCard thinkTwice S.alice gs6
+      (bobLand, gs8) = S.addHandCard island S.bob gs7
+      -- CR 104.3c: Think Twice draws, and a seat drawing from an empty library
+      -- loses before any assertion runs.
+      stocked = List.foldl' (\g pid -> snd (S.addLibraryCard island pid g)) gs8 [S.alice, S.bob, S.carol]
+   in (aliceSpell, bobSpell, carolSpell, bobLand, aliceOnTurn stocked)
+
+-- CR 603.3d: the trigger's target is chosen as it goes on the stack, so the
+-- answerer is needed at the settle and not only at the resolution. bob is the
+-- opponent named; carol is the one left out.
+answerSenTriplets :: Prompt.Prompt r -> r
+answerSenTriplets p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (Recipient.ToPlayer S.bob ==) sets
+  _ -> S.identityAnswer p
+
+-- alice's upkeep begins, the trigger goes on the stack naming bob, and it
+-- resolves. Left in the UPKEEP, which is where the instant cases below want it;
+-- the land case moves to a main phase, the grant lasting the whole turn.
+senTripletsResolved :: GameState.GameState -> GameState.GameState
+senTripletsResolved gs =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      begun = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep})
+      onStack = snd (Engine.runGamePure answerSenTriplets begun Engine.settleForPriority)
+   in S.runPure answerSenTriplets onStack Stack.resolveTop
+
+-- CR 605.3a's offer, which Action.legalActions makes through its own constructor
+-- because CR 605.3b keeps a mana ability off the stack. Enumerated rather than
+-- wildcarded, so a new Action constructor is named by -Werror.
+manaActivationOffer :: A.Action -> Bool
+manaActivationOffer action = case action of
+  A.ActivateManaAbility _ -> True
+  A.Pass -> False
+  A.Play {} -> False
+  A.Cast {} -> False
+  A.Activate {} -> False
+  A.TurnFaceUp {} -> False
+  A.Unlock {} -> False
+  A.DiscardFromHand _ -> False
+  A.Ignore _ -> False
+  A.Plot _ -> False
+  A.Foretell _ -> False
+  A.EndEffect _ -> False
+
+-- Play ONE named object and pass at every other prompt. Pinned to an id, since
+-- this board offers alice a land in her own hand as well.
+playOnlyLand :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+playOnlyLand wanted p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (\a -> a == A.Play wanted Nothing) actions of
+    h : _ -> h
+    [] -> A.Pass
+  _ -> S.identityAnswer p
+
+senTripletsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+senTripletsSpec s registry =
+  let board = do
+        island <- S.printingOf s registry "Island"
+        thinkTwice <- S.printingOf s registry "Think Twice"
+        triplets <- S.printingOf s registry "Sen Triplets"
+        pure (senTripletsBoard island thinkTwice triplets, S.printingName thinkTwice)
+   in Spec.describe s "Sen Triplets" $ do
+        -- THE PROVING CASE. The control comes first: before the trigger resolves,
+        -- the same board offers alice nothing out of bob's hand, so the offer
+        -- below is the permission's rather than the widened candidate list's.
+        Spec.it s "CR 601.3 alice casts a spell out of bob's hand, and the card goes to bob's graveyard" $ do
+          ((_, bobSpell, _, _, open), name) <- board
+          let after = senTripletsResolved open
+              cast = S.runPure S.identityAnswer after (S.cast S.alice bobSpell)
+              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice open)) "before the trigger, bob's card is not offered to alice"
+          Spec.assertBool s (elem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice after)) "with the grant, bob's card is offered to alice"
+          -- CR 601.2a: alice controls the spell, so Think Twice's draw is hers.
+          -- Two cards: the one she already held and the one she drew.
+          Spec.assertEqWith s "alice drew the card" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 2
+          Spec.assertEqWith s "and bob's hand is one card lighter" (length (Game.zoneMembers Zone.Hand S.bob resolved)) 1
+          -- CR 400.3: the card goes to its OWNER's graveyard, whoever cast it.
+          Spec.assertEqWith s "the card is in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 1
+          Spec.assertEqWith s "and not in alice's" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
+        -- CR 109.5 / PlayerScope.You: the grant is alice's, and the hand it names
+        -- is bob's. Two copies of one card in the two opponents' hands differ in
+        -- nothing but whose hand they are in.
+        Spec.it s "CR 601.3 the grant names bob's hand alone" $ do
+          ((_, bobSpell, carolSpell, _, open), name) <- board
+          let after = senTripletsResolved open
+          Spec.assertBool s (notElem (A.Cast carolSpell name Facing.FaceUp) (offeredTo S.alice after)) "alice is not offered the identical card in carol's hand"
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.carol after)) "and carol is not offered the card in bob's"
+        -- The FIRST clause, on the same board and the same object: bob may not
+        -- cast the very card alice is offered. One card, two seats, two answers --
+        -- and carol, whom the trigger did not name, still casts hers.
+        Spec.it s "CR 601.3 bob can't cast spells this turn while carol still can" $ do
+          ((_, bobSpell, carolSpell, _, open), name) <- board
+          let after = senTripletsResolved open
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.bob after)) "bob may not cast his own card"
+          Spec.assertBool s (elem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.bob open)) "though he may on the board where the trigger has not resolved"
+          Spec.assertBool s (elem (A.Cast carolSpell name Facing.FaceUp) (offeredTo S.carol after)) "and carol, unnamed, casts hers"
+        -- The SECOND clause. CR 605.1a makes an Island's "{T}: Add {U}" a mana
+        -- ability, which CR 605.3b keeps off the stack -- so it is offered through
+        -- Action.ActivateManaAbility rather than Action.Activate, and the
+        -- prohibition has to reach that road too: CR 602.5a states no carve-out
+        -- where CR 702.61b writes one for split second.
+        Spec.it s "CR 602.5a bob can't activate abilities this turn, mana abilities included" $ do
+          ((_, _, _, _, open), _) <- board
+          let after = senTripletsResolved open
+              manaOffers pid gs = filter manaActivationOffer (offeredTo pid gs)
+          Spec.assertEqWith s "bob is offered no mana ability at all" (manaOffers S.bob after) []
+          Spec.assertEqWith s "off six Islands he was offered six before the trigger" (length (manaOffers S.bob open)) 6
+          Spec.assertEqWith s "and carol, unnamed, still has her six" (length (manaOffers S.carol after)) 6
+        -- The LAND half of the last sentence, a separate permission because CR
+        -- 305.1 makes playing a land a special action rather than a cast. In a
+        -- MAIN phase, CR 305.1's own window, where the cases above sit in upkeep.
+        Spec.it s "CR 305.1 alice may play a land out of bob's hand" $ do
+          ((_, _, _, bobLand, open), _) <- board
+          let after = (senTripletsResolved open) {GameState.phase = Phase.PrecombatMain}
+              controlledBy pid gs = length (filter (\o -> Projection.controllerOf o gs == Just pid) (Set.toList (GameState.battlefield gs)))
+              played = S.runPure (playOnlyLand bobLand) (after {GameState.priority = Just S.alice}) Engine.priorityLoop
+          Spec.assertBool s (notElem (A.Play bobLand Nothing) (offeredTo S.alice open)) "before the trigger the land in bob's hand is not offered"
+          Spec.assertBool s (elem (A.Play bobLand Nothing) (offeredTo S.alice after)) "with the grant it is"
+          -- CR 305.1: the land enters under the player who PLAYED it, so alice's
+          -- side of the battlefield grows and bob's does not.
+          Spec.assertEqWith s "alice controlled six Islands and the Triplets" (controlledBy S.alice after) 7
+          Spec.assertEqWith s "and eight afterwards" (controlledBy S.alice played) 8
+          Spec.assertEqWith s "bob still controls his own six" (controlledBy S.bob played) 6
+          Spec.assertEqWith s "and his hand is one card lighter" (length (Game.zoneMembers Zone.Hand S.bob played)) 1
+        -- CR 514.2: the grant is stored with an until-end-of-turn expiry, so
+        -- cleanup takes it and the same board refuses the same cast.
+        Spec.it s "CR 514.2 the permission ends at cleanup" $ do
+          ((_, bobSpell, _, _, open), name) <- board
+          let after = senTripletsResolved open
+              ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+          Spec.assertBool s (notElem (A.Cast bobSpell name Facing.FaceUp) (offeredTo S.alice ended)) "alice is no longer offered bob's card"
+          Spec.assertEqWith s "and nothing is stored" (GameState.playerEffects ended) []
+        -- Drannith Magistrate's possessive, which nothing could observe until this
+        -- card existed: BOB controls it, so alice is his opponent, and "from
+        -- anywhere other than THEIR hands" refuses her cast out of his hand while
+        -- leaving her cast out of her own alone. A transcription reading `Not
+        -- (IsInZone Hand)` allows both, and one reading OwnedBy at the CARD's own
+        -- perspective allows both too -- a hand card's controller is its owner, so
+        -- "owned by you" is vacuous there (CR 108.4 / 109.5).
+        Spec.it s "CR 601.3a Drannith Magistrate stops the cross-hand cast and leaves the own-hand cast alone" $ do
+          ((aliceSpell, bobSpell, _, _, open), name) <- board
+          magistrate <- S.printingOf s registry "Drannith Magistrate"
+          let after = senTripletsResolved open
+              policed = snd (S.addCreature magistrate S.bob after)
+              offered oid gs = elem (A.Cast oid name Facing.FaceUp) (offeredTo S.alice gs)
+          Spec.assertBool s (not (offered bobSpell policed)) "alice may not cast out of bob's hand under his Magistrate"
+          Spec.assertBool s (offered aliceSpell policed) "while her own hand is untouched"
+          Spec.assertBool s (offered bobSpell after) "and the one permanent is the whole difference"
 
 -- What this player is offered with priority in hand, the shape
 -- Pawl.SpecialActionSpec's Damping Engine cases use: legalActions answers for the

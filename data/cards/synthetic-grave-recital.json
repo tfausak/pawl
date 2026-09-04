@@ -30,23 +30,36 @@
                         "type": "UntilEndOfTurn"
                       },
                       "effect": {
-                        "type": "CastFromGraveyard",
+                        "type": "CastFrom",
                         "value": {
-                          "type": "Or",
-                          "value": [
-                            {
-                              "type": "HasCardType",
+                          "from": {
+                            "player": {
+                              "type": "Relative",
                               "value": {
-                                "type": "Instant"
+                                "type": "You"
                               }
                             },
-                            {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Sorcery"
-                              }
+                            "zone": {
+                              "type": "Graveyard"
                             }
-                          ]
+                          },
+                          "matching": {
+                            "type": "Or",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Instant"
+                                }
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Sorcery"
+                                }
+                              }
+                            ]
+                          }
                         }
                       },
                       "players": {

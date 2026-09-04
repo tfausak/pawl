@@ -3,8 +3,10 @@ module Pawl.Codec.PlayerEffect where
 import qualified Pawl.Codec.AddActivationCost as AddActivationCost
 import qualified Pawl.Codec.AddSpellCost as AddSpellCost
 import qualified Pawl.Codec.CantSearchLibraries as CantSearchLibraries
+import qualified Pawl.Codec.CastFromZone as CastFromZone
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.InZone as InZone
 import qualified Pawl.Codec.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Codec.Keyword as Keyword
@@ -26,6 +28,7 @@ codec :: Codec.Codec PlayerEffect.PlayerEffect
 codec =
   Arm.tagged
     [ Arm.nullary "CantCastSpells" PlayerEffect.CantCastSpells,
+      Arm.nullary "CantActivateAbilities" PlayerEffect.CantActivateAbilities,
       Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan (\x -> case x of PlayerEffect.CantCastMoreThan y -> Just y; _ -> Nothing),
       Arm.nullary "CantCastChosenName" PlayerEffect.CantCastChosenName,
       Arm.nullary "CantPlayLandChosenName" PlayerEffect.CantPlayLandChosenName,
@@ -54,9 +57,8 @@ codec =
       Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching (\x -> case x of PlayerEffect.CantCastMatching y -> Just y; _ -> Nothing),
       Arm.nullary "CastOnlyAtSorcerySpeed" PlayerEffect.CastOnlyAtSorcerySpeed,
       Arm.nullary "CantPlayLands" PlayerEffect.CantPlayLands,
-      Arm.payload "CastFromGraveyard" filterCodec PlayerEffect.CastFromGraveyard (\x -> case x of PlayerEffect.CastFromGraveyard y -> Just y; _ -> Nothing),
-      Arm.nullary "PlayLandsFromGraveyard" PlayerEffect.PlayLandsFromGraveyard,
-      Arm.payload "CastFromTopOfLibrary" filterCodec PlayerEffect.CastFromTopOfLibrary (\x -> case x of PlayerEffect.CastFromTopOfLibrary y -> Just y; _ -> Nothing),
+      Arm.payload "CastFrom" CastFromZone.codec PlayerEffect.CastFrom (\x -> case x of PlayerEffect.CastFrom y -> Just y; _ -> Nothing),
+      Arm.payload "PlayLandsFrom" InZone.codec PlayerEffect.PlayLandsFrom (\x -> case x of PlayerEffect.PlayLandsFrom y -> Just y; _ -> Nothing),
       Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
       Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing),
       Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing)

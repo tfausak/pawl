@@ -3591,7 +3591,7 @@ lilianaSpec s registry =
           Spec.assertBool s (not (S.castable S.alice zombieId after)) "and the Zombie no longer is"
           Spec.assertBool s (any (S.isCastOf evangelId) (Action.legalActions S.alice after)) "the Cleric is offered"
           Spec.assertBool s (not (any (S.isCastOf zombieId) (Action.legalActions S.alice after))) "while the Zombie is not"
-          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice evangelId after) "the typed question agrees"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Graveyard evangelId after) "the typed question agrees"
           Spec.assertEqWith s "and exactly one restriction is stored" (length (GameState.playerEffects after)) 1
 
         -- CR 612.2 again from the other side, and the reason the counts are TWO
@@ -4891,8 +4891,8 @@ willResolved willId gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer 
 --
 -- BOTH halves of the first sentence are declared, as two arms of one clause: a
 -- land is played and never cast (CR 305.1), so the play half is
--- PlayerEffect.PlayLandsFromGraveyard and the cast half is
--- PlayerEffect.CastFromGraveyard. The last case here is the play half; the
+-- PlayerEffect.PlayLandsFrom and the cast half is PlayerEffect.CastFrom, each
+-- naming the caster's own graveyard. The last case here is the play half; the
 -- unrestricted producer of that arm is Crucible of Worlds, in its own group
 -- below.
 yawgmothsWillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -4945,8 +4945,8 @@ yawgmothsWillSpec s registry =
           (willId, hers, his, gs) <- board
           let after = willResolved willId gs
               bobsTurn = after {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
-          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice hers after) "alice has the permission"
-          Spec.assertBool s (not (PlayerEffect.mayCastFromGraveyard S.bob his after)) "bob does not"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Graveyard hers after) "alice has the permission"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.bob Zone.Graveyard his after)) "bob does not"
           Spec.assertBool s (not (S.castable S.bob his bobsTurn)) "and it is not castable even in his own main phase"
           Spec.assertBool s (not (any (S.isCastOf his) (Action.legalActions S.bob bobsTurn))) "nor offered"
 
@@ -4957,21 +4957,21 @@ yawgmothsWillSpec s registry =
         -- may reach it, which is the half that decides whether a caster and a
         -- card's owner can ever come apart on this road.
         --
-        -- The typed question is asked beside the gate to name WHICH half refuses:
-        -- the permission's filter is empty, so it says yes to bob's copy as
-        -- readily as to hers. TWO independent places say no, and mutating either
-        -- alone leaves this case green -- Cast.zoneCandidates, which offers a
-        -- player only their own copy of a per-player zone, and Cost.costsFor's
-        -- graveyard arm, which asks the permission of the card's OWNER because it
-        -- holds no caster to ask (#2795). Pawl.Engine.Quantity's WasCastFrom arm
-        -- rests on the pair of them (#2689).
+        -- The typed question is asked beside the gate to name WHICH conjunct
+        -- refuses. It is the PERMISSION's own zone reference: Yawgmoth's Will
+        -- writes PlayerRef.Relative You, so mayCastFrom resolves the pile to
+        -- alice's and bob's copy is not in it. Cast.zoneCandidates offers her
+        -- bob's graveyard now (#2169) and the permission is the only thing
+        -- standing between the offer and the cast, which is why the assertion
+        -- below reads False where it once read True: the empty filter still says
+        -- yes to bob's copy, and the reference says no.
         Spec.it s "CR 400.1 the grant does not reach the copy in bob's graveyard" $ do
           (willId, hers, his, gs) <- board
           let after = willResolved willId gs
           Spec.assertBool s (not (S.castable S.alice his after)) "alice may not cast the copy in bob's graveyard"
           Spec.assertBool s (not (any (S.isCastOf his) (Action.legalActions S.alice after))) "nor is it offered to her"
           Spec.assertBool s (S.castable S.alice hers after) "though the identical copy in her own graveyard is castable"
-          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice his after) "so the refusal is not this permission's own filter"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Graveyard his after)) "and the refusal is the permission's zone reference, not its filter"
 
         -- The permission names a ZONE, not a TIME, which is the flashback ruling
         -- one rule over ("you can cast a sorcery using flashback only when you
@@ -4993,7 +4993,7 @@ yawgmothsWillSpec s registry =
           -- TWO, one per half of the card's first sentence.
           Spec.assertEqWith s "both stored effects while they last" (length (GameState.playerEffects after)) 2
           Spec.assertEqWith s "nothing stored afterwards" (GameState.playerEffects ended) []
-          Spec.assertBool s (not (PlayerEffect.mayCastFromGraveyard S.alice hers ended)) "the permission is gone"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Graveyard hers ended)) "the permission is gone"
           Spec.assertBool s (not (S.castable S.alice hers ended)) "and the cast is refused again"
 
         -- CR 305.1: the play-lands half of the same sentence, on a board that
@@ -5117,9 +5117,9 @@ crucibleSpec s registry =
           (hers, his, theirs, _, hisMountain, _, with) <- board True
           let bobsTurn = with {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
               carolsTurn = with {GameState.activePlayer = S.carol, GameState.priority = Just S.carol}
-          Spec.assertBool s (PlayerEffect.mayPlayLandsFromGraveyard S.alice with) "alice has the permission"
-          Spec.assertBool s (not (PlayerEffect.mayPlayLandsFromGraveyard S.bob with)) "bob does not"
-          Spec.assertBool s (not (PlayerEffect.mayPlayLandsFromGraveyard S.carol with)) "nor carol"
+          Spec.assertBool s (elem (Zone.Graveyard, S.alice) (PlayerEffect.playLandPiles S.alice with)) "alice has the permission"
+          Spec.assertBool s (notElem (Zone.Graveyard, S.bob) (PlayerEffect.playLandPiles S.bob with)) "bob does not"
+          Spec.assertBool s (notElem (Zone.Graveyard, S.carol) (PlayerEffect.playLandPiles S.carol with)) "nor carol"
           Spec.assertEqWith s "bob is offered his hand and nothing else" (filter isPlay (Action.legalActions S.bob bobsTurn)) [Action.Type.Play hisMountain Nothing]
           Spec.assertBool s (notElem (Action.Type.Play his Nothing) (Action.legalActions S.bob bobsTurn)) "not bob's own graveyard Swamp"
           Spec.assertBool s (notElem (Action.Type.Play theirs Nothing) (Action.legalActions S.carol carolsTurn)) "nor carol's"
@@ -5138,7 +5138,7 @@ crucibleSpec s registry =
           let played = with {GameState.landsPlayed = Map.singleton S.alice 1}
           Spec.assertEqWith s "the allowance is still one" (PlayerEffect.landPlaysAllowed S.alice played) 1
           Spec.assertEqWith s "and no land play is offered at all" (filter isPlay (Action.legalActions S.alice played)) []
-          Spec.assertBool s (PlayerEffect.mayPlayLandsFromGraveyard S.alice played) "though the permission is still standing"
+          Spec.assertBool s (elem (Zone.Graveyard, S.alice) (PlayerEffect.playLandPiles S.alice played)) "though the permission is still standing"
           Spec.assertBool s (notElem (Action.Type.Play hers Nothing) (Action.legalActions S.alice played)) "so the Swamp is refused by the count"
 
         -- CR 305.1's window. The same board one phase earlier: a grant that
@@ -5249,7 +5249,7 @@ garruksHordeSpec s registry =
           (herTop, _, _, _, herHand, without) <- board "Llanowar Elves" False
           Spec.assertBool s (not (any (S.isCastOf herTop) (Action.legalActions S.alice without))) "the top card is not offered"
           Spec.assertBool s (not (S.castable S.alice herTop without)) "nor castable"
-          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop without)) "and the typed question says no"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Library herTop without)) "and the typed question says no"
           Spec.assertBool s (any (S.isCastOf herHand) (Action.legalActions S.alice without)) "though her hand is offered on the same board"
 
         -- The Filter half: "creature spells". The refusal is not cost or timing,
@@ -5258,7 +5258,7 @@ garruksHordeSpec s registry =
           (herTop, _, _, _, herHand, gs) <- board "Rampant Growth" True
           Spec.assertBool s (not (any (S.isCastOf herTop) (Action.legalActions S.alice gs))) "the sorcery on top is not offered"
           Spec.assertBool s (not (S.castable S.alice herTop gs)) "nor castable"
-          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop gs)) "the permission does not match it"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Library herTop gs)) "the permission does not match it"
           Spec.assertBool s (any (S.isCastOf herHand) (Action.legalActions S.alice gs)) "while the same card in her hand is offered"
 
         -- The zone half: "the TOP of your library". The second Llanowar Elves is
@@ -5268,7 +5268,7 @@ garruksHordeSpec s registry =
           (herTop, herDeep, _, _, _, gs) <- board "Llanowar Elves" True
           Spec.assertBool s (not (any (S.isCastOf herDeep) (Action.legalActions S.alice gs))) "the creature one card down is not offered"
           Spec.assertBool s (not (S.castable S.alice herDeep gs)) "nor castable"
-          Spec.assertBool s (PlayerEffect.mayCastFromTopOfLibrary S.alice herDeep gs) "so the refusal is not the permission's own filter"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Library herDeep gs) "so the refusal is not the permission's own filter"
           Spec.assertBool s (any (S.isCastOf herTop) (Action.legalActions S.alice gs)) "while the card above it is offered"
 
         -- CR 601.3's OTHER limb, on the new road: a permission widens the zone
@@ -5282,7 +5282,7 @@ garruksHordeSpec s registry =
           let caged = snd (S.addCreature cage S.bob gs)
           Spec.assertBool s (not (any (S.isCastOf herTop) (Action.legalActions S.alice caged))) "the top card is not offered with the Cage out"
           Spec.assertBool s (not (S.castable S.alice herTop caged)) "nor castable"
-          Spec.assertBool s (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop caged) "so the refusal is the prohibition, not the permission"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Library herTop caged) "so the refusal is the prohibition, not the permission"
           Spec.assertBool s (any (S.isCastOf herTop) (Action.legalActions S.alice gs)) "and the same cast is offered on the same board without it"
           Spec.assertBool s (any (S.isCastOf herHand) (Action.legalActions S.alice caged)) "while the hand the sentence does not name is untouched"
 
@@ -5294,9 +5294,9 @@ garruksHordeSpec s registry =
               carolsTurn = gs {GameState.activePlayer = S.carol, GameState.priority = Just S.carol}
           Spec.assertBool s (not (any (S.isCastOf hisTop) (Action.legalActions S.bob bobsTurn))) "bob is not offered his own top card"
           Spec.assertBool s (not (any (S.isCastOf theirTop) (Action.legalActions S.carol carolsTurn))) "nor carol hers"
-          Spec.assertBool s (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop gs) "alice has the permission"
-          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.bob hisTop gs)) "bob does not"
-          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.carol theirTop gs)) "nor carol"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Library herTop gs) "alice has the permission"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.bob Zone.Library hisTop gs)) "bob does not"
+          Spec.assertBool s (not (PlayerEffect.mayCastFrom S.carol Zone.Library theirTop gs)) "nor carol"
           -- And a library is a per-player pile (CR 400.1), so the player who
           -- HOLDS the permission cannot reach anybody else's top card either.
           Spec.assertBool s (not (any (S.isCastOf hisTop) (Action.legalActions S.alice gs))) "and alice cannot cast bob's top card"
@@ -5758,8 +5758,8 @@ voidWinnowerSpec s registry =
       let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster []
           cheap = Filter.Type.ManaValueAtMost 5
       Spec.assertBool s (PlayerEffect.matchesObjectFrom Nothing cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
-      Spec.assertBool s (PlayerEffect.choiceCouldEscape Nothing cheap bobsDisaster VariableChoice.Announced board) "and a large enough X takes it out"
-      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape Nothing cheap bobsPiker VariableChoice.Announced board)) "while the fixed spell beside it has no choice to make"
+      Spec.assertBool s (PlayerEffect.choiceCouldEscape S.bob Nothing cheap bobsDisaster VariableChoice.Announced board) "and a large enough X takes it out"
+      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape S.bob Nothing cheap bobsPiker VariableChoice.Announced board)) "while the fixed spell beside it has no choice to make"
 
     -- CR 107.3b puts a floor under that search: a spell cast "without paying its
     -- mana cost" has 0 as its only legal X, so the choice CR 601.3a lets bob

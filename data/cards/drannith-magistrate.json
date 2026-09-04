@@ -24,10 +24,21 @@
             "value": {
               "type": "Not",
               "value": {
-                "type": "IsInZone",
-                "value": {
-                  "type": "Hand"
-                }
+                "type": "And",
+                "value": [
+                  {
+                    "type": "IsInZone",
+                    "value": {
+                      "type": "Hand"
+                    }
+                  },
+                  {
+                    "type": "OwnedBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                ]
               }
             }
           },

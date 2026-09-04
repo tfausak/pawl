@@ -5,7 +5,7 @@ module Pawl.Types.CastingPermission where
 -- Wurm's "while you're searching your library, you may cast this from your
 -- library". The general "cast from the top of your library" (Garruk's Horde) is
 -- a player permission rather than an object one and lives on
--- Pawl.Types.PlayerEffect.CastFromTopOfLibrary instead. Only
+-- Pawl.Types.PlayerEffect.CastFrom instead. Only
 -- Pawl.Engine.Cast reads this type, as a membership test per
 -- arm. Two producers: Face.castingPermissions (printed) and
 -- Pawl.Engine.Keyword.castingPermissionsOf (what rule 702 gives for a keyword).
@@ -13,7 +13,7 @@ module Pawl.Types.CastingPermission where
 -- OBJECT-scoped throughout: every arm is a permission a CARD grants about
 -- ITSELF. The player-scoped sibling -- a continuous effect that lets its player
 -- cast any card from their graveyard (Yawgmoth's Will) -- is a different
--- carrier, and it is Pawl.Types.PlayerEffect.CastFromGraveyard.
+-- carrier, and it is Pawl.Types.PlayerEffect.CastFrom.
 -- Pawl.Engine.Cast.permitsCastFromGraveyard reads the two beside each other.
 data CastingPermission
   = CastFromLibraryWhileSearching

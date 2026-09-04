@@ -201,6 +201,8 @@ library codec
     Pawl.Codec.CardSpec
     Pawl.Codec.CardType
     Pawl.Codec.CardTypeSpec
+    Pawl.Codec.CastFromZone
+    Pawl.Codec.CastFromZoneSpec
     Pawl.Codec.CastingPermission
     Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
@@ -1418,6 +1420,7 @@ library types
     Pawl.Types.CardName
     Pawl.Types.CardType
     Pawl.Types.CarryOver
+    Pawl.Types.CastFromZone
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
     Pawl.Types.CastObligation

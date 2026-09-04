@@ -691,7 +691,15 @@ castableZones pid oid face gs =
         -- card gets for free. It reads the FACE, which is how the rule's "this
         -- half" scoping comes out right -- Dusk is castable from a hand and Dawn
         -- is not, off the same card.
-        Zone.Hand -> not (Keyword.hasAftermath (Face.keywords face))
+        --
+        -- WHOSE hand, which zoneCandidates no longer answers: that list offers
+        -- every player's, so rule 304.1's "their hand" is this conjunct and a
+        -- permission naming somebody else's (Sen Triplets) is the disjunct beside
+        -- it (#2169). CR 108.3 files a hand by owner, so the owner is the seat the
+        -- rules' own allowance names.
+        Zone.Hand ->
+          not (Keyword.hasAftermath (Face.keywords face))
+            && (ownedBy pid oid gs || PlayerEffect.mayCastFrom pid Zone.Hand oid gs)
         Zone.Graveyard -> permitsCastFromGraveyard pid oid face gs
         Zone.Exile -> permitsCastFromExile pid oid face gs
         -- CR 903.8: "a commander's owner may cast it from the command zone". A
@@ -713,7 +721,7 @@ castableZones pid oid face gs =
         -- the caller has already stamped to the half being proposed
         -- (asProposed), so the narrowing "creature spells" reads the chosen half
         -- without this arm naming it.
-        Zone.Library -> PlayerEffect.mayCastFromTopOfLibrary pid oid gs
+        Zone.Library -> PlayerEffect.mayCastFrom pid Zone.Library oid gs
         -- No other zone is in castZones.
         _ -> False
    in filter permitted castZones
@@ -886,9 +894,18 @@ permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
 -- offer to the table: it answers False for every player the permission does not
 -- name, this one included.
 --
--- Every other zone in castZones is one the rules scope by player anyway: a hand,
--- a graveyard and a library are per-player piles (CR 400.1), and CR 903.8 lets
--- only a commander's owner cast it from the command zone.
+-- A HAND, A GRAVEYARD and a LIBRARY are per-player piles (CR 400.1) and every
+-- player's is offered, exile's reason one paragraph up: a CR 601.3 permission
+-- names a PLAYER, and Sen Triplets' names somebody else's hand, so the owner test
+-- is the PERMISSION's rather than this list's (#2169). castableZones' hand arm,
+-- permitsCastFromGraveyard and Pawl.Engine.PlayerEffect.mayCastFrom are the three
+-- that answer it, and each refuses every player no permission names -- so the
+-- widening is an enumeration and never an offer to the table.
+--
+-- CR 903.8 lets only a commander's owner cast it from the command zone, which
+-- Pawl.Engine.Commander.canCastFromCommandZone tests, so that zone keeps the
+-- owner-filed list.
+--
 -- Not implemented: CR 601.3f's gate on a card exiled FACE DOWN -- "a player may
 -- begin to cast such a spell only if they can look at the face-down card in
 -- exile". Unreachable today, since every permission this list is then filtered
@@ -896,19 +913,25 @@ permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
 zoneCandidates :: Zone.Zone -> PlayerId -> GameState -> [ObjectId]
 zoneCandidates zone pid gs = case zone of
   Zone.Exile -> Set.toList (GameState.exile gs)
+  Zone.Hand -> everyPlayersCopyOf zone gs
+  Zone.Graveyard -> everyPlayersCopyOf zone gs
   -- THE TOP CARD ALONE, which is the other half of "you may cast creature spells
   -- from the top of your library": every printing of that permission names the
   -- top card, so the narrowing lives here rather than in a Filter no card would
   -- state. Game.zoneMembers hands a library back in order, top first (CR 401.2's
   -- ordered pile), so `take 1` is that card.
   --
-  -- CR 401.2 keeps a library hidden, and pawl offers this card to its owner
-  -- anyway: every printing of the permission pairs it with a clause that makes
-  -- the top card visible (Garruk's Horde reveals it, Bolas's Citadel looks at
-  -- it), so the offer is the permission's own. What an ANSWERER sees is a
-  -- separate matter, and pawl hides nothing from one yet (#1412).
-  Zone.Library -> take 1 (Game.zoneMembers zone pid gs)
+  -- CR 401.2 keeps a library hidden, and pawl offers this card anyway: every
+  -- printing of the permission pairs it with a clause that makes the top card
+  -- visible (Garruk's Horde reveals it, Bolas's Citadel looks at it), so the offer
+  -- is the permission's own. What an ANSWERER sees is a separate matter, and pawl
+  -- hides nothing from one yet (#1412).
+  Zone.Library -> concatMap (\owner -> take 1 (Game.zoneMembers zone owner gs)) (Game.stillPlaying gs)
   _ -> Game.zoneMembers zone pid gs
+
+-- Every player's copy of a per-player zone (CR 400.1), in seat order.
+everyPlayersCopyOf :: Zone.Zone -> GameState -> [ObjectId]
+everyPlayersCopyOf zone gs = concatMap (\owner -> Game.zoneMembers zone owner gs) (Game.stillPlaying gs)
 
 -- Is this object somewhere this player may cast it from?
 inCastableZone :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
@@ -1131,7 +1154,7 @@ castable pid oid name facing gs =
         && legendaryRestrictionOk pid oid name proposed
         -- Gated HERE, upstream of Action.legalActions, because the engine never
         -- offers an illegal action and then rejects it.
-        && any candidateOk (Cost.candidateCostsFor name oid proposed)
+        && any candidateOk (Cost.candidateCostsFor pid name oid proposed)
 
 -- Every cast this player may propose right now, in castZones' order, as the
 -- (object, half, facing) triples Action.Cast is built from. `castable` re-checks
@@ -1226,7 +1249,8 @@ permitsCastWhileSearching :: Face.Face Card.Type.Card -> Bool
 permitsCastWhileSearching face =
   elem CastingPermission.CastFromLibraryWhileSearching (permissionsWith (Face.keywords face) face)
 
--- CR 601.3 / 702.34a: may this card be cast from its owner's graveyard?
+-- CR 601.3 / 702.34a: may this player cast this card from the graveyard it lies
+-- in?
 --
 -- TWO permissions read beside each other, because CR 601.3's "a rule or effect
 -- allows that player" is reached from two directions and neither is expressible
@@ -1242,8 +1266,19 @@ permitsCastWhileSearching face =
 -- to say "for this player".
 permitsCastFromGraveyard :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromGraveyard pid oid face gs =
-  elem CastingPermission.CastFromGraveyard (permissionsWith (graveyardKeywords oid gs) face)
-    || PlayerEffect.mayCastFromGraveyard pid oid gs
+  (ownedBy pid oid gs && elem CastingPermission.CastFromGraveyard (permissionsWith (graveyardKeywords oid gs) face))
+    || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs
+
+-- CR 108.3: is this the object's owner, and so the player whose per-player zone
+-- it lies in? The conjunct the two arms above owe once zoneCandidates offers
+-- every player's hand and graveyard: rule 304.1's "their hand" and rule 702.34a's
+-- "your graveyard" each name one seat, and neither the candidate list nor a
+-- Filter says which any more (#2169).
+--
+-- An object with no record answers False, which is the only honest reading: a
+-- permission scoped to a seat cannot be judged for a card that is not there.
+ownedBy :: PlayerId -> ObjectId -> GameState -> Bool
+ownedBy pid oid gs = fmap Object.owner (Game.lookupObject oid gs) == Just pid
 
 -- CR 613.1: the keywords a card in a GRAVEYARD has, projected rather than
 -- printed. Rule 702.34a's permission is stated by the ABILITY, and an ability
@@ -1319,7 +1354,7 @@ castableWhileSearching pid gs =
             -- not have (CR 708.2a). Unreachable either way -- no card holds both.
             proposed = asProposed oid name Facing.FaceUp gs
          in permitsCastWhileSearching face
-              && castableWhenOffered pid oid name (Cost.candidateCostsFor name oid proposed) proposed
+              && castableWhenOffered pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed
       proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (foldMap Card.castableFaces (Game.cardOf oid gs)))
    in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
 
@@ -1530,7 +1565,7 @@ castSpellWith perform applied pid oid name facing = do
               (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
-                  (maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied)
+                  (maybe (Cost.candidateCostsFor pid name oid proposed) (pure . Cost.untagged) applied)
               )
           -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move

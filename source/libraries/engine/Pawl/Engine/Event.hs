@@ -4023,8 +4023,13 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 -- CR 616.1 redirect to another zone drops the face instead of carrying it there.
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
-changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
-changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp False CarryOver.NotCarried
+-- CR 110.2a's entry controller rides along, because the one caller is a LAND
+-- PLAY and rule 305.1's player is not always the card's owner: Sen Triplets lets
+-- alice play a land out of bob's hand, and the CR 108.4a fallback this used to
+-- pass would have handed bob the permanent (#2169). Identical wherever the two
+-- seats coincide, which is every other land play.
+changeZoneShowing :: Maybe PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Game (Seq.Seq ObjectId)
+changeZoneShowing under oid requestedDest shown = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty under shown Facing.FaceUp False CarryOver.NotCarried
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.

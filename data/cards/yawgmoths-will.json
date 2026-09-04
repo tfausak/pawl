@@ -30,10 +30,23 @@
                         "type": "UntilEndOfTurn"
                       },
                       "effect": {
-                        "type": "CastFromGraveyard",
+                        "type": "CastFrom",
                         "value": {
-                          "type": "And",
-                          "value": []
+                          "from": {
+                            "player": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            },
+                            "zone": {
+                              "type": "Graveyard"
+                            }
+                          },
+                          "matching": {
+                            "type": "And",
+                            "value": []
+                          }
                         }
                       },
                       "players": {
@@ -51,7 +64,18 @@
                         "type": "UntilEndOfTurn"
                       },
                       "effect": {
-                        "type": "PlayLandsFromGraveyard"
+                        "type": "PlayLandsFrom",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "zone": {
+                            "type": "Graveyard"
+                          }
+                        }
                       },
                       "players": {
                         "type": "Scoped",

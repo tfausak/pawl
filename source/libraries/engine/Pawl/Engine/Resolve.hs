@@ -786,7 +786,11 @@ effectPlayerRefs effect = case effect of
   Effect.EndCombatPhase -> []
   Effect.GainControl {} -> []
   Effect.ArmDelayedTrigger {} -> []
-  Effect.AffectPlayers {} -> []
+  -- CR 400.1's zone reference, which lives inside the permission payloads rather
+  -- than in a field of the opcode -- so the walk is
+  -- Pawl.Engine.PlayerEffect.playerRefsIn's and this arm joins it in, which is
+  -- what puts Sen Triplets' "that player's hand" slot into slotsOf's answer.
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ _ playerEffect) -> PlayerEffect.playerRefsIn playerEffect
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ _ defender) -> [defender]
@@ -3689,7 +3693,7 @@ offerCast resolving caster slot optionality offer = do
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
-            candidates = maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied
+            candidates = maybe (Cost.candidateCostsFor caster name oid proposed) (pure . Cost.untagged) applied
          in if Cast.castableWhenOffered caster oid name candidates proposed
               then
                 -- CR 118.8c, read off the same candidates the cast will be
@@ -7519,6 +7523,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- other opcode reads one, CR 608.2b's empty answer included.
               AffectedPlayers.Named slot ->
                 fmap AffectedPlayers.Named (playerRefPlayers legal controller gs (PlayerRef.InSlot slot))
+            -- CR 601.2c / 608.2b: a zone reference inside the payload is a read of
+            -- this resolution's bindings, so it is baked here for the reason the
+            -- Named set above is -- Sen Triplets' "that player's hand" is the
+            -- targeted opponent, and the slot is gone once this resolution is.
+            -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
+            -- for a slot naming nobody: the reference is left standing and reads
+            -- as naming nobody, rather than falling back to some other seat.
+            bakedEffect = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
             install g scope =
               let (ts, g1) = Game.freshTimestamp g
                   active =
@@ -7528,7 +7540,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ActivePlayerEffect.timestamp = ts,
                         ActivePlayerEffect.expiry = expiry,
                         ActivePlayerEffect.scope = scope,
-                        ActivePlayerEffect.effect = playerEffect
+                        ActivePlayerEffect.effect = bakedEffect
                       }
                in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
          in List.foldl' install gs baked
