@@ -2015,7 +2015,7 @@ omniscienceSpec s registry =
     -- cannot cast for want of priority would pass this for the wrong reason.
     --
     -- TWO copies of one card, differing in whose hand they lie in and in nothing
-    -- else, both priced for ALICE -- the caster the arm now asks about (#2169).
+    -- else, both priced for ALICE -- the caster the arm now asks about, see #2169.
     -- So what the second answer isolates is "your hand" and not "you".
     Spec.it s "CR 118.9 the grant reaches its controller's own hand alone" $ do
       mountain <- S.printingOf s registry "Mountain"

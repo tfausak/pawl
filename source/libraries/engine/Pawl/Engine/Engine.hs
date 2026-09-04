@@ -1219,10 +1219,10 @@ priorityLoop = do
                                 -- moved, a CR 616.1 loop that cancels the move
                                 -- having played nothing.
                                 spent <- State.gets (PlayerEffect.spentByLandPlay p oid)
-                                -- CR 110.2a / 305.1: the permanent enters under
+                                -- CR 110.2 / 305.1: the permanent enters under
                                 -- the player who PLAYED it, which is not the
                                 -- card's owner once a permission opens somebody
-                                -- else's hand (Sen Triplets, #2169).
+                                -- else's hand (Sen Triplets); see #2169.
                                 moved <- Event.changeZoneShowing (Just p) oid Zone.Battlefield mName
                                 Monad.unless (Seq.null moved) (State.modify' (PlayerEffect.consume spent))
                                 -- CR 305.2a counts the lands played this turn, so

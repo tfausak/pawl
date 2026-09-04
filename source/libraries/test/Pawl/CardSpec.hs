@@ -639,11 +639,22 @@ playerRefPositions =
     ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
     ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
     ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
-    ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (SlotName.MkSlotName (Text.pack "oc")) (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"])
+    ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (SlotName.MkSlotName (Text.pack "oc")) (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"]),
+    -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
+    -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
+    -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
+    -- traversal is what the AffectPlayers arm delegates to and a missing arm
+    -- there answers [] rather than failing to compile.
+    ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []))), [plantedPlayer "ap-cast"]),
+    ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
+    -- And an arm carrying none, so the traversal is shown answering nothing where
+    -- there is nothing to answer.
+    ("affect-players-cant-cast", affecting PlayerEffect.CantCastSpells, [])
   ]
   where
     one = Quantity.Type.Literal 1
     playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
+    affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
 
 -- The same list one type in, for the four ObjectRef arms that count PER SEAT
 -- (CR 400.1's per-player zones). Resolve.objectRefPlayerRefs is what owes these.

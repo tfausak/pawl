@@ -314,10 +314,10 @@ enteredFromSpec s registry =
 -- vacuous, which is the printed "a graveyard", and every case below drives that
 -- half. The WasCastFrom half is PlayerRef.Relative You, which reads "you cast it
 -- from your graveyard" -- one reference standing for the caster and for the card's
--- owner alike -- and that is exact only because no road in pawl casts a spell out
--- of a graveyard that is not the caster's own (CR 400.3, and the pair of gates
--- #2795 names; Pawl.Engine.Quantity's WasCastFrom arm carries the proof and the
--- one road that could break it, #2689). EachPlayer would be the wrong call there: it reads
+-- owner alike -- and that is exact only because no card in the pool casts a spell
+-- out of a graveyard that is not the caster's own (CR 400.3, and the permission
+-- #2795 names; Pawl.Engine.Quantity's WasCastFrom arm carries the argument and
+-- the two roads that could break it, #2689). EachPlayer would be the wrong call there: it reads
 -- "anyone cast it", which is weaker than printed. The last case drives the
 -- WasCastFrom disjunct's negative -- the Skeleton is cast from a HAND -- and
 -- Archfiend's Vessel above is where its positive is proved.

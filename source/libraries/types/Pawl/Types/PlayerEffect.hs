@@ -33,7 +33,7 @@ import qualified Pawl.Types.StatedFlip as StatedFlip
 data PlayerEffect
   = -- | CR 601.3 / Silence: this player can't cast spells at all.
     CantCastSpells
-  | -- | CR 602.5a / Sen Triplets: this player can't activate abilities at all.
+  | -- | CR 602.5 / Sen Triplets: this player can't activate abilities at all.
     --
     -- The player-axis twin of CR 701.35a's detain, which stamps one OBJECT
     -- (Pawl.Types.Object.detainedUntil): this names nobody's permanent and refuses
@@ -155,6 +155,10 @@ data PlayerEffect
     -- different zone written into its name: the narrowing to the TOP card is
     -- Pawl.Engine.Cast.zoneCandidates' and never a Filter's, so nothing but the
     -- zone told the two apart.
+    --
+    -- Read as a DISJUNCTION (Pawl.Engine.PlayerEffect.mayCastFrom): one
+    -- applicable permission is enough, so CR 613.11's timestamp order has nothing
+    -- to order.
     CastFrom CastFromZone.CastFromZone
   | -- | CR 305.1 / Crucible of Worlds: this player may play lands from the zone the
     -- reference names -- the play half of CastFrom above, since a land is played

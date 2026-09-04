@@ -677,7 +677,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- same conjunct for CR 605.3a's windows, exactly as sickness below and the
         -- printed rider two lines down are asked in both places.
         && not (Detain.detained srcId gs)
-        -- CR 602.5a's player-axis prohibition (Sen Triplets), beside detain for
+        -- CR 602.5's player-axis prohibition (Sen Triplets), beside detain for
         -- its reason: rule 701.35a stamps one object and this names a player, and
         -- neither carves a mana ability out -- so Cost.manaActivationsGiven
         -- carries this conjunct too, for the CR 605.3a windows that never reach

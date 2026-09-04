@@ -576,7 +576,7 @@ prohibitsCasting pid oid name variable gs =
         -- taken of still lies where the cast would take it from.
         --
         -- CR 109.5's "you" is the CASTER and not the card's controller, which it
-        -- has none of in a hand -- see matchesObjectFor below, and #2169 for what
+        -- has none of in a hand -- see matchesObjectFor below, and see #2169 for what
         -- observes the difference.
         PlayerEffect.CantCastMatching criterion ->
           matchesObjectFor pid source criterion oid gs && not (choiceCouldEscape pid source criterion oid variable gs)
@@ -614,7 +614,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.StateCoinFlip _ -> False
    in any prohibits (applying pid gs)
 
--- CR 602.5a / 101.2 / Sen Triplets: does an effect stop this player activating
+-- CR 602.5 / 101.2 / Sen Triplets: does an effect stop this player activating
 -- abilities at all? The activation-side twin of prohibitsCasting above, and its
 -- own question rather than a widening of that one: CR 602.1 makes an activated
 -- ability neither a spell nor a special action, so nothing on the cast axis
@@ -1002,7 +1002,7 @@ matchesObjectFrom src filter_ oid gs =
 -- has no controller yet (CR 108.4 gives a card in a hand none), so rule 109.5's
 -- "you" for it is the player who would control the spell -- the caster. The two
 -- coincide wherever the caster owns the card, which is why nothing observed the
--- difference until a permission could open somebody else's hand (#2169): Drannith
+-- difference until a permission could open somebody else's hand, see #2169: Drannith
 -- Magistrate's "from anywhere other than their hand" is Filter.OwnedBy You, and
 -- read at the OWNER's perspective that conjunct is vacuously true of every card
 -- in every hand.
@@ -1656,14 +1656,20 @@ choiceCouldApply src criterion oid gs =
 -- alone, and a grant to the whole table would mean each player's own pile.
 --
 -- Exhaustive over PlayerRef, since a new arm has to say what a zone scope makes
--- of it. Four arms name nobody, and each for a reason it shares with
--- Pawl.Engine.Quantity.bakePlayerRef's decision to leave it standing: InSlot and
--- EachInSlot read the RESOLUTION's bindings, which are gone by the time a stored
--- row is read and which Pawl.Engine.Resolve bakes to Specific while they are
--- still there; Candidate names whichever player a fold is aimed at and no fold is
--- running here; ControllerOfBound and Attacking read a slot too. A permission
--- naming nobody opens nothing, which is the honest answer rather than a silent
--- fallback to the caster.
+-- of it. Three arms answer, and the rest name NOBODY: the slot-reading ones
+-- (InSlot, EachInSlot, ControllerOfBound, Attacking) read the RESOLUTION's
+-- bindings, which are gone by the time a stored row is read and which
+-- Pawl.Engine.Resolve bakes to Specific while they are still there, and Candidate
+-- names whichever player a fold is aimed at with no fold running here. A
+-- permission naming nobody opens nothing, which is the honest answer rather than
+-- a silent fallback to the caster.
+--
+-- EachPlayerExcept is the one that could have gone either way, and it names
+-- nobody here rather than taking that arm's own stated reading (an unfilled slot
+-- excludes nobody, so the set is the table). A permission is the direction where
+-- widening on an unanswerable reference reads WEAKER than printed, and no card
+-- writes this arm in this position; the count in a Scope is where the type's
+-- reading belongs.
 zoneOwners :: PlayerId -> PlayerRef.PlayerRef -> GameState -> [PlayerId]
 zoneOwners pid ref gs = case ref of
   PlayerRef.EachPlayer -> Game.stillPlaying gs
@@ -1679,9 +1685,10 @@ zoneOwners pid ref gs = case ref of
 -- Does this permission's zone reference name the zone `oid` lies in, and the
 -- player whose copy of it that is?
 --
--- CR 108.3 files a per-player zone by OWNER, so the object's owner is the seat
+-- CR 400.1 gives each player their own copy of such a zone and CR 400.3 keeps a
+-- card in its owner's, so the object's owner is the seat
 -- compared -- and the comparison is this function's rather than
--- Pawl.Engine.Cast.zoneCandidates', which offers every player's copy (#2169).
+-- Pawl.Engine.Cast.zoneCandidates', which offers every player's copy; see #2169.
 opensZoneOf :: PlayerId -> Zone.Zone -> ObjectId -> InZone.InZone -> GameState -> Bool
 opensZoneOf pid zone oid inZone gs =
   InZone.zone inZone == zone
@@ -1698,7 +1705,7 @@ opensZoneOf pid zone oid inZone gs =
 --
 -- Asks WHOSE copy, which the candidate list used to answer: zoneCandidates offers
 -- every player's hand and graveyard so that a permission can name somebody else's
--- (Sen Triplets), and the owner conjunct moved here with it (#2169). Yawgmoth's
+-- (Sen Triplets), and the owner conjunct moved here with it; see #2169. Yawgmoth's
 -- Will writes PlayerRef.Relative You and reaches no other graveyard for it.
 --
 -- Says nothing about the TOP of a library, which stays zoneCandidates' half of
@@ -1800,7 +1807,7 @@ mayCastFrom pid zone oid gs =
 -- place this differs from mayCastFrom: rule 118.9's grant is worded "from YOUR
 -- hand" on every printing, so the hand is the grantee's by the sentence and no
 -- card has another to name. It stopped being free once Sen Triplets could put
--- alice's cast in bob's hand, where alice's Omniscience says nothing (#2169) --
+-- alice's cast in bob's hand, where alice's Omniscience says nothing (see #2169) --
 -- and the caller can no longer supply it, that arm now asking the CASTER rather
 -- than the card's owner.
 mayCastFromHandWithoutPayingManaCost :: PlayerId -> ObjectId -> GameState -> Bool

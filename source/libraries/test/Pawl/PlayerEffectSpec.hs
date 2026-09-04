@@ -4961,7 +4961,7 @@ yawgmothsWillSpec s registry =
         -- refuses. It is the PERMISSION's own zone reference: Yawgmoth's Will
         -- writes PlayerRef.Relative You, so mayCastFrom resolves the pile to
         -- alice's and bob's copy is not in it. Cast.zoneCandidates offers her
-        -- bob's graveyard now (#2169) and the permission is the only thing
+        -- bob's graveyard now (see #2169) and the permission is the only thing
         -- standing between the offer and the cast, which is why the assertion
         -- below reads False where it once read True: the empty filter still says
         -- yes to bob's copy, and the reference says no.

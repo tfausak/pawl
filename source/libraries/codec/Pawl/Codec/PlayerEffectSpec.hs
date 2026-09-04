@@ -370,7 +370,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.CastOnlyAtSorcerySpeed
       " {\"type\":\"CastOnlyAtSorcerySpeed\"} "
-  -- CR 602.5a / Sen Triplets' second clause.
+  -- CR 602.5 / Sen Triplets' second clause.
   Spec.it s "CantActivateAbilities" $
     Common.assertCodec
       s

@@ -199,7 +199,7 @@ candidateCostsFor pid name oid gs = case Game.lookupObject oid gs of
             -- CR 109.5's "you" is the CASTER, who a card in a hand or a graveyard
             -- has no controller to supply (CR 108.4). The two coincided while
             -- Cast.zoneCandidates handed out only the caster's own pile; a
-            -- permission naming somebody else's hand separates them (#2169), and
+            -- permission naming somebody else's hand separates them (see #2169), and
             -- the CR 601.3 permission and the CR 118.9 grant below read the caster
             -- for the same reason.
             available alternative = case AlternativeCost.condition alternative of
@@ -1616,7 +1616,7 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         -- mana ability too. Here rather than in Mana.manaSourcesGiven, because this
         -- is what BOTH of CR 605.3a's windows consult -- sickness's position above.
         && not (Detain.detained oid gs)
-        -- CR 602.5a's player-axis prohibition (Sen Triplets), read here for
+        -- CR 602.5's player-axis prohibition (Sen Triplets), read here for
         -- detain's reason: the sentence carves no mana ability out where CR
         -- 702.61b does, so both of CR 605.3a's windows owe it.
         && not (PlayerEffect.prohibitsActivatingGiven effects)

@@ -695,8 +695,8 @@ castableZones pid oid face gs =
         -- WHOSE hand, which zoneCandidates no longer answers: that list offers
         -- every player's, so rule 304.1's "their hand" is this conjunct and a
         -- permission naming somebody else's (Sen Triplets) is the disjunct beside
-        -- it (#2169). CR 108.3 files a hand by owner, so the owner is the seat the
-        -- rules' own allowance names.
+        -- it; see #2169. CR 400.1 gives each player their own hand and CR 400.3
+        -- keeps a card in its owner's, so the owner is the seat rule 304.1 names.
         Zone.Hand ->
           not (Keyword.hasAftermath (Face.keywords face))
             && (ownedBy pid oid gs || PlayerEffect.mayCastFrom pid Zone.Hand oid gs)
@@ -897,7 +897,7 @@ permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
 -- A HAND, A GRAVEYARD and a LIBRARY are per-player piles (CR 400.1) and every
 -- player's is offered, exile's reason one paragraph up: a CR 601.3 permission
 -- names a PLAYER, and Sen Triplets' names somebody else's hand, so the owner test
--- is the PERMISSION's rather than this list's (#2169). castableZones' hand arm,
+-- is the PERMISSION's rather than this list's; see #2169. castableZones' hand arm,
 -- permitsCastFromGraveyard and Pawl.Engine.PlayerEffect.mayCastFrom are the three
 -- that answer it, and each refuses every player no permission names -- so the
 -- widening is an enumeration and never an offer to the table.
@@ -1269,11 +1269,13 @@ permitsCastFromGraveyard pid oid face gs =
   (ownedBy pid oid gs && elem CastingPermission.CastFromGraveyard (permissionsWith (graveyardKeywords oid gs) face))
     || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs
 
--- CR 108.3: is this the object's owner, and so the player whose per-player zone
--- it lies in? The conjunct the two arms above owe once zoneCandidates offers
--- every player's hand and graveyard: rule 304.1's "their hand" and rule 702.34a's
--- "your graveyard" each name one seat, and neither the candidate list nor a
--- Filter says which any more (#2169).
+-- CR 400.1 / 400.3: is this the object's owner, and so the player whose copy of a
+-- per-player zone it lies in?
+--
+-- The conjunct the two arms above owe once zoneCandidates offers every player's
+-- hand and graveyard: rule 304.1's "their hand" and rule 702.34a's "your
+-- graveyard" each name one seat, and neither the candidate list nor a Filter says
+-- which any more; see #2169.
 --
 -- An object with no record answers False, which is the only honest reading: a
 -- permission scoped to a seat cannot be judged for a card that is not there.
