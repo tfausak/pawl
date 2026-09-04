@@ -3014,7 +3014,8 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
 -- you would draw a card this turn, you gain 5 life instead" -- name, cost, type
 -- line and Oracle text checked against api.scryfall.com 2026-08-29).
 --
--- The pool's one DrawR producer, and the card-draw event class end to end: an
+-- The pool's GainLife DrawR producer -- Ring of Ma'rûf is the other, in
+-- Pawl.OutsideTheGameSpec -- and the card-draw event class end to end: an
 -- activated ability installs a floating row (CR 614.3) with Uses.Once and an
 -- end-of-turn duration, and the next draw is replaced rather than rewritten --
 -- CR 614.6's "it never happens", so no card leaves the library and CR 121.2's

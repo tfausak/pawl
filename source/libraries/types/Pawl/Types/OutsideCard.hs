@@ -17,7 +17,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 -- about a stable "which is greater" ranking between the two constructors.
 data OutsideCard
   = -- | CR 103.2a's sideboard pool, named by its printing the way
-    -- Pawl.Engine.OutsideTheGame's existing prompt already does.
+    -- Pawl.Engine.Event.bringInto's existing prompt already does.
     InPool PrintingId.PrintingId
   | -- | CR 729.4's main game, seen from inside a subgame as
     -- GameState.outsideObjects -- named by the id the card has out there, since

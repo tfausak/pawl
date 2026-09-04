@@ -123,7 +123,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       (length inHand)
       1
   -- Conjure creates the card out of nothing, so nothing is SPENT -- the half
-  -- Pawl.Engine.OutsideTheGame.bringIn adds over the shared mint, where CR
+  -- Pawl.Engine.Event.bringIn adds over the shared mint, where CR
   -- 400.11b keeps a wish from finding the same copy twice. Two upkeeps, two
   -- distinct Ornithopters.
   Spec.it s "a second upkeep conjures a second Ornithopter" $ do

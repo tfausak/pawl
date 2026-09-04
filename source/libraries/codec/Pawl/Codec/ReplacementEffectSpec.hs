@@ -177,7 +177,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
           )
       )
       " {\"type\":\"LifeLossR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}}} "
-  -- CR 614.11 / 121.6: Words of Worship, the one DrawR producer.
+  -- CR 614.11 / 121.6: Words of Worship, the GainLife DrawR producer.
   Spec.it s "DrawR (Words of Worship)" $
     Common.assertCodec
       s

@@ -1690,6 +1690,16 @@ readsApplier re = case re of
   -- rewrite that DOES read the applier has to be decided here rather than
   -- inheriting this answer.
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
+  -- The card goes to the player the EVENT named and the filter and the reveal
+  -- ride the effect, so GainLife's answer above carries over. The one value this
+  -- rewrite reads off the CANDIDATE is `source`, which reaches nothing but the
+  -- Filter.Context Event.eligible scans the pool under.
+  --
+  -- Not implemented: two such rows alike in `effect` and unlike in `source` would
+  -- offer different cards if the card's filter named its own source, and
+  -- `distinguishing` below folds `source` in nowhere, so the choice between them
+  -- is elided (#3215).
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
   -- CR 121.2a: "you and that player each draw a card" -- the "you" is the row's
   -- own controller, so two rows alike in `effect` and unlike in `you` hand the
   -- extra card to different seats. LifeLossRewrite.ExileFromTopOfYourLibrary's
@@ -1738,8 +1748,9 @@ readsApplier re = case re of
 -- other way: two Rest in Peace under different controllers exile the same card
 -- to the same zone whichever applies, so asking about them would raise a
 -- question the rules leave nothing to decide. `source` is folded in nowhere for
--- the same reason -- every use of it above is a test run BEFORE Event.apply, not a
--- branch inside it.
+-- the same reason -- every use of it above is a test run BEFORE Event.apply, save
+-- the one arm that hands it on as a Filter.Context, which readsApplier's own
+-- comment argues (#3215).
 --
 -- `origin` is NOT such a hole: highestBucket has already partitioned by bucket,
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every
