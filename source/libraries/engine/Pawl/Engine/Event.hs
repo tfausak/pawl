@@ -5071,15 +5071,16 @@ counter source controller oid = Monad.void (counterOne source controller oid)
 -- cancelled each leave their victim out of the answer.
 --
 -- The VICTIMS as the caller named them, not the graveyard incarnations CR 400.7
--- mints, because every reader wants how many rather than which: Swift Silence's
--- "draw a card for each spell countered this way" and Glen Elendra's Answer's
--- "for each spell and ability countered this way", both of which
--- Pawl.Engine.Resolve binds as an amount. An ability leaves no new object at all
--- (CR 608.2n), so there is no second id to report for it -- which is why the
--- answer is the victims and not the incarnations.
+-- mints: Swift Silence's "draw a card for each spell countered this way" and
+-- Glen Elendra's Answer's "for each spell and ability countered this way" want
+-- how many, which Pawl.Engine.Resolve binds as an amount, and Green Slime's "if
+-- a permanent's ability is countered this way" wants WHICH, walked to its CR
+-- 113.7 source under the id the caller named. An ability leaves no new object
+-- at all (CR 608.2n), so there is no second id to report for it -- which is why
+-- the answer is the victims and not the incarnations.
 --
 -- A second door rather than a return type on `counter`, the destroyReturning
--- posture: only the Counter opcode's bound-count slot uses the answer.
+-- posture: only the Counter opcode's two bound slots use the answer.
 counterReturning :: ObjectId -> PlayerId -> [ObjectId] -> Game [ObjectId]
 counterReturning source controller = Monad.filterM (counterOne source controller)
 

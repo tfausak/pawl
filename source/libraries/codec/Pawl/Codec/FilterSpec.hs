@@ -378,6 +378,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsActivatedAbility
       " {\"type\":\"IsActivatedAbility\"} "
+  Spec.it s "FromSource" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.FromSource (Filter.HasCardType CardType.Artifact))
+      " {\"type\":\"FromSource\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}} "
   Spec.it s "IsTapped" $
     Common.assertCodec
       s

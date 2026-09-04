@@ -840,16 +840,18 @@ viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
 viewWithLastKnownAnywhere gs oid =
   if Map.member oid (GameState.objects gs)
     then fullView gs oid
-    else
-      fmap
-        ( \lk ->
-            (viewOfCharacteristics (fullView gs) oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
-              { Filter.owner = Just (LastKnown.owner lk),
-                Filter.token = Game.sourceIsToken (LastKnown.source lk),
-                Filter.blocking = LastKnown.blocking lk
-              }
-        )
-        (Map.lookup oid (GameState.lastKnown gs))
+    else fmap (lastKnownView (fullView gs) oid gs) (Map.lookup oid (GameState.lastKnown gs))
+
+-- The view CR 608.2h's record answers with: viewWithLastKnownAnywhere's body,
+-- shared with the ability-source read in viewOfCharacteristics, which needs it
+-- at ITS caller's depth rather than fullView's.
+lastKnownView :: Count.ViewOf -> ObjectId -> GameState -> LastKnown.LastKnown -> Filter.View
+lastKnownView peers oid gs lk =
+  (viewOfCharacteristics peers oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
+    { Filter.owner = Just (LastKnown.owner lk),
+      Filter.token = Game.sourceIsToken (LastKnown.source lk),
+      Filter.blocking = LastKnown.blocking lk
+    }
 
 -- CR 608.2h: this object's last known information, and only when the id names
 -- nothing, so a caller falls through to its live reader. Shared by the two
@@ -1021,6 +1023,8 @@ viewOfCard face =
           -- CR 113.3b: an ability on the stack is never a printed face, so this
           -- builder's candidate cannot be one.
           Filter.activatedAbility = False,
+          -- CR 113.7, for the line above's reason: no ability, so no source.
+          Filter.abilitySource = Nothing,
           Filter.tapped = False,
           -- CR 110.5d: only permanents have status, and this is a printed FACE
           -- with no object behind it -- the rule's own answer rather than an
@@ -1363,6 +1367,17 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- for an id naming nothing, and for every object that is not an ability on
       -- the stack.
       Filter.activatedAbility = Game.isActivatedAbility oid gs,
+      -- CR 113.7: the source's view, through `peers` at this caller's depth while
+      -- it exists (attachedViews' reason) and through CR 113.7a's last known
+      -- information once it has left -- Green Slime countering the ability of an
+      -- artifact sacrificed to activate it still reads "from an artifact source".
+      -- Nothing for anything that is not an ability on the stack. Lazy, so a
+      -- Filter that never names the atom pays nothing.
+      Filter.abilitySource =
+        Game.abilitySourceOf oid gs >>= \src ->
+          if Map.member src (GameState.objects gs)
+            then peers src
+            else fmap (lastKnownView peers src gs) (Map.lookup src (GameState.lastKnown gs)),
       Filter.tapped = Game.isTapped oid gs,
       -- CR 110.5's other status, and the only site that fills the field. Read off
       -- Object.facing, never off the projection: CR 110.5a says status is not a
@@ -2507,7 +2522,7 @@ rewriteEffect pairs effect = case effect of
   -- of those three lines reddens nothing.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind from to chosenSource) ->
     Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (rewriteObjectRef pairs from) (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
-  Effect.Counter (Counter.MkCounter ref mSlot) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot)
+  Effect.Counter (Counter.MkCounter ref mSlot mSources) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources)
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, where Filter's HasCounters arm rewrites
   -- the same kind (#1840).
@@ -4543,6 +4558,9 @@ filterReads f = case f of
   -- 113.3's two kinds are told apart by Pawl.Types.Source, which no Modification
   -- writes.
   Filter.Type.IsActivatedAbility -> Set.empty
+  -- Reads nothing of the CANDIDATE: CR 113.7's nest is about its source, whose
+  -- characteristics come through `peers` -- filterReadsPeers descends.
+  Filter.Type.FromSource _ -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
   -- CR 110.5a again, one status category over: face-up/face-down is not a
@@ -4631,6 +4649,9 @@ filterReadsPeers f = case f of
   -- not descend: CR 708.12's nest is matched against viewOfCard, which takes no
   -- `peers` and no board at all.
   Filter.Type.RepresentedByCard g -> filterReadsPeers g
+  -- DESCENT: CR 113.7's nest is matched against the source's view, which comes
+  -- through `peers`.
+  Filter.Type.FromSource g -> filterReadsPeers g
   Filter.Type.And fs -> any filterReadsPeers fs
   Filter.Type.Or fs -> any filterReadsPeers fs
   Filter.Type.Not g -> filterReadsPeers g

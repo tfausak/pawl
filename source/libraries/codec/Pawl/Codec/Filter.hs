@@ -101,6 +101,9 @@ codec keywordCodec =
       Arm.nullary "CanAttachToSubject" Filter.CanAttachToSubject,
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsActivatedAbility" Filter.IsActivatedAbility,
+      -- Recursive for AttachedTo's reason, the payload describing the ability's
+      -- SOURCE rather than the ability.
+      Arm.payload "FromSource" (codec keywordCodec) Filter.FromSource (\x -> case x of Filter.FromSource y -> Just y; _ -> Nothing),
       Arm.nullary "IsTapped" Filter.IsTapped,
       Arm.nullary "IsFaceDown" Filter.IsFaceDown,
       -- Recursive for AttachedTo's reason, the payload describing the CARD

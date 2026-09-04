@@ -1934,6 +1934,7 @@ stubView table oid =
                 Filter.canAttachToSubject = False,
                 Filter.token = False,
                 Filter.activatedAbility = False,
+                Filter.abilitySource = Nothing,
                 Filter.tapped = False,
                 Filter.faceDown = False,
                 Filter.representedCard = Nothing,

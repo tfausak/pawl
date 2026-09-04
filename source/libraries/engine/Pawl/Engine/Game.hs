@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Asked as Asked
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
@@ -56,6 +57,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -962,6 +964,26 @@ isActivatedAbility oid gs = case lookupObject oid gs of
       Source.OfToken _ -> False
       Source.OfEmblem _ -> False
       Source.OfSpellCopy _ -> False
+
+-- CR 113.7: the object an ability on the stack came from -- the one whose
+-- ability was activated or triggered. Nothing for anything that is not an
+-- ability on the stack, and for CR 725.2's inherent trigger, which has no
+-- source. The id alone: once the source has left, CR 113.7a's last known
+-- information is filed under it (Pawl.Engine.Projection.lastKnownView).
+abilitySourceOf :: ObjectId -> GameState -> Maybe ObjectId
+abilitySourceOf oid gs = case lookupObject oid gs of
+  Nothing -> Nothing
+  Just obj
+    | Object.zone obj /= Zone.Stack -> Nothing
+    | otherwise -> case Object.source obj of
+        Source.OfAbility a -> Just (ActivatedAbilitySource.source a)
+        Source.OfTrigger t -> Just (TriggeredAbilitySource.source t)
+        Source.OfInherentTrigger _ -> Nothing
+        Source.OfCard _ -> Nothing
+        Source.OfMeld _ -> Nothing
+        Source.OfToken _ -> Nothing
+        Source.OfEmblem _ -> Nothing
+        Source.OfSpellCopy _ -> Nothing
 
 -- CR 110.5: a permanent's tapped/untapped status. CR 110.5d gives status only
 -- to a permanent, so an unknown id -- and a card outside the battlefield -- is

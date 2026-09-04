@@ -2661,6 +2661,130 @@ squelchSpec s registry = Spec.describe s "Squelch" $ do
         Spec.assertEqWith s "bob's graveyard is empty: an ability ceases rather than moving" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
         Spec.assertBool s (Set.member flashId (GameState.battlefield after)) "and Aether Flash itself is untouched"
 
+-- CR 113.7 through CR 701.6a and back: Green Slime ({2}{G} Creature -- Ooze,
+-- flash, "When this creature enters, counter target activated or triggered
+-- ability from an artifact or enchantment source. If a permanent's ability is
+-- countered this way, destroy that permanent."). Its target is Stifle's
+-- Pool.Abilities under Filter.FromSource, whose nest is matched against the
+-- ability's SOURCE rather than the ability; its rider reads
+-- Pawl.Types.Counter's `sources` slot, the permanents walked to from what the
+-- funnel countered.
+--
+-- Three boards, one per half of the rule. The first carries an ability of an
+-- artifact and one of a creature and the answerer takes the SMALLEST recipient
+-- offered, squelchSpec's posture: the creature's ability is the older object,
+-- so a FromSource that admitted it would take it, and a FromSource that admitted
+-- nothing would leave the trigger targetless. The second is CR 113.7a: the
+-- artifact was sacrificed to activate the ability, so the source is read from
+-- last known information -- and, being no permanent, is not destroyed. The
+-- third is the enchantment half and the TRIGGERED half at once, on bob's turn
+-- so CR 603.3b puts his Aether Flash trigger under alice's.
+greenSlimeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+greenSlimeSpec s registry = Spec.describe s "Green Slime" $ do
+  Spec.it s "CR 113.7 the trigger reaches the artifact's ability and not the creature's, and the artifact is destroyed" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    ball <- S.printingOf s registry "Crystal Ball"
+    slime <- S.printingOf s registry "Green Slime"
+    case (soleActivatedAbility sorcerer, soleActivatedAbility ball) of
+      (Just ping, Just scry) -> do
+        let (sorcererId, withSorcerer) = S.addCreature sorcerer S.bob (Setup.emptyGame S.bothPlayers)
+            (ballId, withBall) = S.addCreature ball S.bob withSorcerer
+            -- CR 302.6: the Sorcerer must have settled before its {T} is legal.
+            settled = S.runPure S.identityAnswer withBall (Engine.settleAll S.bob)
+            -- A Mountain for the Ball's {1}, three Forests for the Slime.
+            withLands = List.foldl' (\g (p, pid) -> snd (S.addCreature p pid g)) settled [(mountain, S.bob), (forest, S.alice), (forest, S.alice), (forest, S.alice)]
+            -- CR 701.22a: the scry looks at bob's library, so stock it.
+            withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.bob g)) withLands [1 .. (3 :: Int)]
+            (slimeId, gs) = S.addHandCard slime S.alice withLibrary
+            atAlice :: Prompt.Prompt r -> r
+            atAlice p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+              _ -> S.identityAnswer p
+            -- The Sorcerer's ping first, so its ability is the OLDER object; the
+            -- Ball's scry on top of it.
+            pinging = S.runPure atAlice (gs {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob sorcererId ping)
+            scrying = S.runPure S.identityAnswer (pinging {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob ballId scry)
+            cast = S.runPure S.identityAnswer (scrying {GameState.priority = Just S.alice}) (S.cast S.alice slimeId)
+            entered = S.runPure S.identityAnswer cast Stack.resolveTop
+            takeOldest :: Prompt.Prompt r -> r
+            takeOldest p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> maybe Set.empty Set.singleton (Set.lookupMin legal)) sets
+              _ -> S.identityAnswer p
+            -- CR 603.3: the Slime's trigger goes on the stack, choosing its target.
+            placed = S.runPure takeOldest entered Engine.settleForPriority
+            -- The trigger, then whatever of bob's two abilities survived it.
+            resolved = List.foldl' (\g _ -> S.runPure S.identityAnswer g Stack.resolveTop) placed [1 .. (3 :: Int)]
+            after = S.runPure S.identityAnswer resolved Engine.settleForPriority
+        -- The discriminating pair, AHEAD of the proxies: which ability the
+        -- trigger took is readable as which permanent its rider destroyed (CR
+        -- 113.7) and whether the ping landed.
+        Spec.assertEqWith s "Crystal Ball is in bob's graveyard: its ability was countered and the rider destroyed it (CR 113.7)" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Crystal Ball")) S.bob after) 0
+        Spec.assertEqWith s "alice took the Sorcerer's ping: a creature's ability is not from an artifact or enchantment source" (S.lifeOf S.alice after) (Just 19)
+        Spec.assertEqWith s "the Sorcerer is untouched" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Prodigal Sorcerer")) S.bob after) 1
+        Spec.assertEqWith s "bob's graveyard holds the Ball alone" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+        Spec.assertEqWith s "the stack held the Sorcerer's ping, the Ball's scry and the Slime" (length (GameState.stack cast)) 3
+        Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+      _ -> Spec.assertFailure s "Prodigal Sorcerer and Crystal Ball should each declare one activated ability"
+  Spec.it s "CR 113.7a the ability of an artifact sacrificed to activate it is still from an artifact source, and nothing is destroyed" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    egg <- S.printingOf s registry "Golden Egg"
+    slime <- S.printingOf s registry "Green Slime"
+    -- Golden Egg's second ability: "{2}, {T}, Sacrifice this artifact: You gain
+    -- 3 life." The first is a mana ability, which never reaches the stack.
+    case Face.activatedAbilities (S.combinedFace egg) of
+      [_, gain] -> do
+        -- The lands BEFORE the Egg, so S.identityAnswer's first-offered mana
+        -- source for the {2} is a Mountain and never the Egg's own mana ability,
+        -- whose sacrifice would take the source out from under the activation.
+        let withLands = List.foldl' (\g (p, pid) -> snd (S.addCreature p pid g)) (Setup.emptyGame S.bothPlayers) [(mountain, S.bob), (mountain, S.bob), (forest, S.alice), (forest, S.alice), (forest, S.alice)]
+            (eggId, withEgg) = S.addCreature egg S.bob withLands
+            (slimeId, gs) = S.addHandCard slime S.alice withEgg
+            -- CR 601.2h: the Egg is sacrificed as the cost, so by the time the
+            -- ability waits on the stack its source is in bob's graveyard.
+            activated = S.runPure S.identityAnswer (gs {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob eggId gain)
+            cast = S.runPure S.identityAnswer (activated {GameState.priority = Just S.alice}) (S.cast S.alice slimeId)
+            entered = S.runPure S.identityAnswer cast Stack.resolveTop
+            placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+            resolved = List.foldl' (\g _ -> S.runPure S.identityAnswer g Stack.resolveTop) placed [1 .. (2 :: Int)]
+            after = S.runPure S.identityAnswer resolved Engine.settleForPriority
+        Spec.assertBool s (Set.notMember eggId (GameState.battlefield activated)) "the Egg left the battlefield as the ability's cost"
+        -- The discriminating assertion: a source read live would find nothing
+        -- and the trigger would have no target, so the Egg's ability would
+        -- resolve for 3.
+        Spec.assertEqWith s "bob's life is untouched: the departed Egg's ability was still from an artifact source (CR 113.7a) and was countered" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "bob's graveyard holds the Egg alone: a source that is no permanent is not destroyed" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+        Spec.assertEqWith s "bob's Mountains are untouched" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Mountain")) S.bob after) 2
+        Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+      _ -> Spec.assertFailure s "Golden Egg should declare two activated abilities"
+  Spec.it s "CR 113.7 an enchantment's triggered ability is a target too: the Slime survives Aether Flash and destroys it" $ do
+    forest <- S.printingOf s registry "Forest"
+    aetherFlash <- S.printingOf s registry "Aether Flash"
+    slime <- S.printingOf s registry "Green Slime"
+    let (flashId, withFlash) = S.addCreature aetherFlash S.bob (Setup.emptyGame S.bothPlayers)
+        withLands = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) withFlash [1 .. (3 :: Int)]
+        (slimeId, gs) = S.addHandCard slime S.alice withLands
+        -- bob's turn, so that CR 603.3b puts his Aether Flash trigger on the
+        -- stack FIRST and alice's Slime trigger above it, where it can counter
+        -- the trigger before the 2 damage is dealt. Flash is what lets alice
+        -- cast the Slime here at all (CR 702.8).
+        cast = S.runPure S.identityAnswer (gs {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}) (S.cast S.alice slimeId)
+        entered = S.runPure S.identityAnswer cast Stack.resolveTop
+        placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+        resolved = List.foldl' (\g _ -> S.runPure S.identityAnswer g Stack.resolveTop) placed [1 .. (2 :: Int)]
+        after = S.runPure S.identityAnswer resolved Engine.settleForPriority
+    -- The discriminating pair, AHEAD of the stack-size proxy that would
+    -- otherwise absorb a trigger left targetless: a Slime trigger that could
+    -- not reach the enchantment's trigger would have let Aether Flash deal its
+    -- 2 to a 2/2.
+    Spec.assertEqWith s "Green Slime survives: the enchantment's trigger was countered (CR 701.6a)" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Green Slime")) S.alice after) 1
+    Spec.assertBool s (Set.notMember flashId (GameState.battlefield after)) "and Aether Flash was destroyed: a permanent's ability was countered this way (CR 113.7)"
+    Spec.assertEqWith s "Aether Flash is in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "both triggers went on the stack" (length (GameState.stack placed)) 2
+    Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+
 fizzleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
   Spec.it s "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $ do
@@ -2788,3 +2912,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   artificialEvolutionSpec s registry
   stifleSpec s registry
   squelchSpec s registry
+  greenSlimeSpec s registry

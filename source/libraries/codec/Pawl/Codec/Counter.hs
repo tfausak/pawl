@@ -16,8 +16,10 @@ codec :: Codec.Codec Counter.Counter
 codec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec Counter.ref
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Counter.slot
+  sources <- Fields.defaulted "sources" Nothing (Common.maybe SlotName.codec) Counter.sources
   pure
     Counter.MkCounter
       { Counter.ref = ref,
-        Counter.slot = slot
+        Counter.slot = slot,
+        Counter.sources = sources
       }

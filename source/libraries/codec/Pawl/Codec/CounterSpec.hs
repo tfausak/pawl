@@ -18,7 +18,7 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
     Common.assertCodec
       s
       Counter.codec
-      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing)
+      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing)
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"spell\"}} "
   -- Swift Silence's "counter all other spells. Draw a card for each spell
   -- countered this way".
@@ -26,6 +26,14 @@ spec s = Spec.describe s "Pawl.Codec.Counter" $ do
     Common.assertCodec
       s
       Counter.codec
-      (Counter.MkCounter (ObjectRef.EachSpell (Filter.Not Filter.IsSource)) (Just (SlotName.MkSlotName (Text.pack "countered"))))
+      (Counter.MkCounter (ObjectRef.EachSpell (Filter.Not Filter.IsSource)) (Just (SlotName.MkSlotName (Text.pack "countered"))) Nothing)
       " {\"ref\":{\"type\":\"EachSpell\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}},\"slot\":\"countered\"} "
+  -- Green Slime's "if a permanent's ability is countered this way, destroy that
+  -- permanent": the countered abilities' sources, bound for the Destroy to name.
+  Spec.it s "MkCounter, a targeted ability and its sources bound" $
+    Common.assertCodec
+      s
+      Counter.codec
+      (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ability"))) Nothing (Just (SlotName.MkSlotName (Text.pack "permanent"))))
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"ability\"},\"sources\":\"permanent\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Counter.codec

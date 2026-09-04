@@ -59,11 +59,12 @@ data Scope
     -- the redirected card wrong, because the card is no longer in the zone the
     -- fold reads.
     --
-    -- PUBLIC destinations only, and Pawl.Engine.Count.evaluate is where that is
-    -- enforced. CR 400.7j grants the find only "to a public zone" (CR 400.2's
-    -- list, which Pawl.Engine.Game.isHiddenZone encodes), and CR 701.9c leaves a
-    -- card discarded into a hidden zone with every characteristic undefined, so
-    -- there is nothing a Filter could honestly answer about it.
+    -- PUBLIC destinations, or a REVEALED arrival in a hidden one, and
+    -- Pawl.Engine.Count.findableAfterMove is where that is enforced. CR 400.7j
+    -- grants the find "to a public zone" (CR 400.2's list, which
+    -- Pawl.Engine.Game.isHiddenZone encodes), and CR 701.9c leaves a card
+    -- discarded into a hidden zone with every characteristic undefined only when
+    -- it got there without being revealed.
     --
     -- The slot names a CR 115.10a group binding rather than a target, so it is
     -- read through Pawl.Engine.Filter's slot map exactly as Filter.IsBound is.

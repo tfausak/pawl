@@ -568,7 +568,7 @@ objectRefPositions =
     ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
     ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
     ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing (plantedRef "rd-from") (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
-    ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing), [plantedRef "co"]),
+    ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing), [plantedRef "co"]),
     ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
     ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
     ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
@@ -3427,6 +3427,9 @@ canHostSubjects predicate = case predicate of
   Filter.Type.CanAttachToSubject -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsActivatedAbility -> 0
+  -- A DESCENT for RepresentedByCard's reason below, the nest describing the
+  -- ability's SOURCE.
+  Filter.Type.FromSource f -> canHostSubjects f
   Filter.Type.IsTapped -> 0
   Filter.Type.IsFaceDown -> 0
   -- A DESCENT for AttachedTo's reason, the nest describing the CARD representing
@@ -4560,6 +4563,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.CanAttachToSubject -> []
   Filter.Type.IsToken -> []
   Filter.Type.IsActivatedAbility -> []
+  -- DESCENT, for RepresentedByCard's reason below.
+  Filter.Type.FromSource f -> filterSlotsReadSingly f
   Filter.Type.IsTapped -> []
   Filter.Type.IsFaceDown -> []
   -- DESCENT, for the atom above's reason.
@@ -5516,7 +5521,7 @@ effectFilters effect = case effect of
   Effect.BecomesBlocked _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
-  Effect.Counter (Counter.MkCounter ref _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Counter (Counter.MkCounter ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
   -- All THREE positions: the ObjectRef carries Renegade Krasis' "each other
   -- creature you control with a +1/+1 counter on it", and a Filter there would
   -- otherwise escape the lint; the count is a Quantity like any other; and CR
@@ -5784,7 +5789,7 @@ effectObjectRefs effect = case effect of
   Effect.Fight {} -> []
   Effect.RemoveFromCombat ref -> read_ [ref]
   Effect.BecomesBlocked {} -> []
-  Effect.Counter (Counter.MkCounter ref _) -> read_ [ref]
+  Effect.Counter (Counter.MkCounter ref _ _) -> read_ [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
   -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the
