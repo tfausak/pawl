@@ -3307,7 +3307,77 @@ promiseOfTomorrowSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
+          Spec.assertEqWith s "became names the graveyard incarnation and departedPermanent the battlefield one" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.fromList [(Binding.became, Binding.toObject arrived), (Binding.departedPermanent, Binding.toObject departed)])
+
+-- CR 603.10a's departed permanent under a BYSTANDER's DIES trigger, which
+-- promiseOfTomorrowSpec above deliberately does not read: Promise of Tomorrow
+-- says "exile it" and means CR 400.7e's graveyard card, where this card says
+-- "for each counter on IT" and means the permanent as it last existed on the
+-- battlefield -- an object CR 122.2 stripped of its counters on the way out, so
+-- only CR 608.2h's record still answers.
+--
+-- Cleopatra, Exiled Pharaoh, {2}{B}{G} Legendary Creature -- Human Noble 2/4,
+-- second ability: "Whenever a legendary creature with counters on it dies, draw
+-- a card for each counter on it. You lose 2 life."
+--
+-- Three separations, so the draw count can only be the right one:
+--
+--   * The dead creature, NOT the trigger's source. Cleopatra herself carries
+--     five counters and bob's Jedit Ojanen three, so a payload that read
+--     CR 113.7a's source slot would draw five.
+--
+--   * The dead creature, NOT nothing. An unbound slot reads zero counters and
+--     draws no cards, which is what the mutation of the eventBindings arm
+--     produces.
+--
+--   * "a legendary creature", not "a creature". Carol's Goblin Piker dies under
+--     three counters of its own and Cleopatra says nothing, which is the second
+--     case below.
+--
+-- Bob's Jedit rather than alice's own: the printed condition has no "you
+-- control", and three seats keep the controller of the dead creature, the
+-- controller of the trigger and the bystander apart.
+--
+-- Alice's library is stocked past the largest wrong answer, so a draw of five
+-- would be observable rather than a CR 104.3c loss.
+cleopatraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cleopatraSpec s registry =
+  let cleopatraBoard = do
+        cleopatra <- S.printingOf s registry "Cleopatra, Exiled Pharaoh"
+        jedit <- S.printingOf s registry "Jedit Ojanen"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (cleoId, g1) = S.addCreature cleopatra S.alice S.threePlayerGame
+            (jeditId, g2) = S.addCreature jedit S.bob g1
+            (pikerId, g3) = S.addCreature piker S.carol g2
+            stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) g3 [1 :: Int .. 6]
+            countered = S.addCounter CounterKind.PlusOnePlusOne 3 pikerId (S.addCounter CounterKind.PlusOnePlusOne 3 jeditId (S.addCounter CounterKind.PlusOnePlusOne 5 cleoId stocked))
+        pure (jeditId, pikerId, countered)
+      -- promiseOfTomorrowSpec's road, and for its reason: one route to the
+      -- death, so CR 117.5 places the trigger before anything else runs.
+      killIt oid gs =
+        let killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [oid])
+            settled = S.runPure S.identityAnswer killed Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+   in Spec.describe s "CR 603.10a the permanent a BYSTANDER's dies trigger says \"it\" about" $ do
+        Spec.it s "CR 122.2 / 608.2h bob's Jedit Ojanen dies under three counters and alice draws three cards" $ do
+          (jeditId, _, board) <- cleopatraBoard
+          let (settled, after) = killIt jeditId board
+          Spec.assertEqWith
+            s
+            "three cards drawn -- the dead creature's counters, not Cleopatra's five and not nothing -- and two life lost"
+            (S.handSize S.alice after, S.lifeOf S.alice after)
+            (3, Just 18)
+          Spec.assertEqWith s "alice held nothing before the trigger resolved" (S.handSize S.alice settled) 0
+          Spec.assertEqWith s "and the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject jeditId after)) "the battlefield id is gone (CR 400.7)"
+        -- The control the case above cannot be read without, and the ONE thing
+        -- that differs is the dying creature's supertype: carol's Piker carries
+        -- the same three counters and dies on the same road.
+        Spec.it s "CR 205.4a a NONLEGENDARY creature dying with counters says nothing" $ do
+          (_, pikerId, board) <- cleopatraBoard
+          let (settled, after) = killIt pikerId board
+          Spec.assertEqWith s "no cards drawn and no life lost" (S.handSize S.alice after, S.lifeOf S.alice after) (0, Just 20)
+          Spec.assertEqWith s "because nothing triggered at all" (length (GameState.stack settled)) 0
 
 -- CR 607.2a's linked pair read from the SECOND ability, which is the half
 -- promiseOfTomorrowSpec above could not reach: "At the beginning of each end
@@ -5789,6 +5859,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   warpedDevotionSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
+  cleopatraSpec s registry
   promiseOfTomorrowReturnSpec s registry
   lookBackInterveningSpec s registry
   counterLookBackSpec s registry
