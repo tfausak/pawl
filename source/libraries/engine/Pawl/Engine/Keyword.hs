@@ -63,6 +63,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
@@ -538,7 +539,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   -- CR 702.6d: "if a permanent has multiple equip abilities, any of its equip
   -- abilities may be activated" -- so one ability per instance, crew's reading
   -- above.
-  Keyword.Equip cost -> List.genericReplicate count (equip cost)
+  Keyword.Equip payload -> List.genericReplicate count (equip payload)
   -- CR 702.67c, in CR 702.6d's words: any of a Fortification's fortify
   -- abilities may be used, so one ability per instance as equip is.
   Keyword.Fortify cost -> List.genericReplicate count (fortify cost)
@@ -854,12 +855,24 @@ outlast cost =
 -- an Equipment may only be attached to a creature at all -- is
 -- Pawl.Engine.Attach's and is not restated here.
 --
--- Not implemented: CR 702.6c's "equip [quality] creature" and CR 702.6e's "equip
--- planeswalker", neither of which Pawl.Types.Keyword's bare Cost can say (#2291).
-equip :: Cost Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
-equip cost =
+-- CR 702.6c's "equip [quality] creature" is Equip.quality, and it is a CONJUNCT
+-- ON THE TARGET FILTER and nothing else: that rule says outright that
+-- "additional restrictions for an equip ability don't restrict what the
+-- Equipment may be attached to", so Pawl.Engine.Attach.attachmentFor never sees
+-- it and a quality-equipped creature that stops having the quality keeps the
+-- Equipment. The rule's own "controlled by the player activating the ability"
+-- is the ControlledBy conjunct rule 702.6a already carries; the quality is
+-- appended to it rather than replacing it. Pawl.AuraSpec's "CR 702.6c" case is
+-- what proves the narrowing bites.
+--
+-- Not implemented: CR 702.6e's "equip planeswalker", which attaches to a
+-- planeswalker "as though that planeswalker were a creature" -- a different pool
+-- and an exception Pawl.Engine.Attach.attachmentFor's Equipment branch cannot be
+-- told about through Effect.Attach (#2291).
+equip :: Equip.Equip Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+equip payload =
   ActivatedAbility.MkActivatedAbility
-    { ActivatedAbility.cost = cost,
+    { ActivatedAbility.cost = Equip.cost payload,
       ActivatedAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton equipTarget slot)))
@@ -874,7 +887,7 @@ equip cost =
       ActivatedAbility.name = Nothing
     }
   where
-    slot = TargetSlot.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))
+    slot = TargetSlot.required Pool.Creatures (Just (Filter.And (Filter.ControlledBy PlayerRelation.You : Maybe.maybeToList (Equip.quality payload))))
     effect = Effect.Attach equipTarget
 
 -- The slot rule 702.6a's one target is chosen into, reinforceTarget's position.
@@ -886,7 +899,8 @@ equipTarget = SlotName.MkSlotName (Text.pack "equipped")
 -- where CR 301.5 has a creature, and everything that function's haddock says
 -- about the cost, about CR 115.1e putting "target land you control" in the RULE
 -- rather than on the card, and about CR 608.2b re-asking control at resolution
--- holds here word for word.
+-- holds here word for word. Not its QUALITY paragraph: rule 702.67 states no
+-- counterpart to CR 702.6c, so this payload stays a bare Cost.
 --
 -- Pool.Permanents narrowed by Filter.HasCardType Land, where equip takes
 -- Pool.Creatures whole: CR 115.1a gives the creature pool a constructor and

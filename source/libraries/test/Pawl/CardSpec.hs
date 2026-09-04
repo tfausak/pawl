@@ -154,6 +154,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
@@ -3623,10 +3624,11 @@ keywordFilters keyword = keywordFramed $ case keyword of
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
-  -- CR 702.6a's payload is a COST, level up's and outlast's shape below, so its
-  -- Filters are its components'. The "target creature you control" filter its
+  -- CR 702.6a's payload carries a COST, level up's and outlast's shape below, so
+  -- its Filters are its components' -- plus CR 702.6c's quality, which IS a
+  -- card's, cycling's shape above. The "target creature you control" filter its
   -- minted ability carries is the ENGINE's, never a card's.
-  Keyword.Equip cost -> costFilters cost
+  Keyword.Equip (Equip.MkEquip cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
   -- CR 702.67a's payload is equip's, and so is this: the "target land you
   -- control" filter its minted ability carries is the ENGINE's, never a card's.
   Keyword.Fortify cost -> costFilters cost
