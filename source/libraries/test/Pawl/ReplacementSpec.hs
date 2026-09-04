@@ -1487,9 +1487,9 @@ payNoHeedSpec s registry = Spec.describe s "Pay No Heed (CR 615.1)" $ do
 -- against api.scryfall.com 2026-09-04).
 --
 -- Pay No Heed above with one word added, and that word is the whole group: every
--- other prevention shield in data\/cards\/ writes the trivial `And []` there, so
--- until this card nothing proved CR 609.7a's candidate set was narrowed by a
--- prevention's printed properties at all.
+-- other prevention shield in data\/cards\/ that names a chosen source writes the
+-- trivial `And []` for it, so until this card nothing proved CR 609.7a's
+-- candidate set was narrowed by a prevention's printed properties at all.
 --
 -- Two seats: the card names nobody, and both red sources are bob's, so control
 -- is not what the assertions discriminate on.
