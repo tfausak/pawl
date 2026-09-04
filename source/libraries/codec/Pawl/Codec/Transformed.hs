@@ -2,10 +2,9 @@
 
 module Pawl.Codec.Transformed where
 
-import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Transformed as Transformed
 
@@ -14,9 +13,9 @@ import qualified Pawl.Types.Transformed as Transformed
 codec :: Codec.Codec Transformed.Transformed
 codec = Fields.object $ do
   object <- Fields.required "object" ObjectId.codec Transformed.object
-  names <- Fields.required "names" (Common.set CardName.codec) Transformed.names
+  characteristics <- Fields.required "characteristics" ProjectedCharacteristics.codec Transformed.characteristics
   pure
     Transformed.MkTransformed
       { Transformed.object = object,
-        Transformed.names = names
+        Transformed.characteristics = characteristics
       }

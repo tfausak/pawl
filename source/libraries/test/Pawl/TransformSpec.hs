@@ -106,6 +106,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -246,6 +247,7 @@ spec s registry = Spec.describe s "Transform" $ do
   enterTransformedSpec s registry
   transformedPermanentSpec s registry
   transformTriggerSpec s registry
+  bystanderTransformSpec s registry
   convertSpec s registry
   gainLifeConvertSpec s registry
   moreThanMeetsTheEyeSpec s registry
@@ -735,6 +737,11 @@ thallidFront = CardName.MkCardName (Text.pack "Blightreaper Thallid")
 thallidBack = CardName.MkCardName (Text.pack "Blightsower Thallid")
 saprolingToken = CardName.MkCardName (Text.pack "Phyrexian Saproling Token")
 
+-- What Cult of the Waxing Moon makes, and the quantity every bystander case
+-- below asserts.
+wolfToken :: CardName.CardName
+wolfToken = CardName.MkCardName (Text.pack "Wolf Token")
+
 -- The face Howlpack Piper turns INTO at nightfall, which is also the name its own
 -- printed trigger condition asks about.
 howlerName :: CardName.CardName
@@ -919,13 +926,13 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   -- because no BOARD can ask it: Pawl.Engine.Card gives a transforming permanent
   -- only the shown face's abilities, so a "transforms into X" trigger exists
   -- exactly when the permanent is showing X and every printed pair matches. The
-  -- name becomes load-bearing for the bystander form (#2050) and under a copy
-  -- effect, which is why the check is here rather than dropped -- a UNIT fence,
-  -- stated as one, since the gameplay cases above stay green without it.
+  -- name becomes load-bearing under a copy effect, which is why the check is
+  -- here rather than dropped -- a UNIT fence, stated as one, since the gameplay
+  -- cases above stay green without it.
   Spec.it s "CR 701.27e the condition refuses an event naming a different face" $ do
     let board = emptyBoard
         bearer = S.noSource
-        event into = GameEvent.Transformed (Transformed.MkTransformed bearer (Set.singleton into))
+        event into = GameEvent.Transformed (Transformed.MkTransformed bearer S.emptyCharacteristics {PC.names = Set.singleton into})
         matches into = Event.matchesTrigger board bearer S.alice (TriggerCondition.SelfTransformedInto thallidBack) (event into)
     Spec.assertBool s (matches thallidBack) "the face it names matches"
     Spec.assertBool s (not (matches thallidFront)) "and the other face of the same card does not"
@@ -1030,6 +1037,94 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
     Spec.assertEqWith s "the one creature card among the top six is in alice's hand" (zoneNames Zone.Hand after) ["Goblin Piker"]
     Spec.assertEqWith s "the three cards under the looked-at six are now the top three" (take 3 (zoneNames Zone.Library after)) ["Lightning Bolt", "Ancestral Recall", "Giant Growth"]
     Spec.assertEqWith s "it was night when the spell resolved" (GameState.daytime night) (Just Daytime.Night)
+
+-- CR 701.27e read by a BYSTANDER, which is the other half of that rule: "Some
+-- triggered abilities trigger when an object 'transforms into' an object with a
+-- specified characteristic." The fixture is Cult of the Waxing Moon, a {4}{G}
+-- 5/4 Creature -- Human Shaman reading "Whenever a permanent you control
+-- transforms into a non-Human creature, create a 2/2 green Wolf creature token."
+--
+-- It is the producer because its filter names all three axes the arm has to get
+-- right at once -- one control question, which no ProjectedCharacteristics
+-- carries (CR 109.3), and two characteristics, which the board can only be
+-- trusted for while nothing has turned again -- and because the token is a
+-- quantity nothing else on these boards can produce.
+--
+-- Every case turns the permanent over with the same `sweep` and asserts the same
+-- count. The first three differ from each other in one thing apiece; the last is
+-- the one board on which the sample and a live read part company.
+--
+-- The Cult itself is a creature the sweep names, and CR 701.27c leaves it alone:
+-- it is not double-faced, so no event is recorded for it. Were one recorded, the
+-- Cult is a Human and the filter would decline it anyway.
+bystanderTransformSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
+  -- The rule's own case. Aang is a Human on the face it turns FROM and not one on
+  -- the face it turns INTO, so a match reading the pre-transform characteristics
+  -- makes no Wolf at all -- which is what pins the sample to CR 701.27e's
+  -- "immediately after it does so" rather than to the moment the instruction ran.
+  Spec.it s "CR 701.27e a permanent alice controls turning into a non-Human creature makes the Wolf" $ do
+    cult <- S.printingOf s registry "Cult of the Waxing Moon"
+    aang <- S.printingOf s registry "Aang, at the Crossroads"
+    let (_, withCult) = S.addCreature cult S.alice emptyBoard
+        (aangId, board) = S.addCreature aang S.alice withCult
+        turned = sweep board
+        after = resolveStack (gather turned)
+    Spec.assertEqWith s "the trigger resolved into one Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 1
+    Spec.assertEqWith s "no Wolf exists before the trigger resolves" (S.countOnBattlefieldByName wolfToken S.alice turned) 0
+    Spec.assertEqWith s "Aang was a Human before the turn and is not one after" (fmap (Set.member Subtype.Human . Projection.subtypesOf aangId) [board, turned]) [True, False]
+    Spec.assertEqWith s "and Aang really did turn over" (faceNameOf aangId turned) (Just aangBack)
+  -- The same board with the Aang moved one seat: CR 109.5's "you" is the Cult's
+  -- controller, so a permanent BOB controls turning over is not a permanent alice
+  -- controls. Control is no characteristic (CR 109.3), so it rides no sample and
+  -- the arm reads it off the board; this board cannot tell the two reads apart,
+  -- and the one that could is the arm's own elision (#2050).
+  Spec.it s "CR 109.5 a permanent bob controls turning over makes none" $ do
+    cult <- S.printingOf s registry "Cult of the Waxing Moon"
+    aang <- S.printingOf s registry "Aang, at the Crossroads"
+    let (_, withCult) = S.addCreature cult S.alice emptyBoard
+        (aangId, board) = S.addCreature aang S.bob withCult
+        turned = sweep board
+        after = resolveStack (gather turned)
+    Spec.assertEqWith s "no Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 0
+    Spec.assertEqWith s "bob got none either" (S.countOnBattlefieldByName wolfToken S.bob after) 0
+    Spec.assertEqWith s "and the Aang really did turn over, so there WAS an event to decline" (faceNameOf aangId turned) (Just aangBack)
+  -- The filter's other characteristic limb, and the mirror of the first case's
+  -- timing: Ratchet is a creature on the face it turns FROM and, on an opponent's
+  -- turn with CR 702.161a's living metal switched off, not one on the face it
+  -- turns INTO. So a match reading the pre-transform characteristics makes a Wolf
+  -- here, where the rule makes none.
+  Spec.it s "CR 701.27e / 702.161a a permanent turning into a noncreature on bob's turn makes none" $ do
+    cult <- S.printingOf s registry "Cult of the Waxing Moon"
+    ratchet <- S.printingOf s registry "Ratchet, Field Medic"
+    let (_, withCult) = S.addCreature cult S.alice emptyBoard
+        (ratchetId, board) = S.addCreature ratchet S.alice withCult
+        bobsTurn = S.runPure S.identityAnswer board Engine.handoffTurn
+        turned = sweep bobsTurn
+        after = resolveStack (gather turned)
+    Spec.assertEqWith s "no Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 0
+    Spec.assertEqWith s "Ratchet was a creature before the turn and is not one after" (fmap (Set.member CardType.Creature . Projection.cardTypesOf ratchetId) [bobsTurn, turned]) [True, False]
+    Spec.assertEqWith s "it really did turn over" (faceNameOf ratchetId turned) (Just ratchetBack)
+    Spec.assertEqWith s "and it really is bob's turn" (GameState.activePlayer turned) S.bob
+  -- The only board that can tell the SAMPLE from a live read, and the one
+  -- Pawl.Types.Transformed's own argument names: a permanent that turns twice
+  -- before the CR 117.5 scan. Two turns is one resolution's two clauses -- CR
+  -- 701.27f's gate is only for a permanent's own ability, and `sweep` is neither
+  -- -- so both events wait for the same scan, at which the board shows the front
+  -- face and nothing else.
+  --
+  -- CR 701.27e reads each event at its own turn, so exactly one of the two is a
+  -- turn into a non-Human creature. An arm re-deriving the characteristics at the
+  -- scan sees a Human twice over and makes no Wolf at all.
+  Spec.it s "CR 701.27e each event is read at its own turn, not at the scan" $ do
+    cult <- S.printingOf s registry "Cult of the Waxing Moon"
+    aang <- S.printingOf s registry "Aang, at the Crossroads"
+    let (_, withCult) = S.addCreature cult S.alice emptyBoard
+        (aangId, board) = S.addCreature aang S.alice withCult
+        turned = sweep (sweep board)
+        after = resolveStack (gather turned)
+    Spec.assertEqWith s "the one turn into a non-Human made one Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 1
+    Spec.assertEqWith s "and the scan saw a Human, the permanent being back on its front face" (faceNameOf aangId turned) (Just aangFront)
 
 -- "Destroy each Fungus", which on this board is the Thallid alone -- the
 -- Saproling the transform limb made is a Phyrexian Saproling and not one.
@@ -1253,7 +1348,7 @@ convertSpec s registry = Spec.describe s "Convert" $ do
         settled = S.runPure S.identityAnswer (S.markDamage golemId 2 board) Engine.settleForPriority
         after = S.runPure S.identityAnswer settled Stack.resolveTop
         transformedInto =
-          [ Transformed.names t
+          [ PC.names (Transformed.characteristics t)
           | GameEvent.Transformed t <- S.eventsOf after,
             Transformed.object t == ratchetId
           ]
