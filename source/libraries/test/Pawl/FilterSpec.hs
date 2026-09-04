@@ -755,6 +755,36 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a nameless candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches (named ["Chromatic Star"]) blackCreature Filter.Type.HasChosenName)) "no names"
 
+  -- CR 702.16k: what the carrier's chosen player CONTROLS, plus what they OWN
+  -- that no other player controls. `blackCreature` is controlled by player 0 and
+  -- owned by player 1, which is the one view that tells the two halves apart.
+  Spec.describe s "OfChosenPlayer" $ do
+    let chose n = self {Filter.carrierChosenPlayer = Just (PlayerId.MkPlayerId n)}
+        loose = blackCreature {Filter.controller = Nothing}
+    Spec.it s "matches an object the chosen player controls" $ do
+      Spec.assertBool s (Filter.matches (chose 0) blackCreature Filter.Type.OfChosenPlayer) "controlled by the chosen player"
+
+    -- The rule's own exclusion, and the half a naive "controls or owns" reading
+    -- loses: player 1 owns this creature, and player 0 controls it.
+    Spec.it s "CR 702.16k does not match an owned object another player controls" $ do
+      Spec.assertBool s (not (Filter.matches (chose 1) blackCreature Filter.Type.OfChosenPlayer)) "owned but controlled elsewhere"
+
+    -- CR 108.4: a card outside the battlefield and the stack has no controller,
+    -- which is what "not controlled by another player" reaches.
+    Spec.it s "CR 108.4 matches an owned object nobody controls" $ do
+      Spec.assertBool s (Filter.matches (chose 1) loose Filter.Type.OfChosenPlayer) "owned and uncontrolled"
+
+    Spec.it s "does not match an object a third player owns and nobody controls" $ do
+      Spec.assertBool s (not (Filter.matches (chose 2) loose Filter.Type.OfChosenPlayer)) "somebody else's card"
+
+    -- This atom's vacuous direction, and the reason the position lint exists.
+    Spec.it s "a carrier that chose nobody is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.OfChosenPlayer)) "contextFor leaves it Nothing"
+
+    -- CR 109.1: a player is not an object, so neither half can name one.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (chose 0) aPlayer Filter.Type.OfChosenPlayer)) "player"
+
   Spec.describe s "IsAttacking" $ do
     Spec.it s "matches a view whose combat status says so" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.attacking = True}) Filter.Type.IsAttacking) "attacking"

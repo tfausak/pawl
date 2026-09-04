@@ -974,12 +974,15 @@ data Context = MkContext
     -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
     -- and slotNames' siblings each have.
     sourceAttachedTo :: Maybe ObjectId.ObjectId,
-    -- CR 201.4: the names the SOURCE has already chosen during this resolution,
-    -- for the one atom that compares a candidate's against them (HasChosenName,
-    -- Ancient Vendetta). Supplied by the caller for slotNames' reason -- this
-    -- module holds no game state and cannot read an object's chosen names -- and
-    -- by ONE caller, Pawl.Engine.Resolve's Effect.Search arm, which is the only
-    -- position a card may write the atom in.
+    -- CR 201.4: the names the SOURCE has chosen, for the one atom that compares a
+    -- candidate's against them (HasChosenName, Ancient Vendetta). Supplied by the
+    -- caller for slotNames' reason -- this module holds no game state and cannot
+    -- read an object's chosen names -- and by TWO callers:
+    -- Pawl.Engine.Resolve's Effect.Search arm, which is the only position a CARD
+    -- may write the atom in (CR 608.2c's choice during a resolution), and
+    -- Pawl.Engine.Replacement.candidateContext, where the atom is written by rule
+    -- 702.16e's MINTED player-protection shield rather than by card data (CR
+    -- 614.1c's as-enters choice, Runed Halo).
     --
     -- The SOURCE's and not a slot's, which is what separates it from slotNames
     -- above: CR 201.4's name is not an object, so no slot ever holds it, and
@@ -993,14 +996,42 @@ data Context = MkContext
     --
     -- EMPTY in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is
-    -- vacuously False in every position but a search's filter -- an empty
+    -- vacuously False in every position but those two -- an empty
     -- intersection, which is this atom's arm answering rather than a posture the
     -- record enforces; slotControllers' atom answers True on ITS unfilled read.
     -- What keeps a card out of those positions
     -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
     -- filter", the sweep sourcePower's, slotNames' and sourceAttachedTo's siblings
-    -- each have.
-    sourceChosenNames :: Set.Set CardName.CardName
+    -- each have -- a fence over CARD data, which the replacement filler above is
+    -- not.
+    sourceChosenNames :: Set.Set CardName.CardName,
+    -- CR 702.16k: the player chosen (CR 614.1c) by the permanent whose
+    -- PROTECTION ability wrote the filter being matched, for the one atom that
+    -- asks after them (OfChosenPlayer, True-Name Nemesis). Supplied by the
+    -- caller for slotNames' reason, and by the four positions rule 702.16 reads a
+    -- quality in: Pawl.Engine.Replacement.candidateContext (rule 702.16e's
+    -- shield), Pawl.Engine.Target.targetable (rule 702.16b),
+    -- Pawl.Engine.AttachRestriction.refusesGiven (rules 702.16c and 702.16d) and
+    -- Pawl.Engine.CombatRestriction.cantBeBlockedBy (rule 702.16f).
+    --
+    -- The CARRIER's and not `source`'s, which is what separates it from
+    -- sourceChosenNames above: in three of those four positions the carrier IS
+    -- the context's source, but rule 702.16b's quality is matched AGAINST the
+    -- aiming object, so Pawl.Engine.Target puts that object in `source` and the
+    -- protected candidate here.
+    --
+    -- Read LIVE off the board, sourceChosenNames' posture: CR 609.7b rechecks a
+    -- prevention shield's source half at the event, and a permanent's static
+    -- ability is asked afresh every time.
+    --
+    -- Nothing in contextFor below and so in contextWithSlots and
+    -- contextComparingPower too, so the atom is vacuously False in every position
+    -- but those four -- sourceAttachedTo's posture rather than slotControllers'.
+    -- What keeps a card out of the other positions is Pawl.CardSpec's "CR 702.16k
+    -- no card asks OfChosenPlayer outside a keyword's own filter", the sweep
+    -- sourcePower's, slotNames', sourceAttachedTo's and sourceChosenNames'
+    -- siblings each have.
+    carrierChosenPlayer :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)
 
@@ -1024,10 +1055,16 @@ data Context = MkContext
 -- no honest player to substitute.
 --
 -- CR 201.4's chosen-name atom is a further one a CARD may write (Ancient
--- Vendetta), and it reads the empty set here in every position but the ONE that
--- supplies it -- Pawl.Engine.Resolve's Effect.Search arm, which builds its
--- context from this function and then overlays sourceChosenNames. See that field
--- above for the lint that keeps a card to that position.
+-- Vendetta), and it reads the empty set here in every position but the two that
+-- supply it -- Pawl.Engine.Resolve's Effect.Search arm, which builds its context
+-- from this function and then overlays sourceChosenNames, and
+-- Pawl.Engine.Replacement.candidateContext, which does the same for a minted row.
+-- See that field above for the lint that keeps a card to the first.
+--
+-- CR 702.16k's chosen-player atom (True-Name Nemesis) is a further one a CARD may
+-- write, and it reads the Nothing here in every position but the four rule 702.16
+-- reads a protection quality in -- see carrierChosenPlayer above for the list and
+-- for the lint that keeps a card to them.
 --
 -- CR 110.2's same-controller atom (Bioshift) is the one whose unfilled read does
 -- NOT match nothing, so the paragraphs above are a finding per atom rather than
@@ -1040,7 +1077,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1071,7 +1108,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -1268,6 +1305,17 @@ matches context view predicate = case predicate of
   -- nothing, and a candidate with no name at all (CR 708.2a), each leave one side
   -- empty and answer False without a case of their own.
   Filter.HasChosenName -> not (Set.disjoint (names view) (sourceChosenNames context))
+  -- CR 702.16k's two halves in one disjunction: what the chosen player CONTROLS,
+  -- and what they OWN that no other player controls -- which is the second half's
+  -- whole content, CR 108.4 leaving a card outside the battlefield and the stack
+  -- with no controller at all. A carrier that chose nobody matches nothing.
+  --
+  -- No characteristic is read, deliberately: the rule ends "regardless of that
+  -- object's characteristic values", so this arm is the one quality that asks who
+  -- an object belongs to rather than what it looks like.
+  Filter.OfChosenPlayer -> case carrierChosenPlayer context of
+    Nothing -> False
+    Just pid -> controller view == Just pid || (owner view == Just pid && Maybe.isNothing (controller view))
   -- CR 115.1's "target opponent". The same CR 102.3 reading the ControlledBy arm
   -- above argues for. Vacuously False for an object candidate,
   -- which has no playerIdentity, and for a match with no perspective.
@@ -1565,6 +1613,7 @@ rewrite pairs predicate = case predicate of
   Filter.SameNameAsBound _ -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.HasChosenName -> predicate
+  Filter.OfChosenPlayer -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
   -- atom names a slot rather than a subtype.
@@ -2002,6 +2051,7 @@ bakeBound players predicate = case predicate of
   Filter.SameNameAsBound _ -> predicate
   Filter.SameControllerAsBound _ -> predicate
   Filter.HasChosenName -> predicate
+  Filter.OfChosenPlayer -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
   -- holding an OBJECT -- there is nothing here to substitute.
@@ -2128,6 +2178,7 @@ manaValueThresholds predicate = case predicate of
   Filter.SameNameAsBound _ -> []
   Filter.SameControllerAsBound _ -> []
   Filter.HasChosenName -> []
+  Filter.OfChosenPlayer -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
   -- No threshold: the literal bounds a COUNT OF CARDS in a zone, not a mana
@@ -2254,6 +2305,12 @@ statesAQuality predicate = case predicate of
   -- description is a card name whichever way the name was arrived at, so a search
   -- whose filter is this one may decline to find what it can see.
   Filter.HasChosenName -> True
+  -- CR 701.23b's "stated quality" too, and rule 702.16k's own "regardless of
+  -- that object's characteristic values" is not a counter-argument: the rule
+  -- excuses the PROTECTION from reading characteristics, where this predicate
+  -- asks whether a search's description is trivially true, and "a card that
+  -- player owns" is not.
+  Filter.OfChosenPlayer -> True
   Filter.IsPlayer _ -> True
   Filter.IsControllerOfBound _ -> True
   Filter.CardsInGraveyardAtLeast _ -> True

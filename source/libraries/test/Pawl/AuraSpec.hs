@@ -2219,6 +2219,35 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     Spec.assertEqWith s "CR 702.16c: the Aura lands on the Mammoth, not the protected creature" (fmap Object.attachedTo (Game.lookupObject auraId after)) (Just (Just (Recipient.ToCreature willing)))
     Spec.assertEqWith s "so the Mammoth carries the +2/+1" (S.powerToughnessOf willing after) (Just (5, 4))
     Spec.assertEqWith s "and the Apostle is untouched" (S.powerToughnessOf protected after) (Just (2, 1))
+  -- CR 702.16k's Aura sentence: "Such a permanent or player ... can't be
+  -- enchanted by Auras that player controls." True-Name Nemesis, whose quality is
+  -- Filter.OfChosenPlayer -- read by Pawl.Engine.AttachRestriction.refusesGiven
+  -- off Filter.Context.carrierChosenPlayer, which it fills off the minted row's
+  -- source (the protected host itself).
+  --
+  -- THREE SEATS and a pair of boards differing only in WHOM the Nemesis chose.
+  -- alice's Pacifism is an ordinary white Aura with no quality of its own, so
+  -- nothing but who CONTROLS it can decide the case, and two seats would collapse
+  -- "the chosen player" onto alice.
+  --
+  -- The choice ARRIVES AFTER the attachment, the road the case below already
+  -- takes: the attach gate would otherwise refuse the pairing and there would be
+  -- no standing Aura for CR 704.5m to bury. The stamp stands in for the entry
+  -- choice, whose own road is proved by Pawl.DamageSpec's True-Name Nemesis group.
+  Spec.it s "CR 702.16k whole cards: a Nemesis that chose alice buries her Aura, and one that chose carol keeps it" $ do
+    nemesis <- S.printingOf s registry "True-Name Nemesis"
+    pacifism <- S.printingOf s registry "Pacifism"
+    let (nemesisId, base1) = S.addCreature nemesis S.bob S.threePlayerGame
+        (auraId, base2) = S.addCreature pacifism S.alice base1
+        wearing = S.attach auraId nemesisId base2
+        chose who = S.settleSba (wearing {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just who}) nemesisId (GameState.objects wearing)})
+        choseAlice = chose S.alice
+        choseCarol = chose S.carol
+    Spec.assertBool s (Set.member auraId (GameState.battlefield (S.settleSba wearing))) "before any choice the Aura is legally attached"
+    Spec.assertBool s (not (Set.member auraId (GameState.battlefield choseAlice))) "CR 702.16k / 704.5m alice was chosen, so her Aura is off the battlefield after one pass"
+    Spec.assertBool s (Set.member auraId (GameState.battlefield choseCarol)) "and with carol chosen instead the same Aura stays where it is"
+    Spec.assertEqWith s "CR 704.5m in its owner's graveyard, and alice owns it" (length (Game.zoneMembers Zone.Graveyard S.alice choseAlice)) 1
+
   -- CR 702.16c's and CR 702.16d's SECOND sentences, on one board and in one
   -- state-based pass, because they differ in exactly the way the two rules say:
   -- the Aura is put into its owner's graveyard and the Equipment stays on the

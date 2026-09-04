@@ -955,6 +955,11 @@ controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $
     Spec.assertEqWith s "alice has it back" (Projection.controllerOf creature returned) (Just S.alice)
     Spec.assertBool s (not (Combat.canAttack S.alice creature returned)) "but not continuously, so it cannot attack"
 
+-- CR 614.1c's as-enters choice of a player, stamped onto a permanent a fixture
+-- placed rather than cast (S.addCreature runs no entry loop).
+chosePlayer :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+chosePlayer pid oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just pid}) oid (GameState.objects gs)}
+
 -- Declare attackers with everything, then hand back the state and the ids.
 attacking :: [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 attacking mine theirs =
@@ -1122,6 +1127,36 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton a)) gs)) "the black Cabal Evangel may not block it (CR 702.16f)"
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton red (Set.singleton a)) gs) "the red Goblin Piker beside it may"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
+  -- CR 702.16k: "Such a permanent ... can't be blocked by creatures that player
+  -- controls." True-Name Nemesis, whose quality is Filter.OfChosenPlayer -- the
+  -- one quality that asks who an object BELONGS TO rather than what it looks
+  -- like, answered off Filter.Context.carrierChosenPlayer, which
+  -- Pawl.Engine.CombatRestriction.cantBeBlockedBy fills off the attacker.
+  --
+  -- A PAIR ON ONE BOARD, differing only in WHOM the Nemesis chose. The blocker is
+  -- the same red Goblin Piker bob controls in both rows, so an implementation
+  -- that stopped every blocker fails the second leg, and one that read "an
+  -- opponent" rather than the chosen seat fails it too: alice is the Nemesis's
+  -- own controller, and rule 702.16k names what the CHOSEN player controls.
+  --
+  -- The choice is stamped rather than cast for, which the case below asserts: the
+  -- entry road that writes it is proved by Pawl.DamageSpec's True-Name Nemesis
+  -- group and Pawl.ReplacementSpec's Stuffy Doll group, and a combat fixture
+  -- cannot reach a cast.
+  Spec.it s "CR 702.16k True-Name Nemesis can't be blocked by the chosen player's creature, and can by another's" $ do
+    nemesis <- S.printingOf s registry "True-Name Nemesis"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs) = S.combatBoardOf [nemesis] [piker]
+        declared who attacker = snd (Engine.runGamePure S.aggressiveAnswer (chosePlayer who attacker base) (Combat.declareAttackers S.manaPerformer S.alice))
+    case (mine, theirs) of
+      (a : _, blocker : _) -> do
+        let chosenBob = declared S.bob a
+            chosenAlice = declared S.alice a
+            blocks = Map.singleton blocker (Set.singleton a)
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob blocks chosenBob)) "CR 702.16k bob was chosen, so bob's Goblin Piker may not block it"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks chosenAlice) "and with alice chosen instead the same Piker may"
+        Spec.assertEqWith s "CR 614.1c and the two boards really differ in the seat the Nemesis chose" (Game.lookupObject a chosenBob >>= Object.chosenPlayer, Game.lookupObject a chosenAlice >>= Object.chosenPlayer) (Just S.bob, Just S.alice)
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $ do
     -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
     -- fails if evasion is wrongly implemented as a filter on the candidates.

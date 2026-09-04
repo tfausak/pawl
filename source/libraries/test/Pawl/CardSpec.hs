@@ -3426,6 +3426,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.SameNameAsBound _ -> 0
   Filter.Type.SameControllerAsBound _ -> 0
   Filter.Type.HasChosenName -> 0
+  Filter.Type.OfChosenPlayer -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   -- Zero for the nullary atoms' reason, a payload over: CR 400.1's card count is
   -- a Natural, which holds no Filter for a card author to reach.
@@ -4567,6 +4568,8 @@ filterSlotsReadSingly predicate = case predicate of
   -- Reads the whole set too, one field further over.
   Filter.Type.SameControllerAsBound _ -> []
   Filter.Type.HasChosenName -> []
+  -- Reads no slot at all: rule 702.16k's player arrives on Filter.Context.
+  Filter.Type.OfChosenPlayer -> []
   Filter.Type.IsPlayer _ -> []
   -- The one arm with an answer: the candidate is the controller of the object
   -- the slot names (CR 608.2h), read through slotOneObject.
@@ -6302,10 +6305,12 @@ hasChosenNameCounts card =
    in (total True, total False)
 
 -- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
--- is filled, and Pawl.Engine.Resolve's Effect.Search arm is the one site that
--- fills it. Filter.contextFor, Filter.contextWithSlots, Filter.contextComparingPower
--- and Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName
--- in a target slot, an affected set, a Count filter or a cost criterion is a silent
+-- is filled, and Pawl.Engine.Resolve's Effect.Search arm is the one site a CARD
+-- can reach that fills it -- Pawl.Engine.Replacement.candidateContext is the
+-- other, and rule 702.16e's minted shield is the only filter written there.
+-- Filter.contextFor, Filter.contextWithSlots, Filter.contextComparingPower and
+-- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
+-- a target slot, an affected set, a Count filter or a cost criterion is a silent
 -- False rather than a rejected card. This is where that is made loud.
 --
 -- The SAME framing canAttachToSubjectOffends fences, and for a different rule:
@@ -6325,6 +6330,53 @@ hasChosenNameOffends :: Face.Face Card.Type.Card -> Bool
 hasChosenNameOffends card =
   let (framed, elsewhere) = hasChosenNameCounts card
    in elsewhere /= 0 || framed + elsewhere /= jsonAtoms hasChosenNameTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The CR 702.16k chosen-player tag, spelled once.
+ofChosenPlayerTag :: Text.Text
+ofChosenPlayerTag = Text.pack "OfChosenPlayer"
+
+-- How many CR 702.16k chosen-player atoms this card carries inside a KEYWORD's
+-- own filter, and how many anywhere else. The second number is the offence; the
+-- first is what True-Name Nemesis legitimately has one of.
+ofChosenPlayerCounts :: Face.Face Card.Type.Card -> (Int, Int)
+ofChosenPlayerCounts card =
+  let total wanted = sum [filterAtoms ofChosenPlayerTag f | (framing, f) <- cardFilters card, (framing == KeywordFramed) == wanted]
+   in (total True, total False)
+
+-- CR 702.16k's chosen player is answerable only where
+-- Filter.Context.carrierChosenPlayer is filled, and the four fillers are the four
+-- positions rule 702.16 reads a protection QUALITY in
+-- (Pawl.Engine.Replacement.candidateContext, Pawl.Engine.Target.targetable,
+-- Pawl.Engine.AttachRestriction.refusesGiven,
+-- Pawl.Engine.CombatRestriction.cantBeBlockedBy). Every one of them takes the
+-- filter off a keyword, so a target slot, an affected set, a Count filter or a
+-- cost criterion asking this atom is a silent False rather than a rejected card.
+-- This is where that is made loud.
+--
+-- The frame is KEYWORD rather than PROTECTION, which is wider than rule 702.16k
+-- alone, and the width cuts two ways. CR 702.11d's hexproof quality is the
+-- harmless half: Pawl.Engine.Target.targetable evaluates it against the very
+-- Context that fills the field, so a hexproof-from-the-chosen-player card would
+-- be answerable in that one position too.
+--
+-- CR 702.14a's landwalk is the other half, and this frame admits it while nothing
+-- answers it: Pawl.Engine.Combat.landwalkAllowsGiven matches the criterion
+-- through a plain Filter.contextFor, which leaves carrierChosenPlayer Nothing, so
+-- `Landwalk OfChosenPlayer` would pass this lint and be vacuously False. No
+-- printing can reach it -- rule 702.14a's quality is "usually a land type, but it
+-- can also be the card type land plus any combination of land types, card types,
+-- and/or supertypes", a list with no player on it -- so the hole is unreachable
+-- rather than merely unoccupied. Narrowing the fence to Keyword.Protection is not
+-- a one-line change: `keywordFramed` tags every keyword's filter alike, and
+-- telling them apart wants a Framing this type does not draw.
+--
+-- Two offences under one name, for hasChosenNameOffends' two reasons: the
+-- traversal found the atom outside a keyword, or the traversal and the codec
+-- disagree about how many the card holds.
+ofChosenPlayerOffends :: Face.Face Card.Type.Card -> Bool
+ofChosenPlayerOffends card =
+  let (framed, elsewhere) = ofChosenPlayerCounts card
+   in elsewhere /= 0 || framed + elsewhere /= jsonAtoms ofChosenPlayerTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- The CR 709.4a tag, spelled once.
 sameNameAsBoundTag :: Text.Text
@@ -9732,6 +9784,27 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       "and it is the pool's only one"
       (sum (fmap (uncurry (+) . hasChosenNameCounts . S.combinedFace) ps))
+      1
+  -- CR 702.16k's chosen player in the same frame one atom over: answerable only
+  -- where a protection quality is read, and every one of those four positions
+  -- takes its filter off a keyword. See ofChosenPlayerOffends for the two
+  -- offences.
+  Spec.it s "CR 702.16k no card asks OfChosenPlayer outside a keyword's own filter" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace ofChosenPlayerOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in a keyword's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and the one card that does is
+    -- ACCEPTED here rather than skipped.
+    nemesis <- S.printingOf s registry "True-Name Nemesis"
+    Spec.assertEqWith
+      s
+      "True-Name Nemesis's one atom is framed by its own keyword"
+      (ofChosenPlayerCounts (S.combinedFace nemesis))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and it is the pool's only one"
+      (sum (fmap (uncurry (+) . ofChosenPlayerCounts . S.combinedFace) ps))
       1
   -- CR 701.23a: a search looks through a zone, so one naming none can find
   -- nothing. Nothing else catches an empty set. Search.zones is defaulted-absent
