@@ -483,6 +483,11 @@ data Prompt r where
   -- | CR 601.2b: which mana type CR 107.4e's colour\/colour hybrid ({G\/U})
   -- takes; AnnouncePhyrexianPayment's contract, elided when only one half is
   -- payable and for the degenerate `Hybrid t t`.
+  --
+  -- Both halves spend one mana, so this never changes CR 601.2f's total. What
+  -- it changes is WHICH unit of an oversupplied pool is consumed, and so what
+  -- floats -- proven by Pawl.ManaSpec's "CR 601.2b whichever half of {G\/U} is
+  -- announced, the OTHER floats" Gyre Engineer case.
   AnnounceHybridHalf :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaSymbol.ManaSymbol -> NonEmpty.NonEmpty ManaType.ManaType -> Prompt ManaType.ManaType
   -- | CR 118.7e: which half of a hybrid symbol a cost reduction is applied as,
   -- at CR 601.2f, answered with the resulting symbol; not filtered by
