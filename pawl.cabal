@@ -1257,6 +1257,7 @@ library test
   hs-source-dirs: source/libraries/test
   -- cabal-gild: discover source/libraries/test
   exposed-modules:
+    Pawl.AbilitySlotLintSpec
     Pawl.ActivateSpec
     Pawl.AdventureSpec
     Pawl.AttackKeywordTriggerSpec
@@ -1299,6 +1300,7 @@ library test
     Pawl.DetainSpec
     Pawl.DiceSpec
     Pawl.DungeonSpec
+    Pawl.EffectLintSpec
     Pawl.EngineSpec
     Pawl.EntryReplacementSpec
     Pawl.EntryRestrictionSpec
@@ -1307,6 +1309,7 @@ library test
     Pawl.ExileSpec
     Pawl.ExpirySpec
     Pawl.FaceDownSpec
+    Pawl.FilterPositionLintSpec
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.GoadSpec

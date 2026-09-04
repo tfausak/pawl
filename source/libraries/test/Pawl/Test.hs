@@ -2,6 +2,7 @@ module Pawl.Test where
 
 import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
+import qualified Pawl.AbilitySlotLintSpec
 import qualified Pawl.ActivateSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AttackKeywordTriggerSpec
@@ -449,6 +450,7 @@ import qualified Pawl.DepartureSpec
 import qualified Pawl.DetainSpec
 import qualified Pawl.DiceSpec
 import qualified Pawl.DungeonSpec
+import qualified Pawl.EffectLintSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EntryReplacementSpec
 import qualified Pawl.EntryRestrictionSpec
@@ -467,6 +469,7 @@ import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.Extra.SemigroupSpec
 import qualified Pawl.Extra.Word8Spec
 import qualified Pawl.FaceDownSpec
+import qualified Pawl.FilterPositionLintSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.GameSpec
 import qualified Pawl.GoadSpec
@@ -621,6 +624,9 @@ spec s registry = do
   Pawl.BattleSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardSpec.spec s registry
+  Pawl.AbilitySlotLintSpec.spec s registry
+  Pawl.EffectLintSpec.spec s registry
+  Pawl.FilterPositionLintSpec.spec s registry
   Pawl.CardsSpec.spec s
   Pawl.CaseSpec.spec s registry
   Pawl.ClassSpec.spec s registry
