@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Pawl.Engine.Combat over costs and requirements to attack or block (CR 508.1d,
--- CR 509.1c): attack and block costs, entering blocking, exert, Alluring Siren,
+-- Pawl.Engine.Combat over costs and requirements to attack or block (CR 508.1,
+-- CR 509.1): attack and block costs, entering blocking, exert, Alluring Siren,
 -- Public Enemy, a random opponent, and the declaration retry. Split out of
 -- Pawl.CombatEffectSpec, which keeps the machinery.
 module Pawl.CombatCostSpec where

@@ -1,10 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Pawl.Engine.Combat over attack targets other than a player (CR 506.1, CR
--- 508.1) and the defending player they imply: planeswalkers, battles, shared
--- blockers, last-known and split defenders, Soul Snare and Meandering
--- Towershell. Split out of Pawl.CombatEffectSpec, which keeps the machinery.
+-- Pawl.Engine.Combat over attack targets other than a player (CR 508.1) and
+-- the defending player they imply: planeswalkers, battles, shared blockers,
+-- last-known and split defenders, Soul Snare and Meandering Towershell. Split out of Pawl.CombatEffectSpec, which keeps the machinery.
 module Pawl.PlaneswalkerCombatSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
