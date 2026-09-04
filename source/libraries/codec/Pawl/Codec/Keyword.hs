@@ -2,6 +2,7 @@ module Pawl.Codec.Keyword where
 
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Cycling as Cycling
+import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Morph as Morph
 import qualified Pawl.Codec.Reinforce as Reinforce
@@ -29,7 +30,7 @@ codec =
     [ Arm.nullary "Deathtouch" Keyword.Deathtouch,
       Arm.nullary "Defender" Keyword.Defender,
       Arm.nullary "DoubleStrike" Keyword.DoubleStrike,
-      Arm.payload "Equip" (Cost.codec codec) Keyword.Equip (\x -> case x of Keyword.Equip y -> Just y; _ -> Nothing),
+      Arm.payload "Equip" (Equip.codec codec) Keyword.Equip (\x -> case x of Keyword.Equip y -> Just y; _ -> Nothing),
       Arm.nullary "FirstStrike" Keyword.FirstStrike,
       Arm.nullary "Flash" Keyword.Flash,
       Arm.nullary "Flying" Keyword.Flying,

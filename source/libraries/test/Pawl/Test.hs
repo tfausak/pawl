@@ -170,6 +170,7 @@ import qualified Pawl.Codec.EntryRSpec
 import qualified Pawl.Codec.EntryRestrictionSpec
 import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
+import qualified Pawl.Codec.EquipSpec
 import qualified Pawl.Codec.EventGroupSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExcessDestinationSpec
@@ -755,6 +756,7 @@ spec s registry = do
   Pawl.Codec.EntryRestrictionSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
+  Pawl.Codec.EquipSpec.spec s
   Pawl.Codec.EventGroupSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExcessDestinationSpec.spec s

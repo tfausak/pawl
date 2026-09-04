@@ -3,6 +3,7 @@ module Pawl.Types.Keyword where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Cycling as Cycling
+import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.Reinforce as Reinforce
@@ -32,8 +33,8 @@ import qualified Pawl.Types.Reinforce as Reinforce
 -- Set -- see Pawl.Types.Face.keywords.
 --
 -- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
--- Filter has a HasKeyword arm and this type carries a Filter (702.11d, 702.14c,
--- 702.29e) and a Cost (702.29a/702.33a/702.34a/702.42a) whose components carry one too, so the
+-- Filter has a HasKeyword arm and this type carries a Filter (702.6c, 702.11d,
+-- 702.14c, 702.29e) and a Cost (702.29a/702.33a/702.34a/702.42a) whose components carry one too, so the
 -- three would be a module cycle if any were concrete. They are parametric and
 -- this one is not, which makes `Filter Keyword` and `Cost Keyword` the only
 -- instantiations anywhere.
@@ -43,11 +44,11 @@ data Keyword
   | DoubleStrike -- 702.4
   | -- | 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
     -- creature you control. Activate only as a sorcery." One ability per
-    -- instance (CR 702.6d).
+    -- instance (CR 702.6d), and CR 702.6c's optional quality on the payload.
     --
-    -- Not implemented: CR 702.6c's "equip [quality] creature", which narrows the
-    -- TARGET only, and CR 702.6e's "equip planeswalker" (#2291).
-    Equip (Cost.Cost Keyword)
+    -- Not implemented: CR 702.6e's "equip planeswalker", whose ability attaches
+    -- to a different pool "as though that planeswalker were a creature" (#2291).
+    Equip (Equip.Equip Keyword)
   | FirstStrike -- 702.7
   | -- | 702.8a: may be played any time you could cast an instant.
     Flash

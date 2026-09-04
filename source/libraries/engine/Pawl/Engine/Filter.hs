@@ -17,6 +17,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCards as DiscardCards
+import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -1883,9 +1884,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Evolve -> keyword
   Keyword.Type.Dethrone -> keyword
   Keyword.Type.Fuse -> keyword
-  -- CR 702.6a's equip cost, level up's and outlast's shape. CR 702.67a's
-  -- fortify cost is the same.
-  Keyword.Type.Equip cost -> Keyword.Type.Equip (rewriteCost pairs cost)
+  -- CR 702.6a's equip cost, level up's and outlast's shape, plus CR 702.6c's
+  -- quality, which is a Filter and so descends the way cycling's does. CR
+  -- 702.67a's fortify cost is the cost half alone.
+  Keyword.Type.Equip (Equip.MkEquip cost criterion) -> Keyword.Type.Equip (Equip.MkEquip (rewriteCost pairs cost) (fmap (rewrite pairs) criterion))
   Keyword.Type.Fortify cost -> Keyword.Type.Fortify (rewriteCost pairs cost)
   Keyword.Type.CumulativeUpkeep cost -> Keyword.Type.CumulativeUpkeep (rewriteCost pairs cost)
   Keyword.Type.LevelUp cost -> Keyword.Type.LevelUp (rewriteCost pairs cost)

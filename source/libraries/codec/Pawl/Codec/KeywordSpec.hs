@@ -8,6 +8,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Cycling as Cycling
+import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -369,19 +370,21 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (miracle 2)
       " {\"type\":\"Miracle\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (miracle 2) /= Codec.encode Keyword.codec (plotOf 2)) "the same cost under two keywords encodes differently"
-  -- CR 702.6a's payload is a Cost, LevelUp's and Outlast's shape. The corpus
-  -- load guards the DECODE direction for free -- the six Equipment in
+  -- CR 702.6a's payload is a Cost and CR 702.6c's quality, Cycling's shape. The
+  -- corpus load guards the DECODE direction for free -- the Equipment in
   -- data/cards/ fail to parse without the arm -- and nothing but this case
   -- guards the encode, since Pawl.Codec.Keyword is an Arm.tagged list whose own
   -- `_ -> Nothing` fallthroughs let a missing arm compile (#2262).
-  Spec.it s "Equip carries its cost" $ do
-    let equip n = Keyword.Equip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+  Spec.it s "Equip carries its cost and its quality" $ do
+    let equip n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) Nothing)
+        equipHuman n = Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) (Just (Filter.HasSubtype Subtype.Human)))
     Common.assertCodec
       s
       Keyword.codec
       (equip 1)
-      " {\"type\":\"Equip\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+      " {\"type\":\"Equip\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"quality\":null}} "
     Spec.assertBool s (Codec.encode Keyword.codec (equip 1) /= Codec.encode Keyword.codec (equip 3)) "the cost is part of the encoding"
+    Spec.assertBool s (Codec.encode Keyword.codec (equip 1) /= Codec.encode Keyword.codec (equipHuman 1)) "and so is the quality"
   -- CR 702.67a's payload is equip's, and the two tags must not collide: a
   -- Fortification prints fortify and never equip, so a card decoded into the
   -- wrong one would mint the wrong minted ability.
@@ -392,7 +395,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       (fortify 3)
       " {\"type\":\"Fortify\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
-    Spec.assertBool s (Codec.encode Keyword.codec (fortify 3) /= Codec.encode Keyword.codec (Keyword.Equip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))) "and is not equip"
+    Spec.assertBool s (Codec.encode Keyword.codec (fortify 3) /= Codec.encode Keyword.codec (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []) Nothing))) "and is not equip"
   -- CR 702.87a's payload is a Cost, and the tag must not collide with the level
   -- COUNTER's -- CounterKind's "Level" and this keyword's "LevelUp" are two
   -- different wire tags for the two halves of rule 711.

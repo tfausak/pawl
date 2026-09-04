@@ -5647,9 +5647,17 @@ abilitiesFromCharacteristics peers pc oid gs =
    in -- Rule 702's own activated abilities are appended here, minted from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest.
       --
-      -- Unlike mintedTriggeredAbilitiesOf, no CR 612.2a rewrite is applied here:
-      -- none of the activated abilities rule 702 mints writes a creature-type
-      -- word (gap #2495).
+      -- Unlike mintedTriggeredAbilitiesOf, no CR 612.2a rewrite is applied here,
+      -- and that is right in both directions. A word from a keyword PAYLOAD --
+      -- CR 702.6c's equip quality is the one the pool writes -- has already
+      -- taken the swap once, because layer 3 rewrites the keyword MAP through
+      -- Pawl.Engine.Filter.rewriteKeyword and this reads that map; rewriting
+      -- again here would double-apply it under two chained changes.
+      --
+      -- Not implemented: a rewrite of the words rule 702's OWN TEXT writes into
+      -- an activated ability it mints, which is the half a second pass would be
+      -- for. No rule-702 keyword whose ability functions on the battlefield
+      -- writes a creature-type word today (gap #2495).
       filter
         granted
         ( PC.activatedAbilities pc

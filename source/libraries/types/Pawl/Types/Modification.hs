@@ -275,10 +275,14 @@ data Modification ability
     -- retaining phrase instead, which is the ADD twice over -- rule 702.122a's
     -- crew is written that way in Pawl.Engine.Keyword.
     --
-    -- No REMOVAL arm beside it: no printed card takes a card type away without
-    -- naming the one it becomes, so a remove would be a capability no card
-    -- exercises. Gliding Licid stops being a Creature by becoming an
-    -- Enchantment, which is this arm and not a removal.
+    -- Gliding Licid stops being a Creature by becoming an Enchantment, which is
+    -- this arm and not a removal.
+    --
+    -- Not implemented: a REMOVAL arm, which Luxior, Giada's Gift wants --
+    -- "equipped permanent isn't a planeswalker and is a creature in addition to
+    -- its other types" takes one card type away and ADDS another, where this arm
+    -- would replace every type the object had and AddCardType above removes none
+    -- (#2291).
     SetCardType CardType.CardType
   | -- | layer 4, CR 613.1d / 205.4b: this object gains a supertype (Leyline of
     -- Singularity's "All nonland permanents are legendary"). An ADD and never a
