@@ -46,6 +46,7 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -2308,6 +2309,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
   PlayerEffect.CastFromGraveyard f -> PlayerEffect.CastFromGraveyard (Filter.rewrite pairs f)
+  PlayerEffect.CastFromTopOfLibrary f -> PlayerEffect.CastFromTopOfLibrary (Filter.rewrite pairs f)
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
   -- The rest name no word a subtype pair could reach. The two chosen-name arms
   -- carry nothing at all -- CR 201.4's names are read off the source's
@@ -3146,6 +3148,10 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentLeavesTheBattlefield f -> TriggerCondition.PermanentLeavesTheBattlefield (Filter.rewrite pairs f)
   TriggerCondition.PermanentReturnedToHand f -> TriggerCondition.PermanentReturnedToHand (Filter.rewrite pairs f)
   TriggerCondition.PermanentsReturnedToHand f -> TriggerCondition.PermanentsReturnedToHand (Filter.rewrite pairs f)
+  -- The Filter is rewritten and the TurnScope carried through, the SpellCast arm's
+  -- reason: a rebuild that dropped the field would reset the trigger to firing on
+  -- every turn.
+  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard f scope) -> TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard (Filter.rewrite pairs f) scope)
   -- The Filter is rewritten and the counter kind is not: CR 612.1's pairs swap
   -- SUBTYPE words, and a counter kind names none.
   TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.rewrite pairs f))
@@ -4324,15 +4330,13 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- Pawl.Engine.Cast.proposedFor stamps a candidate-local copy of the board there
 -- and this walk is what makes the stamp visible.
 --
--- Not implemented: the library, which castZones leaves out and this walk
--- therefore does not reach. Casting from it is not impossible -- Panglacial
--- Wurm's CR 601.3 exception is Pawl.Engine.Cast.castableWhileSearching, scoped
--- to a search in progress -- so the gap is card-driven rather than
--- rules-enforced: no bestow card in data/cards/ carries that permission, so a
--- stamp this walk cannot see would skip CR 702.103d with nothing red (#2920). The
--- OTHER library route needs no arm at all -- rule 702.103d's own Garruk's Horde
--- example says a bestow card cast off the top of a library is cast as a creature
--- spell and cannot be cast bestowed; see #2360.
+-- Not implemented: the library, which castZones now names but this walk does not
+-- fold. Both roads into it are real -- Panglacial Wurm's CR 601.3 exception
+-- (Pawl.Engine.Cast.castableWhileSearching) and the standing top-of-library
+-- permission (Pawl.Types.PlayerEffect.CastFromTopOfLibrary) -- so the gap is
+-- card-driven rather than rules-enforced: no bestow card in data/cards/ is
+-- reachable by either, so a stamp this walk cannot see would skip CR 702.103d
+-- with nothing red (#2920).
 --
 -- A card in one of those zones takes its OWN timestamp here, where the stack
 -- incarnation takes the new and later one CR 613.7d gives it at the move. The two

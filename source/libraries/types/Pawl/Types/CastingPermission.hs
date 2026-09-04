@@ -3,9 +3,9 @@ module Pawl.Types.CastingPermission where
 -- | CR 113.6 / 601.3: a static permission to cast a card from a zone or under a
 -- condition it normally could not. CastFromLibraryWhileSearching is Panglacial
 -- Wurm's "while you're searching your library, you may cast this from your
--- library". Not implemented: a general "cast from the top of your library"
--- (Garruk's Horde), which is a player permission rather than an object one and
--- so belongs beside PlayerEffect.CastFromGraveyard (#2360). Only
+-- library". The general "cast from the top of your library" (Garruk's Horde) is
+-- a player permission rather than an object one and lives on
+-- Pawl.Types.PlayerEffect.CastFromTopOfLibrary instead. Only
 -- Pawl.Engine.Cast reads this type, as a membership test per
 -- arm. Two producers: Face.castingPermissions (printed) and
 -- Pawl.Engine.Keyword.castingPermissionsOf (what rule 702 gives for a keyword).

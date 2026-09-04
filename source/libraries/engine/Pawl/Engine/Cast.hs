@@ -663,13 +663,14 @@ candidateFillable pid oid name proposed candidate =
 -- canonical order -- what castableSpells scans, and the list castableZones
 -- filters, so the two can never disagree about where to look.
 --
--- The library is deliberately absent: Panglacial Wurm's permission is scoped to
--- a search in progress (castableWhileSearching) rather than to the whole game,
--- so it is not a zone a player may simply cast from. Not implemented: a standing
--- permission to cast from the top of the library (Garruk's Horde), which would
--- put the library in this list (#2360).
+-- The LIBRARY is in the list for one permission only: the standing "you may cast
+-- creature spells from the top of your library" (Garruk's Horde), which
+-- zoneCandidates narrows to the top card and castableZones' own arm permits.
+-- Panglacial Wurm is NOT that road -- its permission is scoped to a search in
+-- progress rather than to the whole game, and castableWhileSearching walks the
+-- library for it separately.
 castZones :: [Zone.Zone]
-castZones = [Zone.Hand, Zone.Graveyard, Zone.Exile, Zone.Command]
+castZones = [Zone.Hand, Zone.Graveyard, Zone.Exile, Zone.Command, Zone.Library]
 
 -- Which of those zones THIS player may cast THIS half of THIS object from --
 -- where a permission turns into a zone.
@@ -699,6 +700,20 @@ castableZones pid oid face gs =
         -- The owner test is inside isCommander's caller: rule 903.8 lets only the
         -- commander's owner cast it from there.
         Zone.Command -> Commander.canCastFromCommandZone pid oid gs
+        -- CR 601.3 / Garruk's Horde: ONE permission, where the graveyard arm
+        -- above reads two. No card grants this about ITSELF, so there is no
+        -- object-scoped arm to read beside the player-scoped one, and the
+        -- nearest thing -- Panglacial Wurm's
+        -- CastingPermission.CastFromLibraryWhileSearching -- is deliberately not
+        -- read here: rule 601.3's exception for that one is scoped to a search
+        -- in progress, which castableWhileSearching answers instead.
+        --
+        -- The FACE goes unread, where the graveyard arm needs it: the
+        -- permission's Filter is matched against the object's projection, which
+        -- the caller has already stamped to the half being proposed
+        -- (asProposed), so the narrowing "creature spells" reads the chosen half
+        -- without this arm naming it.
+        Zone.Library -> PlayerEffect.mayCastFromTopOfLibrary pid oid gs
         -- No other zone is in castZones.
         _ -> False
    in filter permitted castZones
@@ -871,9 +886,9 @@ permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
 -- offer to the table: it answers False for every player the permission does not
 -- name, this one included.
 --
--- Every other zone in castZones is one the rules scope by player anyway: a hand
--- and a graveyard are per-player piles (CR 400.1), and CR 903.8 lets only a
--- commander's owner cast it from the command zone.
+-- Every other zone in castZones is one the rules scope by player anyway: a hand,
+-- a graveyard and a library are per-player piles (CR 400.1), and CR 903.8 lets
+-- only a commander's owner cast it from the command zone.
 -- Not implemented: CR 601.3f's gate on a card exiled FACE DOWN -- "a player may
 -- begin to cast such a spell only if they can look at the face-down card in
 -- exile". Unreachable today, since every permission this list is then filtered
@@ -881,6 +896,18 @@ permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
 zoneCandidates :: Zone.Zone -> PlayerId -> GameState -> [ObjectId]
 zoneCandidates zone pid gs = case zone of
   Zone.Exile -> Set.toList (GameState.exile gs)
+  -- THE TOP CARD ALONE, which is the other half of "you may cast creature spells
+  -- from the top of your library": every printing of that permission names the
+  -- top card, so the narrowing lives here rather than in a Filter no card would
+  -- state. Game.zoneMembers hands a library back in order, top first (CR 401.2's
+  -- ordered pile), so `take 1` is that card.
+  --
+  -- CR 401.2 keeps a library hidden, and pawl offers this card to its owner
+  -- anyway: every printing of the permission pairs it with a clause that makes
+  -- the top card visible (Garruk's Horde reveals it, Bolas's Citadel looks at
+  -- it), so the offer is the permission's own. What an ANSWERER sees is a
+  -- separate matter, and pawl hides nothing from one yet (#1412).
+  Zone.Library -> take 1 (Game.zoneMembers zone pid gs)
   _ -> Game.zoneMembers zone pid gs
 
 -- Is this object somewhere this player may cast it from?

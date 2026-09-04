@@ -7327,7 +7327,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) named
         -- The recipient each row this resolution installs bakes: one row naming
         -- nobody for a described shield, and one per named recipient otherwise.
-        rows = if Maybe.isJust whatRecipient then [Nothing] else fmap Just recipients
+        --
+        -- A shield naming NO recipient side at all -- Pay No Heed's "prevent all
+        -- damage a source of your choice would deal this turn" -- gets that same
+        -- lone row, whose Nothing recipient is DamagePattern's "every recipient".
+        -- The empty `ref` is what tells it apart from CR 608.2b's gone target,
+        -- which is a card that DID name a recipient and lost it: that one keeps
+        -- installing nothing.
+        rows = if Maybe.isJust whatRecipient || Maybe.isNothing ref then [Nothing] else fmap Just recipients
         -- CR 615.5's additional effect. With no amount to count down, "this way"
         -- is what THIS application prevented, which Prevention.amounts carries.
         rider =
@@ -7373,11 +7380,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       DamageDirection.DealtBy ->
         State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) (Filter.slotObjects context) controller source duration kind DamageRewrite.PreventAll rider printedSource (whatRecipient, Nothing)) g0 (fmap (\oid -> (Nothing, Just (Filter.Type.And [], oid))) (Maybe.mapMaybe Recipient.objectOf named))
       DamageDirection.DealtTo ->
-        -- No recipient is CR 608.2b's gone target, so there is nothing to shield
-        -- and CR 609.7a's choice -- a choice existing only to be baked into a
-        -- row -- is not raised either. PreventNextDamage's posture. A DESCRIBED
-        -- shield always has its one row, its recipients being read at the damage
-        -- event rather than settled here.
+        -- No row is CR 608.2b's gone target -- a named recipient that left -- so
+        -- there is nothing to shield and CR 609.7a's choice, a choice existing
+        -- only to be baked into a row, is not raised either. PreventNextDamage's
+        -- posture. A DESCRIBED shield always has its one row, its recipients
+        -- being read at the damage event rather than settled here, and so does a
+        -- shield naming no recipient at all (`rows` above).
         Monad.unless (null rows) $ do
           -- CR 609.7a: "the source is chosen when the effect is created", so the
           -- choice is made ONCE here and every shield this resolution installs
