@@ -1,5 +1,6 @@
 module Pawl.Types.ActivationRestriction where
 
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.TurnScope as TurnScope
 
@@ -123,4 +124,15 @@ data ActivationRestriction
     -- end of combat step. Nor the negation of AfterBlockersDeclared above, which
     -- would exclude the declare blockers step the card admits.
     BeforeCombatDamage
+  | -- | CR 602.5b: "Activate only if [a fact about the board]" -- Barbarian
+    -- Ring's "Activate only if there are seven or more cards in your
+    -- graveyard". The first arm here that reads no window at all.
+    --
+    -- NOT Pawl.Types.ActivatedAbility.condition, which is the "as long as"
+    -- clause of a static ability that GRANTS the ability: that gate makes the
+    -- ability absent from the projection (Pawl.Engine.Projection.abilitiesGiven),
+    -- while CR 602.5 prohibits activating an ability the object still has. CR
+    -- 613.1f's named removal reads the abilities an object has, so the two are
+    -- not interchangeable.
+    OnlyIf Condition.Condition
   deriving (Eq, Ord, Show)

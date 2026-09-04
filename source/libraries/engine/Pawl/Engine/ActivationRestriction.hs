@@ -10,19 +10,26 @@
 -- Pawl.Engine.Combat imports Pawl.Engine.Cost, so the two combat-record readers
 -- CR 506.7g and CR 508.3b share with the casting side moved down to
 -- Pawl.Engine.Turn, beside the other two windows these arms ask about.
+-- CR 602.5b's board condition is the one arm that reads no window at all, and it
+-- imports Pawl.Engine.Condition and Pawl.Engine.Projection, neither of which
+-- reaches back here.
 --
 -- The only module that may CASE on Pawl.Types.ActivationRestriction, exactly as
 -- Pawl.Engine.CombatRestriction is of the type it names. Casing on the arms is a
 -- classification, not an effect's identity.
 module Pawl.Engine.ActivationRestriction where
 
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 
 -- CR 602.5: does every clause of this ability's printed "activate only ..."
@@ -50,12 +57,17 @@ import Pawl.Types.PlayerId (PlayerId)
 -- that binding: it rejects an action the interpreter was not offered (#219). On
 -- the mana path it also makes the source unpayable, Cost.manaActivations being
 -- asked at both of CR 605.3a's windows.
-restrictionsOk :: PlayerId -> [ActivationRestriction.ActivationRestriction] -> GameState -> Bool
-restrictionsOk pid restrictions gs = all (restrictionMet pid gs) restrictions
+restrictionsOk :: PlayerId -> ObjectId -> [ActivationRestriction.ActivationRestriction] -> GameState -> Bool
+restrictionsOk pid srcId restrictions gs = all (restrictionMet pid srcId gs) restrictions
 
 -- Does the game state satisfy this one printed clause?
-restrictionMet :: PlayerId -> GameState -> ActivationRestriction.ActivationRestriction -> Bool
-restrictionMet pid gs restriction = case restriction of
+--
+-- The SOURCE's id rides along for the OnlyIf arm alone: CR 602.5b's board
+-- condition is a Pawl.Types.Condition, and Pawl.Engine.Condition.holds evaluates
+-- every Quantity in one against an object. Every other arm reads a phase, a turn
+-- or the combat record and ignores it.
+restrictionMet :: PlayerId -> ObjectId -> GameState -> ActivationRestriction.ActivationRestriction -> Bool
+restrictionMet pid srcId gs restriction = case restriction of
   -- CR 307.5's three conjuncts, and Turn.sorcerySpeedWindow is that window shared
   -- with CR 307.1's casting gate: two rules, the same three facts, one copy.
   --
@@ -104,6 +116,21 @@ restrictionMet pid gs restriction = case restriction of
   -- than the combat record, since CR 510.2's damage is a turn-based action of one
   -- step and CR 506.7c admits every combat phase of the turn. Save Point.
   ActivationRestriction.BeforeCombatDamage -> Turn.beforeCombatDamage (GameState.phase gs)
+  -- CR 602.5's prohibition over a fact about the board rather than a window:
+  -- Barbarian Ring's "Activate only if there are seven or more cards in your
+  -- graveyard". Projection.fullView because nothing here is inside a layer fold
+  -- and no object is missing -- Pawl.Engine.Activate.zoneAbilitiesOf takes the
+  -- same view for ActivatedAbility.condition, for the same reason.
+  --
+  -- CR 109.5's "your" is `pid`, the same player every arm above answers "your"
+  -- with, and CR 109.4a pins it to the permanent's controller on the mana path.
+  ActivationRestriction.OnlyIf condition ->
+    Condition.holds
+      (Projection.fullView gs)
+      (Filter.contextFor (Game.teams gs) (Just pid) (Just srcId))
+      gs
+      srcId
+      condition
 
 -- CR 307.5's empty-stack conjunct asked ABOUT THE RIDER rather than about the
 -- board: does this clause need an empty stack to be met?
@@ -117,11 +144,12 @@ restrictionMet pid gs restriction = case restriction of
 -- itself, and the two agree because the move between them is exactly the fact
 -- this reports.
 --
--- SorcerySpeed alone, and the others are not a default: each of them reads a
--- phase, a turn or a combat record, and CR 500.12 puts no game event between the
--- gate and the payment while CR 601.2a's move changes no phase -- so their two
--- windows agree already (riderWindowSpec's pair in Pawl.ManaSpec is that
--- argument for the phase axis).
+-- SorcerySpeed alone, and the four window arms are not a default: each of them
+-- reads a phase, a turn or a combat record, and CR 500.12 puts no game event
+-- between the gate and the payment while CR 601.2a's move changes no phase -- so
+-- their two windows agree already (riderWindowSpec's pair in Pawl.ManaSpec is
+-- that argument for the phase axis). OnlyIf's arm below says why the board
+-- condition answers False without that argument.
 needsEmptyStack :: ActivationRestriction.ActivationRestriction -> Bool
 needsEmptyStack restriction = case restriction of
   ActivationRestriction.SorcerySpeed -> True
@@ -130,3 +158,12 @@ needsEmptyStack restriction = case restriction of
   ActivationRestriction.AttackedThisStep -> False
   ActivationRestriction.AfterBlockersDeclared -> False
   ActivationRestriction.BeforeCombatDamage -> False
+  -- A board condition reads no stack, so the empty-stack question is not its
+  -- question.
+  --
+  -- Not implemented: a board condition CR 601.2a's or CR 602.2a's move falsifies
+  -- -- "activate only if you have no cards in hand", asked of a mana ability
+  -- serving a cast whose card just left the hand. False here keeps the route in
+  -- the supply, and `restrictionsOk` at Cost.payMana reads the real board and
+  -- refuses it, so the payment is right and only the offer is optimistic (#3192).
+  ActivationRestriction.OnlyIf _ -> False
