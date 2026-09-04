@@ -928,7 +928,10 @@ data Context = MkContext
     slotControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
     -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
     -- `slotObjects` above's player half, filled from the same map by the same
-    -- caller (Pawl.Engine.Resolve.effectContext).
+    -- caller (Pawl.Engine.Resolve.effectContext), and by
+    -- Pawl.Engine.Target.slotContext. Those two and no others: every other builder
+    -- of this record leaves it empty, which Pawl.Engine.Count.slotPlayers' elision
+    -- paragraph is about.
     --
     -- NO atom in `matches` below reads it. It is a channel THROUGH this record to
     -- Pawl.Engine.Count.playersFor, which is handed CR 113.7's SOURCE and needs

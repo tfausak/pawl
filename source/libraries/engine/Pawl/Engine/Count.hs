@@ -567,9 +567,18 @@ playersFor viewOf context gs ref =
 -- (Pawl.Engine.Resolve.effectContext), and that is the only read that answers for
 -- an ABILITY: CR 113.7 makes Filter.source the ability's source permanent, while
 -- its targets and its trigger's bindings are stamped on the ability object on the
--- stack (see #1783). The SOURCE's own bindings are the fallback, for a caller that
--- builds no such context -- a static ability, a replacement -- and for a spell the
--- two roads are the same object.
+-- stack (see #1783). The SOURCE's own bindings are the fallback, which is the
+-- honest read for a caller with no announcement behind it at all -- a static
+-- ability's projection -- and for a spell, whose source IS its stack object.
+--
+-- Not implemented: the fallback is what a trigger's INTERVENING-IF and a
+-- replacement's condition get, and for them it is #1783's failure over again.
+-- Pawl.Engine.Stack (CR 603.4 at trigger time and again at CR 608.2a),
+-- Pawl.Engine.Event (off PendingTrigger.bindings) and Pawl.Engine.Replacement all
+-- hold the binding map, pass its OBJECT half as Filter.slotObjects, and leave
+-- Filter.slotPlayers empty -- so "if that player has three or more cards in hand"
+-- reads the source permanent's bindings and is unanswered. Filling them is a line
+-- apiece; no card in data/cards/ writes a player slot under either clause (#3212).
 slotPlayers :: Filter.Context -> GameState -> SlotName.SlotName -> Maybe [PlayerId]
 slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) of
   Just pids -> Just (Set.toList pids)
