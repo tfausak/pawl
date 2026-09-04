@@ -4127,7 +4127,17 @@ effectContext gs controller source legal bindings =
           -- creature may have left by the time the search runs, and "that
           -- creature" is a reference the spell already made rather than a target
           -- CR 608.2b re-checks.
-          Filter.slotNames = fmap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs)) objects
+          Filter.slotNames = fmap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs)) objects,
+          -- CR 601.2c's PLAYERS out of the same CR 608.2b-filtered map
+          -- effectSlotObjects takes the objects from, and the reason the
+          -- resolution has to hand them over at all: CR 113.7 makes
+          -- Filter.source the ability's SOURCE, while its targets and its
+          -- trigger's bindings are stamped on the ability object on the stack,
+          -- so Pawl.Engine.Count.playersFor reading the source's own bindings
+          -- finds nothing for every ability. Keening Stone's "that player's
+          -- graveyard" proves the activated road and Price of Knowledge's "that
+          -- player's hand" the triggered one (Pawl.CountSpec).
+          Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) legal
         }
 
 -- CR 608.2h for an entry rider's counts: the card writes a Quantity per counter

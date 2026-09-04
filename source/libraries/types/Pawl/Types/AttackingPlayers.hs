@@ -6,8 +6,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- | CR 508.6: the players "attacking [a player]" -- the ones controlling a
 -- creature that is attacking the player the slot names -- narrowed to those
 -- standing in the given relation to CR 109.5's "you". Curse of Vitality's "each
--- opponent attacking that player" is the whole of it: `Opponent` and the slot the
--- Curse's own trigger bound.
+-- opponent attacking that player" is `Opponent` and the slot the Curse's own
+-- trigger bound; Synthetic Toll of the Siege's "each player attacking them" is
+-- `AnyPlayer` and a target slot, COUNTED rather than acted on.
 --
 -- Two fields rather than one, because the card text has two halves and neither
 -- implies the other: the relation is about the ABILITY'S controller and the slot
