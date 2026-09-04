@@ -37,9 +37,10 @@ import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Replay as Replay
-import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack

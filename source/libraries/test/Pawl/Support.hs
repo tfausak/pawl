@@ -34,8 +34,10 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.Rewrite as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
-import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Script as Script
 import qualified Pawl.Engine.Setup as Setup

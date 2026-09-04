@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int

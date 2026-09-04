@@ -51,6 +51,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaRider as ManaRider
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction

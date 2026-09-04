@@ -7,7 +7,7 @@ import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.Object as Object

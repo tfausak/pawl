@@ -22,6 +22,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.AttackCost as AttackCost

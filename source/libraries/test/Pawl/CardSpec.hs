@@ -43,9 +43,13 @@ import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.Rewrite as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Resolve.Effect as Resolve
+import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Subtype as Subtype.Engine

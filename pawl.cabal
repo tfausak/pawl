@@ -989,12 +989,16 @@ library engine
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot
     Pawl.Engine.Projection
+    Pawl.Engine.Projection.Rewrite
+    Pawl.Engine.Projection.View
     Pawl.Engine.Quantity
     Pawl.Engine.QuantitySlot
     Pawl.Engine.Rad
     Pawl.Engine.Replacement
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
+    Pawl.Engine.Resolve.Effect
+    Pawl.Engine.Resolve.Slots
     Pawl.Engine.Restamp
     Pawl.Engine.Ring
     Pawl.Engine.Room

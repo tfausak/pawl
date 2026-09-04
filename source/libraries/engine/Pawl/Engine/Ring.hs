@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger

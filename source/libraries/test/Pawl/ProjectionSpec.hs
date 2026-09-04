@@ -31,6 +31,8 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.Rewrite as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 -- Pawl.Types.Filter aliased Filter.Type: the evaluator Pawl.Engine.Filter already claims
 -- the alias Filter above (documented phase exception). Pawl.Types.Subtype is
 -- aliased Subtype.Type below for the same reason, against Pawl.Engine.Subtype.

@@ -19,7 +19,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Expiry as Expiry
-import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.ManaSpending as ManaSpending

@@ -18,7 +18,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural

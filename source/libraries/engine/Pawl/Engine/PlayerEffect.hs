@@ -39,6 +39,8 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.Rewrite as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityKind as AbilityKind
