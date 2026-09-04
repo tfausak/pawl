@@ -20,7 +20,7 @@
 module Pawl.Engine.ActivationRestriction where
 
 import qualified Pawl.Engine.Condition as Condition
-import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection

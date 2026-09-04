@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal

@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal

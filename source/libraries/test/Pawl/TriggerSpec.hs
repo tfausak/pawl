@@ -31,6 +31,8 @@ import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Binding as Event
+import qualified Pawl.Engine.Event.Trigger as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal

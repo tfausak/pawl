@@ -28,6 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)

@@ -962,6 +962,9 @@ library engine
     Pawl.Engine.Engine
     Pawl.Engine.EntryRestriction
     Pawl.Engine.Event
+    Pawl.Engine.Event.Binding
+    Pawl.Engine.Event.Match
+    Pawl.Engine.Event.Trigger
     Pawl.Engine.Exile
     Pawl.Engine.Expiry
     Pawl.Engine.FaceDown
