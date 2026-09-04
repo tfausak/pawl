@@ -12130,8 +12130,18 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- PermanentDies arm has already required the battlefield-to-graveyard pair, and
   -- CR 400.2 lists the graveyard among the public zones. That is what makes
   -- eventBindingSlots' unconditional promise for this condition honest.
+  --
+  -- CR 603.10a's departed permanent BESIDE it, the PermanentLeavesTheBattlefield
+  -- arm below's second slot for that arm's reason: one printed "it" is two
+  -- objects, and which one a card means is the card's business. Cleopatra,
+  -- Exiled Pharaoh's "draw a card for each counter on it" is about the creature
+  -- as it last existed on the battlefield, whose counters CR 122.2 destroyed on
+  -- the way out and which only CR 608.2h still answers for; Promise of Tomorrow's
+  -- "exile it" is about the graveyard card. Unconditional, needing no guard at
+  -- all: `departed` is on every zone change, and this condition admits no other
+  -- event.
   (TriggerCondition.PermanentDies _, GameEvent.Moved m) ->
-    setBecameArrivals m Map.empty
+    Binding.setDepartedPermanent (ZoneChange.departed (Moved.change m)) (setBecameArrivals m Map.empty)
   -- CR 400.7e off the CARD rather than off the move: Planar Void's "exile that
   -- card" acts on the one arrival its trigger matched, so this binds
   -- ZoneChange.object alone where the two arms above bind every arrival as a
@@ -13010,10 +13020,17 @@ eventBindingSlots cond = case cond of
   -- graveyard public. Guaranteed rather than conditional, unlike
   -- SelfLeavesTheBattlefield below, because matchesTrigger has already pinned the
   -- destination to the graveyard. Promise of Tomorrow's "exile it" is the reader.
-  TriggerCondition.PermanentDies _ -> Set.singleton Binding.became
-  -- Empty where PermanentDies binds CR 400.7e's graveyard card, and NECESSARILY
-  -- so: the trigger event is a whole CR 704.3 batch, which may have buried
-  -- several cards, and one slot cannot name them all. Nothing in print asks for
+  -- CR 400.7e's graveyard card and CR 603.10a's departed permanent, the pair
+  -- AttachedCreatureDies binds below and for the same reason: the two are
+  -- different objects, and a card names whichever its sentence means (Promise of
+  -- Tomorrow the arrival, Cleopatra, Exiled Pharaoh the deceased). Both
+  -- guaranteed given a match -- matchesTrigger has pinned the battlefield-to-
+  -- graveyard pair, which CR 400.2 makes public, and every zone change carries
+  -- `departed`.
+  TriggerCondition.PermanentDies _ -> Set.fromList [Binding.became, Binding.departedPermanent]
+  -- Empty where PermanentDies binds two, and NECESSARILY so: the trigger event is
+  -- a whole CR 704.3 batch, which may have buried several cards, and neither slot
+  -- can name them all. Nothing in print asks for
   -- one either: Scryfall o:"one or more other creatures you control die",
   -- 2026-08-24, matches Vengeful Townsfolk and Vraan, Executioner Thane, whose
   -- payloads act on the bearer and on the players. A printing whose payload said
@@ -13045,10 +13062,12 @@ eventBindingSlots cond = case cond of
   -- several owners' hands, and one slot cannot name them all. Tameshi, Reality
   -- Architect's payload names none of them.
   TriggerCondition.PermanentsReturnedToHand _ -> Set.empty
-  -- Nothing, where PermanentDies binds CR 400.7e's graveyard card: rule 702.55b's
-  -- ability speaks about the creature it HAUNTS and never about the card that
-  -- creature became, so no printing of haunt names the arrival. eventBindings has
-  -- no arm for this condition either, which is what the empty floor pins.
+  -- Nothing, where PermanentDies binds CR 400.7e's graveyard card and CR 603.10a's
+  -- departed permanent: rule 702.55b's ability speaks about the creature it
+  -- HAUNTS -- an object GameState.haunting names rather than the event -- and
+  -- never about the deceased or the card it became, so no printing of haunt names
+  -- either. eventBindings has no arm for this condition either, which is what the
+  -- empty floor pins.
   TriggerCondition.HauntedCreatureDies -> Set.empty
   -- CR 701.6a's countering names two objects and a player and this binds none of
   -- them -- eventBindings has no arm for it. Empty by decision rather than

@@ -385,15 +385,13 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 --
 -- Bound for the BYSTANDER conditions only --
 -- TriggerCondition.PermanentLeavesTheBattlefield, its destination-pinned
--- PermanentReturnedToHand, and, for CR 303.4b's enchanted creature,
--- AttachedCreatureDies, where Banewasp Affliction's "that creature's
--- controller loses life equal to its toughness" reads it. Under
+-- PermanentReturnedToHand, its graveyard-pinned PermanentDies, where Cleopatra,
+-- Exiled Pharaoh's "draw a card for each counter on it" reads it, and, for CR
+-- 303.4b's enchanted creature, AttachedCreatureDies, where Banewasp Affliction's
+-- "that creature's controller loses life equal to its toughness" reads it. Under
 -- TriggerCondition.SelfLeavesTheBattlefield and SelfDies the departed id already
 -- IS CR 113.7a's `triggerSource`, so a second name for one object would be the
 -- redundancy SelfPutIntoGraveyardFromAnywhere's empty floor declines.
--- TriggerCondition.PermanentDies is the same shape and is deliberately left
--- unbound: no card in `data\/cards\/` reads the dead permanent rather than the
--- graveyard card it became (#2347).
 --
 -- Every read of it is CR 608.2h's last known information --
 -- Pawl.Engine.Resolve.effectViewOf is what licenses that for this slot, exactly

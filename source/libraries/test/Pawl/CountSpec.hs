@@ -581,7 +581,8 @@ tobiasSpec s registry =
 -- every one of which PUTS counters, and o:"greatest number of counters" returns
 -- none. Felisa, Fang of Silverquill and Angelic Sleuth read "the number of
 -- counters it had on it" off the TRIGGER's own object, which reaches
--- Projection.viewWithLastKnownAnywhere instead and is blocked on #2347 besides.
+-- Projection.viewWithLastKnownAnywhere through Binding.departedPermanent
+-- instead -- a different question from this fold over the whole turn's deaths.
 --
 -- Synthetic Charnel Tally, {2}{B} Creature -- Zombie 2/2: "When this creature
 -- dies, you gain X life, where X is the greatest number of counters among
