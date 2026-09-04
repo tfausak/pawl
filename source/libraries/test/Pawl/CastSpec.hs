@@ -4843,10 +4843,12 @@ addTeferi teferi gs = snd (S.addCreature teferi S.alice gs)
 -- PlayerScope.EachPlayer from PlayerScope.Opponents. "Players" includes the Cage's
 -- own controller (CR 109.5 has no "you" in that sentence to exclude her).
 --
--- The LIBRARY half has its own case below, off the one cast from a library CR
--- 601.3 allows: Panglacial Wurm's, offered while its controller searches
--- (Pawl.Engine.Cast.castableWhileSearching). Or is written for both zones because
--- the printed sentence names both, and each disjunct is proved on its own board.
+-- The LIBRARY half has its own case below, off Panglacial Wurm's mid-search
+-- offer (Pawl.Engine.Cast.castableWhileSearching). The other road into a library
+-- cast -- Garruk's Horde's standing permission -- is refused by the same
+-- disjunct, proved in Pawl.PlayerEffectSpec's GarruksHorde group. Or is written
+-- for both zones because the printed sentence names both, and each disjunct is
+-- proved on its own board.
 grafdiggersCageCastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 grafdiggersCageCastSpec s registry = Spec.describe s "Grafdigger's Cage" $ do
   Spec.it s "CR 601.3 no player may cast from a graveyard, the Cage's own controller included, and a hand cast is untouched" $ do
@@ -4865,9 +4867,9 @@ grafdiggersCageCastSpec s registry = Spec.describe s "Grafdigger's Cage" $ do
     -- PlayerScope.Opponents leaves its controller alone where this leaves nobody
     -- alone, on the same board and the same graveyard cast.
     Spec.assertBool s (casting S.alice aliceGrave (withMagistrate magistrate open)) "and the Magistrate's PlayerScope.Opponents, on the same board, spares her"
-  -- The Or's second disjunct, on the only board that can show it: CR 601.3's
-  -- library cast is Panglacial Wurm's mid-search offer, and the Cage is the one
-  -- permanent between the two readings.
+  -- The Or's second disjunct on the mid-search road, where the Cage is the one
+  -- permanent between the two readings. The standing top-of-library permission
+  -- is the same disjunct's other road, in Pawl.PlayerEffectSpec.
   Spec.it s "CR 601.3 the library disjunct: a mid-search cast is refused too" $ do
     cage <- S.printingOf s registry "Grafdigger's Cage"
     forest <- S.printingOf s registry "Forest"

@@ -110,7 +110,9 @@ data PlayerEffect
     CantBeCountered (Filter.Filter Keyword.Keyword)
   | -- | CR 615.12 / 613.11 / Spider-Punk: damage matching the pattern can't be
     -- prevented. Pawl.ReplacementSpec's questingBeastSpec proves the pattern's
-    -- source and kind limbs against each other.
+    -- source and kind limbs against each other. Pawl.CardSpec lints the pool
+    -- for a narrowed PlayerScope, which is what makes
+    -- Pawl.Engine.PlayerEffect.unpreventable's board-wide fold exact.
     --
     -- Not implemented: Whippoorwill's recipient limb has no site to bake a
     -- recipient into this pattern (#845).
@@ -144,6 +146,14 @@ data PlayerEffect
     -- graveyard -- the play half of CastFromGraveyard above, since a land is
     -- played and never cast.
     PlayLandsFromGraveyard
+  | -- | CR 601.3 / Garruk's Horde: this player may cast a matching card from the
+    -- top of their library.
+    --
+    -- The Filter reads the printed card, the graveyard arm's #1859. Not
+    -- implemented: the play half Future Sight also states ("you may play lands
+    -- ... from the top of your library"), which needs a play-side arm the way
+    -- PlayLandsFromGraveyard is CastFromGraveyard's (#3224).
+    CastFromTopOfLibrary (Filter.Filter Keyword.Keyword)
   | -- | CR 118.9 / Omniscience: this player may cast a matching spell from their
     -- hand without paying its mana cost.
     --

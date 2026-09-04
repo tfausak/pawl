@@ -56,6 +56,7 @@ codec =
       Arm.nullary "CantPlayLands" PlayerEffect.CantPlayLands,
       Arm.payload "CastFromGraveyard" filterCodec PlayerEffect.CastFromGraveyard (\x -> case x of PlayerEffect.CastFromGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "PlayLandsFromGraveyard" PlayerEffect.PlayLandsFromGraveyard,
+      Arm.payload "CastFromTopOfLibrary" filterCodec PlayerEffect.CastFromTopOfLibrary (\x -> case x of PlayerEffect.CastFromTopOfLibrary y -> Just y; _ -> Nothing),
       Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
       Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing),
       Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing)
