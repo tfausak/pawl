@@ -4333,6 +4333,125 @@ hermesSpec s registry =
               Spec.assertEqWith s "CR 508.1b and bob's Bird really was declared attacking alice" (sentAt after) (Map.fromList [(theirBirdId, AttackTarget.OfPlayer S.alice)])
             Nothing -> Spec.assertFailure s "fixture should give alice a Hermes and two Birds"
 
+-- CR 508.3c at a floor ABOVE one, which is the whole difference between this
+-- group and hermesSpec above: the same condition counts the creatures the Filter
+-- admits instead of asking whether there is any.
+--
+-- Military Intelligence {1}{U} Enchantment is the card: "Whenever you attack
+-- with two or more creatures, draw a card." One ability, one effect, and no
+-- quality narrowing at all -- the Filter is HasCardType Creature, which every
+-- declared attacker satisfies (CR 508.1a), so on every board here the COUNT is
+-- doing the work and the Filter is doing none.
+--
+-- The bearer is an enchantment and never attacks, so it is a bystander
+-- throughout, hermesSpec's posture.
+--
+-- Three attackers is what parts "at least two" from "exactly two", and one
+-- attacker is what parts it from Hermes' "one or more". Both are needed: a floor
+-- read as equality passes the two-attacker board, and a dropped floor passes
+-- both the two- and the three-attacker boards.
+--
+-- The draw is read as the HAND'S CONTENTS rather than as a hand size, because
+-- the library is stocked with distinctly named cards and a second resolution
+-- would move a second, nameable one. By name and not by object id: CR 400.7
+-- makes a drawn card a new object, so the id the library held is not the id the
+-- hand holds and only the name carries across the move.
+militaryIntelligenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+militaryIntelligenceSpec s registry =
+  let -- Declares exactly the creatures `plan` names, each attacking bob,
+      -- FILTERED out of what the engine offered rather than built, hermesSpec's
+      -- reason.
+      answering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering plan p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid plan) ids
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      libraryOf = Game.zoneMembers Zone.Library S.alice
+      -- alice holds the enchantment and three Settled untapped creatures; bob
+      -- holds two of his own, so the last board can declare two without alice's.
+      -- Four DISTINCT cards under alice's library, deeper than any board here
+      -- draws, so CR 104.3c never fires.
+      fixture = do
+        intelligence <- S.printingOf s registry "Military Intelligence"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        raven <- S.printingOf s registry "Augury Raven"
+        mountain <- S.printingOf s registry "Mountain"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        plains <- S.printingOf s registry "Plains"
+        case S.combatBoardOf [intelligence, piker, maiden, raven] [piker, maiden] of
+          (gs, [_, pikerId, maidenId, ravenId], [theirPikerId, theirMaidenId]) ->
+            -- addLibraryCard puts its card ON TOP, so the deepest is stocked
+            -- first and `ids` comes out top-first.
+            let deal (acc, g) printing = let (oid, g1) = S.addLibraryCard printing S.alice g in (oid : acc, g1)
+                (ids, stocked) = List.foldl' deal ([], gs) [plains, island, forest, mountain]
+             in pure (Just (pikerId, maidenId, ravenId, theirPikerId, theirMaidenId, ids, stocked))
+          _ -> pure Nothing
+      -- combatBoardOf hardcodes alice as the active player and CR 506.2's second
+      -- sentence then makes bob the defender. Both are turned around here, which
+      -- is the whole difference between the last board and the others.
+      bobsTurn gs =
+        gs
+          { GameState.activePlayer = S.bob,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]}
+          }
+   in Spec.describe s "Military Intelligence" $ do
+        -- The proving case: exactly two declared, exactly one card drawn.
+        Spec.it s "CR 508.3c whole card: two attackers declared together draw ONE card" $ do
+          built <- fixture
+          case built of
+            Just (pikerId, maidenId, _, _, _, ids, gs) -> case ids of
+              [mountain, forest, island, plains] -> do
+                let after = atBlockers (answering [pikerId, maidenId]) gs
+                Spec.assertEqWith s "alice's hand started empty" (handNames S.alice gs) []
+                Spec.assertEqWith s "the library started top-first Mountain, Forest, Island, Plains" (libraryOf gs) [mountain, forest, island, plains]
+                Spec.assertEqWith s "ONE draw: the Mountain off the top and nothing else is in hand" (handNames S.alice after) ["Mountain"]
+                Spec.assertEqWith s "and the library kept the other three, in order" (libraryOf after) [forest, island, plains]
+                Spec.assertEqWith s "CR 508.1b both creatures really were declared attacking bob" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.bob), (maidenId, AttackTarget.OfPlayer S.bob)])
+              _ -> Spec.assertFailure s "expected four library cards"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Military Intelligence and three creatures"
+        -- ONE attacker. The floor is two, so nothing triggers -- the falsifier
+        -- for a reading that kept Hermes' "one or more".
+        Spec.it s "CR 508.3c one attacker is below the floor and draws nothing" $ do
+          built <- fixture
+          case built of
+            Just (pikerId, _, _, _, _, ids, gs) -> do
+              let after = atBlockers (answering [pikerId]) gs
+              Spec.assertEqWith s "no draw: alice's hand is still empty" (handNames S.alice after) []
+              Spec.assertEqWith s "and the library is exactly as it was stocked" (libraryOf after) ids
+              Spec.assertEqWith s "CR 508.1b and the one creature really was declared" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.bob)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Military Intelligence and three creatures"
+        -- THREE attackers. Still one card: "two or more" is a floor and the
+        -- ability fires once per DECLARATION. The falsifier both for a floor read
+        -- as equality, which draws nothing here, and for a per-attacker arity,
+        -- which draws three.
+        Spec.it s "CR 508.3c three attackers still draw exactly one card" $ do
+          built <- fixture
+          case built of
+            Just (pikerId, maidenId, ravenId, _, _, ids, gs) -> case ids of
+              [_, forest, island, plains] -> do
+                let after = atBlockers (answering [pikerId, maidenId, ravenId]) gs
+                Spec.assertEqWith s "ONE draw again: only the Mountain off the top is in hand" (handNames S.alice after) ["Mountain"]
+                Spec.assertEqWith s "and the library kept the other three, in order" (libraryOf after) [forest, island, plains]
+                Spec.assertEqWith s "CR 508.1b all three really were declared attacking bob" (sentAt after) (Map.fromList [(pikerId, AttackTarget.OfPlayer S.bob), (maidenId, AttackTarget.OfPlayer S.bob), (ravenId, AttackTarget.OfPlayer S.bob)])
+              _ -> Spec.assertFailure s "expected four library cards"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Military Intelligence and three creatures"
+        -- CR 109.5's "you": BOB declares two, and alice's enchantment stays
+        -- silent. The falsifier for a reading that dropped the PlayerRelation --
+        -- every board above has alice declaring, so on those three it is
+        -- invisible.
+        Spec.it s "CR 508.3c an opponent attacking with two creatures does not trigger it" $ do
+          built <- fixture
+          case built of
+            Just (_, _, _, theirPikerId, theirMaidenId, ids, gs) -> do
+              let after = atBlockers (answering [theirPikerId, theirMaidenId]) (bobsTurn gs)
+              Spec.assertEqWith s "no draw: alice's hand is still empty" (handNames S.alice after) []
+              Spec.assertEqWith s "and alice's library is exactly as it was stocked" (libraryOf after) ids
+              Spec.assertEqWith s "CR 508.1b and bob's two creatures really were declared attacking alice" (sentAt after) (Map.fromList [(theirPikerId, AttackTarget.OfPlayer S.alice), (theirMaidenId, AttackTarget.OfPlayer S.alice)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Military Intelligence and three creatures"
+
 anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 anafenzaAttackSpec s registry =
   let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
@@ -6623,6 +6742,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   avatarRokuSpec s registry
   everWatchingThresholdSpec s registry
   hermesSpec s registry
+  militaryIntelligenceSpec s registry
   seiferSpec s registry
   luluSpec s registry
   marauderTollSpec s registry
