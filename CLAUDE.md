@@ -1,6 +1,8 @@
 # CLAUDE.md
 
-Guidance for Claude Code (and other agents) working in this repository.
+Guidance for Claude Code (and other agents) working in this repository. Rules
+only: the incidents that motivated them are in git history and the PRs that
+added them.
 
 ## What Pawl is
 
@@ -63,24 +65,15 @@ to agents as written. What it doesn't say:
   by `cd`ing there.
 
 - Working in a worktree, NEVER `cd` to the primary checkout, not even to read.
-  The isolation guard redirects `git` to your own worktree but not `python`,
-  `grep`, `sed` or `cabal`, so `cd` there looks safe --- git reports your own
-  branch --- while every file edit lands in the primary checkout's working
-  tree, on whatever branch its owner has checked out. That has happened
-  (~17 files, 2026-08-28). The owner works there concurrently and often has
-  uncommitted changes, which no stash and no reflog can recover once a stray
-  edit is "reverted".
+  The isolation guard redirects `git` but not `python`, `grep`, `sed` or
+  `cabal`, so every file edit made there lands on whatever branch the owner
+  has checked out, alongside their uncommitted changes.
 
-- That file no longer sets `semaphore: True`. Concurrent `cabal` runs are
-  serialised by `script/with-build-lock.sh` instead (two builds at a time,
-  machine-wide; the machine has 8 GB), so prefix every `cabal` call with it.
-  The GHC job semaphore was dropped on 2026-09-02: a killed run corrupted it
-  (`semWait: invalid argument`) and cabal then HUNG rather than exiting, which
-  stalled every other worktree; with the lock capping builds at two on eight
-  cores, `jobs: 4` per build needs no sharing. Never `pkill -f 'cabal test'`
-  --- it reaches other agents' worktrees; kill your own PID. Piping `cabal`
-  into `head` --- or anything else that closes the pipe early --- deadlocks
-  it on SIGPIPE while it still holds a lock slot. Redirect to a file and read
+- Prefix every `cabal` call with `script/with-build-lock.sh`, which caps
+  builds at two machine-wide (the machine has 8 GB). Never `pkill -f 'cabal
+  test'` --- it reaches other agents' worktrees; kill your own PID. Never pipe
+  `cabal` into `head` or anything else that closes the pipe early: it
+  deadlocks on SIGPIPE while holding a lock slot. Redirect to a file and read
   the file.
 
 - Derive against `origin/main`, not the working checkout, which drifts:
@@ -89,55 +82,49 @@ to agents as written. What it doesn't say:
 
 - Self-review the branch before opening the PR, and fix the findings on the
   branch. At minimum: re-check every CR citation against `docs/rules.txt`, and
-  re-read every comment the change touched. Both reliably catch real defects.
+  re-read every comment the change touched.
 
 - The PR body carries the case for merging. A line each:
   - what changed and why, with `Closes #N` --- bare text, since backticks break
     the link. Never write close, fix or resolve next to an issue number you do
-    not intend to close, in any phrasing including a denial ("does not close
-    #N" closed it); write "related to #N". A keyword in any branch commit
-    survives the squash.
+    not intend to close, in any phrasing including a denial; write "related to
+    #N". A keyword in any branch commit survives the squash.
   - the CR citations behind it
   - the design calls made, and the alternatives rejected
   - how it was verified: suite count before -> after, the proving test, and for
-    each mutation the assertion it reddened, named. A mutation reported only as
-    "went red" is one nobody diagnosed.
+    each mutation the assertion it reddened, named.
   - whether the rules core cases on an effect's *identity* --- an explicit "no"
   - what was deferred
 
 - Keep the prose terse --- PR bodies, issue comments, commit messages and code
   comments alike, and a citation in place of a quoted rule. Do the verification
   work in full; write it up short. A commit message is a subject line and, at
-  most, two sentences of why. A PR body is the bullets above and nothing else:
-  no narrative, no restating the diff. The one thing never to trim is the
-  mutation line --- which assertion reddened, named --- because that is what
-  catches a mutation absorbed by an assertion ahead of the gameplay one.
+  most, two sentences of why. A PR body is the bullets above and nothing else.
+  The one thing never to trim is the mutation line --- which assertion
+  reddened, named.
 
 - Mark the PR ready once the self-review's findings are pushed and the suite is
   green, report it, and stop. Don't wait for CI. Don't start the next unit ---
-  one unit at a time per checkout, since two branches contend for `HEAD`.
+  one unit at a time per checkout.
 
-- STAGE, then `hooky fix`. It acts on staged files only --- an unstaged file is
-  skipped, which is where "hooky fix wasn't enough" comes from --- and runs
-  every check `.hooky.kdl` wires up: CI's ormolu, hlint, cabal-gild, `cabal
-  check` and nixfmt, plus the JSON formatter and the builtin lint rules. It
-  rewrites in place, so `git add` again afterwards.
-  `--all` sweeps the tree in two minutes instead of one second; use it only
-  when you suspect something landed unstaged.
+- STAGE, then `hooky fix`. It acts on staged files only, runs every check
+  `.hooky.kdl` wires up, and rewrites in place, so `git add` again afterwards.
+  `--all` sweeps the tree in two minutes; use it only when you suspect
+  something landed unstaged.
 
 - After a PR merges, before the next unit, ask: did anything catch you that
   your own checks didn't? did you violate an instruction? did you learn a
   project fact the repo doesn't record? A project fact belongs here, in the
-  section it bears on, folded into the next unit's PR. Skip it when there is
-  genuinely nothing.
+  section it bears on, as a rule and not as its story, folded into the next
+  unit's PR. Skip it when there is genuinely nothing.
 
 - Most of what's left is card-driven: working an issue means finding the real
   card and adding it to `data/cards/`. That is the work, not a side quest, and
   "no producer in the pool" describes it rather than excusing it. What is
   forbidden is a capability no card exercises: per `docs/design.md` section 4,
-  an effect is not done until a card exercises it in a gameplay-level test. The
-  one good reason to stop is a *rules* reason --- the card turns out not to
-  exercise the thing after all.
+  an effect is not done until a card exercises it in a gameplay-level test.
+  The one good reason to stop is a *rules* reason --- the card turns out not
+  to exercise the thing after all.
 
 - Labels: `elision`, `gap`, `rules-correctness` and `bug`, plus the expiry
   triggers `expires:milestone`, `expires:card-driven`, `expires:subsystem` and
@@ -154,21 +141,18 @@ to agents as written. What it doesn't say:
   313/315, subgames, Commander, the Ring, dungeons).
 
 - Verify Oracle text with `curl -s
-  'https://api.scryfall.com/cards/named?fuzzy=<name>'`; WebFetch gets 403s. The
-  SEARCH endpoint is stricter than that one: `/cards/search` answers 400 to
-  every regex query unless a `User-Agent` header is sent, where
-  `/cards/named` needs none.
-  `_scratch/AllPrintings.json` is a dated MTGJSON dump: sound for FINDING a
-  card, unsound for ruling one out. When grepping it there is no space after
-  the colon (`"name":"Foo"`), and `rulings` sorts before `text`, so a hit near
-  a name is usually ruling boilerplate.
+  'https://api.scryfall.com/cards/named?fuzzy=<name>'`; WebFetch gets 403s.
+  `/cards/search` answers 400 to every regex query unless a `User-Agent`
+  header is sent. `_scratch/AllPrintings.json` is a dated MTGJSON dump: sound
+  for FINDING a card, unsound for ruling one out. When grepping it there is no
+  space after the colon (`"name":"Foo"`), and `rulings` sorts before `text`, so
+  a hit near a name is usually ruling boilerplate.
 
 - `_scratch/` also holds permissively licensed prior art --- `phase`, `mtgish`,
   `argentum-engine`; `docs/agents/implementing.md` says what each is good for.
-  Consult them AFTER deriving the rule from `docs/rules.txt`, since reading
-  someone else's model first imports it; the CR wins every disagreement.
-  Everything under `_scratch/` is gitignored and may be absent --- a skipped
-  step, not a blocked one.
+  Consult them AFTER deriving the rule from `docs/rules.txt`; the CR wins every
+  disagreement. Everything under `_scratch/` is gitignored and may be absent
+  --- a skipped step, not a blocked one.
 
 - When no printing can reach the rule, write `data/cards/synthetic-*.json`.
   Search first: a real card wins whenever one exists, in the order regular >
@@ -187,14 +171,16 @@ to agents as written. What it doesn't say:
   the issue; a comment citing the test that *proves* a behavior is a different
   genre and outlives it.
 
-  Nothing checks any of this. The scripts that did --- elisions, censuses, CR
-  citations --- were removed as overfitted to a tree that changes daily; don't
-  propose replacements. The WORDING is still the convention, because a `grep` is
-  what finds these now: a comment paragraph saying "not implemented" is an
-  elision paragraph, an elision phrased otherwise marks its citation `(gap #N)`,
-  and a historical reference sharing a paragraph with an elision drops the
-  parentheses (`see #1116`). Closing an issue means grepping its bare number and
-  rewriting every elision that cited it, in the same PR.
+  Nothing checks any of this, and no script should: the WORDING is the
+  convention, because a `grep` is what finds these. A comment paragraph saying
+  "not implemented" is an elision paragraph, an elision phrased otherwise
+  marks its citation `(gap #N)`, and a historical reference sharing a
+  paragraph with an elision drops the parentheses (`see #1116`). Closing an
+  issue means grepping its bare number and rewriting every elision that cited
+  it, in the same PR.
+
+  A filed follow-up names the real card that needs it. A gap no card needs is
+  folded in or dropped, not filed; `docs/agents/implementing.md` has the rule.
 
   A BLOCKED issue records its blocker as a GitHub dependency, not as prose:
 
@@ -203,10 +189,9 @@ to agents as written. What it doesn't say:
     -F issue_id="$(gh api repos/tfausak/pawl/issues/<BLOCKER> --jq .id)"
   ```
 
-  Don't also write a `Blocked by #N` comment. A closed blocker KEEPS its link
-  --- that is how a reader sees an issue became workable. A blocker with no
-  issue is an untracked deficiency: file it, then link it. When a capability
-  lands, read its dependents
+  Don't also write a `Blocked by #N` comment. A closed blocker KEEPS its link.
+  A blocker with no issue is an untracked deficiency: file it, then link it.
+  When a capability lands, read its dependents
   (`gh api repos/tfausak/pawl/issues/N/dependencies/blocking`) and say in the
   PR body which issues it unblocked.
 
@@ -218,16 +203,14 @@ to agents as written. What it doesn't say:
 ## Before you consider a change done
 
 1.  Distrust the issue body --- its status, its blockers and its size estimate
-    have all been wrong. Re-derive against the tree before planning, and
+    are routinely wrong. Re-derive against the tree before planning, and
     correct the issue in a comment when it's wrong.
 
 2.  Verify a scripted edit's blast radius. Bulk `sed`/Python rewrites land in
-    comments, strings, and the middle of multi-line case bodies. Read the diff
-    and confirm the shape before staging. A scripted insertion of constructor
-    arms also lands inside comment groups that COUNT their members ("Four
-    keyword actions, none of them...", "the three whose watcher is..."), which
-    neither `-Werror` nor a mutation sees; move the inserted arm out of the
-    counted group and give it its own comment.
+    comments, strings, and the middle of multi-line case bodies, and inside
+    comment groups that COUNT their members. Read the diff and confirm the
+    shape before staging; move an inserted arm out of a counted group and give
+    it its own comment.
 
 3.  Mutate the change away and re-run. A green suite is not evidence the test
     proves anything. Break the line you just wrote, confirm the new test
@@ -235,8 +218,7 @@ to agents as written. What it doesn't say:
     gameplay-level one, an assertion ahead of it absorbed the mutation and the
     behaviour is unproven. If nothing fails, say so in the PR rather than
     implying coverage. `script/mutate.sh` runs one mutation and prints the
-    assertion, without judging whether it is the gameplay-level one;
-    `docs/agents/implementing.md` lists the traps.
+    assertion; `docs/agents/implementing.md` lists the traps.
 
 4.  Find the sites `-Werror` won't. A `{}` or `_` pattern absorbs a new
     constructor or field silently; the recurring ones are
@@ -247,26 +229,19 @@ to agents as written. What it doesn't say:
     `Pawl.CardSpec`'s filter and keyword traversals. No `Arm.tagged` codec is
     forced --- every such list carries its own `_ -> Nothing`, so a new
     constructor compiles with no codec arm and no round-trip test (#2262). An
-    `Arm.enum` codec derives and needs neither; dozens of modules use one, so
-    check which kind the type has rather than assuming. Grep the sibling
-    constructor, read every hit, and record in the PR which ones you read and
-    why each is right as it stands.
+    `Arm.enum` codec derives and needs neither; check which kind the type has.
+    Grep the sibling constructor, read every hit, and record in the PR which
+    ones you read and why each is right as it stands.
 
-    A NEW FIELD has its own invisible site: positional record construction in
-    the test suite absorbs it in argument order, and `-Werror` names it only
-    when the neighbouring argument's type happens to clash. It has bitten twice
-    (PRs #2009 and #2021). Grep every construction site of the type by hand.
+    A NEW FIELD's invisible site is positional record construction in the test
+    suite, which absorbs it in argument order. Grep every construction site of
+    the type by hand.
 
-    WIDENING AN EXISTING FUNCTION'S RESULT is the same hazard with no tripwire
-    at all. Every case above adds a case to a TYPE, so a fallthrough or a
-    positional site is at least greppable; returning a second element where one
-    used to come back changes no type, so `-Werror` is silent and step 3 is too
-    --- a mutation proves the test is sensitive to the line you wrote, never
-    that you found the other readers. That shipped a regression (PR #2537 ->
-    #2555): `Card.castableFaces` gained a second face, the gate legitimising it
-    went in one caller, and `Resolve.offerCast` --- which builds its own
-    candidate list --- offered the face for free. Grep the function's callers,
-    and say in the PR body which paths you drove and which you did not.
+    WIDENING AN EXISTING FUNCTION'S RESULT has no tripwire at all: no type
+    changes, so `-Werror` is silent and a mutation proves only that the test is
+    sensitive to your line, never that you found the other readers. Grep the
+    function's callers, and say in the PR body which paths you drove and which
+    you did not.
 
 5.  Closing #N means moving every census row that cites it. #875, #876 and #877
     annotate implemented rows with the issue numbers of what those rows still
@@ -288,12 +263,10 @@ project-specific rules it doesn't cover:
 
 - A constructor's haddock is ONE line saying what it means, plus its CR
   citation. Not a paragraph, not the rule's text, not a worked example, not the
-  history of how it came to exist. `pawl:types` currently runs 4.5 comment
-  lines per line of code and `Pawl.Types.Keyword` alone carries 1283 comment
-  lines; that is the debt this rule stops growing (#2561). Two things earn more
-  than a line: an elision paragraph, which states what is NOT implemented and
-  cites its issue, and a note naming the test that PROVES a behaviour. Both
-  outlive the one-liner; nothing else does.
+  history of how it came to exist. Two things earn more than a line: an
+  elision paragraph, which states what is NOT implemented and cites its issue,
+  and a note naming the test that PROVES a behaviour. Both outlive the
+  one-liner; nothing else does.
 
 - Language extensions come from the allowlist in `.hlint.yaml`. Using one it
   doesn't name means adding it there in the same change, with the reason.

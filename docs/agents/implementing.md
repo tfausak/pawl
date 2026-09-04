@@ -301,9 +301,16 @@ otherwise, and then say so in the PR.
   fine, not scope creep.
 - **File it** when it needs its own card, its own design decision, or touches
   files outside your unit --- and cite it inline where the code elides it.
+  **A filed gap names the real card that needs it**, found the way `CLAUDE.md`
+  says a producer is found, in the issue body. If you cannot name one, the gap
+  is not filed: fold it in, or record it in the PR body under "deferred" and
+  let it go. An elision still gets its issue, since the comment at the code
+  site must cite one; the card rule applies to the gap it elides.
 
-Each filed leaf costs a whole unit's fixed overhead later; a follow-up that
-takes ten minutes now and forty as its own dispatch is folded in.
+Each filed leaf costs a whole unit's fixed overhead later, and a merged PR
+filing about one issue is why the backlog holds its size. A follow-up that
+takes ten minutes now and forty as its own dispatch is folded in; one no card
+reaches is a capability the design forbids building anyway.
 
 ## Git and the PR
 
