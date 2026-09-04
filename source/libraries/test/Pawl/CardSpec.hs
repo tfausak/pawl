@@ -6390,22 +6390,36 @@ ofChosenPlayerOffends card =
 sameNameAsBoundTag :: Text.Text
 sameNameAsBoundTag = Text.pack "SameNameAsBound"
 
--- How many CR 709.4a atoms this card carries in a position whose evaluator fills
--- Filter.Context.slotNames -- a MODE's target slot filter (Harness the Storm) or
--- a CR 701.23 search filter (Bifurcate) -- and how many anywhere else. The second
--- number is the offence.
+-- How many CR 709.4a atoms this card carries in one of the two ADMITTED
+-- positions -- a MODE's target slot filter (Harness the Storm) or a CR 701.23
+-- search filter (Bifurcate) -- and how many anywhere else. The second number is
+-- the offence.
+--
+-- An ALLOWLIST of two rather than "wherever Filter.Context.slotNames is filled",
+-- which since #2141's search half is the wider set: every position a resolution
+-- reaches through Pawl.Engine.Resolve.effectContext has the names -- an
+-- ObjectRef's own affected set among them, which is SourceHostFramed inside an
+-- effect (Resolve.battlefieldMatching). So this rejects the atom in positions
+-- that would in fact answer, and only in that direction -- widen it when a card
+-- wants one of them, which is the posture sweptForSingularSlots takes at
+-- SlotlessCostFramed.
 sameNameAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameNameAsBoundCounts card =
   let total wanted = sum [filterAtoms sameNameAsBoundTag f | (framing, f) <- cardFilters card, elem framing [InTargetSlot, SearchFramed] == wanted]
    in (total True, total False)
 
 -- CR 709.4a's bound-name comparison is answerable only where
--- Filter.Context.slotNames is filled: Pawl.Engine.Target.admittedGiven, which
--- matches a MODE's target slot Filter, and Pawl.Engine.Resolve.effectContext,
--- which every position of a resolution goes through -- the search filter among
--- them. Filter.contextFor and Filter.contextComparingPower leave it empty, so
+-- Filter.Context.slotNames is filled, which two callers do:
+-- Pawl.Engine.Target.admittedGiven, matching a MODE's target slot Filter, and
+-- Pawl.Engine.Resolve.effectContext, which all but two of a resolution's
+-- positions go through -- the search filter among them.
+-- Filter.contextFor and Filter.contextComparingPower leave it empty, so
 -- Filter.SameNameAsBound in a Count filter, an affected set or a cost criterion
 -- is a silent False rather than a rejected card. This is where that is made loud.
+--
+-- The two positions sameNameAsBoundCounts admits are narrower than that, on
+-- purpose: see its own note. So a card rejected here is not necessarily one the
+-- engine would answer wrong.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
 -- traversal found the atom outside those two positions, or the traversal and the codec
@@ -9834,13 +9848,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       [Set.fromList [Zone.Library, Zone.Graveyard]]
     Spec.assertBool s (length (concatMap (searchZoneSets . S.combinedFace) ps) > 5) "and the pool gives the sweep other searches to be about"
   -- CR 709.4a's Filter.SameNameAsBound is in CR 701.3a's position one axis over:
-  -- answerable only where Filter.Context.slotNames is filled, which is a MODE's
-  -- target slot and a CR 701.23 search filter -- the second since
+  -- answerable only where Filter.Context.slotNames is filled, and unanswerable --
+  -- a silent False -- everywhere else. The two positions ADMITTED here are a
+  -- MODE's target slot and a CR 701.23 search filter, the second since
   -- Pawl.Engine.Resolve's Effect.Search arm took its context from the resolution
-  -- (Pawl.ResolveSpec's Bifurcate cases). See sameNameAsBoundOffends for the two
-  -- offences and Framing for why CR 303.4a's enchant slot is not one of the safe
-  -- positions.
-  Spec.it s "CR 709.4a no card asks SameNameAsBound where slotNames is empty" $ do
+  -- (Pawl.ResolveSpec's Bifurcate cases). That pair is narrower than the set that
+  -- would answer -- sameNameAsBoundCounts says why -- so this rejects in the safe
+  -- direction only. See sameNameAsBoundOffends for the two offences and Framing
+  -- for why CR 303.4a's enchant slot is not one of the safe positions.
+  Spec.it s "CR 709.4a no card asks SameNameAsBound outside a mode's target slot or a search filter" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace sameNameAsBoundOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only in a target slot's or a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
@@ -10900,7 +10916,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- each is asserted through sameNameAsBoundCounts as well as the predicate -- the
   -- counts say the TRAVERSAL put it in that position, where the predicate alone is
   -- also satisfied by the codec half noticing an atom the traversal missed.
-  Spec.it s "the lint itself catches SameNameAsBound where slotNames is empty" $ do
+  Spec.it s "the lint itself catches SameNameAsBound outside a mode's target slot or a search filter" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     harness <- S.printingOf s registry "Harness the Storm"

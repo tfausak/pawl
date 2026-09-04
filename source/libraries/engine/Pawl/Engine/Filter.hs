@@ -882,8 +882,10 @@ data Context = MkContext
     -- sourcePower's reason -- this module holds no game state and cannot read an
     -- object's names -- and by two callers: Pawl.Engine.Target.admittedGiven,
     -- where a target slot's Filter is matched, and
-    -- Pawl.Engine.Resolve.effectContext, which every position of a resolution
-    -- goes through (Bifurcate's search filter).
+    -- Pawl.Engine.Resolve.effectContext, which is what all but two of a
+    -- resolution's positions go through (Bifurcate's search filter). The two
+    -- that do not are slotObjects' pair above, and are its elision rather than
+    -- this field's: a caller building a bare contextFor has neither map.
     --
     -- Separate from `slotObjects` above rather than derived from it, and that is
     -- the same division sourcePower makes against `source`: an id is not a name
@@ -900,7 +902,7 @@ data Context = MkContext
     -- False.
     --
     -- What keeps a card out of those positions is Pawl.CardSpec's
-    -- "CR 709.4a no card asks SameNameAsBound where slotNames is empty",
+    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot or a search filter",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
     -- CR 110.2: the CONTROLLERS of the objects the surrounding announcement's

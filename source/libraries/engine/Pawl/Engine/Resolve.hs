@@ -6325,10 +6325,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Bound onto this effect's SOURCE, so a later effect reads it as
     -- Quantity.InSlot; bound even at zero, since zero is an answer. ONE number
     -- across every miller, as no Quantity has a per-player reader.
+    --
     -- Not implemented: the tally's filter is matched in a bare Filter.contextFor,
     -- so an atom naming a slot this same resolution bound -- the mill's own, a
-    -- clause above -- answers as though nothing were bound (#2141). No card in
-    -- the pool writes one there.
+    -- clause above -- takes its empty-slot value rather than an answer: False for
+    -- Filter.IsBound and its siblings, and TRUE for SameControllerAsBound, which
+    -- widens on an absent key (#2141). No card in the pool writes one there.
     Monad.forM_ mTally $ \tally ->
       let tallyContext = Filter.contextFor (Game.teams gs) Nothing Nothing
           viewOfMilled = Projection.viewsOf gs
