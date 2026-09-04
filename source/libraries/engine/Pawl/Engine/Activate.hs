@@ -677,7 +677,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- printed rider two lines down are asked in both places.
         && not (Detain.detained srcId gs)
         && sicknessOkGiven pcs pid srcId ability gs
-        && ActivationRestriction.restrictionsOk pid (ActivatedAbility.restrictions ability) gs
+        && ActivationRestriction.restrictionsOk pid srcId (ActivatedAbility.restrictions ability) gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
         && payableCostGiven aimable sources pcs (familyGrantingGiven pcs srcId gs ability) pid srcId gs (ActivatedAbility.cost ability)

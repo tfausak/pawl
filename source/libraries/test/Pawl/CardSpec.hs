@@ -62,6 +62,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -783,6 +784,19 @@ conditionQuantities condition = case condition of
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
 conditionCounts = concatMap quantityCounts . conditionQuantities
 
+-- Every Condition an "activate only ..." clause holds: only CR 602.5b's OnlyIf
+-- carries one, every other arm naming a window instead. Both card sweeps take
+-- from it, conditionQuantities' role one type up.
+restrictionConditions :: ActivationRestriction.ActivationRestriction -> [Condition.Type.Condition]
+restrictionConditions restriction = case restriction of
+  ActivationRestriction.SorcerySpeed -> []
+  ActivationRestriction.DuringPhase _ -> []
+  ActivationRestriction.DuringTurn _ -> []
+  ActivationRestriction.AttackedThisStep -> []
+  ActivationRestriction.AfterBlockersDeclared -> []
+  ActivationRestriction.BeforeCombatDamage -> []
+  ActivationRestriction.OnlyIf condition -> [condition]
+
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
 -- this beside it, or the gate's Counts -- and through them its Filters -- go
@@ -1376,6 +1390,10 @@ activatedAbilityCounts ability =
   -- cardCounts treatment of Face.maximumX one type over (Blighted Nightmare).
   concatMap quantityCounts (ActivatedAbility.maximumX ability)
     <> foldMap conditionCounts (ActivatedAbility.condition ability)
+    -- CR 602.5b's "activate only if [board condition]" rider, whose Condition is
+    -- a Count position like any other -- and the one ActivatedAbility field the
+    -- two sweeps reached through nothing until OnlyIf gave it a payload.
+    <> concatMap conditionCounts (concatMap restrictionConditions (ActivatedAbility.restrictions ability))
     <> concatMap effectCounts (Modal.allEffects (ActivatedAbility.modal ability))
     <> concatMap conditionCounts (modalClauseConditions (ActivatedAbility.modal ability))
 
@@ -5982,6 +6000,9 @@ activatedAbilityFilters ability =
     -- CR 702.178a's "as long as" gate, the triggeredAbilityFilters treatment of
     -- CR 603.4's intervening "if" one field over.
     <> frame Unframed (concatMap conditionFilters (Maybe.maybeToList (ActivatedAbility.condition ability)))
+    -- CR 602.5b's rider. Unframed because Pawl.Engine.ActivationRestriction's
+    -- OnlyIf arm builds a plain Filter.contextFor and sets no sourceAttachedTo.
+    <> frame Unframed (concatMap conditionFilters (concatMap restrictionConditions (ActivatedAbility.restrictions ability)))
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach

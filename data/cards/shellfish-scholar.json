@@ -1,6 +1,115 @@
 {
   "faces": [
     {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AffectPlayers",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "effect": {
+                            "type": "ReduceSpellCost",
+                            "value": {
+                              "reduction": [
+                                {
+                                  "type": "Generic",
+                                  "value": 2
+                                }
+                              ],
+                              "whichSpells": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "WasCastFrom",
+                                    "value": {
+                                      "type": "Graveyard"
+                                    }
+                                  },
+                                  {
+                                    "type": "OwnedBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "players": {
+                            "type": "Scoped",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "restrictions": [
+            {
+              "type": "OnlyIf",
+              "value": {
+                "type": "Compares",
+                "value": {
+                  "comparison": {
+                    "type": "AtLeast"
+                  },
+                  "measured": {
+                    "type": "Count",
+                    "value": {
+                      "aggregation": {
+                        "type": "Members"
+                      },
+                      "filter": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "scope": {
+                        "type": "InZone",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "zone": {
+                            "type": "Graveyard"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "threshold": {
+                    "type": "Literal",
+                    "value": 7
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",
