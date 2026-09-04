@@ -149,8 +149,11 @@ data PlayerRef
     -- creature attacking a given player -- is about the combat record rather than
     -- about a characteristic.
     --
-    -- Not implemented: Pawl.Engine.Count.playersFor folds no combat record, so a
-    -- Scope or a ManaCount naming this reference is unanswered. Its one reader is
-    -- Pawl.Engine.Resolve.playerRefPlayers (#1441).
+    -- TWO readers, folding the same live combat record:
+    -- Pawl.Engine.Resolve.playerRefPlayers for the reference in an effect's own
+    -- recipient position, and Pawl.Engine.Count.playersFor -- which
+    -- Pawl.Engine.Quantity and Pawl.Engine.ManaCount both route through -- under a
+    -- Scope or a ManaCount. Pawl.CountSpec's Synthetic Toll of the Siege proves
+    -- the second.
     Attacking AttackingPlayers.AttackingPlayers
   deriving (Eq, Ord, Show)

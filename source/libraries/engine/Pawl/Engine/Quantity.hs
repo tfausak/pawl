@@ -745,15 +745,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       PlayerRef.EachPlayerExcept _ -> Count.playersFor viewOf context gs ref
       PlayerRef.Relative _ -> Count.playersFor viewOf context gs ref
       PlayerRef.InSlot _ -> Count.playersFor viewOf context gs ref
-      -- InSlot's plural, answered there too: the read is off the source's
-      -- bindings, which that function holds.
+      -- InSlot's plural, answered there too: off the resolution's own slots, or
+      -- the source's bindings where the position supplies none.
       PlayerRef.EachInSlot _ -> Count.playersFor viewOf context gs ref
       PlayerRef.Specific _ -> Count.playersFor viewOf context gs ref
-      -- CR 508.6's set, left with Count.playersFor's Nothing even though the view
-      -- IS here: this reference names a set of players and every quantity that
-      -- reads one reads exactly one player (see the LifeTotal arm), so answering
-      -- it would need a fold this position does not supply. Its reader is
-      -- Pawl.Engine.Resolve.playerRefPlayers, which folds (#1441).
+      -- CR 508.6's set, folded there off the live combat record. The scalar arms
+      -- above still decline it, and not for want of an answer: each takes
+      -- `Just [pid]` and no more (see the LifeTotal arm), so a reference naming a
+      -- table's worth of players leaves them unanswered. Where it DOES read is a
+      -- scope's fold -- Synthetic Toll of the Siege's "for each player attacking
+      -- them" (Pawl.CountSpec).
       PlayerRef.Attacking _ -> Count.playersFor viewOf context gs ref
 
     -- Every entry onto the battlefield this log records for one id. A list and not

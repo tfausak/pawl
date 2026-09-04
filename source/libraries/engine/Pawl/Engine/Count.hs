@@ -9,6 +9,7 @@
 -- lets a count read the projection without the module cycle or the recursion.
 module Pawl.Engine.Count where
 
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -22,6 +23,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -45,6 +47,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -445,8 +448,8 @@ playersFor viewOf context gs ref =
   let everyone = Game.stillPlaying gs
    in case ref of
         PlayerRef.EachPlayer -> Just everyone
-        -- EachPlayer minus the seat the slot names, read off the source's
-        -- bindings as InSlot below reads them. DEFINED rather than Nothing where
+        -- EachPlayer minus the seat the slot names, read through slotPlayers below
+        -- as InSlot reads it. DEFINED rather than Nothing where
         -- that read comes up empty -- a slot naming nobody excludes nobody, which
         -- is the type's stated reading and the opposite of InSlot's collapse. A
         -- reference with no source at all is still unanswerable, since without one
@@ -456,13 +459,14 @@ playersFor viewOf context gs ref =
         -- 729.5 leaves a resumed resolution holding -- this answers Nothing where
         -- Pawl.Engine.Resolve.playerRefPlayers' arm answers "excludes nobody", and
         -- neither consults GameState.detachedBindings (#2493).
-        PlayerRef.EachPlayerExcept name -> do
-          src <- Filter.source context
-          obj <- Game.lookupObject src gs
-          let excluded = do
-                recipient <- Binding.onlyOne =<< Map.lookup name (Binding.targetsOf (Object.bindings obj))
-                Recipient.playerOf recipient
-          Just (filter (\pid -> Just pid /= excluded) everyone)
+        PlayerRef.EachPlayerExcept name ->
+          case Filter.source context >>= \src -> Game.lookupObject src gs of
+            Nothing -> Nothing
+            Just _ ->
+              let excluded = case slotPlayers context gs name of
+                    Just [pid] -> Just pid
+                    _ -> Nothing
+               in Just (filter (\pid -> Just pid /= excluded) everyone)
         PlayerRef.Relative relation -> do
           you <- Filter.perspective context
           case relation of
@@ -481,32 +485,17 @@ playersFor viewOf context gs ref =
             -- unanswerable, and widening that for one arm would let a reference
             -- resolve where its siblings cannot.
             PlayerRelation.AnyPlayer -> Just everyone
-        PlayerRef.InSlot name -> do
-          src <- Filter.source context
-          obj <- Game.lookupObject src gs
-          -- One recipient or none: a count reads a slot that names one player,
-          -- and Binding.onlyOne is how every such reader declines a slot that
-          -- names several (CR 601.2c).
-          recipient <- Binding.onlyOne =<< Map.lookup name (Binding.targetsOf (Object.bindings obj))
-          case recipient of
-            Recipient.ToPlayer pid -> Just [pid]
-            Recipient.ToCreature _ -> Nothing
-            Recipient.ToPlaneswalker _ -> Nothing
-            Recipient.ToBattle _ -> Nothing
-            Recipient.ToObject _ -> Nothing
-            -- Unreachable: Pawl.Engine.Target.drawFromPiles replaces CR 406.4's
-            -- pile with the card drawn from it before any slot is bound.
-            Recipient.ToPile _ -> Nothing
-        -- InSlot's plural, off the same bindings: EVERY player the slot names,
-        -- with the non-player recipients dropped rather than collapsing the
-        -- whole read the way Binding.onlyOne does above. An UNBOUND slot is
-        -- still unanswerable, which is that arm's posture -- nothing named
+        -- ONE player or none: a count reads a slot that names one player, and
+        -- declining a slot that names several is CR 601.2c's own answer, the one
+        -- Binding.onlyOne gives every other such reader.
+        PlayerRef.InSlot name -> case slotPlayers context gs name of
+          Just [pid] -> Just [pid]
+          _ -> Nothing
+        -- InSlot's plural, off the same read: EVERY player the slot names, rather
+        -- than collapsing the whole answer the way the arm above does. An UNBOUND
+        -- slot is still unanswerable, which is that arm's posture -- nothing named
         -- nobody, and a fold over the empty set would be a different claim.
-        PlayerRef.EachInSlot name -> do
-          src <- Filter.source context
-          obj <- Game.lookupObject src gs
-          recipients <- Map.lookup name (Binding.targetsOf (Object.bindings obj))
-          Just (Maybe.mapMaybe Recipient.playerOf (Set.toList recipients))
+        PlayerRef.EachInSlot name -> slotPlayers context gs name
         -- InSlot's baked half, and answered exactly as the arm above answers a
         -- slot that names one player: the seat, with no roster test. Per the CR
         -- 102.1 note above a departed player keeps their row, so this can name one
@@ -542,13 +531,53 @@ playersFor viewOf context gs ref =
         PlayerRef.ControllerOfBound slot ->
           fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
         -- CR 508.6's set: the players controlling a creature attacking the player
-        -- a slot names, narrowed by the relation the card printed.
+        -- a slot names, narrowed by the relation the card printed. The SAME fold
+        -- Pawl.Engine.Resolve.playerRefPlayers makes for the reference in an
+        -- effect's own recipient position, so the two cannot come apart about who
+        -- is attacking whom -- AttackTarget.OfPlayer alone (CR 508.1b lists player,
+        -- planeswalker and battle separately), read LIVE off GameState.combat
+        -- because the sentence is present tense and CR 506.4's removal takes a
+        -- controller back out, and filtered out of `everyone` so the roster order
+        -- and CR 102.1's departed seat are the ones every arm above gives.
         --
-        -- Not implemented: the combat record this would fold is
-        -- GameState.combat, which the arm above's view says nothing about, and no
-        -- card in data/cards/ writes the reference under a Scope or a ManaCount.
-        -- Its one reader is Pawl.Engine.Resolve.playerRefPlayers (#1441).
-        PlayerRef.Attacking _ -> Nothing
+        -- The controller comes off the injected view rather than a projection of
+        -- this module's own, ControllerOfBound's road above and for CR 613.1b's
+        -- reason. Unanswered where the slot names no one player: the relation is
+        -- about a third seat and there is nothing to be attacking.
+        --
+        -- Synthetic Toll of the Siege is the producer (Pawl.CountSpec); no
+        -- printing counts attacking players (Scryfall o:"for each player
+        -- attacking", o:"each player attacking", o:"players attacking",
+        -- 2026-09-04, no hit).
+        PlayerRef.Attacking (AttackingPlayers.MkAttackingPlayers relation slot) -> do
+          you <- Filter.perspective context
+          attacked <- case slotPlayers context gs slot of
+            Just [pid] -> Just pid
+            _ -> Nothing
+          let sentAt = Map.keys (Map.filter (== AttackTarget.OfPlayer attacked) (Combat.attackers (GameState.combat gs)))
+              attackers = Maybe.mapMaybe (viewOf Monad.>=> Filter.controller) sentAt
+          Just (filter (\pid -> PlayerRelation.holds (Game.teams gs) relation you pid && pid `elem` attackers) everyone)
+
+-- CR 601.2c: the players one slot names at this position, or Nothing where no
+-- slot of that name is bound here -- which every arm above reads as
+-- "unanswerable" rather than as an empty fold.
+--
+-- TWO roads, and the first is why Filter.Context carries the map at all. A
+-- resolution supplies its own CR 608.2b-filtered slots
+-- (Pawl.Engine.Resolve.effectContext), and that is the only read that answers for
+-- an ABILITY: CR 113.7 makes Filter.source the ability's source permanent, while
+-- its targets and its trigger's bindings are stamped on the ability object on the
+-- stack (#1783). The SOURCE's own bindings are the fallback, for a caller that
+-- builds no such context -- a static ability, a replacement -- and for a spell the
+-- two roads are the same object.
+slotPlayers :: Filter.Context -> GameState -> SlotName.SlotName -> Maybe [PlayerId]
+slotPlayers context gs name = case Map.lookup name (Filter.slotPlayers context) of
+  Just pids -> Just (Set.toList pids)
+  Nothing -> do
+    src <- Filter.source context
+    obj <- Game.lookupObject src gs
+    recipients <- Map.lookup name (Binding.targetsOf (Object.bindings obj))
+    Just (Maybe.mapMaybe Recipient.playerOf (Set.toList recipients))
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event
 -- recorded rather than from any object that may no longer exist.

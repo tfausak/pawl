@@ -15,6 +15,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Engine as Engine
@@ -22,18 +23,22 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -43,6 +48,7 @@ import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -368,6 +374,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   censusOfTheCursedSpec s registry
   relicRunnerSpec s registry
   flunkSpec s registry
+  keeningStoneSpec s registry
+  tollOfTheSiegeSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -1257,3 +1265,151 @@ flunkSpec s registry =
           Spec.assertEqWith s "a -6/2: 7 minus carol's one card" (S.powerToughnessOf wallId after) (Just (-6, 2))
           Spec.assertEqWith s "carol controls the Wall she does not own" (Projection.controllerOf wallId after) (Just S.carol)
           Spec.assertEqWith s "its owner bob still holds three" (S.handSize S.bob after) 3
+
+-- CR 113.7 / CR 608.2c: a count whose SCOPE names the player an ABILITY's slot
+-- bound. Pawl.Engine.Resolve.effectContext frames the resolution on the ability's
+-- SOURCE, while its target is stamped on the ability object on the stack, so
+-- Count.playersFor reading the source's own bindings found nothing and the count
+-- came back unanswered -- a mill of nothing. A SPELL cannot show it: its source
+-- and its stack object are one object. GAMEPLAY LEVEL for the Flunk group's
+-- reason -- what is on trial is which object the resolution's slots are read off,
+-- which a hand-built context would decide for the engine.
+--
+-- Keening Stone, {6} Artifact: "{5}, {T}: Target player mills X cards, where X is
+-- the number of cards in that player's graveyard." Nothing else on the card, so
+-- the target's graveyard is the only thing a case can be reading.
+--
+-- THREE SEATS with THREE DIFFERENT graveyards, because "that player", "you" and
+-- "each player" are three sentences a two-seat board or an equal graveyard
+-- collapses onto one. alice activates and holds 2 cards in her graveyard, bob --
+-- the target -- 3 and carol 1, so the mill reads:
+--
+--   bob, the target       X = 3   graveyard 3 -> 6, library 10 -> 7
+--   alice, the activator  X = 2
+--   carol                 X = 1
+--   every player at once  X = 6
+--   unanswered            X = 0   graveyard 3,      library 10
+--
+-- bob's library is stocked past the deepest of those, so no reading decks him (CR
+-- 104.3c) before the assertion runs.
+keeningStoneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+keeningStoneSpec s registry =
+  let inZone zone pid gs = length (Game.zoneMembers zone pid gs)
+      stock add printing pid n gs = List.foldl' (\g _ -> snd (add printing pid g)) gs [1 .. (n :: Int)]
+      board = do
+        stone <- S.printingOf s registry "Keening Stone"
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (stoneId, withStone) = S.addCreature stone S.alice (S.landsFor swamp S.alice 5 S.threePlayerGame)
+            staged =
+              stock S.addGraveyardCard piker S.carol 1
+                . stock S.addGraveyardCard piker S.bob 3
+                . stock S.addGraveyardCard piker S.alice 2
+                . stock S.addLibraryCard piker S.alice 10
+                $ stock S.addLibraryCard piker S.bob 10 withStone
+        pure (stoneId, staged {GameState.priority = Just S.alice}, Face.activatedAbilities (S.combinedFace stone))
+      fire stoneId ability target gs = S.runPure (aimedAtPlayer target) gs (do Activate.activateAbility S.alice stoneId ability; Stack.resolveTop)
+   in Spec.describe s "Keening Stone" $ do
+        Spec.it s "CR 113.7 X counts the graveyard of the ABILITY's target, not of its source's bindings" $ do
+          (stoneId, ready, abilities) <- board
+          case abilities of
+            [] -> Spec.assertFailure s "Keening Stone should declare one activated ability"
+            ability : _ -> do
+              let after = fire stoneId ability S.bob ready
+              Spec.assertEqWith s "bob's graveyard took the three cards the count read" (inZone Zone.Graveyard S.bob after) 6
+              Spec.assertEqWith s "and his library is three shallower" (inZone Zone.Library S.bob after) 7
+              Spec.assertEqWith s "alice's two-card graveyard was not the one counted" (inZone Zone.Graveyard S.alice after) 2
+              Spec.assertEqWith s "nor carol's one" (inZone Zone.Graveyard S.carol after) 1
+        -- The TARGET axis, on a board differing from the one above in the target
+        -- alone: aimed at alice the same ability mills two, her graveyard's depth
+        -- and not bob's. A count read off the source would answer the same number
+        -- on both boards.
+        Spec.it s "CR 113.7 the same ability aimed at alice mills TWO, her own graveyard's depth" $ do
+          (stoneId, ready, abilities) <- board
+          case abilities of
+            [] -> Spec.assertFailure s "Keening Stone should declare one activated ability"
+            ability : _ -> do
+              let after = fire stoneId ability S.alice ready
+              Spec.assertEqWith s "alice's graveyard took two" (inZone Zone.Graveyard S.alice after) 4
+              Spec.assertEqWith s "and her library is two shallower" (inZone Zone.Library S.alice after) 8
+              Spec.assertEqWith s "bob, untargeted, milled nothing" (inZone Zone.Graveyard S.bob after) 3
+
+-- CR 508.6: "a player is 'attacking [a player]' if the first player controls a
+-- creature that is attacking the second player" -- COUNTED, which is the reading
+-- Count.playersFor answered Nothing for. The reference already resolves in an
+-- effect's own recipient position (Curse of Vitality,
+-- Pawl.EventTriggerSpec); this is the same fold under a Scope.OverPlayers.
+--
+-- Synthetic Toll of the Siege, {1}{W} Instant: "Target player gains 1 life for
+-- each player attacking them." SYNTHETIC because no printing counts attacking
+-- players -- Scryfall o:"for each player attacking", o:"each player attacking",
+-- o:"players attacking", o:"player attacking you", 2026-09-04, no hit; the five
+-- Curses that write the reference all put it in a recipient position.
+--
+-- THE VACUITY GUARD is two attacking CREATURES from ONE attacking player: the
+-- count is 1 and not 2, which is what separates folding players from folding the
+-- combat record's rows. CR 508.1 lets only the active player declare, so one is
+-- as many attacking players as a legal board holds.
+--
+-- THREE SEATS, all three doing different work: alice attacks, carol casts, bob is
+-- targeted -- so "you", the attacked player and the attacking player are three
+-- different names. The life gain is bob's, not the caster's.
+tollOfTheSiegeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tollOfTheSiegeSpec s registry =
+  let board = do
+        piker <- S.printingOf s registry "Goblin Piker"
+        plains <- S.printingOf s registry "Plains"
+        toll <- S.printingOf s registry "Synthetic Toll of the Siege"
+        case S.threePlayerCombat [piker, piker] [] [] of
+          (gs0, [_, _], [], []) -> pure (Just (S.addHandCard toll S.carol (S.landsFor plains S.carol 2 gs0)))
+          _ -> pure Nothing
+      -- Declines the declaration outright: the board that differs from the one
+      -- above in the attack alone.
+      standingStill :: Prompt.Prompt r -> r
+      standingStill p = case p of
+        Prompt.DeclareAttackers {} -> []
+        _ -> S.attackTo S.bob p
+      castToll tollId gs = S.runPure (aimedAtPlayer S.bob) gs (do S.cast S.carol tollId; Stack.resolveTop)
+      sentAt gs = Map.elems (Combat.attackers (GameState.combat gs))
+   in Spec.describe s "Synthetic Toll of the Siege" $ do
+        -- The proving case. Both of alice's Pikers attack bob, and bob gains ONE
+        -- life: alice is one player however many creatures she sent.
+        Spec.it s "CR 508.6 two creatures from one attacker count as ONE player attacking" $ do
+          built <- board
+          case built of
+            Just (tollId, gs) -> do
+              let after = castToll tollId (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (S.attackTo S.bob) gs)
+              Spec.assertEqWith s "bob gained 1: alice is the one player attacking him" (S.lifeOf S.bob after) (Just 21)
+              Spec.assertEqWith s "CR 508.1b both Pikers really were declared attacking bob" (sentAt after) [AttackTarget.OfPlayer S.bob, AttackTarget.OfPlayer S.bob]
+              Spec.assertEqWith s "the caster gained nothing: the life is the target's" (S.lifeOf S.carol after) (Just 20)
+            Nothing -> Spec.assertFailure s "fixture should give alice two Pikers and carol the Toll"
+        -- The control twin: the same board with the declaration declined, so the
+        -- count folds nobody and the gain above came from the attack.
+        Spec.it s "CR 508.6 with nobody attacking the count is zero" $ do
+          built <- board
+          case built of
+            Just (tollId, gs) -> do
+              let after = castToll tollId (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) standingStill gs)
+              Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob after) (Just 20)
+              Spec.assertEqWith s "and nothing was declared" (sentAt after) []
+            Nothing -> Spec.assertFailure s "fixture should give alice two Pikers and carol the Toll"
+        -- The SLOT discriminator: the same two attackers sent at carol instead.
+        -- Somebody is attacking, and it is not the targeted player, so bob gains
+        -- nothing -- the falsifier for a fold that ignored the slot.
+        Spec.it s "CR 508.6 attacking the OTHER player leaves the target's count at zero" $ do
+          built <- board
+          case built of
+            Just (tollId, gs) -> do
+              let after = castToll tollId (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (S.attackTo S.carol) gs)
+              Spec.assertEqWith s "bob gained nothing: nobody is attacking HIM" (S.lifeOf S.bob after) (Just 20)
+              Spec.assertEqWith s "CR 508.1b and carol really was the one attacked" (sentAt after) [AttackTarget.OfPlayer S.carol, AttackTarget.OfPlayer S.carol]
+            Nothing -> Spec.assertFailure s "fixture should give alice two Pikers and carol the Toll"
+
+-- CR 601.2c: fill every target slot with the candidate naming `pid`. The offered
+-- set is FILTERED rather than answered with a hand-built recipient, so CR 608.2b's
+-- re-read at resolution still finds the target (`aimedAt` above is the same
+-- answerer one recipient kind over).
+aimedAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimedAtPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
+  _ -> S.identityAnswer p
