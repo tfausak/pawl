@@ -157,10 +157,9 @@ increaseAbility =
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Just belowMaxSpeed,
       -- CR 702.179d's own "this ability triggers only once each turn", stated in
-      -- the data because the rule states it. It is NOT what enforces the limit
-      -- here: Engine.withinTurnLimit reads the CR 603.3b log, and the record it
-      -- reads is the one a SOURCELESS trigger does not get (#1026), so
-      -- `alreadyTriggered` below is still the enforcement. The two agree.
+      -- the data because the rule states it, and enforced from there like every
+      -- other rider: Engine.withinTurnLimit reads the CR 603.3b log, which
+      -- records a sourceless trigger under its controller.
       TriggeredAbility.limit = TriggerLimit.OncePerTurn
     }
 
@@ -182,13 +181,12 @@ belowMaxSpeed =
 -- Engine.placePendingTriggers merge it into the one batch CR 603.3b orders, and
 -- Pawl.Engine.Monarch.placeInherent put it on the stack.
 --
--- AT MOST ONE, for two separate reasons that must not be confused. "One or more
--- opponents lose life" makes a whole batch of simultaneous losses a SINGLE
--- occurrence, which is why this scans the batch rather than mapping over it; and
--- "this ability triggers only once each turn" is the per-turn limit, which
--- GameState.speedIncreasedThisTurn carries and Engine.placePendingTriggers marks
--- -- see `increaseAbility`'s TriggerLimit for why the generic reader does not
--- reach a sourceless trigger.
+-- AT MOST ONE PER GATHER, and "one or more opponents lose life" is the reason:
+-- a whole batch of simultaneous losses is a SINGLE occurrence, which is why this
+-- scans the batch rather than mapping over it. The separate per-turn limit,
+-- "this ability triggers only once each turn", is NOT enforced here --
+-- `increaseAbility` prints the rider and Engine.withinTurnLimit spends it off
+-- the CR 603.3b log, as it does for an ability a card bears.
 --
 -- Only the ACTIVE player's ability can fire, which is CR 702.179d's "during your
 -- turn" and not a shortcut. Only a player with 1 or more speed HAS the ability at
@@ -213,10 +211,8 @@ inherentPending events gs =
       -- (Effect.DecreaseSpeed) can now make observable, a player dropped back
       -- below 4 having spent no trigger.
       below = Maybe.maybe False (< maxSpeed) (speedOf you gs)
-      alreadyTriggered = Set.member you (GameState.speedIncreasedThisTurn gs)
    in [ PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty Nothing
       | hasSpeed,
         below,
-        not alreadyTriggered,
         List.any lostLife events
       ]

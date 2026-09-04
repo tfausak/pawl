@@ -846,6 +846,8 @@ library codec
     Pawl.Codec.TriggerFrequencySpec
     Pawl.Codec.TriggerLimit
     Pawl.Codec.TriggerLimitSpec
+    Pawl.Codec.TriggerSource
+    Pawl.Codec.TriggerSourceSpec
     Pawl.Codec.TurnFaceDown
     Pawl.Codec.TurnFaceDownSpec
     Pawl.Codec.TurnScope

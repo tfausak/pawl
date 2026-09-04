@@ -45,6 +45,11 @@ import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
+-- Aliased Condition.Type, not Condition, per the project-wide convention
+-- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
+-- and must not collide.
+
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
@@ -54,9 +59,6 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
--- Aliased Condition.Type, not Condition, per the project-wide convention
--- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
--- and must not collide.
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
@@ -82,6 +84,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FloatingCandidate as FloatingCandidate
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -91,6 +94,9 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -134,6 +140,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -2307,7 +2314,14 @@ representativeEvents cond =
         -- for what this pins: eventBindings contributes nothing for this
         -- condition under any event, so the floor is empty either way.
         TriggerCondition.SagaFinalChapterTriggers _ ->
-          one (GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered departed S.alice (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 3))))
+          one
+            ( GameEvent.AbilityTriggered
+                AbilityTriggered.MkAbilityTriggered
+                  { AbilityTriggered.source = TriggerSource.OfObject departed,
+                    AbilityTriggered.controller = S.alice,
+                    AbilityTriggered.ability = bareAbility (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 3))
+                  }
+            )
         -- CR 725.1's own event, and the only one this condition admits. CR 725.3
         -- makes it name exactly one player, so there is no second shape of the
         -- event for the floor to differ on. bob rather than the perspective
@@ -5780,3 +5794,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   bystanderZoneSpec s registry
   aetherFlashSpec s registry
   kindredSpec s registry
+
+-- A triggered ability with this condition and no payload, for the representative
+-- GameEvent.AbilityTriggered above. The record names the ABILITY beside its
+-- source, and that arm's floor does not depend on what the ability does.
+bareAbility :: TriggerCondition.TriggerCondition -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
+bareAbility condition =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = condition,
+      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }

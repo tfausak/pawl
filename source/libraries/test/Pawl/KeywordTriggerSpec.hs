@@ -1350,8 +1350,8 @@ creatureBecomesBlockedByAtLeastSpec s registry =
         length
           [ ()
           | GameEvent.AbilityTriggered record <- S.eventsOf gs,
-            AbilityTriggered.source record == oid,
-            case AbilityTriggered.condition record of
+            AbilityTriggered.source record == TriggerSource.OfObject oid,
+            case TriggeredAbility.condition (AbilityTriggered.ability record) of
               TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
               _ -> False
           ]
@@ -5177,7 +5177,16 @@ rampageSpec s registry =
           (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker"]
           case mine of
             [pack] -> do
-              let fired after = elem (GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered pack S.alice TriggerCondition.SelfBecomesBlocked)) (S.eventsOf after)
+              let fired after =
+                    not
+                      ( null
+                          [ ()
+                          | GameEvent.AbilityTriggered record <- S.eventsOf after,
+                            AbilityTriggered.source record == TriggerSource.OfObject pack,
+                            AbilityTriggered.controller record == S.alice,
+                            TriggeredAbility.condition (AbilityTriggered.ability record) == TriggerCondition.SelfBecomesBlocked
+                          ]
+                      )
               Spec.assertBool s (not (fired (S.runToStep (Phase.Combat CombatStep.CombatDamage) noBlocks gs))) "nothing blocked, so nothing triggered"
               Spec.assertBool s (fired (atDamage gs)) "and the same board with the block taken does trigger"
             _ -> Spec.assertFailure s "fixture should give alice one Pack"

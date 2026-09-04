@@ -10916,11 +10916,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- control triggers".
   --
   -- The event carries the triggered ability's SOURCE, its CONTROLLER as it
-  -- triggered (CR 603.3a) and its trigger CONDITION, and all three are read:
+  -- triggered (CR 603.3a) and the ABILITY, and all three are read:
   --
-  --   * the condition must be a chapter ability's (CR 714.2b, through
-  --     Saga.chapterOfCondition, so this and the SelfCountersReached arm above
-  --     cannot drift about what a chapter symbol is);
+  --   * the ability must be a chapter ability (CR 714.2b, through Saga.chapterOf,
+  --     so this and the SelfCountersReached arm above cannot drift about what a
+  --     chapter symbol is);
   --   * its chapter must be the source's FINAL chapter number (CR 714.2d), which
   --     is why the source's projection is read rather than the event alone;
   --   * the source must be a Saga with one or more chapter abilities
@@ -10943,11 +10943,15 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- as an object with no subtypes, which Saga.tracksLore declines -- the same
   -- silence CR 603.10 would give a look-back that found nothing (#1028).
   TriggerCondition.SagaFinalChapterTriggers relation -> case event of
-    GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered srcId controller fired) ->
-      PlayerRelation.holds (Game.teams gs) relation you controller
-        && ( let pc = Projection.project srcId gs
-              in Saga.tracksLore pc && Saga.chapterOfCondition fired == Just (Saga.finalChapterOf pc)
-           )
+    -- A SOURCELESS inherent ability (CR 725.2, CR 702.179d) is never a chapter
+    -- ability of a Saga, there being no Saga behind it to read lore counters off.
+    GameEvent.AbilityTriggered record -> case AbilityTriggered.source record of
+      TriggerSource.Sourceless -> False
+      TriggerSource.OfObject srcId ->
+        PlayerRelation.holds (Game.teams gs) relation you (AbilityTriggered.controller record)
+          && ( let pc = Projection.project srcId gs
+                in Saga.tracksLore pc && Saga.chapterOf (AbilityTriggered.ability record) == Just (Saga.finalChapterOf pc)
+             )
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False

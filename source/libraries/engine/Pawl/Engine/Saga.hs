@@ -131,19 +131,7 @@ chapterTriggers restricted before after n = crossed before after n && (after == 
 -- representation at all: that rule says the shorthand MEANS two abilities, so a
 -- card prints two entries sharing one modal.
 chapterOf :: TriggeredAbility card ability -> Maybe Natural
-chapterOf = chapterOfCondition . TriggeredAbility.condition
-
--- | The same question asked of a trigger CONDITION alone, which is where the
--- whole of the answer lives: CR 714.2 calls a chapter symbol "a keyword ability
--- that represents a triggered ability", and CR 714.2b writes that ability's
--- trigger condition out, so a chapter ability is one whose condition is that.
---
--- Split out for GameEvent.AbilityTriggered, which carries a condition rather than
--- an ability (CR 603.3b): Historian's Boon's "the final chapter ability of a Saga
--- you control" asks this of the event, and Pawl.Engine.Event.matchesTrigger must
--- get the same answer `chapterOf` gives the SBA above.
-chapterOfCondition :: TriggerCondition.TriggerCondition -> Maybe Natural
-chapterOfCondition condition = case condition of
+chapterOf ability = case TriggeredAbility.condition ability of
   TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore n) -> Just n
   _ -> Nothing
 

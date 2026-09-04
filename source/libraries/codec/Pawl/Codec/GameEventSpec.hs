@@ -6,6 +6,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
+import qualified Pawl.Codec.TriggeredAbilitySourceSpec as TriggeredAbilitySourceSpec
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -47,7 +48,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
@@ -57,7 +57,7 @@ import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
-import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -343,8 +343,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered (ObjectId.MkObjectId 7) (PlayerId.MkPlayerId 1) (TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You)))
-      " {\"type\":\"AbilityTriggered\",\"value\":{\"source\":7,\"controller\":1,\"condition\":{\"type\":\"SagaFinalChapterTriggers\",\"value\":{\"type\":\"You\"}}}} "
+      ( GameEvent.AbilityTriggered
+          AbilityTriggered.MkAbilityTriggered
+            { AbilityTriggered.source = TriggerSource.OfObject (ObjectId.MkObjectId 7),
+              AbilityTriggered.controller = PlayerId.MkPlayerId 1,
+              AbilityTriggered.ability = TriggeredAbilitySourceSpec.ability
+            }
+      )
+      " {\"type\":\"AbilityTriggered\",\"value\":{\"source\":{\"type\":\"OfObject\",\"value\":7},\"controller\":1,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}}}} "
   -- The permanent, then the player control LEFT, then the player it went to. The
   -- order matters and distinct ids prove it: "when YOU lose control" reads the
   -- middle field, and a swap would make it read the gainer.

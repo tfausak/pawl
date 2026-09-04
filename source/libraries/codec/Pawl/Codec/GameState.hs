@@ -153,7 +153,6 @@ codec resolve = Fields.object $ do
   drewFromEmpty <- Fields.defaulted "drewFromEmpty" Set.empty (Common.set PlayerId.codec) GameState.drewFromEmpty
   landsPlayed <- Fields.defaulted "landsPlayed" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.landsPlayed
   drawsThisTurn <- Fields.defaulted "drawsThisTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.drawsThisTurn
-  speedIncreasedThisTurn <- Fields.defaulted "speedIncreasedThisTurn" Set.empty (Common.set PlayerId.codec) GameState.speedIncreasedThisTurn
   pendingControl <- Fields.defaulted "pendingControl" Map.empty (Common.naturalMap PlayerId.codec Decider.codec) GameState.pendingControl
   activeControl <- Fields.defaulted "activeControl" Nothing (Common.maybe Decider.codec) GameState.activeControl
   monarch <- Fields.defaulted "monarch" Nothing (Common.maybe PlayerId.codec) GameState.monarch
@@ -228,7 +227,6 @@ codec resolve = Fields.object $ do
         GameState.drewFromEmpty = drewFromEmpty,
         GameState.landsPlayed = landsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,
-        GameState.speedIncreasedThisTurn = speedIncreasedThisTurn,
         GameState.pendingControl = pendingControl,
         GameState.activeControl = activeControl,
         GameState.monarch = monarch,

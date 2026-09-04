@@ -88,6 +88,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -1277,7 +1278,7 @@ whisperingWizardSpec s registry =
       -- CR 603.3b's own record of an ability triggering, counted for one source.
       -- The Spirit count says what RESOLVED; this says what TRIGGERED, which is
       -- what the rider limits.
-      firedBy oid gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, AbilityTriggered.source record == oid]
+      firedBy oid gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, AbilityTriggered.source record == TriggerSource.OfObject oid]
       board island bearer n =
         let withLands = S.landsFor island S.alice 10 S.threePlayerGame
             addBearer (ids, g) _ = let (oid, g') = S.addCreature bearer S.alice g in (ids <> [oid], g')
@@ -1410,6 +1411,62 @@ whisperingWizardSpec s registry =
           Spec.assertEqWith s "with no Spirit token" (spiritsOf S.alice creatureCast) 0
           Spec.assertEqWith s "the noncreature cast that follows still fires" (fmap (`firedBy` after) bearers) [1]
           Spec.assertEqWith s "and makes its Spirit" (spiritsOf S.alice after) 1
+
+-- The rider on ONE of two abilities a single object bears (#1664). Both watch the
+-- same event, one prints the rider and one does not, and the unlimited one firing
+-- must not spend the limited one's turn: CR 113.7 makes them abilities of one
+-- source, and CR 603.2 makes each of them an ability that triggers on its own.
+--
+-- WHY A SYNTHETIC. No printing writes two triggered abilities that share a
+-- trigger condition -- the multi-trigger cards among the "triggers only once each
+-- turn" printings (Elvish Archivist, Jin-Gitaxias, Oasis of Renewal) each pair the
+-- rider with a DIFFERENT condition, so their two abilities never collide.
+--
+-- Synthetic Twinned Vigil, {2}{W} Enchantment: "Whenever you cast a spell, you
+-- gain 1 life." and "Whenever you cast a spell, if you control a creature, you
+-- gain 5 life. This ability triggers only once each turn." Nothing of it is
+-- omitted.
+--
+-- The intervening "if" (CR 603.4) is what separates the two in TIME, which is
+-- what the collision needs: the first cast is a CREATURE SPELL, so as it is cast
+-- alice controls no creature and only the unlimited ability triggers -- and it is
+-- that ability's own log record which used to suppress the limited one for the
+-- rest of the turn.
+--
+-- 1 and 5 rather than two equal gains, so no total below is reachable two ways;
+-- twelve library cards a seat, since Think Twice draws.
+twinnedVigilSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+twinnedVigilSpec s registry =
+  let castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+      board island vigil =
+        let withLands = S.landsFor island S.alice 10 S.threePlayerGame
+            (_, withVigil) = S.addCreature vigil S.alice withLands
+            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
+            stocked = List.foldl' stock withVigil [S.alice, S.bob, S.carol]
+         in stocked
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+   in Spec.describe s "TriggerLimit" $ do
+        Spec.it s "an unlimited sibling ability spends no part of the rider" $ do
+          island <- S.printingOf s registry "Island"
+          vigil <- S.printingOf s registry "Synthetic Twinned Vigil"
+          homunculus <- S.printingOf s registry "Furtive Homunculus"
+          think <- S.printingOf s registry "Think Twice"
+          let gs = board island vigil
+              (creature, g1) = S.addHandCard homunculus S.alice gs
+              (firstSpell, g2) = S.addHandCard think S.alice g1
+              (secondSpell, g3) = S.addHandCard think S.alice g2
+              afterCreature = castAndResolve S.alice creature g3
+              afterFirst = castAndResolve S.alice firstSpell afterCreature
+              afterSecond = castAndResolve S.alice secondSpell afterFirst
+          Spec.assertEqWith s "the limited ability fires on the cast that follows, 21 plus 1 plus 5" (S.lifeOf S.alice afterFirst) (Just 27)
+          Spec.assertEqWith s "and its own rider still binds it for the rest of the turn, 27 plus 1" (S.lifeOf S.alice afterSecond) (Just 28)
+          -- The preconditions the two assertions above rest on, AFTER them so
+          -- neither can absorb a mutation aimed at the rider's key.
+          Spec.assertEqWith s "the creature cast fired the unlimited ability alone, 20 plus 1" (S.lifeOf S.alice afterCreature) (Just 21)
+          Spec.assertEqWith s "the creature really landed, so the intervening if held for the next cast" (S.countOnBattlefieldByName (S.printingName homunculus) S.alice afterCreature) 1
 
 -- The same CR 601.2i cast, read for WHICH cast of the turn it was --
 -- SpellCast.ordinal. The cast-side twin of drawTriggerSpec's Erudite Wizard, and
@@ -4366,7 +4423,7 @@ everWatchingThresholdSpec s registry =
       -- clause is checked at the GATHER, so an ability it rejects "does nothing"
       -- and never becomes a trigger to record. Asserted beside the hand because
       -- the hand alone cannot tell a clause that held from a draw that failed.
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (AbilityTriggered.condition record)]
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record))]
       -- bob active and declaring, with `defending` settled as CR 506.2a's one
       -- defending player. combatBoardOf's tail of steps, so S.runToStep can walk
       -- from the declare attackers step to the next one.
@@ -4511,7 +4568,7 @@ seiferSpec s registry =
       -- legal target and CR 603.3d removes it. The count is the closest
       -- observable there is, and it is what the two silent boards below lead
       -- with.
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (AbilityTriggered.condition record)]
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
    in Spec.describe s "Seifer, Balamb Rival" $ do
         -- The proving test: alice attacks bob, so rule 508.3e's two subjects are
         -- alice and bob, and the goad lands on the Giant the trigger named.
@@ -4619,7 +4676,7 @@ luluSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       stunOn oid gs = fmap (Map.findWithDefault 0 CounterKind.Stun . Object.counters) (Game.lookupObject oid gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (AbilityTriggered.condition record)]
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
    in Spec.describe s "Lulu, Stern Guardian" $ do
         -- The proving test: alice picks bob, so rule 508.3e's two subjects are
         -- alice and bob and the trigger fires. TWO Pikers so the target slot is
@@ -4695,7 +4752,7 @@ marauderTollSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (AbilityTriggered.condition record)]
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record))]
       fixture = do
         piker <- S.printingOf s registry "Goblin Piker"
         toll <- S.printingOf s registry "Synthetic Marauder's Toll"
@@ -4754,7 +4811,7 @@ reprisalLedgerSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (AbilityTriggered.condition record)]
+      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
       fixture = do
         piker <- S.printingOf s registry "Goblin Piker"
         ledger <- S.printingOf s registry "Synthetic Reprisal Ledger"
@@ -6573,6 +6630,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   savantiRomeroSpec s registry
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry
+  twinnedVigilSpec s registry
   clarionSpiritSpec s registry
   desolationTwinSpec s registry
   presenceOfTheMasterSpec s registry

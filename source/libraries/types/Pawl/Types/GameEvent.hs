@@ -301,16 +301,15 @@ data GameEvent
     -- Not implemented: a slot for the sacrificed permanent, which "sacrifice a
     -- creature ... return IT" would read (#977).
     PermanentSacrificed PermanentWasSacrificed.PermanentWasSacrificed
-  | -- | CR 603.3b: an ABILITY TRIGGERED -- the source (CR 113.7), the ability's
-    -- controller as it triggered (CR 603.3a), and the TriggerCondition that
-    -- fired. Appended by Pawl.Engine.Engine.placePendingTriggers before the batch
-    -- is put onto the stack, which is what lets the abilities reacting to it join
-    -- the SAME batch in rule 603.3b's second pass.
+  | -- | CR 603.3b: an ABILITY TRIGGERED -- what it hangs on (CR 113.7), the
+    -- ability's controller as it triggered (CR 603.3a), and the ability itself.
+    -- Appended by Pawl.Engine.Engine.placePendingTriggers before the batch is put
+    -- onto the stack, which is what lets the abilities reacting to it join the
+    -- SAME batch in rule 603.3b's second pass.
     --
-    -- Not implemented: an entry for a SOURCELESS inherent ability (CR 725.2's
-    -- monarch pair, CR 702.179d's speed increase, CR 728.1's rad counters) or for
-    -- a CR 603.7 delayed ability, so nothing can trigger off one of those
-    -- triggering (#1026).
+    -- Not implemented: a CR 603.7 DELAYED ability never triggers off one of
+    -- these entries, Engine.reactions re-scanning only the event triggers
+    -- (#1026).
     AbilityTriggered AbilityTriggered.AbilityTriggered
   | -- | A permanent's CONTROLLER CHANGED: the permanent, the player who
     -- controlled it when the game last looked, and the player who controls it
