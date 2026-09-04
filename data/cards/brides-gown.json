@@ -5,12 +5,15 @@
         {
           "type": "Equip",
           "value": {
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 2
-              }
-            ]
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 2
+                }
+              ]
+            },
+            "quality": null
           }
         }
       ],

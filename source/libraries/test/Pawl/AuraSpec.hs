@@ -98,6 +98,15 @@ import qualified Pawl.Types.Zone as Zone
 -- and CR 704.5n's detach-rather-than-bury state-based action; see #193. The
 -- Reattach group below is the same keyword action aimed the other way, at a
 -- permanent the effect TARGETS rather than at its own source.
+-- Answers every CR 601.2c target offer with the named object when it is offered
+-- at all, and with the smallest of the rest when it is not. Top level so that it
+-- stays rank-1 polymorphic in the prompt's result; a `let` binding under the
+-- monomorphism restriction cannot answer two prompts of different result types.
+aimedAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p
+
 equipmentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- CR 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
@@ -196,6 +205,43 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
             Spec.assertEqWith s "the equip ability attached it" (fmap Object.attachedTo (Game.lookupObject equip after)) (Just (Just (Recipient.ToCreature creature)))
             Spec.assertEqWith s "and the Piker is now 4/1" (Projection.powerOf creature after) (Just 4)
             Spec.assertEqWith s "toughness unchanged" (Projection.toughnessOf creature after) (Just 1)
+  -- CR 702.6c: "These equip abilities may legally target only a creature that's
+  -- controlled by the player activating the ability and that has the chosen
+  -- quality." Dúnedain Blade prints "Equip Human {1}" beside a plain "Equip
+  -- {3}", so one card drives that narrowing and CR 702.6d's "any of its equip
+  -- abilities may be activated" at once.
+  --
+  -- The PAIR is the proof: one board, one answerer that always prefers the
+  -- Goblin, and the only difference is WHICH of the Blade's two minted abilities
+  -- is activated. Three lands pay either cost, so neither half can pass for want
+  -- of mana. The Goblin is the only other creature alice controls, which is what
+  -- makes the quality ability's candidate list a singleton.
+  Spec.it s "CR 702.6c an equip Human ability can't reach the Goblin, and CR 702.6d the plain one on the same card can" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    blade <- S.printingOf s registry "Dúnedain Blade"
+    let (goblin, base1) = S.addCreature piker S.alice (S.landsInPlay mountain 3)
+        (human, base2) = S.addCreature evangel S.alice base1
+        (bladeId, base3) = S.addCreature blade S.alice base2
+        board = base3 {GameState.priority = Just S.alice}
+        abilityCosting n =
+          List.find
+            ((==) (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) . Cost.Type.mana . ActivatedAbility.cost)
+            (Projection.abilitiesOf bladeId board)
+        equipWith ability =
+          let activated = snd (Engine.runGamePure (aimedAtObject goblin) board (Activate.activateAbility S.alice bladeId ability))
+           in snd (Engine.runGamePure (aimedAtObject goblin) activated Stack.resolveTop)
+    case (abilityCosting 1, abilityCosting 3) of
+      (Just quality, Just plain) -> do
+        let afterQuality = equipWith quality
+            afterPlain = equipWith plain
+        Spec.assertEqWith s "CR 702.6c the quality ability attached the Blade to the Human" (fmap Object.attachedTo (Game.lookupObject bladeId afterQuality)) (Just (Just (Recipient.ToCreature human)))
+        Spec.assertEqWith s "so the Goblin is still 2/1" (Projection.powerOf goblin afterQuality) (Just 2)
+        Spec.assertEqWith s "and the Human is 4/3" (Projection.powerOf human afterQuality) (Just 4)
+        Spec.assertEqWith s "CR 702.6d the plain ability, on the same board, attached it to the Goblin" (fmap Object.attachedTo (Game.lookupObject bladeId afterPlain)) (Just (Just (Recipient.ToCreature goblin)))
+        Spec.assertEqWith s "which is then 4/1" (Projection.powerOf goblin afterPlain) (Just 4)
+      _ -> Spec.assertFailure s "Dúnedain Blade should offer both of rule 702.6's minted abilities"
   -- CR 701.3c: "Attaching an Aura, Equipment, or Fortification on the
   -- battlefield to a different object or player causes [it] to receive a new
   -- timestamp." That feeds CR 613.7's layer ordering, so it is not cosmetic.

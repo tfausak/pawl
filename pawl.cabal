@@ -401,6 +401,8 @@ library codec
     Pawl.Codec.EntryRiders
     Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EntryRSpec
+    Pawl.Codec.Equip
+    Pawl.Codec.EquipSpec
     Pawl.Codec.EventGroup
     Pawl.Codec.EventGroupSpec
     Pawl.Codec.EventShape
@@ -1523,6 +1525,7 @@ library types
     Pawl.Types.EntryRewrite
     Pawl.Types.EntryRiders
     Pawl.Types.EntwineDecision
+    Pawl.Types.Equip
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
     Pawl.Types.ExcessDestination
