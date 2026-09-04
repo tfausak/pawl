@@ -18,6 +18,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural
@@ -260,6 +261,39 @@ spec s registry = Spec.describe s "Initiative" $ do
     -- before the damage, so every entry here is the damage's doing.
     Spec.assertEqWith s "CR 726.2 exactly one take was recorded for bob's two creatures" (takings after) [S.bob]
     Spec.assertEqWith s "and he holds the initiative" (GameState.initiative after) (Just S.bob)
+
+  -- CR 726.2 makes the hand-off "controlled by the player who had the initiative
+  -- at the time the abilities triggered", so when the damage that triggers it
+  -- also kills the holder, CR 800.4d keeps it off the stack and CR 726.4 alone
+  -- moves the initiative -- to the ACTIVE player, not the damager's controller.
+  -- The Court of Grace ruling says the same of the monarch's twin; #3148 claimed
+  -- the opposite.
+  --
+  -- Three seats with the damager's controller NOT the active player is the only
+  -- board where the two readings differ, and no real combat reaches it (CR
+  -- 508.1a: only the active player's creatures attack; CR 506.4: a controller
+  -- change removes a creature from combat), so the damage is `combatDamageTo`'s
+  -- hand-written event and bob's life total is written down by hand at what the
+  -- 2 it records would have left him with.
+  Spec.it s "CR 726.4/800.4d lethal combat damage to the holder hands the initiative to the active player, not the damager's controller" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    undercity <- S.printingOf s registry "Undercity"
+    let (_, carols, base) = board island piker undercity
+        held = S.withInitiative S.bob base
+        dying = held {GameState.players = Map.adjust (\p -> p {Player.life = -1}) S.bob (GameState.players held)}
+        after = resolveAll answering (S.withEvents [combatDamageTo S.bob carols] dying)
+    Spec.assertEqWith s "bob held the initiative going in" (GameState.initiative held) (Just S.bob)
+    Spec.assertEqWith s "alice is the active player, and carol's Piker dealt the damage" (GameState.activePlayer held, Projection.controllerOf carols held) (S.alice, Just S.carol)
+    -- The rule: CR 726.4's hand-off is the only take.
+    Spec.assertEqWith s "CR 726.4 alice, the active player, has the initiative" (GameState.initiative after) (Just S.alice)
+    Spec.assertEqWith s "CR 800.4d exactly one take was recorded, the hand-off's, naming her" (takings after) [S.alice]
+    -- CR 726.4 says alice TAKES the initiative, so CR 726.2's third ability
+    -- ventures her; the departed bob and the untouched carol venture nowhere.
+    Spec.assertEqWith s "CR 726.2/701.49d and, having taken it, she entered Undercity" (dungeonNamesOf S.alice after) ["\"Undercity\""]
+    Spec.assertEqWith s "carol, whose Piker dealt the damage, ventured into nothing" (dungeonNamesOf S.carol after) []
+    Spec.assertEqWith s "CR 704.5a bob lost the game" (Game.stillPlaying after) [S.alice, S.carol]
+    Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
 
   -- CR 603.10, first sentence: the trigger condition is checked against the
   -- objects that exist IMMEDIATELY AFTER the damage, and the CR 704.5g

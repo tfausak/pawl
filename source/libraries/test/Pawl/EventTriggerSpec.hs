@@ -5403,6 +5403,40 @@ monarchTriggerSpec s registry =
           Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the reassignment recorded its crowning"
           Spec.assertEqWith s "CR 104.2a two survivors, so the game is still going" (GameState.result after) Nothing
           Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
+        -- CR 725.2 makes the crown steal "controlled by the player who was the
+        -- monarch at the time the abilities triggered", so when the damage that
+        -- triggers it also kills the monarch, CR 800.4d keeps it off the stack
+        -- and CR 725.4 alone moves the crown -- to the ACTIVE player, not the
+        -- damager's controller. Gatherer's Court of Grace ruling says the same:
+        -- the steal "doesn't resolve", and the attacker's controller usually
+        -- ends up monarch only because "it is likely their turn". #3148 claimed
+        -- the opposite.
+        --
+        -- Three seats with the damager's controller NOT the active player is the
+        -- only board where the two readings differ, and no real combat reaches
+        -- it (CR 508.1a: only the active player's creatures attack; CR 506.4: a
+        -- controller change removes a creature from combat), so the damage is a
+        -- hand-written event and bob's life total is written down by hand at
+        -- what the 2 it records would have left him with.
+        Spec.it s "CR 725.4/800.4d lethal combat damage to the monarch crowns the active player, not the damager's controller" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          bogWraith <- S.printingOf s registry "Bog Wraith"
+          let base = bystanders piker birdMaiden bogWraith (S.withMonarch S.bob (Setup.emptyGame S.threePlayers))
+              wraith = case Game.zoneMembers Zone.Battlefield S.carol base of
+                oid : _ -> oid
+                [] -> S.noSource
+              dying = base {GameState.players = Map.adjust (\p -> p {Player.life = -1}) S.bob (GameState.players base)}
+              after = resolveAll S.identityAnswer (combatDamageTo S.bob wraith dying)
+          Spec.assertEqWith s "bob wore the crown going in" (GameState.monarch base) (Just S.bob)
+          Spec.assertEqWith s "alice is the active player, and carol's Wraith dealt the damage" (GameState.activePlayer base, Projection.controllerOf wraith base) (S.alice, Just S.carol)
+          -- The rule: CR 725.4's hand-off is the only crowning.
+          Spec.assertEqWith s "CR 725.4 alice, the active player, is the monarch" (GameState.monarch after) (Just S.alice)
+          Spec.assertEqWith s "CR 800.4d carol was never crowned: bob's steal trigger did not reach the stack" (filter (== GameEvent.BecameMonarch S.carol) (S.eventsOf after)) []
+          Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the hand-off recorded its crowning, naming her"
+          Spec.assertEqWith s "CR 704.5a bob lost the game" (Game.stillPlaying after) [S.alice, S.carol]
+          Spec.assertEqWith s "CR 104.2a two survivors, so the game is still going" (GameState.result after) Nothing
+          Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
         -- CR 603.10, first sentence: the crown steal is checked against the
         -- objects that exist IMMEDIATELY AFTER the damage, and the CR 704.5g
         -- destruction that kills a trampler its blocker traded with is a LATER
