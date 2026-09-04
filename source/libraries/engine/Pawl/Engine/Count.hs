@@ -902,11 +902,16 @@ viewOfSnapshot mController isToken counters snapshot =
 -- Not viewOfSnapshot alone, and that is the whole point: CR 109.3 names an
 -- object's controller and what an Aura enchants among the things that are NOT
 -- characteristics, and a zone is no more one (CR 400.1), so a snapshot has
--- nothing to say about them and a Filter naming one would go silently False --
--- Filter.IsAttachedToSource is the shape that would. Those come from the live
--- view, and only the axes viewOfSnapshot reads off a ProjectedCharacteristics
--- are overwritten -- which is why the sampled view is built by that function
--- rather than by a second field list that could come to disagree with it.
+-- nothing to say about them and a Filter naming one would go silently False.
+-- Those come from the live view, which is not what CR 603.10 asks for either;
+-- Pawl.Engine.Event's TriggerCondition.PermanentTransforms arm carries the
+-- elision that says so.
+--
+-- AN EDIT SITE, and the sampled half is built by calling viewOfSnapshot so that
+-- the VALUES cannot disagree -- but the list of fields below is a second
+-- hand-kept copy of which of them the snapshot answers. A field added to
+-- viewOfSnapshot's PC-derived set and not to this record update is silently read
+-- LIVE here, and neither -Werror nor any test says so. Keep the two in step.
 overlaySnapshot :: PC.ProjectedCharacteristics -> Filter.View -> Filter.View
 overlaySnapshot snapshot live =
   let sampled = viewOfSnapshot (Filter.controller live) (Filter.token live) (Filter.counters live) snapshot

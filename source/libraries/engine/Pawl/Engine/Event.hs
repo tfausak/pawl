@@ -10437,11 +10437,21 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- The CHARACTERISTICS come off the event and everything else off the board,
   -- which is what Count.overlaySnapshot is for: CR 701.27e pins the specified
-  -- characteristic to the instant the turn finished, while control and what a
-  -- permanent is attached to are no characteristics at all (CR 109.3 names both)
-  -- and have to be read as they stand. A wholly live read would answer wrong for
-  -- a permanent that turned twice before the CR 117.5 scan, which is the argument
-  -- Pawl.Types.Transformed makes for carrying the sample.
+  -- characteristic to the instant the turn finished, and a wholly live read
+  -- would answer wrong for a permanent that turned twice before the CR 117.5
+  -- scan, which is the argument Pawl.Types.Transformed makes for carrying the
+  -- sample.
+  --
+  -- Not implemented: the same at-event read for the axes a
+  -- ProjectedCharacteristics cannot carry, which CR 109.3 excludes from an
+  -- object's characteristics but CR 603.10 and CR 603.2 pin all the same -- a
+  -- trigger's condition is checked against the objects as they were immediately
+  -- after the event. Control and ATTACHMENT are the two, and attachment is the
+  -- one a printing reaches: Neglected Heirloom's "when equipped creature
+  -- transforms" is `HasAttached IsSource`, and on a board where the equipped
+  -- creature turns into a noncreature the CR 704.5n unattach runs at the same CR
+  -- 117.5 boundary, BEFORE triggers go on the stack, so the live read here finds
+  -- nothing attached and the ability never fires (#2050).
   --
   -- viewWithLastKnown rather than viewOfObject, PermanentTurnedFaceUp's reason:
   -- a permanent that turned over and left before the CR 117.5 boundary is still
