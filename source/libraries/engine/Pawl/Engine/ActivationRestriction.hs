@@ -10,6 +10,9 @@
 -- Pawl.Engine.Combat imports Pawl.Engine.Cost, so the two combat-record readers
 -- CR 506.7g and CR 508.3b share with the casting side moved down to
 -- Pawl.Engine.Turn, beside the other two windows these arms ask about.
+-- CR 602.5b's board condition is the one arm that reads no window at all, and it
+-- imports Pawl.Engine.Condition and Pawl.Engine.Projection, neither of which
+-- reaches back here.
 --
 -- The only module that may CASE on Pawl.Types.ActivationRestriction, exactly as
 -- Pawl.Engine.CombatRestriction is of the type it names. Casing on the arms is a
@@ -116,8 +119,8 @@ restrictionMet pid srcId gs restriction = case restriction of
   -- CR 602.5's prohibition over a fact about the board rather than a window:
   -- Barbarian Ring's "Activate only if there are seven or more cards in your
   -- graveyard". Projection.fullView because nothing here is inside a layer fold
-  -- and no object is missing -- Pawl.Engine.Activate's own CR 702.178a gate one
-  -- function over takes the same view for the same reason.
+  -- and no object is missing -- Pawl.Engine.Activate.zoneAbilitiesOf takes the
+  -- same view for ActivatedAbility.condition, for the same reason.
   --
   -- CR 109.5's "your" is `pid`, the same player every arm above answers "your"
   -- with, and CR 109.4a pins it to the permanent's controller on the mana path.
