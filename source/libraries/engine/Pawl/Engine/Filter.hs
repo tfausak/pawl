@@ -1175,12 +1175,15 @@ matches context view predicate = case predicate of
   Filter.PowerAtMost n -> case power view of
     Nothing -> False
     Just p -> p <= n
+  Filter.ToughnessGreaterThanPower -> case (toughness view, power view) of
+    (Just t, Just p) -> t > p
+    _ -> False
   -- CR 702.134a's "power less than this creature's power", the one power
   -- comparison whose bound is another object rather than a literal. False unless
-  -- BOTH powers are readable, which is the two arms above joined: a candidate
-  -- with no power is no more "a creature with lesser power" than it is one with
-  -- power 2 or less, and a source whose power nothing supplied names no bound to
-  -- be less than.
+  -- BOTH powers are readable, which is PowerAtLeast and PowerAtMost joined: a
+  -- candidate with no power is no more "a creature with lesser power" than it is
+  -- one with power 2 or less, and a source whose power nothing supplied names no
+  -- bound to be less than.
   Filter.PowerLessThanSource -> case (power view, sourcePower context) of
     (Just p, Just s) -> p < s
     _ -> False
@@ -1609,8 +1612,9 @@ rewrite pairs predicate = case predicate of
   Filter.HasKeywordFamily _ -> predicate
   Filter.PowerAtLeast _ -> predicate
   Filter.PowerAtMost _ -> predicate
-  -- Untouched for the two above's reason: the atom names a comparison, and CR
-  -- 612.1 finds no word in it to swap.
+  Filter.ToughnessGreaterThanPower -> predicate
+  -- Untouched for the power atoms' reason above: the atom names a comparison,
+  -- and CR 612.1 finds no word in it to swap.
   Filter.PowerLessThanSource -> predicate
   Filter.PowerGreaterThanSource -> predicate
   -- Untouched for the two above's reason: a slot name is not a word CR 612.1's
@@ -2055,6 +2059,7 @@ bakeBound players predicate = case predicate of
   Filter.HasKeywordFamily _ -> predicate
   Filter.PowerAtLeast _ -> predicate
   Filter.PowerAtMost _ -> predicate
+  Filter.ToughnessGreaterThanPower -> predicate
   Filter.PowerLessThanSource -> predicate
   Filter.PowerGreaterThanSource -> predicate
   -- Untouched: CR 603.2's map holds PLAYERS, and this atom's slot names a
@@ -2190,6 +2195,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasKeywordFamily _ -> []
   Filter.PowerAtLeast _ -> []
   Filter.PowerAtMost _ -> []
+  Filter.ToughnessGreaterThanPower -> []
   Filter.PowerLessThanSource -> []
   Filter.PowerGreaterThanSource -> []
   Filter.PowerIsAmountInSlot _ -> []
@@ -2312,6 +2318,7 @@ statesAQuality predicate = case predicate of
   Filter.HasKeywordFamily _ -> True
   Filter.PowerAtLeast _ -> True
   Filter.PowerAtMost _ -> True
+  Filter.ToughnessGreaterThanPower -> True
   Filter.PowerLessThanSource -> True
   Filter.PowerGreaterThanSource -> True
   Filter.PowerIsAmountInSlot _ -> True

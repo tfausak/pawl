@@ -54,6 +54,8 @@ data Filter keyword
     -- so neither is reachable from the other, and Pawl.FilterSpec pins that pair
     -- apart. Answered off the projection, in every zone.
     PowerAtMost Integer
+  | -- | CR 208.1: the object's toughness is strictly greater than its power.
+    ToughnessGreaterThanPower
   | -- | CR 208.1 compared against the SOURCE rather than a literal: the object's
     -- power is strictly less than the power of the object the evaluation comes
     -- from (CR 702.134a's mentor). Read off Pawl.Engine.Filter.Context's

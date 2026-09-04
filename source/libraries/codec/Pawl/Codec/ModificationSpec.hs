@@ -246,6 +246,12 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.SwitchPowerToughness
       " {\"type\":\"SwitchPowerToughness\"} "
+  Spec.it s "AssignCombatDamageWithToughness" $
+    Common.assertCodec
+      s
+      codec
+      Modification.AssignCombatDamageWithToughness
+      " {\"type\":\"AssignCombatDamageWithToughness\"} "
   -- layer 6, CR 702.184c: this object's controller's station abilities read
   -- toughness instead of power. Payload-free, self-only.
   Spec.it s "GrantsStationToughness" $

@@ -348,11 +348,8 @@ combatRecipient gs attacker target =
 -- pay any part of the same bar. Where one can, the question is asked -- and the
 -- answer may turn out to have been forced after all, which is the direction CR
 -- 510.1 itself takes by announcing the whole assignment at once.
--- Not implemented: a static ability that substitutes another characteristic
--- for CR 510.1a's power (Tapestry Warden's second clause); this reads power
--- unconditionally (#3167).
 attackerAssignment :: GameState -> Bool -> (ObjectId, AttackTarget) -> Game ([DamageEvent.DamageEvent], Map.Map Recipient.Recipient Natural)
-attackerAssignment gs contested (attacker, target) = case Projection.powerOf attacker gs of
+attackerAssignment gs contested (attacker, target) = case Projection.combatDamageAmountOf attacker gs of
   Nothing -> pure ([], Map.empty)
   Just p ->
     if p <= 0
@@ -517,11 +514,8 @@ blockerChooser gs attackers controller =
 -- damage divided among them, so the unit of assignment is the blocker. An action
 -- and not a list for that division alone -- with one attacker blocked the rule
 -- forces the whole assignment and asks nothing.
--- Not implemented: a static ability that substitutes another characteristic
--- for CR 510.1a's power (Tapestry Warden's second clause); this reads power
--- unconditionally (#3167).
 blockerAssignment :: GameState -> (ObjectId, Set.Set ObjectId) -> Game [DamageEvent.DamageEvent]
-blockerAssignment gs (blocker, attackers) = case Projection.powerOf blocker gs of
+blockerAssignment gs (blocker, attackers) = case Projection.combatDamageAmountOf blocker gs of
   Nothing -> pure []
   Just p
     | p <= 0 -> pure []
@@ -652,7 +646,7 @@ contestedAssignment gs attackers (attacker, target) =
         AttackTarget.OfPlaneswalker _ -> True
         AttackTarget.OfPlayer _ -> False
         AttackTarget.OfBattle _ -> False
-      assigning oid = maybe False (> 0) (Projection.powerOf oid gs)
+      assigning oid = maybe False (> 0) (Projection.combatDamageAmountOf oid gs)
       shares (other, otherTarget) =
         other /= attacker
           && assigning other

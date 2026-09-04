@@ -45,6 +45,7 @@ codec keywordCodec =
       Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily (\x -> case x of Filter.HasKeywordFamily y -> Just y; _ -> Nothing),
       Arm.payload "PowerAtLeast" Common.integer Filter.PowerAtLeast (\x -> case x of Filter.PowerAtLeast y -> Just y; _ -> Nothing),
       Arm.payload "PowerAtMost" Common.integer Filter.PowerAtMost (\x -> case x of Filter.PowerAtMost y -> Just y; _ -> Nothing),
+      Arm.nullary "ToughnessGreaterThanPower" Filter.ToughnessGreaterThanPower,
       Arm.nullary "PowerLessThanSource" Filter.PowerLessThanSource,
       Arm.nullary "PowerGreaterThanSource" Filter.PowerGreaterThanSource,
       Arm.payload "PowerIsAmountInSlot" SlotName.codec Filter.PowerIsAmountInSlot (\x -> case x of Filter.PowerIsAmountInSlot y -> Just y; _ -> Nothing),

@@ -89,6 +89,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.PowerAtMost 2)
       " {\"type\":\"PowerAtMost\",\"value\":2} "
+  Spec.it s "ToughnessGreaterThanPower" $
+    Common.assertCodec
+      s
+      codec
+      Filter.ToughnessGreaterThanPower
+      " {\"type\":\"ToughnessGreaterThanPower\"} "
   Spec.it s "PowerLessThanSource" $
     Common.assertCodec
       s
