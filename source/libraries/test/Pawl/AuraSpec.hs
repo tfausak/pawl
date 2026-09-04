@@ -92,12 +92,6 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
--- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
--- Object.attachedTo, and an affected set read off it -- so what is genuinely new
--- is the CR 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent,
--- and CR 704.5n's detach-rather-than-bury state-based action; see #193. The
--- Reattach group below is the same keyword action aimed the other way, at a
--- permanent the effect TARGETS rather than at its own source.
 -- Answers every CR 601.2c target offer with the named object when it is offered
 -- at all, and with the smallest of the rest when it is not. Top level so that it
 -- stays rank-1 polymorphic in the prompt's result; a `let` binding under the
@@ -107,6 +101,12 @@ aimedAtObject oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just oid) . Recipient.objectOf) sets
   _ -> S.identityAnswer p
 
+-- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
+-- Object.attachedTo, and an affected set read off it -- so what is genuinely new
+-- is the CR 701.3 Attach keyword action that MOVES an already-on-the-battlefield permanent,
+-- and CR 704.5n's detach-rather-than-bury state-based action; see #193. The
+-- Reattach group below is the same keyword action aimed the other way, at a
+-- permanent the effect TARGETS rather than at its own source.
 equipmentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 equipmentSpec s registry = Spec.describe s "Equipment" $ do
   -- CR 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
