@@ -641,7 +641,7 @@ prohibitsPlayingLand pid names gs =
         -- lands ... from your graveyard" is the arm below rather than this one.
         PlayerEffect.CastFromGraveyard _ -> False
         -- The same, one zone over: Future Sight's land half would be its own arm
-        -- rather than this one (#3224).
+        -- rather than this one (gap #3224).
         PlayerEffect.CastFromTopOfLibrary _ -> False
         -- And the play-side permission allows rather than prohibits, so it is
         -- False here for the reason every permission is: this question is only
