@@ -1383,7 +1383,7 @@ ancestralMemoriesSpec s registry =
 -- transcribed.
 --
 -- WHICH opponent is itself a CR 608.2d choice the controller announces, so the
--- card writes Effect.ChooseOpponent into a slot and the ref's chooser reads that
+-- card writes Effect.ChoosePlayer into a slot and the ref's chooser reads that
 -- slot -- Skullwinder's shape, one ObjectRef over.
 --
 -- THREE seats, and the two legs below differ in exactly one thing: which opponent
@@ -2458,7 +2458,7 @@ bloodForBonesSpec s registry =
             (List.sort [named "Murder", named "Blood for Bones"])
 
 -- The third CHOOSER, and the effect that fills it: Chooser.BoundInSlot over a
--- slot Effect.ChooseOpponent bound as the same resolution ran.
+-- slot Effect.ChoosePlayer bound as the same resolution ran.
 --
 -- Skullwinder {2}{G} Creature -- Snake 1/3: "Deathtouch. When this creature
 -- enters, return target card from your graveyard to your hand, then choose an
@@ -2527,6 +2527,7 @@ skullwinderSpec s registry =
          in (after, responses)
       named = Just . CardName.MkCardName . Text.pack
       opponentChoices responses = length [() | Response.ChoseOpponent _ <- responses]
+      playerChoices responses = length [() | Response.ChosePlayer _ <- responses]
       cardChoices responses = length [() | Response.ChoseCardInGraveyard _ <- responses]
       -- The third candidate the prompt offers, by POSITION rather than by name:
       -- a name would be found again in a union of every graveyard, and the
@@ -2595,6 +2596,33 @@ skullwinderSpec s registry =
             "and the Snake itself is on the battlefield"
             (List.sort [fmap S.nameOf (Game.cardOf oid after) | oid <- Set.toList (GameState.battlefield after), fmap S.nameOf (Game.cardOf oid after) /= named "Forest"])
             [named "Skullwinder"]
+        -- CR 102.2 / 608.2d: PlayerScope.Opponents leaves the CONTROLLER out of
+        -- the offer, so an answerer naming alice is answering a question she was
+        -- never put -- the offer is filtered and the first opponent takes it.
+        -- The board is the headline's, one answerer apart. A scope that admitted
+        -- her would let her raid her own graveyard a second time, which the hand
+        -- and graveyard assertions read directly; the recorded response is the
+        -- other half, since the engine raises ChoosePlayer rather than
+        -- ChooseOpponent exactly when the offer holds the chooser.
+        Spec.it s "CR 102.2 the controller is not among the opponents offered" $ do
+          skullwinder <- S.printingOf s registry "Skullwinder"
+          forest <- S.printingOf s registry "Forest"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          judgment <- S.printingOf s registry "Day of Judgment"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          hero <- S.printingOf s registry "Benalish Hero"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          let namingAlice p = case p of
+                Prompt.ChooseOpponent {} -> S.alice
+                _ -> S.identityAnswer p
+              (handId, gs) = board skullwinder forest (stock hero cavalry berserkers murder maiden sentry judgment wraith)
+              (after, responses) = run namingAlice handId gs
+          Spec.assertEqWith s "alice keeps only her own targeted card, her second staying buried" (namesIn Zone.Hand S.alice after, namesIn Zone.Graveyard S.alice after) ([named "Murder"], [named "Bird Maiden"])
+          Spec.assertEqWith s "bob, the first opponent, is the one the fallback named" (namesIn Zone.Hand S.bob after) [named "Ogre Sentry"]
+          Spec.assertEqWith s "and the prompt put was an opponent's, never a player's" (opponentChoices responses, playerChoices responses) (1, 0)
         -- The paired control, on the SAME board with only the answerer changed:
         -- the default takes the first opponent and the first card, so a different
         -- seat is asked and a different card moves. Two seats' worth of

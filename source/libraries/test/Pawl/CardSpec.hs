@@ -617,7 +617,7 @@ plantedRef = ObjectRef.InSlot . SlotName.MkSlotName . Text.pack
 -- alone and compile.
 playerRefPositions :: [(String, Effect.Effect () (), [PlayerRef.PlayerRef])]
 playerRefPositions =
-  [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
+  [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor 1 ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
     ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
     ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
     ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
@@ -1229,7 +1229,7 @@ ownCounts effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
   Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
@@ -1378,7 +1378,7 @@ ownQuantities effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie rollDie -> Maybe.maybeToList (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
@@ -1650,7 +1650,7 @@ effectNestedEffects effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame {} -> []
-  Effect.ChooseOpponent {} -> []
+  Effect.ChoosePlayer {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -2249,7 +2249,7 @@ effectReplacements effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -3201,7 +3201,7 @@ effectMintedFaces effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -5762,7 +5762,7 @@ effectFilters effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
   Effect.RollDie rollDie -> frame Unframed (foldMap quantityFilters (RollDie.modifier rollDie))
@@ -6010,7 +6010,7 @@ effectObjectRefs effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.Attach {} -> []
   Effect.PlaySubgame {} -> []
-  Effect.ChooseOpponent {} -> []
+  Effect.ChoosePlayer {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []

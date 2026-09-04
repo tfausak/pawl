@@ -90,6 +90,7 @@ import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -446,7 +447,7 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   --
   -- Joined with the COUNT's own slots, TopOfLibrary's arm above and for its
   -- reason; the CHOOSER's are the generic playerRefSlots fold this case is joined
-  -- into, which is what makes Animal Magnetism's ChooseOpponent slot a read.
+  -- into, which is what makes Animal Magnetism's ChoosePlayer slot a read.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _ count _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots count)
   -- The arm above's read, for its reasons: the candidates come from a slot, and
   -- the ref reads every member of the group to match them.
@@ -529,7 +530,7 @@ objectRefPlayerRefs ref = case ref of
   -- default CR 608.2c's resolving controller.
   --
   -- The arm above's regression fence, for a different reason: the D4 dataflow lint
-  -- subtracts a slot the mode's own ChooseOpponent DEFINES from both sides of its
+  -- subtracts a slot the mode's own ChoosePlayer DEFINES from both sides of its
   -- equality, so the only card whose chooser names a slot cannot observe this
   -- report. A chooser naming a DECLARED target slot would, and no printing writes
   -- one -- Pawl.Types.Chooser's BoundInSlot note says the same of its own.
@@ -675,7 +676,7 @@ effectObjectRefs effect = case effect of
   Effect.ExileUntilMonarch {} -> []
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
-  Effect.ChooseOpponent {} -> []
+  Effect.ChoosePlayer {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -720,7 +721,7 @@ effectPlayerRefs effect = case effect of
   Effect.Fight {} -> []
   Effect.ModifyTarget {} -> []
   Effect.ChangeText {} -> []
-  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _) -> [ref]
+  Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
   Effect.Search (Search.MkSearch searcher owner _ _ _ _ _) -> [searcher, owner]
   Effect.ExileAllGraveyards -> []
   Effect.RestartGame {} -> []
@@ -806,7 +807,7 @@ effectPlayerRefs effect = case effect of
   Effect.ExileUntilMonarch {} -> []
   Effect.ExileHaunting {} -> []
   Effect.PlaySubgame {} -> []
-  Effect.ChooseOpponent {} -> []
+  Effect.ChoosePlayer {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -1065,7 +1066,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- CR 729.1/729.1b: the slot is a DEFINITION (the subgame's winner), not a read.
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
-  Effect.ChooseOpponent _ -> Map.empty
+  Effect.ChoosePlayer _ -> Map.empty
   Effect.ChooseOpponentAtRandom _ -> Map.empty
   -- A DEFINITION for the result slot (boundSlots below), but CR 706.2's modifier
   -- is a READ: the instruction's own Quantity may name a slot an earlier effect
@@ -1570,7 +1571,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- CR 729.1b: a DEFINITION, and the subgame reads no binding of the outer game.
   Effect.PlaySubgame _ -> True
   -- PlaySubgame's answer: a definition reads no slot.
-  Effect.ChooseOpponent _ -> True
+  Effect.ChoosePlayer _ -> True
   Effect.ChooseOpponentAtRandom _ -> True
   Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
@@ -1730,7 +1731,7 @@ readsX = any effectReadsX
       Effect.AttachTargetToEach {} -> False
       Effect.AttachBound {} -> False
       Effect.PlaySubgame _ -> False
-      Effect.ChooseOpponent _ -> False
+      Effect.ChoosePlayer _ -> False
       Effect.ChooseOpponentAtRandom _ -> False
       -- CR 706.2's modifier is an ordinary Quantity, so it may be the X the
       -- caster announced (CR 601.2b).
@@ -1839,8 +1840,8 @@ boundSlots effect = case effect of
   Effect.CopyStackObject {} -> Set.empty
   -- CR 729.1b: the subgame's winner, reported rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
-  -- CR 608.2d: the opponent this effect chose.
-  Effect.ChooseOpponent slot -> Set.singleton slot
+  -- CR 608.2d: the player this effect chose.
+  Effect.ChoosePlayer choice -> Set.singleton (ChoosePlayer.slot choice)
   Effect.ChooseOpponentAtRandom slot -> Set.singleton slot
   -- CR 706.4: the number the die came up, for a later effect of this resolution
   -- to read as Quantity.InSlot.
@@ -4324,7 +4325,7 @@ matchingFromAmong legal resolving controller source gs filter_ members =
 -- WHO is asked is the ref's own chooser, ONE seat: CR 608.2c's resolving
 -- controller by default, or the seat a PlayerRef names -- Animal Magnetism's "an
 -- opponent chooses a creature card from among them", read out of the slot a
--- ChooseOpponent filled earlier in this resolution. Read through playerRefPlayers
+-- ChoosePlayer filled earlier in this resolution. Read through playerRefPlayers
 -- so the slot is read as every other is (CR 608.2b): a reference naming nobody,
 -- or naming several where no printing writes one, asks nobody and so names no
 -- card (CR 101.3).
@@ -4949,11 +4950,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Halfling) are mana abilities and take the inline CR 605.3b road instead, so
   -- neutralising this line leaves the whole suite green. CR 106.6a states it
   -- anyway, which is why the line is here.
-  Effect.AddMana (ManaAddition.MkManaAddition ref production retention restriction rider) -> do
+  Effect.AddMana (ManaAddition.MkManaAddition ref production count retention restriction rider) -> do
     gs0 <- State.get
+    let howMany = Natural.toIntSaturating count
     case Mana.producedTypes source gs0 production of
-      -- One settled type is one mana; a clause adding two writes two effects,
-      -- run in printed order (CR 608.2c).
+      -- One settled type needs no question; the COUNT is how many units this one
+      -- instruction adds, and a clause adding mana of two DIFFERENT types writes
+      -- two effects, run in printed order (CR 608.2c).
       [manaType] ->
         let unit =
               ManaUnit.MkManaUnit
@@ -4963,7 +4966,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   ManaUnit.restriction = restriction,
                   ManaUnit.rider = rider
                 }
-         in State.modify' (\gs -> foldr (\pid -> Mana.addMana pid [unit]) gs (playerRefPlayers legal controller gs0 ref))
+         in State.modify' (\gs -> foldr (\pid -> Mana.addMana pid (replicate howMany unit)) gs (playerRefPlayers legal controller gs0 ref))
       -- No type at all is CR 607.2d's "the chosen color" with nothing chosen:
       -- adding nothing is the honest answer.
       [] -> pure ()
@@ -4973,6 +4976,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- order, with apnapOrder supplying the ORDER and the ref the MEMBERSHIP; a
       -- recipient apnapOrder does not name keeps its place at the end rather than
       -- losing the mana CR 106.4 puts in their pool.
+      --
+      -- CR 105.4's choice is made ONCE for the whole instruction, which is what
+      -- "two mana of any one color they choose" says (Stadium Vendors): the
+      -- count replicates the unit the answer settled rather than asking again.
       first : second : more ->
         let offered = first NonEmpty.:| (second : more)
             named = playerRefPlayers legal controller gs0 ref
@@ -4993,7 +5000,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ManaUnit.restriction = restriction,
                         ManaUnit.rider = rider
                       }
-              State.modify' (Mana.addMana pid [unit])
+              State.modify' (Mana.addMana pid (replicate howMany unit))
   Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
@@ -5277,32 +5284,50 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case result of
       Result.Won winner -> State.modify' (bindPlayerSlot resolving slot winner)
       Result.Drawn -> pure ()
-  -- CR 608.2d: "choose an opponent", announced as this effect is applied and
-  -- bound so the sentence after it can say "that player". NOT A TARGET (CR
-  -- 115.10a), so nothing was announced at CR 601.2c and the pick is made here,
-  -- against the board as this effect runs.
+  -- CR 608.2d: "choose an opponent" (Skullwinder) or "choose a player" (Stadium
+  -- Vendors), announced as this effect is applied and bound so the sentence
+  -- after it can say "that player". NOT A TARGET (CR 115.10a), so nothing was
+  -- announced at CR 601.2c and the pick is made here, against the board as this
+  -- effect runs.
   --
-  -- The opponents are Game.stillPlaying's, so a seat that has left (CR 104.3a) is
-  -- not offered; CR 102.2 leaves a two-player game nothing to decide. An answer
-  -- naming somebody never offered falls back to the first candidate, since the
-  -- instruction is mandatory. No opponent at all binds nothing, so the following
+  -- WHICH players are offered is the payload's PlayerScope, read through
+  -- PlayerEffect.playersInScope against CR 109.5's "you" -- the resolving
+  -- controller -- so this arm classifies the choice and never names a card. That
+  -- fold is over Game.stillPlaying, so a seat that has left (CR 104.3a) is not
+  -- offered; CR 102.2 leaves "an opponent" nothing to decide at two seats, where
+  -- "a player" there has two candidates and must be asked. An answer naming
+  -- somebody never offered falls back to the first candidate, since the
+  -- instruction is mandatory. Nobody in scope binds nothing, so the following
   -- sentence names no player and does nothing (CR 101.3).
-  Effect.ChooseOpponent slot -> do
+  --
+  -- The PROMPT is picked by whether the offer contains the chooser, which is
+  -- what separates Prompt.ChooseOpponent (whose haddock claims it never offers
+  -- them) from Prompt.ChoosePlayer -- a property of the candidate set rather
+  -- than of the scope's name, so no arm of PlayerScope can drift out of step
+  -- with it.
+  Effect.ChoosePlayer choice -> do
     gs <- State.get
-    let opponents = Game.opponentsOf controller gs
-    chosenOpponent <- case opponents of
+    let slot = ChoosePlayer.slot choice
+        candidates = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs (ChoosePlayer.scope choice))
+    chosenPlayer <- case candidates of
       [] -> pure Nothing
       [sole] -> pure (Just sole)
       first : second : rest -> do
         let offered = first NonEmpty.:| (second : rest)
-        answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller source offered)
+            decider = Decide.deciderFor controller gs
+            question =
+              if List.elem controller (NonEmpty.toList offered)
+                then Prompt.ChoosePlayer decider controller source offered
+                else Prompt.ChooseOpponent decider controller source offered
+        answer <- Game.choose question
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
-    Monad.forM_ chosenOpponent $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
-  -- ChooseOpponent's twin with the decision replaced by randomness (Ruhan of the
-  -- Fomori): the same offer, the same filter, the same bind, and the same CR
-  -- 608.2d moment -- only the question changes. CR 701.9b's distinction between
-  -- "at random" and "the player chooses" is why it is a separate opcode and a
-  -- separate prompt.
+    Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
+  -- ChoosePlayer's twin with the decision replaced by randomness (Ruhan of the
+  -- Fomori): the same filter, the same bind, and the same CR 608.2d moment --
+  -- the question changes, and so does the offer, which is CR 102.3's opponents
+  -- with no scope beside the slot to widen them (#3230). CR 701.9b's distinction
+  -- between "at random" and "the player chooses" is why it is a separate opcode
+  -- and a separate prompt.
   --
   -- Game.ask and not Game.choose, since randomness is not CR 104.4b's optional
   -- action. The question goes to the INTERPRETER: the engine does not roll and no
@@ -5905,7 +5930,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   Chooser.EachInScope ->
                     fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
                       zoneScopePlayers legal controller gs scope
-                  -- ONE chooser, read out of the slot a ChooseOpponent bound,
+                  -- ONE chooser, read out of the slot a ChoosePlayer bound,
                   -- choosing out of their own graveyard. Through playerRefPlayers so
                   -- the slot is read as every other is (CR 608.2b): an unfilled,
                   -- illegal, non-player or many-valued slot names nobody, and nobody

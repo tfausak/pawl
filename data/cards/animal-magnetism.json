@@ -49,8 +49,13 @@
               {
                 "effects": [
                   {
-                    "type": "ChooseOpponent",
-                    "value": "opponent"
+                    "type": "ChoosePlayer",
+                    "value": {
+                      "scope": {
+                        "type": "Opponents"
+                      },
+                      "slot": "opponent"
+                    }
                   },
                   {
                     "type": "MoveToZone",

@@ -24,14 +24,17 @@ defaultPlayer = PlayerRef.Relative PlayerRelation.You
 --
 -- @player@ is DEFAULTED rather than required, and the default is the rule's own
 -- reading: CR 106.3 has a mana effect instruct "a player" to add, and a card that
--- names nobody means CR 109.5's "you". Every printing in the pool but Shizuko,
--- Caller of Autumn leaves it out, so requiring it would make every card restate a
--- rule.
+-- names nobody means CR 109.5's "you". Nearly every printing in the pool leaves
+-- it out, so requiring it would make every card restate a rule.
 --
 -- @retention@ is DEFAULTED the same way and for the same reason: CR 106.4's
 -- default is that the player loses the mana as the step ends, so a card that
 -- says nothing means Ordinary. Shizuko, Caller of Autumn's "until end of turn,
 -- they don't lose this mana" is the one printing in the pool that writes it.
+--
+-- @count@ is DEFAULTED to 1: an instruction adds one mana unless the card says
+-- otherwise, and Stadium Vendors' "two mana of any one color they choose" is the
+-- printing in the pool that writes it.
 --
 -- @restriction@ and @rider@ are CR 106.6's two shapes, each DEFAULTED to
 -- Nothing: almost every printing says neither, and the two are independent --
@@ -41,6 +44,7 @@ codec :: Codec.Codec ManaAddition.ManaAddition
 codec = Fields.object $ do
   player <- Fields.defaulted "player" defaultPlayer PlayerRef.codec ManaAddition.player
   production <- Fields.required "production" ManaProduction.codec ManaAddition.production
+  count <- Fields.defaulted "count" 1 Common.natural ManaAddition.count
   retention <- Fields.defaulted "retention" ManaRetention.Ordinary ManaRetention.codec ManaAddition.retention
   restriction <- Fields.defaulted "restriction" Nothing (Common.maybe ManaRestriction.codec) ManaAddition.restriction
   rider <- Fields.defaulted "rider" Nothing (Common.maybe ManaRider.codec) ManaAddition.rider
@@ -48,6 +52,7 @@ codec = Fields.object $ do
     ManaAddition.MkManaAddition
       { ManaAddition.player = player,
         ManaAddition.production = production,
+        ManaAddition.count = count,
         ManaAddition.retention = retention,
         ManaAddition.restriction = restriction,
         ManaAddition.rider = rider

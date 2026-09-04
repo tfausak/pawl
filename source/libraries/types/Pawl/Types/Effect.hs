@@ -8,6 +8,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Counter as Counter
@@ -474,17 +475,17 @@ data Effect card ability
   | -- | CR 729.1 / 729.1b: play a Magic subgame, then bind its winner into this
     -- slot; nothing is bound for a draw. A definition, never a target.
     PlaySubgame SlotName.SlotName
-  | -- | CR 608.2d: the resolving controller chooses one of their opponents, and
-    -- the player chosen is bound into this slot for a later effect of the same
-    -- resolution to name (Skullwinder). Choose, not target; elided at one
-    -- candidate.
-    --
-    -- Not implemented: "choose a player", which would offer the controller too
-    -- and so needs a scope beside the slot (#1444).
-    ChooseOpponent SlotName.SlotName
-  | -- | ChooseOpponent's twin with the decision replaced by randomness (Ruhan of
+  | -- | CR 608.2d: the resolving controller chooses one player from the payload's
+    -- scope, and the player chosen is bound into its slot for a later effect of
+    -- the same resolution to name -- Skullwinder's "choose an opponent", Stadium
+    -- Vendors' "choose a player". Choose, not target; elided at one candidate.
+    ChoosePlayer ChoosePlayer.ChoosePlayer
+  | -- | ChoosePlayer's twin with the decision replaced by randomness (Ruhan of
     -- the Fomori), so Prompt's RandomOpponent carries no Decider. Elided at one
     -- candidate, CR 102.2 leaving a two-player game exactly one opponent.
+    --
+    -- Not implemented: a scope beside this slot, so "choose a player at random"
+    -- (Scrambleverse, Wildfire Devils) has no spelling (#3230).
     ChooseOpponentAtRandom SlotName.SlotName
   | -- | CR 706.1: roll a die of the stated kind, and bind the result as an
     -- amount at the payload's slot for a later effect to read as
