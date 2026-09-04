@@ -144,6 +144,14 @@ data PlayerEffect
     -- graveyard -- the play half of CastFromGraveyard above, since a land is
     -- played and never cast.
     PlayLandsFromGraveyard
+  | -- | CR 601.3 / Garruk's Horde: this player may cast a matching card from the
+    -- top of their library.
+    --
+    -- The Filter reads the printed card, the graveyard arm's #1859. Not
+    -- implemented: the play half Future Sight also states ("you may play lands
+    -- ... from the top of your library"), which needs a play-side arm the way
+    -- PlayLandsFromGraveyard is CastFromGraveyard's (#3224).
+    CastFromTopOfLibrary (Filter.Filter Keyword.Keyword)
   | -- | CR 118.9 / Omniscience: this player may cast a matching spell from their
     -- hand without paying its mana cost.
     --

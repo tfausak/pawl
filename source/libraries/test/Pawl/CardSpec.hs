@@ -4764,6 +4764,8 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.3's zone permission, narrowed by the card's own qualities exactly as
   -- the timing permission beside it is (Yawgmoth's Will's is `And []`).
   PlayerEffect.CastFromGraveyard f -> [f]
+  -- The same permission one zone over (Garruk's Horde's "creature spells").
+  PlayerEffect.CastFromTopOfLibrary f -> [f]
   -- CR 305.1's play-side permission narrows nothing: a land play has already
   -- fixed the card type, and Crucible of Worlds' sentence says no more.
   PlayerEffect.PlayLandsFromGraveyard -> []
@@ -4844,6 +4846,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CastOnlyAtSorcerySpeed -> False
   PlayerEffect.CantPlayLands -> False
   PlayerEffect.CastFromGraveyard _ -> False
+  PlayerEffect.CastFromTopOfLibrary _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
@@ -4902,6 +4905,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CastOnlyAtSorcerySpeed -> False
   PlayerEffect.CantPlayLands -> False
   PlayerEffect.CastFromGraveyard _ -> False
+  PlayerEffect.CastFromTopOfLibrary _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
