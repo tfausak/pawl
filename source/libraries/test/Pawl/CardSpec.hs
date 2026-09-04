@@ -898,6 +898,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfTurnedFaceUp -> []
   -- CR 701.27e's names a face, which is a CardName and not a Quantity.
   TriggerCondition.SelfTransformedInto _ -> []
+  -- Its bystander sibling carries a Filter, which holds no Count either.
+  TriggerCondition.PermanentTransforms _ -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
@@ -4170,6 +4172,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfTurnedFaceUp -> []
   -- CR 701.27e's names a face by name; nothing about it is a Filter.
   TriggerCondition.SelfTransformedInto _ -> []
+  -- Its bystander sibling carries one -- Cult of the Waxing Moon's "a permanent
+  -- you control ... into a non-Human creature".
+  TriggerCondition.PermanentTransforms f -> unframed [f]
   -- Its watcher-scoped sibling carries one, and Aven Farseer's is the trivial
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> unframed [f]
@@ -4444,6 +4449,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionSlots conditions
   TriggerCondition.SelfTurnedFaceUp -> []
   TriggerCondition.SelfTransformedInto _ -> []
+  TriggerCondition.PermanentTransforms _ -> []
   TriggerCondition.PermanentTurnedFaceUp _ -> []
   TriggerCondition.PermanentBecomesDesignated _ -> []
   TriggerCondition.SelfEvolves -> []

@@ -681,6 +681,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfTransformedInto (CardName.MkCardName (Text.pack "Blightsower Thallid")))
       " {\"type\":\"SelfTransformedInto\",\"value\":\"Blightsower Thallid\"} "
+  -- The same rule read by a bystander, whose payload is a Filter instead: the TAG
+  -- is the whole difference between the two, so both are pinned.
+  Spec.it s "PermanentTransforms round-trips its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentTransforms (Filter.Not (Filter.HasSubtype Subtype.Human)))
+      " {\"type\":\"PermanentTransforms\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Human\"}}}} "
   -- CR 709.5i. The payload is a PlayerRelation, read against the controller of the
   -- permanent that became fully unlocked. BOTH relations, since the two are what
   -- separate "you fully unlock" from an opponent doing it.
