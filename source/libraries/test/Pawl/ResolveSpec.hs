@@ -1276,6 +1276,55 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "the other Forest card and the nonland stayed in the library"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [loreArbor board, lorePiker board])
+  -- Bifurcate -- "Search your library for a permanent card with the same name as
+  -- target nontoken creature, put that card onto the battlefield, then shuffle."
+  -- The whole-card proof that a SEARCH filter is matched in the resolution's own
+  -- context (CR 608.2c): its CR 201.2a comparison is against the slot the spell
+  -- targeted, which a bare Filter.contextFor would have answered False for on
+  -- every card in the library, fetching nothing at all.
+  --
+  -- TWO cases over ONE board, differing in exactly which creature was targeted,
+  -- because a single board cannot tell "the name in the target slot" from "any
+  -- permanent card": the library's head is the Piker, and the answerer takes the
+  -- head of what it is offered, so the Hill Giant case is the one an unfiltered
+  -- candidate list fails. The Mountain is a permanent card of neither name and is
+  -- rejected on both.
+  Spec.it s "CR 201.2a whole card: Bifurcate finds the card sharing a name with the creature it targeted" $ do
+    board <- bifurcateBoard s registry
+    let settled = resolveBifurcate (bifurcatePiker board) board
+    Spec.assertEqWith
+      s
+      "a second Goblin Piker is on the battlefield"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice settled)
+      2
+    Spec.assertEqWith
+      s
+      "and the Hill Giant was not fetched beside it"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.alice settled)
+      1
+    Spec.assertEqWith
+      s
+      "the two cards of other names stayed in the library"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [bifurcateLibraryGiant board, bifurcateLibraryMountain board])
+  Spec.it s "CR 201.2a whole card: Bifurcate aimed at the other creature finds the OTHER name" $ do
+    board <- bifurcateBoard s registry
+    let settled = resolveBifurcate (bifurcateGiant board) board
+    Spec.assertEqWith
+      s
+      "a second Hill Giant is on the battlefield"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.alice settled)
+      2
+    Spec.assertEqWith
+      s
+      "and the Piker at the head of the library was never a candidate"
+      (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice settled)
+      1
+    Spec.assertEqWith
+      s
+      "the two cards of other names stayed in the library"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [bifurcateLibraryPiker board, bifurcateLibraryMountain board])
   -- Mana Severance -- "Search your library for any number of land cards, exile
   -- them, then shuffle." The whole-card proof that a search can state NO count
   -- (CR 701.23a: the find is bounded by what the zone holds, not by a number the
@@ -2483,6 +2532,60 @@ loreBoard s registry = do
 resolveLore :: (forall r. Prompt.Prompt r -> r) -> LoreBoard -> GameState.GameState
 resolveLore answer board =
   let cast = snd (Engine.runGamePure answer (loreState board) (S.cast S.alice (loreSpell board)))
+   in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
+-- Bifurcate's board. Two creatures with DIFFERENT names on the battlefield, and
+-- a library holding one card of each of those names plus a Mountain the name
+-- comparison rejects on either board.
+--
+-- The library's head is the Goblin Piker (Support.addLibraryCard prepends), and
+-- the answerer takes the head of whatever the search offers: a filter that
+-- admitted every permanent card would fetch the Piker on both boards, so the
+-- Hill Giant case is what separates "the name the spell targeted" from "any
+-- permanent card".
+data BifurcateBoard = MkBifurcateBoard
+  { bifurcateState :: GameState.GameState,
+    bifurcateSpell :: ObjectId.ObjectId,
+    -- | The Goblin Piker on the battlefield.
+    bifurcatePiker :: ObjectId.ObjectId,
+    -- | The Hill Giant on the battlefield.
+    bifurcateGiant :: ObjectId.ObjectId,
+    -- | The Goblin Piker card in the library.
+    bifurcateLibraryPiker :: ObjectId.ObjectId,
+    -- | The Hill Giant card in the library.
+    bifurcateLibraryGiant :: ObjectId.ObjectId,
+    -- | The Mountain card in the library, which shares neither name.
+    bifurcateLibraryMountain :: ObjectId.ObjectId
+  }
+
+bifurcateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m BifurcateBoard
+bifurcateBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  bifurcate <- S.printingOf s registry "Bifurcate"
+  let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 4)
+      (giantId, g2) = S.addCreature giant S.alice g1
+      (mountainId, g3) = S.addLibraryCard mountain S.alice g2
+      (libraryGiant, g4) = S.addLibraryCard giant S.alice g3
+      (libraryPiker, g5) = S.addLibraryCard piker S.alice g4
+      (gs, spellId) = S.handOne bifurcate g5
+  pure (MkBifurcateBoard gs spellId pikerId giantId libraryPiker libraryGiant mountainId)
+
+-- Aims the one target slot at `target` and takes the head of whatever the search
+-- then offers. The recipient is FILTERED out of the offer rather than built, so
+-- the Creatures pool's own ToCreature is what is announced.
+bifurcateAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+bifurcateAnswer target p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just target) . Recipient.objectOf) sets
+  _ -> findFirst p
+
+resolveBifurcate :: ObjectId.ObjectId -> BifurcateBoard -> GameState.GameState
+resolveBifurcate target board =
+  let answer :: Prompt.Prompt r -> r
+      answer = bifurcateAnswer target
+      cast = snd (Engine.runGamePure answer (bifurcateState board) (S.cast S.alice (bifurcateSpell board)))
    in snd (Engine.runGamePure answer cast Engine.priorityLoop)
 
 -- Mana Severance's board. Two Islands pay the {1}{U}, and the library holds the

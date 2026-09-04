@@ -237,6 +237,12 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 -- and IsSource is `source` -- rather than the subject's, because the destination
 -- filter is that ability's card text. The two coincide for CR 303.4k, where the
 -- Aura's own rider is asking about the Aura.
+--
+-- Not implemented: it carries no slot bindings, so a destination filter naming a
+-- slot the calling resolution bound takes its empty-slot value rather than an
+-- answer: False for Filter.IsBound and its siblings, and TRUE for
+-- SameControllerAsBound, which widens on an absent key (#2141). No card in the
+-- pool writes one there.
 hostsFor :: PlayerId -> ObjectId -> ObjectId -> Filter.Type.Filter Keyword.Keyword -> GameState -> [ObjectId]
 hostsFor controller source subject filter_ gs =
   let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf

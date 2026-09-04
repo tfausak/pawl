@@ -1912,7 +1912,7 @@ apply batch candidate event =
       -- is the ROW's, through Replacement.candidateContext: CR 109.5's "you" is
       -- the row's controller rather than the entrant's, and a floating row's
       -- captured slot bindings ride along, which is what a bare Filter.contextFor
-      -- would have dropped; see #2141 for the four callers that still do.
+      -- would have dropped; see #2141 for the callers that still do.
       --
       -- Consumed unconditionally: CR 614.5 is about the row having applied, and a
       -- row whose amount would not evaluate has still applied. Consuming only on
@@ -12138,11 +12138,11 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- arm below's second slot for that arm's reason: one printed "it" is two
   -- objects, and which one a card means is the card's business. Cleopatra,
   -- Exiled Pharaoh's "draw a card for each counter on it" is about the creature
-  -- as it last existed on the battlefield, whose counters CR 122.2 destroyed on
-  -- the way out and which only CR 608.2h still answers for; Promise of Tomorrow's
-  -- "exile it" is about the graveyard card. Unconditional, needing no guard at
-  -- all: `departed` is on every zone change, and this condition admits no other
-  -- event.
+  -- as it last existed on the battlefield, whose counters ceased to exist on the
+  -- way out (CR 122.2: they are not "removed") and which only CR 608.2h still
+  -- answers for; Promise of Tomorrow's "exile it" is about the graveyard card.
+  -- Unconditional, needing no guard at all: `departed` is on every zone change,
+  -- and this condition admits no other event.
   (TriggerCondition.PermanentDies _, GameEvent.Moved m) ->
     Binding.setDepartedPermanent (ZoneChange.departed (Moved.change m)) (setBecameArrivals m Map.empty)
   -- CR 400.7e off the CARD rather than off the move: Planar Void's "exile that

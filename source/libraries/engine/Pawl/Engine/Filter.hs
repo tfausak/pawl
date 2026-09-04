@@ -853,13 +853,14 @@ data Context = MkContext
     -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
     -- fold, trigger matching, a cost paid with nothing announced, combat
-    -- declarations, duration expiry -- but it was NOT honest of every
-    -- in-resolution caller: four of them build a bare contextFor while a
-    -- resolution's bindings do exist (#2141), and
-    -- Pawl.Engine.Projection.freezeQuantities was a fifth until it took its
-    -- context from the caller.
+    -- declarations, duration expiry -- but it is NOT honest of every
+    -- in-resolution caller: Pawl.Engine.Resolve's mill tally and
+    -- Pawl.Engine.Attach.hostsFor build a bare contextFor while a resolution's
+    -- bindings do exist (#2141). Pawl.Engine.Projection.freezeQuantities was one
+    -- until it took its context from the caller, and Resolve's Effect.Search arm
+    -- until it did the same.
     --
-    -- Pawl.Engine.OutsideTheGame.eligible is a FIFTH in-resolution caller and is
+    -- Pawl.Engine.OutsideTheGame.eligible is a further in-resolution caller and is
     -- NOT one of #2141's, honest for a reason of its own rather than for the
     -- reason above: its candidates are cards outside the game, which CR 400.11c
     -- keeps every spell and ability from affecting, so no slot of the resolution
@@ -879,8 +880,12 @@ data Context = MkContext
     -- slots hold, for the one atom that compares a candidate's against them
     -- (SameNameAsBound, Harness the Storm). Supplied by the caller for
     -- sourcePower's reason -- this module holds no game state and cannot read an
-    -- object's names -- and by one caller, Pawl.Engine.Target.admittedGiven,
-    -- which is where a target slot's Filter is matched.
+    -- object's names -- and by two callers: Pawl.Engine.Target.admittedGiven,
+    -- where a target slot's Filter is matched, and
+    -- Pawl.Engine.Resolve.effectContext, which is what all but two of a
+    -- resolution's positions go through (Bifurcate's search filter). The two
+    -- that do not are slotObjects' pair above, and are its elision rather than
+    -- this field's: a caller building a bare contextFor has neither map.
     --
     -- Separate from `slotObjects` above rather than derived from it, and that is
     -- the same division sourcePower makes against `source`: an id is not a name
@@ -890,13 +895,14 @@ data Context = MkContext
     -- object, and no filter that omits the atom ever forces it.
     --
     -- EMPTY in contextFor and contextWithSlots below, so the atom is vacuously
-    -- False in every position but a target slot. Which direction an unfilled read
-    -- takes is the ATOM's choice rather than a rule this record imposes: the arm
-    -- in `matches` below decides it, and slotControllers' SameControllerAsBound
-    -- chooses True where this one chooses False.
+    -- False in a position neither of the two callers above builds. Which
+    -- direction an unfilled read takes is the ATOM's choice rather than a rule
+    -- this record imposes: the arm in `matches` below decides it, and
+    -- slotControllers' SameControllerAsBound chooses True where this one chooses
+    -- False.
     --
     -- What keeps a card out of those positions is Pawl.CardSpec's
-    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot",
+    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot or a search filter",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
     -- CR 110.2: the CONTROLLERS of the objects the surrounding announcement's
