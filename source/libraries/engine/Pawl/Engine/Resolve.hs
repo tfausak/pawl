@@ -4122,7 +4122,8 @@ effectContext gs controller source legal bindings =
           -- trigger's bindings are stamped on the ability object on the stack,
           -- so Pawl.Engine.Count.playersFor reading the source's own bindings
           -- finds nothing for every ability. Keening Stone's "that player's
-          -- graveyard" is what proves it (Pawl.CountSpec).
+          -- graveyard" proves the activated road and Price of Knowledge's "that
+          -- player's hand" the triggered one (Pawl.CountSpec).
           Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) legal
         }
 

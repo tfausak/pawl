@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -29,6 +30,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -57,6 +59,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
@@ -376,6 +379,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   flunkSpec s registry
   keeningStoneSpec s registry
   tollOfTheSiegeSpec s registry
+  priceOfKnowledgeSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -1413,3 +1417,60 @@ aimedAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimedAtPlayer pid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer pid) sets
   _ -> S.identityAnswer p
+
+-- CR 603.2b / CR 113.7: the TRIGGERED half of the Keening Stone group above --
+-- a count whose scope names the player the trigger's own event bound. The
+-- binding is stamped on the ability object on the stack (Binding.triggerPlayer),
+-- never on the enchantment CR 113.7 makes the source, so a read off the source
+-- answered nothing here exactly as it did for an activated ability.
+--
+-- Price of Knowledge, {6}{B} Enchantment: "Players have no maximum hand size. /
+-- At the beginning of each opponent's upkeep, this enchantment deals damage to
+-- that player equal to the number of cards in that player's hand." The first
+-- clause is a PlayerEffect and nothing here reads it.
+--
+-- THREE SEATS with THREE DIFFERENT hands, the Keening Stone group's reason:
+-- alice controls the enchantment and holds 2 cards, bob takes the upkeep and
+-- holds 3, carol holds 1. bob takes 3 and every other reading is a different
+-- number -- 2 for the controller's hand, 1 for carol's, 6 for the whole table, 0
+-- for a count that never answered.
+--
+-- Every library is stocked, since the upkeep runs through the priority loop and a
+-- CR 104.3c decking would end the game before the assertion.
+priceOfKnowledgeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+priceOfKnowledgeSpec s registry =
+  let stock printing pid n gs = List.foldl' (\g _ -> snd (S.addHandCard printing pid g)) gs [1 .. (n :: Int)]
+      library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      board = do
+        price <- S.printingOf s registry "Price of Knowledge"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (_, withPrice) = S.addCreature price S.alice S.threePlayerGame
+        pure
+          ( library piker S.carol 10
+              . library piker S.bob 10
+              . library piker S.alice 10
+              . stock piker S.carol 1
+              . stock piker S.bob 3
+              $ stock piker S.alice 2 withPrice
+          )
+      upkeepOf pid gs =
+        let upkeep = Phase.Beginning BeginningStep.Upkeep
+            began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+            settled = S.runPure S.identityAnswer began Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Engine.priorityLoop
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "Price of Knowledge" $ do
+        Spec.it s "CR 603.2b the damage counts the hand of the player the TRIGGER bound" $ do
+          gs <- board
+          let after = upkeepOf S.bob gs
+          Spec.assertEqWith s "bob took 3: his own three cards, not alice's two" (lives after) (Just 20, Just 17, Just 20)
+          Spec.assertEqWith s "bob still holds the three the count read" (S.handSize S.bob after) 3
+          Spec.assertEqWith s "alice's two are nobody's business here" (S.handSize S.alice after) 2
+          Spec.assertEqWith s "nor carol's one" (S.handSize S.carol after) 1
+        -- The SCOPE twin, on a board differing in whose upkeep it is: "each
+        -- OPPONENT's upkeep" leaves the enchantment's own controller alone, so
+        -- nothing fires and nobody is damaged.
+        Spec.it s "CR 603.2b the controller's own upkeep fires nothing" $ do
+          gs <- board
+          let after = upkeepOf S.alice gs
+          Spec.assertEqWith s "nobody took damage" (lives after) (Just 20, Just 20, Just 20)
