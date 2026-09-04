@@ -204,15 +204,14 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- a state-based action long before -- and CR 702.34a's exile then moves it
   -- somewhere no other clause here could put it.
   --
-  -- Pawl's Shellfish Scholar omits the printed "Threshold -- {T}: Spells you cast
-  -- from your graveyard this turn cost {2} less to cast. Activate only if seven
-  -- or more cards are in your graveyard." The reduction's filter is now writable
-  -- (Filter.WasCastFrom, proved by Pawl.PlayerEffectSpec's Patrician Geist
-  -- group); what is still missing is the rider, Pawl.Types.ActivationRestriction
-  -- having no arm for a condition about the board (#2799). Writing the ability
-  -- without the rider would leave the card WEAKER than printed, which is the
-  -- direction that disqualifies it, so the whole ability waits. As it stands the
-  -- omission is stricter: alice pays every cost in full.
+  -- The Scholar's other printed line -- "Threshold -- {T}: Spells you cast from
+  -- your graveyard this turn cost {2} less to cast. Activate only if seven or
+  -- more cards are in your graveyard." -- is carried too, and this case does not
+  -- reach it: three Islands pay Think Twice's {2}{U} flashback with no reduction,
+  -- and the Scholar is never activated here. Pawl.ActivateSpec's
+  -- PrintedActivationThresholdReduction group is what proves that half. The
+  -- reduction's filter is Filter.WasCastFrom, proved by Pawl.PlayerEffectSpec's
+  -- Patrician Geist group.
   Spec.it s "conjure puts a card into the conjuring player's graveyard, castable out of it" $ do
     islandPrinting <- S.printingOf s registry "Island"
     scholar <- S.printingOf s registry "Shellfish Scholar"

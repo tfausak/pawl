@@ -6,7 +6,13 @@
 -- out in full, and both halves of that sentence are vocabulary the card model
 -- already had: the activated half is an ordinary activated ability with an
 -- ActivationRestriction.SorcerySpeed and an ActivatedAbility.condition, and the
--- static half is an ordinary StaticAbility with a CR 604.2 clause. What this unit
+-- static half is an ordinary StaticAbility with a CR 604.2 clause.
+--
+-- Not implemented: CR 716.2a's "activate only if this Class is level N-1" as the
+-- RESTRICTION the rule states. ActivatedAbility.condition is a grant gate, so
+-- the bar is absent below the level rather than present and prohibited;
+-- ActivationRestriction.OnlyIf is the faithful spelling and these cards do not
+-- take it (#3193). What this unit
 -- added is the mark those two clauses read -- Object.classLevel, written by
 -- Effect.SetClassLevel and read by Quantity.ClassLevel.
 --

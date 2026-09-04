@@ -1,5 +1,6 @@
 module Pawl.Codec.ActivationRestriction where
 
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.DuringPhase as DuringPhase
 import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -7,7 +8,8 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 
 -- | Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a
--- window and CR 102.1's DuringTurn a scope; SorcerySpeed, AttackedThisStep,
+-- window, CR 102.1's DuringTurn a scope and CR 602.5's OnlyIf a condition;
+-- SorcerySpeed, AttackedThisStep,
 -- AfterBlockersDeclared and BeforeCombatDamage still render as bare tags.
 --
 -- There is no tag for "no rider": CR 602.2's default is the EMPTY LIST on the
@@ -20,5 +22,6 @@ codec =
       Arm.payload "DuringTurn" TurnScope.codec ActivationRestriction.DuringTurn (\x -> case x of ActivationRestriction.DuringTurn y -> Just y; _ -> Nothing),
       Arm.nullary "AttackedThisStep" ActivationRestriction.AttackedThisStep,
       Arm.nullary "AfterBlockersDeclared" ActivationRestriction.AfterBlockersDeclared,
-      Arm.nullary "BeforeCombatDamage" ActivationRestriction.BeforeCombatDamage
+      Arm.nullary "BeforeCombatDamage" ActivationRestriction.BeforeCombatDamage,
+      Arm.payload "OnlyIf" Condition.codec ActivationRestriction.OnlyIf (\x -> case x of ActivationRestriction.OnlyIf y -> Just y; _ -> Nothing)
     ]

@@ -4,12 +4,24 @@ import qualified Pawl.Codec.ActivationRestriction as ActivationRestriction
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.DuringPhase as DuringPhase
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
@@ -91,4 +103,26 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       ActivationRestriction.codec
       ActivationRestriction.BeforeCombatDamage
       " {\"type\":\"BeforeCombatDamage\"} "
+  -- CR 602.5 over a fact about the board rather than a window: Barbarian Ring's
+  -- "Activate only if there are seven or more cards in your graveyard".
+  Spec.it s "OnlyIf, Barbarian Ring's threshold rider" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      ( ActivationRestriction.OnlyIf
+          ( Condition.Compares
+              Compares.MkCompares
+                { Compares.measured =
+                    Quantity.Count
+                      Count.MkCount
+                        { Count.aggregation = Aggregation.Members,
+                          Count.filter = Filter.And [],
+                          Count.scope = Scope.InZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You))
+                        },
+                  Compares.comparison = Comparison.AtLeast,
+                  Compares.threshold = Quantity.Literal 7
+                }
+          )
+      )
+      " {\"type\":\"OnlyIf\",\"value\":{\"type\":\"Compares\",\"value\":{\"comparison\":{\"type\":\"AtLeast\"},\"measured\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"scope\":{\"type\":\"InZone\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}}}},\"threshold\":{\"type\":\"Literal\",\"value\":7}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

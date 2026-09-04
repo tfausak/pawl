@@ -8,6 +8,7 @@ module Pawl.ActivateSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -119,6 +120,8 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   hoistDifferentialSpec s registry
   printedActivationRestrictionSpec s registry
+  printedActivationBoardConditionSpec s registry
+  printedActivationThresholdReductionSpec s registry
   printedActivationConjunctionSpec s registry
   printedActivationCombatPointSpec s registry
   printedActivationWholePhaseSpec s registry
@@ -4224,3 +4227,157 @@ abilityCeilingSpec s registry = Spec.describe s "AbilityCeilingAndBoundSlot" $ d
         after = snd (Engine.runGamePure (answerXTargetingReturning 1 ringId) g3 act)
     Spec.assertEqWith s "the mana value 1 artifact card is on the battlefield" (S.countOnBattlefieldByName (S.printingName ring) S.alice after) 1
     Spec.assertEqWith s "and the mana value 3 one the announced 1 excluded is still in the graveyard" (graveyardNames S.alice after) [S.printingName ball]
+
+-- CR 602.5's rider over a fact about the board rather than a window: Barbarian
+-- Ring (Modern Horizons 3) prints "Threshold -- {R}, {T}, Sacrifice this land: It deals 2
+-- damage to any target. Activate only if there are seven or more cards in your
+-- graveyard." Oracle text checked against Scryfall 2026-09-03. "Threshold" is an
+-- ability word (CR 207.2c) and carries no rules meaning; the sentence after the
+-- colon is the whole restriction.
+--
+-- The fixture is alice attacking with one Goblin Piker (2/1) into a bob who
+-- controls the Ring and one Mountain, and the PAIR of boards below differs in
+-- exactly one thing: how many cards are in bob's graveyard. The Mountain is on
+-- both, so a negative cannot pass for want of the {R}.
+barbarianBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+barbarianBoard piker ring mountain buried =
+  let (gs0, ours, _) = S.combatBoardOf [piker] []
+      (ringId, gs1) = S.addCreature ring S.bob gs0
+      (_, gs2) = S.addCreature mountain S.bob gs1
+      gs3 = iterate (snd . S.addGraveyardCard piker S.bob) gs2 !! buried
+   in case ours of
+        attackerId : _ -> (ringId, attackerId, gs3)
+        -- combatBoardOf returns one id per printing given, so this is
+        -- unreachable; a bogus id fails the assertions rather than the suite.
+        [] -> (ringId, S.noSource, gs3)
+
+-- Takes the first offered activation and aims it at the attacker, else passes.
+-- The offer is FILTERED rather than answered with a hand-built recipient, so a
+-- candidate the engine never offered cannot slip past CR 608.2b's re-read.
+ringAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+ringAnswer ringId attackerId p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivate options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just attackerId) . Recipient.objectOf) sets
+  -- Anything but the Ring: its own {T} is part of the cost this mana is being
+  -- found for, so tapping it here would make the payment unpayable and CR
+  -- 602.2b would rewind the activation. The Mountain is the other candidate.
+  Prompt.ChooseManaSource _ _ candidates -> List.find (/= ringId) (NonEmpty.toList candidates)
+  _ -> S.aggressiveAnswer p
+
+printedActivationBoardConditionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationBoardConditionSpec s registry = Spec.describe s "PrintedActivationBoardCondition" $ do
+  -- The rider, isolated. bob holds priority in the declare attackers step, the
+  -- Ring is untapped, the Mountain pays the {R} and there is a legal target, so
+  -- the only thing withholding the ability is the count in bob's graveyard --
+  -- and the two boards below differ in nothing else.
+  Spec.it s "CR 602.5 the Ring's ping is NOT offered with six cards in the graveyard" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    ring <- S.printingOf s registry "Barbarian Ring"
+    mountain <- S.printingOf s registry "Mountain"
+    let (ringId, _, board) = barbarianBoard piker ring mountain 6
+        attacked = desertAttacked board
+    Spec.assertEqWith s "six cards in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob attacked)) 6
+    Spec.assertEqWith s "no activation of the Ring" (activationsOf ringId (Action.legalActions S.bob attacked)) []
+
+  Spec.it s "CR 602.5 the Ring's ping IS offered with seven cards in the graveyard" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    ring <- S.printingOf s registry "Barbarian Ring"
+    mountain <- S.printingOf s registry "Mountain"
+    let (ringId, _, board) = barbarianBoard piker ring mountain 7
+        attacked = desertAttacked board
+    Spec.assertEqWith s "seven cards in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob attacked)) 7
+    Spec.assertEqWith s "exactly one activation, the ping" (length (activationsOf ringId (Action.legalActions S.bob attacked))) 1
+
+  -- The gameplay-level proof (design.md section 4), driven through
+  -- Engine.runStep and the priority loop rather than by calling
+  -- Activate.activateAbility, which does not gate. bob takes every activation
+  -- the engine offers him and the whole combat phase runs.
+  --
+  -- The 2/1 Piker is the falsifier: 2 damage is lethal (CR 704.5g), so an engine
+  -- that ignored the rider would kill it on the six-card board too and bob would
+  -- never take the 2 combat damage.
+  Spec.it s "CR 602.5 whole card: with seven cards buried the Ring pings the attacker dead" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    ring <- S.printingOf s registry "Barbarian Ring"
+    mountain <- S.printingOf s registry "Mountain"
+    let (ringId, attackerId, board) = barbarianBoard piker ring mountain 7
+        after = S.runCombat (ringAnswer ringId attackerId) board
+    Spec.assertBool s (not (Set.member attackerId (GameState.battlefield after))) "the attacker died to the ping"
+    Spec.assertEqWith s "so no combat damage reached bob" (S.lifeOf S.bob after) (Just 20)
+
+  -- The same board with one card fewer in the graveyard, and nothing else
+  -- changed: the ability is never offered, the Piker survives and connects.
+  Spec.it s "CR 602.5 whole card: with six cards buried the attacker survives and connects" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    ring <- S.printingOf s registry "Barbarian Ring"
+    mountain <- S.printingOf s registry "Mountain"
+    let (ringId, attackerId, board) = barbarianBoard piker ring mountain 6
+        after = S.runCombat (ringAnswer ringId attackerId) board
+    Spec.assertBool s (Set.member attackerId (GameState.battlefield after)) "the attacker is still on the battlefield"
+    Spec.assertEqWith s "and bob took the 2 combat damage" (S.lifeOf S.bob after) (Just 18)
+
+-- The pool's second producer of the same rider, and the one whose EFFECT the
+-- rider gates rather than a ping: Shellfish Scholar (Alchemy: Bloomburrow,
+-- digital) prints "Threshold -- {T}: Spells you cast from your graveyard this
+-- turn cost {2} less to cast. Activate only if seven or more cards are in your
+-- graveyard." Oracle text checked against Scryfall 2026-09-03.
+--
+-- alice controls the Scholar and ONE Island, and Think Twice ("Flashback
+-- {2}{U}") lies in her graveyard. One Island cannot pay {2}{U}, so the flashback
+-- is affordable only after the reduction, and the reduction is reachable only
+-- through the rider -- which makes the pair of boards below differ in the count
+-- alone and still differ in what alice ends the loop having done.
+shellfishBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+shellfishBoard scholar island thinkTwice filler =
+  let (scholarId, gs0) = S.addCreature scholar S.alice (S.landsInPlay island 1)
+      (_, gs1) = S.addGraveyardCard thinkTwice S.alice gs0
+      gs2 = iterate (snd . S.addGraveyardCard island S.alice) gs1 !! filler
+      -- CR 104.3c would lose alice the game out from under the assertions when
+      -- Think Twice draws.
+      (_, gs3) = S.addLibraryCard island S.alice gs2
+   in (scholarId, gs3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+
+-- Activates whatever is offered, else casts, else passes -- so the Scholar's
+-- ability is taken before the flashback it pays for becomes affordable.
+scholarAnswer :: Prompt.Prompt r -> r
+scholarAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivate options of
+    a : _ -> a
+    [] -> case filter isCast options of
+      c : _ -> c
+      [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+isCast :: A.Action -> Bool
+isCast a = case a of
+  A.Cast {} -> True
+  _ -> False
+
+printedActivationThresholdReductionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationThresholdReductionSpec s registry = Spec.describe s "PrintedActivationThresholdReduction" $ do
+  -- CR 702.34a: flashback casts the card from the graveyard and exiles it as it
+  -- resolves, so the exile is what says the {U} was actually paid -- a cast that
+  -- was rewound for want of mana (CR 601.2) leaves the card where it lay.
+  Spec.it s "CR 602.5 whole card: with seven cards buried the Scholar's reduction pays for the flashback" $ do
+    scholar <- S.printingOf s registry "Shellfish Scholar"
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (_, board) = shellfishBoard scholar island thinkTwice 6
+        after = S.runPure scholarAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "CR 702.34a exiled Think Twice as it resolved" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+    Spec.assertEqWith s "and alice drew the card it promised" (S.handSize S.alice after) 1
+
+  -- One card fewer in the graveyard and nothing else changed: the ability is
+  -- never offered, so {2}{U} stands and one Island cannot pay it.
+  Spec.it s "CR 602.5 whole card: with six cards buried the flashback stays unaffordable" $ do
+    scholar <- S.printingOf s registry "Shellfish Scholar"
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (_, board) = shellfishBoard scholar island thinkTwice 5
+        after = S.runPure scholarAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "nothing was flashed back, so nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    Spec.assertEqWith s "Think Twice is still in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 6
+    Spec.assertEqWith s "and alice drew nothing" (S.handSize S.alice after) 0
