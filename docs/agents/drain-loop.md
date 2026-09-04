@@ -72,12 +72,18 @@ Re-read it whenever a merged PR touches it. Derive everything against
 ## Procedure
 
 **Dispatch.** Pick an unassigned issue with no `needs-planning` label,
-preferring `priority-high`. **Do not rank by open dependents.** The
-dependency graph is a shallow forest, not a tree: the overwhelming majority of
-merged units report `dependencies/blocking` empty and unblock nothing, so "a
-capability that unblocks three issues" describes almost no issue in the
-backlog. Rank by `priority-high`, then by whatever is file-disjoint from the
-build.
+preferring `priority-high`. Below that tier, **rank by card demand**: the
+backlog is a treadmill of gaps each found by the last card tried, and the
+loop ends not at zero but at "every remaining gap unblocks one card", so the
+descent has to be by marginal value. Before dispatching, count the real cards
+the gap unblocks --- a `grep -c` of the Oracle phrase over
+`_scratch/AllPrintings.json`, or a Scryfall `/cards/search` with a
+`User-Agent` header when the dump is absent --- and take the largest count
+that is file-disjoint from the build. Put the count in the brief; the
+implementer picks the producer from those cards. **Do not rank by open
+dependents.** The dependency graph is a shallow forest: the overwhelming
+majority of merged units unblock nothing, so "a capability that unblocks three
+issues" describes almost no issue in the backlog.
 
 `needs-planning` covers two things: an issue-to-issue blocker, and an issue
 awaiting a design call from the owner (#146, #1828, #2167 carry the label with
@@ -104,10 +110,13 @@ mutations against the merged state. This worked twice in one run on
 `Projection.hs` and on `Game.hs`. Prefer a disjoint issue where one exists;
 stack when the alternative is an idle lane.
 
-**Dispatch a cluster only when one issue's edit sites contain the others'.**
-A cluster is one dispatch, one worktree, one PR closing every issue in it, and
-when it is real the per-unit fixed cost is paid once. But a shared TOPIC is not
-a cluster: the eleven topic trackers #2190--#2200 each assert shared machinery
+**A cluster is the default dispatch shape, a single issue the fallback.**
+Half of a dispatch's tokens are fixed cost paid once per worktree, so every
+dispatch starts from the clustering pass's current list, and a lone issue goes
+out only when no cluster on the list is file-disjoint from the build. A cluster
+is one dispatch, one worktree, one PR closing every issue in it. What makes
+one is one issue's edit sites containing the others'; a shared TOPIC is not a
+cluster: the eleven topic trackers #2190--#2200 each assert shared machinery
 in the body, and every one of them split into unrelated units under triage.
 Two issues qualify when they share an edit site OR take the SAME fix shape in
 adjacent code: #2534 and #2535 were one bracket around two neighbouring folds,
@@ -123,23 +132,35 @@ unnecessary `GameState` field, a producer that proved nothing. Dispatch
 straight off the issue, and tell the agent the issue body is the artefact most
 often wrong.
 
-**Audit every few merges.** This is one of the audit lane's two standing jobs,
-and the only mechanism that looks ACROSS units. Two units each correct alone
-can compose wrong and no single unit's mutations see it: three consecutive
-rounds each found a real defect (#2505, #2529, and #2555 --- a regression the
-run itself had introduced five units earlier). Read the merged diffs, not the
-tests. A comment-only unit is the same shape from the other side --- nothing
-red catches a false CR classification. Its brief must open with: read
+**Audit every few merges, for correctness only.** This is one of the audit
+lane's two standing jobs, and the only mechanism that looks ACROSS units. Two
+units each correct alone can compose wrong and no single unit's mutations see
+it: three consecutive rounds each found a real defect (#2505, #2529, and #2555
+--- a regression the run itself had introduced five units earlier). Read the
+merged diffs, not the tests. Its brief must open with: read
 `docs/agents/researching.md` first.
+
+An audit round costs as much as an implementation, so its brief bounds what
+counts as a finding: behaviour that diverges from the CR, a rules-core arm that
+cases on an effect's identity, a false CR classification in a comment, a
+mutation the PR body reports that could not have reddened the named assertion.
+Prose is not a finding. A wording nit, a haddock over one line, a stale
+citation that still points at the right rule: the auditor fixes none of these,
+reports none of these, and no "fix N comment nits" unit is dispatched for
+them. They are corrected by the next unit that edits the file, under the
+self-review rule in `CLAUDE.md`.
 
 Act on a finding by sending the unit's agent back, not by filing and
 re-dispatching: a send-back costs ~15--25k against ~200k for a fresh unit, and
 catches the defect before the merge rather than after.
 
-**Run a clustering pass every ten or fifteen merges.** The audit lane's other
-standing job, and how the fixed cost above gets recovered: one read-only agent
-groups the dispatchable backlog by the code each issue names, and what it
-returns is dispatched under "Dispatch a cluster" above.
+**Run a clustering pass whenever the cluster list runs dry.** The audit
+lane's other standing job, and how the fixed cost above gets recovered: one
+read-only agent groups the dispatchable backlog by the code each issue names,
+and what it returns is the list every dispatch draws from under "A cluster is
+the default dispatch shape" above. Its output is a ranked list, card demand
+first; a pass that returns no cluster at all is a convergence signal worth
+reporting, not a reason to fall back to single issues quietly.
 `docs/agents/researching.md` has the method. Measured 2026-08-31: 172k tokens
 for thirteen high-confidence clusters and seven medium, plus stale issues found
 on the way; its first cluster closed two issues for 193k, about one unit's
@@ -187,6 +208,19 @@ overwritten by another's, and restoring it injected a different unit's
 in-flight code into the tree --- a corruption no build catches, because both
 sides compile.
 
+**Keep the warm worktree at `origin/main`, and seed every dispatch from it.**
+`script/warm-worktree.sh refresh` resets `.claude/worktrees/warm` to
+`origin/main` and builds it through the lock; run it after every merge, in the
+background, since the build is incremental and the lane does not wait on it.
+`script/warm-worktree.sh seed DIR` clones its `dist-newstyle` into a fresh
+worktree, which `implementing.md` tells the agent to do before its first
+build. Measured 2026-09-04 on a loaded machine: a cold `cabal build all` in a
+fresh worktree took 463s; seeded from a build 80 files behind, 414s with 843
+of 1528 modules recompiled; seeded from a build at the same commit, 24s with
+none. A donor that has fallen behind still pays off, so a missed refresh is a
+slower dispatch, not a broken one. The warm worktree is never reaped and
+never dispatched into.
+
 **Builds are counted, machine-wide.** The GHC job semaphore shares compile
 slots; it does not stop several worktrees running `cabal` at once, and with
 three going an 8 GB machine is unusable. Every `cabal` invocation in every
@@ -203,17 +237,19 @@ while it holds a lock slot. Tell agents to run `cabal` in the foreground with
 a generous timeout, to split long runs by `--pattern`, and never to `pkill`
 by pattern; a run at 0% CPU for ten minutes is killed by its own PID.
 
-**Reap after every merge.** A finished unit leaves a worktree under
-`.claude/worktrees/`, its placeholder `worktree-agent-*` branch, the unit's own
-branch, and often a `cabal` process stalled on the semaphore at 0% CPU. None of
-it goes away on its own, and a stalled `cabal` keeps a build slot the live lanes
-need. Once a unit's PR is merged, from the primary checkout: `git worktree
+**Reap after every merge, then refresh the warm worktree.** A finished unit
+leaves a worktree under `.claude/worktrees/`, its placeholder
+`worktree-agent-*` branch, the unit's own branch, and often a `cabal` process
+stalled on the semaphore at 0% CPU. None of it goes away on its own, and a
+stalled `cabal` keeps a build slot the live lanes need. Once a unit's PR is merged, from the primary checkout: `git worktree
 remove --force` its worktree (unlock first), `git worktree prune`, `git fetch
 --prune`, then delete every local branch whose upstream is `[gone]` or that has
 no commit beyond `origin/main`, skipping any branch a live worktree has checked
 out. Kill a stalled `cabal` by its PID after `lsof -p <pid> -d cwd` shows a
 finished worktree, never by pattern. Leave any branch you did not create that
-still carries commits, and say so; the owner keeps review branches.
+still carries commits, and say so; the owner keeps review branches. The warm
+worktree is exempt from all of this: leave it, and run
+`script/warm-worktree.sh refresh` in the background once the reap is done.
 
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
 be up to date, so every merge invalidates every other armed PR and the queue

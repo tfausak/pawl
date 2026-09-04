@@ -3,7 +3,8 @@
 Read this first when you are dispatched to work an issue end to end and open a
 PR. `CLAUDE.md` and `CONTRIBUTING.md` still apply and override anything here;
 this file is the standing procedure a dispatch brief would otherwise repeat, so
-the brief carries only what is specific to your unit.
+the brief carries only what is specific to your unit. Rules only: the incidents
+behind them are in git history.
 
 You hold the build. The one other thing that may be building is the previous
 unit, if its PR went red on CI and its agent was sent back.
@@ -14,33 +15,33 @@ A brief spares you the re-derivation: the producer's Oracle text, its card
 JSON, the edit sites, a drafted red test, the mutations. Start there rather
 than from the issue. What you owe it is verification, not repetition.
 
-Its two halves are not equally reliable. Findings the researcher could *read*
---- whether a blocker landed, which producer works, the edit-site set, CR
-citations --- hold up, and routinely change a unit's scope. Anything needing a
-compiler does not: in one nine-unit run every brief carried at least one wrong
-wire spelling, stale line number, or mutation prediction. `curl` the Oracle
-text and diff it against the brief's JSON, grep the sibling to confirm the edit
-sites, and re-derive the mutations yourself.
+Findings the researcher could *read* --- whether a blocker landed, which
+producer works, the edit-site set, CR citations --- hold up. Anything needing a
+compiler does not: wire spellings, line numbers, mutation predictions. `curl`
+the Oracle text and diff it against the brief's JSON, grep the sibling to
+confirm the edit sites, and re-derive the mutations yourself.
 
 **A mutation the brief predicted red that comes back green is a finding, not a
-formality** --- it happened three times in that run. Either the board cannot
-discriminate, or the site has no observer. Diagnose which before proceeding; do
-not reword the prediction to match the result.
+formality.** Either the board cannot discriminate, or the site has no observer.
+Diagnose which before proceeding; do not reword the prediction to match the
+result.
 
 Distrust the issue's estimate of SIZE as much as its status, in both
-directions: one issue's "site" line named one file and the unit needed a new
-`GameEvent` across seventy-odd forced arms. The cheapest first move is to find
-the funnel --- the one function every path to the behaviour goes through ---
-and read what it already gates or orders. Several units turned out to be a test
-and a comment.
+directions. The cheapest first move is to find the funnel --- the one function
+every path to the behaviour goes through --- and read what it already gates or
+orders.
 
 ## Before the first build
 
 Copy `cabal.project.local` in from the primary checkout, as a BARE command of
 its own, and confirm it is there. The worktree-isolation guard refuses a
-compound command wholesale, and its error names the other half; one run read
-the refusal as being about the chained `git` and built unpedantic until CI
-caught it.
+compound command wholesale, and its error names the other half.
+
+Then, before anything runs `cabal`, seed `dist-newstyle` from the warm
+worktree: `/abs/path/to/primary/script/warm-worktree.sh seed "$PWD"`. It
+refuses if the warm build is missing, in which case build cold and say so in
+the PR. Never build in the warm worktree yourself; the orchestrator refreshes
+it.
 
 ## Running the suite
 
@@ -50,21 +51,18 @@ While iterating, run only the subtree you are in --- add `-p Detain`, a tasty
 pattern over the `Spec.describe` group names --- and the whole suite before
 each commit and before the push; an engine change reaches specs you did not
 open. Redirect output to a file and read the file, and keep
-`--hide-successes`: piping `cabal test` stalls it for minutes and,
-backgrounded, leaves the output empty, and a passing run otherwise prints a
-line per test --- 9326 lines, ~186k tokens, more than a whole unit's budget
---- where `--hide-successes` leaves 18. Build with `cabal build -v0`, which
-drops cabal's progress noise and still prints GHC's errors in full, `pedantic`
-having made the warnings errors. One build at a time; no `cabal clean`; keep
-the optimizer on (`-O0` was measured: the cold build saves under a minute and
-the suite then blows its budget on cases that take 0.02s at `-O1`).
+`--hide-successes`: a passing run otherwise prints a line per test, more than a
+whole unit's token budget. Build with `cabal build -v0`, which drops cabal's
+progress noise and still prints GHC's errors in full. One build at a time; no
+`cabal clean`; keep the optimizer on (`-O0` saves under a minute cold and then
+blows the suite's timeouts).
 
-The timeout catches infinite loops; it is not an assertion about speed. A few
-cases run 1-2s unloaded and the machine is shared, so a lone TIMEOUT is
-background noise --- re-run it unloaded first; a real hang fails at any budget.
-Two subtrees carry their own budgets via `Tasty.localOption` in `Pawl.Test`; CI
-sets 15s suite-wide through `flake.nix`'s `testFlags`, so a tighter local budget
-manufactures TIMEOUTs CI never sees.
+The timeout catches infinite loops; it is not an assertion about speed. The
+machine is shared, so a lone TIMEOUT is background noise --- re-run it unloaded
+first; a real hang fails at any budget. Two subtrees carry their own budgets
+via `Tasty.localOption` in `Pawl.Test`; CI sets 15s suite-wide through
+`flake.nix`'s `testFlags`, so a tighter local budget manufactures TIMEOUTs CI
+never sees.
 
 ## Enumerate the edit sites in one pass
 
@@ -79,9 +77,7 @@ change done"), and say in the PR which ones you read and why each is correct.
 
 A comment asserting a limit the engine used to have becomes false the moment
 the limit lifts, and nothing catches it. It is not mechanically checkable, so
-do not propose a script for it.
-
-Three sweeps, all yours:
+do not propose a script for it. Three sweeps, all yours:
 
 - **When your change widens a capability**, grep for prose asserting the old
   limit --- the name of what you widened, the zone or type it now reaches, and
@@ -90,13 +86,10 @@ Three sweeps, all yours:
 - **When you add a card**, grep the construct's type and constructor names for
   counting absolutes (`one`, `only`, `no card`, `the pool's`). A comment that
   counts producers is falsified by the card that becomes the second one, and
-  the card's own PR is the only place that is visible. PR #1788 made three such
-  comments false.
-- **When you would write a NEW negative**, don't write the bare form. Three PRs
-  in one session introduced a false absolute in the very PR that deleted an
-  older one, each because a negative Scryfall result is evidence about the
-  QUERY, and every query was built from pawl's identifier rather than the
-  printed template.
+  the card's own PR is the only place that is visible.
+- **When you would write a NEW negative**, don't write the bare form. A
+  negative Scryfall result is evidence about the QUERY, and a query built from
+  pawl's identifier rather than the printed template proves nothing.
 
 Two shapes are admissible for a negative. Prefer the citation: the claim is
 almost always the REASON a slot is unbuilt, which makes it an elision, so `Not
@@ -120,27 +113,24 @@ was captured; `Pawl.Engine.Resolve.gateHolds` and its callers are where this
 bites.
 
 Related: one writer, every road. When you record an event, grep for every
-function that performs the action --- `Daytime.turnDue` reaches
-`Game.turnFaceOver` directly, bypassing `Resolve.turnOver`, so recording in the
-opcode's arm alone would have missed the day/night road entirely.
+function that performs the action; a second road that bypasses the funnel
+(`Daytime.turnDue` reaching `Game.turnFaceOver` around `Resolve.turnOver`) is
+the usual miss.
 
 ## Mutation testing
 
 `CLAUDE.md` requires mutating the change away and re-running. How:
 
-`script/mutate.sh FILE SED_EXPR PATTERN [CABAL_ARG...]` runs one, and is the
-shape the rest of this section describes: it backs the file up outside the tree,
-applies the mutation, runs the tasty subtree `PATTERN` selects, prints the first
-failing assertion with its group path, and restores the file from a `trap`. Its
-exit status is the outcome --- red, nothing red, did not compile, or pattern
-matched nothing, which tasty otherwise reports as a pass. `--help` has the codes.
-Run it, like every `cabal` call, through `script/with-build-lock.sh`; its
-`--no-semaphore -j4` retry only matters in a checkout that still enables the
-GHC job semaphore, which `cabal.project.local` no longer does.
+`script/mutate.sh FILE SED_EXPR PATTERN [CABAL_ARG...]` runs one: it backs the
+file up outside the tree, applies the mutation, runs the tasty subtree
+`PATTERN` selects, prints the first failing assertion with its group path, and
+restores the file from a `trap`. Its exit status is the outcome --- red,
+nothing red, did not compile, or pattern matched nothing, which tasty otherwise
+reports as a pass. `--help` has the codes. Run it, like every `cabal` call,
+through `script/with-build-lock.sh`.
 
-What it does **not** do is the judgement the next two bullets ask for: it names
-the assertion that went red, and says nothing about whether that assertion is
-the gameplay-level one. A proxy ahead of the behavioural assertion produces a
+What it does **not** do is judge whether the assertion it names is the
+gameplay-level one. A proxy ahead of the behavioural assertion produces a
 perfectly good-looking line of output. Read the label, then decide.
 
 - **One mutation at a time, and read the failure.** Red is not the bar: it must
@@ -154,22 +144,19 @@ perfectly good-looking line of output. Read the label, then decide.
   reported itself, and the real assertion may never have run. Reorder so the
   behavioural assertion precedes every proxy, keep the proxy after it, re-run.
   Do this even when the red looks right: a proxy's message usually names the
-  same objects the behaviour does, which is why reading it as confirmation is
-  the easy mistake, and agents who had read this advice have made it anyway.
-  `Pawl.ExpirySpec`'s "CR 514.2 / 611.2a neither cleanup nor the handoff into
-  bob's turn reaches it" is the worked example in the tree.
+  same objects the behaviour does. `Pawl.ExpirySpec`'s "CR 514.2 / 611.2a
+  neither cleanup nor the handoff into bob's turn reaches it" is the worked
+  example in the tree.
 - **Ordering the gameplay assertion first is necessary, not sufficient.** It
   also has to be able to DIFFER under the mutation: if the board has not
   advanced far enough, both readings produce the same value and the assertion
-  is vacuous however early it sits. PR #1806's counter case resolved only the
-  stack's TOP object, which cannot tell "countered" from "still on the stack".
-  Ask what a wrong implementation would have produced at the moment you read
-  the value; for a counter that means resolving the stack down.
-- **Never `git checkout <file>` to revert a mutation** --- real edits have been
-  lost that way. Copy the file to a backup and move it back, or let
-  `script/mutate.sh` do it; its backup lives under `mktemp -d` rather than
-  beside the file, because a stray `Foo.hs.bak` turns up in a concurrent
-  session's `git status`.
+  is vacuous however early it sits. Ask what a wrong implementation would have
+  produced at the moment you read the value; for a counter that means
+  resolving the stack down, not reading its top.
+- **Never `git checkout <file>` to revert a mutation** --- real edits are lost
+  that way. Copy the file to a backup and move it back, or let
+  `script/mutate.sh` do it; its backup lives under `mktemp -d`, never beside
+  the file, where a concurrent session would see it.
 - **Build a negative as a pair of boards differing in exactly one thing.** A
   negative assembled on its own board passes for reasons you did not choose.
 - **Keep the mutated binding referenced.** Deleting a use trips
@@ -190,10 +177,9 @@ perfectly good-looking line of output. Read the label, then decide.
 
 After any merge from `origin/main`, run the suite first --- a card file in a
 superseded wire spelling makes the registry throw `InvalidCorpus` and aborts
-the WHOLE corpus load, so every case dies at once; grep the corpus for the old
-spelling rather than eyeballing your diff --- then re-run the load-bearing
-mutations, since a bad conflict resolution can neuter a test while leaving the
-suite green.
+the WHOLE corpus load; grep the corpus for the old spelling rather than
+eyeballing your diff --- then re-run the load-bearing mutations, since a bad
+conflict resolution can neuter a test while leaving the suite green.
 
 ## Vacuity traps
 
@@ -247,10 +233,9 @@ Each of these has shipped a green-but-meaningless test in this repository:
 
 ## Cards
 
-Never take a card's printed values on trust from a brief OR an issue body; both
-have carried a wrong mana cost and a card claimed to be in the pool that was
-not. Fetch the Oracle text yourself (`CLAUDE.md` has the `curl`) and diff. For
-a double-faced card read the `card_faces` array, not the top-level text.
+Never take a card's printed values on trust from a brief OR an issue body.
+Fetch the Oracle text yourself (`CLAUDE.md` has the `curl`) and diff. For a
+double-faced card read the `card_faces` array, not the top-level text.
 
 If a clause cannot be expressed, say which, and whether the omission leaves
 pawl's card **stricter** or **weaker** than printed. Weaker in the controller's
@@ -260,8 +245,7 @@ producer or stop. Stricter is admissible with an issue and an inline `(#N)`.
 **A stale transcription looks exactly like a missing capability.** Before
 concluding the engine cannot express something, grep `data/cards/` for a card
 that already uses it. Having fixed one card, **sweep the corpus for its
-siblings**. A wrong value survives precisely where no test pays it --- Life and
-Limb carried `{G}{G}` for a `{3}{G}` card because nothing ever cast it.
+siblings**: a wrong value survives precisely where no test pays it.
 
 ### Prior art, when you need a producer or a field shape
 
@@ -301,9 +285,16 @@ otherwise, and then say so in the PR.
   fine, not scope creep.
 - **File it** when it needs its own card, its own design decision, or touches
   files outside your unit --- and cite it inline where the code elides it.
+  **A filed gap names the real card that needs it**, found the way `CLAUDE.md`
+  says a producer is found, in the issue body. If you cannot name one, the gap
+  is not filed: fold it in, or record it in the PR body under "deferred" and
+  let it go. An elision still gets its issue, since the comment at the code
+  site must cite one; the card rule applies to the gap it elides.
 
-Each filed leaf costs a whole unit's fixed overhead later; a follow-up that
-takes ten minutes now and forty as its own dispatch is folded in.
+Each filed leaf costs a whole unit's fixed overhead later, and a merged PR
+filing about one issue is why the backlog holds its size. A follow-up that
+takes ten minutes now and forty as its own dispatch is folded in; one no card
+reaches is a capability the design forbids building anyway.
 
 ## Git and the PR
 
@@ -313,9 +304,8 @@ takes ten minutes now and forty as its own dispatch is folded in.
   it squash-merges and re-run the suite and the load-bearing mutations against
   the merged state. Say in the PR body which base it was cut from.
 - Immediately before the self-review and the push, `git fetch` and merge
-  `origin/main` again, however recently you last did --- a PR armed just before
-  you were dispatched typically lands mid-run. Then re-run the suite and the
-  load-bearing mutations against the merged state.
+  `origin/main` again, however recently you last did. Then re-run the suite
+  and the load-bearing mutations against the merged state.
 - **Never force-push after opening.** `git merge origin/main` and keep the
   merge commit; a rebase discards the one auto-merge adds. Resolve conflicts by
   taking **both** sides, then re-run the mutations.
@@ -331,9 +321,7 @@ takes ten minutes now and forty as its own dispatch is folded in.
   query. Say in the PR which dependents are now workable.
 - **Closing #N means re-deriving every inline `(#N)` in the tree**, not just
   the site you fixed. Grep the BARE number over the whole tree, not the file
-  set a brief or issue body names --- that set has been incomplete three times
-  in one session, each miss a live elision claiming a capability was missing
-  that had landed months earlier. Grep again after the last merge from
+  set a brief or issue body names. Grep again after the last merge from
   `origin/main`.
 - **Do not close an issue your unit only narrowed.** Where a sibling site keeps
   it open, write "related to #N", never a closing keyword --- in any branch
@@ -346,10 +334,9 @@ vacuously when run bare.
 
 Nothing checks a `CR` citation. Re-reading the rule in `docs/rules.txt` is the
 only check there is: a citation naming a real rule that does not say what the
-sentence claims passed the old script silently, which is how `CR 108.1` sat in
-this file citing ownership (CR 108.3) through weeks of green CI. A CR update
-renumbers rules in the tree and in issue bodies alike, so after taking one,
-grep the renumbered rules across both and correct them --- the tree in the PR,
-the bodies in a comment.
+sentence claims is the shape that slips through. A CR update renumbers rules in
+the tree and in issue bodies alike, so after taking one, grep the renumbered
+rules across both and correct them --- the tree in the PR, the bodies in a
+comment.
 
 Then stop. Do not wait on CI, and do not start another unit.
