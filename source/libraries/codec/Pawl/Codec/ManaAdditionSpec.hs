@@ -26,6 +26,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       ManaAddition.codec
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+            ManaAddition.count = 1,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Nothing,
@@ -33,14 +34,16 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}} "
-  -- Shizuko, Caller of Autumn's "that player adds": the one printing that writes
-  -- the key, over the slot CR 603.2b's step event bound.
+  -- Shizuko, Caller of Autumn's "that player adds", over the slot CR 603.2b's
+  -- step event bound; Stadium Vendors writes the same key over the slot its own
+  -- ChoosePlayer bound.
   Spec.it s "MkManaAddition, a named recipient" $
     Common.assertCodec
       s
       ManaAddition.codec
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer")),
+            ManaAddition.count = 1,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Nothing,
@@ -59,6 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       ManaAddition.codec
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer")),
+            ManaAddition.count = 1,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Green),
             ManaAddition.retention = ManaRetention.UntilEndOfTurn,
             ManaAddition.restriction = Nothing,
@@ -75,6 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       ManaAddition.codec
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+            ManaAddition.count = 1,
             ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Just (ManaRestriction.onlyCasts (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature])),
@@ -92,6 +97,7 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
       ManaAddition.codec
       ( ManaAddition.MkManaAddition
           { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+            ManaAddition.count = 1,
             ManaAddition.production = ManaProduction.OfType ManaType.Colorless,
             ManaAddition.retention = ManaRetention.Ordinary,
             ManaAddition.restriction = Just (ManaRestriction.MkManaRestriction {ManaRestriction.casts = Nothing, ManaRestriction.activations = Just (Filter.And [])}),
@@ -99,4 +105,20 @@ spec s = Spec.describe s "Pawl.Codec.ManaAddition" $ do
           }
       )
       " {\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colorless\"}},\"restriction\":{\"activations\":{\"type\":\"And\",\"value\":[]}}} "
+  -- Stadium Vendors' "two mana of any one color they choose": the count is the
+  -- one field a card writes to make CR 105.4's choice cover more than one mana.
+  Spec.it s "MkManaAddition, a count written on the wire" $
+    Common.assertCodec
+      s
+      ManaAddition.codec
+      ( ManaAddition.MkManaAddition
+          { ManaAddition.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "chosen")),
+            ManaAddition.count = 2,
+            ManaAddition.production = ManaProduction.AnyColor,
+            ManaAddition.retention = ManaRetention.Ordinary,
+            ManaAddition.restriction = Nothing,
+            ManaAddition.rider = Nothing
+          }
+      )
+      " {\"count\":2,\"player\":{\"type\":\"InSlot\",\"value\":\"chosen\"},\"production\":{\"type\":\"AnyColor\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ManaAddition.codec

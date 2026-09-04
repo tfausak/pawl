@@ -498,7 +498,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     let ab =
           ActivatedAbility.MkActivatedAbility
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing)] Map.empty,
+              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) 1 ManaRetention.Ordinary Nothing Nothing)] Map.empty,
               ActivatedAbility.maximumX = [],
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
@@ -513,7 +513,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing)]
+                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) 1 ManaRetention.Ordinary Nothing Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.maximumX = [],
               ActivatedAbility.restrictions = [],
@@ -3569,6 +3569,80 @@ burningTreeArranged bte pid =
 plainGreen :: ManaUnit.ManaUnit
 plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
 
+-- CR 608.2d's OTHER reading of "choose": a scope that admits the CONTROLLER.
+-- Stadium Vendors ({3}{R} 3/3 Creature -- Goblin, "When this creature enters,
+-- choose a player. That player adds two mana of any one color they choose")
+-- (name, cost, type line, power, toughness and Oracle text checked against
+-- api.scryfall.com, 2026-09-04) is the printing, and the whole card is
+-- transcribed. Skullwinder's "choose an opponent" is the same opcode one
+-- PlayerScope over, and Pawl.MassEffectSpec's Skullwinder group is what holds
+-- that arm honest.
+--
+-- THREE SEATS, because two collapse "a player" onto "an opponent" the moment
+-- the controller is picked out: at two seats the pair below could not tell
+-- "alice was offered" from "alice was the only candidate left".
+--
+-- "any ONE color" is the ManaAddition count rather than two AddMana effects: CR
+-- 105.4's choice is made once for the instruction, so both units take the
+-- colour the ANSWER settled. The colour answerer keys on the seat the
+-- ChooseManaType prompt names -- alice red, bob green, carol blue -- so the
+-- pool says which seat was instructed as well as how much they got.
+stadiumVendorsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stadiumVendorsSpec s registry =
+  let -- Pinned to `who` by NAME out of the offer rather than by index, and
+      -- FILTERED rather than invented: a scope that never offered them takes the
+      -- first candidate instead, so the pool below reads the engine's answer.
+      answering :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      answering who p = case p of
+        Prompt.ChoosePlayer _ _ _ offer -> do
+          State.modify' (<> NonEmpty.toList offer)
+          pure (Maybe.fromMaybe (NonEmpty.head offer) (List.find (== who) (NonEmpty.toList offer)))
+        Prompt.ChooseManaType _ asked _ _
+          | asked == S.alice -> pure (ManaType.Colored Color.Red)
+          | asked == S.bob -> pure (ManaType.Colored Color.Green)
+          | otherwise -> pure (ManaType.Colored Color.Blue)
+        _ -> pure (S.identityAnswer p)
+      -- alice's Vendors entering with its CR 603.6a event, that trigger placed,
+      -- and a Goblin Piker ({1}{R}) in her hand with her active and holding
+      -- priority in her own precombat main phase. No land and no other mana
+      -- source is anywhere, so the trigger's two mana are the only mana there is.
+      arranged vendors piker =
+        let (base, pikerId) = S.handOne piker S.threePlayerGame
+            (_, entered) = S.entersWithTrigger vendors S.alice base
+         in (pikerId, snd (Engine.runGamePure S.identityAnswer entered Engine.placePendingTriggers))
+      resolved who (pikerId, placed) =
+        let ((_, after), offer) = State.runState (Engine.runGame (answering who) placed Stack.resolveTop) []
+         in (pikerId, after, offer)
+   in Spec.describe s "Stadium Vendors" $ do
+        -- The headline, and the reading "choose an opponent" cannot express:
+        -- alice is in the offer and takes it herself.
+        Spec.it s "CR 608.2d the controller is offered, and the two mana land in her own pool" $ do
+          vendors <- S.printingOf s registry "Stadium Vendors"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, after, offer) = resolved S.alice (arranged vendors piker)
+          Spec.assertBool s (any (S.isCastOf pikerId) (Action.legalActions S.alice after)) "alice can cast a {1}{R} Piker, which one mana could not pay for"
+          Spec.assertEqWith s "and her pool is {R}{R}, one CR 105.4 choice covering both" (poolOf S.alice after) [plainRed, plainRed]
+          Spec.assertEqWith s "neither opponent got anything" (poolOf S.bob after, poolOf S.carol after) ([], [])
+          Spec.assertEqWith s "every seat still in the game was offered, the chooser included" (List.sort offer) (List.sort [S.alice, S.bob, S.carol])
+          Spec.assertEqWith s "the stack is empty again" (length (GameState.stack after)) 0
+
+        -- The pair's other leg, differing in EXACTLY one thing: which player
+        -- alice names. carol answers the colour prompt, which is what "they
+        -- choose" says -- a board that asked the controller would float red.
+        Spec.it s "CR 106.3 naming an opponent instructs THEM, and they pick the colour" $ do
+          vendors <- S.printingOf s registry "Stadium Vendors"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, after, _) = resolved S.carol (arranged vendors piker)
+          Spec.assertEqWith s "carol got {U}{U}, the colour SHE named" (poolOf S.carol after) [plainBlue, plainBlue]
+          Spec.assertEqWith s "alice, who controls the Goblin, got nothing" (poolOf S.alice after) []
+          Spec.assertBool s (not (any (S.isCastOf pikerId) (Action.legalActions S.alice after))) "so the same Piker is not castable"
+          Spec.assertEqWith s "and bob, the seat neither of them named, got nothing" (poolOf S.bob after) []
+
+-- plainRed's twin one colour over, so an assertion naming it says WHICH colour
+-- the recipient chose and not merely how many units they got.
+plainBlue :: ManaUnit.ManaUnit
+plainBlue = plainGreen {ManaUnit.manaType = ManaType.Colored Color.Blue}
+
 -- plainGreen's twin, differing in EXACTLY one field: what Shizuko, Caller of
 -- Autumn's trigger adds. The pair is what makes the group below discriminating
 -- -- ManaUnit derives Eq, so an assertion naming both by name says which units
@@ -4888,6 +4962,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   chromaticSpec s registry
   millikinSpec s registry
   burningTreeSpec s registry
+  stadiumVendorsSpec s registry
   shizukoSpec s registry
   avatarRokuSpec s registry
   geosurgeSpec s registry

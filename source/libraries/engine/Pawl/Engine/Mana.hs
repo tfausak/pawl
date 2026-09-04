@@ -300,6 +300,7 @@ intrinsicManaAddition manaType =
   ManaAddition.MkManaAddition
     { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
       ManaAddition.production = ManaProduction.OfType manaType,
+      ManaAddition.count = 1,
       ManaAddition.retention = ManaRetention.Ordinary,
       ManaAddition.restriction = Nothing,
       ManaAddition.rider = Nothing
@@ -431,10 +432,17 @@ manaOptionsOfGiven pcs oid gs =
             ManaUnit.restriction = ManaAddition.restriction addition,
             ManaUnit.rider = ManaAddition.rider addition
           }
+      -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit
+      -- AFTER the type is picked: an addition of two AnyColor offers five options
+      -- here, not twenty-five. A REGRESSION FENCE rather than a proven behaviour
+      -- -- no mana ability in data/cards/ writes a count above one, Stadium
+      -- Vendors being a triggered ability that resolves off the stack (Resolve's
+      -- arm), so neutralising this replicate leaves the suite green. CR 106.3
+      -- states it anyway, which is why it is here.
       expand (cost, restrictions, additions, others) =
         fmap
-          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = Mana.MkMana units, ManaOption.effects = others})
-          (traverse (\addition -> fmap (unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
+          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = Mana.MkMana (concat units), ManaOption.effects = others})
+          (traverse (\addition -> fmap (replicate (Natural.toIntSaturating (ManaAddition.count addition)) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object

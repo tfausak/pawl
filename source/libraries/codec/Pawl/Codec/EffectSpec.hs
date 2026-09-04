@@ -27,6 +27,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Color as Color
@@ -230,13 +231,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing))
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) 1 ManaRetention.Ordinary Nothing Nothing))
       " {\"type\":\"AddMana\",\"value\":{\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing))
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor 1 ManaRetention.Ordinary Nothing Nothing))
       " {\"type\":\"AddMana\",\"value\":{\"production\":{\"type\":\"AnyColor\"}}} "
   -- CR 106.4's other half: Shizuko, Caller of Autumn's "that player adds", where
   -- the recipient is written because CR 109.5's "you" is somebody else.
@@ -245,7 +246,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (ManaProduction.OfType (ManaType.Colored Color.Green)) ManaRetention.Ordinary Nothing Nothing))
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (ManaProduction.OfType (ManaType.Colored Color.Green)) 1 ManaRetention.Ordinary Nothing Nothing))
       " {\"type\":\"AddMana\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}}}} "
   Spec.it s "Search" $
     Common.assertJsonCodec
@@ -1631,13 +1632,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser")))
       " {\"type\":\"PlaySubgame\",\"value\":\"loser\"} "
-  Spec.it s "ChooseOpponent" $
+  Spec.it s "ChoosePlayer, an opponent" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChooseOpponent (SlotName.MkSlotName (Text.pack "opponent")))
-      " {\"type\":\"ChooseOpponent\",\"value\":\"opponent\"} "
+      (Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer PlayerScope.Opponents (SlotName.MkSlotName (Text.pack "opponent"))))
+      " {\"type\":\"ChoosePlayer\",\"value\":{\"scope\":{\"type\":\"Opponents\"},\"slot\":\"opponent\"}} "
+  Spec.it s "ChoosePlayer, a player" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChoosePlayer (ChoosePlayer.MkChoosePlayer PlayerScope.EachPlayer (SlotName.MkSlotName (Text.pack "chosen"))))
+      " {\"type\":\"ChoosePlayer\",\"value\":{\"scope\":{\"type\":\"EachPlayer\"},\"slot\":\"chosen\"}} "
   Spec.it s "ChooseOpponentAtRandom" $
     Common.assertJsonCodec
       s

@@ -328,16 +328,23 @@ data Prompt r where
   -- the Filter, CR 201.4's Oracle card reference not being a set the engine
   -- holds (#663).
   ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Prompt CardName.CardName
-  -- | Which opponent a card's text names, as a permanent enters (CR 614.12a)
-  -- or at resolution for CR 701.29a's fateseal; the chooser is CR 109.5's
-  -- "you" at entry and the rule's actor at the fateseal.
+  -- | Which opponent a card's text names, as a permanent enters (CR 614.12a),
+  -- at resolution for CR 701.29a's fateseal, or for a resolving
+  -- Pawl.Types.Effect.ChoosePlayer whose scope leaves the chooser out
+  -- (Skullwinder); the chooser is CR 109.5's "you" at entry and the rule's
+  -- actor at the fateseal.
   ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 310.9a: which player protects the battle, chosen by its controller as
   -- it enters and again under CR 310.11's state-based action; the candidates
   -- are Pawl.Engine.Battle.protectorCandidates.
   ChooseProtector :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 614.1c with CR 614.12a: which player the entering permanent's
-  -- controller chooses, from every player still in the game.
+  -- controller chooses (Stuffy Doll), or, at resolution, which player a
+  -- resolving effect's controller chooses (CR 608.2d; Stadium Vendors) -- the
+  -- ObjectId is the entering permanent on the first road and the resolving
+  -- source on the second. The candidates come from the caller, and this
+  -- constructor rather than ChooseOpponent above is the one raised exactly when
+  -- they include the chooser.
   ChoosePlayer :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | An order over one player's triggered abilities, a permutation of the
   -- entries' indices. At Pawl.Engine.Engine.orderPending it is CR 603.3b's

@@ -383,7 +383,8 @@ data Response
     -- controller, so this does not always carry an opponent.
     ChoseProtector PlayerId.PlayerId
   | -- | CR 614.1c / 614.12a: the player chosen as a permanent entered ("As this
-    -- creature enters, choose a player" -- Stuffy Doll). Distinct from
+    -- creature enters, choose a player" -- Stuffy Doll), or CR 608.2d's player
+    -- chosen by a resolving effect (Stadium Vendors). Distinct from
     -- ChoseOpponent and ChoseProtector above for the reason Prompt.ChoosePlayer
     -- gives: "a player" offers every seat, the chooser included.
     ChosePlayer PlayerId.PlayerId

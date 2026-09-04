@@ -10,7 +10,7 @@ import qualified Data.Text as Text
 -- bound to a whole GROUP of tokens is read by every ObjectRef-taking opcode; the
 -- opcodes that still take a bare SlotName project its single target, which is
 -- what each of them means -- Attach moves one object, Evolve and Mentor name one
--- creature, ChooseOpponent names a player -- see #1397 and #1398, which moved the
+-- creature, ChoosePlayer names a player -- see #1397 and #1398, which moved the
 -- four that wanted a group.
 newtype SlotName = MkSlotName
   { unwrap :: Text.Text

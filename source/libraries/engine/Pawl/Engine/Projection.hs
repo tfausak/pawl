@@ -2673,7 +2673,7 @@ rewriteEffect pairs effect = case effect of
   -- No Filter to rewrite: both fields are slot names.
   Effect.AttachBound {} -> effect
   Effect.PlaySubgame _ -> effect
-  Effect.ChooseOpponent _ -> effect
+  Effect.ChoosePlayer _ -> effect
   Effect.ChooseOpponentAtRandom _ -> effect
   -- CR 706.1's number of sides is a numeral rather than a computed count; the
   -- modifier added to the result is the Quantity, PutCounters' descent above.
