@@ -21,6 +21,7 @@ import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.ChangeText as ChangeText
+import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
 import qualified Pawl.Codec.Counter as Counter
@@ -190,7 +191,7 @@ codec cardCodec abilityCodec =
       Arm.payload "AttachTargetToEach" AttachTarget.codec Effect.AttachTargetToEach (\x -> case x of Effect.AttachTargetToEach y -> Just y; _ -> Nothing),
       Arm.payload "AttachBound" AttachBound.codec Effect.AttachBound (\x -> case x of Effect.AttachBound y -> Just y; _ -> Nothing),
       Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame (\x -> case x of Effect.PlaySubgame y -> Just y; _ -> Nothing),
-      Arm.payload "ChooseOpponent" SlotName.codec Effect.ChooseOpponent (\x -> case x of Effect.ChooseOpponent y -> Just y; _ -> Nothing),
+      Arm.payload "ChoosePlayer" ChoosePlayer.codec Effect.ChoosePlayer (\x -> case x of Effect.ChoosePlayer y -> Just y; _ -> Nothing),
       Arm.payload "ChooseOpponentAtRandom" SlotName.codec Effect.ChooseOpponentAtRandom (\x -> case x of Effect.ChooseOpponentAtRandom y -> Just y; _ -> Nothing),
       Arm.payload "RollDie" RollDie.codec Effect.RollDie (\x -> case x of Effect.RollDie y -> Just y; _ -> Nothing),
       Arm.payload "FlipCoin" FlipCoin.codec Effect.FlipCoin (\x -> case x of Effect.FlipCoin y -> Just y; _ -> Nothing),

@@ -22,6 +22,11 @@ module Pawl.Types.PlayerScope where
 --     702.11c's hexproof). Its perspective is that PROTECTED player, which is
 --     not CR 109.5's "you": the two coincide only because both cards in the pool
 --     say "You have ...".
+--   * Pawl.Types.ChoosePlayer -- which players a resolving "choose a player"
+--     offers (Stadium Vendors), against the resolving controller; the one
+--     carrier that is an offer rather than an axis of application.
+--   * Pawl.Types.PlayerEffect.CantSearchLibraries, Pawl.Types.AimedAt and
+--     Pawl.Types.CantAttackPlayer carry it too, each against its own perspective.
 --
 -- The scope is always resolved DYNAMICALLY on both PlayerEffect carriers. CR
 -- 611.2c freezes a stored effect's OBJECT set -- which is what every stored

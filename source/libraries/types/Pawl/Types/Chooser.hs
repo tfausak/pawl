@@ -45,7 +45,7 @@ data Chooser
     EachInScope
   | -- | The ONE player a slot names -- Skullwinder's "choose an opponent. That
     -- player returns a card from their graveyard to their hand", where the slot
-    -- was filled by Pawl.Types.Effect's ChooseOpponent earlier in the same
+    -- was filled by Pawl.Types.Effect's ChoosePlayer earlier in the same
     -- resolution. One chooser and so ONE card, EachInScope's cardinality with the
     -- scope's fold replaced by a single seat.
     --

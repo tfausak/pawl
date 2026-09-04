@@ -618,7 +618,7 @@ plantedRef = ObjectRef.InSlot . SlotName.MkSlotName . Text.pack
 -- alone and compile.
 playerRefPositions :: [(String, Effect.Effect () (), [PlayerRef.PlayerRef])]
 playerRefPositions =
-  [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
+  [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor 1 ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
     ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
     ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
     ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
@@ -900,7 +900,7 @@ modificationCounts modification = case modification of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
-  -- Payload-free, so there is no Count to sweep.
+  -- Payload-free, both of them, so there is no Count to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
@@ -1241,7 +1241,7 @@ ownCounts effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
   Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
@@ -1390,7 +1390,7 @@ ownQuantities effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie rollDie -> Maybe.maybeToList (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> [FlipCoin.count flipCoin]
@@ -1662,7 +1662,7 @@ effectNestedEffects effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame {} -> []
-  Effect.ChooseOpponent {} -> []
+  Effect.ChoosePlayer {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -2261,7 +2261,7 @@ effectReplacements effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -2550,8 +2550,8 @@ shieldNamingNothingOffends :: Effect.Effect Card.Type.Card (GrantedAbility.Grant
 shieldNamingNothingOffends effect = case effect of
   -- CR 615.7's counted shield has no source-only spelling to admit here: no
   -- printing counts an amount down while naming only a source. The recipient-less
-  -- printings that name one -- Pilgrim of Justice, Penance, Opal-Eye's first
-  -- ability -- are CR 615.8's "the next time ... would deal damage", a rewrite
+  -- printings that name one -- Pilgrim of Justice, Penance -- are CR 615.8's
+  -- "the next time ... would deal damage", a rewrite
   -- pawl does not have (gap #3206), and this arm is what keeps one out of the
   -- corpus meanwhile.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref whatRecipient whoRecipient _ _ _) ->
@@ -3213,7 +3213,7 @@ effectMintedFaces effect = case effect of
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []
@@ -4220,7 +4220,7 @@ modificationFilters modification = case modification of
   Modification.AddColor _ -> []
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
-  -- Payload-free, so there is no Filter to sweep.
+  -- Payload-free, both of them, so there is no Filter to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
@@ -4997,7 +4997,14 @@ storedPlayerScope effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ scope playerEffect) -> Just (scope, playerEffect)
   _ -> Nothing
 
--- The Filters an EntryRewrite carries, on four different axes. CR 201.4a's is the
+-- CR 707.9's "except ..." clauses. Only the CR 707.9a arm reaches a Filter, and
+-- only through the keyword it names; CR 707.9b's pair is two literals.
+copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+copyExceptionFilters exception = case exception of
+  CopyException.SetPowerToughness _ -> []
+  CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
+
+-- The Filters an EntryRewrite carries, on five different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
 -- Chamber's "other than a basic land card name"), a predicate over a CARD in the
 -- Oracle card reference rather than over an object on the board -- the same shape
@@ -5006,14 +5013,9 @@ storedPlayerScope effect = case effect of
 -- (Shimatsu the Bloodcloaked's "any number of permanents"). CR 614.1c's as-enters
 -- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
 -- card"). CR 707.5's copy choice carries a fourth, over permanents on the
--- battlefield (Copy Enchantment's "any enchantment"). None of the four is framed.
--- CR 707.9's "except ..." clauses. Only the CR 707.9a arm reaches a Filter, and
--- only through the keyword it names; CR 707.9b's pair is two literals.
-copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
-copyExceptionFilters exception = case exception of
-  CopyException.SetPowerToughness _ -> []
-  CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
-
+-- battlefield (Copy Enchantment's "any enchantment"). CR 707.9a's copy exception
+-- carries a fifth, through the keyword it grants (a landwalk's). None of the
+-- five is framed.
 entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> unframed [f]
@@ -5027,6 +5029,8 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- landwalk is one that holds a Filter. The CR 614.1d `tapped` flag beside them
   -- holds none (Vesuva).
   EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _) -> unframed [f] <> concatMap copyExceptionFilters exceptions
+  -- Not implemented: descending into each option's keywords, whose landwalk
+  -- Filter this walk does not reach (#3232).
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChoiceByCoinFlip _ -> []
   EntryRewrite.ChooseColor -> []
@@ -5775,7 +5779,7 @@ effectFilters effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
-  Effect.ChooseOpponent _ -> []
+  Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
   Effect.RollDie rollDie -> frame Unframed (foldMap quantityFilters (RollDie.modifier rollDie))
@@ -6023,7 +6027,7 @@ effectObjectRefs effect = case effect of
   Effect.ExileHaunting {} -> []
   Effect.Attach {} -> []
   Effect.PlaySubgame {} -> []
-  Effect.ChooseOpponent {} -> []
+  Effect.ChoosePlayer {} -> []
   Effect.ChooseOpponentAtRandom {} -> []
   Effect.RollDie {} -> []
   Effect.FlipCoin {} -> []

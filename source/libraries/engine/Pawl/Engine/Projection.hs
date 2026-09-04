@@ -1858,7 +1858,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.AddColor _ -> Just m
         Modification.AddChosenColor -> Just m
         Modification.SwitchPowerToughness -> Just m
-        -- No quantity to freeze: a bare marker.
+        -- No quantity to freeze: two bare markers.
         Modification.AssignCombatDamageWithToughness -> Just m
         Modification.GrantsStationToughness -> Just m
 
@@ -2197,7 +2197,7 @@ rewriteModification pairs m =
         -- Hammerheim changes what its removal reaches not at all.
         Modification.LoseKeywordFamily _ -> acc
         Modification.SwitchPowerToughness -> acc
-        -- Nothing to rewrite: a bare marker naming no subtype word.
+        -- Nothing to rewrite: two bare markers naming no subtype word.
         Modification.AssignCombatDamageWithToughness -> acc
         Modification.GrantsStationToughness -> acc
         -- CR 612.1 through both boxes: a Quantity.Count carries a Filter, so a
@@ -2674,7 +2674,7 @@ rewriteEffect pairs effect = case effect of
   -- No Filter to rewrite: both fields are slot names.
   Effect.AttachBound {} -> effect
   Effect.PlaySubgame _ -> effect
-  Effect.ChooseOpponent _ -> effect
+  Effect.ChoosePlayer _ -> effect
   Effect.ChooseOpponentAtRandom _ -> effect
   -- CR 706.1's number of sides is a numeral rather than a computed count; the
   -- modifier added to the result is the Quantity, PutCounters' descent above.
@@ -4926,7 +4926,7 @@ modificationReads m = case m of
   -- Carries a payload-free family, so there is no Filter here to read anything.
   Modification.LoseKeywordFamily _ -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
-  -- Carries no Quantity: a bare marker.
+  -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
   Modification.GrantsStationToughness -> Set.empty
   Modification.SetLandSubtype _ -> Set.empty
@@ -6322,7 +6322,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
-  -- Hands out no Keyword at all.
+  -- Neither marker hands out a Keyword, whatever the station one's name says.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
 
@@ -6381,7 +6381,7 @@ grantsMintingType m = case m of
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
   Modification.SwitchPowerToughness -> False
-  -- Writes no card type or subtype at all.
+  -- Neither marker writes a card type or subtype.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
 
