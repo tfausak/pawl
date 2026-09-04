@@ -11,7 +11,18 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "PlayLandsFromGraveyard"
+            "type": "PlayLandsFrom",
+            "value": {
+              "player": {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              },
+              "zone": {
+                "type": "Graveyard"
+              }
+            }
           },
           "scope": {
             "type": "You"

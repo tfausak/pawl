@@ -4,8 +4,10 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
@@ -31,6 +33,15 @@ import qualified Pawl.Types.StatedFlip as StatedFlip
 data PlayerEffect
   = -- | CR 601.3 / Silence: this player can't cast spells at all.
     CantCastSpells
+  | -- | CR 602.5 / Sen Triplets: this player can't activate abilities at all.
+    --
+    -- The player-axis twin of CR 701.35a's detain, which stamps one OBJECT
+    -- (Pawl.Types.Object.detainedUntil): this names nobody's permanent and refuses
+    -- every activation the player would make. A MANA ABILITY too, which is why
+    -- detain is the twin rather than split second (CR 702.61b): the sentence
+    -- carves nothing out, so Pawl.Engine.Cost.manaActivationsGiven reads it beside
+    -- detain for CR 605.3a's windows.
+    CantActivateAbilities
   | -- | CR 601.3 / Rule of Law: this player can't cast more than this many spells
     -- each turn.
     CantCastMoreThan Natural.Natural
@@ -135,25 +146,28 @@ data PlayerEffect
     CastOnlyAtSorcerySpeed
   | -- | CR 305.1 / Damping Engine: this player can't play lands.
     CantPlayLands
-  | -- | CR 601.3 / Yawgmoth's Will: this player may cast a matching card from their
-    -- graveyard.
+  | -- | CR 601.3 / Yawgmoth's Will, Garruk's Horde, Sen Triplets: this player may
+    -- cast a matching card from the zone the payload names.
     --
-    -- The Filter reads the PRINTED card in the graveyard, so a continuous effect
-    -- changing a graveyard card's own characteristics is invisible to the
-    -- narrowing (#1859).
-    CastFromGraveyard (Filter.Filter Keyword.Keyword)
-  | -- | CR 305.1 / Crucible of Worlds: this player may play lands from their
-    -- graveyard -- the play half of CastFromGraveyard above, since a land is
-    -- played and never cast.
-    PlayLandsFromGraveyard
-  | -- | CR 601.3 / Garruk's Horde: this player may cast a matching card from the
-    -- top of their library.
+    -- ONE arm for every zone a CR 601.3 permission can open, the zone and its
+    -- owner being the payload's (Pawl.Types.CastFromZone). The graveyard and the
+    -- top of a library had an arm each, and the second was the first with a
+    -- different zone written into its name: the narrowing to the TOP card is
+    -- Pawl.Engine.Cast.zoneCandidates' and never a Filter's, so nothing but the
+    -- zone told the two apart.
     --
-    -- The Filter reads the printed card, the graveyard arm's #1859. Not
-    -- implemented: the play half Future Sight also states ("you may play lands
-    -- ... from the top of your library"), which needs a play-side arm the way
-    -- PlayLandsFromGraveyard is CastFromGraveyard's (#3224).
-    CastFromTopOfLibrary (Filter.Filter Keyword.Keyword)
+    -- Read as a DISJUNCTION (Pawl.Engine.PlayerEffect.mayCastFrom): one
+    -- applicable permission is enough, so CR 613.11's timestamp order has nothing
+    -- to order.
+    CastFrom CastFromZone.CastFromZone
+  | -- | CR 305.1 / Crucible of Worlds: this player may play lands from the zone the
+    -- reference names -- the play half of CastFrom above, since a land is played
+    -- and never cast.
+    --
+    -- Not implemented: the top of a library, which the CAST half reaches and which
+    -- Future Sight's land clause needs -- the reference can say it, and
+    -- Pawl.Engine.Action.playableLands draws from no library (#3224).
+    PlayLandsFrom InZone.InZone
   | -- | CR 118.9 / Omniscience: this player may cast a matching spell from their
     -- hand without paying its mana cost.
     --

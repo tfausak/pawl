@@ -2710,7 +2710,7 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     Spec.assertEqWith
       s
       "CR 702.103a: the printed cost and the bestow cost are both offered from the hand"
-      (fmap Cost.Type.mana (Cost.costsFor (S.printingName rollicker) spellId board))
+      (fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName rollicker) spellId board))
       [Just (ManaCost.MkManaCost [theRed]), Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, theRed])]
     -- CR 702.103b, the gameplay-level pair, FIRST so nothing ahead of it absorbs
     -- a mutation: a set of card types and a set of subtypes, both read off the

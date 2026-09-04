@@ -1113,7 +1113,7 @@ fireblastSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 2 True
-          candidates = Cost.costsFor (S.printingName fireblastPrinting) fireblast gs
+          candidates = Cost.costsFor S.alice (S.printingName fireblastPrinting) fireblast gs
           red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       Spec.assertEqWith s "two candidates" (length candidates) 2
       Spec.assertEqWith
@@ -1213,7 +1213,7 @@ asmorSpec s registry =
       vultures <- S.printingOf s registry "Circling Vultures"
       let (asmor, vulturesId, gs) = asmorBoard swamp asmorPrinting vultures
           discarded = S.runPure S.identityAnswer gs (Event.discard DiscardCause.Ordinary S.alice vulturesId)
-          manaOf state = fmap Cost.Type.mana (Cost.costsFor (S.printingName asmorPrinting) asmor state)
+          manaOf state = fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName asmorPrinting) asmor state)
           blackRed = ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.Black) (ManaType.Colored Color.Red))
       Spec.assertEqWith s "undiscarded: the printed cost alone, unpayable" (manaOf gs) [Nothing]
       Spec.assertEqWith s "discarded: the printed cost first, then the {B/R}" (manaOf discarded) [Nothing, Just (ManaCost.MkManaCost [blackRed])]
@@ -1258,7 +1258,7 @@ asmorSpec s registry =
       asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
       vultures <- S.printingOf s registry "Circling Vultures"
       let (asmor, _, gs) = asmorBoard swamp asmorPrinting vultures
-      case Cost.costsFor (S.printingName asmorPrinting) asmor gs of
+      case Cost.costsFor S.alice (S.printingName asmorPrinting) asmor gs of
         [] -> Spec.assertFailure s "the printed cost was not offered at all"
         printed : _ -> do
           Spec.assertEqWith s "the printed cost really is CR 118.6's unpayable one" (Cost.Type.mana printed) Nothing
@@ -1462,7 +1462,7 @@ crossCheckSpec s registry =
           (_, threeMountains) = S.addCreature mountain S.alice twoTapped
           (_, taxedThree) = S.addCreature thalia S.alice threeMountains
           (fireblastThree, gsThree) = S.addHandCard fireblastPrinting S.alice taxedThree
-          alternativeOf oid gs = case Cost.costsFor (S.printingName fireblastPrinting) oid gs of
+          alternativeOf oid gs = case Cost.costsFor S.alice (S.printingName fireblastPrinting) oid gs of
             _ : alt : _ -> Just (Cost.Type.mana (Cost.total S.alice oid alt gs))
             _ -> Nothing
       Spec.assertEqWith
@@ -2009,19 +2009,38 @@ omniscienceSpec s registry =
       Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack refused)) 0
       Spec.assertEqWith s "and bob was untouched either way" (S.lifeOf S.bob resolved) (Just 20)
     -- The grant is its CONTROLLER's, which is what the card's PlayerScope.You
-    -- says. Asserted on the candidate list rather than on castability, because
-    -- only one player holds priority on any one board and an instant bob cannot
-    -- cast for want of priority would pass this for the wrong reason.
-    Spec.it s "CR 118.9 the grant reaches its controller's hand alone" $ do
+    -- says, and it is scoped to that player's own HAND, which is what the
+    -- sentence says. Asserted on the candidate list rather than on castability,
+    -- because only one player holds priority on any one board and an instant bob
+    -- cannot cast for want of priority would pass this for the wrong reason.
+    --
+    -- TWO copies of one card, differing in whose hand they lie in and in nothing
+    -- else, both priced for ALICE -- the caster the arm now asks about, see #2169.
+    -- So what the second answer isolates is "your hand" and not "you".
+    Spec.it s "CR 118.9 the grant reaches its controller's own hand alone" $ do
       mountain <- S.printingOf s registry "Mountain"
       omniscience <- S.printingOf s registry "Omniscience"
       bolt <- S.printingOf s registry "Lightning Bolt"
       let (hers, granted) = omniscienceBoard mountain omniscience bolt 0 True
           (his, gs) = S.addHandCard bolt S.bob granted
-          manaOf oid = fmap Cost.Type.mana (Cost.costsFor (S.printingName bolt) oid gs)
+          manaOf oid = fmap Cost.Type.mana (Cost.costsFor S.alice (S.printingName bolt) oid gs)
           red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       Spec.assertEqWith s "alice is offered the printed {R} and the grant's {0}" (manaOf hers) [Just (ManaCost.MkManaCost [red]), Just (ManaCost.MkManaCost [])]
-      Spec.assertEqWith s "bob is offered the printed {R} alone" (manaOf his) [Just (ManaCost.MkManaCost [red])]
+      Spec.assertEqWith s "the identical copy in bob's hand is offered the printed {R} alone" (manaOf his) [Just (ManaCost.MkManaCost [red])]
+    -- The other conjunct, on the same shape of board: bob controls the
+    -- enchantment and alice does not, so the card in ALICE's hand is priced for
+    -- her without the grant. Paired with the case above rather than folded into
+    -- it, since one board cannot vary both the hand and the controller.
+    Spec.it s "CR 109.5 an opponent's grant does not reach this player's hand" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (hers, base) = omniscienceBoard mountain omniscience bolt 0 False
+          gs = snd (S.addCreature omniscience S.bob base)
+          manaOf pid oid = fmap Cost.Type.mana (Cost.costsFor pid (S.printingName bolt) oid gs)
+          red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+      Spec.assertEqWith s "alice is offered the printed {R} alone" (manaOf S.alice hers) [Just (ManaCost.MkManaCost [red])]
+      Spec.assertEqWith s "and bob, who does control it, is not offered {0} for a card in alice's hand" (manaOf S.bob hers) [Just (ManaCost.MkManaCost [red])]
     -- CR 118.9a lets the controller announce WHICH alternative cost they pay, so
     -- the grant is appended to the card's own candidates rather than replacing
     -- them: Fireblast under Omniscience may still sacrifice two Mountains.
@@ -2037,7 +2056,7 @@ omniscienceSpec s registry =
       Spec.assertEqWith
         s
         "printed, then the sacrifice alternative, then the grant"
-        (fmap shapeOf (Cost.costsFor (S.printingName fireblastPrinting) fireblast gs))
+        (fmap shapeOf (Cost.costsFor S.alice (S.printingName fireblastPrinting) fireblast gs))
         [ (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, red, red]), 0),
           (Just (ManaCost.MkManaCost []), 1),
           (Just (ManaCost.MkManaCost []), 0)
@@ -2361,7 +2380,7 @@ catharticReunionSpec s registry =
       -- Read through costsFor, so the assertion is against the cost the engine
       -- would actually offer (mana cost plus the printed additional cost),
       -- never a hand-built one.
-      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice reunion c gs) (Cost.costsFor (S.printingName catharticReunion) reunion gs))) "no offered cost is payable"
+      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice reunion c gs) (Cost.costsFor S.alice (S.printingName catharticReunion) reunion gs))) "no offered cost is payable"
       Spec.assertBool s (not (any (S.isCastOf reunion) (Action.legalActions S.alice gs))) "and no Cast is offered"
     Spec.it s "CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid" $ do
       -- The COST path's reject-not-repair, and deliberately the opposite of what
@@ -2463,7 +2482,7 @@ magmaticInsightSpec s registry =
       magmaticInsight <- S.printingOf s registry "Magmatic Insight"
       let (insight, _, gs) = magmaticBoard mountain piker magmaticInsight piker
       Spec.assertEqWith s "the hand is the same size as the payable board's" (S.handSize S.alice gs) 3
-      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice insight c gs) (Cost.costsFor (S.printingName magmaticInsight) insight gs))) "no offered cost is payable"
+      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice insight c gs) (Cost.costsFor S.alice (S.printingName magmaticInsight) insight gs))) "no offered cost is payable"
       Spec.assertBool s (not (any (S.isCastOf insight) (Action.legalActions S.alice gs))) "and no Cast is offered"
 
 -- Springleaf Drum {1} Artifact: "{T}, Tap an untapped creature you control: Add

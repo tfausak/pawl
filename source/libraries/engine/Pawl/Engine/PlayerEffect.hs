@@ -27,6 +27,8 @@
 module Pawl.Engine.PlayerEffect where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.Functor.Const as Functor
+import qualified Data.Functor.Identity as Functor
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -49,6 +51,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import Pawl.Types.CardName (CardName)
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import Pawl.Types.CostAdjustments (CostAdjustments)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -57,6 +60,7 @@ import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
@@ -72,6 +76,8 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerEffect (PlayerEffect)
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
@@ -83,6 +89,7 @@ import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.VariableChoice as VariableChoice
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 109.5: "you" on an object is its controller, and for a static ability the
 -- CURRENT controller. `pid` is the player being asked about; `controller` is the
@@ -508,6 +515,7 @@ prohibitsCasting pid oid name variable gs =
   let cast = castsThisTurn pid gs
       prohibits (source, effect) = case effect of
         PlayerEffect.CantCastSpells -> True
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan limit -> cast >= limit
         -- CR 601.3a / 614.1c: the quality is the name chosen as the SOURCE
         -- entered, so an ability whose permanent has chosen nothing prohibits
@@ -566,8 +574,12 @@ prohibitsCasting pid oid name variable gs =
         -- The quality can be the ZONE the cast is from (Filter.IsInZone): both
         -- callers ask this before CR 601.2a's move, so the object the view is
         -- taken of still lies where the cast would take it from.
+        --
+        -- CR 109.5's "you" is the CASTER and not the card's controller, which it
+        -- has none of in a hand -- see matchesObjectFor below, and see #2169 for what
+        -- observes the difference.
         PlayerEffect.CantCastMatching criterion ->
-          matchesObjectFrom source criterion oid gs && not (choiceCouldEscape source criterion oid variable gs)
+          matchesObjectFor pid source criterion oid gs && not (choiceCouldEscape pid source criterion oid variable gs)
         -- CR 307.5 / Teferi, Mage of Zhalfir: outside that rule's moment this
         -- player casts nothing. Turn.sorcerySpeedWindow is CR 307.5's three
         -- conjuncts and the window CR 307.1 already shares, so there is one copy
@@ -595,13 +607,32 @@ prohibitsCasting pid oid name variable gs =
         -- CR 601.3's other half: this arm ALLOWS a cast the rules would refuse,
         -- and no permission prohibits anything. mayCastFromGraveyard below is
         -- where it is read.
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
    in any prohibits (applying pid gs)
+
+-- CR 602.5 / 101.2 / Sen Triplets: does an effect stop this player activating
+-- abilities at all? The activation-side twin of prohibitsCasting above, and its
+-- own question rather than a widening of that one: CR 602.1 makes an activated
+-- ability neither a spell nor a special action, so nothing on the cast axis
+-- reaches it and Silence stops no activation.
+--
+-- A MEMBERSHIP TEST rather than a case, which is what the arm carrying no payload
+-- buys: there is nothing to read off it, so the question is whether such a row
+-- applies at all. Pawl.Engine.Cast.permitsCastFromGraveyard reads the
+-- object-scoped permission the same way.
+--
+-- Given the rows the caller has already gathered, which is what lets
+-- Pawl.Engine.Cost.manaActivationsGiven ask it inside its own hoisted sweep
+-- (#1073); `prohibitsActivating` is the wrapper for a caller holding no list.
+prohibitsActivatingGiven :: [(Maybe ObjectId, PlayerEffect)] -> Bool
+prohibitsActivatingGiven effects = List.elem PlayerEffect.CantActivateAbilities (fmap snd effects)
+
+prohibitsActivating :: PlayerId -> GameState -> Bool
+prohibitsActivating pid gs = prohibitsActivatingGiven (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
 -- The play-side twin of prohibitsCasting above, and a separate question rather
@@ -639,15 +670,12 @@ prohibitsPlayingLand pid names gs =
         -- CR 305.1 once more: a permission naming the zone a SPELL may be cast
         -- from stops no land play, which is why Yawgmoth's Will's "you may play
         -- lands ... from your graveyard" is the arm below rather than this one.
-        PlayerEffect.CastFromGraveyard _ -> False
-        -- The same, one zone over: Future Sight's land half would be its own arm
-        -- rather than this one (gap #3224).
-        PlayerEffect.CastFromTopOfLibrary _ -> False
+        PlayerEffect.CastFrom _ -> False
         -- And the play-side permission allows rather than prohibits, so it is
         -- False here for the reason every permission is: this question is only
-        -- ever "does something stop THIS land". mayPlayLandsFromGraveyard below
-        -- is where the grant is read.
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        -- ever "does something stop THIS land". mayPlayLandsFrom below is where
+        -- the grant is read.
+        PlayerEffect.PlayLandsFrom _ -> False
         -- CR 305.1 again, in the other direction: a prohibition on CASTING says
         -- nothing about a special action, so Silence and Rule of Law leave a
         -- land play alone. CR 305.2's and CR 305.3's limits are the closed
@@ -657,6 +685,7 @@ prohibitsPlayingLand pid names gs =
         -- land, which is all this one asks.
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
@@ -730,6 +759,7 @@ prohibitsSearching pid owner causeController gs =
         -- them reaches it -- Silence stops the spell, never the search a
         -- resolved one performs.
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -756,9 +786,8 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -789,6 +818,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -815,9 +845,8 @@ prohibitsCounters pid kind gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.StateCoinFlip _ -> False
    in any (prohibits . snd) (applying pid gs)
@@ -845,6 +874,7 @@ prohibitsBecomingMonarch pid gs =
         -- and no prohibition on casting reaches an effect that has already
         -- resolved.
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -877,9 +907,8 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -967,11 +996,30 @@ matchesObjectFrom :: Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -
 matchesObjectFrom src filter_ oid gs =
   Filter.matches (contextFrom src oid gs) (Projection.viewOfObject oid gs) filter_
 
+-- matchesObjectFrom with CR 109.5's "you" NAMED rather than read off the object.
+--
+-- One caller, prohibitsCasting's CR 601.3a arm, and one rule: a card being cast
+-- has no controller yet (CR 108.4 gives a card in a hand none), so rule 109.5's
+-- "you" for it is the player who would control the spell -- the caster. The two
+-- coincide wherever the caster owns the card, which is why nothing observed the
+-- difference until a permission could open somebody else's hand, see #2169: Drannith
+-- Magistrate's "from anywhere other than their hand" is Filter.OwnedBy You, and
+-- read at the OWNER's perspective that conjunct is vacuously true of every card
+-- in every hand.
+matchesObjectFor :: PlayerId -> Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
+matchesObjectFor you src filter_ oid gs =
+  Filter.matches (contextFor (Just you) src gs) (Projection.viewOfObject oid gs) filter_
+
 -- The Context every match in this module is made against: CR 109.5's "you" is
 -- the AFFECTED object's own controller, and the source is the row's.
 contextFrom :: Maybe ObjectId -> ObjectId -> GameState -> Filter.Context
-contextFrom src oid gs =
-  (Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) src)
+contextFrom src oid gs = contextFor (Projection.controllerOf oid gs) src gs
+
+-- contextFrom with the perspective supplied, which matchesObjectFor above is the
+-- one caller of.
+contextFor :: Maybe PlayerId -> Maybe ObjectId -> GameState -> Filter.Context
+contextFor you src gs =
+  (Filter.contextFor (Game.teams gs) you src)
     { Filter.sourceAttachedTo = src >>= \s -> Projection.hostOf s gs
     }
 
@@ -1019,15 +1067,16 @@ contextFrom src oid gs =
 -- Asked ONCE, and nothing re-asks it: CR 601.3a lets the player begin "ignoring
 -- the effect", so a player who then announces an X that leaves the spell in the
 -- prohibited class still casts it.
-choiceCouldEscape :: Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
-choiceCouldEscape src criterion oid variable gs =
+choiceCouldEscape :: PlayerId -> Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
+choiceCouldEscape you src criterion oid variable gs =
   let variables = case variable of
         VariableChoice.Announced -> variablesIn oid gs
         VariableChoice.FixedAtZero -> 0
-      -- The SAME context matchesObjectFrom builds, and it has to be: this asks
+      -- The SAME context matchesObjectFor builds, and it has to be: this asks
       -- whether that match could flip, so a context that answered an atom
-      -- differently would be asking about a different criterion.
-      context = contextFrom src oid gs
+      -- differently would be asking about a different criterion -- the caster's
+      -- perspective included.
+      context = contextFor (Just you) src gs
       view = Projection.viewOfObject oid gs
       escapes base =
         let limit = 2 + maximum (0 : Filter.manaValueThresholds criterion)
@@ -1080,6 +1129,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.AddActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1102,9 +1152,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1121,6 +1170,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.AddActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1143,9 +1193,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1165,6 +1214,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1187,9 +1237,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1313,6 +1362,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.AddActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1335,9 +1385,8 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1367,6 +1416,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1389,9 +1439,8 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1409,6 +1458,7 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1431,9 +1481,8 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1512,6 +1561,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.MayPlayAsThoughItHadFlash criterion -> Just criterion
   PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
   PlayerEffect.CantCastSpells -> Nothing
+  PlayerEffect.CantActivateAbilities -> Nothing
   PlayerEffect.CantCastMoreThan _ -> Nothing
   PlayerEffect.CantCastChosenName -> Nothing
   PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1538,9 +1588,8 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CantCastMatching _ -> Nothing
   PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
   PlayerEffect.CantPlayLands -> Nothing
-  PlayerEffect.CastFromGraveyard _ -> Nothing
-  PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-  PlayerEffect.PlayLandsFromGraveyard -> Nothing
+  PlayerEffect.CastFrom _ -> Nothing
+  PlayerEffect.PlayLandsFrom _ -> Nothing
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
   PlayerEffect.CantGetCounters _ -> Nothing
   PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1600,22 +1649,76 @@ choiceCouldApply src criterion oid gs =
   let bestowable = not (null (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs))))
    in bestowable && Filter.matches (contextFrom src oid gs) (Projection.bestowedView oid gs) criterion
 
--- CR 601.3: may `pid` cast `oid` from a graveyard because an EFFECT says so?
+-- CR 400.1: whose copies of a zone a reference inside a permission applying to
+-- `pid` names. The perspective is the AFFECTED player and not the row's
+-- controller, which is what makes PlayerRef.Relative You read as "your graveyard"
+-- for whoever the permission reached: Yawgmoth's Will affects its controller
+-- alone, and a grant to the whole table would mean each player's own pile.
 --
--- The typed question Pawl.Engine.Cast.permitsCastFromGraveyard asks beside the
+-- Exhaustive over PlayerRef, since a new arm has to say what a zone scope makes
+-- of it. Three arms answer, and the rest name NOBODY: the slot-reading ones
+-- (InSlot, EachInSlot, ControllerOfBound, Attacking) read the RESOLUTION's
+-- bindings, which are gone by the time a stored row is read and which
+-- Pawl.Engine.Resolve bakes to Specific while they are still there, and Candidate
+-- names whichever player a fold is aimed at with no fold running here. A
+-- permission naming nobody opens nothing, which is the honest answer rather than
+-- a silent fallback to the caster.
+--
+-- EachPlayerExcept is the one that could have gone either way, and it names
+-- nobody here rather than taking that arm's own stated reading (an unfilled slot
+-- excludes nobody, so the set is the table). A permission is the direction where
+-- widening on an unanswerable reference reads WEAKER than printed, and no card
+-- writes this arm in this position; the count in a Scope is where the type's
+-- reading belongs.
+zoneOwners :: PlayerId -> PlayerRef.PlayerRef -> GameState -> [PlayerId]
+zoneOwners pid ref gs = case ref of
+  PlayerRef.EachPlayer -> Game.stillPlaying gs
+  PlayerRef.Relative relation -> filter (PlayerRelation.holds (Game.teams gs) relation pid) (Game.stillPlaying gs)
+  PlayerRef.Specific other -> [other]
+  PlayerRef.InSlot _ -> []
+  PlayerRef.EachInSlot _ -> []
+  PlayerRef.EachPlayerExcept _ -> []
+  PlayerRef.Candidate -> []
+  PlayerRef.ControllerOfBound _ -> []
+  PlayerRef.Attacking _ -> []
+
+-- Does this permission's zone reference name the zone `oid` lies in, and the
+-- player whose copy of it that is?
+--
+-- CR 400.1 gives each player their own copy of such a zone and CR 400.3 keeps a
+-- card in its owner's, so the object's owner is the seat
+-- compared -- and the comparison is this function's rather than
+-- Pawl.Engine.Cast.zoneCandidates', which offers every player's copy; see #2169.
+opensZoneOf :: PlayerId -> Zone.Zone -> ObjectId -> InZone.InZone -> GameState -> Bool
+opensZoneOf pid zone oid inZone gs =
+  InZone.zone inZone == zone
+    && maybe False (\obj -> elem (Object.owner obj) (zoneOwners pid (InZone.player inZone) gs)) (Game.lookupObject oid gs)
+
+-- CR 601.3: may `pid` cast `oid` from this zone because an EFFECT says so?
+--
+-- The typed question Pawl.Engine.Cast.castableZones asks beside the
 -- object-scoped Pawl.Types.CastingPermission.CastFromGraveyard it already read,
 -- so that module never sees a PlayerEffect constructor and neither permission is
 -- expressed in terms of the other. One card carrying flashback and one player
 -- holding Yawgmoth's Will's grant are two rules (CR 702.34a, CR 601.3) reaching
 -- the same gate.
 --
--- Asks nothing about WHOSE graveyard: Pawl.Engine.Cast.zoneCandidates hands this
--- only the cards in `pid`'s own graveyard (CR 400.1's per-player zone), which is
--- the "your graveyard" every printing of this permission says.
+-- Asks WHOSE copy, which the candidate list used to answer: zoneCandidates offers
+-- every player's hand and graveyard so that a permission can name somebody else's
+-- (Sen Triplets), and the owner conjunct moved here with it; see #2169. Yawgmoth's
+-- Will writes PlayerRef.Relative You and reaches no other graveyard for it.
 --
--- A DISJUNCTION, for the reason Pawl.Types.PlayerEffect.CastFromGraveyard gives:
--- one applicable permission is enough, so CR 613.11's timestamp order has
--- nothing to order.
+-- Says nothing about the TOP of a library, which stays zoneCandidates' half of
+-- the question: that hands this the top card alone, so a permission worded "from
+-- the top of your library" (Garruk's Horde) comes out of the two together. The
+-- object-scoped Pawl.Types.CastingPermission.CastFromLibraryWhileSearching is
+-- emphatically NOT read here -- Panglacial Wurm's permission is scoped to a
+-- search in progress (Pawl.Engine.Cast.castableWhileSearching), and reading it
+-- here would let it be cast off the top at any time.
+--
+-- A DISJUNCTION, for the reason Pawl.Types.PlayerEffect.CastFrom gives: one
+-- applicable permission is enough, so CR 613.11's timestamp order has nothing to
+-- order.
 --
 -- matchesObject is called only from inside the arm that already matched, so a
 -- board with no such effect on it runs no projections at all -- the posture
@@ -1625,20 +1728,19 @@ choiceCouldApply src criterion oid gs =
 -- the STATE, exactly as mayCastAsThoughItHadFlash does above: the callers stamp
 -- the proposal through Pawl.Engine.Cast.asProposed first, so the same
 -- matchesObject reads the chosen half rather than CR 709.4's combined view.
-mayCastFromGraveyard :: PlayerId -> ObjectId -> GameState -> Bool
-mayCastFromGraveyard pid oid gs =
+mayCastFrom :: PlayerId -> Zone.Zone -> ObjectId -> GameState -> Bool
+mayCastFrom pid zone oid gs =
   let allows (source, effect) = case effect of
-        PlayerEffect.CastFromGraveyard criterion -> matchesObjectFrom source criterion oid gs
-        -- A CR 601.3 permission naming a different zone: mayCastFromTopOfLibrary
-        -- below is its gate, and Pawl.Engine.Cast.castableZones asks the two
-        -- separately so neither zone borrows the other's permission.
-        PlayerEffect.CastFromTopOfLibrary _ -> False
+        PlayerEffect.CastFrom grant ->
+          opensZoneOf pid zone oid (CastFromZone.from grant) gs
+            && matchesObjectFrom source (CastFromZone.matching grant) oid gs
         -- The other CR 601.3 permission on this axis names a TIME, and this
         -- question is about a ZONE.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -1666,81 +1768,13 @@ mayCastFromGraveyard pid oid gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-        -- The play-side twin names the same ZONE and still answers nothing here:
-        -- CR 305.1 makes playing a land a special action, so a grant to play
-        -- lands from a graveyard permits no cast (Crucible of Worlds lets nobody
-        -- cast anything).
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        -- The play-side twin can name the same ZONE and still answers nothing
+        -- here: CR 305.1 makes playing a land a special action, so a grant to
+        -- play lands from a graveyard permits no cast (Crucible of Worlds lets
+        -- nobody cast anything).
+        PlayerEffect.PlayLandsFrom _ -> False
         -- A COST and not a permission at all: Omniscience says what a spell
-        -- pays, never where it may be cast from, so it opens no graveyard.
-        -- mayCastFromHandWithoutPayingManaCost below is its one reader, and CR
-        -- 601.3's permission is still owed separately.
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
-        PlayerEffect.CantGetCounters _ -> False
-        PlayerEffect.StateCoinFlip _ -> False
-   in any allows (applying pid gs)
-
--- CR 601.3 / Garruk's Horde: may `pid` cast `oid` from the TOP of their library
--- because an EFFECT says so?
---
--- The typed question Pawl.Engine.Cast.permitsCastFromTopOfLibrary asks, beside
--- mayCastFromGraveyard above and for its reasons: a disjunction, since one
--- applicable permission is enough; called only from inside the arm that already
--- matched; and reaching the proposed half through the STATE, the caller having
--- stamped it through Pawl.Engine.Cast.asProposed.
---
--- Says nothing about the TOP, which is Pawl.Engine.Cast.zoneCandidates' half of
--- the question: that hands this only the top card of `pid`'s own library, so a
--- permission worded "from the top of your library" comes out of the two together.
--- The object-scoped Pawl.Types.CastingPermission.CastFromLibraryWhileSearching
--- is emphatically NOT read here -- Panglacial Wurm's permission is scoped to a
--- search in progress (Pawl.Engine.Cast.castableWhileSearching), and reading it
--- here would let it be cast off the top at any time.
-mayCastFromTopOfLibrary :: PlayerId -> ObjectId -> GameState -> Bool
-mayCastFromTopOfLibrary pid oid gs =
-  let allows (source, effect) = case effect of
-        PlayerEffect.CastFromTopOfLibrary criterion -> matchesObjectFrom source criterion oid gs
-        -- The graveyard twin, read at mayCastFromGraveyard above: a permission
-        -- naming that zone opens no library.
-        PlayerEffect.CastFromGraveyard _ -> False
-        -- The other CR 601.3 permission on this axis names a TIME, and this
-        -- question is about a ZONE.
-        PlayerEffect.CastAsThoughItHadFlash _ -> False
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
-        PlayerEffect.PlayAdditionalLands _ -> False
-        PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
-        PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.SetMaximumHandSize _ -> False
-        PlayerEffect.IncreaseMaximumHandSize _ -> False
-        PlayerEffect.ReduceMaximumHandSize _ -> False
-        PlayerEffect.DontLoseUnspentMana _ -> False
-        PlayerEffect.SpendManaAsThough _ -> False
-        PlayerEffect.CantBeTargetedBy _ -> False
-        PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented _ -> False
-        PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
-        PlayerEffect.CantBecomeMonarch -> False
-        -- A PROHIBITION, and CR 601.3 asks the two halves separately:
-        -- prohibitsCasting above is where Damping Engine and Silence are read.
-        PlayerEffect.CantCastMatching _ -> False
-        PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
-        -- CR 305.1 makes playing a land a special action, so a grant to play
-        -- lands permits no cast (Crucible of Worlds lets nobody cast anything).
-        PlayerEffect.PlayLandsFromGraveyard -> False
-        -- A COST and not a permission at all: Omniscience says what a spell
-        -- pays, never where it may be cast from, so it opens no library.
+        -- pays, never where it may be cast from, so it opens no zone.
         -- mayCastFromHandWithoutPayingManaCost below is its one reader, and CR
         -- 601.3's permission is still owed separately.
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -1765,25 +1799,34 @@ mayCastFromTopOfLibrary pid oid gs =
 -- function's to enforce -- it is CR 601.2b's announcement picking one candidate
 -- from the list.
 --
--- Takes the OBJECT and reaches the half through the STATE, exactly as the two
--- above do: the caller has stamped the proposal through
+-- Takes the OBJECT and reaches the half through the STATE, exactly as the one
+-- above does: the caller has stamped the proposal through
 -- Pawl.Engine.Cast.asProposed, so matchesObject reads the half being cast.
+--
+-- WHOSE hand is a conjunct here rather than a field on the arm, which is the one
+-- place this differs from mayCastFrom: rule 118.9's grant is worded "from YOUR
+-- hand" on every printing, so the hand is the grantee's by the sentence and no
+-- card has another to name. It stopped being free once Sen Triplets could put
+-- alice's cast in bob's hand, where alice's Omniscience says nothing (see #2169) --
+-- and the caller can no longer supply it, that arm now asking the CASTER rather
+-- than the card's owner.
 mayCastFromHandWithoutPayingManaCost :: PlayerId -> ObjectId -> GameState -> Bool
 mayCastFromHandWithoutPayingManaCost pid oid gs =
-  let allows (source, effect) = case effect of
+  let inTheirOwnHand = fmap Object.owner (Game.lookupObject oid gs) == Just pid
+      allows (source, effect) = case effect of
         PlayerEffect.CastFromHandWithoutPayingManaCost criterion -> matchesObjectFrom source criterion oid gs
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
         -- The CR 601.3 permissions, which say WHERE a spell may be cast from and
         -- WHEN. Neither states a cost, which is the whole reason this arm is its
         -- own: Yawgmoth's Will's cast pays the card's printed cost.
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
+        PlayerEffect.CastFrom _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -1817,77 +1860,77 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-   in any allows (applying pid gs)
+   in inTheirOwnHand && any allows (applying pid gs)
 
--- CR 305.1: may `pid` play a land from their graveyard because an EFFECT says
--- so? Crucible of Worlds' whole sentence, and the play half of Yawgmoth's Will's
--- first one.
+-- CR 305.1: which piles may `pid` play a land from because an EFFECT says so?
+-- Crucible of Worlds' whole sentence, the play half of Yawgmoth's Will's first
+-- one, and Sen Triplets' "you may play lands ... from that player's hand".
 --
--- The PLAY-side sibling of mayCastFromGraveyard above, and read at a different
--- gate for the reason CR 305.1 gives: playing a land is a special action that
--- never uses the stack, so Pawl.Engine.Action.playableLands asks this where
+-- The PLAY-side sibling of mayCastFrom above, and read at a different gate for
+-- the reason CR 305.1 gives: playing a land is a special action that never uses
+-- the stack, so Pawl.Engine.Action.playableLands asks this where
 -- Pawl.Engine.Cast.castableZones asks that one. Neither permission implies the
 -- other, and Yawgmoth's Will declares both arms because its sentence says both.
 --
--- Asks nothing about WHICH land and so takes no ObjectId, where the cast side
--- takes one: the arm carries no Filter (see the type), and the zone is a
--- per-player pile (CR 400.1) whose members the caller has already selected.
+-- A LIST of (zone, owner) piles rather than a Bool about one, which is the shape
+-- the caller wants once a grant can name somebody else's hand: the cast side is
+-- handed a candidate and asks about it, and this side has to produce the
+-- candidates. Duplicates are left in -- the caller reads members off each pile,
+-- and Pawl.Engine.Action.playableLands nubs the ids it ends up with.
 --
--- A DISJUNCTION, for mayCastFromGraveyard's reason: one applicable permission is
--- enough, so CR 613.11's timestamp order has nothing to order.
-mayPlayLandsFromGraveyard :: PlayerId -> GameState -> Bool
-mayPlayLandsFromGraveyard pid gs =
-  let allows effect = case effect of
-        PlayerEffect.PlayLandsFromGraveyard -> True
-        -- The cast-side twin of this one: same zone, but a land is played and
+-- Asks nothing about WHICH land, where the cast side takes an ObjectId: the arm
+-- carries no Filter (see the type), so a grant opens the whole pile or none of
+-- it.
+playLandPiles :: PlayerId -> GameState -> [(Zone.Zone, PlayerId)]
+playLandPiles pid gs =
+  let piles effect = case effect of
+        PlayerEffect.PlayLandsFrom inZone -> fmap ((,) (InZone.zone inZone)) (zoneOwners pid (InZone.player inZone) gs)
+        -- The cast-side twin, which can name the same zone: a land is played and
         -- never cast (CR 305.1), so it reaches no land play.
-        PlayerEffect.CastFromGraveyard _ -> False
-        -- A cast permission naming a DIFFERENT zone, so it reaches no land play
-        -- either. Not implemented: the top-of-library land play Future Sight
-        -- states, which needs its own arm (#3224).
-        PlayerEffect.CastFromTopOfLibrary _ -> False
+        PlayerEffect.CastFrom _ -> []
         -- CR 305.2's COUNT, which says nothing about a zone. The two compose in
         -- Pawl.Engine.Action.legalActions -- that one bounds how many plays,
         -- this one widens where they may come from -- without either knowing of
         -- the other.
-        PlayerEffect.PlayAdditionalLands _ -> False
-        PlayerEffect.CastAsThoughItHadFlash _ -> False
-        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
-        PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
-        PlayerEffect.IncreaseSpellCost {} -> False
-        PlayerEffect.IncreaseActivationCost {} -> False
-        PlayerEffect.ReduceSpellCost {} -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.AddActivationCost {} -> False
-        PlayerEffect.AddSpellCost {} -> False
-        PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.SetMaximumHandSize _ -> False
-        PlayerEffect.IncreaseMaximumHandSize _ -> False
-        PlayerEffect.ReduceMaximumHandSize _ -> False
-        PlayerEffect.DontLoseUnspentMana _ -> False
-        PlayerEffect.SpendManaAsThough _ -> False
-        PlayerEffect.CantBeTargetedBy _ -> False
-        PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented _ -> False
-        PlayerEffect.DamageCantBeRedirected _ -> False
-        PlayerEffect.CantSearchLibraries _ -> False
-        PlayerEffect.HasProtectionFromChosenName -> False
-        PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.PlayAdditionalLands _ -> []
+        PlayerEffect.CastAsThoughItHadFlash _ -> []
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> []
+        PlayerEffect.CantCastSpells -> []
+        PlayerEffect.CantActivateAbilities -> []
+        PlayerEffect.CantCastMoreThan _ -> []
+        PlayerEffect.CantCastChosenName -> []
+        PlayerEffect.CantPlayLandChosenName -> []
+        PlayerEffect.IncreaseSpellCost {} -> []
+        PlayerEffect.IncreaseActivationCost {} -> []
+        PlayerEffect.ReduceSpellCost {} -> []
+        PlayerEffect.ReduceActivationCost {} -> []
+        PlayerEffect.AddActivationCost {} -> []
+        PlayerEffect.AddSpellCost {} -> []
+        PlayerEffect.NoMaximumHandSize -> []
+        PlayerEffect.SetMaximumHandSize _ -> []
+        PlayerEffect.IncreaseMaximumHandSize _ -> []
+        PlayerEffect.ReduceMaximumHandSize _ -> []
+        PlayerEffect.DontLoseUnspentMana _ -> []
+        PlayerEffect.SpendManaAsThough _ -> []
+        PlayerEffect.CantBeTargetedBy _ -> []
+        PlayerEffect.CantBeCountered _ -> []
+        PlayerEffect.DamageCantBePrevented _ -> []
+        PlayerEffect.DamageCantBeRedirected _ -> []
+        PlayerEffect.CantSearchLibraries _ -> []
+        PlayerEffect.HasProtectionFromChosenName -> []
+        PlayerEffect.CantBecomeMonarch -> []
         -- The PROHIBITIONS, which prohibitsPlayingLand above is what reads: CR
         -- 101.2 makes a "can't" beat this permission, and the two are folded at
         -- separate gates so that neither can outvote the other by accident.
-        PlayerEffect.CantCastMatching _ -> False
-        PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantCastMatching _ -> []
+        PlayerEffect.CastOnlyAtSorcerySpeed -> []
+        PlayerEffect.CantPlayLands -> []
         -- A cost, not a zone: CR 118.9's grant says what a spell PAYS and
         -- widens no pile a land may be played from.
-        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
-        PlayerEffect.CantGetCounters _ -> False
-        PlayerEffect.StateCoinFlip _ -> False
-   in any (allows . snd) (applying pid gs)
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> []
+        PlayerEffect.CantGetCounters _ -> []
+        PlayerEffect.StateCoinFlip _ -> []
+   in concatMap (piles . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
 -- ability controlled by `caster`?
@@ -1933,6 +1976,7 @@ protectedFromTargeting rows caster pid gs =
             -- sourceless spell or ability is nobody, so it is not that player.
             PlayerScope.ControllingMostPermanents -> False
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -1963,9 +2007,8 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -2015,6 +2058,7 @@ protectedFromGiven rows oid gs =
         -- anything about which objects may reach this player.
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -2040,9 +2084,8 @@ protectedFromGiven rows oid gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -2083,6 +2126,7 @@ protectionCarriers gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2108,9 +2152,8 @@ protectionCarriers gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -2149,6 +2192,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         -- CR 305.1's name-based prohibition stops ONE land rather than changing
@@ -2177,9 +2221,8 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -2234,6 +2277,7 @@ maximumHandSize pid gs =
         PlayerEffect.IncreaseMaximumHandSize extra -> fmap (extra +) current
         PlayerEffect.ReduceMaximumHandSize fewer -> fmap (\limit -> if fewer >= limit then 0 else limit - fewer) current
         PlayerEffect.CantCastSpells -> current
+        PlayerEffect.CantActivateAbilities -> current
         PlayerEffect.CantCastMoreThan _ -> current
         PlayerEffect.CantCastChosenName -> current
         PlayerEffect.CantPlayLandChosenName -> current
@@ -2258,9 +2302,8 @@ maximumHandSize pid gs =
         PlayerEffect.CantCastMatching _ -> current
         PlayerEffect.CastOnlyAtSorcerySpeed -> current
         PlayerEffect.CantPlayLands -> current
-        PlayerEffect.CastFromGraveyard _ -> current
-        PlayerEffect.CastFromTopOfLibrary _ -> current
-        PlayerEffect.PlayLandsFromGraveyard -> current
+        PlayerEffect.CastFrom _ -> current
+        PlayerEffect.PlayLandsFrom _ -> current
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
         PlayerEffect.CantGetCounters _ -> current
         PlayerEffect.StateCoinFlip _ -> current
@@ -2298,6 +2341,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.DontLoseUnspentMana f -> Just f
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2324,9 +2368,8 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -2355,6 +2398,7 @@ spendManaAsThough pid gs =
         PlayerEffect.SpendManaAsThough clause -> Just clause
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2381,9 +2425,8 @@ spendManaAsThough pid gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -2425,6 +2468,7 @@ cantBeCountered pid oid gs =
   let stops (source, effect) = case effect of
         PlayerEffect.CantBeCountered criterion -> matchesObjectFrom source criterion oid gs
         PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -2455,9 +2499,8 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands -> False
-        PlayerEffect.CastFromGraveyard _ -> False
-        PlayerEffect.CastFromTopOfLibrary _ -> False
-        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -2516,14 +2559,14 @@ unpreventable gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2580,14 +2623,14 @@ unredirectable gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2634,6 +2677,7 @@ statedFlips pid gs =
         -- it happens while an instruction that already resolved is being
         -- followed, or inside an entry replacement.
         PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2662,9 +2706,8 @@ statedFlips pid gs =
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
-        PlayerEffect.CastFromGraveyard _ -> Nothing
-        PlayerEffect.CastFromTopOfLibrary _ -> Nothing
-        PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFrom _ -> Nothing
+        PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (says . snd) (applying pid gs)
@@ -2706,3 +2749,59 @@ spentGrants grantOf pid oid gs =
 -- asked about has happened.
 consume :: [ActivePlayerEffect.ActivePlayerEffect] -> GameState -> GameState
 consume rows gs = gs {GameState.playerEffects = filter (`notElem` rows) (GameState.playerEffects gs)}
+
+-- Every PlayerRef this effect holds, traversed rather than read: CR 400.1's zone
+-- references live inside the two permission payloads, and both a READER (the slot
+-- report Pawl.Engine.Resolve.slotsOf owes) and a WRITER (the bake at CR 611.2b,
+-- Pawl.Engine.Resolve's AffectPlayers arm) want the same walk.
+--
+-- Exhaustive with no wildcard, Pawl.Engine.QuantitySlot's posture: a new arm
+-- carrying a reference has to say so here, and @-Werror@ is what asks. Const and
+-- Identity are the two instances used.
+overPlayerRefs :: (Applicative f) => (PlayerRef.PlayerRef -> f PlayerRef.PlayerRef) -> PlayerEffect -> f PlayerEffect
+overPlayerRefs f effect = case effect of
+  PlayerEffect.CantCastSpells -> pure effect
+  PlayerEffect.CantActivateAbilities -> pure effect
+  PlayerEffect.CantCastMoreThan _ -> pure effect
+  PlayerEffect.CantCastChosenName -> pure effect
+  PlayerEffect.CantPlayLandChosenName -> pure effect
+  PlayerEffect.IncreaseSpellCost _ -> pure effect
+  PlayerEffect.IncreaseActivationCost _ -> pure effect
+  PlayerEffect.ReduceSpellCost _ -> pure effect
+  PlayerEffect.ReduceActivationCost _ -> pure effect
+  PlayerEffect.AddActivationCost _ -> pure effect
+  PlayerEffect.AddSpellCost _ -> pure effect
+  PlayerEffect.PlayAdditionalLands _ -> pure effect
+  PlayerEffect.NoMaximumHandSize -> pure effect
+  PlayerEffect.SetMaximumHandSize _ -> pure effect
+  PlayerEffect.IncreaseMaximumHandSize _ -> pure effect
+  PlayerEffect.ReduceMaximumHandSize _ -> pure effect
+  PlayerEffect.DontLoseUnspentMana _ -> pure effect
+  PlayerEffect.SpendManaAsThough _ -> pure effect
+  PlayerEffect.CantBeTargetedBy _ -> pure effect
+  PlayerEffect.HasProtectionFromChosenName -> pure effect
+  PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
+  PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect
+  PlayerEffect.CantBeCountered _ -> pure effect
+  PlayerEffect.DamageCantBePrevented _ -> pure effect
+  PlayerEffect.DamageCantBeRedirected _ -> pure effect
+  PlayerEffect.CantSearchLibraries _ -> pure effect
+  PlayerEffect.CantBecomeMonarch -> pure effect
+  PlayerEffect.CantCastMatching _ -> pure effect
+  PlayerEffect.CastOnlyAtSorcerySpeed -> pure effect
+  PlayerEffect.CantPlayLands -> pure effect
+  PlayerEffect.CastFrom grant ->
+    fmap (\ref -> PlayerEffect.CastFrom grant {CastFromZone.from = (CastFromZone.from grant) {InZone.player = ref}}) (f (InZone.player (CastFromZone.from grant)))
+  PlayerEffect.PlayLandsFrom inZone ->
+    fmap (\ref -> PlayerEffect.PlayLandsFrom inZone {InZone.player = ref}) (f (InZone.player inZone))
+  PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
+  PlayerEffect.CantGetCounters _ -> pure effect
+  PlayerEffect.StateCoinFlip _ -> pure effect
+
+-- overPlayerRefs read, for a caller that only wants the references.
+playerRefsIn :: PlayerEffect -> [PlayerRef.PlayerRef]
+playerRefsIn = Functor.getConst . overPlayerRefs (Functor.Const . pure)
+
+-- overPlayerRefs written, for a caller substituting each reference.
+mapPlayerRefs :: (PlayerRef.PlayerRef -> PlayerRef.PlayerRef) -> PlayerEffect -> PlayerEffect
+mapPlayerRefs f = Functor.runIdentity . overPlayerRefs (Functor.Identity . f)

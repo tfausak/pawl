@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.SplitSecond as SplitSecond
@@ -676,6 +677,12 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- same conjunct for CR 605.3a's windows, exactly as sickness below and the
         -- printed rider two lines down are asked in both places.
         && not (Detain.detained srcId gs)
+        -- CR 602.5's player-axis prohibition (Sen Triplets), beside detain for
+        -- its reason: rule 701.35a stamps one object and this names a player, and
+        -- neither carves a mana ability out -- so Cost.manaActivationsGiven
+        -- carries this conjunct too, for the CR 605.3a windows that never reach
+        -- this function.
+        && not (PlayerEffect.prohibitsActivating pid gs)
         && sicknessOkGiven pcs pid srcId ability gs
         && ActivationRestriction.restrictionsOk pid srcId (ActivatedAbility.restrictions ability) gs
         && loyaltyOk pid srcId ability gs

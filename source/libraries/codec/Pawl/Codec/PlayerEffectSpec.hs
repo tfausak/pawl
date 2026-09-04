@@ -1,6 +1,7 @@
 module Pawl.Codec.PlayerEffectSpec where
 
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -8,6 +9,7 @@ import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -15,6 +17,7 @@ import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -23,13 +26,17 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
@@ -363,6 +370,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.CastOnlyAtSorcerySpeed
       " {\"type\":\"CastOnlyAtSorcerySpeed\"} "
+  -- CR 602.5 / Sen Triplets' second clause.
+  Spec.it s "CantActivateAbilities" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.CantActivateAbilities
+      " {\"type\":\"CantActivateAbilities\"} "
   -- CR 305.1 / Damping Engine's land half.
   Spec.it s "CantPlayLands" $
     Common.assertCodec
@@ -370,41 +384,37 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.CantPlayLands
       " {\"type\":\"CantPlayLands\"} "
-  -- CR 601.3 / Yawgmoth's Will, whose sentence names no quality of the spell.
-  Spec.it s "CastFromGraveyard, an empty filter" $
+  -- CR 601.3 / Yawgmoth's Will, whose sentence names no quality of the spell and
+  -- whose zone is the caster's own.
+  Spec.it s "CastFrom, an empty filter" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.CastFromGraveyard (Filter.And []))
-      " {\"type\":\"CastFromGraveyard\",\"value\":{\"type\":\"And\",\"value\":[]}} "
-  -- CR 601.3 narrowed / Haakon, Stromgald Scourge's "Knight spells".
-  Spec.it s "CastFromGraveyard, a filter that names qualities" $
+      (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)) (Filter.And [])))
+      " {\"type\":\"CastFrom\",\"value\":{\"from\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"And\",\"value\":[]}}} "
+  -- CR 601.3 / Garruk's Horde's "creature spells", the arm that used to be a
+  -- CastFromTopOfLibrary of its own: the zone is all that told the two apart.
+  Spec.it s "CastFrom, a filter that names qualities" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.CastFromGraveyard (Filter.HasCardType CardType.Creature))
-      " {\"type\":\"CastFromGraveyard\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+      (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Library (PlayerRef.Relative PlayerRelation.You)) (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"CastFrom\",\"value\":{\"from\":{\"zone\":{\"type\":\"Library\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- CR 601.3 / Sen Triplets: the zone belongs to the player a slot names, which
+  -- is the whole of what the reference buys.
+  Spec.it s "CastFrom, a slot naming whose zone" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "opponent")))) (Filter.And [])))
+      " {\"type\":\"CastFrom\",\"value\":{\"from\":{\"zone\":{\"type\":\"Hand\"},\"player\":{\"type\":\"InSlot\",\"value\":\"opponent\"}},\"matching\":{\"type\":\"And\",\"value\":[]}}} "
   -- CR 305.1 / Crucible of Worlds, whose sentence narrows no land.
-  Spec.it s "PlayLandsFromGraveyard" $
+  Spec.it s "PlayLandsFrom" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      PlayerEffect.PlayLandsFromGraveyard
-      " {\"type\":\"PlayLandsFromGraveyard\"} "
-  -- CR 601.3 / Garruk's Horde's "creature spells".
-  Spec.it s "CastFromTopOfLibrary, a filter that names qualities" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.CastFromTopOfLibrary (Filter.HasCardType CardType.Creature))
-      " {\"type\":\"CastFromTopOfLibrary\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
-  -- CR 601.3 / Future Sight's cast half, whose sentence narrows no spell.
-  Spec.it s "CastFromTopOfLibrary, an empty filter" $
-    Common.assertCodec
-      s
-      PlayerEffect.codec
-      (PlayerEffect.CastFromTopOfLibrary (Filter.And []))
-      " {\"type\":\"CastFromTopOfLibrary\",\"value\":{\"type\":\"And\",\"value\":[]}} "
+      (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)))
+      " {\"type\":\"PlayLandsFrom\",\"value\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
   -- CR 118.9 / Omniscience, whose sentence names no quality of the spell.
   Spec.it s "CastFromHandWithoutPayingManaCost, an empty filter" $
     Common.assertCodec
