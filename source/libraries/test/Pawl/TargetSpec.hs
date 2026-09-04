@@ -1186,6 +1186,41 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "and the humbled Apostle dies to it" (S.creaturesInPlay S.bob (resolve humbled)) 0
     Spec.assertEqWith s "while the protected one is still standing, never having been aimed at" (S.creaturesInPlay S.bob base) 1
 
+  -- CR 702.16k: "Such a permanent or player can't be targeted by spells or
+  -- abilities the specified player controls." True-Name Nemesis, whose quality is
+  -- Filter.OfChosenPlayer -- answered off Filter.Context.carrierChosenPlayer,
+  -- which Pawl.Engine.Target.targetable fills off the CANDIDATE rather than off
+  -- the aiming source, that being where rule 702.16b's ability lives.
+  --
+  -- THREE SEATS and a pair of boards differing only in WHOM the Nemesis chose:
+  -- two would collapse "the chosen player" onto alice, and the refusal would pass
+  -- under a hard-coded "an opponent" as happily as under the field. carol never
+  -- acts; she is the seat the second row names.
+  --
+  -- A Hill Giant (3/3, no abilities) stands beside the Nemesis so the refusal
+  -- cannot pass for a spell that reaches nothing at all, and Murder's pool is
+  -- Creatures unfiltered, so no printed criterion of its own excludes a 3/1
+  -- Merfolk.
+  --
+  -- The choice is stamped rather than cast for; the entry road that writes it is
+  -- proved by Pawl.DamageSpec's True-Name Nemesis group.
+  Spec.it s "CR 702.16k alice's Murder cannot target a Nemesis that chose her, and can one that chose carol" $ do
+    nemesis <- S.printingOf s registry "True-Name Nemesis"
+    giant <- S.printingOf s registry "Hill Giant"
+    murder <- S.printingOf s registry "Murder"
+    case S.spellTargetSlot murder of
+      Just slot -> do
+        let (nemesisId, board0) = S.addCreature nemesis S.bob S.threePlayerGame
+            (giantId, board) = S.addCreature giant S.bob board0
+            chose who = board {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just who}) nemesisId (GameState.objects board)}
+            reaches gs victim =
+              let (spellId, onStack) = S.spellOnStack murder S.alice gs
+               in Set.member (Recipient.ToCreature victim) (Target.legalRecipients (Just S.alice) spellId slot onStack)
+        Spec.assertBool s (not (reaches (chose S.alice) nemesisId)) "CR 702.16k alice was chosen, so her Murder cannot target the Nemesis"
+        Spec.assertBool s (reaches (chose S.carol) nemesisId) "and with carol chosen instead the same Murder reaches it"
+        Spec.assertBool s (reaches (chose S.alice) giantId) "while the Hill Giant beside it admits the Murder in the refusing row too"
+      Nothing -> Spec.assertFailure s "Murder should declare a target slot"
+
   -- CR 702.16j: "A permanent or player with protection from everything has
   -- protection from each object regardless of that object's characteristic
   -- values." Progenitus ({W}{W}{U}{U}{B}{B}{R}{R}{G}{G} Legendary Creature --

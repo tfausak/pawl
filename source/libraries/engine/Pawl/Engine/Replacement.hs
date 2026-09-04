@@ -293,10 +293,10 @@ collect sources floating =
                 PermanentCandidate.MkPermanentCandidate
                   { PermanentCandidate.source = src,
                     PermanentCandidate.provenance = ReplacementProvenance.Minted,
-                    PermanentCandidate.effect = protectionShield pid src,
+                    PermanentCandidate.effect = protectionShield pid,
                     PermanentCandidate.ordinal = InstanceOrdinal.MkInstanceOrdinal 0
                   },
-            ReplacementCandidate.effect = protectionShield pid src,
+            ReplacementCandidate.effect = protectionShield pid,
             ReplacementCandidate.source = src,
             ReplacementCandidate.controller = Projection.controllerOf src sources,
             ReplacementCandidate.lifetime = Nothing,
@@ -306,17 +306,17 @@ collect sources floating =
           }
       -- Rule 702.16e's row for one (protected player, carrier) pair.
       --
-      -- The quality is CR 201.4's chosen names, spelled as the disjunction of the
-      -- literal names the carrier holds RIGHT NOW -- the same set intersection
-      -- PlayerEffect.protectedFromGiven asks for the targeting and Aura bars, so
-      -- the three consequences of rule 702.16 cannot disagree about which sources
-      -- carry the quality. A carrier that has chosen nothing yields `Or []`, which
-      -- matches no source, rather than a shield against everything.
+      -- The quality is CR 201.4's chosen names, spelled as Filter.HasChosenName
+      -- -- the same set intersection PlayerEffect.protectedFromGiven asks for the
+      -- targeting and Aura bars, so the three consequences of rule 702.16 cannot
+      -- disagree about which sources carry the quality. A carrier that has chosen
+      -- nothing intersects with nothing and matches no source, rather than
+      -- shielding against everything.
       --
-      -- Filter.HasChosenName would say the same thing and is not usable here: it
-      -- reads Filter.sourceChosenNames, which candidateContext leaves empty (see
-      -- Pawl.Engine.Filter.contextFor), so it is vacuously False in every
-      -- replacement position.
+      -- The atom answers here because candidateContext fills
+      -- Filter.sourceChosenNames off the carrier; it is what makes the read LIVE
+      -- at the damage event (CR 609.7b) rather than frozen when this pair was
+      -- gathered.
       --
       -- `whichRecipient` and not `whoRecipient`, though both name a player: the
       -- protected seat is an id this segment knows, where a PlayerRelation would
@@ -326,13 +326,13 @@ collect sources floating =
       -- No kind, rule 702.16e saying "any damage", and no printed recipient half
       -- at all -- `whatRecipient` is the permanent half's spelling and this row is
       -- the other one.
-      protectionShield pid src =
+      protectionShield pid =
         ReplacementEffect.DamageR
           DamageR.MkDamageR
             { DamageR.matching =
                 DamagePattern.MkDamagePattern
                   { DamagePattern.whichKind = Nothing,
-                    DamagePattern.whatSource = Filter.Type.Or (fmap Filter.Type.HasName (Set.toList (PlayerEffect.chosenNamesOf (Just src) sources))),
+                    DamagePattern.whatSource = Filter.Type.HasChosenName,
                     DamagePattern.whatRecipient = Nothing,
                     DamagePattern.whoRecipient = Nothing,
                     DamagePattern.whichRecipient = Just (Recipient.ToPlayer pid),
@@ -1307,6 +1307,16 @@ matchesFiltered gs candidate filter_ oid =
 -- asked what it is attached to, which is what lets Pariah's printed redirect
 -- destination say "enchanted creature" (Filter.IsHostOfSource). Nothing for a
 -- floating row whose source has left, the atom's ordinary vacuous answer.
+--
+-- CR 201.4's chosen names and CR 614.1c's chosen player ride along on the same
+-- footing, and LIVE for CR 609.7b's reason: a prevention shield's source half is
+-- rechecked at the event, so a name or a seat the source chose between the row's
+-- installation and the damage is the one this reads. The names go through
+-- Pawl.Engine.PlayerEffect.chosenNamesOf, which falls back to CR 608.2h's last
+-- known information for a source already in a graveyard; the player has no such
+-- fallback because Pawl.Types.LastKnown records no chosen player, and rule
+-- 702.16k's carrier is a permanent on the battlefield whenever its own static
+-- ability mints a row.
 candidateContext :: GameState -> ReplacementCandidate -> Filter.Context
 candidateContext gs candidate =
   ( Filter.contextWithSlots
@@ -1315,7 +1325,9 @@ candidateContext gs candidate =
       (Just (ReplacementCandidate.source candidate))
       (ReplacementCandidate.slots candidate)
   )
-    { Filter.sourceAttachedTo = Projection.hostOf (ReplacementCandidate.source candidate) gs
+    { Filter.sourceAttachedTo = Projection.hostOf (ReplacementCandidate.source candidate) gs,
+      Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just (ReplacementCandidate.source candidate)) gs,
+      Filter.carrierChosenPlayer = Game.lookupObject (ReplacementCandidate.source candidate) gs >>= Object.chosenPlayer
     }
 
 -- CR 614.12 for a token that does not exist yet: a lot's token is judged off

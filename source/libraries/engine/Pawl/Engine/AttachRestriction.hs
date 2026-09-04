@@ -57,6 +57,7 @@ import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 
@@ -133,7 +134,12 @@ refusesGiven pcs subject host gs =
                 gs
             barred =
               Filter.matches
+                -- CR 702.16k: the carrier is the row's source, which for a row
+                -- rule 702.16 minted is the protected host itself -- the same
+                -- frame this function's haddock states for the minted case.
                 (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
+                  { Filter.carrierChosenPlayer = Game.lookupObject source gs >>= Object.chosenPlayer
+                  }
                 subjectView
                 (if null changes then attachers else Filter.rewrite changes attachers)
          in named && barred

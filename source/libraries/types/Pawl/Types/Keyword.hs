@@ -79,9 +79,14 @@ data Keyword
     -- constructor: Progenitus writes it, and Pawl.TargetSpec's "CR 702.16j" and
     -- Pawl.DamageSpec's "CR 702.16j" prove the targeting and damage halves.
     --
-    -- Not implemented: rule 702.16k's "protection from [a player]" -- whose
-    -- quality is a PLAYER and not a characteristic, so no Filter says it -- and
-    -- the "from each" shorthands of rules 702.16h and 702.16i (#2229).
+    -- Rule 702.16k's "protection from [a player]" is Filter.OfChosenPlayer, no
+    -- variant constructor either: True-Name Nemesis writes it, and its four
+    -- prohibitions are proved by Pawl.DamageSpec's, Pawl.TargetSpec's,
+    -- Pawl.CombatSpec's and Pawl.AuraSpec's "CR 702.16k" cases.
+    --
+    -- Not implemented: a LINT over the "from each" shorthands of rules 702.16h
+    -- and 702.16i, which expand to one instance of this constructor per quality
+    -- and so are a transcription nothing checks (#3200).
     Protection (Filter.Filter Keyword)
   | Reach -- 702.17
   | -- | 702.18a: this permanent or player can't be the target of spells or

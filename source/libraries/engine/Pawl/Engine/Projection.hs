@@ -4481,6 +4481,9 @@ filterReads f = case f of
   -- Reads NAMES at both ends too, HasName's answer one indirection along: the
   -- chosen half is not a projection at all, and no Modification writes the other.
   Filter.Type.HasChosenName -> Set.empty
+  -- Reads the candidate's CONTROLLER, SameControllerAsBound's answer above: rule
+  -- 702.16k's other half is an owner, which CR 108.3 never projects.
+  Filter.Type.OfChosenPlayer -> Set.singleton Controller
   Filter.Type.IsPlayer _ -> Set.empty
   -- Reads a CONTROLLER rather than a characteristic (CR 109.3 lists none).
   Filter.Type.IsControllerOfBound _ -> Set.empty
@@ -4699,6 +4702,9 @@ filterReadsPeers f = case f of
   -- Pawl.Engine.Target.slotContext -- no peer projection is read here.
   Filter.Type.SameControllerAsBound _ -> False
   Filter.Type.HasChosenName -> False
+  -- The carrier's chosen player arrives on the Context; the candidate's own
+  -- controller and owner are read off its view, so no PEER is projected.
+  Filter.Type.OfChosenPlayer -> False
   Filter.Type.IsPlayer _ -> False
   Filter.Type.IsControllerOfBound _ -> False
   Filter.Type.CardsInGraveyardAtLeast _ -> False
