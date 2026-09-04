@@ -935,7 +935,7 @@ data Context = MkContext
     -- the resolution's own slots instead: an ability's targets and its trigger's
     -- bindings are stamped on the ABILITY object on the stack, and a source is not
     -- its stack object, so a read off the source's bindings answers nothing for
-    -- every ability (#1783). A spell is the one object for which the two agree.
+    -- every ability (see #1783). A spell is the one object for which the two agree.
     --
     -- ABSENT versus EMPTY as slotControllers above, and the two mean what they do
     -- there: a key is here for every slot the caller bound, so a missing key is a

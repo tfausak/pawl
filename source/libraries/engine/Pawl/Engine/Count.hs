@@ -567,7 +567,7 @@ playersFor viewOf context gs ref =
 -- (Pawl.Engine.Resolve.effectContext), and that is the only read that answers for
 -- an ABILITY: CR 113.7 makes Filter.source the ability's source permanent, while
 -- its targets and its trigger's bindings are stamped on the ability object on the
--- stack (#1783). The SOURCE's own bindings are the fallback, for a caller that
+-- stack (see #1783). The SOURCE's own bindings are the fallback, for a caller that
 -- builds no such context -- a static ability, a replacement -- and for a spell the
 -- two roads are the same object.
 slotPlayers :: Filter.Context -> GameState -> SlotName.SlotName -> Maybe [PlayerId]
