@@ -126,7 +126,7 @@ data PlayerRef
     -- asks. That rule's "or if the effect has moved it from a public zone to a
     -- hidden zone, the effect uses the object's last known information" is the
     -- clause this arm rests on, and every reader answers it through a last-known
-    -- aware view: Pawl.Engine.Resolve.playerRefPlayers through
+    -- aware view: Pawl.Engine.Resolve.Slots.playerRefPlayers through
     -- Pawl.Engine.Projection.controllerWithLastKnown,
     -- Pawl.Engine.Count.playersFor -- which Pawl.Engine.Quantity and
     -- Pawl.Engine.ManaCount both route through -- off the view its caller
@@ -150,7 +150,7 @@ data PlayerRef
     -- about a characteristic.
     --
     -- TWO readers, folding the same live combat record:
-    -- Pawl.Engine.Resolve.playerRefPlayers for the reference in an effect's own
+    -- Pawl.Engine.Resolve.Slots.playerRefPlayers for the reference in an effect's own
     -- recipient position, and Pawl.Engine.Count.playersFor -- which
     -- Pawl.Engine.Quantity and Pawl.Engine.ManaCount both route through -- under a
     -- Scope or a ManaCount. Pawl.CountSpec's Synthetic Toll of the Siege proves

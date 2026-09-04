@@ -969,7 +969,7 @@ storedPlayerScope effect = case effect of
 -- Named for those ARMS rather than for the opcodes: this is a property of
 -- what Pawl.Engine.Resolve implements, not of the card's alphabet.
 data Asks
-  = -- | Read through Pawl.Engine.Resolve.objectRefObjects, which is pure and so
+  = -- | Read through Pawl.Engine.Resolve.Slots.objectRefObjects, which is pure and so
     -- raises no prompt: every ObjectRef position but the three below.
     AsksNothing
   | -- | Pawl.Engine.Resolve's Effect.MoveToZone gather, which runs in the Game
@@ -990,7 +990,7 @@ data Asks
 
 -- Whether an ObjectRef arm is a resolution-time QUESTION rather than a read --
 -- the five arms Pawl.Types.ObjectRef documents as such, and exactly the five
--- Pawl.Engine.Resolve.objectRefObjects answers [] for.
+-- Pawl.Engine.Resolve.Slots.objectRefObjects answers [] for.
 --
 -- ObjectRef.ChosenPlayer is NOT one, despite the name: the seat was chosen on
 -- entry and is read out of stored state here. ObjectRef.EachCardFromAmong is not
@@ -2027,7 +2027,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "only a library has ends" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 608.2d: a choice an effect offers is announced while the effect is
   -- applied, so an opcode that gathers its objects through the pure
-  -- Pawl.Engine.Resolve.objectRefObjects cannot make one. Three arms of Resolve
+  -- Pawl.Engine.Resolve.Slots.objectRefObjects cannot make one. Three arms of Resolve
   -- reach the Game monad and ask instead, over DIFFERENT subsets -- see Asks --
   -- and a chooser-shaped ref written anywhere else names no object, so that share
   -- of the instruction is skipped (CR 101.3, CR 609.3) with nothing on the wire
@@ -2123,7 +2123,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
       (inert [Effect.Transform sourceAndOne, moves sourceAndOne, reveals sourceAndOne, Effect.Tap sourceAndOne])
       [True, False, True, True]
     -- CR 701.28a's convert, classified with Transform because it IS Transform's
-    -- gather (Pawl.Engine.Resolve.turnPermanentsOver): the same four card-shaped
+    -- gather (Pawl.Engine.Resolve.Effect.turnPermanentsOver): the same four card-shaped
     -- arms are inert under it and the same battlefield subset is asked.
     Spec.assertEqWith
       s

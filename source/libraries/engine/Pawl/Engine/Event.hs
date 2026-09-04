@@ -438,7 +438,7 @@ enterTapped oid =
 -- exactly what a second record would break.
 --
 -- What does NOT come through here is a permanent entering the battlefield tapped
--- (`enterTapped` above, and Pawl.Engine.Resolve.putTapped) -- CR 603.2e's other
+-- (`enterTapped` above, and Pawl.Engine.Resolve.Effect.putTapped) -- CR 603.2e's other
 -- sentence, and the reason those two stay direct writes.
 --
 -- CR 110.5 makes tapped a PERMANENT's status, which every caller above already
@@ -1304,7 +1304,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      observes. CR 614.12 does not sanction any of them: a simultaneously-
 --      entering sibling's continuous effects do not already exist relative to it.
 --      Excluded by GameState.enteringBeside, which runEntry writes for the span of
---      one member's loop and Pawl.Engine.Projection.abilitySources subtracts, so
+--      one member's loop and Pawl.Engine.Projection.View.abilitySources subtracts, so
 --      the exclusion covers every read at once rather than one call site at a
 --      time. Pawl.ReplacementSpec's "a Wood Elemental reanimated beside Ashaya
 --      sacrifices nothing" is the proof: without it Ashaya, Soul of the Wild makes
@@ -4450,7 +4450,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
           -- one exactly when the effect it carries named a destination -- CR
           -- 303.4a's target for Pawl.Engine.Stack's Aura branch, which is also the
           -- only door a resolving Aura spell takes, and the fixed host for
-          -- Pawl.Engine.Resolve.putFound's search destination (Auratouched Mage).
+          -- Pawl.Engine.Resolve.Effect.putFound's search destination (Auratouched Mage).
           -- So the rule's own exclusion is carried without this funnel asking what
           -- kind of move it is.
           --

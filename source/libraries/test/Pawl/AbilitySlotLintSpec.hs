@@ -255,7 +255,7 @@ triggeredAbilityOffends ability =
 -- What is NOT on it is the point:
 --
 --   * both event slots (CR 400.7e's `became`, CR 702.70a's `thatPlayer`): an
---     activation is not an event, so Pawl.Engine.Event.eventBindings never runs
+--     activation is not an event, so Pawl.Engine.Event.Binding.eventBindings never runs
 --     for one.
 --   * Binding.chosenModes (CR 700.2), which IS stamped and is still not an
 --     exemption: its binding carries a mode set and nothing else, so no effect
@@ -514,7 +514,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- have to pick. Pawl.Engine.Engine.placeOne merges the ability's placement-time
   -- choices with the environment captured when it was armed, per FIELD, so a
   -- collision leaves one Binding carrying both a CR 601.2c target and a Create's
-  -- minted group -- and Pawl.Engine.Resolve.slotGroup answers with the group,
+  -- minted group -- and Pawl.Engine.Resolve.Slots.slotGroup answers with the group,
   -- silently discarding a target that CR 608.2b was owed a re-validation of.
   --
   -- Rejected rather than resolved by precedence: the card would be saying two

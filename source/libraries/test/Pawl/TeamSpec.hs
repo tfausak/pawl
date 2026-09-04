@@ -101,7 +101,7 @@ spec s registry = Spec.describe s "Teams" $ do
       (Combat.Type.defenders (GameState.combat settled))
       [S.carol, S.dave]
   -- CR 102.3 through the effect DSL's PlayerRef.Relative Opponent, which
-  -- Pawl.Engine.Resolve.playerRefPlayers resolves.
+  -- Pawl.Engine.Resolve.Slots.playerRefPlayers resolves.
   --
   -- Prologue to Phyresis, {1}{U} Instant: "Each opponent gets a poison counter.
   -- Draw a card." The whole card is that one instruction plus a draw, so nothing

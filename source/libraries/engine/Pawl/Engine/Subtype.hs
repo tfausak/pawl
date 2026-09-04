@@ -55,7 +55,7 @@ isLandType subtype = case subtype of
 --
 -- The word is what CR 612.2a needs and a family test cannot supply: a token's
 -- NAME is text, so swapping the creature type that defines it means writing the
--- new word out (Pawl.Engine.Projection.rewriteCard). isCreatureType below reads
+-- new word out (Pawl.Engine.Projection.Rewrite.rewriteCard). isCreatureType below reads
 -- this rather than restating the list, so the two cannot drift.
 creatureTypeWord :: Subtype.Subtype -> Maybe Text.Text
 creatureTypeWord subtype = case subtype of

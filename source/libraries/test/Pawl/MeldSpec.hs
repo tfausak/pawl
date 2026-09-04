@@ -1200,7 +1200,7 @@ transforming = turningOver Effect.Transform
 
 -- CR 701.28a's word for the same instruction, which that rule routes through
 -- rules 701.27a-f and 712.9-10 unchanged. A SEPARATE opcode reaching one
--- Pawl.Engine.Resolve.turnPermanentsOver, so a case run through both asserts
+-- Pawl.Engine.Resolve.Effect.turnPermanentsOver, so a case run through both asserts
 -- that the shared path is shared rather than that two implementations agree.
 converting :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
 converting = turningOver Effect.Convert

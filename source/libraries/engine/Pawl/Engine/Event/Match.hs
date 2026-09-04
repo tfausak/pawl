@@ -5355,7 +5355,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- The EVENT and nothing else: how many cards moved, and whether any could,
   -- is CR 701.22a's business and CR 701.22d says explicitly that neither
-  -- narrows this. Pawl.Engine.Resolve.scryOne records the event outside its
+  -- narrows this. Pawl.Engine.Resolve.Effect.scryOne records the event outside its
   -- own prompt guard for that sentence.
   TriggerCondition.PlayerScries relation -> case event of
     GameEvent.Moved {} -> False

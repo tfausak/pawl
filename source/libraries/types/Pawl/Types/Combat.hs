@@ -75,7 +75,7 @@ data Combat = MkCombat
     -- `attackers`, and pruned by Pawl.Engine.Game.removeFromCombat. Read by
     -- Pawl.Engine.Defender.playerOfAttacker as CR 802.2a's answer, and by
     -- Pawl.Engine.Combat.noteAttackingNothing and
-    -- Pawl.Engine.Projection.viewOfCharacteristics as CR 506.4's comparand for
+    -- Pawl.Engine.Projection.View.viewOfCharacteristics as CR 506.4's comparand for
     -- "if its controller ... changes".
     attackedUnder :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | CR 506.4 for an attacked BATTLE: who controlled it as the attacking
@@ -255,7 +255,7 @@ data Combat = MkCombat
     -- sampler answering rule 506.4's other derived clauses runs, and pruned by
     -- Pawl.Engine.Game.removeFromCombat when the attacker itself leaves combat.
     -- Read by Pawl.Engine.Damage.combatRecipient and by
-    -- Pawl.Engine.Projection.viewOfCharacteristics, alongside the live
+    -- Pawl.Engine.Projection.View.viewOfCharacteristics, alongside the live
     -- derivation each already makes: the record is what makes the answer stick
     -- between samples, the derivation is what answers within one.
     attackingNothing :: Set.Set ObjectId.ObjectId,

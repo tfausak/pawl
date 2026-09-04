@@ -109,7 +109,7 @@ data GameEvent
     --
     -- The PlayerId is CR 508.5's defending player FOR THIS CREATURE, stamped at
     -- declaration time because the planeswalker and battle forms of that rule
-    -- need the board and Pawl.Engine.Event.eventBindings has none; CR 508.5a
+    -- need the board and Pawl.Engine.Event.Binding.eventBindings has none; CR 508.5a
     -- makes it one player rather than a set. The Natural is how many creatures
     -- the same declaration named, CR 506.5's "the only creature declared as an
     -- attacker", carried because CR 702.83b scopes "alone" to a combat phase

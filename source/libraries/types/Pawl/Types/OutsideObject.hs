@@ -12,7 +12,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 --
 -- No characteristics of its own beyond the status below: CR 729.1b gives a
 -- main-game effect no meaning here, so the card is read from its PRINTED FACE
--- (Pawl.Engine.Projection.viewOfCard), exactly as CR 103.2a's sideboard pool is.
+-- (Pawl.Engine.Projection.View.viewOfCard), exactly as CR 103.2a's sideboard pool is.
 -- The owner is carried because CR 108.3b scopes every reach outside the game to
 -- the acting player's OWN cards.
 data OutsideObject = MkOutsideObject

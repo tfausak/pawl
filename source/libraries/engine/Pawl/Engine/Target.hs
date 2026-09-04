@@ -1399,7 +1399,7 @@ chooseTargets decider pid oid x slots sets = do
 -- Taken here rather than in the pool, because the two halves of rule 406.4 are
 -- about different moments: legality is the card's (basePoolGiven's exile arm),
 -- and only the ANNOUNCEMENT is narrowed. Every caller that raises a prompt over
--- a target set owes this call -- Pawl.Engine.Resolve.chooseNewTargetsFor is the
+-- a target set owes this call -- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor is the
 -- other one -- or it would offer by name what the rule says may not be named.
 --
 -- Applied to the set the slot's Filter already narrowed, so a pile reaches the
@@ -1577,7 +1577,7 @@ selectionLegal perspective seed source x slots sets chosen gs =
 -- between them the moments an announcement over declared slots is accepted --
 -- selectionLegal above (CR 601.2e's cast and CR 602.2's activation),
 -- Pawl.Engine.Engine.placeBorne (CR 603.3d's placement) and
--- Pawl.Engine.Resolve.chooseNewTargetsFor (CR 707.10c's re-target). The
+-- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor (CR 707.10c's re-target). The
 -- re-derivation is exactly the one CR 608.2b will make at resolution, so a
 -- selection this admits cannot be one resolution then drops.
 --

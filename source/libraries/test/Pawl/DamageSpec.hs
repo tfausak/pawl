@@ -2401,7 +2401,7 @@ m2cPropertySpec s registry =
 -- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
 -- creature, or a planeswalker." Damage.damageRecipient is where a Recipient that
 -- names a permanent GENERICALLY -- Pawl.Engine.Binding.became's entrant, which
--- Pawl.Engine.Event.eventBindings tags Recipient.ToObject because the trigger condition
+-- Pawl.Engine.Event.Binding.eventBindings tags Recipient.ToObject because the trigger condition
 -- says nothing about the entrant's card types -- gets classified before an
 -- effect can build a damage event out of it.
 --

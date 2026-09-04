@@ -279,7 +279,7 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- ability can move its object out of. No modal ability in the pool states one.
 --
 -- This is the ACTIVATED reading of a rule that says "an ability";
--- Pawl.Engine.Event.zoneFunctionedFrom is the triggered one, and has only the
+-- Pawl.Engine.Event.Trigger.zoneFunctionedFrom is the triggered one, and has only the
 -- effect half to fold, CR 603.1 giving a triggered ability no cost.
 --
 -- CR 113.6m's "a previous part of its cost or effect specifies that the

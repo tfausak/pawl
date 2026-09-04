@@ -2525,7 +2525,7 @@ bystanderSpec s registry =
 --
 -- CR 603.10a is deliberately NOT this case. There the rule's own "unless its
 -- trigger condition ... specifies that the object is put into that zone" arm
--- decides -- `Pawl.Engine.Event.conditionPutsSelfInto`, read by
+-- decides -- `Pawl.Engine.Event.Trigger.conditionPutsSelfInto`, read by
 -- `Pawl.Engine.Event.leftBattlefield`'s own filter -- and the Aura half beside
 -- it is read, in `screamsFromWithinSpec` below; a bystander carries any
 -- condition at all, so nothing about either reaches here.

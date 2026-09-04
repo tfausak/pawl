@@ -892,7 +892,7 @@ baseView gs oid =
 -- freeze answers Nothing, and Resolve stores no continuous effect at all. Rush of
 -- Blood's "+X/+0 ... where X is its power" is one producer; Paladin Class's
 -- level-3 "+1/+1 for each other attacking creature" is another, whose Count
--- filter reads the same map through Filter.IsBound. Pawl.Engine.Resolve.effectContext
+-- filter reads the same map through Filter.IsBound. Pawl.Engine.Resolve.Slots.effectContext
 -- is the one engine caller's spelling.
 freezeQuantities :: GameState -> ObjectId -> ObjectId -> Filter.Context -> Modification.Modification ability -> Maybe (Modification.Modification ability)
 freezeQuantities gs announcedOn source context m =

@@ -1587,7 +1587,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsToken)) "player"
 
   -- CR 113.3b against CR 113.3c. A bare field read like IsToken above: the
-  -- builder (Pawl.Engine.Projection.viewOfCharacteristics, through
+  -- builder (Pawl.Engine.Projection.View.viewOfCharacteristics, through
   -- Pawl.Engine.Game.isActivatedAbility) is where the zone and the kind are
   -- decided, so the gameplay-level proof is Pawl.CounterspellSpec's Squelch
   -- group.
@@ -1603,7 +1603,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
   -- CR 110.5. The atom is a bare field read, Transformed's shape below: the
   -- battlefield scoping CR 110.5d demands lives in the BUILDER that fills the
-  -- field (Pawl.Engine.Projection.viewOfCharacteristics), so the gameplay-level
+  -- field (Pawl.Engine.Projection.View.viewOfCharacteristics), so the gameplay-level
   -- proof is Pawl.FaceDownSpec's Break Open group.
   Spec.describe s "IsFaceDown" $ do
     Spec.it s "matches a view whose permanent is face down" $ do

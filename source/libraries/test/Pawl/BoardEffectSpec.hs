@@ -1109,7 +1109,7 @@ communeWithLavaSpec s registry =
               depthOf q = Effect.Reveal (Reveal.MkReveal (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) q)) Nothing)
           -- SlotArity.Amount and not One: the depth reads the slot's amount
           -- rather than an object, so the entry is a read with no arity claim on
-          -- it (Pawl.Engine.Resolve.quantitySlots).
+          -- it (Pawl.Engine.Resolve.Slots.quantitySlots).
           Spec.assertEqWith
             s
             "a depth naming a slot is reported, so the CR 603.3b dataflow lint sees it"

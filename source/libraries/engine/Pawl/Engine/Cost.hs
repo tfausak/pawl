@@ -3151,7 +3151,7 @@ tapForManaWith perform inFlight oid = do
               -- happens.
               --
               -- The performer runs it against no ability object, CR 605.3b
-              -- leaving one uncreated; Pawl.Engine.Resolve.performManaAbility is
+              -- leaving one uncreated; Pawl.Engine.Resolve.Effect.performManaAbility is
               -- where the source stands in for it.
               perform oid controller (ManaOption.effects chosen)
               pure True

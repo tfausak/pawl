@@ -57,7 +57,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- "Token", so a Zombie Army token is named "Zombie Army Token" -- the Servo token's
 -- shape. The subtype's word comes from Pawl.Engine.Subtype.creatureTypeWord, the
 -- same list CR 205.3m holds, so a text-changed amass (CR 612.2a) mints a token named
--- for the NEW word -- Pawl.Engine.Projection.rewriteEffect has already swapped the
+-- for the NEW word -- Pawl.Engine.Projection.Rewrite.rewriteEffect has already swapped the
 -- subtype by the time this is called. Nothing there means card data wrote a subtype
 -- of another family, which no printing does; the name is "Army Token" in that case
 -- rather than this being partial.

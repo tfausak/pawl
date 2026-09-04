@@ -112,7 +112,7 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- have held it. CR 114.4 is what makes either do anything at all on an object in
 -- the command zone -- "abilities of emblems function in the command zone" -- and
 -- Pawl.Engine.Projection.gatherGiven, Pawl.Engine.Projection.replacementsAffecting,
--- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event.eventTriggers each
+-- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event.Trigger.eventTriggers each
 -- walk the command zone for exactly that, all four through
 -- Pawl.Engine.Vanguard.functionsFromCommandZone.
 --

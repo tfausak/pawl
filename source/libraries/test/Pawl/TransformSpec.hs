@@ -26,12 +26,12 @@
 -- because no printed card carries one without the other: the Effect.Convert arm
 -- of Pawl.Engine.Resolve (the same turnPermanentsOver the transform arm calls),
 -- and the static ability Pawl.Engine.Keyword.livingMetal mints for
--- Pawl.Engine.Projection.staticAbilitiesOf. See convertSpec, whose fixture is
+-- Pawl.Engine.Projection.View.staticAbilitiesOf. See convertSpec, whose fixture is
 -- Ratchet, Field Medic // Ratchet, Rescue Racer.
 --
 -- Also CR 701.27g's "transformed permanent", the phrase a CARD asks rather than
 -- the engine: Pawl.Types.Filter's Transformed atom, filled by
--- Pawl.Engine.Projection.viewOfCharacteristics. See transformedPermanentSpec,
+-- Pawl.Engine.Projection.View.viewOfCharacteristics. See transformedPermanentSpec,
 -- whose fixture is Tovolar and Mutagen Connoisseur rather than the Gargoyle.
 --
 -- Also CR 701.27f's SECOND sentence, which measures a DELAYED triggered
@@ -1622,7 +1622,7 @@ playMedic decision wanted spellId gs =
 -- instances of the trigger reach the stack together off two lifelink sources, and
 -- the second's convert is ignored. "CR 701.28e / 603.12 an ignored convert arms no
 -- reflexive" is what proves the arm hangs on the act rather than on the CR 603.5
--- answer (Pawl.Engine.Resolve.applyClauseEffects).
+-- answer (Pawl.Engine.Resolve.Effect.applyClauseEffects).
 gainLifeConvertSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainLifeConvertSpec s registry = Spec.describe s "GainLifeConvert" $ do
   -- THE proving case: the first four limbs on one board. alice casts Blossoming Calm

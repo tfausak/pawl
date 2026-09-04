@@ -93,7 +93,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- battlefield rather than anything the text says.
 --
 -- The empty name is CR 708.2a's "no name" and is the same value
--- Pawl.Engine.Projection.baseCharacteristics gives an object with no card behind
+-- Pawl.Engine.Projection.View.baseCharacteristics gives an object with no card behind
 -- it. No listing in the pool names one. It matches no printed card, which is
 -- what makes CR 708.4's "effects that care about the characteristics of a spell
 -- will see only the face-down spell's characteristics" true for a prohibition
@@ -395,7 +395,7 @@ merge2 l r =
         (Nothing, Nothing) -> Nothing
         -- CR 208.2's star stands in where one box has no ability behind it: the
         -- seed substitutes it into that box and leaves the box as it found it,
-        -- number or star (Pawl.Engine.Projection.seedCharacteristicPT).
+        -- number or star (Pawl.Engine.Projection.View.seedCharacteristicPT).
         (p, t) -> Just CharacteristicPT.MkCharacteristicPT {CharacteristicPT.power = Maybe.fromMaybe Quantity.Star p, CharacteristicPT.toughness = Maybe.fromMaybe Quantity.Star t},
       -- CR 709.4c: a sentence bounding X is an ability in a half's text box, so
       -- the combined view has BOTH halves', and CR 702.102b hands the pair to a
@@ -580,7 +580,7 @@ castableFaces card = case Card.layout card of
   --
   -- That second entry is `convertedFace` below, named because a reader who
   -- cannot pay rule 702.162a's cost cannot have it: CR 118.9a gives a spell one
-  -- alternative cost, so Pawl.Engine.Resolve.offerCast drops it from an offer
+  -- alternative cost, so Pawl.Engine.Resolve.Effect.offerCast drops it from an offer
   -- that states an alternative of its own.
   --
   -- Read off the front face's PRINTED keywords, which is CR 712.11d's own scope
@@ -627,7 +627,7 @@ castableFaces card = case Card.layout card of
 -- "fuse is a static ability found on some split cards that applies WHILE THE CARD
 -- WITH FUSE IS IN A PLAYER'S HAND" -- so Pawl.Engine.Cast.castableSpells, which
 -- has the zone, is what offers it. Every other road to a cast (an effect's offer,
--- Pawl.Engine.Resolve.offerCast) therefore reaches the halves alone. Not
+-- Pawl.Engine.Resolve.Effect.offerCast) therefore reaches the halves alone. Not
 -- implemented: fusing under a permission an effect grants for a cast from the
 -- hand (gap #2787).
 --
@@ -729,7 +729,7 @@ mergeDisjointModes l r =
 -- paying that alternative cost, which is why Pawl.Engine.Cost.candidateCostsFor
 -- REPLACES the zone's candidates with it. CR 118.9a allows a spell one
 -- alternative cost, so an effect offering a cast under an alternative of its own
--- cannot reach this face at all; Pawl.Engine.Resolve.offerCast drops it, and
+-- cannot reach this face at all; Pawl.Engine.Resolve.Effect.offerCast drops it, and
 -- Pawl.InvestigateSpec's "CR 118.9a a free offer does not also offer the
 -- converted face" is the proof.
 convertedFace :: Card.Card -> Maybe (Face.Face Card.Card)
@@ -1207,7 +1207,7 @@ hasSharedTypeLine card = case Card.layout card of
 -- emptied one would leave the "Roaring Furnace//" of a half that was subtracted.
 -- With no door open it has no name at all, which is the empty CardName
 -- faceDownFace uses for CR 708.2a's "no name" -- the same value
--- Pawl.Engine.Projection.baseCharacteristics gives an object with no card behind
+-- Pawl.Engine.Projection.View.baseCharacteristics gives an object with no card behind
 -- it, and one that matches no printing.
 roomFace :: Set.Set CardName.CardName -> Card.Card -> Face.Face Card.Card
 roomFace unlocked card =

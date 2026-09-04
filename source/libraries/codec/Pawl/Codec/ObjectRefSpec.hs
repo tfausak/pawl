@@ -201,7 +201,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   -- written against that shape fails to decode rather than reading as a literal.
   -- A NEGATIVE depth is no longer a decode failure -- Quantity.Literal takes an
   -- Integer -- and is clamped to zero where it is read instead (CR 107.1b),
-  -- which Pawl.Engine.Resolve.objectRefObjects' own note records.
+  -- which Pawl.Engine.Resolve.Slots.objectRefObjects' own note records.
   Spec.it s "TopOfLibrary rejects a bare number as a depth" $
     Spec.assertBool
       s

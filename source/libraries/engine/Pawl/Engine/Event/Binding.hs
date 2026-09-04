@@ -635,7 +635,7 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- Banewasp Affliction's "that creature's controller loses life equal to ITS
   -- toughness" names the host rather than the Aura, and both halves of that
   -- sentence are CR 608.2h reads of a permanent CR 400.7 has already replaced.
-  -- Pawl.Engine.Resolve.effectViewOf is what answers the toughness, and it looks
+  -- Pawl.Engine.Resolve.Slots.effectViewOf is what answers the toughness, and it looks
   -- back for exactly this slot and Binding.sacrificedPermanent;
   -- Pawl.Engine.Projection.controllerWithLastKnown answers the controller for any
   -- slot PlayerRef.ControllerOfBound names.
@@ -755,7 +755,7 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
 -- this rule landed, and no reader of the slot in data/cards/ can tell the
 -- difference. TWO OR MORE are bound as a GROUP (Binding.toObjects), which is
 -- the shape Pawl.Types.Binding documents for "every object one instruction
--- produced or acted on" and which Pawl.Engine.Resolve.objectRefObjects reads
+-- produced or acted on" and which Pawl.Engine.Resolve.Slots.objectRefObjects reads
 -- ahead of the recipient path for ObjectRef.InSlot.
 --
 -- The shape is conditional because the two readers are: an ObjectRef reads

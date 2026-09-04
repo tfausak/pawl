@@ -330,7 +330,7 @@ refSlots = foldMap (either playerRefSlots Set.singleton) . nestedRefs
 
 -- The slots one reference names -- renamePlayerRef's reading partner, derived
 -- from the same traversal so the two cannot disagree about which arms name one.
--- Pawl.Engine.Resolve.playerRefSlots is the third reader of this classification
+-- Pawl.Engine.Resolve.Slots.playerRefSlots is the third reader of this classification
 -- and adds the ARITY each read has, which no rename needs.
 playerRefSlots :: PlayerRef.PlayerRef -> Set SlotName
 playerRefSlots = Const.getConst . overPlayerRefSlots (Const.Const . Set.singleton)

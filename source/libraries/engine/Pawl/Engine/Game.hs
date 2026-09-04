@@ -619,7 +619,7 @@ faceOfObject gs obj = case Object.facing obj of
   Facing.FaceUp -> fmap (resolveFaceFor (Just obj)) (cardOfSource gs (Just (Object.source obj)))
 
 -- CR 201.1 / 709.4a: the names of the object an id names -- `faceOf`'s plural
--- companion, and the value Pawl.Engine.Projection.baseCharacteristics seeds
+-- companion, and the value Pawl.Engine.Projection.View.baseCharacteristics seeds
 -- ProjectedCharacteristics.names from.
 --
 -- EMPTY for a face-down object, which is CR 708.2a's "no name" said in the one
@@ -723,7 +723,7 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
 --
 -- Through faceOfWithLastKnown, so a departed permanent's ability is read against
 -- the same declarations it carried while it existed (CR 608.2h). The face-up
--- face only, where Pawl.Engine.Resolve.declaredDelayedAbility falls back to the
+-- face only, where Pawl.Engine.Resolve.Effect.declaredDelayedAbility falls back to the
 -- card's other faces: that fallback is about which face happens to be up as an
 -- opcode RUNS, and a zone-functioning question is asked of the face the ability
 -- was read off.
@@ -877,7 +877,7 @@ facesTurned before after = filter (\oid -> faceIn before oid /= faceIn after oid
 -- what both callers want. Pawl.Engine.Daytime asks this of battlefield
 -- permanents, where CR 110.1 leaves no such object, and reads it beside a
 -- keyword test that such an object fails anyway;
--- Pawl.Engine.Projection.viewOfCharacteristics reads it beside a battlefield
+-- Pawl.Engine.Projection.View.viewOfCharacteristics reads it beside a battlefield
 -- conjunct of its own, so CR 701.27g answers False for such an object either
 -- way.
 isFrontFaceUp :: ObjectId -> GameState -> Bool
@@ -969,7 +969,7 @@ isActivatedAbility oid gs = case lookupObject oid gs of
 -- ability was activated or triggered. Nothing for anything that is not an
 -- ability on the stack, and for CR 725.2's inherent trigger, which has no
 -- source. The id alone: once the source has left, CR 113.7a's last known
--- information is filed under it (Pawl.Engine.Projection.lastKnownView).
+-- information is filed under it (Pawl.Engine.Projection.View.lastKnownView).
 abilitySourceOf :: ObjectId -> GameState -> Maybe ObjectId
 abilitySourceOf oid gs = case lookupObject oid gs of
   Nothing -> Nothing
@@ -1118,7 +1118,7 @@ honourShuffle offered answer =
 -- Pawl.Engine.Projection and Pawl.Engine.Count already case on it too.
 --
 -- The whole record rather than the caster alone, which is all castsThisTurn
--- wants: Pawl.Engine.Event.castOrdinal needs the spell's id off the same arm,
+-- wants: Pawl.Engine.Event.Match.castOrdinal needs the spell's id off the same arm,
 -- to find where in the log the cast it is matching sits.
 castOf :: GameEvent -> Maybe SpellWasCast.SpellWasCast
 castOf event = case event of

@@ -55,7 +55,7 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- Villainous Ogre's "as long as you control a Demon, this creature has '{B}:
     -- Regenerate this creature'" is the pool's -- unlike max speed's, its clause
     -- reads the BOARD, so the reader it is judged through has to be the one at the
-    -- caller's own layer depth (Pawl.Engine.Projection.abilitiesFromCharacteristics).
+    -- caller's own layer depth (Pawl.Engine.Projection.View.abilitiesFromCharacteristics).
     -- A grant whose grantee is the granting object itself and whose granted
     -- ability is printed right there is indistinguishable from the printed ability
     -- plus its own gate, so pawl carries the gate on the ability rather than

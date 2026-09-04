@@ -5120,7 +5120,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- many permanents the ref swept. CR 603.2c's batch conditions are what a
       -- board can read that with -- TriggerCondition.PermanentsGetCounters fires
       -- once for the sweep where its per-permanent twin fires once per recipient,
-      -- and Pawl.Engine.Event.batchScoped is that fork.
+      -- and Pawl.Engine.Event.Trigger.batchScoped is that fork.
       --
       -- The per-recipient CR 122.6 funnel below is no argument for N groups: CR
       -- 616.1g is where the rules say events nest at all -- a replacement may

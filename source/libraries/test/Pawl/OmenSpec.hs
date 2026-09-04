@@ -74,7 +74,7 @@ spec s registry = Spec.describe s "Omen" $ do
   --
   -- Asked of Pawl.Engine.Card.castableFaces DIRECTLY as well as through the
   -- board below, because that list is what every road to a cast reads -- the
-  -- priority actions here, and Pawl.Engine.Resolve.offerCast, which builds its
+  -- priority actions here, and Pawl.Engine.Resolve.Effect.offerCast, which builds its
   -- own candidates over the same call.
   Spec.it s "CR 720.3 both halves are castable faces" $ do
     dawnbreaker <- S.printingOf s registry "Riling Dawnbreaker"

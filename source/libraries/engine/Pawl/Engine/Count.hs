@@ -183,7 +183,7 @@ revealedArriving gs oid =
 
 -- CR 109.1 / 120.1: THE player candidate's view -- Pawl.Engine.Filter.playerView
 -- with the one field a bare PlayerId cannot answer filled from the board.
--- Pawl.Engine.Projection.viewOfCharacteristics fills Filter.dealtDamageThisTurn
+-- Pawl.Engine.Projection.View.viewOfCharacteristics fills Filter.dealtDamageThisTurn
 -- for an object off Game.damagedObject; this is its player half, off
 -- Game.wasDealtDamageThisTurn, so CR 120.1's four recipients are read back
 -- through one event reader (#2157).
@@ -458,7 +458,7 @@ playersFor viewOf context gs ref =
         --
         -- Not implemented: a source object that EXISTED and then ceased, which CR
         -- 729.5 leaves a resumed resolution holding -- this answers Nothing where
-        -- Pawl.Engine.Resolve.playerRefPlayers' arm answers "excludes nobody", and
+        -- Pawl.Engine.Resolve.Slots.playerRefPlayers' arm answers "excludes nobody", and
         -- neither consults GameState.detachedBindings (#2493).
         PlayerRef.EachPlayerExcept name ->
           case Filter.source context >>= \src -> Game.lookupObject src gs of
@@ -533,7 +533,7 @@ playersFor viewOf context gs ref =
           fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
         -- CR 508.6's set: the players controlling a creature attacking the player
         -- a slot names, narrowed by the relation the card printed. The SAME fold
-        -- Pawl.Engine.Resolve.playerRefPlayers makes for the reference in an
+        -- Pawl.Engine.Resolve.Slots.playerRefPlayers makes for the reference in an
         -- effect's own recipient position, so the two cannot come apart about who
         -- is attacking whom -- AttackTarget.OfPlayer alone (CR 508.1b lists player,
         -- planeswalker and battle separately), read LIVE off GameState.combat
@@ -565,7 +565,7 @@ playersFor viewOf context gs ref =
 --
 -- TWO roads, and the first is why Filter.Context carries the map at all. A
 -- resolution supplies its own CR 608.2b-filtered slots
--- (Pawl.Engine.Resolve.effectContext), and that is the only read that answers for
+-- (Pawl.Engine.Resolve.Slots.effectContext), and that is the only read that answers for
 -- an ABILITY: CR 113.7 makes Filter.source the ability's source permanent, while
 -- its targets and its trigger's bindings are stamped on the ability object on the
 -- stack (see #1783). The SOURCE's own bindings are the fallback, which is the
@@ -913,7 +913,7 @@ viewOfSnapshot mController isToken counters snapshot =
       -- and `power` too -- so this answers what the object HAD at the event.
       --
       -- Rule 702's own abilities are minted on top, exactly as
-      -- Pawl.Engine.Projection.abilitiesFromCharacteristics mints them: a
+      -- Pawl.Engine.Projection.View.abilitiesFromCharacteristics mints them: a
       -- ProjectedCharacteristics stores the printed and granted list only, so
       -- reading the field bare would answer differently here than live for a
       -- Vehicle with crew or a land with reinforce. CR 702.178a's grant condition

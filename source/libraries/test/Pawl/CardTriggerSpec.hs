@@ -2679,7 +2679,7 @@ brambleElementalSpec s registry =
 -- Presence of Gond (Pawl.ActivateSpec) is the activated half of the same
 -- Modification arm. What this group adds is the other side of the fold: a
 -- granted ability has to be found by the CR 603.2 scan, not only by the
--- projection, and Pawl.Engine.Event.eventTriggers reads
+-- projection, and Pawl.Engine.Event.Trigger.eventTriggers reads
 -- ProjectedCharacteristics.triggeredAbilities to do it.
 --
 -- Three seats, and the two that matter are DIFFERENT players: alice controls the
@@ -2846,7 +2846,7 @@ betrayalSpec s registry = Spec.describe s "CR 701.26a a becomes-tapped trigger" 
   -- CR 603.2e: "An ability that triggers when a permanent 'becomes tapped' ...
   -- doesn't trigger if the permanent enters the battlefield in that state." The
   -- pair is the same board under the two writes -- Event.enterTapped, which
-  -- Pawl.Engine.Resolve.putTapped mirrors, against Event.tap -- so the only thing
+  -- Pawl.Engine.Resolve.Effect.putTapped mirrors, against Event.tap -- so the only thing
   -- that differs is which one the engine used.
   Spec.it s "CR 603.2e a permanent stamped tapped as it enters fires nothing" $ do
     board <- betrayalBoard s registry True

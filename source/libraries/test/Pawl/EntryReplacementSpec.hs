@@ -1743,7 +1743,7 @@ ordersEntry seasonFirst seasonId p = case p of
     let wantSeason = if asked <= (0 :: Int) then seasonFirst else not seasonFirst
     pure
       ( maybe
-          (error "Pawl.ReplacementSpec.ordersEntry: no matching row offered")
+          (error "Pawl.EntryReplacementSpec.ordersEntry: no matching row offered")
           Int.toNaturalSaturating
           (List.findIndex ((== wantSeason) . (== seasonId) . ReplacementEntry.source) entries)
       )
@@ -2164,7 +2164,7 @@ squadCaptainSpec s registry = Spec.describe s "Squad Captain (CR 614.12)" $ do
 -- is why the 0/0 survives in between.
 --
 -- X is defined by the ability's own text (CR 107.3c) and answered once, when the
--- effect is applied (CR 608.2h) -- Pawl.Engine.Resolve.freezeRiders, against the
+-- effect is applied (CR 608.2h) -- Pawl.Engine.Resolve.Effect.freezeRiders, against the
 -- resolution's own context, which is what makes Filter.IsSource and CR 109.5's
 -- "you" live on this path.
 --

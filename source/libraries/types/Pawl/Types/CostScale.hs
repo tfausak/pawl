@@ -25,7 +25,7 @@ data CostScale
     -- hybrid half ("A hybrid symbol that is both black and another type is a
     -- black mana symbol, regardless of what cost is paid for it") and rule
     -- 107.4f is the Phyrexian half, which postdates it.
-    -- Pawl.Engine.Projection.symbolColors is the shared classifier that makes
+    -- Pawl.Engine.Projection.View.symbolColors is the shared classifier that makes
     -- all three fall out.
     PerColoredSymbol Color.Color
   deriving (Eq, Ord, Show)

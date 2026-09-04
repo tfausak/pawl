@@ -1636,7 +1636,7 @@ modalSlotsOffend abilityBound modal =
    in any modeOffends (Modal.modes modal)
 
 -- What performing a hand action binds, and the whole of it:
--- Pawl.Engine.Resolve.performHandAction hands applyEffect an environment holding
+-- Pawl.Engine.Resolve.Effect.performHandAction hands applyEffect an environment holding
 -- CR 113.7's `self` and nothing else.
 --
 -- NOT the whole reserved set, and `you` is the difference that matters: casting
@@ -2332,9 +2332,9 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 --
 -- The two pregame windows are here too, though cardResolutionEffects does not
 -- reach them: a hand action's effects run through the same
--- Pawl.Engine.Resolve.applyEffect the resolution carriers do, so a MoveToZone in
+-- Pawl.Engine.Resolve.Effect.applyEffect the resolution carriers do, so a MoveToZone in
 -- one that names CR 113.7's `self` as the incarnation it minted would overwrite
--- the very binding Pawl.Engine.Resolve.performHandAction stamped, mid-action.
+-- the very binding Pawl.Engine.Resolve.Effect.performHandAction stamped, mid-action.
 ownBoundSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 ownBoundSlots card = Resolve.definedSlots (cardResolutionEffects card <> concat (handActions card))
 
@@ -3948,9 +3948,9 @@ blockPermissionFilters permission =
 --   * SourceHostFramed -- a position whose evaluator fills
 --     Filter.Context.sourceAttachedTo, which is five rather than one: a static
 --     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
---     triggered ability's CR 603.4 clause (Pawl.Engine.Event.interveningHolds and
+--     triggered ability's CR 603.4 clause (Pawl.Engine.Event.Trigger.interveningHolds and
 --     Pawl.Engine.Stack's CR 608.2a re-check), an effect's
---     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.objectRefObjects), a printed
+--     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.Slots.objectRefObjects), a printed
 --     PLAYER ability's own effect (Pawl.Engine.PlayerEffect.matchesObjectFrom,
 --     which takes the source off the row `applying` returns), and a CR 614.1
 --     replacement ROW's own Filters -- its pattern's two and CR 614.9's printed
@@ -4024,7 +4024,7 @@ data Framing
   | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's, the one
     -- card-authored position whose candidates are never objects in the game:
     -- Pawl.Engine.Event.eligible matches it against a printed FACE
-    -- (Pawl.Engine.Projection.viewOfCard). Marked not because its evaluator
+    -- (Pawl.Engine.Projection.View.viewOfCard). Marked not because its evaluator
     -- FILLS a field the others leave empty but because its candidate view leaves
     -- one empty that every other position fills -- `identity` -- so
     -- Filter.IsBound is a silent False there and nowhere else.
@@ -4163,7 +4163,7 @@ unframed = fmap ((,) Unframed)
 -- first four listed on Framing above, the fifth carrying ReplacementRowFramed
 -- instead for the reason that constructor gives. An ObjectRef's own Filter is
 -- always one, whatever
--- effect carries it, because Pawl.Engine.Resolve.objectRefObjects is the single
+-- effect carries it, because Pawl.Engine.Resolve.Slots.objectRefObjects is the single
 -- site that turns an ObjectRef into objects.
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
@@ -4281,7 +4281,7 @@ effectFilters effect = case effect of
   -- the framings' evaluators is the one that reads it.
   Effect.ChooseCardName restriction -> unframed [restriction]
   -- THE one wish-framed position. CR 400.11c's filter is matched against a
-  -- PRINTED FACE (Pawl.Engine.Projection.viewOfCard) rather than against an
+  -- PRINTED FACE (Pawl.Engine.Projection.View.viewOfCard) rather than against an
   -- object any of the other framings' evaluators project, which is what makes
   -- Filter.IsBound a silent False in it.
   Effect.FromOutsideTheGame payload -> outsideTheGameFramed [FromOutsideTheGame.filter payload]
@@ -4577,7 +4577,7 @@ enchantSlots card = Face.enchant card <> grantedEnchantSlots card
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
   frame Unframed (triggerConditionFilters (TriggeredAbility.condition ability))
-    -- THE CR 603.4 position: Pawl.Engine.Event.interveningHolds and
+    -- THE CR 603.4 position: Pawl.Engine.Event.Trigger.interveningHolds and
     -- Pawl.Engine.Stack's CR 608.2a re-check both supply the source's host here,
     -- and the trigger CONDITION above them is matched by Event.matchesTrigger,
     -- which does not.
@@ -5491,7 +5491,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Not folded into the mode lint below: that one compares reads against a
   -- card's DECLARED slots, and a CDA declares none, so its whole available side
   -- is the reserved set. The printed boxes are swept alongside the CDA because a
-  -- slot named there reaches the same evaluator (Pawl.Engine.Projection.seedCharacteristicPT
+  -- slot named there reaches the same evaluator (Pawl.Engine.Projection.View.seedCharacteristicPT
   -- substitutes only into a Star).
   Spec.it s "a printed or characteristic-defining P/T reads only reserved slots" $ do
     ps <- S.allPrintings s

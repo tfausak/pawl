@@ -1272,7 +1272,7 @@ flunkSpec s registry =
           Spec.assertEqWith s "its owner bob still holds three" (S.handSize S.bob after) 3
 
 -- CR 113.7 / CR 608.2c: a count whose SCOPE names the player an ABILITY's slot
--- bound. Pawl.Engine.Resolve.effectContext frames the resolution on the ability's
+-- bound. Pawl.Engine.Resolve.Slots.effectContext frames the resolution on the ability's
 -- SOURCE, while its target is stamped on the ability object on the stack, so
 -- Count.playersFor reading the source's own bindings found nothing and the count
 -- came back unanswered -- a mill of nothing. A SPELL cannot show it: its source

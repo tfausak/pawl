@@ -545,7 +545,7 @@ sameNameAsBoundTag = Text.pack "SameNameAsBound"
 --
 -- An ALLOWLIST of two rather than "wherever Filter.Context.slotNames is filled",
 -- which since #2141's search half is the wider set: every position a resolution
--- reaches through Pawl.Engine.Resolve.effectContext has the names -- an
+-- reaches through Pawl.Engine.Resolve.Slots.effectContext has the names -- an
 -- ObjectRef's own affected set among them, which is SourceHostFramed inside an
 -- effect (Resolve.battlefieldMatching). So this rejects the atom in positions
 -- that would in fact answer, and only in that direction -- widen it when a card
@@ -559,7 +559,7 @@ sameNameAsBoundCounts card =
 -- CR 709.4a's bound-name comparison is answerable only where
 -- Filter.Context.slotNames is filled, which two callers do:
 -- Pawl.Engine.Target.admittedGiven, matching a MODE's target slot Filter, and
--- Pawl.Engine.Resolve.effectContext, which all but two of a resolution's
+-- Pawl.Engine.Resolve.Slots.effectContext, which all but two of a resolution's
 -- positions go through -- the search filter among them.
 -- Filter.contextFor and Filter.contextComparingPower leave it empty, so
 -- Filter.SameNameAsBound in a Count filter, an affected set or a cost criterion
@@ -663,7 +663,7 @@ isBoundCounts card =
 
 -- CR 400.11c's candidates are cards outside the game, which no spell or ability
 -- affects, so no slot of the resolution names one -- and
--- Pawl.Engine.Projection.viewOfCard, the view they are matched through, fills no
+-- Pawl.Engine.Projection.View.viewOfCard, the view they are matched through, fills no
 -- `identity` for Filter.IsBound to compare in any case. The atom in a wish's
 -- filter is therefore a silent False rather than a rejected card. This is where
 -- that is made loud.
@@ -733,7 +733,7 @@ timesKickedWithOffends card =
 -- that a nested one cannot smuggle either in.
 --
 -- A CR 603.8 STATE trigger, because the two kinds of condition are gathered by
--- different scans: Pawl.Engine.Event.stateTriggers walks the battlefield asking
+-- different scans: Pawl.Engine.Event.Trigger.stateTriggers walks the battlefield asking
 -- whether the state holds, and Event.matchesTrigger walks the event log. An
 -- ability that was both would be gathered by stateTriggers whenever any clause
 -- held (that arm answers `any`), and CR 603.8's "not again until the ability has
@@ -2167,7 +2167,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       (False, (1, 0))
     -- The OTHER accepted position, and the pair to the rejections above: a search
     -- filter is matched in the resolution's own context
-    -- (Pawl.Engine.Resolve.effectContext), so the same buried atom that offends
+    -- (Pawl.Engine.Resolve.Slots.effectContext), so the same buried atom that offends
     -- in every position above is accepted here.
     let searched = base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
     Spec.assertEqWith

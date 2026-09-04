@@ -278,7 +278,7 @@ abilitiesWhenTriggeredSpec s registry =
 --
 -- Sanguine Bond, {3}{B}{B} Enchantment, "Whenever you gain life, target opponent
 -- loses that much life." CR 603.2 makes the amount part of the event that fired
--- the trigger, and Pawl.Engine.Event.eventBindings stamps it under
+-- the trigger, and Pawl.Engine.Event.Binding.eventBindings stamps it under
 -- Pawl.Engine.Binding.eventAmount, which the card's LoseLife reads as an ordinary
 -- Quantity.InSlot.
 --
@@ -1545,7 +1545,7 @@ enrageSpec s registry =
 -- not read: Belltower Sphinx, {4}{U} Creature -- Sphinx 2/5, "Flying. Whenever a
 -- source deals damage to this creature, that source's controller mills that many
 -- cards." Its payload is PlayerRef.ControllerOfBound over the slot
--- Pawl.Engine.Event.eventBindings stamps from DamageEvent.source.
+-- Pawl.Engine.Event.Binding.eventBindings stamps from DamageEvent.source.
 --
 -- NONCOMBAT events throughout, which is the point: the slot is spelled
 -- `combatDamager` for CR 510.2's sake, and a stamp that filtered on DamageKind

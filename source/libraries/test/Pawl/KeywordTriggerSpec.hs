@@ -57,7 +57,7 @@ import qualified Pawl.Types.Zone as Zone
 
 -- CR 702.70: poisonous -- the first keyword whose rule text IS a triggered
 -- ability, so it is minted by Pawl.Engine.Keyword and gathered by the same
--- Pawl.Engine.Event.eventTriggers scan a printed trigger goes through, with the damaged
+-- Pawl.Engine.Event.Trigger.eventTriggers scan a printed trigger goes through, with the damaged
 -- player carried across in the reserved Binding.triggerPlayer slot.
 poisonousSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 poisonousSpec s registry =
@@ -312,7 +312,7 @@ ingestSpec s registry =
 -- 'Whenever this creature attacks, defending player sacrifices N permanents.'"
 -- Rule 702 states it as a triggered ability, like CR 702.70a's poisonous and CR
 -- 702.91a's battle cry, so it is minted by
--- Pawl.Engine.Keyword and gathered by the same Pawl.Engine.Event.eventTriggers
+-- Pawl.Engine.Keyword and gathered by the same Pawl.Engine.Event.Trigger.eventTriggers
 -- scan.
 --
 -- Slivdrazi Monstrosity is the card, and it reaches annihilator the long way
@@ -423,7 +423,7 @@ annihilatorSpec s registry =
 -- turn.'" Rule 702 states it as a triggered
 -- ability, like CR 702.70a's poisonous and CR 702.86a's annihilator, so it is
 -- minted by Pawl.Engine.Keyword
--- and gathered by the same Pawl.Engine.Event.eventTriggers scan.
+-- and gathered by the same Pawl.Engine.Event.Trigger.eventTriggers scan.
 --
 -- Hero of Bladehold is the card, and it is here for a second reason: battle cry
 -- and its printed "whenever this creature attacks, create two 1/1 white Soldier

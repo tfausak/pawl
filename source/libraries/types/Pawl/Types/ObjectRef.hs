@@ -94,7 +94,7 @@ data ObjectRef
     ChosenCardInHand ChosenCardInHand.ChosenCardInHand
   | -- | CR 608.2d / Commune with the Gods: a card chosen out of the group a slot
     -- holds -- the printed "from among them" -- read through
-    -- Pawl.Engine.Resolve.fromAmongMembers.
+    -- Pawl.Engine.Resolve.Effect.fromAmongMembers.
     ChosenCardFromAmong ChosenCardFromAmong.ChosenCardFromAmong
   | -- | CR 608.2c / Mulch: every card in the group a slot holds that the Filter
     -- matches -- the printed "all land cards revealed this way", the arm above's

@@ -1424,7 +1424,7 @@ prefersLongYieldFrom wanted p = case p of
 -- 2 damage to you") is the pool's first mana ability with a clause beyond its
 -- mana, and CR 605.3b is what makes that clause the payment path's business
 -- rather than a resolution's: the ability never goes on the stack, so nothing
--- above Pawl.Engine.Cost would run it. Pawl.Engine.Resolve.performManaAbility is
+-- above Pawl.Engine.Cost would run it. Pawl.Engine.Resolve.Effect.performManaAbility is
 -- the executor the payment path is handed for it.
 ancientTombSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ancientTombSpec s registry = Spec.describe s "Ancient Tomb" $ do

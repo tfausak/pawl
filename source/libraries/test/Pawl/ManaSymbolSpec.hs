@@ -1752,18 +1752,18 @@ castAndResolveRecording answer gs oid =
 -- Pay the {G/U/P} with life, and answer the CR 616.1e race by SOURCE -- Doubling
 -- Season's row names the enchantment, compleated's names Tamiyo -- so the
 -- assertion does not rest on the engine's canonical candidate order.
--- Pawl.ReplacementSpec.raceIsSelf is the same idiom.
+-- Pawl.DamageReplacementSpec.raceIsSelf is the same idiom.
 racesCompleated :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 racesCompleated wantCompleated seasonId p = case p of
   Prompt.ChooseReplacement _ _ entries ->
     maybe
-      (error "Pawl.ManaSpec.racesCompleated: no matching row offered")
+      (error "Pawl.ManaSymbolSpec.racesCompleated: no matching row offered")
       Int.toNaturalSaturating
       (List.findIndex ((== wantCompleated) . (/= seasonId) . ReplacementEntry.source) entries)
   _ -> announcesBoth PhyrexianPayment.PaysLife greenMana p
 
 -- Was this recorded answer a CR 616.1 ordering choice?
--- Pawl.ReplacementSpec.wasAskedToReplace as a per-response predicate, so the
+-- Pawl.PreventionSpec.wasAskedToReplace as a per-response predicate, so the
 -- case above can COUNT the orders asked rather than only notice one.
 wasReplacementChoice :: Response.Response -> Bool
 wasReplacementChoice r = case r of

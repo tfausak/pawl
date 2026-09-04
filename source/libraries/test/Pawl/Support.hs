@@ -586,12 +586,12 @@ withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1
 
--- The one CR 103.5b performer (Pawl.Engine.Resolve.performHandAction), so a test
+-- The one CR 103.5b performer (Pawl.Engine.Resolve.Effect.performHandAction), so a test
 -- that only wants a game set up does not have to reach into Pawl.Engine.Resolve for it.
 performer :: HandActionPerformer.HandActionPerformer
 performer = Resolve.performHandAction
 
--- The one CR 405.6c performer (Pawl.Engine.Resolve.performManaAbility), which
+-- The one CR 405.6c performer (Pawl.Engine.Resolve.Effect.performManaAbility), which
 -- every payment path takes as a parameter, so a test that pays a cost does not
 -- have to reach into Pawl.Engine.Resolve for it.
 manaPerformer :: ManaAbilityPerformer.ManaAbilityPerformer
@@ -1346,7 +1346,7 @@ markDamage oid n gs =
 
 -- The events recorded so far this turn, in order, WITHOUT the EventGroup each
 -- carries. Which events were simultaneous is a question only
--- Pawl.Engine.Event.eventTriggers asks (CR 603.10a), and it reads the log itself;
+-- Pawl.Engine.Event.Trigger.eventTriggers asks (CR 603.10a), and it reads the log itself;
 -- an assertion about what happened wants the events alone.
 eventsOf :: GameState.GameState -> [GameEvent.GameEvent]
 eventsOf = fmap LoggedEvent.event . Foldable.toList . GameState.events

@@ -17,6 +17,6 @@ module Pawl.Types.RequiredDefender where
 data RequiredDefender
   = -- | CR 108.4 / 303.4m: the controller of the object the source is attached
     -- to. Names nobody when the source is attached to nothing, or to a player
-    -- (Pawl.Engine.Projection.hostOf answers Nothing for both).
+    -- (Pawl.Engine.Projection.View.hostOf answers Nothing for both).
     ControllerOfAttached
   deriving (Bounded, Enum, Eq, Ord, Show)

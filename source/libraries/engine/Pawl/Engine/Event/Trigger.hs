@@ -714,7 +714,7 @@ eventTriggers events gs =
       -- (Pawl.ZoneTriggerSpec's `becameSlotSpec` proves the trigger fires either
       -- way). Ivory Gargoyle's delayed-trigger pair (CR 113.6m's final
       -- sentence, #2500) is what reaches the exception instead, its own payload
-      -- naming the reserved slot: `Pawl.ZoneTriggerSpec.ivoryGargoyleSpec` proves
+      -- naming the reserved slot: `Pawl.LeavesTriggerSpec.ivoryGargoyleSpec` proves
       -- a mutation dropping the exception empties this event's own candidate
       -- list.
       --

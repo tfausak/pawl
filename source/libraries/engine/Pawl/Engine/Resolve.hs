@@ -116,7 +116,7 @@ targetSlotSlots slot =
       -- off the announcement the caller hands over.
       --
       -- What it buys is the pairing -- a card whose bound names an amount its
-      -- CONDITION does not supply (Pawl.Engine.Event.eventBindingSlots) is caught
+      -- CONDITION does not supply (Pawl.Engine.Event.Binding.eventBindingSlots) is caught
       -- only because the read is reported here. No card in data/cards/ misauthors
       -- that pairing, so the proof is a planted one; see amountSlots below for
       -- which case proves it.

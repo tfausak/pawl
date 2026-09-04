@@ -688,7 +688,7 @@ graveyardEffectZoneTriggerSpec s registry =
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered begun)) []
 
 -- CR 114.4: "abilities of emblems function in the command zone" -- the third zone
--- Pawl.Engine.Event.eventTriggers scans, and the only one whose membership is
+-- Pawl.Engine.Event.Trigger.eventTriggers scans, and the only one whose membership is
 -- decided by the OBJECT rather than by the trigger condition (CR 113.6p).
 --
 -- Ajani, Adversary of Tyrants {2}{W}{W} Legendary Planeswalker -- Ajani, loyalty

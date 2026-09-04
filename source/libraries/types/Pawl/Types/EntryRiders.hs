@@ -119,7 +119,7 @@ import qualified Pawl.Types.TapState as TapState
 -- token enters with X +1/+1 counters on it, where X is the number of other
 -- creatures you control", whose X is defined by the ability's own text (CR
 -- 107.3c) -- while the funnel takes EntryRiders Natural, a settled number.
--- Pawl.Engine.Resolve.freezeRiders is the one bridge: it evaluates each count
+-- Pawl.Engine.Resolve.Effect.freezeRiders is the one bridge: it evaluates each count
 -- once, when the effect is applied, which is the rule the parameter exists to
 -- state. A Quantity reaching the funnel unevaluated is then a type error rather
 -- than a context built where there is none to build.

@@ -103,7 +103,7 @@ data PayGate = MkPayGate
     -- Pawl.Engine.Cost pays a component list one element at a time.
     --
     -- A COUNTER KIND rather than a general Quantity, because no producer needs
-    -- more; a widened field would take Pawl.Engine.Projection.rewriteQuantity
+    -- more; a widened field would take Pawl.Engine.Projection.Rewrite.rewriteQuantity
     -- through rewritePayGate, as rewriteEffect's own descent already does, where
     -- the narrow one takes Pawl.Engine.Filter.rewriteCounterKind. Cyclone's
     -- "sacrifice this enchantment unless you pay {G} for each wind counter on it"

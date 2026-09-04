@@ -3,7 +3,7 @@
 -- readings that rule defines fold this over an ability's effects, one per kind
 -- of ability: Pawl.Engine.Activate.zoneFunctionedFrom takes the cost half
 -- (Pawl.Engine.Cost.zoneFunctionedFrom) alongside it, and
--- Pawl.Engine.Event.zoneFunctionedFrom has no cost half to take.
+-- Pawl.Engine.Event.Trigger.zoneFunctionedFrom has no cost half to take.
 --
 -- Here rather than in Pawl.Engine.Cost because it is a classification of an
 -- EFFECT and that module's whole contract is to be the sole casing home for a
@@ -61,7 +61,7 @@ import Pawl.Types.Zone (Zone)
 -- needs the text an Effect.ArmDelayedTrigger's name stands for, and the opcode
 -- carries only the name (Pawl.Types.Face.delayedAbilities holds the payload,
 -- Effect being first-order). Every caller supplies the map off the same card the
--- ability is read from, which is where Pawl.Engine.Resolve.declaredDelayedAbility
+-- ability is read from, which is where Pawl.Engine.Resolve.Effect.declaredDelayedAbility
 -- resolves the name at run time.
 --
 -- Not implemented: rule 702's own delayed abilities
@@ -161,7 +161,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, and the answer stands: the rider
   -- does not run as an effect of this ability at all, but from
-  -- Pawl.Engine.Resolve.runPreventionRider against the effect's own source, so
+  -- Pawl.Engine.Resolve.Effect.runPreventionRider against the effect's own source, so
   -- nothing it does can be this ability moving "the object it's on".
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing

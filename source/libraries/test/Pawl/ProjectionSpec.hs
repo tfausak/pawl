@@ -1383,7 +1383,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- rewrite that reached only Mode.effects would leave this assertion at Swamp.
   --
   -- Pawl.TriggerSpec's whole-card case is the end-to-end proof, through
-  -- Pawl.Engine.Event.stateTriggers.
+  -- Pawl.Engine.Event.Trigger.stateTriggers.
   Spec.it s "CR 612.1 hacking Barbarian Outcast swaps the land type inside its triggered ability" $ do
     barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
     let base = Setup.emptyGame S.bothPlayers

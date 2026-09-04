@@ -1411,7 +1411,7 @@ castFromGraveyardExile =
 -- a second instance is redundant -- lifelink's reading, not toxic's.
 --
 -- NOT exhaustive, where mintedReplacementsFor is. The pattern here is
--- Pawl.Engine.Projection.definesColorless: one function that decides what one
+-- Pawl.Engine.Projection.View.definesColorless: one function that decides what one
 -- rule means, named after the rule rather than after the shape. A keyword whose
 -- meaning is a static ability is rare enough that a hundred-arm case would say
 -- nothing a reader could not get from the rule number.

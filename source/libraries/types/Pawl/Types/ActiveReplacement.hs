@@ -122,7 +122,7 @@ data ActiveReplacement = MkActiveReplacement
     -- Both installers restrict it: installDamageRow's rows are empty for a shield
     -- naming no slot, and an Effect.Replace's keep its clause's reads beside the
     -- row's. What the map does NOT hold is an id a resolution baked into the
-    -- pattern itself; Pawl.Engine.Resolve.referentsOfReplacement reports those.
+    -- pattern itself; Pawl.Engine.Resolve.Effect.referentsOfReplacement reports those.
     --
     -- REWRITTEN by CR 400.7h: a card cast under a permission this row's source
     -- granted becomes a new object (CR 400.7), and Pawl.Engine.Cast.followIntoSpell

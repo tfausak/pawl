@@ -20,7 +20,7 @@ data TurnScope
   | ControllersTurn
   | -- | The mirror of ControllersTurn: Brineborn Cutthroat's "during an
     -- opponent's turn". Read as CR 102.3's relation between the active player
-    -- and the reader's own player (Pawl.Engine.Event.turnScopeAdmits), which is
+    -- and the reader's own player (Pawl.Engine.Event.Match.turnScopeAdmits), which is
     -- every other seat at two seats (CR 102.2) and in a Free-for-All (CR 806.1),
     -- and a seat on another team in a game between teams.
     OpponentsTurn

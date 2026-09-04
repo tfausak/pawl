@@ -22,6 +22,6 @@ data MonarchTarget
     -- bound in a target slot, announced under CR 601.2c and re-checked under CR
     -- 608.2b like any other target. The first arm that reads a slot, so it is
     -- also what makes Effect.BecomeMonarch a slot-reading opcode for
-    -- Pawl.Engine.Resolve.slotsOf and the dataflow lint.
+    -- Pawl.Engine.Resolve.Slots.slotsOf and the dataflow lint.
     InSlot SlotName.SlotName
   deriving (Eq, Ord, Show)

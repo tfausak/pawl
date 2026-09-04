@@ -10,7 +10,7 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- Pawl.Types.EachCardInGraveyard's shape over the other per-player zone, and
 -- resolved the same way: the same scope, read by the same
 -- Pawl.Engine.Target.zoneScopePlayers, and the same fold in
--- Pawl.Engine.Resolve.objectRefObjects. The zone is BAKED IN rather than carried
+-- Pawl.Engine.Resolve.Slots.objectRefObjects. The zone is BAKED IN rather than carried
 -- as a Pawl.Types.Zone, for the reason that arm's header gives.
 --
 -- THE HIDDEN-ZONE QUESTION (CR 400.2) IS THE CARD'S TO ANSWER, NOT THE ENGINE'S.

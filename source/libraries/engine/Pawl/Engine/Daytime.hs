@@ -86,7 +86,7 @@ hasKeyword kw pcs oid = case Map.lookup oid pcs of
 --
 -- Read by CR 701.28's convert too, and CR 701.28f is why it must be: "if a spell
 -- or ability states that a permanent can't transform, that permanent also can't
--- convert". The two opcodes share one Pawl.Engine.Resolve.turnPermanentsOver, so
+-- convert". The two opcodes share one Pawl.Engine.Resolve.Effect.turnPermanentsOver, so
 -- that holds by construction rather than by a second check.
 restrictsTransform :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Bool
 restrictsTransform pcs oid =
