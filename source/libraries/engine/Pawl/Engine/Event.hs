@@ -1147,9 +1147,8 @@ eligible predicate source pid gs =
 --
 -- The card is MINTED, Pawl.Engine.Dungeon.enter's road: outside the game is not
 -- a zone (CR 400.11), so no object stood for the card and the move into the hand
--- is not a zone change. Pawl.Engine.mintCard is where that happens, and
--- its haddock says why the insertion does not go through
--- `changeZone`.
+-- is not a zone change. `mintCard` above is where that happens, and its haddock
+-- says why the insertion does not go through `changeZone`.
 --
 -- The pool is SPENT, unlike Pawl.Engine.Dungeon.enter's supply: CR 400.11b keeps
 -- a card brought in "in the game until the game ends", so a second Burning Wish
@@ -1205,9 +1204,8 @@ bringInto payload source pid = do
 -- the card into their hand. Split out from `bringInto` above because it is the half
 -- every other road into the game will want -- CR 727.2's restart (#135) and CR
 -- 707.13's copy created outside the game (#888) -- and none of those reveals
--- anything. The SPEND is the whole of what it adds over
--- Pawl.Engine.mintCard, which Alchemy's conjure reaches with nothing to
--- spend.
+-- anything. The SPEND is the whole of what it adds over `mintCard`, which
+-- Alchemy's conjure reaches with nothing to spend.
 bringIn :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
 bringIn pid printingId gs =
   let (oid, gs1) = mintCard pid Nothing printingId Zone.Hand LibraryPosition.defaultValue gs

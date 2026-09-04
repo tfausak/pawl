@@ -86,6 +86,8 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
+import qualified Pawl.Types.DrawR as DrawR
+import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
@@ -2890,9 +2892,11 @@ rewriteReplacementEffect pairs effect = case effect of
   -- and no arm of the rewrite names a Filter or a card. No printed word, so
   -- nothing to swap.
   ReplacementEffect.LifeLossR {} -> effect
-  -- A DrawR is one CR 109.5 relation and one amount of life; no Filter and no
-  -- card, so no printed word to swap. LifeLossR's answer, and for its reason.
-  ReplacementEffect.DrawR {} -> effect
+  -- A DrawR's pattern is one CR 109.5 relation, but the REWRITE can hold CR 400.11c's
+  -- wish filter, which rewriteEffect's own Effect.FromOutsideTheGame arm swaps on
+  -- the resolution road -- so it has to be swapped here too, or the same sentence
+  -- would read one way as a spell and another as a floating row.
+  ReplacementEffect.DrawR r -> ReplacementEffect.DrawR r {DrawR.rewrite = rewriteDrawRewrite pairs (DrawR.rewrite r)}
   -- A DrawCountR is one CR 109.5 relation, one count and one nullary rewrite; no
   -- Filter and no card, so no printed word to swap. DrawR's answer.
   ReplacementEffect.DrawCountR {} -> effect
@@ -2947,6 +2951,23 @@ rewriteDamageRewrite pairs rewrite = case rewrite of
   DamageRewrite.PreventAllBut _ -> rewrite
   DamageRewrite.SetAmount _ -> rewrite
   DamageRewrite.Scale _ -> rewrite
+
+-- CR 612.1 through what a CR 614.1a draw replacement does. The wish filter is the
+-- one printed word a draw rewrite can hold, and it is the SAME Filter
+-- rewriteEffect's Effect.FromOutsideTheGame arm swaps, so the two roads into the
+-- game agree about what a text change did (CR 400.11c).
+--
+-- NO BOARD OBSERVES IT, rewriteDamageRewrite's position above: the pool's one
+-- draw-replacing wish is Ring of Ma'rûf, whose filter is @And []@ and names no
+-- subtype for CR 612.1 to swap, so neutralising the Filter.rewrite here leaves the
+-- suite green. The arm is the rule rather than a proven behaviour -- a card
+-- replacing a draw with "a Goblin card you own from outside the game", under a
+-- text-changing effect, would be what proves it. Exhaustive rather than a
+-- wildcard, rewriteReplacementEffect's posture.
+rewriteDrawRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> DrawRewrite.DrawRewrite -> DrawRewrite.DrawRewrite
+rewriteDrawRewrite pairs rewrite = case rewrite of
+  DrawRewrite.GainLife _ -> rewrite
+  DrawRewrite.FromOutsideTheGame payload -> DrawRewrite.FromOutsideTheGame payload {FromOutsideTheGame.filter = Filter.rewrite pairs (FromOutsideTheGame.filter payload)}
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
