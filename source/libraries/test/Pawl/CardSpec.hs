@@ -3562,8 +3562,24 @@ counterKindFilters kind = case kind of
   CounterKind.Hone -> []
   CounterKind.Named _ -> []
 
+-- A keyword's own Filters, tagged. Almost all of them are KeywordFramed, whose
+-- argument is that no evaluator of a keyword payload supplies a slot-carrying
+-- Context; CR 702.6c's equip quality is the exception, because rule 702.6a's
+-- minted ability carries it into a TARGET SLOT -- see MintedTargetSlot.
+--
+-- The exception is drawn HERE rather than inside keywordPayloadFilters below, so
+-- that walk stays a bare list and stays the exhaustive one: a Keyword
+-- constructor added without an arm there fails to compile, where this selector's
+-- fallthrough decides only a FRAMING and answers KeywordFramed for it. A new
+-- rule-702 keyword that transplanted its payload into a minted slot the way
+-- equip does would owe an arm here, and nothing but this comment says so.
 keywordFilters :: Keyword.Keyword -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
-keywordFilters keyword = keywordFramed $ case keyword of
+keywordFilters keyword = case keyword of
+  Keyword.Equip (Equip.MkEquip cost mQuality) -> keywordFramed (costFilters cost) <> mintedTargetSlot (Maybe.maybeToList mQuality)
+  _ -> keywordFramed (keywordPayloadFilters keyword)
+
+keywordPayloadFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
+keywordPayloadFilters keyword = case keyword of
   Keyword.Cycling (Cycling.MkCycling cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
@@ -3625,10 +3641,13 @@ keywordFilters keyword = keywordFramed $ case keyword of
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
   -- CR 702.6a's payload carries a COST, level up's and outlast's shape below, so
-  -- its Filters are its components' -- plus CR 702.6c's quality, which IS a
-  -- card's, cycling's shape above. The "target creature you control" filter its
-  -- minted ability carries is the ENGINE's, never a card's.
-  Keyword.Equip (Equip.MkEquip cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
+  -- its Filters are its components'. The "target creature you control" filter
+  -- its minted ability carries is the ENGINE's, never a card's.
+  --
+  -- The COST HALF ONLY. CR 702.6c's quality is a card's Filter too, but it is
+  -- not KeywordFramed and so is handed out by keywordFilters above rather than
+  -- here; repeating it in this arm would report it twice.
+  Keyword.Equip (Equip.MkEquip cost _) -> costFilters cost
   -- CR 702.67a's payload is equip's, and so is this: the "target land you
   -- control" filter its minted ability carries is the ENGINE's, never a card's.
   Keyword.Fortify cost -> costFilters cost
@@ -4528,7 +4547,10 @@ triggerConditionSlots triggerCondition = case triggerCondition of
 -- CounterKind hides under a keyword (CR 122.1b). Sound rather than elided --
 -- keywordFilters tags both KeywordFramed, a position whose evaluator supplies no
 -- slots at all, so nothing there reads a slot singly or plurally and there is no
--- clash to report. sweptForSingularSlots below is that argument, and every reader
+-- clash to report. That covers the payload as it is READ under Filter.HasKeyword;
+-- the one payload rule 702 transplants into a slot instead, CR 702.6c's equip
+-- quality, keywordFilters hands out as its own MintedTargetSlot pair, which IS
+-- swept. sweptForSingularSlots below is that argument, and every reader
 -- reaches this walk through framedSlotsReadSingly beside it, so a keyword's
 -- Filter arriving as a TOP-LEVEL tagged pair is dropped exactly as this
 -- non-descent drops it nested (#2741).
@@ -5178,8 +5200,12 @@ blockPermissionFilters permission =
 --     `hostFramed` treats the two alike, and only the ObjectRef twin lint tells
 --     them apart.
 --   * KeywordFramed -- a KEYWORD's own Filter, wherever the keyword is written.
---     The one tag applied by the leaf that PRODUCES the Filter rather than by
---     the position that quotes it, which `frame` below is what keeps.
+--     One of the two tags applied by the leaf that PRODUCES the Filter rather
+--     than by the position that quotes it, which `frame` below is what keeps.
+--   * MintedTargetSlot -- the other, and the one keyword payload that is a
+--     TARGET SLOT filter: CR 702.6c's equip quality. Answered by
+--     Pawl.Engine.Target.admittedGiven like InTargetSlot, with the bindings and
+--     the chosen player of SlotlessCostFramed, which is to say none.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -5277,6 +5303,25 @@ data Framing
     -- a slot. Synthetic Spiteful Rite and Synthetic Spiteful Altar are the cards
     -- (Pawl.CostSpec's "Synthetic Spiteful Rite" group).
     SlotlessCostFramed
+  | -- | A keyword PAYLOAD Filter that rule 702 transplants into the target slot
+    -- of an ability it mints -- CR 702.6c's equip quality, the only one, which
+    -- Pawl.Engine.Keyword.equip conjoins with rule 702.6a's "you control".
+    --
+    -- Neither of its neighbours. Not KeywordFramed, whose whole argument is that
+    -- no evaluator of a keyword's payload supplies a slot-carrying Context: this
+    -- one is answered by Pawl.Engine.Target.admittedGiven like any target slot.
+    -- Not InTargetSlot either, because the minted ability has ONE slot and no
+    -- announcement behind it, so the bindings that position's atoms compare
+    -- against are empty -- Filter.Context.slotNames, slotControllers and
+    -- carrierChosenPlayer are all unfilled, exactly as they are for a
+    -- SlotlessCostFramed cost.
+    --
+    -- So every atom lint treats it as an offence and the sweep still reaches it,
+    -- which is the conservative direction on both axes: a card writing CR
+    -- 702.16k's chosen player, CR 709.4a's bound name, CR 110.2's bound
+    -- controller or CR 115.10a's bound object into an equip quality is rejected
+    -- rather than silently vacuous.
+    MintedTargetSlot
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -5298,6 +5343,9 @@ hostFramed framing = case framing of
   -- Pawl.Engine.Filter.contextFor leaves `sourceAttachedTo` empty too, so a CR
   -- 303.4b question is as unanswerable here as a slot one.
   SlotlessCostFramed -> False
+  -- Pawl.Engine.Target.slotContext leaves it empty as well, so the minted equip
+  -- ability's quality cannot ask a CR 303.4b question either.
+  MintedTargetSlot -> False
 
 -- Is this position's Filter swept for a slot read singly (filterSlotsReadSingly
 -- above)? Every framing but a keyword's own, which is not: no evaluator of a
@@ -5317,8 +5365,11 @@ hostFramed framing = case framing of
 -- whose ReplacementCandidate.slots is empty because no resolution installed a
 -- printed static ability. Target.slotContext's map is answered only by
 -- admittedGiven and lastKnownAdmits, which match a target slot's own Filter --
--- Unframed, never KeywordFramed. Filter.HasKeyword is not even a read: it asks
--- Set membership of the whole keyword.
+-- Unframed, InTargetSlot, or, for the one payload rule 702 transplants into a
+-- slot (CR 702.6c's equip quality), MintedTargetSlot: never KeywordFramed, which
+-- is why that quality carries a framing of its own rather than this one.
+-- Filter.HasKeyword is not even a read: it asks Set membership of the whole
+-- keyword.
 --
 -- The lint is conservative everywhere else, reporting the atom wherever it sits
 -- rather than only where it is answered, so this is the one exemption and it is
@@ -5341,6 +5392,10 @@ sweptForSingularSlots framing = case framing of
   -- which isBoundCounts rejects outright at this position. Keeping the sweep is
   -- what Unframed did before #2881, and it can only reject more.
   SlotlessCostFramed -> True
+  -- SWEPT for the same reason, and here the slot map really is a target slot's
+  -- -- it is only the BINDINGS in it that are empty, so a batch slot read singly
+  -- is as reportable as at InTargetSlot.
+  MintedTargetSlot -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -5379,10 +5434,17 @@ outsideTheGameFramed = fmap ((,) OutsideTheGameFramed)
 slotlessCost :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 slotlessCost = fmap ((,) SlotlessCostFramed)
 
--- Tag a Filter position as a KEYWORD's own. The only tag applied at the leaf
--- that produces the Filter, keywordFilters, rather than at a quoting position.
+-- Tag a Filter position as a KEYWORD's own. One of the two tags applied at the
+-- leaf that produces the Filter, keywordFilters, rather than at a quoting
+-- position.
 keywordFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 keywordFramed = fmap ((,) KeywordFramed)
+
+-- Tag a Filter position as a keyword payload rule 702 carries into a MINTED
+-- ability's target slot -- CR 702.6c's equip quality, the other tag keywordFilters
+-- applies at the leaf.
+mintedTargetSlot :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+mintedTargetSlot = fmap ((,) MintedTargetSlot)
 
 -- Apply a quoting position's Framing to filters that are ALREADY tagged, filling
 -- in only the ones still Unframed. The lifts above take a bare list, which is
@@ -5390,10 +5452,11 @@ keywordFramed = fmap ((,) KeywordFramed)
 -- reach one hand back tagged pairs, and a deeper tag wins because the deeper
 -- position is the one whose evaluator actually reads the Filter.
 --
--- KeywordFramed is the only tag any of those traversals produces, so "a deeper
--- tag wins" has exactly one case today; it is written as the general rule
--- because the alternative -- letting the quoting position overwrite -- is the
--- narrowing this replaced, see #2730 and #2733.
+-- KeywordFramed and MintedTargetSlot are the only tags any of those traversals
+-- produces, both from keywordFilters, so "a deeper tag wins" has two cases
+-- today; it is written as the general rule because the alternative -- letting
+-- the quoting position overwrite -- is the narrowing this replaced, see #2730
+-- and #2733.
 frame :: Framing -> [(Framing, Filter.Type.Filter Keyword.Keyword)] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 frame framing = fmap (\(inner, f) -> (if inner == Unframed then framing else inner, f))
 
@@ -6370,6 +6433,14 @@ ofChosenPlayerCounts card =
 -- cost criterion asking this atom is a silent False rather than a rejected card.
 -- This is where that is made loud.
 --
+-- Every one of them takes the filter off a keyword AS A KEYWORD, which is why
+-- CR 702.6c's equip quality is not in this bucket: rule 702.6a's minted ability
+-- carries that payload into a target slot answered by
+-- Pawl.Engine.Target.slotContext, which sets carrierChosenPlayer to Nothing. It
+-- arrives as MintedTargetSlot rather than KeywordFramed and so offends here,
+-- which is the point of that framing; the "CR 702.16k an equip quality is not a
+-- protection quality" case below is what proves it.
+--
 -- The frame is KEYWORD rather than PROTECTION, which is wider than rule 702.16k
 -- alone, and the width cuts two ways. CR 702.11d's hexproof quality is the
 -- harmless half: Pawl.Engine.Target.targetable evaluates it against the very
@@ -6511,14 +6582,15 @@ isBoundTag :: Text.Text
 isBoundTag = Text.pack "IsBound"
 
 -- How many CR 115.10a bound-object atoms this card carries in a position with no
--- resolution behind it -- a WISH's filter, a KEYWORD's own, or a COST paid with
--- no announcement behind it -- and how many anywhere else. The FIRST
+-- resolution behind it -- a WISH's filter, a KEYWORD's own, a COST paid with
+-- no announcement behind it, or the target slot of an ability rule 702 mints --
+-- and how many anywhere else. The FIRST
 -- number is the offence here, which is the sibling position lints turned around:
 -- the atom is answerable in every position whose evaluator supplies the
--- resolution's slots, and unanswerable in the three that supply none.
+-- resolution's slots, and unanswerable in the four that supply none.
 isBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 isBoundCounts card =
-  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, elem framing [OutsideTheGameFramed, KeywordFramed, SlotlessCostFramed] == wanted]
+  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, elem framing [OutsideTheGameFramed, KeywordFramed, SlotlessCostFramed, MintedTargetSlot] == wanted]
    in (total True, total False)
 
 -- CR 400.11c's candidates are cards outside the game, which no spell or ability
@@ -9838,6 +9910,46 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and it is the pool's only one"
       (sum (fmap (uncurry (+) . ofChosenPlayerCounts . S.combinedFace) ps))
       1
+  -- The hole that bucket had while every keyword payload was KeywordFramed. CR
+  -- 702.6c's equip quality is a payload that is NOT read as a keyword: rule
+  -- 702.6a's minted ability carries it into a target slot, which
+  -- Pawl.Engine.Target.slotContext answers with carrierChosenPlayer unfilled, so
+  -- an equip quality asking CR 702.16k's chosen player would have passed the lint
+  -- above and then matched nothing. MintedTargetSlot is what makes it loud.
+  Spec.it s "CR 702.16k an equip quality is not a protection quality" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    blade <- S.printingOf s registry "Dúnedain Blade"
+    let base = S.combinedFace piker
+        creatures = Filter.Type.HasCardType CardType.Creature
+        -- Buried under both combinators, so a lint reading only the top of a
+        -- Filter would miss it.
+        buried = Filter.Type.And [Filter.Type.Or [creatures, Filter.Type.OfChosenPlayer]]
+        equipping quality = Keyword.Equip (Equip.MkEquip (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) quality)
+        offending = base {Face.keywords = Set.singleton (equipping (Just buried))}
+        protecting = base {Face.keywords = Set.singleton (Keyword.Protection buried)}
+    -- Ordered FIRST, and the assertion this framing exists for.
+    Spec.assertBool s (ofChosenPlayerOffends offending) "OfChosenPlayer in an equip quality offends"
+    Spec.assertEqWith s "counted outside the keyword bucket" (ofChosenPlayerCounts offending) (0, 1)
+    -- The pair differing in exactly ONE thing: the same buried atom on the same
+    -- face, moved into a quality rule 702.16 really does read off the keyword.
+    Spec.assertBool s (not (ofChosenPlayerOffends protecting)) "the same atom in a protection quality does not"
+    Spec.assertEqWith s "counted inside it" (ofChosenPlayerCounts protecting) (1, 0)
+    -- So the framing rejects the ATOM and not the position: the printed quality
+    -- in the pool carries it and is accepted.
+    Spec.assertBool s (not (ofChosenPlayerOffends (S.combinedFace blade))) "Dúnedain Blade's own quality is accepted"
+    Spec.assertEqWith
+      s
+      "and arrives framed as a minted target slot"
+      (fmap fst (filter ((==) (Filter.Type.HasSubtype Subtype.Human) . snd) (cardFilters (S.combinedFace blade))))
+      [MintedTargetSlot]
+    -- The other half of what that framing promises, one atom over: the minted
+    -- ability announces nothing, so CR 115.10a's bound object is as unanswerable
+    -- in an equip quality as in a keyword's own filter, and isBoundCounts puts
+    -- the framing in its offending list for that.
+    let slot = SlotName.MkSlotName (Text.pack "target")
+        bound = Filter.Type.And [Filter.Type.Or [creatures, Filter.Type.IsBound slot]]
+    Spec.assertBool s (isBoundOffends (base {Face.keywords = Set.singleton (equipping (Just bound))})) "IsBound in an equip quality offends too"
+    Spec.assertBool s (not (isBoundOffends (base {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching bound) Nothing]}))) "and the same atom at an unframed position does not"
   -- CR 701.23a: a search looks through a zone, so one naming none can find
   -- nothing. Nothing else catches an empty set. Search.zones is defaulted-absent
   -- to the library, so a card file has to write "zones": [] on purpose -- and the
@@ -10539,7 +10651,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         (ReplacementRowFramed, [bound]),
         (OutsideTheGameFramed, [bound]),
         (KeywordFramed, []),
-        (SlotlessCostFramed, [bound])
+        (SlotlessCostFramed, [bound]),
+        (MintedTargetSlot, [bound])
       ]
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
