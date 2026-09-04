@@ -29,4 +29,16 @@ spec s = Spec.describe s "Pawl.Codec.CantSearchLibraries" $ do
           CantSearchLibraries.cause = PlayerScope.You
         }
       " {\"library\":{\"type\":\"You\"},\"cause\":{\"type\":\"You\"}} "
+  -- The two fields hold the same type and the cases above give them the same
+  -- value, so neither tells a swapped pair apart. This one does: no printing
+  -- narrows the axes differently, and the case exists to pin which key is which.
+  Spec.it s "MkCantSearchLibraries narrowed differently on each axis" $
+    Common.assertCodec
+      s
+      CantSearchLibraries.codec
+      CantSearchLibraries.MkCantSearchLibraries
+        { CantSearchLibraries.library = PlayerScope.You,
+          CantSearchLibraries.cause = PlayerScope.Opponents
+        }
+      " {\"library\":{\"type\":\"You\"},\"cause\":{\"type\":\"Opponents\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CantSearchLibraries.codec

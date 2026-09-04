@@ -333,7 +333,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.CantSearchLibraries (CantSearchLibraries.MkCantSearchLibraries PlayerScope.EachPlayer PlayerScope.EachPlayer))
+      (PlayerEffect.CantSearchLibraries CantSearchLibraries.MkCantSearchLibraries {CantSearchLibraries.library = PlayerScope.EachPlayer, CantSearchLibraries.cause = PlayerScope.EachPlayer})
       " {\"type\":\"CantSearchLibraries\",\"value\":{\"library\":{\"type\":\"EachPlayer\"},\"cause\":{\"type\":\"EachPlayer\"}}} "
   -- CR 702.16c / Runed Halo.
   Spec.it s "HasProtectionFromChosenName" $

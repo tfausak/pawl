@@ -518,8 +518,7 @@ data PlayerEffect
   | -- | CR 725 / 101.2 / Jared Carthalion, True Heir: this player can't become the
     -- monarch.
     --
-    -- CR 611.1's third clause once more, and here in the same shape
-    -- CantSearchLibraries takes: CR 725.1 makes the monarch a DESIGNATION a
+    -- CR 611.1's third clause once more: CR 725.1 makes the monarch a DESIGNATION a
     -- player has rather than a characteristic of any object, so nothing in the CR
     -- 613.1 layers computes it and a restriction on taking it belongs on CR
     -- 613.11's rules axis.
