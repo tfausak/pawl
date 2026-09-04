@@ -41,7 +41,6 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
-import qualified Pawl.Engine.OutsideTheGame as OutsideTheGame
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
@@ -135,6 +134,8 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Draw as Draw
+import qualified Pawl.Types.DrawR as DrawR
+import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
@@ -162,6 +163,7 @@ import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -1282,9 +1284,9 @@ replacementRowReads re = case re of
   -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and no arm
   -- of LifeLossRewrite carries a Filter or a Quantity: no read at all.
   ReplacementEffect.LifeLossR {} -> ([], [])
-  -- A DrawR is one ControllerRelation and one amount of life. LifeLossR's answer,
-  -- and for its reason.
-  ReplacementEffect.DrawR {} -> ([], [])
+  -- The pattern is one ControllerRelation; a Filter can only ride the REWRITE, and
+  -- drawRewriteReads below is what reports it.
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ rewrite) -> drawRewriteReads rewrite
   -- A DrawCountR is one ControllerRelation, one threshold and one nullary rewrite.
   -- DrawR's answer, and for its reason.
   ReplacementEffect.DrawCountR {} -> ([], [])
@@ -1343,6 +1345,17 @@ turnUpRewriteReads :: TurnUpRewrite.TurnUpRewrite -> ([Filter.Type.Filter Keywor
 turnUpRewriteReads rewrite = case rewrite of
   TurnUpRewrite.WithCounters counters -> ([], Map.elems (WithCounters.counters counters))
   TurnUpRewrite.MayAttachTo filter_ -> ([filter_], [])
+
+-- What a DRAW rewrite reads. entryRewriteReads' discipline again, and the answer
+-- is SYNTACTIC rather than per-reader: CR 400.11c keeps a spell or ability from
+-- affecting a card outside the game, so no slot of any resolution can name one and
+-- Event.eligible's own comment says Filter.IsBound answers nothing there -- but a
+-- slot NAME in the row's own data is still an object the row refers to (CR
+-- 609.7a), and declaring it is the safe direction for the capture.
+drawRewriteReads :: DrawRewrite.DrawRewrite -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
+drawRewriteReads rewrite = case rewrite of
+  DrawRewrite.GainLife _ -> ([], [])
+  DrawRewrite.FromOutsideTheGame payload -> ([FromOutsideTheGame.filter payload], [])
 
 -- replacementRowReads as a slot map. Arity One for every FILTER read, a
 -- Filter.IsBound being a membership test rather than a target slot; the QUANTITY
@@ -8120,9 +8133,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- whose control was gained. The SOURCE goes along only for the filter's context
   -- (CR 113.7), the same pair the search arm's own context is built from.
   --
-  -- Pawl.Engine.OutsideTheGame is the whole of it, and this arm asks nothing about
+  -- Pawl.Engine.Event.bringInto is the whole of it, and this arm asks nothing about
   -- which effect the filter came from.
-  Effect.FromOutsideTheGame payload -> OutsideTheGame.bringInto payload source controller
+  Effect.FromOutsideTheGame payload -> Event.bringInto payload source controller
   -- CR 608.2n: "Exile Burning Wish" -- the resolving SPELL goes to exile as this
   -- instruction runs rather than to its owner's graveyard when the resolution
   -- ends. finishSpell's move afterwards finds nothing, CR 400.7 having minted a

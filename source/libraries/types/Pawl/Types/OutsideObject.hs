@@ -22,7 +22,7 @@ data OutsideObject = MkOutsideObject
     -- one thing about it CR 729.1b does not keep out. A status is not an effect
     -- or a definition -- CR 708.2 makes the listed characteristics the object's
     -- own COPIABLE VALUES -- so it travels with the object the way ownership
-    -- does, and Pawl.Engine.OutsideTheGame.eligible reads a face-down entry
+    -- does, and Pawl.Engine.Event.eligible reads a face-down entry
     -- through Pawl.Engine.Card.faceDownFace rather than through the printing.
     --
     -- Only `eligible` reads it. What CROSSES is the card, face up: CR 708.9 has

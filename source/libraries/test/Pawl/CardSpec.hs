@@ -141,6 +141,8 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Draw as Draw
+import qualified Pawl.Types.DrawR as DrawR
+import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -5030,7 +5032,12 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> unframed [turnUpPattern] <> turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
-  ReplacementEffect.DrawR {} -> []
+  -- The pattern is one ControllerRelation; the wish filter a FromOutsideTheGame
+  -- rewrite carries is the one Filter a draw row can hold (Ring of Maʼrûf), and
+  -- it is CR 400.11c's, so it takes the same framing Effect.FromOutsideTheGame's
+  -- does.
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame payload)) -> outsideTheGameFramed [FromOutsideTheGame.filter payload]
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> []
   ReplacementEffect.DrawCountR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
@@ -5220,7 +5227,7 @@ data Framing
     ReplacementRowFramed
   | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's, the one
     -- card-authored position whose candidates are never objects in the game:
-    -- Pawl.Engine.OutsideTheGame.eligible matches it against a printed FACE
+    -- Pawl.Engine.Event.eligible matches it against a printed FACE
     -- (Pawl.Engine.Projection.viewOfCard). Marked not because its evaluator
     -- FILLS a field the others leave empty but because its candidate view leaves
     -- one empty that every other position fills -- `identity` -- so

@@ -721,10 +721,10 @@ applies gs event candidate =
         -- board on which the rewrite would change nothing.
         --
         -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the three
-        -- src-derived arms below it: the only producer installs a FLOATING row
-        -- from an activated ability, so its "you" was baked when the ability
-        -- resolved and survives the source leaving the battlefield or changing
-        -- hands. See matchesCandidatePlayer (#2662).
+        -- src-derived arms below it: both producers install a FLOATING row from an
+        -- activated ability, so the "you" was baked when the ability resolved and
+        -- survives the source leaving the battlefield or changing hands -- which
+        -- Ring of Ma'rûf's own cost makes it do. See matchesCandidatePlayer (#2662).
         (ReplacementEffect.DrawR pat, ProposedEvent.WouldDraw pid) ->
           matchesCandidatePlayer gs src (ReplacementCandidate.controller candidate) (DrawR.whose pat) pid
         -- CR 121.2a: whose draw INSTRUCTIONS the row watches (CR 109.5's "you"),
@@ -1690,6 +1690,16 @@ readsApplier re = case re of
   -- rewrite that DOES read the applier has to be decided here rather than
   -- inheriting this answer.
   ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.GainLife _)) -> False
+  -- The card goes to the player the EVENT named and the filter and the reveal
+  -- ride the effect, so GainLife's answer above carries over. The one value this
+  -- rewrite reads off the CANDIDATE is `source`, which reaches nothing but the
+  -- Filter.Context Event.eligible scans the pool under.
+  --
+  -- Not implemented: two such rows alike in `effect` and unlike in `source` would
+  -- offer different cards if the card's filter named its own source, and
+  -- `distinguishing` below folds `source` in nowhere, so the choice between them
+  -- is elided (#3215).
+  ReplacementEffect.DrawR (DrawR.MkDrawR _ (DrawRewrite.FromOutsideTheGame _)) -> False
   -- CR 121.2a: "you and that player each draw a card" -- the "you" is the row's
   -- own controller, so two rows alike in `effect` and unlike in `you` hand the
   -- extra card to different seats. LifeLossRewrite.ExileFromTopOfYourLibrary's
@@ -1738,8 +1748,9 @@ readsApplier re = case re of
 -- other way: two Rest in Peace under different controllers exile the same card
 -- to the same zone whichever applies, so asking about them would raise a
 -- question the rules leave nothing to decide. `source` is folded in nowhere for
--- the same reason -- every use of it above is a test run BEFORE Event.apply, not a
--- branch inside it.
+-- the same reason -- every use of it above is a test run BEFORE Event.apply, save
+-- the one arm that hands it on as a Filter.Context, which readsApplier's own
+-- comment argues (#3215).
 --
 -- `origin` is NOT such a hole: highestBucket has already partitioned by bucket,
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every
@@ -2719,9 +2730,9 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- not because the resource is inexhaustible; `breaches` is where the count is
   -- actually read, once per proposal.
   ReplacementEffect.LifeLossR {} -> Nothing
-  -- CR 614.1a: a life gain is not a supply a batch can run out of, and the
-  -- question never arrives besides -- `contested` above filters by
-  -- WouldDealDamage, which no DrawR row matches.
+  -- The question never arrives: `contested` above filters by WouldDealDamage,
+  -- which no DrawR row matches. A life gain is no supply in any case; CR 400.11b's
+  -- pool IS one, and `bringInto` is where its own exhaustion is read.
   ReplacementEffect.DrawR {} -> Nothing
   -- The instruction class one rule up, and the same answer for the same reason:
   -- `contested` asks only about a damage batch.
