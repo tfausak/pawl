@@ -45,10 +45,6 @@ import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
--- Aliased Condition.Type, not Condition, per the project-wide convention
--- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
--- and must not collide.
-
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -59,6 +55,9 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
+-- Aliased Condition.Type, not Condition, per the project-wide convention
+-- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
+-- and must not collide.
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
@@ -1963,6 +1962,18 @@ leavesBattlefieldSpec s registry =
 -- Nothing is ever stocked under the ARRIVING id, deliberately: see the pin.
 representativeDeparted :: ObjectId.ObjectId
 representativeDeparted = ObjectId.MkObjectId 1
+
+-- A triggered ability with this condition and no payload, for the representative
+-- GameEvent.AbilityTriggered below. The record names the ABILITY beside its
+-- source, and that arm's floor does not depend on what the ability does.
+bareAbility :: TriggerCondition.TriggerCondition -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
+bareAbility condition =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = condition,
+      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
 
 representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty GameEvent.GameEvent
 representativeEvents cond =
@@ -5801,15 +5812,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   bystanderZoneSpec s registry
   aetherFlashSpec s registry
   kindredSpec s registry
-
--- A triggered ability with this condition and no payload, for the representative
--- GameEvent.AbilityTriggered above. The record names the ABILITY beside its
--- source, and that arm's floor does not depend on what the ability does.
-bareAbility :: TriggerCondition.TriggerCondition -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)
-bareAbility condition =
-  TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = condition,
-      TriggeredAbility.modal = Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
-      TriggeredAbility.limit = TriggerLimit.Unlimited
-    }

@@ -1412,15 +1412,16 @@ whisperingWizardSpec s registry =
           Spec.assertEqWith s "the noncreature cast that follows still fires" (fmap (`firedBy` after) bearers) [1]
           Spec.assertEqWith s "and makes its Spirit" (spiritsOf S.alice after) 1
 
--- The rider on ONE of two abilities a single object bears (#1664). Both watch the
--- same event, one prints the rider and one does not, and the unlimited one firing
--- must not spend the limited one's turn: CR 113.7 makes them abilities of one
--- source, and CR 603.2 makes each of them an ability that triggers on its own.
+-- The rider on ONE of two abilities a single object bears. Both watch the same
+-- event, one prints the rider and one does not, and the unlimited one firing must
+-- not spend the limited one's turn: CR 113.7 makes them abilities of one source,
+-- and CR 603.2 makes each of them an ability that triggers on its own. This is
+-- what proves Engine.limitKey keys on the ABILITY and not on its condition.
 --
--- WHY A SYNTHETIC. No printing writes two triggered abilities that share a
--- trigger condition -- the multi-trigger cards among the "triggers only once each
--- turn" printings (Elvish Archivist, Jin-Gitaxias, Oasis of Renewal) each pair the
--- rider with a DIFFERENT condition, so their two abilities never collide.
+-- WHY A SYNTHETIC. Scryfall o:"triggers only once each turn", 2026-09-03: 143
+-- printings, and no face among them opens two trigger clauses the same way, so
+-- not one of them has two abilities that could share a key. The multi-trigger
+-- cards there pair the rider with a DIFFERENT condition.
 --
 -- Synthetic Twinned Vigil, {2}{W} Enchantment: "Whenever you cast a spell, you
 -- gain 1 life." and "Whenever you cast a spell, if you control a creature, you
