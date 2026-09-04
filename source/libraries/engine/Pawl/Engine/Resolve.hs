@@ -5043,8 +5043,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Asked per (searcher, owner) pair and handed this resolution's own
             -- controller, because a prohibition narrows on both axes: whose
             -- library is looked through, and who controls the spell or ability
-            -- causing the look (Ashiok, Dream Render). CR 113.7's source is the
-            -- resolving object, so its controller is the cause's.
+            -- causing the look (Ashiok, Dream Render). `controller` is CR
+            -- 405.4's controller of the object whose instructions these are.
             prohibited <- State.gets (PlayerEffect.prohibitsSearching searcher owner controller)
             -- The printed "and/or": the searcher picks which of the zones the
             -- card names to look through -- Delivery Moogle's "your library

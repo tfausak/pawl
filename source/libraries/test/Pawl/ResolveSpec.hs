@@ -1736,7 +1736,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "alice's Favor is not a spell bob controls, so the search happened and the Swamp left his library"
       (Game.zoneMembers Zone.Library S.bob after)
       []
-    Spec.assertEqWith s "and CR 701.23a's find put it onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Swamp")) S.bob after) 1
+    Spec.assertEqWith s "and the Favor's own instruction put it onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Swamp")) S.bob after) 1
   -- The library axis, which needs a search whose owner is not its searcher:
   -- Extract's "search target player's library". Bob's own spell causes it, so
   -- Ashiok's cause half is satisfied and only "THEIR library" is left to stop

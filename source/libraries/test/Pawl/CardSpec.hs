@@ -4704,7 +4704,8 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> damagePatternFilters pattern_
   -- CR 614.9's twin, patterned by the same type and read the same way.
   PlayerEffect.DamageCantBeRedirected pattern_ -> damagePatternFilters pattern_
-  -- CR 701.23 names no quality of the libraries it stops being searched.
+  -- CR 701.23's prohibition narrows by WHOSE library and WHOSE spell or
+  -- ability, both PlayerScopes, and by no quality a Filter could state.
   PlayerEffect.CantSearchLibraries _ -> []
   -- CR 702.16a's quality is a chosen card NAME, read off the source's
   -- Object.chosenNames rather than written by the card, so this arm carries no
