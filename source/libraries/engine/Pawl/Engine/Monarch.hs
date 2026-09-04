@@ -133,6 +133,15 @@ inherentMatch monarch cond gs logged = case (cond, LoggedEvent.event logged) of
 -- nowhere to find them. Skipping Event.interveningHolds costs nothing because
 -- CR 603.4 applies to neither ability (see oneEffect); an inherent ability that
 -- does carry an "if" checks it in its own gatherer, as Pawl.Engine.Speed does.
+--
+-- The monarch is read LIVE, where the damager comes off CR 603.10's sample, and
+-- that is sound: inside one settle only CR 725.4's departure hand-off can move
+-- the crown between the damage and this scan, and the steal it would then have
+-- gathered is controlled by the departed monarch (CR 725.2's "the player who
+-- was the monarch at the time"), which CR 800.4d keeps off the stack -- so the
+-- active player holds the crown either way. Proved by Pawl.EventTriggerSpec's
+-- "CR 725.4/800.4d lethal combat damage to the monarch crowns the active
+-- player, not the damager's controller".
 inherentMonarchPending :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 inherentMonarchPending events gs = case GameState.monarch gs of
   Nothing -> []

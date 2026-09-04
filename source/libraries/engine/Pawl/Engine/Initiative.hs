@@ -157,6 +157,14 @@ beginsHoldersUpkeep holder gs logged = case (TriggeredAbility.condition upkeepVe
 -- per damaging creature, where CR 726.2 prints "whenever ONE OR MORE creatures a
 -- player controls deal combat damage", one per controller. Neither reading is a
 -- generalisation of the other and neither module may borrow the other's.
+--
+-- The holder is read LIVE, where the damagers come off CR 603.10's sample, for
+-- Monarch.inherentMonarchPending's reason: only CR 726.4's departure hand-off
+-- can move the designation inside one settle, and the hand-off it would then
+-- have gathered belongs to the departed holder, whom CR 800.4d keeps off the
+-- stack. Proved by Pawl.InitiativeSpec's "CR 726.4/800.4d lethal combat damage
+-- to the holder hands the initiative to the active player, not the damager's
+-- controller".
 inherentPending :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 inherentPending events gs = held <> takes
   where
