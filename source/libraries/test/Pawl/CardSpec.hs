@@ -90,6 +90,7 @@ import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
@@ -944,6 +945,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.PermanentReturnedToHand _ -> []
   TriggerCondition.PermanentsReturnedToHand _ -> []
+  -- CR 603.10a's third family carries a Filter and a TurnScope, and neither holds
+  -- a Count.
+  TriggerCondition.CardLeavesGraveyard {} -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
@@ -4266,6 +4270,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- same way for PermanentsDie's reason: answering [] here would exempt Tameshi,
   -- Reality Architect's "noncreature permanents" from every corpus filter lint.
   TriggerCondition.PermanentsReturnedToHand f -> unframed [f]
+  -- CR 603.10a's third family carries its Filter inside a record, and it is card
+  -- text like any other -- Kishla Skimmer's "your graveyard" is that Filter.
+  TriggerCondition.CardLeavesGraveyard payload -> unframed [CardLeavesGraveyard.filter payload]
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
@@ -4475,6 +4482,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.PermanentReturnedToHand _ -> []
   TriggerCondition.PermanentsReturnedToHand _ -> []
+  TriggerCondition.CardLeavesGraveyard {} -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   -- CR 702.55a names the haunted creature through the haunting object's own
