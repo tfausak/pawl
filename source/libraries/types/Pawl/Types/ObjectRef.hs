@@ -21,8 +21,9 @@ import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 -- every other arm's are found AS it runs. That is the distinction CR 115.10a
 -- draws: only InSlot can name a target; no other arm ever does.
 data ObjectRef
-  = -- | CR 601.2c / 608.2b: the objects bound in a slot, usually the one
-    -- Recipient a target filled but every member where the slot holds a group.
+  = -- | CR 601.2c / 608.2b: the objects bound in a slot -- the one Recipient a
+    -- target or a reserved binding put there, or every member where the slot
+    -- holds a group, which is a definition rather than a target (CR 115.10a).
     InSlot SlotName.SlotName
   | -- | CR 109.2 / Day of Judgment: every permanent on the battlefield matching
     -- the Filter, swept when the effect executes (CR 608.2c).
