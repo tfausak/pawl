@@ -6052,6 +6052,239 @@ oraclesAttendantsSpec s registry = Spec.describe s "Oracle's Attendants (CR 614.
     Spec.assertEqWith s "omega's 3 stays on the victim" (S.damageOf victim (strike omega 3 aimed)) (Just 3)
     Spec.assertEqWith s "alice was asked which source, and answered alpha" (chosenSourcesIn (answersFor (aimAndChoose victim alpha) g4 activate)) [alpha]
 
+-- Every floating COUNTED redirection row, as (remaining, source side, destination,
+-- watched source): redirectRows' twin for DamageRewrite.RedirectNext, read back
+-- off the store so a case can tell a spent row from one never installed.
+countedRedirectRows :: GameState.GameState -> [(Natural.Natural, Maybe Recipient.Recipient, Recipient.Recipient, Maybe ObjectId.ObjectId)]
+countedRedirectRows gs =
+  [ (remaining, DamagePattern.whichRecipient pat, dest, DamagePattern.whichSource pat)
+  | active <- GameState.replacements gs,
+    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.RedirectNext remaining dest) _) <- [ActiveReplacement.effect active]
+  ]
+
+-- Carom's two slots aimed by NAME, `from` at the victim and `to` at the haven,
+-- each filtered out of its offered set rather than built.
+aimFromTo :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimFromTo victim haven p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapWithKey (\slot (_, legal) -> Set.filter ((==) (Just (if slot == SlotName.MkSlotName (Text.pack "from") then victim else haven)) . Recipient.objectOf) legal) sets
+  _ -> S.identityAnswer p
+
+-- Aim Harm's Way at bob and choose `src` as CR 609.7a's source.
+aimAtBobChoosing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtBobChoosing src p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) sets
+  Prompt.ChooseDamageSource _ _ _ candidates ->
+    Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== src) (NonEmpty.toList candidates))
+  _ -> S.identityAnswer p
+
+-- Spend a contested countdown on the batch's hits in `wanted` order, by
+-- RECIPIENT, deflectionCombat's shape.
+orderedBy :: [Recipient.Recipient] -> Prompt.Prompt r -> r
+orderedBy wanted p = case p of
+  Prompt.OrderDamage _ _ events ->
+    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.target e) wanted)
+     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  _ -> S.identityAnswer p
+
+-- CR 614.9's redirection with CR 615.7's countdown, whose producer is Carom
+-- ({1}{W} Instant: "The next 1 damage that would be dealt to target creature
+-- this turn is dealt to another target creature instead. / Draw a card."; name,
+-- cost, type line and Oracle text checked against api.scryfall.com 2026-09-03).
+--
+-- Turn the Tables above with an AMOUNT: that redirection moves every event for
+-- the turn, this one moves 1 damage and is then spent -- so a 3-damage event
+-- comes out as TWO events, 1 on the other creature and 2 where it was aimed.
+-- The Oracle rulings on Harm's Way, the same shape one card over, say so:
+-- "Harm's Way will redirect just 2 of that damage."
+--
+-- The victim and the haven are both alice's Goblin Pikers, so a redirect aimed
+-- the wrong way round moves damage between two things the board tells apart
+-- only by id; bob's Piker is the source. alice's library is stocked for the
+-- card's second sentence.
+caromSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+caromSpec s registry = Spec.describe s "Carom (CR 614.9, CR 615.7)" $ do
+  let hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      amounts gs = List.sort (fmap DamageEvent.amount (S.damageEventsOf gs))
+      targets gs = fmap DamageEvent.target (S.damageEventsOf gs)
+      strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
+      board = do
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        carom <- S.printingOf s registry "Carom"
+        let base = S.landsInPlay plains 2
+            (victim, g1) = S.addCreature piker S.alice base
+            (haven, g2) = S.addCreature piker S.alice g1
+            (attacker, g3) = S.addCreature piker S.bob g2
+            (caromId, g4) = S.addHandCard carom S.alice g3
+            (_, g5) = S.addLibraryCard plains S.alice g4
+            ready =
+              g5
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            redirected = S.runPure (aimFromTo victim haven) ready (S.cast S.alice caromId Monad.>> Stack.resolveTop)
+        pure (victim, haven, attacker, ready, redirected)
+  Spec.it s "CR 615.7 the next 1 of a 3-damage event moves and the other 2 stay where they were aimed" $ do
+    (victim, haven, attacker, _, redirected) <- board
+    let after = strike attacker (Recipient.ToCreature victim) 3 redirected
+    -- THE gameplay assertion, and the pair that separates a counted redirect
+    -- from Turn the Tables: the victim keeps 2 and the haven takes 1.
+    Spec.assertEqWith s "the victim takes 2 of the 3" (S.damageOf victim after) (Just 2)
+    Spec.assertEqWith s "and the haven takes the 1 that moved" (S.damageOf haven after) (Just 1)
+    -- CR 614.9 moves "the same damage": two events of the same source, and
+    -- nothing prevented.
+    Spec.assertEqWith s "two events, 1 and 2" (amounts after) [1, 2]
+    Spec.assertEqWith s "the row is spent and gone" (countedRedirectRows after) []
+    -- The proxies, after the behaviour.
+    Spec.assertEqWith s "setup: one counted row of 1, from the victim to the haven" (countedRedirectRows redirected) [(1, Just (Recipient.ToCreature victim), Recipient.ToCreature haven, Nothing)]
+  Spec.it s "CR 615.7 once spent, the next event stays whole" $ do
+    (victim, haven, attacker, _, redirected) <- board
+    let spent = strike attacker (Recipient.ToCreature victim) 3 redirected
+        after = strike attacker (Recipient.ToCreature victim) 2 spent
+    Spec.assertEqWith s "the second event's 2 all lands on the victim" (S.damageOf victim after) (Just 4)
+    Spec.assertEqWith s "and the haven keeps the 1 alone" (S.damageOf haven after) (Just 1)
+  Spec.it s "CR 614.9 a 1-damage event moves whole, and the row is spent by it" $ do
+    (victim, haven, attacker, _, redirected) <- board
+    let after = strike attacker (Recipient.ToCreature victim) 1 redirected
+    Spec.assertEqWith s "the victim takes nothing" (S.damageOf victim after) (Just 0)
+    Spec.assertEqWith s "the haven takes the 1" (S.damageOf haven after) (Just 1)
+    Spec.assertEqWith s "one event, addressed to the haven" (targets after) [Recipient.ToCreature haven]
+    Spec.assertEqWith s "the row is spent and gone" (countedRedirectRows after) []
+  -- The BASELINE that makes the cases above discriminate: the same board, the
+  -- spell never cast.
+  Spec.it s "CR 614.9 no redirect, no move: the whole 3 lands on the victim" $ do
+    (victim, haven, attacker, ready, _) <- board
+    let after = strike attacker (Recipient.ToCreature victim) 3 ready
+    Spec.assertEqWith s "the victim takes all 3" (S.damageOf victim after) (Just 3)
+    Spec.assertEqWith s "the haven takes nothing" (S.damageOf haven after) (Just 0)
+    Spec.assertEqWith s "one event" (amounts after) [3]
+  -- The other recipient is not covered: damage aimed at the haven stays there.
+  Spec.it s "CR 614.9 the redirection covers the creature the spell named and not the other" $ do
+    (victim, haven, attacker, _, redirected) <- board
+    let after = strike attacker (Recipient.ToCreature haven) 2 redirected
+    Spec.assertEqWith s "the haven takes its own 2" (S.damageOf haven after) (Just 2)
+    Spec.assertEqWith s "the victim takes nothing" (S.damageOf victim after) (Just 0)
+    Spec.assertEqWith s "and the row is unspent" (fmap (\(n, _, _, _) -> n) (countedRedirectRows after)) [1]
+  -- The card's second sentence, so the whole card is exercised.
+  Spec.it s "the card draws as it resolves" $ do
+    (_, _, _, ready, redirected) <- board
+    Spec.assertEqWith s "Carom left the hand and a card arrived" (S.handSize S.alice redirected) (S.handSize S.alice ready)
+
+-- CR 614.9's redirection over a DESCRIBED recipient side with CR 615.7's
+-- countdown and CR 609.7a's chosen source, whose producer is Harm's Way ({W}
+-- Instant: "The next 2 damage that a source of your choice would deal to you
+-- and/or permanents you control this turn is dealt to any target instead.";
+-- name, cost, type line and Oracle text checked against api.scryfall.com
+-- 2026-09-03).
+--
+-- Divine Deflection's recipient side on a redirection: ONE row and one
+-- countdown over alice and everything she controls, read live at each damage
+-- event, rather than a row per recipient. The destination is bob himself, so the
+-- moved damage is read off a life total.
+--
+-- The chosen source is omega, deliberately not the first candidate offered,
+-- Oracle's Attendants' reason.
+harmsWaySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+harmsWaySpec s registry = Spec.describe s "Harm's Way (CR 614.9, CR 615.7, CR 609.7a)" $ do
+  let hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      targets gs = fmap DamageEvent.target (S.damageEventsOf gs)
+      strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
+      board = do
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        harmsWay <- S.printingOf s registry "Harm's Way"
+        let base = S.landsInPlay plains 1
+            (mine, g1) = S.addCreature piker S.alice base
+            (alpha, g2) = S.addCreature piker S.bob g1
+            (omega, g3) = S.addCreature piker S.bob g2
+            (harmsWayId, g4) = S.addHandCard harmsWay S.alice g3
+            ready =
+              g4
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            redirected = S.runPure (aimAtBobChoosing omega) ready (S.cast S.alice harmsWayId Monad.>> Stack.resolveTop)
+        pure (mine, alpha, omega, ready, redirected)
+  Spec.it s "CR 615.7 the chosen source's 5 to alice: 2 is dealt to bob and 3 to alice" $ do
+    (_, _, omega, _, redirected) <- board
+    let after = strike omega (Recipient.ToPlayer S.alice) 5 redirected
+    -- THE gameplay assertion: the moved 2 lands on the target, the rest stays.
+    Spec.assertEqWith s "bob, the target, takes the 2 that moved" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "alice takes the remaining 3" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "two events, the moved one first" (zip (amounts after) (targets after)) [(2, Recipient.ToPlayer S.bob), (3, Recipient.ToPlayer S.alice)]
+    Spec.assertEqWith s "the row is spent and gone" (countedRedirectRows after) []
+    -- The proxies, after the behaviour: one described row, naming no recipient
+    -- by id, aimed at bob and watching omega.
+    Spec.assertEqWith s "setup: one counted row of 2 over a described recipient side" (countedRedirectRows redirected) [(2, Nothing, Recipient.ToPlayer S.bob, Just omega)]
+  Spec.it s "CR 611.2c a permanent alice controls is covered by the same countdown" $ do
+    (mine, _, omega, _, redirected) <- board
+    let first = strike omega (Recipient.ToCreature mine) 1 redirected
+        second = strike omega (Recipient.ToCreature mine) 3 first
+        third = strike omega (Recipient.ToCreature mine) 2 second
+    Spec.assertEqWith s "the 1 to alice's creature moves whole" (S.damageOf mine first) (Just 0)
+    Spec.assertEqWith s "and lands on bob" (S.lifeOf S.bob first) (Just 19)
+    -- CR 615.7's one countdown: 1 is left, so the next 3 splits 1 and 2.
+    Spec.assertEqWith s "the next 3 leaves 2 on the creature" (S.damageOf mine second) (Just 2)
+    Spec.assertEqWith s "and 1 more on bob" (S.lifeOf S.bob second) (Just 18)
+    Spec.assertEqWith s "and once spent, the next 2 stays whole" (S.damageOf mine third) (Just 4)
+    Spec.assertEqWith s "bob takes no more" (S.lifeOf S.bob third) (Just 18)
+  -- CR 609.7a: the row watches the ONE source alice chose.
+  Spec.it s "CR 609.7a the unchosen source's damage to alice stays where it was aimed" $ do
+    (_, alpha, _, _, redirected) <- board
+    let after = strike alpha (Recipient.ToPlayer S.alice) 3 redirected
+    Spec.assertEqWith s "alice takes alpha's whole 3" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and the row is unspent" (fmap (\(n, _, _, _) -> n) (countedRedirectRows after)) [2]
+  -- The description's other edge: a permanent bob controls is not "a permanent
+  -- you control".
+  Spec.it s "CR 611.2c the chosen source's damage to bob's own creature is not covered" $ do
+    (_, alpha, omega, _, redirected) <- board
+    let after = strike omega (Recipient.ToCreature alpha) 3 redirected
+    Spec.assertEqWith s "bob's creature takes the whole 3" (S.damageOf alpha after) (Just 3)
+    Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob after) (Just 20)
+  -- CR 615.7's allocation on a redirection: "If the chosen source would
+  -- simultaneously deal damage to multiple permanents you control ... Harm's Way
+  -- will redirect just 2 of that damage ... You choose which 2 damage is
+  -- redirected" (Oracle rulings). One question to alice, and the answer decides
+  -- which recipient keeps its damage.
+  Spec.it s "CR 615.7 a simultaneous batch contends for the 2, and alice orders it" $ do
+    (mine, _, omega, _, redirected) <- board
+    let batch = [hit omega (Recipient.ToCreature mine) 3, hit omega (Recipient.ToPlayer S.alice) 3]
+        creatureFirst = S.runPure (orderedBy [Recipient.ToCreature mine]) redirected (Damage.applyDamage batch)
+        aliceFirst = S.runPure (orderedBy [Recipient.ToPlayer S.alice]) redirected (Damage.applyDamage batch)
+    Spec.assertEqWith s "creature first: it keeps 1" (S.damageOf mine creatureFirst) (Just 1)
+    Spec.assertEqWith s "and alice keeps her whole 3" (S.lifeOf S.alice creatureFirst) (Just 17)
+    Spec.assertEqWith s "alice first: she keeps 1" (S.lifeOf S.alice aliceFirst) (Just 19)
+    Spec.assertEqWith s "and the creature keeps its whole 3" (S.damageOf mine aliceFirst) (Just 3)
+    Spec.assertEqWith s "either way bob takes exactly the 2" (fmap (`S.lifeOf` creatureFirst) [S.bob] <> fmap (`S.lifeOf` aliceFirst) [S.bob]) [Just 18, Just 18]
+    Spec.assertBool s (wasAskedToOrderDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) redirected (Damage.applyDamage batch))) "alice was asked to order the batch"
+  -- CR 615.12 speaks of PREVENTION effects, and a redirection is not one, so
+  -- unpreventable damage still contends for the 2 and is still moved. This is
+  -- what gives Replacement.contested's `contends` its observer: filtering the
+  -- batch by preventability, as a prevention shield's contest is, would leave
+  -- nothing to order here.
+  Spec.it s "CR 615.12 unpreventable damage is still moved, and still contended for" $ do
+    (mine, _, omega, _, redirected) <- board
+    spiderPunk <- S.printingOf s registry "Spider-Punk"
+    let (_, withPunk) = S.addCreature spiderPunk S.bob redirected
+        batch = [hit omega (Recipient.ToCreature mine) 3, hit omega (Recipient.ToPlayer S.alice) 3]
+        aliceFirst = S.runPure (orderedBy [Recipient.ToPlayer S.alice]) withPunk (Damage.applyDamage batch)
+    Spec.assertEqWith s "alice first: she keeps 1" (S.lifeOf S.alice aliceFirst) (Just 19)
+    Spec.assertEqWith s "the creature keeps its whole 3" (S.damageOf mine aliceFirst) (Just 3)
+    Spec.assertEqWith s "and bob takes the 2" (S.lifeOf S.bob aliceFirst) (Just 18)
+    Spec.assertBool s (wasAskedToOrderDamage (answersFor (orderedBy [Recipient.ToPlayer S.alice]) withPunk (Damage.applyDamage batch))) "alice was asked to order the batch"
+  -- The BASELINE: the same board, the spell never cast.
+  Spec.it s "CR 614.9 no redirect, no move: alice takes the whole 5" $ do
+    (_, _, omega, ready, _) <- board
+    let after = strike omega (Recipient.ToPlayer S.alice) 5 ready
+    Spec.assertEqWith s "alice takes all 5" (S.lifeOf S.alice after) (Just 15)
+    Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "setup: no row" (countedRedirectRows ready) []
+
 -- CR 614.9 with BOTH halves of the sentence printed on a card, which is what
 -- separates this group from Turn the Tables and Oracle's Attendants above: those
 -- two are resolutions, so the engine bakes their recipient and their destination
@@ -7627,6 +7860,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   samiteMinistrationSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
+  caromSpec s registry
+  harmsWaySpec s registry
   pariahSpec s registry
   lavaBurstSpec s registry
   queensBayPaladinSpec s registry

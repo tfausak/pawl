@@ -1061,7 +1061,7 @@ createEmblem pid card = do
 -- convenience rather than a constraint.
 resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
 resolveZoneChange asOf zc = do
-  (outcome, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
+  (outcome, _, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty (ProposedEvent.WouldChangeZone zc)
   case outcome >>= Replacement.asZoneChange of
     Nothing -> pure (Nothing, exiledBy, shuffling, Nothing)
     Just settled -> do
@@ -1254,7 +1254,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      for the floating one, and the AMOUNT half by its Squad Captain.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
-  (outcome, _, _, _) <- applyReplacementsFully asOf batch event
+  (outcome, _, _, _, _) <- applyReplacementsFully asOf batch event
   pure outcome
 
 -- The same loop, answering CR 615.13's second question as well: WHICH prevention
@@ -1264,10 +1264,16 @@ applyReplacementsIn asOf batch event = do
 -- damage class can answer anything but the empty list -- CR 615.1 makes a
 -- prevention effect a thing that watches a DAMAGE event -- so every other caller
 -- would be threading a value it knows is empty.
-applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
+--
+-- The survivors are a LIST for the same class's other reason: CR 614.9's
+-- counted redirection (Harm's Way) moves part of an event and leaves the rest
+-- where it was, so one proposed damage event can come out of the loop as two.
+-- Every other class comes out as at most one, which applyReplacementsIn reads
+-- off the first component alone.
+applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game ([ProposedEvent], [Prevention])
 applyReplacementsReporting asOf batch event = do
-  (outcome, prevented, _, _) <- applyReplacementsFully asOf batch event
-  pure (outcome, prevented)
+  (outcome, residue, prevented, _, _) <- applyReplacementsFully asOf batch event
+  pure (Maybe.maybeToList outcome <> residue, prevented)
 
 -- The loop itself, with the side answers its two classes of caller want: CR
 -- 615.13's preventions, CR 607.2b's "which object's replacement effect is what
@@ -1275,10 +1281,14 @@ applyReplacementsReporting asOf batch event = do
 -- empty, Nothing or False for every event class but one -- damage for the first,
 -- zone changes for the other two -- which is why the three entries above and
 -- around it exist rather than one wide return everywhere.
-applyReplacementsFully :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId, Bool)
+--
+-- The second component is the RESIDUE: the events a partial cover split off
+-- this one (Replacement.partialCoverage), each settled through its own
+-- continuation of the loop. Empty for every class but damage.
+applyReplacementsFully :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
 applyReplacementsFully asOf batch = loop asOf batch Set.empty [] Nothing False
 
-loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention], Maybe ObjectId, Bool)
+loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
 loop asOf batch applied prevented exiledBy shuffling event = do
   gs <- State.get
   -- From scratch each iteration: collect against the CURRENT state (or, for a
@@ -1308,57 +1318,96 @@ loop asOf batch applied prevented exiledBy shuffling event = do
       fresh = filter (\candidate -> unused candidate && notSibling candidate) (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
     -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
-    [] -> pure (Just event, prevented, exiledBy, shuffling)
+    [] -> pure (Just event, [], prevented, exiledBy, shuffling)
     bucket -> do
       picked <- Replacement.choose gs event bucket
       case picked of
         -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
         -- is non-empty and `choose` always picks. Total rather than partial.
-        Nothing -> pure (Just event, prevented, exiledBy, shuffling)
-        Just candidate -> do
-          -- CR 615.12: the chosen effect is a prevention effect and this damage
-          -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
-          -- of it. The event comes back undiminished and no shield is written down
-          -- -- "existing damage prevention shields won't be reduced by damage
-          -- that can't be prevented" -- while the recursive call below still
-          -- records it as applied, which is CR 615.12a's "just once" and the
-          -- reason this does not spin. What the application still owes is the
-          -- rule's middle clause, "any additional effects they have will take
-          -- place", which is `applyInertly`'s whole job.
-          --
-          -- CR 615.3's use count is skipped too, which no card notices: every
-          -- prevention row pawl installs is Uses.Unlimited (Resolve.installDamageRow
-          -- says why, and Fog's authored row says Unlimited as well), so the
-          -- `consume` this bypasses would have been a no-op anyway.
-          --
-          -- A SEPARATE fold rather than a flag inside `apply`, because CR 615.12 is
-          -- a fact about the (effect, event) PAIR and not about any one rewrite:
-          -- `apply`'s arms answer "what does this rewrite do", and the rule stops
-          -- the rewrite happening at all while leaving its additional effect
-          -- standing. CR 614.1a's replacements never come here, so a Furnace of
-          -- Rath still doubles unpreventable damage.
-          --
-          -- CR 615.5's AUTHORED rider is the other half of that middle clause,
-          -- and `applyInertly` cannot reach it: the rider rides on the candidate
-          -- rather than on the rewrite, and this module cannot run a card's
-          -- effects. So the classification is bound here and handed to
-          -- `preventionBy` below, which reports a prevention of 0 off the
-          -- undiminished event -- enough for Pawl.Engine.Damage to queue the
-          -- rider, and not enough for CR 615.13's record. Phantom Tiger loses a
-          -- +1/+1 counter to damage it could not prevent (Pawl.ReplacementSpec).
-          let inert = Replacement.inertPrevention gs candidate event
-          outcome <- case inert of
-            Just rewrite -> applyInertly candidate rewrite event
-            Nothing -> apply batch candidate event
-          -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
-          -- no arm of that fold has to report anything and none can forget to.
-          -- What makes it exact rather than a guess is Replacement.prevents: only a
-          -- PREVENTION rewrite's shrinkage is prevention, where CR 614.1a's
-          -- SetAmount and Scale shrink an event without preventing a point of it.
-          let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy inert candidate event outcome)
-          case outcome of
-            Nothing -> pure (Nothing, prevented1, exiledBy, shuffling)
-            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) (shuffling || shufflesAfter candidate) rewritten
+        Nothing -> pure (Just event, [], prevented, exiledBy, shuffling)
+        -- CR 614.9 over a countdown (CR 615.7's shape, which that rule states
+        -- only for preventions; Harm's Way's rulings supply the redirect's):
+        -- the chosen effect covers only PART of this event (Harm's Way's
+        -- remaining 2 against a 5), so the event is split here and the
+        -- candidate applied to the covered half, while the residue -- "any
+        -- remaining damage is dealt normally" -- continues through the loop as
+        -- an event of its own. It carries the applied set INCLUDING this
+        -- candidate, which is CR 614.5: one effect applies to one event once,
+        -- and the residue is the rest of that same event rather than a new one
+        -- -- so a Furnace of Rath that already doubled it does not double the
+        -- residue again. The covered half's own thread runs first, the
+        -- residue's after it, both against whatever prompts they raise in that
+        -- order.
+        --
+        -- CR 614.5's other direction is not kept: an effect the covered half's
+        -- continuation applies is not recorded for the residue, so it may apply
+        -- to both halves. Harmless for every rewrite in the tree, each being
+        -- distributive over a split (a doubling of 2 and of 3 is a doubling of
+        -- 5); a non-distributive rewrite reaching both halves would be what
+        -- refutes it, and none has a producer.
+        --
+        -- Not implemented: rejoining the two halves when the redirect's
+        -- destination IS the residue's recipient, so the one permanent is dealt
+        -- two events where the rules deal one and a "whenever this is dealt
+        -- damage" trigger fires twice (#3190).
+        Just candidate
+          | Just covered <- Replacement.partialCoverage gs candidate event,
+            Just (front, rest) <- Replacement.splitDamage covered event -> do
+              let applied1 = Set.insert (ReplacementCandidate.identity candidate) applied
+              (survivor, residue1, prevented1, exiledBy1, shuffling1) <- applyChosen asOf batch applied prevented exiledBy shuffling candidate front
+              (leftover, residue2, prevented2, exiledBy2, shuffling2) <- loop asOf batch applied1 prevented1 exiledBy1 shuffling1 rest
+              pure (survivor, residue1 <> Maybe.maybeToList leftover <> residue2, prevented2, exiledBy2, shuffling2)
+        Just candidate -> applyChosen asOf batch applied prevented exiledBy shuffling candidate event
+
+-- One iteration of `loop`: apply the chosen candidate to the event and continue
+-- with what comes back. Split out so the partial-cover branch above and the
+-- ordinary one apply a candidate the same way.
+applyChosen :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
+applyChosen asOf batch applied prevented exiledBy shuffling candidate event = do
+  gs <- State.get
+  -- CR 615.12: the chosen effect is a prevention effect and this damage
+  -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
+  -- of it. The event comes back undiminished and no shield is written down
+  -- -- "existing damage prevention shields won't be reduced by damage
+  -- that can't be prevented" -- while the recursive call below still
+  -- records it as applied, which is CR 615.12a's "just once" and the
+  -- reason this does not spin. What the application still owes is the
+  -- rule's middle clause, "any additional effects they have will take
+  -- place", which is `applyInertly`'s whole job.
+  --
+  -- CR 615.3's use count is skipped too, which no card notices: every
+  -- prevention row pawl installs is Uses.Unlimited (Resolve.installDamageRow
+  -- says why, and Fog's authored row says Unlimited as well), so the
+  -- `consume` this bypasses would have been a no-op anyway.
+  --
+  -- A SEPARATE fold rather than a flag inside `apply`, because CR 615.12 is
+  -- a fact about the (effect, event) PAIR and not about any one rewrite:
+  -- `apply`'s arms answer "what does this rewrite do", and the rule stops
+  -- the rewrite happening at all while leaving its additional effect
+  -- standing. CR 614.1a's replacements never come here, so a Furnace of
+  -- Rath still doubles unpreventable damage.
+  --
+  -- CR 615.5's AUTHORED rider is the other half of that middle clause,
+  -- and `applyInertly` cannot reach it: the rider rides on the candidate
+  -- rather than on the rewrite, and this module cannot run a card's
+  -- effects. So the classification is bound here and handed to
+  -- `preventionBy` below, which reports a prevention of 0 off the
+  -- undiminished event -- enough for Pawl.Engine.Damage to queue the
+  -- rider, and not enough for CR 615.13's record. Phantom Tiger loses a
+  -- +1/+1 counter to damage it could not prevent (Pawl.ReplacementSpec).
+  let inert = Replacement.inertPrevention gs candidate event
+  outcome <- case inert of
+    Just rewrite -> applyInertly candidate rewrite event
+    Nothing -> apply batch candidate event
+  -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
+  -- no arm of that fold has to report anything and none can forget to.
+  -- What makes it exact rather than a guess is Replacement.prevents: only a
+  -- PREVENTION rewrite's shrinkage is prevention, where CR 614.1a's
+  -- SetAmount and Scale shrink an event without preventing a point of it.
+  let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy inert candidate event outcome)
+  case outcome of
+    Nothing -> pure (Nothing, [], prevented1, exiledBy, shuffling)
+    Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) (shuffling || shufflesAfter candidate) rewritten
 
 -- CR 607.2b's link, read OUTSIDE `apply` from the event before and after --
 -- `preventionBy`'s posture above, for its reason: no arm of that fold has to
@@ -1469,6 +1518,7 @@ applyInertly candidate rewrite event = do
     DamageRewrite.SetAmount _ -> pure ()
     DamageRewrite.Scale _ -> pure ()
     DamageRewrite.Redirect _ -> pure ()
+    DamageRewrite.RedirectNext _ _ -> pure ()
     DamageRewrite.RedirectMatching _ -> pure ()
   pure (Just event)
 
@@ -2481,7 +2531,7 @@ apply batch candidate event =
             -- Both subtractions below are total on Natural: `prevented` is a min
             -- of the two operands, so it is no greater than either.
             prevented = min remaining amount
-        Replacement.setShield (ReplacementCandidate.identity candidate) damageR (remaining - prevented)
+        Replacement.setShield (ReplacementCandidate.identity candidate) damageR (DamageRewrite.PreventNext (remaining - prevented))
         if prevented >= amount
           then pure Nothing
           else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = amount - prevented}))
@@ -2530,6 +2580,29 @@ apply batch candidate event =
         pure . Just $ case Replacement.redirectDestination gs dest of
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
+      -- The arm above with a countdown: Harm's Way moves as much of THIS event
+      -- as it has left and writes the rest back, PreventNext's CR 615.7
+      -- arithmetic borrowed onto a rule-614 rewrite (that rule governs only
+      -- preventions; the redirect's rests on Harm's Way's rulings). The event
+      -- arriving here never exceeds
+      -- the remainder -- `loop` split anything larger on
+      -- Replacement.partialCoverage and sent the residue on as an event of its
+      -- own -- so the whole of it moves, and `min` is the guard for the one
+      -- route that bypasses the split, a destination CR 614.9's guard has
+      -- retired: that one hands the event back unchanged and spends nothing,
+      -- CR 609.7b's "if for any reason the shield ... replaces no damage, the
+      -- shield isn't used up".
+      --
+      -- NOT `consume`, for PreventNext's reason: the row is spent in damage
+      -- rather than per application, and `setShield` drops it at 0.
+      DamageRewrite.RedirectNext remaining dest -> do
+        gs <- State.get
+        case Replacement.redirectDestination gs dest of
+          Nothing -> pure (Just event)
+          Just live -> do
+            let moved = min remaining (DamageEvent.amount de)
+            Replacement.setShield (ReplacementCandidate.identity candidate) damageR (DamageRewrite.RedirectNext (remaining - moved) dest)
+            pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = moved, DamageEvent.target = live}))
       -- CR 614.9 with the destination PRINTED rather than baked -- Pariah's
       -- "all damage that would be dealt to you is dealt to enchanted creature
       -- instead". The arm above with `dest` found by description instead of read
@@ -3164,13 +3237,14 @@ fullyUnlockedAfter halves card = case card of
     Card.hasSharedTypeLine c
       && all (\face -> Set.member (Face.name face) halves) (Card.Type.faces c)
 
--- CR 615: settle one proposed damage event. Nothing means it does not happen;
--- the second answer is CR 615.13's, one entry per prevention effect that applied
--- to THIS event and prevented some of it.
-resolveDamage :: DamageEvent.DamageEvent -> Game (Maybe DamageEvent.DamageEvent, [Prevention])
+-- CR 615: settle one proposed damage event. Empty means it does not happen; two
+-- or more is CR 614.9's counted redirection having moved part of it (Harm's
+-- Way). The second answer is CR 615.13's, one entry per prevention effect that
+-- applied to THIS event and prevented some of it.
+resolveDamage :: DamageEvent.DamageEvent -> Game ([DamageEvent.DamageEvent], [Prevention])
 resolveDamage de = do
   (outcome, prevented) <- applyReplacementsReporting Nothing Set.empty (ProposedEvent.WouldDealDamage de)
-  pure (outcome >>= Replacement.asDamageEvent, prevented)
+  pure (Maybe.mapMaybe Replacement.asDamageEvent outcome, prevented)
 
 -- CR 608.2f / 510.2: settle a whole batch of SIMULTANEOUS damage events, and
 -- answer the survivors. The typed door Pawl.Engine.Damage uses, so Damage never
@@ -3195,7 +3269,7 @@ resolveDamageBatch :: [DamageEvent.DamageEvent] -> Game ([DamageEvent.DamageEven
 resolveDamageBatch events = do
   ordered <- Replacement.orderBatch events
   settled <- Monad.mapM resolveDamage ordered
-  pure (Maybe.mapMaybe fst settled, Replacement.groupPreventions (concatMap snd settled))
+  pure (concatMap fst settled, Replacement.groupPreventions (concatMap snd settled))
 
 -- CR 701.8 / 614.8: settle a proposed destruction. `Just` is the object actually
 -- destroyed -- which need not be the one asked about, since a rewrite may
