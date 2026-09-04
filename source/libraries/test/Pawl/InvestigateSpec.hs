@@ -735,7 +735,8 @@ randomRevealSpec s registry =
 -- upkeep player's, and the two are the same question: the Filter.IsBound
 -- conjunct already names exactly one card, so the scope only has to reach it.
 -- Either spelling answers now that a Count reads a trigger's slot-named player
--- (Pawl.CountSpec's Keening Stone); this one is what the card has always said.
+-- (Pawl.CountSpec's Price of Knowledge); this one is what the card has always
+-- said.
 wildEvocationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 wildEvocationSpec s registry =
   let -- alice controls the enchantment; bob holds `cards` in the order given, so

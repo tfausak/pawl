@@ -1294,8 +1294,9 @@ flunkSpec s registry =
 --   every player at once  X = 6
 --   unanswered            X = 0   graveyard 3,      library 10
 --
--- bob's library is stocked past the deepest of those, so no reading decks him (CR
--- 104.3c) before the assertion runs.
+-- Both milled libraries are stocked past the deepest of those readings, so the
+-- library assertion measures the mill rather than CR 701.17b's floor at "as many
+-- as possible".
 keeningStoneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 keeningStoneSpec s registry =
   let inZone zone pid gs = length (Game.zoneMembers zone pid gs)
