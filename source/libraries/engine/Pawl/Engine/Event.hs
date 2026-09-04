@@ -141,6 +141,8 @@ import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LifeGainR as LifeGainR
+import qualified Pawl.Types.LifeGainRewrite as LifeGainRewrite
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
@@ -1669,6 +1671,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.TurnUpR {} -> False
   ReplacementEffect.UntapR _ -> False
   ReplacementEffect.LifeLossR {} -> False
+  ReplacementEffect.LifeGainR {} -> False
   ReplacementEffect.DrawR {} -> False
   ReplacementEffect.DrawCountR {} -> False
   ReplacementEffect.PhaseR _ -> False
@@ -2943,6 +2946,20 @@ apply batch candidate event =
             pure Nothing
     -- Unreachable: `applies` admits LifeLossR only against WouldLoseLife.
     (ReplacementEffect.LifeLossR {}, _) -> pure (Just event)
+    -- CR 614.1a: Boon Reflection's "you gain twice that much life instead". The
+    -- event is left STANDING at a rewritten gain rather than cancelled, the
+    -- resizing loss arms above for their reason: CR 616.2's next iteration
+    -- re-collects against it, so a second Boon Reflection quadruples.
+    (ReplacementEffect.LifeGainR (LifeGainR.MkLifeGainR _ rewrite), ProposedEvent.WouldGainLife pid n) -> case rewrite of
+      -- The proposed amount IS the whole input: a scaling is stated on the gain
+      -- and not on the resulting total, so nothing is read off the board.
+      -- Pawl.Engine.Replacement.scale is the shared arithmetic, LifeLossRewrite's
+      -- Scaled arm's.
+      LifeGainRewrite.Scaled scaling -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldGainLife pid (Replacement.scale scaling n)))
+    -- Unreachable: `applies` admits LifeGainR only against WouldGainLife.
+    (ReplacementEffect.LifeGainR {}, _) -> pure (Just event)
     -- CR 614.6 with CR 614.11: Words of Worship's "the next time you would draw a
     -- card this turn, you gain 5 life instead". The draw NEVER HAPPENS -- no card
     -- leaves the library, no GameEvent.Drew is recorded and CR 121.2's tally does
@@ -2957,9 +2974,13 @@ apply batch candidate event =
     -- The life goes to the player the EVENT named, which for the producer in the
     -- pool is the same seat as CR 109.5's "you"; see Pawl.Types.DrawRewrite.
     (ReplacementEffect.DrawR (DrawR.MkDrawR _ rewrite), ProposedEvent.WouldDraw pid) -> case rewrite of
+      -- Through resolveLifeGain, CR 614.1's funnel for the gain class: the life
+      -- this rewrite substitutes for the draw is a life gain event like any
+      -- other, so a LifeGainR row resizes it.
       DrawRewrite.GainLife n -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        changeLife pid (toInteger n)
+        settled <- resolveLifeGain pid n
+        changeLife pid (toInteger settled)
         pure Nothing
       -- CR 400.11c through the same CR 614.6 cancellation: Ring of Ma'rûf's
       -- "instead put a card you own from outside the game into your hand". The
@@ -3793,6 +3814,37 @@ resolveLifeLoss cause pid n =
     else do
       outcome <- applyReplacements (ProposedEvent.WouldLoseLife cause pid n)
       pure (maybe 0 snd (outcome >>= Replacement.asLifeLoss))
+
+-- CR 119.3 / 119.10 / 120.3f: settle how much life a player actually gains, and
+-- answer with the settled amount. resolveLifeLoss the other direction, and the
+-- one funnel every gain goes through -- Pawl.Engine.Resolve's Effect.GainLife
+-- arm and its changeLifeByDelta (the upward side of a set, an exchange and a
+-- redistribution alike), Pawl.Engine.Damage's CR 120.3f lifelink pass, and the
+-- DrawRewrite.GainLife arm above -- so a row cannot reach one road and miss
+-- another.
+--
+-- The SETTLED amount may be larger than what came in, and for the pool's only
+-- producers always is: Pawl.Types.LifeGainRewrite is a scaling.
+--
+-- It does not WRITE the life total, resolveLifeLoss's split and for its reason:
+-- every caller already owns that write, and the lifelink one has to keep its
+-- record out of a CR 510.2 bracket its caller opened.
+--
+-- Zero proposes nothing, which is CR 119.10 in as many words: "if a player gains
+-- 0 life, no life gain event would occur, and these effects won't apply".
+--
+-- Not implemented: CR 119.7's restriction on a player who CAN'T gain life --
+-- under which no gain happens here at all and "a replacement effect that would
+-- replace a life gain event affecting that player won't do anything", so the
+-- gate belongs ahead of the proposal rather than among the rows. Vacuous:
+-- Pawl.Types.PlayerEffect has no such arm to consult (#3078).
+resolveLifeGain :: PlayerId -> Natural -> Game Natural
+resolveLifeGain pid n =
+  if n == 0
+    then pure 0
+    else do
+      outcome <- applyReplacements (ProposedEvent.WouldGainLife pid n)
+      pure (maybe 0 snd (outcome >>= Replacement.asLifeGain))
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
 resolveTokens :: PlayerId -> Seq.Seq TokenLot.TokenLot -> Game (Maybe (PlayerId, Seq.Seq TokenLot.TokenLot))

@@ -58,7 +58,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- nothing and pays nothing. Nothing is what a reader gating on a paid cost -- CR
 -- 702.37b's megamorph counter, the only such reader -- correctly declines.
 --
--- Thirteen arms, not every replaceable event class the rules define: each of the rest
+-- Not every replaceable event class the rules define: each of the rest
 -- is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
@@ -141,6 +141,19 @@ data ProposedEvent
     -- field's currency, so CR 616.2's next iteration sees a smaller loss rather
     -- than a differently-shaped event.
     WouldLoseLife LifeLossCause.LifeLossCause PlayerId.PlayerId Natural.Natural
+  | -- | CR 119.3 / 119.10: a player would gain life. Raised by
+    -- Pawl.Engine.Event.resolveLifeGain, the one funnel every gain goes through
+    -- -- Pawl.Engine.Resolve's Effect.GainLife arm and its changeLifeByDelta,
+    -- CR 120.3f's lifelink gain, and the gain a DrawRewrite substitutes for a
+    -- draw.
+    --
+    -- NO cause, where WouldLoseLife carries one: the loss side needs the grain
+    -- because Worship's clause is scoped to damage, and no printed gain clause
+    -- narrows by how the gain came about. The field appears when a card needs it.
+    --
+    -- The Natural is the life that WOULD be gained, never the resulting total,
+    -- WouldLoseLife's currency and for its reason.
+    WouldGainLife PlayerId.PlayerId Natural.Natural
   | -- | CR 121.1 / 614.11: a player would draw a card. Raised by
     -- Pawl.Engine.Event.drawCardReturning, the one funnel CR 121.1's turn-based
     -- draw, an opening hand and an Effect.Draw all go through -- and raised

@@ -3342,6 +3342,152 @@ collectorBoard island piker collector recall collecting =
 -- day) is the payer, ReplacementSpec's Bloodletter group's choice for the same
 -- reason: it charges CR 119.4's payment as a COST, which is the road this row
 -- watches, and the mana half of that cost is one Swamp.
+-- CR 614.1a / 119.10: Boon Reflection ({4}{W} Enchantment, "If you would gain
+-- life, you gain twice that much life instead." -- name, cost, type line and
+-- Oracle text checked against api.scryfall.com 2026-09-04).
+--
+-- The life-total class's GAIN half, and the mirror of the Bloodletter group
+-- above: that row watches CR 119.3's downward direction and this one the upward,
+-- which CR 119.10 reads as "if a source would cause you to gain life". The
+-- producer was picked over its two siblings for having nothing else printed on
+-- it -- Rhox Faithmender carries lifelink and Alhammarret's Archive a second
+-- replacement, and each would put a second row on the board under test.
+--
+-- Its own rulings fix the two readings this group asserts and the CR does not
+-- spell out: "if you have 3 life and an effect says that your life total
+-- 'becomes 10,' your life total will actually become 17", which is CR 119.5's
+-- gain proposed like any other, and "if you control two Boon Reflections, you'll
+-- gain four times the original amount of life", which is CR 616.2 re-collecting
+-- against the rewritten event rather than CR 614.5 spending both rows on one.
+--
+-- THREE SEATS wherever the clause's CR 109.5 "you" is the question, because a
+-- two-player board cannot tell "the row's controller" from "the player the event
+-- names" when one seat holds both roles.
+boonReflectionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 614.1a)" $ do
+  -- CR 119.3's plain road: Pawl.Engine.Resolve's Effect.GainLife arm. ONE board,
+  -- two casts of the SAME spell, so the only thing that differs between the two
+  -- answers is which seat controls the row. Blossoming Calm ({W} Instant,
+  -- "Choose one -- * You gain 2 life. * ..." in pawl's transcription: hexproof
+  -- until your next turn and 2 life) is an instant, so bob may cast his on
+  -- alice's main phase.
+  --
+  -- Every number distinct -- a gain of 2, a doubled 4, and totals of 24, 22 and
+  -- 20 -- so no two readings of the rule land on the same total.
+  Spec.it s "CR 119.3 an effect's life gain is doubled for the row's controller and nobody else" $ do
+    plains <- S.printingOf s registry "Plains"
+    calm <- S.printingOf s registry "Blossoming Calm"
+    boon <- S.printingOf s registry "Boon Reflection"
+    let (_, g1) = S.addCreature boon S.alice S.threePlayerGame
+        (alicesCalm, g2) = S.addHandCard calm S.alice g1
+        (bobsCalm, g3) = S.addHandCard calm S.bob g2
+        ready = S.landsFor plains S.bob 1 (S.landsFor plains S.alice 1 (inMainPhase S.alice g3))
+        after =
+          S.runPure
+            S.identityAnswer
+            ready
+            ( S.cast S.alice alicesCalm
+                Monad.>> Stack.resolveTop
+                Monad.>> S.cast S.bob bobsCalm
+                Monad.>> Stack.resolveTop
+            )
+    Spec.assertEqWith s "CR 614.1a alice's printed gain of 2 becomes 4" (S.lifeOf S.alice after) (Just 24)
+    Spec.assertEqWith s "CR 109.5 bob is not the row's you, so his same 2 stays 2" (S.lifeOf S.bob after) (Just 22)
+    Spec.assertEqWith s "and carol, who gained nothing, is untouched" (S.lifeOf S.carol after) (Just 20)
+  -- CR 616.2 rather than CR 614.5: the rewritten event is re-collected, so the
+  -- SECOND row applies to the doubled gain. The card's own ruling states the
+  -- answer -- "if you control two Boon Reflections, you'll gain four times the
+  -- original amount" -- and the board is the case above with one more row, so the
+  -- two differ in exactly one thing.
+  Spec.it s "CR 616.2 two rows compound rather than one spending the event" $ do
+    plains <- S.printingOf s registry "Plains"
+    calm <- S.printingOf s registry "Blossoming Calm"
+    boon <- S.printingOf s registry "Boon Reflection"
+    let (_, g1) = S.addCreature boon S.alice S.threePlayerGame
+        (_, g2) = S.addCreature boon S.alice g1
+        (alicesCalm, g3) = S.addHandCard calm S.alice g2
+        ready = S.landsFor plains S.alice 1 (inMainPhase S.alice g3)
+        after = S.runPure S.identityAnswer ready (S.cast S.alice alicesCalm Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "2 doubled twice is 8, not the 4 one row alone gives" (S.lifeOf S.alice after) (Just 28)
+  -- CR 120.3f: lifelink's gain is a life gain event like any other, so the row
+  -- reaches it -- which is the half of this unit that no Effect.GainLife road can
+  -- prove, Pawl.Engine.Damage having its own write.
+  --
+  -- Sanguine Bond ({3}{B}{B} Enchantment, "Whenever you gain life, target
+  -- opponent loses that much life") is what makes the RECORDED amount observable
+  -- at gameplay level: a gain written as 6 and recorded as 3 would leave bob's
+  -- own total wrong while alice's looked right.
+  --
+  -- REAL COMBAT with Celestine, the Living Saint (3/4 lifelink) attacking, the
+  -- Worship group's fixture reused. TWO SEATS here rather than three, because
+  -- Sanguine Bond's "target opponent" would otherwise be a choice this case does
+  -- not mean to make; the CR 109.5 discrimination is the case above's job.
+  --
+  -- Every number distinct -- 3 dealt, 6 gained, 6 drained, bob at 11 and alice at
+  -- 26 -- and the unreplaced reading (bob at 14, alice at 23) shares none of them.
+  Spec.it s "CR 120.3f lifelink's gain goes through the same funnel" $ do
+    plains <- S.printingOf s registry "Plains"
+    boon <- S.printingOf s registry "Boon Reflection"
+    bond <- S.printingOf s registry "Sanguine Bond"
+    celestine <- S.printingOf s registry "Celestine, the Living Saint"
+    let armed extra =
+          let (_, g1) = S.addCreature bond S.bob (S.landsInPlay plains 2)
+              (_, g2) = S.addCreature celestine S.bob g1
+           in S.runCombat attackNoBlock (bobAttacks (extra g2))
+        doubled = armed (snd . S.addCreature boon S.bob)
+        control = armed id
+    Spec.assertEqWith s "CR 614.1a bob's lifelink 3 becomes 6" (S.lifeOf S.bob doubled) (Just 26)
+    Spec.assertEqWith s "and the Bond drains the SETTLED 6, so alice takes 3 + 6" (S.lifeOf S.alice doubled) (Just 11)
+    Spec.assertEqWith s "the same board without the row gains bob the printed 3" (S.lifeOf S.bob control) (Just 23)
+    Spec.assertEqWith s "and drains alice 3, so she takes 3 + 3" (S.lifeOf S.alice control) (Just 14)
+  -- CR 614.11's substituted gain, the fourth road into the funnel: Words of
+  -- Worship's "the next time you would draw a card this turn, you gain 5 life
+  -- instead" gains life through a REPLACEMENT rather than through an effect, and
+  -- rule 119.10 knows no difference -- a source caused alice to gain life.
+  --
+  -- The board is the Words of Worship group's armed one with a row added, so the
+  -- two differ in exactly one thing, and the draw is still cancelled either way.
+  Spec.it s "CR 614.11 the life a draw replacement substitutes is a gain the row resizes" $ do
+    plains <- S.printingOf s registry "Plains"
+    wordsOfWorship <- S.printingOf s registry "Words of Worship"
+    boon <- S.printingOf s registry "Boon Reflection"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (armed, _) = wordsBoard plains wordsOfWorship piker True
+        after = S.runPure S.identityAnswer (snd (S.addCreature boon S.alice armed)) (Event.drawCard S.alice)
+    Spec.assertEqWith s "CR 614.1a the substituted 5 becomes 10, so alice is at 30" (S.lifeOf S.alice after) (Just 30)
+    Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
+  -- CR 119.5's upward direction, through Pawl.Engine.Resolve's changeLifeByDelta:
+  -- "if an effect sets a player's life total to a specific number, the player
+  -- gains or loses the necessary amount of life". The card's own ruling is the
+  -- exact claim -- "your life total will actually become 17" from 3 on a set to
+  -- 10 -- so the resulting total OVERSHOOTS the number the effect named.
+  --
+  -- Biorhythm ({6}{G}{G} Sorcery, "Each player's life total becomes the number of
+  -- creatures they control") is the Bloodletter group's producer one direction
+  -- over: one instruction, three seats, three answers off one pre-effect board
+  -- (CR 608.2f). carol holds the row and is the only seat whose total goes UP.
+  --
+  -- Every number distinct -- alice to 1, bob to 2, carol from 2 by a gain of 1
+  -- doubled to 2 -- so the unreplaced reading of carol (3) collides with nothing.
+  Spec.it s "CR 119.5 a total set HIGHER is a life gain the row resizes" $ do
+    forest <- S.printingOf s registry "Forest"
+    biorhythm <- S.printingOf s registry "Biorhythm"
+    boon <- S.printingOf s registry "Boon Reflection"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g1) = S.addCreature boon S.carol S.threePlayerGame
+        (_, g2) = S.addCreature piker S.alice g1
+        (_, g3) = S.addCreature piker S.bob g2
+        (_, g4) = S.addCreature piker S.bob g3
+        (_, g5) = S.addCreature piker S.carol g4
+        (_, g6) = S.addCreature piker S.carol g5
+        (_, g7) = S.addCreature piker S.carol g6
+        (held, g8) = S.addHandCard biorhythm S.alice g7
+        ready = inMainPhase S.alice (atLife S.carol 2 (S.landsFor forest S.alice 8 g8))
+        after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
+    Spec.assertEqWith s "CR 119.5 carol gains the 1 that would reach 3, doubled, so she ends at 4" (S.lifeOf S.carol after) (Just 4)
+    Spec.assertEqWith s "alice's total falls to her one creature, and a loss is no gain to resize" (S.lifeOf S.alice after) (Just 1)
+    Spec.assertEqWith s "and bob's falls to his two, the row being carol's alone" (S.lifeOf S.bob after) (Just 2)
+
 ashiokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 614.6)" $ do
   -- Every number distinct: three cards in the library, two paid for, one left,
@@ -7840,6 +7986,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   almsCollectorSpec s registry
   bloodletterSpec s registry
   ashiokSpec s registry
+  boonReflectionSpec s registry
   divineDeflectionSpec s registry
   braceForImpactSpec s registry
   inkshieldSpec s registry

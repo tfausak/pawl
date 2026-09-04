@@ -30,6 +30,8 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeGainR as LifeGainR
+import qualified Pawl.Types.LifeGainRewrite as LifeGainRewrite
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
 import qualified Pawl.Types.LifeLossR as LifeLossR
@@ -177,6 +179,18 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
           )
       )
       " {\"type\":\"LifeLossR\",\"value\":{\"matching\":{\"whose\":{\"type\":\"Yours\"},\"whichCause\":{\"type\":\"ByDamage\"}},\"rewrite\":{\"type\":\"LeaveAtLeast\",\"value\":1}}} "
+  -- CR 614.1a / 119.10: Boon Reflection, the LifeGainR producer.
+  Spec.it s "LifeGainR (Boon Reflection)" $
+    Common.assertCodec
+      s
+      codec
+      ( ReplacementEffect.LifeGainR
+          ( LifeGainR.MkLifeGainR
+              ControllerRelation.Yours
+              (LifeGainRewrite.Scaled (Scaling.Multiply 2))
+          )
+      )
+      " {\"type\":\"LifeGainR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Scaled\",\"value\":{\"type\":\"Multiply\",\"value\":2}}}} "
   -- CR 614.11 / 121.6: Words of Worship, the GainLife DrawR producer.
   Spec.it s "DrawR (Words of Worship)" $
     Common.assertCodec

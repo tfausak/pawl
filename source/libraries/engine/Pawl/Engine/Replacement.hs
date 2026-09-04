@@ -87,6 +87,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LifeGainR as LifeGainR
+import qualified Pawl.Types.LifeGainRewrite as LifeGainRewrite
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.LifeLossRewrite as LifeLossRewrite
@@ -148,6 +150,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
@@ -714,13 +717,25 @@ applies gs event candidate =
           maybe True (== cause) (LifeLossPattern.whichCause pat)
             && matchesPlayer gs src (LifeLossPattern.whose pat) pid
             && breaches gs (ReplacementCandidate.controller candidate) rewrite pid n
+        -- CR 614.1a / 119.10: whose life total the row watches (CR 109.5's
+        -- "your"), and whether the rewrite would actually resize the gain. That
+        -- second conjunct is LifeLossR's third above, and for its reason: a gain
+        -- the row would leave alone never reaches CR 616.1's choice and is never
+        -- spent under CR 614.5.
+        --
+        -- Read off the SOURCE, the LifeLossR arm's posture rather than DrawR's:
+        -- every gain producer is a permanent's static ability, whose CR 109.5
+        -- "you" is its controller as projected now.
+        (ReplacementEffect.LifeGainR (LifeGainR.MkLifeGainR whose rewrite), ProposedEvent.WouldGainLife pid n) ->
+          matchesPlayer gs src whose pid
+            && resizes rewrite n
         -- CR 121.6 / 614.11: whose card draws the row watches (CR 109.5's "you").
         -- The whole of the pattern, there being nothing else about a draw to
         -- narrow by, and no `admits` beside it: rule 614.11's first sentence
         -- makes the row apply even when the library is empty, so there is no
         -- board on which the rewrite would change nothing.
         --
-        -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the three
+        -- Read off the CANDIDATE, the ZoneChangeR arm's posture and not the
         -- src-derived arms below it: both producers install a FLOATING row from an
         -- activated ability, so the "you" was baked when the ability resolved and
         -- survives the source leaving the battlefield or changing hands -- which
@@ -752,6 +767,7 @@ applies gs event candidate =
         (ReplacementEffect.TurnUpR {}, _) -> False
         (ReplacementEffect.UntapR _, _) -> False
         (ReplacementEffect.LifeLossR {}, _) -> False
+        (ReplacementEffect.LifeGainR {}, _) -> False
         (ReplacementEffect.DrawR {}, _) -> False
         (ReplacementEffect.DrawCountR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
@@ -807,6 +823,18 @@ breaches gs you rewrite pid n = case rewrite of
   -- the front of that same list.
   LifeLossRewrite.ExileFromTopOfYourLibrary ->
     maybe False (\owner -> Natural.length (Game.zoneMembers Zone.Library owner gs) >= n) you
+
+-- CR 614.1a: would this rewrite actually change the gain? `breaches` above, for
+-- the gain class -- and simpler, since every arm of Pawl.Types.LifeGainRewrite
+-- is arithmetic on the proposed amount and none reads the board.
+--
+-- `Scaled (Multiply 1)` and `Scaled (AddMore 0)` resize nothing and are refused,
+-- which is `breaches`' Scaled arm carried over word for word: a fence rather than
+-- a proved behaviour, no printing in data/cards/ scaling a life gain by an
+-- identity.
+resizes :: LifeGainRewrite.LifeGainRewrite -> Natural -> Bool
+resizes rewrite n = case rewrite of
+  LifeGainRewrite.Scaled scaling -> scale scaling n /= n
 
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
 -- the entering object? `admits` and `unspent` above, for the entry class.
@@ -1023,7 +1051,7 @@ matchesPlayer gs src rel pid = relationHolds gs src (Projection.controllerOf src
 -- the source live instead unscopes such a row the moment the source leaves the
 -- battlefield, and hands it to the new controller on a control change.
 --
--- The three arms still on matchesPlayer -- CounterR, TokenR, LifeLossR -- are
+-- The arms still on matchesPlayer -- CounterR, TokenR, LifeLossR, LifeGainR -- are
 -- equivalent to this today and are left alone: every producer of theirs is a
 -- permanent's static ability, whose source is on the battlefield whenever the row
 -- is consulted. DrawR is the first ControllerRelation pattern whose producer
@@ -1496,6 +1524,7 @@ bucketOfEffect re = case re of
   -- CR 616.1a-d are all about entering the battlefield and copying; a life total
   -- is neither, so CR 616.1e.
   ReplacementEffect.LifeLossR {} -> ReplacementBucket.Other
+  ReplacementEffect.LifeGainR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entering the battlefield and copying; drawing a
   -- card is neither, so CR 616.1e.
   ReplacementEffect.DrawR {} -> ReplacementBucket.Other
@@ -1681,6 +1710,10 @@ readsApplier re = case re of
   -- 704.5j's legend rule does not leave standing. No board can put the two
   -- answers apart, and False would still be the wrong classification.
   ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ LifeLossRewrite.ExileFromTopOfYourLibrary) -> True
+  -- The gain side's whole rewrite sum, and the two resizing loss arms' answer:
+  -- the scaling is the effect's own field and the player is the one the event
+  -- named. Cased on the inner sum, LifeLossR's discipline above for its reason.
+  ReplacementEffect.LifeGainR (LifeGainR.MkLifeGainR _ (LifeGainRewrite.Scaled _)) -> False
   -- The player who gains the life is the one the EVENT named, and the amount is
   -- the effect's own field, so two rows alike in `effect` gain the same seat the
   -- same life whoever holds them. CR 109.5's "you" is read in `applies` rather
@@ -1851,6 +1884,11 @@ chooserOf gs event = case event of
   -- reason. Not the damage's source or its controller: by CR 120.4c the damage
   -- is dealt and settled, and what is being replaced is a result of it.
   ProposedEvent.WouldLoseLife _ pid _ -> Just pid
+  -- CR 616.1's affected player is the one the event happens to, which for a life
+  -- gain is the player gaining it -- WouldLoseLife's answer one direction over.
+  -- Not the source causing the gain: CR 119.10 reads the clause as "if a source
+  -- would cause [a player] to gain life", and the player is who it happens to.
+  ProposedEvent.WouldGainLife pid _ -> Just pid
   -- CR 616.1's affected player is the one the event happens to, which for a draw
   -- is the player who would draw the card -- WouldLoseLife's answer, and for its
   -- reason. There is no affected OBJECT: CR 121.1's card is not chosen until the
@@ -2730,6 +2768,9 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- not because the resource is inexhaustible; `breaches` is where the count is
   -- actually read, once per proposal.
   ReplacementEffect.LifeLossR {} -> Nothing
+  -- A scaling on the gain side is arithmetic on whatever amount arrives, the
+  -- resizing loss arms above and for their reason.
+  ReplacementEffect.LifeGainR {} -> Nothing
   -- The question never arrives: `contested` above filters by WouldDealDamage,
   -- which no DrawR row matches. A life gain is no supply in any case; CR 400.11b's
   -- pool IS one, and `bringInto` is where its own exhaustion is read.
@@ -2752,6 +2793,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
@@ -2768,6 +2810,7 @@ asDestruction event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
@@ -2786,6 +2829,7 @@ asUntap event = case event of
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
@@ -2806,6 +2850,7 @@ asDraw event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
 
 -- asDraw's twin one event class up (CR 121.2a): who was instructed to draw and how
 -- many cards the instruction names once CR 616.1's loop has settled it, or Nothing
@@ -2825,6 +2870,7 @@ asDrawCount event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
 
 asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural)
 asCounters event = case event of
@@ -2839,6 +2885,7 @@ asCounters event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
@@ -2858,6 +2905,7 @@ asPlayerCounters event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
@@ -2869,6 +2917,26 @@ asPlayerCounters event = case event of
 asLifeLoss :: ProposedEvent -> Maybe (PlayerId, Natural)
 asLifeLoss event = case event of
   ProposedEvent.WouldLoseLife _ pid n -> Just (pid, n)
+  ProposedEvent.WouldGainLife {} -> Nothing
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
+
+-- asLifeLoss the other direction: the player who would gain life and how much of
+-- the gain has survived, or Nothing when a replacement took the event outright.
+asLifeGain :: ProposedEvent -> Maybe (PlayerId, Natural)
+asLifeGain event = case event of
+  ProposedEvent.WouldGainLife pid n -> Just (pid, n)
+  ProposedEvent.WouldLoseLife {} -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
@@ -2895,6 +2963,7 @@ asTokens event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
 
@@ -2974,5 +3043,6 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
   ProposedEvent.WouldUntap _ -> Nothing
   ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
