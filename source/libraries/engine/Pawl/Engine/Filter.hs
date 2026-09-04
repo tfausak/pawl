@@ -1180,10 +1180,10 @@ matches context view predicate = case predicate of
     _ -> False
   -- CR 702.134a's "power less than this creature's power", the one power
   -- comparison whose bound is another object rather than a literal. False unless
-  -- BOTH powers are readable, which is the two arms above joined: a candidate
-  -- with no power is no more "a creature with lesser power" than it is one with
-  -- power 2 or less, and a source whose power nothing supplied names no bound to
-  -- be less than.
+  -- BOTH powers are readable, which is PowerAtLeast and PowerAtMost joined: a
+  -- candidate with no power is no more "a creature with lesser power" than it is
+  -- one with power 2 or less, and a source whose power nothing supplied names no
+  -- bound to be less than.
   Filter.PowerLessThanSource -> case (power view, sourcePower context) of
     (Just p, Just s) -> p < s
     _ -> False
@@ -1613,8 +1613,8 @@ rewrite pairs predicate = case predicate of
   Filter.PowerAtLeast _ -> predicate
   Filter.PowerAtMost _ -> predicate
   Filter.ToughnessGreaterThanPower -> predicate
-  -- Untouched for the two above's reason: the atom names a comparison, and CR
-  -- 612.1 finds no word in it to swap.
+  -- Untouched for the power atoms' reason above: the atom names a comparison,
+  -- and CR 612.1 finds no word in it to swap.
   Filter.PowerLessThanSource -> predicate
   Filter.PowerGreaterThanSource -> predicate
   -- Untouched for the two above's reason: a slot name is not a word CR 612.1's

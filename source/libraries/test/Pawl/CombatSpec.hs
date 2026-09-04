@@ -105,6 +105,19 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
       attacker : _ -> Spec.assertEqWith s "attacker took four" (S.damageOf attacker after) (Just 4)
+  Spec.it s "CR 702.19b a trampling Tapestry Warden spills the excess over its toughness" $ do
+    warden <- S.printingOf s registry "Tapestry Warden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [warden] [piker]
+    case mine of
+      [] -> Spec.assertFailure s "fixture should have an attacker"
+      attacker : _ -> do
+        -- CR 702.19b's excess is excess over what the creature ASSIGNS, so the
+        -- 3/4 Warden divides 4: one lethal point onto the 2/1 Piker and three
+        -- over. Reading power would leave bob at 18.
+        let after = S.settleSba (S.fightWith trampleThresholdAnswer (withTrample attacker gs))
+        Spec.assertEqWith s "defender took three over the blocker" (S.lifeOf S.bob after) (Just 17)
+        Spec.assertEqWith s "and the blocker took its lethal point" (S.creaturesInPlay S.bob after) 0
   Spec.it s "CR 509 a blocked attacker does not damage the player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 1 1
@@ -1008,6 +1021,37 @@ withFear oid gs =
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- CR 702.19: grant trample to `oid` with a stored continuous effect, withFear's
+-- posture. Tapestry Warden does not print trample, and the pool has no printed
+-- trampler that also assigns with toughness.
+withTrample :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withTrample oid gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      eff =
+        ContinuousEffect.MkContinuousEffect
+          { ContinuousEffect.source = oid,
+            ContinuousEffect.timestamp = ts,
+            ContinuousEffect.expiry = Expiry.AtCleanup,
+            ContinuousEffect.modification = Modification.GainKeyword Keyword.Trample,
+            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+          }
+   in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- CR 702.19b: assigns each blocker exactly the threshold the engine offered and
+-- every leftover point to the defending player. Reads the amount off the prompt
+-- rather than computing it, so a wrong substitution shows up as a wrong life
+-- total rather than a rejected assignment.
+trampleThresholdAnswer :: Prompt.Prompt r -> r
+trampleThresholdAnswer p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds n ->
+    let blockers = Map.filterWithKey (\r _ -> S.isCreatureRecipient r) thresholds
+        spent = sum (Map.elems blockers)
+        leftover = if n >= spent then n - spent else 0
+     in case filter (not . S.isCreatureRecipient) (Map.keys thresholds) of
+          d : _ -> Map.insert d leftover blockers
+          [] -> blockers
+  _ -> S.aggressiveAnswer p
 
 -- A layer-7c effect that turns Goblin Piker's 2/1 into a 2/3, so Tapestry
 -- Warden's CR 613.11 rules effect must see the finished characteristics.

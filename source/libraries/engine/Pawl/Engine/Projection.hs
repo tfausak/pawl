@@ -4038,8 +4038,9 @@ removesAbilities m = case m of
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
-  -- A grant, GainKeyword's answer above: not a removal.
+  -- CR 613.11 rules-modifying marker rather than a layer-6 ability change.
   Modification.AssignCombatDamageWithToughness -> False
+  -- A grant, GainKeyword's answer above: not a removal.
   Modification.GrantsStationToughness -> False
   Modification.AddLandSubtype _ -> False
   Modification.ChangeSubtypeWord {} -> False
@@ -5557,9 +5558,9 @@ noValuePT pc
 -- 7b on the question is settled and CR 208.5 answers it -- a creature whose CDA
 -- CR 305.7 stripped is a 0, not a blank, to anything counting it.
 --
--- Layer's derived Ord is CR 613.1's order, so the comparison is the sublayer
--- test. The precedent is noncreaturePT, CR 208.3's sibling, which the mid-fold
--- readers already apply.
+-- Layer's derived Ord is CR 613.1's order followed by CR 613.11's Rules, so the
+-- comparison is the sublayer test. The precedent is noncreaturePT, CR 208.3's
+-- sibling, which the mid-fold readers already apply.
 noValueAt :: Layer -> ProjectedCharacteristics -> ProjectedCharacteristics
 noValueAt bound = if bound > Layer.CharacteristicPT then noValuePT else id
 

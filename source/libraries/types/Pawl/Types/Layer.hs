@@ -2,7 +2,9 @@ module Pawl.Types.Layer where
 
 -- | CR 613.1: the layers a continuous effect can apply in, ordered by rule number
 -- so the DERIVED Ord IS the application order -- the sole thing the projection
--- sorts on. Complete for diffability against CR 613 (the Keyword posture). Copy
+-- sorts on. Rules is not one of them: CR 613.11's rules-modifying effects apply
+-- after every layer, so it sorts last.
+-- Complete for diffability against CR 613 (the Keyword posture). Copy
 -- and CharacteristicPT have no Modification producer -- a copy is seeded into the
 -- fold by Projection.copiableCharacteristics, and a CDA's P/T is applied by
 -- Projection.applyCharacteristicPT off the object's own partial rather than
