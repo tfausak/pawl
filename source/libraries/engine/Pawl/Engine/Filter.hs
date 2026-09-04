@@ -926,6 +926,24 @@ data Context = MkContext
     -- controller at all (CR 108.4's card in a library). The atom widens on the
     -- first and refuses on the second.
     slotControllers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
+    -- CR 601.2c / 603.2: the PLAYERS the surrounding resolution's slots name --
+    -- `slotObjects` above's player half, filled from the same map by the same
+    -- caller (Pawl.Engine.Resolve.effectContext).
+    --
+    -- NO atom in `matches` below reads it. It is a channel THROUGH this record to
+    -- Pawl.Engine.Count.playersFor, which is handed CR 113.7's SOURCE and needs
+    -- the resolution's own slots instead: an ability's targets and its trigger's
+    -- bindings are stamped on the ABILITY object on the stack, and a source is not
+    -- its stack object, so a read off the source's bindings answers nothing for
+    -- every ability (see #1783). A spell is the one object for which the two agree.
+    --
+    -- ABSENT versus EMPTY as slotControllers above, and the two mean what they do
+    -- there: a key is here for every slot the caller bound, so a missing key is a
+    -- position that bound no such slot -- where playersFor falls back to the
+    -- source's own bindings, the read every caller building no resolution context
+    -- still gets -- and an empty set is a slot bound to no player at all, which
+    -- that function declines rather than widening.
+    slotPlayers :: Map.Map SlotName.SlotName (Set.Set PlayerId.PlayerId),
     -- CR 601.2b / 603.2: the NUMBERS the surrounding announcement's bindings hold,
     -- keyed by slot -- "that much" as the trigger's own event stamped it
     -- (Pawl.Engine.Binding.eventAmount), the X a caster just named
@@ -1083,7 +1101,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1114,7 +1132,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty, slotControllers = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the

@@ -733,9 +733,10 @@ randomRevealSpec s registry =
 --
 -- "If it's a land card" is counted over EVERY player's hand rather than over the
 -- upkeep player's, and the two are the same question: the Filter.IsBound
--- conjunct already names exactly one card, so the scope only has to reach it. A
--- Count over a slot-named player's zone is unanswerable from a trigger today
--- (gap #1783), which is why it is not spelled the other way.
+-- conjunct already names exactly one card, so the scope only has to reach it.
+-- Either spelling answers now that a Count reads a trigger's slot-named player
+-- (Pawl.CountSpec's Price of Knowledge); this one is what the card has always
+-- said.
 wildEvocationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 wildEvocationSpec s registry =
   let -- alice controls the enchantment; bob holds `cards` in the order given, so

@@ -362,6 +362,12 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- A THUNK, like its siblings: one projection per bound object, paid
             -- for only by a filter that names the atom.
             Filter.slotControllers = fmap (foldMap (foldMap (foldMap (maybe Set.empty Set.singleton . Filter.controller) . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
+            -- CR 601.2c's PLAYERS out of the same environment, slotObjects' half
+            -- one recipient kind over. Filled here for the symmetry rather than
+            -- for a reader in this module: no Filter atom asks it, and the one
+            -- function that does (Pawl.Engine.Count.playersFor) is reached from
+            -- this context only through a slot's CR 202.3 computed bound.
+            Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) targets,
             -- CR 603.2's NUMBERS out of the same environment: "that much", the
             -- amount the trigger's own event stamped, which the bound below reads
             -- through Quantity.InSlot. Not an atom's input -- no Filter arm reads
