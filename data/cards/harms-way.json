@@ -1,0 +1,73 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Harm's Way",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "RedirectDamage",
+                    "value": {
+                      "amount": {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "chosenSource": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "to": {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      "whatRecipient": {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "whoRecipient": {
+                        "type": "You"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "pool": {
+                  "type": "AnyTarget"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

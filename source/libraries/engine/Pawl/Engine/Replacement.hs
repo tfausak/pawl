@@ -523,11 +523,14 @@ unspent rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
-  -- CR 614.9's redirection has nothing to spend: it moves the recipient and
-  -- leaves the amount alone, so no application can exhaust it. Its printed twin
-  -- is the same rewrite with the destination described rather than named.
+  -- CR 614.9's uncounted redirection has nothing to spend: it moves the
+  -- recipient and leaves the amount alone, so no application can exhaust it.
+  -- Its printed twin is the same rewrite with the destination described rather
+  -- than named.
   DamageRewrite.Redirect _ -> True
   DamageRewrite.RedirectMatching _ -> True
+  -- The counted redirection is spent as PreventNext is, in damage.
+  DamageRewrite.RedirectNext remaining _ -> remaining > 0
 
 -- CR 122.1c: does this damage rewrite admit the event's RECIPIENT? The shield's
 -- prevention says "if damage would be dealt to THIS permanent", and that
@@ -549,6 +552,7 @@ admitsRecipient src rewrite de = case rewrite of
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
   DamageRewrite.Redirect _ -> True
+  DamageRewrite.RedirectNext _ _ -> True
   DamageRewrite.RedirectMatching _ -> True
 
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
@@ -1963,8 +1967,14 @@ consume identity_ = case identity_ of
 -- are deliberately NOT reduced, since they apply separately to each event. No
 -- card can print a PreventNext at all (see Pawl.Types.DamageRewrite), so this
 -- arm has no producer.
-setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Natural -> Game ()
-setShield identity_ damageR left = case identity_ of
+--
+-- The caller passes the rewrite with the new remainder already written in --
+-- PreventNext for a shield, RedirectNext for Harm's Way's counted redirection,
+-- which is spent in the same unit -- and the 0 that drops the row is read off
+-- `remainingOf`, so the two counted rewrites cannot disagree about when a row
+-- is used up.
+setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> DamageRewrite.DamageRewrite -> Game ()
+setShield identity_ damageR spent = case identity_ of
   CandidateId.OfPermanent {} -> pure ()
   CandidateId.OfFloating floating ->
     State.modify' $ \gs ->
@@ -1975,9 +1985,76 @@ setShield identity_ damageR left = case identity_ of
               && ActiveReplacement.timestamp active == ts
           rewrite active
             | not (mine active) = Just active
-            | left == 0 = Nothing
-            | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR damageR {DamageR.rewrite = DamageRewrite.PreventNext left}}
+            | remainingOf spent == Just 0 = Nothing
+            | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR damageR {DamageR.rewrite = spent}}
        in gs {GameState.replacements = Maybe.mapMaybe rewrite (GameState.replacements gs)}
+
+-- CR 615.7's remaining amount, for the two rewrites that count one down --
+-- Mending Hands' shield and Harm's Way's counted redirection -- and Nothing for
+-- every rewrite that has no such number. `unspent` and `contestedResource` read
+-- the same field through their own arms; this is the write-back's reading.
+--
+-- A CLASSIFICATION of effects, in `prevents`' genre: one arm per constructor,
+-- no wildcard, so a third counted rewrite is asked here rather than never
+-- dropped at 0.
+remainingOf :: DamageRewrite.DamageRewrite -> Maybe Natural
+remainingOf rewrite = case rewrite of
+  DamageRewrite.PreventNext remaining -> Just remaining
+  DamageRewrite.RedirectNext remaining _ -> Just remaining
+  DamageRewrite.PreventAll -> Nothing
+  DamageRewrite.PreventAllBut _ -> Nothing
+  DamageRewrite.PreventRemovingShieldCounter -> Nothing
+  DamageRewrite.SetAmount _ -> Nothing
+  DamageRewrite.Scale _ -> Nothing
+  DamageRewrite.Redirect _ -> Nothing
+  DamageRewrite.RedirectMatching _ -> Nothing
+
+-- CR 614.9 over CR 615.7's counted shape: how much of this damage event the
+-- candidate's rewrite will actually MOVE, where that is less than the whole
+-- event. Harm's Way's "the next 2 damage ... is dealt to any target instead"
+-- meeting a 5-damage event moves 2 and leaves 3 on the original recipient, and
+-- that residue is a second EVENT rather than a smaller one -- which is what
+-- separates this from PreventNext, whose residue is the same event shrunk and
+-- is handled inside its own arm of Event.apply. Event.loop splits the event on
+-- this answer before applying the candidate to the covered part.
+--
+-- Nothing for every rewrite that takes the event whole, for a counted redirect
+-- large enough to cover all of it, and for one CR 614.9's guard has made inert
+-- (a destination that left): that one hands the event back unchanged and
+-- spends nothing (CR 609.7b), so there is nothing to split.
+--
+-- A CLASSIFICATION of effects, in `prevents`' genre: one arm per constructor,
+-- no wildcard.
+partialCoverage :: GameState -> ReplacementCandidate -> ProposedEvent -> Maybe Natural
+partialCoverage gs candidate event = case (ReplacementCandidate.effect candidate, event) of
+  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de) -> case rewrite of
+    DamageRewrite.RedirectNext remaining dest
+      | Maybe.isJust (redirectDestination gs dest) && remaining < DamageEvent.amount de -> Just remaining
+      | otherwise -> Nothing
+    DamageRewrite.PreventNext _ -> Nothing
+    DamageRewrite.PreventAll -> Nothing
+    DamageRewrite.PreventAllBut _ -> Nothing
+    DamageRewrite.PreventRemovingShieldCounter -> Nothing
+    DamageRewrite.SetAmount _ -> Nothing
+    DamageRewrite.Scale _ -> Nothing
+    DamageRewrite.Redirect _ -> Nothing
+    DamageRewrite.RedirectMatching _ -> Nothing
+  _ -> Nothing
+
+-- The two halves of a damage event `partialCoverage` split: the covered part,
+-- which the candidate is applied to, and the residue, which continues through
+-- the loop as an event of its own with the same source, recipient and riders.
+-- Nothing for an event that is not damage or a cover that is not smaller than
+-- it; the caller has already asked `partialCoverage`, so neither arises.
+splitDamage :: Natural -> ProposedEvent -> Maybe (ProposedEvent, ProposedEvent)
+splitDamage covered event = case event of
+  ProposedEvent.WouldDealDamage de
+    | covered < DamageEvent.amount de ->
+        Just
+          ( ProposedEvent.WouldDealDamage de {DamageEvent.amount = covered},
+            ProposedEvent.WouldDealDamage de {DamageEvent.amount = DamageEvent.amount de - covered}
+          )
+  _ -> Nothing
 
 -- CR 615.1a: is this damage rewrite a PREVENTION effect, rather than one of CR
 -- 614.1a's replacements? "Effects that use the word 'prevent' are prevention
@@ -2011,6 +2088,9 @@ prevents rewrite = case rewrite of
   -- is what keeps `preventionBy`, `inertPrevention` and CR 615.13's trigger away
   -- from it.
   DamageRewrite.Redirect _ -> False
+  -- Harm's Way counts its damage down as a shield does and still never says
+  -- "prevent": the 2 it moves is dealt, one recipient over.
+  DamageRewrite.RedirectNext _ _ -> False
   DamageRewrite.RedirectMatching _ -> False
 
 -- CR 615.12: applied to damage that CAN'T be prevented, does this rewrite still
@@ -2044,6 +2124,7 @@ spentInertly rewrite = case rewrite of
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   DamageRewrite.Redirect _ -> False
+  DamageRewrite.RedirectNext _ _ -> False
   DamageRewrite.RedirectMatching _ -> False
 
 -- CR 614.9: the destination a redirection effect may still use, re-derived
@@ -2172,6 +2253,8 @@ redirects rewrite = case rewrite of
   -- The same rule with the destination described rather than named, so a card
   -- forbidding redirection (Lava Burst) stops both.
   DamageRewrite.RedirectMatching _ -> True
+  -- And the same rule counted down, so it stops Harm's Way too.
+  DamageRewrite.RedirectNext _ _ -> True
   DamageRewrite.PreventNext _ -> False
   DamageRewrite.PreventAll -> False
   DamageRewrite.PreventAllBut _ -> False
@@ -2502,13 +2585,17 @@ contested gs events =
       indexed = zip [0 ..] events
       -- Reached only for a candidate `contestedResource` gave a resource for,
       -- which is a DamageR and nothing else, so the wildcard names no rewrite.
-      spendsInertly candidate = case ReplacementCandidate.effect candidate of
-        ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) -> spentInertly rewrite
+      -- CR 615.12's filter is a PREVENTION's: a redirect never prevents, so
+      -- unpreventable damage contends for Harm's Way's 2 exactly as any other
+      -- damage does, and `applies` alone says whether the row reaches it.
+      contends candidate event = case ReplacementCandidate.effect candidate of
+        ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) ->
+          not (prevents rewrite) || preventable gs event || spentInertly rewrite
         _ -> False
       hitsOf candidate =
         filter
           ( \entry ->
-              (preventable gs (snd entry) || spendsInertly candidate)
+              contends candidate (snd entry)
                 && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate
           )
           indexed
@@ -2563,6 +2650,11 @@ contestedResource :: GameState -> ReplacementCandidate -> Maybe (Natural, [Damag
 contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) -> case rewrite of
     DamageRewrite.PreventNext remaining -> Just (remaining, sum . fmap DamageEvent.amount)
+    -- Harm's Way's counted redirection is the same resource in the same unit:
+    -- "Harm's Way will redirect just 2 of that damage ... You choose which 2
+    -- damage is redirected" (its Oracle rulings), which is CR 615.7's
+    -- allocation on a rule-614 rewrite.
+    DamageRewrite.RedirectNext remaining _ -> Just (remaining, sum . fmap DamageEvent.amount)
     -- CR 122.1c: one counter per application, so a batch of n events demands n
     -- of them, and the permanent's counters are the supply.
     DamageRewrite.PreventRemovingShieldCounter ->

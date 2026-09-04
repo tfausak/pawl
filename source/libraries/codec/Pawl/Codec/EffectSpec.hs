@@ -901,7 +901,10 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           RedirectDamage.MkRedirectDamage
             { RedirectDamage.duration = Duration.UntilEndOfTurn,
               RedirectDamage.kind = Just DamageKind.Combat,
-              RedirectDamage.from = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+              RedirectDamage.amount = Nothing,
+              RedirectDamage.from = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
+              RedirectDamage.whatRecipient = Nothing,
+              RedirectDamage.whoRecipient = Nothing,
               RedirectDamage.to = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
               RedirectDamage.chosenSource = Nothing
             }

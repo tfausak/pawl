@@ -66,6 +66,14 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.codec
       (DamageRewrite.Redirect (Recipient.ToCreature (ObjectId.MkObjectId 7)))
       " {\"type\":\"Redirect\",\"value\":{\"type\":\"ToCreature\",\"value\":7}} "
+  -- Redirect with CR 615.7's countdown (Harm's Way), keyed by name for #1464's
+  -- reason; the replay path's, as Redirect's is.
+  Spec.it s "RedirectNext" $
+    Common.assertCodec
+      s
+      DamageRewrite.codec
+      (DamageRewrite.RedirectNext 2 (Recipient.ToCreature (ObjectId.MkObjectId 7)))
+      " {\"type\":\"RedirectNext\",\"value\":{\"remaining\":2,\"to\":{\"type\":\"ToCreature\",\"value\":7}}} "
   -- CR 614.9's redirection with a PRINTED destination (Pariah's "dealt to
   -- enchanted creature instead"). The authored twin of Redirect above, so this
   -- wire form IS a card's.

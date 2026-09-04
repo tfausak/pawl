@@ -8,6 +8,8 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -23,7 +25,10 @@ spec s = Spec.describe s "Pawl.Codec.RedirectDamage" $ do
       ( RedirectDamage.MkRedirectDamage
           { RedirectDamage.duration = Duration.UntilEndOfTurn,
             RedirectDamage.kind = Just DamageKind.Combat,
-            RedirectDamage.from = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+            RedirectDamage.amount = Nothing,
+            RedirectDamage.from = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
+            RedirectDamage.whatRecipient = Nothing,
+            RedirectDamage.whoRecipient = Nothing,
             RedirectDamage.to = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "attacker")),
             RedirectDamage.chosenSource = Nothing
           }
@@ -37,7 +42,10 @@ spec s = Spec.describe s "Pawl.Codec.RedirectDamage" $ do
       ( RedirectDamage.MkRedirectDamage
           { RedirectDamage.duration = Duration.UntilEndOfTurn,
             RedirectDamage.kind = Nothing,
-            RedirectDamage.from = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+            RedirectDamage.amount = Nothing,
+            RedirectDamage.from = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))),
+            RedirectDamage.whatRecipient = Nothing,
+            RedirectDamage.whoRecipient = Nothing,
             RedirectDamage.to = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "attacker")),
             RedirectDamage.chosenSource = Nothing
           }
@@ -54,10 +62,31 @@ spec s = Spec.describe s "Pawl.Codec.RedirectDamage" $ do
       ( RedirectDamage.MkRedirectDamage
           { RedirectDamage.duration = Duration.UntilEndOfTurn,
             RedirectDamage.kind = Nothing,
-            RedirectDamage.from = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            RedirectDamage.amount = Nothing,
+            RedirectDamage.from = Just (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+            RedirectDamage.whatRecipient = Nothing,
+            RedirectDamage.whoRecipient = Nothing,
             RedirectDamage.to = ObjectRef.EachMatching Filter.IsSource,
             RedirectDamage.chosenSource = Just (Filter.And [])
           }
       )
       " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"from\":{\"type\":\"InSlot\",\"value\":\"target\"},\"to\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"chosenSource\":{\"type\":\"And\",\"value\":[]}} "
+  -- Harm's Way: CR 615.7's amount and a DESCRIBED recipient side, so `from` is
+  -- elided and the description's two halves are written.
+  Spec.it s "MkRedirectDamage, counted and described" $
+    Common.assertCodec
+      s
+      RedirectDamage.codec
+      ( RedirectDamage.MkRedirectDamage
+          { RedirectDamage.duration = Duration.UntilEndOfTurn,
+            RedirectDamage.kind = Nothing,
+            RedirectDamage.amount = Just (Quantity.Literal 2),
+            RedirectDamage.from = Nothing,
+            RedirectDamage.whatRecipient = Just (Filter.ControlledBy PlayerRelation.You),
+            RedirectDamage.whoRecipient = Just PlayerRelation.You,
+            RedirectDamage.to = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            RedirectDamage.chosenSource = Just (Filter.And [])
+          }
+      )
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"amount\":{\"type\":\"Literal\",\"value\":2},\"whatRecipient\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"whoRecipient\":{\"type\":\"You\"},\"to\":{\"type\":\"InSlot\",\"value\":\"target\"},\"chosenSource\":{\"type\":\"And\",\"value\":[]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RedirectDamage.codec

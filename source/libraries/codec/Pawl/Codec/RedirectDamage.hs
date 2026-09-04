@@ -7,6 +7,8 @@ import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectRef as ObjectRef
+import qualified Pawl.Codec.PlayerRelation as PlayerRelation
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -24,14 +26,20 @@ codec :: Codec.Codec RedirectDamage.RedirectDamage
 codec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec RedirectDamage.duration
   kind <- Fields.defaulted "kind" Nothing (Common.maybe DamageKind.codec) RedirectDamage.kind
-  from <- Fields.required "from" ObjectRef.codec RedirectDamage.from
+  amount <- Fields.defaulted "amount" Nothing (Common.maybe Quantity.codec) RedirectDamage.amount
+  from <- Fields.defaulted "from" Nothing (Common.maybe ObjectRef.codec) RedirectDamage.from
+  whatRecipient <- Fields.defaulted "whatRecipient" Nothing (Common.maybe (Filter.codec Keyword.codec)) RedirectDamage.whatRecipient
+  whoRecipient <- Fields.defaulted "whoRecipient" Nothing (Common.maybe PlayerRelation.codec) RedirectDamage.whoRecipient
   to <- Fields.required "to" ObjectRef.codec RedirectDamage.to
   chosenSource <- Fields.defaulted "chosenSource" Nothing (Common.maybe (Filter.codec Keyword.codec)) RedirectDamage.chosenSource
   pure
     RedirectDamage.MkRedirectDamage
       { RedirectDamage.duration = duration,
         RedirectDamage.kind = kind,
+        RedirectDamage.amount = amount,
         RedirectDamage.from = from,
+        RedirectDamage.whatRecipient = whatRecipient,
+        RedirectDamage.whoRecipient = whoRecipient,
         RedirectDamage.to = to,
         RedirectDamage.chosenSource = chosenSource
       }

@@ -567,7 +567,7 @@ objectRefPositions =
     ("copy-spell-for-each", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs-ref") (CopyTargets.ForEach (plantedRef "cs-each"))), [plantedRef "cs-ref", plantedRef "cs-each"]),
     ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
     ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
-    ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing (plantedRef "rd-from") (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
+    ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
     ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing), [plantedRef "co"]),
     ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
     ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
@@ -1138,7 +1138,7 @@ ownCounts effect = case effect of
   -- card's Counts -- the same recursion Create takes into a minted token.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationCounts duration
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> durationCounts duration <> foldMap quantityCounts amount
   -- CR 708.2's listed characteristics are card data, so the listed power and
   -- toughness are walked for the reason Create's minted face is. The listed type
   -- line holds no Quantity.
@@ -1298,7 +1298,7 @@ ownQuantities effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ _) -> durationQuantities duration
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _ _) -> durationQuantities duration
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> Maybe.maybeToList amount <> durationQuantities duration
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
     fmap (\(Power.MkPower quantity) -> quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
       <> fmap (\(Toughness.MkToughness quantity) -> quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
@@ -2346,6 +2346,9 @@ engineMintedDamage rewrite = case rewrite of
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   DamageRewrite.Redirect _ -> True
+  -- Redirect with CR 615.7's countdown: the same baked Recipient, and the
+  -- remaining amount beside it is engine-written for PreventNext's reason.
+  DamageRewrite.RedirectNext _ _ -> True
   -- CR 614.9's redirection with the destination DESCRIBED rather than named,
   -- which is exactly the shape a card may print: Pariah's "dealt to enchanted
   -- creature instead" is a Filter and names no id.
@@ -2432,6 +2435,7 @@ preventsDamage rewrite = case rewrite of
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   DamageRewrite.Redirect _ -> False
+  DamageRewrite.RedirectNext _ _ -> False
   DamageRewrite.RedirectMatching _ -> False
 
 -- The non-vacuity half of riderWithoutPreventionOffends' lint, isPhaseR's shape.
@@ -2504,6 +2508,10 @@ shieldNamingNothingOffends effect = case effect of
     Maybe.isNothing ref && case direction of
       DamageDirection.DealtBy -> True
       DamageDirection.DealtTo -> Maybe.isNothing whatRecipient
+  -- CR 614.9's redirection covers a side the same two ways -- Carom names it,
+  -- Harm's Way describes it -- and one saying neither installs nothing.
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from whatRecipient whoRecipient _ _) ->
+    Maybe.isNothing from && Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient
   _ -> False
 
 -- The non-vacuity half of that lint, isPhaseR's shape.
@@ -2511,6 +2519,7 @@ isPreventionShield :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbilit
 isPreventionShield effect = case effect of
   Effect.PreventNextDamage {} -> True
   Effect.PreventAllDamage {} -> True
+  Effect.RedirectDamage {} -> True
   _ -> False
 
 -- A shield pinned to the SOURCE side of the damage event, one field narrower
@@ -5005,6 +5014,7 @@ damageRewriteFilters :: DamageRewrite.DamageRewrite -> [Filter.Type.Filter Keywo
 damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.RedirectMatching f -> [f]
   DamageRewrite.Redirect _ -> []
+  DamageRewrite.RedirectNext _ _ -> []
   DamageRewrite.PreventAll -> []
   DamageRewrite.PreventRemovingShieldCounter -> []
   DamageRewrite.PreventNext _ -> []
@@ -5507,10 +5517,10 @@ effectFilters effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ ref whatRecipient _ chosenSource whatSource rider) ->
     frame Unframed (durationFilters duration) <> unframed (Maybe.maybeToList chosenSource <> Maybe.maybeToList whatRecipient <> [whatSource]) <> frame SourceHostFramed (foldMap objectRefFilters ref) <> concatMap effectFilters rider
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
-  -- CR 609.7a's chosen source is UNFRAMED, for the reason the two prevention
-  -- arms above give.
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef chosenSource) ->
-    frame Unframed (durationFilters duration) <> unframed (Maybe.maybeToList chosenSource) <> frame SourceHostFramed (objectRefFilters srcRef <> objectRefFilters destRef)
+  -- CR 609.7a's chosen source and the recipient description are UNFRAMED, for
+  -- the reason the two prevention arms above give.
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount srcRef whatRecipient _ destRef chosenSource) ->
+    frame Unframed (durationFilters duration) <> frame Unframed (foldMap quantityFilters amount) <> unframed (Maybe.maybeToList chosenSource <> Maybe.maybeToList whatRecipient) <> frame SourceHostFramed (foldMap objectRefFilters srcRef <> objectRefFilters destRef)
   -- CR 708.2's listed characteristics hold no Filter, but the ref does -- Ixidron's
   -- "all other nontoken creatures" is an ObjectRef Filter like Destroy's, so the
   -- lint reaches it.
@@ -5780,7 +5790,7 @@ effectObjectRefs effect = case effect of
   Effect.SkipNextPhase {} -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ srcRef destRef _) -> read_ [srcRef, destRef]
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ srcRef _ _ destRef _) -> read_ (Maybe.maybeToList srcRef <> [destRef])
   -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
   -- this arm never reaches the Game monad, so an AnyNumberMatching ref written
   -- here would name nothing. inertChoosers is what says so at load time.
@@ -9211,6 +9221,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             Effect.PreventNextDamage shield {PreventNextDamage.ref = Nothing, PreventNextDamage.whatRecipient = Nothing, PreventNextDamage.whoRecipient = Nothing}
           Effect.PreventAllDamage shield ->
             Effect.PreventAllDamage shield {PreventAllDamage.ref = Nothing, PreventAllDamage.whatRecipient = Nothing}
+          Effect.RedirectDamage redirect ->
+            Effect.RedirectDamage redirect {RedirectDamage.from = Nothing, RedirectDamage.whatRecipient = Nothing, RedirectDamage.whoRecipient = Nothing}
           other -> other
         shieldsOf = filter isPreventionShield . cardResolutionEffects . S.combinedFace
     Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf hands))) "the real Mending Hands names its recipient"
@@ -9219,6 +9231,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (shieldNamingNothingOffends . strip) (shieldsOf deflection)) "and the same shield with that description removed is rejected"
     Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf packLeader))) "the real Pack Leader describes the recipients of an unbounded shield"
     Spec.assertBool s (any (shieldNamingNothingOffends . strip) (shieldsOf packLeader)) "and the same shield with that description removed is rejected"
+    -- CR 614.9's redirection, both spellings of its covered side.
+    carom <- S.printingOf s registry "Carom"
+    harmsWay <- S.printingOf s registry "Harm's Way"
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf carom))) "the real Carom names the creature it redirects damage from"
+    Spec.assertBool s (any (shieldNamingNothingOffends . strip) (shieldsOf carom)) "and the same redirection with that name removed is rejected"
+    Spec.assertBool s (not (any shieldNamingNothingOffends (shieldsOf harmsWay))) "the real Harm's Way describes the recipients it covers"
+    Spec.assertBool s (any (shieldNamingNothingOffends . strip) (shieldsOf harmsWay)) "and the same redirection with that description removed is rejected"
     -- The by-direction shield names a SOURCE rather than a recipient, which the
     -- lint accepts: a shield covering everyone still says what it covers.
     Spec.assertBool s (any isByDirectionShield (shieldsOf dovin)) "setup: Dovin prints a by-direction shield"
