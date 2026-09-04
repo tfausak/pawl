@@ -2,7 +2,8 @@
 
 Read this first when you are dispatched to triage the backlog, check whether a
 card is expressible, or turn an issue into a brief someone else will implement.
-`CLAUDE.md` still applies and overrides anything here.
+`CLAUDE.md` still applies and overrides anything here. Rules only: the
+incidents behind them are in git history.
 
 You do not hold the build. Another agent does, and it is building right now.
 
@@ -28,72 +29,52 @@ ref you derived against so a stale derivation is visible.
 
 ## Findings, not predictions
 
-Split what you write by whether reading can settle it. Measured over a day's
-run of brief-driven units, the split is stark: what the researcher could settle
-by reading survived in most of the PRs that reported on it, and what the
-researcher could only guess at was corrected in nearly every one.
+Split what you write by whether reading can settle it.
 
 **Reading settles these, and they are where your value is.** Whether the issue
-body is still true --- the loop's highest-yield research act, and the thing
-that day's PRs corrected more often than anything else. Producer hunts and
-Oracle text, whether a stated blocker has landed, edit-site enumeration,
+body is still true --- the loop's highest-yield research act. Producer hunts
+and Oracle text, whether a stated blocker has landed, edit-site enumeration,
 cross-file greps, elision and census sweeps, CR citations, which half of a
 split issue you are aiming at.
 
-**Reading cannot settle these.** Wire spellings: not one drafted spelling in
-that run was right as written. Drafted test boards: one in eleven survived.
-Falsifying mutations: wrong more often than right, and wrong in BOTH directions
---- predicted-red came back green (#2258, #2219, #2238), predicted-green came
-back red (#2256, #2232, #2227). Which files a unit touches. Line numbers.
+**Reading cannot settle these.** Wire spellings. Drafted test boards.
+Falsifying mutations, which are wrong in BOTH directions. Which files a unit
+touches. Line numbers.
 
 Draft only the ones that force an argument --- drafting the mutation is what
 forces the discrimination argument --- and mark them unverified in the HEADING,
-not a footnote. The one robust meta-signal in that run: where a brief flagged
-something unverified, the flag itself was almost always right.
+not a footnote. A flag saying "unverified" is the one prediction that is
+reliably right.
 
-**Never tell the implementer not to chase something.** #2227's brief predicted
-a mutation green and wrote "do not add a third seat to chase them"; a fourth
-board reddened it, so the prediction nearly bought a fenced line where a proof
-existed. A prediction that argues for weaker coverage is worse than none.
+**Never tell the implementer not to chase something.** A prediction that
+argues for weaker coverage is worse than none.
 
 Cite identifiers to grep for, never line numbers.
 
 ## Distrust the issue body, and the comments
 
 `CLAUDE.md` says to re-derive an issue's status against the tree. Start from
-staleness rather than testing for it: over 2026-08-31's run essentially every
-issue dispatched was wrong in some way, and several of the shapes are not what
-"out of date" suggests --- the body named the wrong gap entirely, the opcode it
-called missing having existed all along; a "no printing spells this" claim fell
-to a better-phrased Scryfall query, the original being unable to match its own
-counterexample; an issue called its omission STRICTER than printed when it ran
-weaker, so a rules-correctness bug sat inside a documentation-shaped issue; one
-was half overtaken by a PR that landed the same day; and a "nothing in the pool
-does this" claim was falsified by a card added after the issue was filed.
+staleness rather than testing for it, and expect shapes "out of date" does not
+suggest: the body names the wrong gap entirely; a "no printing spells this"
+claim falls to a better query; an omission called STRICTER than printed runs
+weaker, so a rules-correctness bug sits inside a documentation-shaped issue;
+half the issue was overtaken by a PR that landed the same day; a "nothing in
+the pool does this" claim was falsified by a card added since.
 
-Sharper forms, all of which have paid repeatedly:
-
-**"No printed card does this" is the least reliable claim in the tracker** ---
-false eight times in one run, twice from an earlier comment on the same issue.
+**"No printed card does this" is the least reliable claim in the tracker.**
 Search the mechanic, not the card names already written down: `t:aura
 o:/morph/`, not the two cards the thread argued about.
 
-**A negative usually swept one axis and never ran the sibling.** #635's "no
-producer" was true for basic land types and false for creature types, which the
-same text-changer reaches. #683's "blocked on five capabilities" was true of
-the canonical card pair and false of a cheaper one nobody had looked for.
-Before recording a negative, name the axis you swept and ask what the
-neighbouring one would return.
+**A negative usually swept one axis and never ran the sibling.** Before
+recording a negative, name the axis you swept and ask what the neighbouring
+one would return.
 
-**"This needs a subsystem pawl doesn't have" is the least reliable rejection**
---- populate, bloodthirst, recover and fortify were each rejected for a
-capability that was not missing. Verify at the *carrier*: the type or function
-that would hold the behaviour. Read it, and name it. "Needs X" with no carrier
-named is not a derivation.
+**"This needs a subsystem pawl doesn't have" is the least reliable rejection.**
+Verify at the *carrier*: the type or function that would hold the behaviour.
+Read it, and name it. "Needs X" with no carrier named is not a derivation.
 
-**A named producer can be unusable for a reason the body never checked.** #638
-named three cards that all say "target *activated* ability", which no `Filter`
-can narrow. Check the producer against the vocabulary, not just against print.
+**A named producer can be unusable for a reason the body never checked.**
+Check the producer against the vocabulary, not just against print.
 
 **Check which issue you are aiming at, and which HALF.** A sweep splits an
 issue and leaves the original title over both. Read the body for "split out of
@@ -115,16 +96,12 @@ Verdicts are **still open**, **closed by PR #N** (name it), **superseded by
 #N**, or **narrowed** (say what remains). A close by re-derivation is the
 cheapest close there is.
 
-**Sweep the tree, not the card pool.** Re-checking whether an
-`expires:card-driven` issue's producer has arrived in `data/cards/` is a closed
-seam: two independent passes over every open card-driven issue found no fired
-trigger. That label does not mean wait --- it means the unit is "add the card",
-and the sweep will not find it for you. The open seam is engine-internal:
-issues whose stated gap, blocker or carrier is stale against the tree. The
-other direction is open too: an elision outlives the close of the issue it
-cites, and since the checking scripts were removed only a grep for the bare
-number finds it. And a closed issue is not evidence the capability exists ---
-one was closed by hand with no PR behind it, and had to be re-filed.
+**Sweep the tree, not the card pool.** `expires:card-driven` does not mean
+wait --- it means the unit is "add the card", and no sweep finds that for you.
+The open seam is engine-internal: issues whose stated gap, blocker or carrier
+is stale against the tree. The other direction is open too: an elision
+outlives the close of the issue it cites, and only a grep for the bare number
+finds it. A closed issue is not evidence the capability exists.
 
 ## Clusters
 
@@ -134,11 +111,9 @@ list, and a per-issue proving test. Name the issues it closes and the order to
 work them.
 
 **A shared TOPIC is not a cluster, and topic is what a body's claim of shared
-machinery usually turns out to mean.** Every one of the eleven topic trackers
-#2190--#2200 asserts shared machinery in its body; every one of them split into
-unrelated units under triage. Before proposing a cluster, name the function or
-constructor all its issues edit. If you cannot, you have found a topic, and the
-issues dispatch separately.
+machinery usually turns out to mean.** Before proposing a cluster, name the
+function or constructor all its issues edit. If you cannot, you have found a
+topic, and the issues dispatch separately.
 
 **The clustering pass** is the sweep form of this, and one dispatch of its own:
 index the `Module.function` identifiers every dispatchable issue body names,
@@ -146,10 +121,11 @@ group by shared identifier, and open the cited function with `git show
 origin/main:<path>` for every pair you propose --- a pair whose shared function
 you have not read is a topic. Rank each cluster high or medium confidence and
 name the claim it rests on, since the dispatcher weights a shared-edit-site or
-containment claim far above an "issue X unblocks issue Y" one; `drain-loop.md`
-has why. Report the by-catch as findings in their own right, and it is much of
-the pass's value: issues already satisfied by landed work, issues citing a
-closed blocker as open, duplicates.
+containment claim far above an "issue X unblocks issue Y" one. Rank the list by
+card demand the way `drain-loop.md`'s dispatch rule counts it. Report the
+by-catch as findings in their own right, and it is much of the pass's value:
+issues already satisfied by landed work, issues citing a closed blocker as
+open, duplicates.
 
 ## What a finding is
 
@@ -186,15 +162,12 @@ the strength stated and no higher.
   may not link the dependency yourself --- name it for the dispatcher. If it
   has no issue, say so: that is an untracked deficiency
 - the **producer**, with Oracle text fetched THIS SESSION, never copied from
-  the body --- #2261's brief inherited the body's wrong mana cost by copying
-  it. Say whether the card is already in `data/cards/`, and give a
+  the body. Say whether the card is already in `data/cards/`, and give a
   clause-by-clause expressibility check naming the opcode for each. If a clause
   must be omitted, say whether the omission runs stricter or weaker than
   printed
 - the **edit sites**, `-Werror`-forced ones enumerated by grepping a named
-  sibling constructor, every `{}` or `_` site flagged separately. The
-  highest-volume field and the best survival rate of any non-trivial one; a
-  miss costs a compile error and a phantom costs reading time, both cheap
+  sibling constructor, every `{}` or `_` site flagged separately
 - the **elision and census sweep** by bare issue number
 - the **vacuity traps** that apply, from `docs/agents/implementing.md`
 - the **design call**, when derived from the CR and a named carrier
@@ -203,26 +176,20 @@ the strength stated and no higher.
 **Flagged unverified, in the heading.**
 
 - the **composition check** --- as a question, not an answer. See below
-- the **CR citations**, grepped by number from `docs/rules.txt`. Right about as
-  often as wrong, and a CR number must never stand in for a code pointer:
-  #2227's brief pointed at `Combat.attackers` where CR 508.4 wants
-  `declaredAttackers`, a rules error dressed as a code pointer
+- the **CR citations**, grepped by number from `docs/rules.txt`. A CR number
+  must never stand in for a code pointer
 - the **discrimination argument**, and only its NEGATIVE half. See below
 
-**Do not write these.** Each was wrong essentially every time it was reported
-on, and each has a cheaper substitute that was right every time.
+**Do not write these.** Each has a cheaper substitute that holds up.
 
 - *Card JSON and Haskell wire spellings.* Substitute: "spell it after
   `data/cards/<neighbour>.json`, which writes the same payload", plus the
-  Oracle text. A neighbour existed in every case; the transcription was wrong
-  in every case.
+  Oracle text.
 - *The drafted board.* Substitute: the asserted quantity and its value under
-  each competing reading. That is the half implementers kept and used; the
-  fixture calls, seat counts and helper names are the half they threw away.
+  each competing reading. The fixture calls, seat counts and helper names are
+  the half implementers throw away.
 - *A files-touched list, as a scheduling artefact.* Substitute: the subsystem
-  name and the one or two files the unit certainly rewrites. The precise list
-  named modules that do not exist (#2206), the wrong spec file (#2215) and a
-  module placement that is an import cycle (#2247).
+  name and the one or two files the unit certainly rewrites.
 - *A falsifying mutation as a prediction.* Substitute, per site, either "I
   found no observer in `data/cards/` --- expect green" or silence. Never name
   the expected colour, never name the assertion, never advise against chasing
@@ -234,26 +201,17 @@ A drafted test is a claim about TWO implementations, and is worth dispatching
 only if the buggy one fails it. Deriving that the code is wrong is not deriving
 that your board can see it wrong.
 
-**Your negative claims land; your positive ones do not.** Over that day's run,
-every surviving discrimination claim was the researcher saying a board *will
-not* work --- #2242's "the obvious one-leg board cannot discriminate, which is
-why legs two and three exist", #2218's flagged collapsing case. Every claim
-that a board *would* work was corrected. So: state which boards collapse and
-why, name the quantity and its value under each reading, and stop there. The
-board itself is the implementer's to build.
-
-Handing over a board that cannot discriminate is the expensive failure, not a
-neutral one: #2255's brief planted the spell with `S.spellOnStack`, which never
-chooses a mode, so the spell resolved to nothing and every leg of the test read
-identically.
+**Your negative claims land; your positive ones do not.** State which boards
+collapse and why, name the quantity and its value under each reading, and stop
+there. The board itself is the implementer's to build. Handing over a board
+that cannot discriminate is the expensive failure, not a neutral one.
 
 - Name the asserted quantity and give its value under each implementation.
   Equal values mean the board cannot discriminate: change the BOARD, never the
   assertion.
 - Walk the buggy implementation to the END, through the rules that fire on the
-  way. #1683's board asserted a hand of one; CR 400.3 sends the found card to
-  its OWNER's hand, so both implementations end at one card. A second card in
-  one library separates them.
+  way (CR 400.3 sending a found card to its OWNER's hand is the classic
+  collapse).
 - Justify every element of the board --- why two seats and not three, why two
   different lands. An unjustifiable element is usually the one hiding the
   collapse.
@@ -268,29 +226,16 @@ two answers apart. When no board separates them, say so --- that is a finding.
 
 ## Composition, not just existence
 
-**Write this section as a question.** It is the field this file argues hardest
-for, and the field the day's implementers corrected most often: proposed call
-shapes were wrong (#2225, #2247), a claimed existing proof turned out to be a
-card no spec plays (#2263), and the run's one real composition defect ---
-`Effect.Search` building `Filter.contextFor Nothing Nothing`, so a new
-context-relative atom would be vacuously False --- was found by the
-implementer, not the brief (#2234). What worked was flagging it as open and
-naming the first function to read (#2241, #2225). Do the trace below to find
-the question; hand over the question and the function, not a verdict.
+**Write this section as a question.** Hand over the question and the first
+function to read, not a verdict.
 
 The expressibility check passes on cards whose opcodes are inert TOGETHER,
-because what an atom answers depends on the path it is reached by. Showstopping
-Surprise needed five opcodes; all existed, but the sweep reaching them built
-its `Filter.Context` through `Filter.contextFor`, whose slot map is empty ---
-so "each OTHER creature" was `Not (IsBound "target")` against nothing, and the
-card damaged its own target to death (see #1876, the PR that fixed it). The
-live issue for the remaining callers is **#2141** --- cite that, not the PR
-number. A brief copying #1876 out of this file cited a merged PR at the
-implementer (#2225).
-
-The symptom is a VACUOUS ATOM: one that cannot be false, or cannot be true,
-because the field it reads was never filled on this path. It compiles, the
-codec round-trips, the card loads, and nothing is red.
+because what an atom answers depends on the path it is reached by. The symptom
+is a VACUOUS ATOM: one that cannot be false, or cannot be true, because the
+field it reads was never filled on this path. It compiles, the codec
+round-trips, the card loads, and nothing is red. The live issue for the
+remaining callers is **#2141** --- cite that, not the PR that fixed the first
+instance.
 
 For each opcode the producer needs:
 
