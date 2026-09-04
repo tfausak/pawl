@@ -965,8 +965,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- EVENT's grouping for the arm above's reason, not a number this condition
   -- counts.
   TriggerCondition.PlayerAttacks _ -> []
-  -- CR 508.3c's "one or more" is the printed sentence's quantifier and not a
-  -- number this condition counts, and its Filter holds no Count for
+  -- The floor this one DOES carry is a bare Natural, SelfBlocksAtLeast's shape
+  -- below, rather than a Count over Quantities; its Filter holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.PlayerAttacksWith {} -> []
   -- Two PlayerRelations hold no Count, and rule 508.3e's "one or more" is the

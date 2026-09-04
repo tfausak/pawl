@@ -7396,13 +7396,16 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Explored _ -> False
     GameEvent.Exerted _ -> False
     GameEvent.BecameAttacked _ -> False
-  -- CR 508.3c: the player the payload names declared one or more attackers the
-  -- Filter admits. The arm above narrowed, against the same once-per-DECLARATION
-  -- event, because that is the arity every printing of "attacks with" takes --
-  -- the quantifier is in the printed sentence ("one or more Birds"), so a
-  -- declaration naming two Birds fires it once. CR 508.3a's per-attacker event
-  -- sits below answering False: matching it here would fire once per declared
-  -- Bird instead.
+  -- CR 508.3c: the player the payload names declared at least the payload's
+  -- number of attackers the Filter admits. The arm above narrowed, against the
+  -- same once-per-DECLARATION event, because that is the arity every printing of
+  -- "attacks with" takes -- the quantifier is in the printed sentence ("one or
+  -- more Birds", "two or more creatures"), so a declaration naming four Birds
+  -- fires it once. CR 508.3a's per-attacker event sits below answering False:
+  -- matching it here would fire once per declared Bird instead.
+  --
+  -- AT LEAST, never exactly, which is how the printed "N or more" reads and how
+  -- TriggerCondition.SelfBlocksAtLeast reads its own rule.
   --
   -- The creatures come from Combat.declaredAttackers rather than from the event,
   -- which carries only who declared, and NOT from Combat.attackers as
@@ -7425,14 +7428,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- viewWithLastKnown and the Filter context framed by the bearer, exactly as
   -- SelfBlocksOneOrMore's arm below does it. Nothing is bound, so the context's
   -- empty slot map is honest here.
-  TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith relation f) -> case event of
+  TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith relation f floor_) -> case event of
     GameEvent.AttackersDeclared attacker
       | PlayerRelation.holds (Game.teams gs) relation you attacker ->
           let combat = GameState.combat gs
               admits oid =
                 Map.lookup oid (Combat.joinedUnder combat) == Just attacker
                   && maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown oid gs oid)
-           in any admits (Set.toList (Combat.declaredAttackers combat))
+           in Natural.length (filter admits (Set.toList (Combat.declaredAttackers combat))) >= floor_
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
     GameEvent.CoinFlipped {} -> False

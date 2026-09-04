@@ -111,12 +111,9 @@ data TriggerCondition
     -- against GameEvent.AttackersDeclared, with the declaring player bound
     -- under Pawl.Engine.Binding.attackingPlayer.
     PlayerAttacks PlayerRelation.PlayerRelation
-  | -- | CR 508.3c: "whenever [a player] attacks with [a creature]" (Hermes,
-    -- Overseer of Elpis) -- the arm above narrowed by a Filter over the
-    -- creatures declared.
-    --
-    -- Not implemented: a floor above one, which Aurelia, the Law Above's "with
-    -- three or more creatures" needs (#2226).
+  | -- | CR 508.3c: "whenever [a player] attacks with [n or more creatures]"
+    -- (Military Intelligence) -- the arm above narrowed by a Filter over the
+    -- creatures declared and by how many of them the declaration names.
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" (Seifer,
     -- Balamb Rival), once per pair; only AttackTarget.OfPlayer matches. Both
