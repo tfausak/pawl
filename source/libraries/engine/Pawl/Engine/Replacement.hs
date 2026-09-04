@@ -279,9 +279,17 @@ collect sources floating =
       --
       -- CR 109.5's "you" is the CARRIER's controller, not the protected player --
       -- the two differ the moment a scope wider than PlayerScope.You appears --
-      -- and nothing in the row reads it: the pattern's source side is a literal
-      -- name set and its recipient side is a baked id, so no atom here is
-      -- perspective-relative.
+      -- and nothing in the row reads it: the pattern's source side is
+      -- Filter.HasChosenName, which reads the carrier's own chosen names off the
+      -- Context rather than a perspective, and its recipient side is a baked id,
+      -- so no atom here is perspective-relative.
+      --
+      -- That same atom is why the effect value no longer varies with WHICH names
+      -- the carrier holds, where the literal disjunction it replaced did. The
+      -- identity above is unharmed: the carrier's id is its own component, so two
+      -- carriers protecting one seat stay two instances, and this segment is
+      -- re-derived from the board every iteration (see below), so a row can never
+      -- outlive the names it was built from.
       --
       -- Nothing to consume and no rider: this segment is re-derived from the board
       -- every iteration, exactly as segment 1 is, and CR 615.10 leaves a static

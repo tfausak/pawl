@@ -153,10 +153,8 @@ data Filter keyword
     -- Set intersection, for CR 201.4g's interchangeable names as much as CR
     -- 709.4a's, and vacuously False where the source has chosen no name.
     HasChosenName
-  | -- | CR 702.16k: the candidate object is one the protection carrier's chosen
-    -- player controls, or one they own that no other player controls --
-    -- True-Name Nemesis's "protection from the chosen player". Vacuously False
-    -- where the carrier chose nobody.
+  | -- | CR 702.16k: the candidate is an object the protection carrier's chosen
+    -- player controls, or one they own that no other player controls.
     OfChosenPlayer
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective
     -- -- "target opponent". Separate from ControlledBy, which asks who controls

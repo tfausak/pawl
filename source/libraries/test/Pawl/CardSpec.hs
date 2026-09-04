@@ -6354,10 +6354,21 @@ ofChosenPlayerCounts card =
 -- This is where that is made loud.
 --
 -- The frame is KEYWORD rather than PROTECTION, which is wider than rule 702.16k
--- alone: Pawl.Engine.Target.targetable evaluates CR 702.11d's hexproof quality
--- against the same Context, so a hexproof-from-the-chosen-player card would be
--- answerable in that one position too. Narrowing the fence to Keyword.Protection
--- would need a framing this type does not draw.
+-- alone, and the width cuts two ways. CR 702.11d's hexproof quality is the
+-- harmless half: Pawl.Engine.Target.targetable evaluates it against the very
+-- Context that fills the field, so a hexproof-from-the-chosen-player card would
+-- be answerable in that one position too.
+--
+-- CR 702.14a's landwalk is the other half, and this frame admits it while nothing
+-- answers it: Pawl.Engine.Combat.landwalkAllowsGiven matches the criterion
+-- through a plain Filter.contextFor, which leaves carrierChosenPlayer Nothing, so
+-- `Landwalk OfChosenPlayer` would pass this lint and be vacuously False. No
+-- printing can reach it -- rule 702.14a's quality is "usually a land type, but it
+-- can also be the card type land plus any combination of land types, card types,
+-- and/or supertypes", a list with no player on it -- so the hole is unreachable
+-- rather than merely unoccupied. Narrowing the fence to Keyword.Protection is not
+-- a one-line change: `keywordFramed` tags every keyword's filter alike, and
+-- telling them apart wants a Framing this type does not draw.
 --
 -- Two offences under one name, for hasChosenNameOffends' two reasons: the
 -- traversal found the atom outside a keyword, or the traversal and the codec
