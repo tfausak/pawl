@@ -239,8 +239,10 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 -- Aura's own rider is asking about the Aura.
 --
 -- Not implemented: it carries no slot bindings, so a destination filter naming a
--- slot the calling resolution bound answers as though nothing were bound
--- (#2141). No card in the pool writes one there.
+-- slot the calling resolution bound takes its empty-slot value rather than an
+-- answer: False for Filter.IsBound and its siblings, and TRUE for
+-- SameControllerAsBound, which widens on an absent key (#2141). No card in the
+-- pool writes one there.
 hostsFor :: PlayerId -> ObjectId -> ObjectId -> Filter.Type.Filter Keyword.Keyword -> GameState -> [ObjectId]
 hostsFor controller source subject filter_ gs =
   let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
