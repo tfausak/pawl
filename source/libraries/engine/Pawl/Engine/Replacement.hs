@@ -1953,6 +1953,21 @@ applyCopyException snapshot exception = case exception of
         PC.toughness = Just t,
         PC.characteristicPT = Nothing
       }
+  -- CR 707.9a: the gained abilities become part of the copiable values "along
+  -- with any other abilities that were copied", so this ADDS rather than sets.
+  -- unionWith (+) and not a plain union, applyEntryOption's reason: an instance
+  -- gained here is a second instance on a copy that already had the keyword, and
+  -- CR 702.105b makes each instance of dethrone trigger separately.
+  --
+  -- Nothing else moves. CR 604.3a(2) makes an ability acquired through a copy
+  -- effect characteristic-defining, and writing it here is what delivers that:
+  -- Projection's layer-4 seed reads these keywords, so an excepted changeling
+  -- reaches applySubtypeDefining (CR 613.3, CR 702.73a) rather than being
+  -- granted in timestamp order. No companion strip either, unlike the arm above
+  -- -- CR 707.9d applies to an exception that provides VALUES for a
+  -- characteristic, and gaining an ability provides none.
+  CopyException.GainKeywords keywords ->
+    snapshot {PC.keywords = Map.unionWith (+) (PC.keywords snapshot) (Map.fromSet (const 1) keywords)}
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- permanents matching the rewrite's printed noun phrase, other than itself, minus

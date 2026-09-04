@@ -3,7 +3,9 @@
 
 -- Covers: Pawl.Engine.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
 -- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
--- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), its CR 707.5 eligible set
+-- (Replacement.applyCopyExceptions -- CR 707.9b's Quicksilver Gargantuan, and CR
+-- 707.9a's Dack's Duplicate and Omni-Changeling, the second of which is where CR
+-- 604.3a makes the gained ability characteristic-defining), its CR 707.5 eligible set
 -- (Replacement.legalCopyTargets, Copy Enchantment's "any enchantment" against Clone's
 -- "any creature", and Clever Impersonator's negated "any nonland permanent"), the
 -- P2 copy gate (Clone), and
@@ -75,6 +77,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -95,6 +98,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -179,6 +183,34 @@ targeting victim p = case p of
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   _ -> S.identityAnswer p
+
+-- CR 302.6: a permanent that entered this turn has not been under its
+-- controller's control continuously since their turn began. Written by hand
+-- because S.spellOnStack records Sickness.Settled, so the permanent a resolution
+-- makes out of it would otherwise be able to attack with no haste at all -- and
+-- asserted on the board before the attack, since Dack's Duplicate's haste half
+-- rests on it.
+sickened :: ObjectId -> GameState.GameState -> GameState.GameState
+sickened oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+
+-- Distinct life totals, so no reading of "the player with the most life" (CR
+-- 702.105a) is reached by a coincidence: bob is ahead and is the one attacked.
+withLives :: Integer -> Integer -> GameState.GameState -> GameState.GameState
+withLives a b gs =
+  let at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+   in gs {GameState.players = at S.alice a (at S.bob b (GameState.players gs))}
+
+-- S.combatBoardOf's placement, applied to a board a resolution built rather than
+-- a fixture: alice active in the declare attackers step, with bob already the
+-- defending player (CR 506.2) and the rest of the turn's steps ahead.
+intoCombat :: GameState.GameState -> GameState.GameState
+intoCombat gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
+      GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
+    }
 
 -- The tokens on the battlefield (CR 111.6), newest first.
 tokensOnBattlefield :: GameState.GameState -> [ObjectId]
@@ -615,6 +647,107 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the Goyf itself moves with the graveyards" (S.powerToughnessOf goyfId later) $ Just (2, 3)
         Spec.assertEqWith s "the token does not" (S.powerToughnessOf tokenId later) $ Just (7, 7)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- THE PROVING TEST for CR 707.9a, the exception that makes the copy GAIN an
+  -- ability. Dack's Duplicate {2}{U}{R} Creature -- Shapeshifter 0/0: "You may
+  -- have this creature enter as a copy of any creature on the battlefield,
+  -- except it has haste and dethrone."
+  --
+  -- Both keywords are read at GAMEPLAY level in one attack: without haste (CR
+  -- 702.10b) the copy could not be declared at all, and dethrone (CR 702.105a)
+  -- is the +1/+1 counter it takes for attacking the player with the most life.
+  -- So 3/2 is "both arrived" and 2/1 is "at least one did not" -- the case
+  -- cannot say which, both keywords riding one Set.
+  --
+  -- A CLONE copying the SAME Piker is the control: the copy without the
+  -- exception, entering the same turn, equally sick. It cannot attack and takes
+  -- no counter, which is what separates the exception from the copy road.
+  -- Everything else about the Duplicate is asserted to be the Piker's (CR
+  -- 707.2), since an exception modifies the copying process rather than
+  -- replacing it.
+  Spec.it s "Dack's Duplicate copies a creature and gains haste and dethrone (CR 707.9a)" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    duplicate <- S.printingOf s registry "Dack's Duplicate"
+    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        (_, stagedClone) = S.spellOnStack clone S.alice board
+        withClone = resolveAndSettle (copyNamed pikerId) stagedClone
+        (_, stagedDuplicate) = S.spellOnStack duplicate S.alice withClone
+        entered = resolveAndSettle (copyNamed pikerId) stagedDuplicate
+    case (cloneOnBattlefield entered, newest (printedOnBattlefield "Dack's Duplicate" entered)) of
+      (Just cloneId, Just duplicateId) -> do
+        let ready = sickened duplicateId (sickened cloneId (withLives 15 20 entered))
+            fought = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (S.attackTo S.bob) (intoCombat ready)
+        -- The precondition the haste half rests on: neither copy is settled, so
+        -- CR 302.6 is a real bar for the one without haste.
+        Spec.assertEqWith s "both copies are summoning sick (CR 302.6)" (fmap Object.sickness (Game.lookupObject duplicateId ready), fmap Object.sickness (Game.lookupObject cloneId ready)) (Just Sickness.Sick, Just Sickness.Sick)
+        -- CR 707.2 ran: the exception modified the copy, it did not replace it.
+        Spec.assertEqWith s "the Duplicate is the Piker by name (CR 707.2)" (Projection.namesOf duplicateId entered) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
+        Spec.assertBool s (Set.member Subtype.Goblin (Projection.subtypesOf duplicateId entered)) "and a Goblin, the Piker's own subtype"
+        Spec.assertEqWith s "and the Piker's 2/1" (S.powerToughnessOf duplicateId entered) $ Just (2, 1)
+        -- THE GAMEPLAY ASSERTION, ahead of the two diagnostics below: it attacked
+        -- (haste) and grew (dethrone).
+        Spec.assertEqWith s "the Duplicate attacked and dethrone grew it to 3/2" (S.powerToughnessOf duplicateId fought) $ Just (3, 2)
+        Spec.assertEqWith s "the copy without the exception is still a 2/1" (S.powerToughnessOf cloneId fought) $ Just (2, 1)
+        Spec.assertEqWith s "and the Clone never joined the attack (CR 508.1a)" (Map.keys (Combat.Type.attackers (GameState.combat fought))) [duplicateId]
+      _ -> Spec.assertFailure s "the Clone and the Duplicate should both be on the battlefield"
+
+  -- THE PROVING TEST for CR 604.3a's third criterion: an ability acquired
+  -- through a copy effect is CHARACTERISTIC-DEFINING. Omni-Changeling {3}{U}{U}
+  -- Creature -- Shapeshifter 0/0: "Changeling / Convoke / You may have this
+  -- creature enter as a copy of any creature on the battlefield, except it has
+  -- changeling."
+  --
+  -- Not implemented: convoke (#877), so pawl's Omni-Changeling pays {3}{U}{U} in
+  -- full -- stricter than printed, and nothing below turns on the cost.
+  --
+  -- The copy's own printed changeling is GONE (CR 707.2 replaced it with the
+  -- Piker's text), so the exception is the only source of it. Lord of Atlantis
+  -- is the reader -- "other Merfolk get +1/+1 and have islandwalk", an affected
+  -- set read off the projection -- so a copy that is every creature type (CR
+  -- 702.73a) is a Merfolk and gets pumped.
+  --
+  -- Two controls on the one board, each 2/1 for its own reason: bob's Goblin
+  -- Piker is no Merfolk, and a Clone copying it is the copy WITHOUT the
+  -- exception. The token copy is where the CDA claim actually bites -- CR 707.2
+  -- copies the copiable values and leaves every CR 613 layer behind, so a
+  -- changeling GRANTED over the copy would produce a 2/1 token here.
+  Spec.it s "Omni-Changeling's copy is every creature type, and so is a token copy of it (CR 604.3a)" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    clone <- S.printingOf s registry "Clone"
+    omni <- S.printingOf s registry "Omni-Changeling"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let (_, withLord) = S.addCreature lord S.alice (S.landsInPlay island 3)
+        (pikerId, board) = S.addCreature piker S.bob withLord
+        (_, stagedClone) = S.spellOnStack clone S.alice board
+        withClone = resolveAndSettle (copyNamed pikerId) stagedClone
+        (_, stagedOmni) = S.spellOnStack omni S.alice withClone
+        entered = resolveAndSettle (copyNamed pikerId) stagedOmni
+    case (cloneOnBattlefield entered, newest (printedOnBattlefield "Omni-Changeling" entered)) of
+      (Just cloneId, Just omniId) -> do
+        -- The Counterpart is aimed at the excepted copy and at nothing else: an
+        -- unpinned answerer copies the lord instead, and a second lord makes
+        -- every creature on the board a size that proves nothing.
+        let resolved = castAndResolve (targeting omniId) counterpart entered
+        case tokensOnBattlefield resolved of
+          [tokenId] -> do
+            -- THE GAMEPLAY ASSERTION: the lord sees a Merfolk.
+            Spec.assertEqWith s "the excepted copy is a Merfolk, so 2/1 plus the lord" (S.powerToughnessOf omniId resolved) $ Just (3, 2)
+            -- CR 707.2 through CR 613.3: the token reads the copiable values, and
+            -- the changeling among them defines its types at layer 4 all over again.
+            Spec.assertEqWith s "and so is a token copy of it (CR 707.2)" (S.powerToughnessOf tokenId resolved) $ Just (3, 2)
+            -- The two controls, on the same board: neither is a changeling.
+            Spec.assertEqWith s "the copy without the exception is not a Merfolk" (S.powerToughnessOf cloneId resolved) $ Just (2, 1)
+            Spec.assertEqWith s "and neither is the Piker it copied" (S.powerToughnessOf pikerId resolved) $ Just (2, 1)
+            -- Diagnostics, after the behaviour: the copy is the Piker by name, and
+            -- the type it gained is one CR 205.3m lists rather than every subtype.
+            Spec.assertEqWith s "the excepted copy is the Piker by name (CR 707.2)" (Projection.namesOf omniId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
+            Spec.assertBool s (Set.member Subtype.Merfolk (Projection.subtypesOf omniId resolved)) "and a Merfolk among its creature types"
+            Spec.assertBool s (not (Set.member Subtype.Island (Projection.subtypesOf omniId resolved))) "and no land type (CR 205.3m)"
+          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+      _ -> Spec.assertFailure s "the Clone and the Omni-Changeling should both be on the battlefield"
 
   Spec.it s "Cackling Counterpart mints a token copy of the targeted creature (CR 707.2, CR 111.3)" $ do
     island <- S.printingOf s registry "Island"

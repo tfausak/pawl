@@ -405,8 +405,9 @@ data Keyword
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one
 -- is a characteristic-defining ability and is folded at the start of layer 5
--- (Projection.applyColorDefining), per CR 613.3. A GRANTED one is not, CR 604.3a
--- denying CDA status to an ability that is not printed on the card it affects, so
+-- (Projection.applyColorDefining), per CR 613.3. A GRANTED one is not, CR 604.3a's
+-- second criterion reaching only what is printed on the card, granted to a token
+-- by the effect that made it, or acquired through a copy or text-changing effect, so
 -- Projection.grantedDefiningParts routes it into layer 5 as an ordinary
 -- timestamped colour effect -- stamped with the granting permanent when a static
 -- ability grants it (CR 613.7a), and at creation when a resolution does (CR
@@ -416,4 +417,7 @@ data Keyword
 -- creature colourless" are the proofs.
 --
 -- CR 702.73a's changeling takes the same routes one layer down, through the
--- same pair of functions.
+-- same pair of functions -- plus a third, CR 604.3a's copy-effect clause, which
+-- needs no function of its own: Replacement.applyCopyException writes CR 707.9a's
+-- gained keyword into the copiable snapshot, which is where the printed route
+-- reads from (Omni-Changeling).

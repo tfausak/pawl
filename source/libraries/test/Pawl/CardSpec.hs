@@ -110,6 +110,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
@@ -4993,6 +4994,13 @@ storedPlayerScope effect = case effect of
 -- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
 -- card"). CR 707.5's copy choice carries a fourth, over permanents on the
 -- battlefield (Copy Enchantment's "any enchantment"). None of the four is framed.
+-- CR 707.9's "except ..." clauses. Only the CR 707.9a arm reaches a Filter, and
+-- only through the keyword it names; CR 707.9b's pair is two literals.
+copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+copyExceptionFilters exception = case exception of
+  CopyException.SetPowerToughness _ -> []
+  CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
+
 entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> unframed [f]
@@ -5000,11 +5008,12 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.RevealOrTapped f -> unframed [f]
   -- CR 707.5's eligible set -- Clone's "any creature", Copy Enchantment's "any
   -- enchantment" -- is a criterion over permanents on the battlefield, so it
-  -- belongs in this walk. CR 707.9's exceptions beside it carry no Filter: an
-  -- "except ..." clause states values, never a criterion over objects
-  -- (Pawl.Types.CopyException imports no Filter, which is what keeps that
-  -- honest), and neither does the CR 614.1d `tapped` flag beside them (Vesuva).
-  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _ _) -> unframed [f]
+  -- belongs in this walk. So do CR 707.9's exceptions beside it, which reach a
+  -- Filter through a KEYWORD rather than by stating a criterion of their own:
+  -- CR 707.9a's gained ability is a Pawl.Types.Keyword, and CR 702.14c's
+  -- landwalk is one that holds a Filter. The CR 614.1d `tapped` flag beside them
+  -- holds none (Vesuva).
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _) -> unframed [f] <> concatMap copyExceptionFilters exceptions
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChoiceByCoinFlip _ -> []
   EntryRewrite.ChooseColor -> []
