@@ -5137,9 +5137,11 @@ blockPermissionFilters permission =
 --     atom belongs here and nowhere else.
 --   * InTargetSlot -- a MODE's target slot filter, the one position matched by
 --     Pawl.Engine.Target.admittedGiven, which is the one site that fills
---     Filter.Context.slotNames and Filter.Context.slotControllers. CR 709.4a's
---     Filter.SameNameAsBound and CR 110.2's Filter.SameControllerAsBound belong
---     here and nowhere else, and their vacuous directions differ: an unfilled
+--     Filter.Context.slotControllers and one of the two that fill
+--     Filter.Context.slotNames. CR 110.2's Filter.SameControllerAsBound belongs
+--     here and nowhere else; CR 709.4a's Filter.SameNameAsBound belongs here and
+--     in SearchFramed below, the other position slotNames is filled at. Their
+--     vacuous directions differ: an unfilled
 --     slotNames answers False, an unfilled slotControllers answers True. So a
 --     misplaced SameNameAsBound admits nothing and a misplaced
 --     SameControllerAsBound admits everything, so this tag carries more for the
@@ -5191,6 +5193,11 @@ data Framing
     -- object a CR 701.3a question can be asked ABOUT from the candidate's side:
     -- Pawl.Engine.Resolve's Effect.Search arm overlays
     -- Filter.View.canAttachToSubject with the searching ability's own source.
+    --
+    -- It is also the second position that fills Filter.Context.slotNames: that
+    -- arm takes its context from the resolution (Resolve.effectContext), so CR
+    -- 709.4a's Filter.SameNameAsBound answers here as it does in a target slot
+    -- (Bifurcate).
     --
     -- CR 702.29e's typecycling filter is deliberately NOT one, though
     -- Pawl.Engine.Keyword turns it into an Effect.Search that would answer: the
@@ -6383,24 +6390,25 @@ ofChosenPlayerOffends card =
 sameNameAsBoundTag :: Text.Text
 sameNameAsBoundTag = Text.pack "SameNameAsBound"
 
--- How many CR 709.4a atoms this card carries inside a MODE's target slot filter,
--- and how many anywhere else. The second number is the offence; the first is what
--- Harness the Storm legitimately has one of.
+-- How many CR 709.4a atoms this card carries in a position whose evaluator fills
+-- Filter.Context.slotNames -- a MODE's target slot filter (Harness the Storm) or
+-- a CR 701.23 search filter (Bifurcate) -- and how many anywhere else. The second
+-- number is the offence.
 sameNameAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameNameAsBoundCounts card =
-  let total wanted = sum [filterAtoms sameNameAsBoundTag f | (framing, f) <- cardFilters card, (framing == InTargetSlot) == wanted]
+  let total wanted = sum [filterAtoms sameNameAsBoundTag f | (framing, f) <- cardFilters card, elem framing [InTargetSlot, SearchFramed] == wanted]
    in (total True, total False)
 
 -- CR 709.4a's bound-name comparison is answerable only where
--- Filter.Context.slotNames is filled, and Pawl.Engine.Target.admittedGiven --
--- the one site that matches a MODE's target slot Filter -- is the one site that
--- fills it. Filter.contextFor and Filter.contextComparingPower leave it empty, so
--- Filter.SameNameAsBound in a Count filter, an affected set, a search filter or a
--- cost criterion is a silent False rather than a rejected card. This is where that
--- is made loud.
+-- Filter.Context.slotNames is filled: Pawl.Engine.Target.admittedGiven, which
+-- matches a MODE's target slot Filter, and Pawl.Engine.Resolve.effectContext,
+-- which every position of a resolution goes through -- the search filter among
+-- them. Filter.contextFor and Filter.contextComparingPower leave it empty, so
+-- Filter.SameNameAsBound in a Count filter, an affected set or a cost criterion
+-- is a silent False rather than a rejected card. This is where that is made loud.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside a target slot, or the traversal and the codec
+-- traversal found the atom outside those two positions, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence.
@@ -9827,25 +9835,35 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (length (concatMap (searchZoneSets . S.combinedFace) ps) > 5) "and the pool gives the sweep other searches to be about"
   -- CR 709.4a's Filter.SameNameAsBound is in CR 701.3a's position one axis over:
   -- answerable only where Filter.Context.slotNames is filled, which is a MODE's
-  -- target slot and nothing else. See sameNameAsBoundOffends for the two offences
-  -- and Framing for why CR 303.4a's enchant slot is not one of the safe positions.
-  Spec.it s "CR 709.4a no card asks SameNameAsBound outside a mode's target slot" $ do
+  -- target slot and a CR 701.23 search filter -- the second since
+  -- Pawl.Engine.Resolve's Effect.Search arm took its context from the resolution
+  -- (Pawl.ResolveSpec's Bifurcate cases). See sameNameAsBoundOffends for the two
+  -- offences and Framing for why CR 303.4a's enchant slot is not one of the safe
+  -- positions.
+  Spec.it s "CR 709.4a no card asks SameNameAsBound where slotNames is empty" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace sameNameAsBoundOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in a target slot's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "the atom sits only in a target slot's or a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sibling sweeps would be alone: the pool authors the
-    -- atom, and the one card that does is ACCEPTED here rather than skipped.
+    -- atom, and the two cards that do are ACCEPTED here rather than skipped -- one
+    -- in each of the two positions, so neither half of the pair is unwitnessed.
     harness <- S.printingOf s registry "Harness the Storm"
     Spec.assertEqWith
       s
       "Harness the Storm's one atom is in its trigger's target slot"
       (sameNameAsBoundCounts (S.combinedFace harness))
       (1, 0)
+    bifurcate <- S.printingOf s registry "Bifurcate"
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "Bifurcate's one atom is in its search's filter"
+      (sameNameAsBoundCounts (S.combinedFace bifurcate))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and they are the pool's only two"
       (sum (fmap (uncurry (+) . sameNameAsBoundCounts . S.combinedFace) ps))
-      1
+      2
     -- Both sides of the split, with room to spare under the pool's real figures:
     -- a traversal that had stopped walking, or a Framing that had stopped marking
     -- target slots, would fail here rather than pass the sweep above by iterating
@@ -9854,6 +9872,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let positions = concatMap (cardFilters . S.combinedFace) ps
     Spec.assertBool s (length positions > 100) "the pool gives the traversal Filter positions to walk"
     Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
+    Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 10) "and search filters, the accepted side's other half"
   -- CR 110.2's Filter.SameControllerAsBound is CR 709.4a's atom one characteristic
   -- over, in the same position and with the STAKES reversed: it is vacuously TRUE
   -- where Filter.Context.slotControllers has no key for its slot, so an atom
@@ -10881,7 +10900,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- each is asserted through sameNameAsBoundCounts as well as the predicate -- the
   -- counts say the TRAVERSAL put it in that position, where the predicate alone is
   -- also satisfied by the codec half noticing an atom the traversal missed.
-  Spec.it s "the lint itself catches SameNameAsBound outside a mode's target slot" $ do
+  Spec.it s "the lint itself catches SameNameAsBound where slotNames is empty" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     harness <- S.printingOf s registry "Harness the Storm"
@@ -10930,9 +10949,6 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                         )
                     ]
                 }
-            ),
-            ( "a Search filter",
-              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
               base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
@@ -11014,6 +11030,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       "a buried atom in a mode's target slot is accepted"
       (sameNameAsBoundOffends slotted, sameNameAsBoundCounts slotted)
+      (False, (1, 0))
+    -- The OTHER accepted position, and the pair to the rejections above: a search
+    -- filter is matched in the resolution's own context
+    -- (Pawl.Engine.Resolve.effectContext), so the same buried atom that offends
+    -- in every position above is accepted here.
+    let searched = base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+    Spec.assertEqWith
+      s
+      "a buried atom in a search's filter is accepted"
+      (sameNameAsBoundOffends searched, sameNameAsBoundCounts searched)
       (False, (1, 0))
     Spec.assertEqWith
       s

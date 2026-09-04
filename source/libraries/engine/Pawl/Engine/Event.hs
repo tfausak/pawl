@@ -1912,7 +1912,7 @@ apply batch candidate event =
       -- is the ROW's, through Replacement.candidateContext: CR 109.5's "you" is
       -- the row's controller rather than the entrant's, and a floating row's
       -- captured slot bindings ride along, which is what a bare Filter.contextFor
-      -- would have dropped; see #2141 for the four callers that still do.
+      -- would have dropped; see #2141 for the callers that still do.
       --
       -- Consumed unconditionally: CR 614.5 is about the row having applied, and a
       -- row whose amount would not evaluate has still applied. Consuming only on

@@ -1,0 +1,128 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Bifurcate",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Search",
+                    "value": {
+                      "destination": {
+                        "type": "Battlefield"
+                      },
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "Or",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Artifact"
+                                }
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Battle"
+                                }
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Enchantment"
+                                }
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Planeswalker"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "SameNameAsBound",
+                            "value": "twin"
+                          }
+                        ]
+                      },
+                      "owner": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "searcher": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "twin": {
+                "filter": {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsToken"
+                  }
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
