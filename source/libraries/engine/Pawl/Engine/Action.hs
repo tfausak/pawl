@@ -43,6 +43,10 @@ import qualified Pawl.Types.Zone as Zone
 -- about where to look -- CR 601.3's permission names a PLAYER, and exile is
 -- filed by owner, so a land somebody else owns has to be reachable.
 --
+-- Not implemented: a fourth source, the top of the library, which the CAST side
+-- reaches (Pawl.Engine.Cast.castZones) and which Future Sight's land half would
+-- need here (#3224).
+--
 -- Reading the OBJECT-BORNE permission with Cast.permitsPlayFromExile and not
 -- Cast.permitsCastFromExile is the whole of what makes this the PLAY side: the
 -- plotted and foretold permissions that one also folds in each say "may cast it"

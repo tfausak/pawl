@@ -391,6 +391,20 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.PlayLandsFromGraveyard
       " {\"type\":\"PlayLandsFromGraveyard\"} "
+  -- CR 601.3 / Garruk's Horde's "creature spells".
+  Spec.it s "CastFromTopOfLibrary, a filter that names qualities" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CastFromTopOfLibrary (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"CastFromTopOfLibrary\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 601.3 / Future Sight's cast half, whose sentence narrows no spell.
+  Spec.it s "CastFromTopOfLibrary, an empty filter" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CastFromTopOfLibrary (Filter.And []))
+      " {\"type\":\"CastFromTopOfLibrary\",\"value\":{\"type\":\"And\",\"value\":[]}} "
   -- CR 118.9 / Omniscience, whose sentence names no quality of the spell.
   Spec.it s "CastFromHandWithoutPayingManaCost, an empty filter" $
     Common.assertCodec

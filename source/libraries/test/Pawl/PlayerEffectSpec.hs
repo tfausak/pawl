@@ -5159,6 +5159,149 @@ crucibleSpec s registry =
           Spec.assertEqWith s "her graveyard has only the Sorcerer left" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
           Spec.assertEqWith s "and CR 305.2a's tally counted it" (Map.lookup S.alice (GameState.landsPlayed after)) (Just 1)
 
+-- Cast ONE named object and pass at every other prompt -- playOnly above for a
+-- cast. Pinned to an id rather than to "whichever cast is offered", so a board
+-- that stopped offering it passes rather than repairing the case with some other
+-- cast.
+castOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+castOnly wanted p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf wanted) actions of
+    h : _ -> h
+    [] -> Action.Type.Pass
+  _ -> S.identityAnswer p
+
+-- alice, bob and carol each have three Forests and a library whose top card is a
+-- creature; alice's library holds a SECOND creature one card down, and her hand
+-- holds a Rampant Growth. `top` is her library's top card and `present` whether
+-- the Horde is on her battlefield, so every pair of boards below differs in one
+-- of those two and in nothing else.
+hordeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hordeBoard forest horde elves rampant top present =
+  let lands = S.landsFor forest S.carol 3 (S.landsFor forest S.bob 3 (S.landsFor forest S.alice 3 S.threePlayerGame))
+      -- S.addLibraryCard puts each card ON TOP of the last, so the deepest goes
+      -- in first and `top` is what the permission can reach.
+      (_, g1) = S.addLibraryCard forest S.alice lands
+      (herDeep, g2) = S.addLibraryCard elves S.alice g1
+      (herTop, g3) = S.addLibraryCard top S.alice g2
+      (_, g4) = S.addLibraryCard forest S.bob g3
+      (hisTop, g5) = S.addLibraryCard elves S.bob g4
+      (_, g6) = S.addLibraryCard forest S.carol g5
+      (theirTop, g7) = S.addLibraryCard elves S.carol g6
+      (herHand, g8) = S.addHandCard rampant S.alice g7
+      g9 = if present then snd (S.addCreature horde S.alice g8) else g8
+   in ( herTop,
+        herDeep,
+        hisTop,
+        theirTop,
+        herHand,
+        g9
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Garruk's Horde {5}{G}{G} Creature -- Beast 7/7: "Trample / Play with the top
+-- card of your library revealed. / You may cast creature spells from the top of
+-- your library."
+--
+-- The producer of PlayerEffect.CastFromTopOfLibrary, and the LIBRARY's entry in
+-- Pawl.Engine.Cast.castZones: a CR 601.3 permission naming a zone the rules give
+-- nobody, where Yawgmoth's Will above names the graveyard. The narrowing to the
+-- TOP card is Cast.zoneCandidates' and not the Filter's, so these cases prove
+-- the two halves separately -- the second creature one card down is the one that
+-- can tell them apart.
+--
+-- Not implemented: "Play with the top card of your library revealed", which
+-- data/cards/garruks-horde.json omits -- pawl hands every answerer the whole
+-- game already, so a revealed card is indistinguishable from a hidden one
+-- (#1412). Neither stricter nor weaker than printed, and no case below rests on
+-- it.
+garruksHordeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+garruksHordeSpec s registry =
+  let board top present = do
+        forest <- S.printingOf s registry "Forest"
+        horde <- S.printingOf s registry "Garruk's Horde"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        rampant <- S.printingOf s registry "Rampant Growth"
+        topPrinting <- S.printingOf s registry top
+        pure (hordeBoard forest horde elves rampant topPrinting present)
+   in Spec.describe s "GarruksHorde" $ do
+        -- The whole card, end to end: library -> stack -> battlefield. Driven
+        -- through Engine.priorityLoop rather than Pawl.Engine.Cast.castSpell,
+        -- which is the difference between proving the permission and proving the
+        -- move: `S.cast` announces whatever it is handed, so a board where the
+        -- cast is never OFFERED still puts the card on the battlefield. The
+        -- answerer is pinned to this id, so an unoffered cast passes instead.
+        Spec.it s "CR 601.3 the top card of the library is cast and resolves" $ do
+          elves <- S.printingOf s registry "Llanowar Elves"
+          (herTop, _, _, _, _, gs) <- board "Llanowar Elves" True
+          let resolved = S.runPure (castOnly herTop) gs Engine.priorityLoop
+          Spec.assertEqWith s "the library's top card is on the battlefield" (S.countOnBattlefieldByName (S.printingName elves) S.alice resolved) 1
+          Spec.assertEqWith s "and the library is one card shorter" (length (Game.zoneMembers Zone.Library S.alice resolved)) 2
+          Spec.assertBool s (S.castable S.alice herTop gs) "it was castable"
+          Spec.assertBool s (any (S.isCastOf herTop) (Action.legalActions S.alice gs)) "and offered"
+
+        -- The pair. Two boards differing in the Horde and in nothing else, with
+        -- the same Forests and the same hand on both -- so the offer appearing
+        -- is the permission and can be nothing else.
+        Spec.it s "CR 601.3 without the Horde the same top card is not castable" $ do
+          (herTop, _, _, _, herHand, without) <- board "Llanowar Elves" False
+          Spec.assertBool s (not (any (S.isCastOf herTop) (Action.legalActions S.alice without))) "the top card is not offered"
+          Spec.assertBool s (not (S.castable S.alice herTop without)) "nor castable"
+          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop without)) "and the typed question says no"
+          Spec.assertBool s (any (S.isCastOf herHand) (Action.legalActions S.alice without)) "though her hand is offered on the same board"
+
+        -- The Filter half: "creature spells". The refusal is not cost or timing,
+        -- which the identical card in her HAND on the same board shows.
+        Spec.it s "CR 601.3 a noncreature card on top is not offered" $ do
+          (herTop, _, _, _, herHand, gs) <- board "Rampant Growth" True
+          Spec.assertBool s (not (any (S.isCastOf herTop) (Action.legalActions S.alice gs))) "the sorcery on top is not offered"
+          Spec.assertBool s (not (S.castable S.alice herTop gs)) "nor castable"
+          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop gs)) "the permission does not match it"
+          Spec.assertBool s (any (S.isCastOf herHand) (Action.legalActions S.alice gs)) "while the same card in her hand is offered"
+
+        -- The zone half: "the TOP of your library". The second Llanowar Elves is
+        -- a creature the permission matches, and it is one card down -- so this
+        -- is Cast.zoneCandidates' narrowing and nothing else.
+        Spec.it s "CR 601.3 only the top card is reached, not the creature beneath it" $ do
+          (herTop, herDeep, _, _, _, gs) <- board "Llanowar Elves" True
+          Spec.assertBool s (not (any (S.isCastOf herDeep) (Action.legalActions S.alice gs))) "the creature one card down is not offered"
+          Spec.assertBool s (not (S.castable S.alice herDeep gs)) "nor castable"
+          Spec.assertBool s (PlayerEffect.mayCastFromTopOfLibrary S.alice herDeep gs) "so the refusal is not the permission's own filter"
+          Spec.assertBool s (any (S.isCastOf herTop) (Action.legalActions S.alice gs)) "while the card above it is offered"
+
+        -- CR 601.3's OTHER limb, on the new road: a permission widens the zone
+        -- and a prohibition still closes it. Grafdigger's Cage is the pair's
+        -- second permanent, under BOB, so the refusal is its PlayerScope.EachPlayer
+        -- rather than anything about who controls the Horde. Pawl.CastSpec's
+        -- Grafdigger's Cage group proves the same disjunct on the mid-search road.
+        Spec.it s "CR 601.3 a prohibition still closes the zone the permission opened" $ do
+          cage <- S.printingOf s registry "Grafdigger's Cage"
+          (herTop, _, _, _, herHand, gs) <- board "Llanowar Elves" True
+          let caged = snd (S.addCreature cage S.bob gs)
+          Spec.assertBool s (not (any (S.isCastOf herTop) (Action.legalActions S.alice caged))) "the top card is not offered with the Cage out"
+          Spec.assertBool s (not (S.castable S.alice herTop caged)) "nor castable"
+          Spec.assertBool s (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop caged) "so the refusal is the prohibition, not the permission"
+          Spec.assertBool s (any (S.isCastOf herTop) (Action.legalActions S.alice gs)) "and the same cast is offered on the same board without it"
+          Spec.assertBool s (any (S.isCastOf herHand) (Action.legalActions S.alice caged)) "while the hand the sentence does not name is untouched"
+
+        -- CR 109.5 at three seats. Each opponent is asked in their OWN main
+        -- phase, so CR 307.1's window is open and the refusal is the scope.
+        Spec.it s "CR 109.5 the You scope reaches neither opponent's library" $ do
+          (herTop, _, hisTop, theirTop, _, gs) <- board "Llanowar Elves" True
+          let bobsTurn = gs {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+              carolsTurn = gs {GameState.activePlayer = S.carol, GameState.priority = Just S.carol}
+          Spec.assertBool s (not (any (S.isCastOf hisTop) (Action.legalActions S.bob bobsTurn))) "bob is not offered his own top card"
+          Spec.assertBool s (not (any (S.isCastOf theirTop) (Action.legalActions S.carol carolsTurn))) "nor carol hers"
+          Spec.assertBool s (PlayerEffect.mayCastFromTopOfLibrary S.alice herTop gs) "alice has the permission"
+          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.bob hisTop gs)) "bob does not"
+          Spec.assertBool s (not (PlayerEffect.mayCastFromTopOfLibrary S.carol theirTop gs)) "nor carol"
+          -- And a library is a per-player pile (CR 400.1), so the player who
+          -- HOLDS the permission cannot reach anybody else's top card either.
+          Spec.assertBool s (not (any (S.isCastOf hisTop) (Action.legalActions S.alice gs))) "and alice cannot cast bob's top card"
+          Spec.assertBool s (not (S.castable S.alice hisTop gs)) "nor is it castable by her"
+
 -- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
 -- counteringBoard above, with a Goblin Piker as the victim spell.
 --
@@ -5992,6 +6135,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   sigardasAidSpec s registry
   yawgmothsWillSpec s registry
   crucibleSpec s registry
+  garruksHordeSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
