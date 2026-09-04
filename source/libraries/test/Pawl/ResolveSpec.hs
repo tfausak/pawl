@@ -1279,7 +1279,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- Bifurcate -- "Search your library for a permanent card with the same name as
   -- target nontoken creature, put that card onto the battlefield, then shuffle."
   -- The whole-card proof that a SEARCH filter is matched in the resolution's own
-  -- context (CR 608.2c): its CR 709.4a comparison is against the slot the spell
+  -- context (CR 608.2c): its CR 201.2a comparison is against the slot the spell
   -- targeted, which a bare Filter.contextFor would have answered False for on
   -- every card in the library, fetching nothing at all.
   --
@@ -1289,7 +1289,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- head of what it is offered, so the Hill Giant case is the one an unfiltered
   -- candidate list fails. The Mountain is a permanent card of neither name and is
   -- rejected on both.
-  Spec.it s "CR 709.4a whole card: Bifurcate finds the card sharing a name with the creature it targeted" $ do
+  Spec.it s "CR 201.2a whole card: Bifurcate finds the card sharing a name with the creature it targeted" $ do
     board <- bifurcateBoard s registry
     let settled = resolveBifurcate (bifurcatePiker board) board
     Spec.assertEqWith
@@ -1307,7 +1307,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "the two cards of other names stayed in the library"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [bifurcateLibraryGiant board, bifurcateLibraryMountain board])
-  Spec.it s "CR 709.4a whole card: Bifurcate aimed at the other creature finds the OTHER name" $ do
+  Spec.it s "CR 201.2a whole card: Bifurcate aimed at the other creature finds the OTHER name" $ do
     board <- bifurcateBoard s registry
     let settled = resolveBifurcate (bifurcateGiant board) board
     Spec.assertEqWith

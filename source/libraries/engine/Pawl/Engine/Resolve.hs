@@ -4095,7 +4095,7 @@ referentsOfBindings bindings =
 --
 -- The NAMES of those same objects ride along too, which is why the parameter is a
 -- GameState rather than Teams alone: this module can read a board and
--- Pawl.Engine.Filter cannot, so CR 709.4a's SameNameAsBound is answerable at a
+-- Pawl.Engine.Filter cannot, so CR 201.2a's SameNameAsBound is answerable at a
 -- resolution's positions exactly as it is at a target slot's
 -- (Pawl.Engine.Target.slotContext). A THUNK, as it is there: one projection per
 -- bound object, paid for only by a filter naming the atom.
@@ -4109,7 +4109,7 @@ effectContext gs controller source legal bindings =
           -- the amount of {E} paid this way". Live off the resolving object, the
           -- group half's own read, so a clause reads what the clause before it bound.
           Filter.boundAmounts = Map.mapMaybe Binding.Type.amount bindings,
-          -- CR 709.4a's names off the same objects, through CR 608.2h's
+          -- CR 201.2a's names off the same objects, through CR 608.2h's
           -- last-known reader for slotContext's reason: Bifurcate's bound
           -- creature may have left by the time the search runs, and "that
           -- creature" is a reference the spell already made rather than a target
@@ -4976,7 +4976,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- Through effectContext and NOT Filter.contextFor, so the resolution's own
     -- slots ride along and a search filter naming one is answerable: Bifurcate's
-    -- "with the same name as target nontoken creature" is CR 709.4a's
+    -- "with the same name as target nontoken creature" is CR 201.2a's
     -- Filter.SameNameAsBound over the slot the spell targeted, which a bare
     -- context would have answered False for on every card in the library.
     -- Pawl.ResolveSpec's Bifurcate cases are what prove it.
