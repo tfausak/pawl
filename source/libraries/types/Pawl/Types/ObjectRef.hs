@@ -21,663 +21,103 @@ import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 -- every other arm's are found AS it runs. That is the distinction CR 115.10a
 -- draws: only InSlot can name a target; no other arm ever does.
 data ObjectRef
-  = -- | The objects bound in a slot (CR 601.2c filled it by targeting, or the
-    -- engine reserved it -- Binding.triggerSource). Usually ONE, the slot's
-    -- single Recipient, subject to CR 608.2b's illegal-target check when the slot
-    -- was a target.
-    --
-    -- But a slot bound to a whole GROUP names every one of them -- Salt Road
-    -- Skirmish's "they gain haste until end of turn" over the two tokens the
-    -- sentence before it made, and Act on Impulse's "those cards" over the three
-    -- its own move exiled. A group is a definition and never a
-    -- target (CR 115.10a), so it owes CR 608.2b nothing; the arm still reads at
-    -- most one object per slot for every OTHER kind of binding, which is why
-    -- "target creature" cannot become two.
+  = -- | CR 601.2c / 608.2b: the objects bound in a slot, usually the one
+    -- Recipient a target filled but every member where the slot holds a group.
     InSlot SlotName.SlotName
-  | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of
-    -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
-    -- set drawn from another zone is one of the arms below -- a graveyard's is
-    -- EachCardInGraveyard, a hand's EachCardInYourHand, a library's
-    -- EachCardInYourLibrary, exile's EachCardExiledWithSource -- and a FILTERED
-    -- sweep of a zone is written on the arm for that zone: the battlefield's is
-    -- here, and a graveyard's, a hand's, the stack's and the linked exile set's
-    -- are on their own arms, a library's included.
-    --
-    -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
-    -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
-    -- fixed for that instruction; judging which swept objects are affected
-    -- before any of them is (CR 608.2f) belongs to the opcode's funnel rather
-    -- than to this type.
-    --
-    -- A CONTINUOUS effect over a set must additionally freeze the swept set into
-    -- the effect itself (CR 611.2c), storing Affected.TheseObjects; the one-shots
-    -- that take this type store nothing.
+  | -- | CR 109.2 / Day of Judgment: every permanent on the battlefield matching
+    -- the Filter, swept when the effect executes (CR 608.2c).
     EachMatching (Filter.Filter Keyword.Keyword)
-  | -- | Every CARD IN A GRAVEYARD matching the Filter, in the graveyards the
-    -- PlayerScope names -- Rise of the Dark Realms' "all creature cards from all
-    -- graveyards". EachMatching's sibling with CR 109.2's battlefield default
-    -- switched off by the card's own words, which is CR 109.2a: a description
-    -- carrying "card" and the name of a zone "means a card matching that
-    -- description in the stated zone".
-    --
-    -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, the shape
-    -- Pawl.Types.Pool.CardsInGraveyard takes one question over: each zone whose
-    -- filtered sweep a card in the pool asks for gets its own arm --
-    -- EachCardExiledWithSource takes the exile one and EachCardInHand a hand's.
-    -- A hidden zone (CR 400.2) owes a visibility question a graveyard does not,
-    -- and Pawl.Types.EachCardInHand is where that answer is written.
-    --
-    -- The Pawl.Types.ZoneScope is WHOSE, which CR 400.1 forces this arm to
-    -- say and EachMatching's shared battlefield never has to. The SAME type a
-    -- target pool carries, so both readings are stated once: the perspective's
-    -- own (Rise of the Dark Realms' "all graveyards") and the players another
-    -- slot of the announcement targets (Angel of Finality's "target player's
-    -- graveyard"). Read by Pawl.Engine.Target.zoneScopePlayers for both, so
-    -- the sweep and the pool cannot drift.
-    --
-    -- Not a target and never one (CR 115.10a), and swept when the effect executes
-    -- (CR 608.2c) -- the two properties EachMatching above has, for its reasons.
+  | -- | CR 109.2a / Rise of the Dark Realms: every card matching the Filter in the
+    -- graveyards the payload's ZoneScope names.
     EachCardInGraveyard EachCardInGraveyard.EachCardInGraveyard
-  | -- | Every card in the RESOLVING CONTROLLER's hand -- Ignorant Bliss' "exile
-    -- all cards from your hand". EachMatching's sibling with CR 109.2's
-    -- battlefield default switched off the same way EachCardInGraveyard switches
-    -- it off, CR 109.2a.
-    --
-    -- Nullary, where the graveyard arms carry a scope and a filter, and each
-    -- omission is a rule rather than an economy. NO PLAYER: CR 400.2 makes a hand
-    -- a hidden zone, so an arm reaching anyone else's would owe a visibility
-    -- question this one never asks -- CR 109.5's "you" is the resolving
-    -- controller, who may already look at their own hand. NO FILTER: a filtered
-    -- SWEEP of a hidden zone is the same question, since which cards matched is
-    -- then read off what left the zone, and nothing needs to be told apart when
-    -- EVERY card goes. EachCardInHand below carries both, and supersedes neither:
-    -- what makes IT legitimate is that its producer prints the reveal (CR
-    -- 701.20a) that shows the hand, which Ignorant Bliss does not and does not
-    -- need. ChosenCardInHand below does carry a Filter, and that is not this
-    -- arm's question either: one card chosen out of a hand tells nobody which of
-    -- the others matched. Nor is EachCardInYourLibrary's stated Filter: that arm
-    -- reaches only its own controller's zone, whose ORDER no player may see (CR
-    -- 401.2), so the matches leaving tells nobody anything about what stayed.
-    --
-    -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
-    -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
-    -- properties EachMatching above has.
-    --
-    -- ONE card out of a hand rather than all of them is ChosenCardInHand or
-    -- RandomCardInHand below, both of which do reach another player's hand --
-    -- they answer the visibility question this arm avoids rather than dodging
-    -- it, the first by asking that hand's own owner (CR 402.3) and the second by
-    -- naming the card without anybody looking at all.
+  | -- | CR 109.2a / Ignorant Bliss: every card in the resolving controller's hand,
+    -- nullary because CR 400.2's hidden zone and CR 109.5's "you" leave neither a
+    -- player nor a filter to state.
     EachCardInYourHand
-  | -- | Every card in the hands a Pawl.Types.ZoneScope names that the
-    -- optional Filter matches -- Amnesia's "target player reveals their hand and
-    -- discards all nonland cards". EachCardInGraveyard's scope and filter over
-    -- the arm above's zone, both of which that arm declines;
-    -- Pawl.Types.EachCardInHand's header says why this one may have them and what
-    -- answers the CR 400.2 visibility question there.
+  | -- | CR 109.2a / Amnesia: every card the optional Filter matches in the hands
+    -- the payload's ZoneScope names.
     EachCardInHand EachCardInHand.EachCardInHand
-  | -- | Every card in the resolving controller's library that the optional Filter
-    -- matches -- Leveler's "exile all cards from your library" bare (CR 400.12's
-    -- instruction to a zone), Caldera Breaker's "exile all Mountain cards from
-    -- your library" stated (CR 109.2a, the word "card" beside the name of a
-    -- zone). EachCardInYourHand's arm over CR 400.1's other hidden zone, and only
-    -- the resolving controller's for its reasons (CR 400.2, CR 109.5).
-    --
-    -- The Filter is OPTIONAL for EachCardExiledWithSource's reason:
-    -- Pawl.Types.Filter has no tautological arm, so "all cards from your library"
-    -- has no other spelling.
-    --
-    -- A FILTER over a hidden zone, which EachCardInYourHand declines: what makes
-    -- it legitimate here is that a sweep states no count and hands out no choice,
-    -- so which cards matched is read off what left the zone and the zone's own
-    -- order is never shown. CR 401.2's order survives untouched -- the matches
-    -- leave and the rest stay where they were.
-    --
-    -- NOT a search, which is why it is an arm here rather than a use of
-    -- Pawl.Types.Effect.Search: CR 701.23a's search LOOKS AT the zone and FINDS
-    -- cards, and neither producer's text says either word, so CR 701.23b's "isn't
-    -- required to find" and CR 701.23f's search triggers do not reach it and CR
-    -- 701.24 shuffles nothing. A stated characteristic does not make it one:
-    -- rule 701.23b governs a player who is SEARCHING, and this instruction never
-    -- asks anyone to. Proved by Pawl.MassEffectSpec's "CR 701.23a a sweep is not
-    -- a search, and CR 701.24 shuffles nothing".
+  | -- | CR 400.12 / 109.2a / Leveler, Caldera Breaker: every card in the resolving
+    -- controller's library that the optional Filter matches. Not CR 701.23a's
+    -- search, so no search trigger fires and CR 701.24 shuffles nothing -- proved
+    -- by Pawl.MassEffectSpec's "CR 701.23a a sweep is not a search, and CR 701.24
+    -- shuffles nothing".
     EachCardInYourLibrary (Maybe (Filter.Filter Keyword.Keyword))
-  | -- | CR 607.2a's linked set: every card in exile that an instruction in an
-    -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
-    -- card". EachMatching's sibling with CR 109.2's battlefield default switched
-    -- off, the way EachCardInGraveyard and EachCardInYourHand switch it off, and
-    -- the arm is what makes the rest of rule 607.2a sayable: "the second ability
-    -- refers only to cards in the exile zone that were put there as a result of
-    -- an instruction to exile them in the first ability."
-    --
-    -- ONE READING, rule 607.2a's own: an ability that exiles and a SECOND ability
-    -- printed on the same object referring back, which is Hoarding Dragon. An
-    -- ability referring back to what its OWN earlier instruction exiled is CR
-    -- 400.7j read in CR 608.2c's written order and names the slot that
-    -- instruction bound instead -- Hanweir Battlements' "exile them, then meld
-    -- them", which SourceAndChosenPermanent below is what lets it write.
-    --
-    -- NO PLAYER: exile is a public zone (CR 400.2) and the set is defined by
-    -- which object exiled the card, not by whose it is.
-    --
-    -- The Filter is OPTIONAL because a linked reference usually names the whole
-    -- set it is linked to -- Hoarding Dragon, Promise of Tomorrow and Savior of
-    -- Ollenbock each take all of it, and write no filter. Karn Liberated is the
-    -- printing that narrows the set with its own words, "all non-Aura PERMANENT
-    -- CARDS exiled with Karn", so the subset has to be sayable; a stated filter
-    -- is read exactly as EachMatching's is, against each linked card's
-    -- projection.
-    --
-    -- Singular and plural are ONE arm, which is CR 607.3: an ability referring to
-    -- "the exiled card" whose linked ability exiled several "performs that action
-    -- on each exiled card". So a sweep is the faithful reading of both wordings,
-    -- and Hoarding Dragon's singular text needs no separate spelling.
-    --
-    -- Read against GameState.exiledWith, which is where the link lives; see that
-    -- field for what the key is and for what rule 607.2a's per-ABILITY scope is
-    -- approximated by.
-    --
-    -- Not a target and never one (CR 115.10a) -- the reference is a definition,
-    -- not a choice -- and swept when the effect executes (CR 608.2c), the two
-    -- properties EachMatching above has.
+  | -- | CR 607.2a / Hoarding Dragon, Karn Liberated: every card in exile that an
+    -- instruction in an ability of this effect's source put there, narrowed by the
+    -- optional Filter.
     EachCardExiledWithSource (Maybe (Filter.Filter Keyword.Keyword))
-  | -- | Every SPELL ON THE STACK matching the Filter -- Swift Silence's "all
-    -- other spells". EachMatching's sibling with CR 109.2's battlefield default
-    -- switched off by the word "spell", which is CR 109.2b: a description
-    -- carrying that word "means a spell matching that description on the stack".
+  | -- | CR 109.2b / Swift Silence: every spell on the stack matching the Filter,
+    -- abilities excluded (CR 113.9).
     --
-    -- SPELLS ONLY, never the abilities that share the zone. That is not a
-    -- narrowing this arm chose: rule 109.2b's word is "spell", and CR 112.1
-    -- makes a spell a CARD on the stack, so an activated or triggered ability is
-    -- not one. The test is Pawl.Engine.Game.isSpell, a classification of the
-    -- object's kind and never of the card's identity. A set holding BOTH
-    -- populations is EachOnStack below; a set holding the ABILITIES alone is a
-    -- third arm nothing has needed yet (gap #2032). CR 113.9 keeps the two
-    -- populations apart wherever countering reads them, and pawl already draws
-    -- the same line at the target pool (Cancel's Pool.Spells against Stifle's
-    -- Pool.Abilities).
-    --
-    -- "Other" is written `Not IsSource`, the one spelling CR 601.2c's "another"
-    -- and Opalescence's "each other" already share -- the resolving spell is
-    -- still on the stack while its own instructions run (CR 608.2), so an arm
-    -- that dropped the source unasked would make "counter all spells" unsayable.
-    --
-    -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, which is
-    -- EachCardInGraveyard's reason: a card wanting a filtered sweep of one more
-    -- zone gets one more arm.
-    --
-    -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
-    -- fizzle -- which is the whole difference between this and Cancel's targeted
-    -- Pool.Spells slot. Swept when the effect executes (CR 608.2c), so a spell
-    -- that has already left the stack is not in the set and one put there since
-    -- the countering spell was cast is.
+    -- Not implemented: a set holding the abilities alone, which no card has needed
+    -- (gap #2032).
     EachSpell (Filter.Filter Keyword.Keyword)
-  | -- | Every OBJECT ON THE STACK matching the Filter, spells and abilities
-    -- alike -- Glen Elendra's Answer's "all spells your opponents control and
-    -- all abilities your opponents control". The arm above with CR 109.2b's word
-    -- "spell" switched off: CR 405.1 puts spells and abilities on the stack and
-    -- nothing else there, so a sentence naming both kinds names the zone and the
-    -- Filter is the whole narrowing.
-    --
-    -- ONE arm rather than the arm above plus #2032's abilities-only sibling,
-    -- because the printed sentence is ONE instruction and CR 608.2f processes
-    -- its objects simultaneously: two refs would be two batches, and a rider
-    -- counting "each spell and ability countered this way" would have two counts
-    -- to read rather than one.
-    --
-    -- SAYABLE ONLY WHERE THE CARD SAYS ABILITIES, which CR 113.9 makes a rule
-    -- rather than a transcription preference: an ability on the stack "can be
-    -- countered by effects that specifically counter abilities", so a sentence
-    -- naming spells alone is the arm above and writing it here would counter
-    -- objects the card never named.
-    --
-    -- NO KIND TEST at the sweep, which is the difference from the arm above
-    -- rather than an omission. CR 701.6a's ending still differs per victim -- a
-    -- countered spell reaches a graveyard and a countered ability ceases (CR
-    -- 608.2n) -- and Pawl.Engine.Event.counterOne picks between them off
-    -- Pawl.Engine.Game.isAbility, a classification of the object's kind.
-    --
-    -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
-    -- fizzle. Swept when the effect executes (CR 608.2c), the arm above's
-    -- timing, so an object put on the stack since the sweeping spell was cast is
-    -- in the set.
+  | -- | CR 405.1 / Glen Elendra's Answer: every object on the stack matching the
+    -- Filter, spells and abilities alike.
     EachOnStack (Filter.Filter Keyword.Keyword)
-  | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The
-    -- first of the three arms that name no object at all (EachOpponent and
-    -- ChosenPlayer below are the others), and it is here rather than on
-    -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:
-    -- CR 120.3a makes a player a damage recipient, and Effect.DealDamage already
-    -- reaches one through the InSlot arm. Every OTHER ObjectRef-taking opcode
-    -- reads objects only, and this arm drops out of the sweep there rather than
-    -- being rejected -- the posture Pawl.Engine.Resolve.objectRefObjects already
-    -- takes for a player bound in a slot.
-    --
-    -- Payload-free rather than carrying a Pawl.Types.PlayerRef: "each player" is
-    -- what the card says, and a PlayerRef would make InSlot sayable twice over.
-    --
-    -- Not a target (CR 115.10a) and swept when the effect executes, the two
-    -- properties EachMatching above has.
-    --
-    -- A sentence naming creatures AND players ("each creature without flying and
-    -- each player") is ONE DealDamage whose clauses name this arm beside an
-    -- EachMatching, which CR 608.2f deals as a single batch;
-    -- Pawl.ReplacementSpec's Molten Disaster case proves it.
+  | -- | CR 120.3a / Molten Disaster: every player in the game, an ObjectRef because
+    -- a damage clause's ref is one. Pawl.ReplacementSpec's Molten Disaster case
+    -- proves that a clause naming this arm beside an EachMatching is one CR 608.2f
+    -- batch.
     EachPlayer
-  | -- | Every OPPONENT of the resolving controller -- Soul Immolation's "each
-    -- opponent". EachPlayer's set narrowed by CR 102.1's relation, and here for
-    -- that arm's reason: it names no object at all, and it is an ObjectRef
-    -- because a damage clause's ref is an ObjectRef (CR 120.3a makes a player a
-    -- damage recipient).
-    --
-    -- Payload-free, EachPlayer's call: "each opponent" is what the card says,
-    -- and a Pawl.Types.PlayerRef would make InSlot sayable twice over. The
-    -- perspective is CR 109.5's "you", the resolving controller, and
-    -- Pawl.Types.PlayerRelation.holds is the single definition of whom that
-    -- leaves -- so this arm and a Filter's ControlledBy Opponent cannot drift
-    -- apart about who an opponent is.
-    --
-    -- NOT EachPlayer with the controller dropped at the reader: rule 102.1's
-    -- roster is what EachPlayer names, and a card saying "each opponent" says
-    -- something narrower that no reader may infer from the wider arm.
-    --
-    -- Not a target (CR 115.10a) and swept when the effect executes, the two
-    -- properties EachMatching above has.
-    --
-    -- A sentence naming opponents AND their permanents ("each opponent and each
-    -- creature they control", Soul Immolation) is ONE DealDamage whose clauses
-    -- name this arm beside an EachMatching, the shape EachPlayer above
-    -- describes.
+  | -- | CR 102.1 / 120.3a / Soul Immolation: every opponent of the resolving
+    -- controller, the arm above narrowed by CR 109.5's perspective.
     EachOpponent
-  | -- | The player this effect's SOURCE chose as it entered the battlefield --
-    -- Stuffy Doll's "it deals that much damage to the chosen player". EachPlayer's
-    -- sibling one seat wide, and here for that arm's reason: the arm names no
-    -- object at all, and it is an ObjectRef because a damage clause's ref is an
-    -- ObjectRef (CR 120.3a makes a player a damage recipient).
-    --
-    -- Read off Object.chosenPlayer of the effect's SOURCE, which is CR 113.7a's
-    -- source permanent rather than the resolving ability object -- the direction
-    -- EachCardExiledWithSource already reads for CR 607.2a, and the only one that
-    -- works: the choice was made as the permanent entered (CR 614.12a), long
-    -- before the ability that reads it was put on the stack.
-    --
-    -- Payload-free rather than carrying a slot or a PlayerRef, ChooseColor's
-    -- position: the card says "the chosen player", which names the one choice its
-    -- own entry replacement recorded. A permanent that chose nobody -- because it
-    -- has no such replacement, or because it was put onto the battlefield by
-    -- something that never ran one -- names nobody, and CR 101.3 ignores that
-    -- share of the instruction.
-    --
-    -- Not a target and never one (CR 115.10a): the choice was made on entry, not
-    -- announced on the stack, so CR 608.2b has nothing to re-validate. Read when
-    -- the effect executes (CR 608.2c), so a designation the source lost by
-    -- changing zones (CR 400.7) is already gone.
+  | -- | CR 614.12a / 120.3a / Stuffy Doll: the player this effect's source chose as
+    -- it entered the battlefield, read off Object.chosenPlayer there.
     ChosenPlayer
-  | -- | The cards on top of a library, deepest named last -- Count on Luck's "the
-    -- top card of your library" and Act on Impulse's "the top three cards of your
-    -- library". A library is a per-player zone (CR 400.1) kept as an ordered pile
-    -- (CR 401.2), so "the top card" is a position rather than a property, and that
-    -- is what no Filter can say: EachMatching sweeps the battlefield (CR 109.2) and
-    -- a Filter matches characteristics, neither of which can pick the head of a
-    -- hidden pile (CR 400.2).
-    --
-    -- The PlayerRef is WHOSE library, so "the top card of target player's library"
-    -- is the same arm through its InSlot. The Quantity is HOW MANY off the top of
-    -- EACH library it names, so a depth of three over "each player" is three per
-    -- seat rather than three in total -- which is what "exile the top three cards
-    -- of each player's library" would say. A library holding fewer cards than the
-    -- depth gives up what it has (CR 609.3), and an empty one gives nothing.
-    --
-    -- A Pawl.Types.Quantity rather than a Natural, because a printed depth need
-    -- not be a literal: Commune with Lava's "exile the top X cards of your
-    -- library" reads CR 601.2b's announced X, where Act on Impulse's three is a
-    -- Quantity.Literal. The depth is evaluated ONCE for the whole ref and clamped
-    -- to zero if it will not evaluate or evaluates negative (CR 107.1b) --
-    -- Pawl.Engine.Resolve.objectRefObjects is where both happen. A nested Quantity
-    -- is also a static-analysis surface: it may name a slot
-    -- (Pawl.Engine.Resolve.objectRefSlots) and it may read X
-    -- (Pawl.Engine.Resolve.readsX), and both reach it through
-    -- Pawl.Engine.Resolve.objectRefQuantities.
-    --
-    -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
-    -- cards are not -- so CR 608.2b has nothing to fizzle. Read when the effect
-    -- executes (CR 608.2c), which is what makes an empty library a no-op rather
-    -- than an error: there is no top card, so the arm names nothing.
+  | -- | CR 401.2 / 121.1 / Count on Luck, Act on Impulse: the cards on top of the
+    -- libraries the payload's PlayerRef names, as deep as its Quantity, deepest
+    -- named last.
     TopOfLibrary TopOfLibrary.TopOfLibrary
-  | -- | The cards on top of a library down to and INCLUDING the one whose match
-    -- ends the walk -- Treasure Hunt's "reveal cards from the top of your library
-    -- until you reveal a nonland card", Open the Way's "until you reveal X land
-    -- cards". TopOfLibrary's sibling, and a second way to say HOW DEEP rather
-    -- than a second way to reveal: both name a prefix of CR 401.2's ordered pile
-    -- taken from its head (CR 121.1) and both carry a Quantity, and they differ
-    -- only in what that Quantity counts -- cards there, MATCHES here.
-    --
-    -- NOT EachCardInYourLibrary's filtered sweep, and that is the difference: a
-    -- sweep names every card in the zone that matches, where this walks the pile
-    -- from the top and stops, so which cards it names is a POSITION question
-    -- that a Filter only terminates. Every card the walk names is then shown by
-    -- the effect reading it (CR 701.20a), where the cards a sweep passed over
-    -- are not.
-    --
-    -- The card that completes the count is in the set, which is what "until you
-    -- reveal a nonland card" says: the walk stops having revealed it, not before
-    -- it. A library holding fewer matches than the count gives up the whole of
-    -- itself and stops at the bottom (CR 609.3), and the rest of the instruction
-    -- is then performed on all of it. A count of zero names nothing, the walk
-    -- being over before it starts.
-    --
-    -- No rule of the CR governs "until": the stopping condition is the card's own
-    -- text, and what the walk owes the rulebook is CR 401.2's order, CR 121.1's
-    -- head and CR 609.3's shortfall.
-    --
-    -- The PlayerRef is WHOSE library, TopOfLibrary's field for its reason, and
-    -- the walk runs once per library it names rather than once across all of
-    -- them.
-    --
-    -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
-    -- cards are not -- and read when the effect executes (CR 608.2c), the two
-    -- properties TopOfLibrary above has. An empty library names nothing.
+  | -- | CR 401.2 / Treasure Hunt, Open the Way: the cards on top of a library down
+    -- to and INCLUDING the one whose match completes the payload's count.
     TopOfLibraryUntil TopOfLibraryUntil.TopOfLibraryUntil
-  | -- | A card in a graveyard, matching the Filter, CHOSEN as the effect runs
-    -- rather than swept -- Port of Karfell's "return a creature card from your
-    -- graveyard to the battlefield tapped".
+  | -- | CR 608.2d / Port of Karfell: a card in a graveyard matching the Filter,
+    -- chosen as the effect runs rather than targeted (CR 115.1).
     --
-    -- NOT A TARGET, and the distinction this arm exists for. A graveyard is a
-    -- public zone (CR 400.2), so nothing about the zone would stop the card from
-    -- saying "target"; CR 115.1 is what settles it, since a spell or ability is
-    -- targeted only where its own text says "target [something]". This sentence
-    -- does not, so the choice is made while applying the effect (CR 608.2d)
-    -- rather than announced on the stack (CR 601.2c), and CR 608.2b has nothing
-    -- to re-validate. That is also why the arm is here rather than a
-    -- Pawl.Types.Pool.CardsInGraveyard slot, which is a TARGET pool: the two
-    -- questions look alike on the board and differ in every rule that reads them
-    -- -- shroud, hexproof, "becomes the target" triggers and the fizzle.
+    -- Not implemented: a count above one -- Fall of the Thran's "each player
+    -- returns TWO land cards from their graveyard to the battlefield" -- and with
+    -- it the exclusion "another" states (#1437).
     --
-    -- WHO CHOOSES is the Pawl.Types.Chooser, which also fixes how many cards
-    -- the arm names: TheController is CR 608.2c's default and one card across
-    -- the whole scope (Port of Karfell), EachInScope is one card per player in
-    -- scope, each chosen by that player out of their own graveyard (Exhume's
-    -- "each player puts a creature card from their graveyard onto the
-    -- battlefield"), and BoundInSlot is one card chosen by the one player a slot
-    -- names -- Skullwinder's "choose an opponent. That player returns a card
-    -- from their graveyard to their hand", where Effect.ChooseOpponent filled the
-    -- slot a sentence earlier.
-    --
-    -- The Pawl.Types.ZoneScope is WHOSE GRAVEYARDS the candidates are drawn
-    -- from, which CR 400.1 forces this arm to say for EachCardInGraveyard's
-    -- reason -- and the same type that arm carries, so the InSlot reading is
-    -- open here too: Grasping Tentacles' "an artifact card from that player's
-    -- graveyard" names the seat its own mill targeted. Under
-    -- TheController it is independent of the chooser -- `You` is Port of
-    -- Karfell's "your graveyard", and the wider scopes are Extract from
-    -- Darkness' "a graveyard", still chosen from by the effect's controller.
-    -- Under the other two the chooser fixes whose graveyard and the scope is the
-    -- outer bound on which graveyards the instruction reaches, which is what the
-    -- sentences themselves do.
-    --
-    -- ONE card per chooser, with no count beside the Filter, and CR 609.3
-    -- covers the shortfall: a graveyard holding no matching card yields
-    -- nothing, and that share of the instruction is ignored (CR 101.3) rather
-    -- than failing. Not implemented: a count above one -- Fall of the Thran's
-    -- "each player returns TWO land cards from their graveyard to the
-    -- battlefield" -- and with it the exclusion "another" states, which Blood
-    -- for Bones gets for free because its first choice has already left the
-    -- graveyard by the time the second is offered (#1437).
-    --
-    -- Read when the effect executes (CR 608.2c), the property every arm above
-    -- but InSlot has. Unlike them the read is a QUESTION (CR 608.2d), so it can
-    -- be carried out only where Pawl.Engine.Resolve reaches the Game monad for
-    -- its objects -- today the Effect.MoveToZone gather alone; Resolve's pure
-    -- sweep answers nothing for it. A card that writes this arm under any other
-    -- opcode therefore names no object and does nothing, so Pawl.CardSpec's
-    -- inertChoosers rejects the pairing: which (opcode, arm) pairs ask is a
-    -- ragged matrix, and the lint is the only thing that states it.
+    -- A QUESTION rather than a read, so only an opcode whose gather reaches the
+    -- Game monad carries it out; Pawl.CardSpec's inertChoosers rejects the other
+    -- pairings, and it is the only thing that states that ragged matrix.
     ChosenCardInGraveyard ChosenCardInGraveyard.ChosenCardInGraveyard
-  | -- | A card in a HAND, chosen as the effect runs -- Karn Liberated's "+4:
-    -- target player exiles a card from their hand". ChosenCardInGraveyard's
-    -- sibling over the hidden zone CR 400.2 makes a hand, and the hidden half is
-    -- the whole difference between them.
+  | -- | CR 608.2d / 402.3 / Karn Liberated: a card in a hand matching the Filter,
+    -- chosen as the effect runs by the seat whose hand it is -- which is why one
+    -- PlayerRef does the chooser's and the zone's duty at once.
     --
-    -- ONE PlayerRef beside the Filter, where the graveyard arm needs a Pawl.Types.Chooser beside a
-    -- Pawl.Types.PlayerScope, because for a hand those two questions have one
-    -- answer: CR 402.3 lets a player look at their own hand and at nobody else's,
-    -- so the player who chooses IS the player whose hand is looked in. The ref
-    -- therefore names the choosers and the hands at once, and the pair the
-    -- graveyard arm can legitimately split -- "target opponent chooses a card in
-    -- YOUR graveyard" -- has no legal spelling here to keep apart. EachPlayer is
-    -- one choice each, in APNAP order (CR 608.2e, CR 101.4); an InSlot is Karn's
-    -- one targeted seat; `Relative You` is the resolving controller choosing in
-    -- their own hand.
-    --
-    -- FILTERED, exactly as the graveyard arm is, and the hidden zone is no bar to
-    -- it: EachCardInYourHand's visibility argument does not reach here, because a
-    -- filter narrowing a hand only its own owner is shown reveals nothing to
-    -- anybody else (CR 402.3). Elvish Piper's "a creature card from your hand" is
-    -- the printing that narrows one; Karn's "a card from their hand" states no
-    -- characteristic and writes the always-matching filter.
-    --
-    -- NOT A TARGET, which the zone settles here rather than CR 115.1's "target"
-    -- test settling it as it does for the graveyard arm: pawl has no target pool
-    -- over a hidden zone, since announcing such a target would reveal the card
-    -- (#559). The PLAYER is the target Karn's text names, and the card is chosen
-    -- while the effect is applied (CR 608.2d).
-    --
-    -- ONE card per chooser, with CR 609.3 covering the shortfall exactly as it
-    -- does for the graveyard arm: an empty hand yields nothing and that share of
-    -- the instruction is ignored (CR 101.3).
-    --
-    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read, so only Pawl.Engine.Resolve's MoveToZone gather carries it out --
-    -- ChosenCardInGraveyard's note above describes what a card writing it under
-    -- any other opcode gets, and which lint rejects that pairing.
+    -- Never a target, because pawl has no target pool over a hidden zone (#559).
     ChosenCardInHand ChosenCardInHand.ChosenCardInHand
-  | -- | A card chosen out of the GROUP a slot holds -- the printed "from among
-    -- them", as in Commune with the Gods' "reveal the top five cards of your
-    -- library. You may put a creature or enchantment card from among them into
-    -- your hand". ChosenCardInGraveyard's sibling with the candidate set taken
-    -- from an earlier clause of this same resolution instead of from a zone.
-    --
-    -- The SLOT is what makes it reach where no other arm does. A group is bound
-    -- by CR 701.20a's reveal, CR 701.20e's look, CR 701.17c's mill or a move, and
-    -- it sits wherever that effect left it -- which for a look or a reveal is the
-    -- LIBRARY, since neither moves anything (CR 701.20b). No zone-keyed arm can
-    -- offer a choice there: EachCardInYourLibrary's filtered sweep names every
-    -- match in the whole zone and asks nobody anything, where a group is the
-    -- handful an earlier clause picked out by POSITION and this arm asks which
-    -- of them is taken. TopOfLibraryUntil's walk is not one either -- it names a
-    -- prefix, which stops at the match that completes its count rather than at
-    -- the deepest one.
-    -- Where the batch DID move to a graveyard, Midnight Tilling writes the same
-    -- sentence as ChosenCardInGraveyard narrowed by Filter.IsBound; this arm
-    -- reads the slot directly instead, so it needs no such sweep.
-    --
-    -- Reads the slot's GROUP first, its single binding second and its still-legal
-    -- targets last -- Pawl.Engine.Resolve.fromAmongMembers, the one definition
-    -- the InSlot arm above and EachCardFromAmong below share -- so a look at a
-    -- one-card library, which binds the singular shape, offers that card rather
-    -- than nothing.
-    --
-    -- NOT A TARGET and never one (CR 115.10a): the slot was filled by an
-    -- instruction of this resolution rather than announced on the stack (CR
-    -- 601.2c), so CR 608.2b has nothing to re-validate, and the choice is made
-    -- while applying the effect (CR 608.2d). That is also why the arm is not
-    -- subject to the caller's legal-target map, exactly as InSlot's group read is
-    -- not.
-    --
-    -- WHO chooses, how many cards, and what CR 609.3 does with a group holding no
-    -- match are all Pawl.Types.ChosenCardFromAmong's notes.
-    --
-    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read, so an opcode carries it out only by asking
-    -- Pawl.Engine.Resolve.chooseCardFromAmong -- which MoveToZone and CR 701.20a's
-    -- Reveal both do, Carth the Lion's "you may REVEAL a planeswalker card from
-    -- among them and put it into your hand" being one choice its reveal makes and
-    -- its move reads back out of a slot. Under any OTHER opcode the ref names no
-    -- object; ChosenCardInGraveyard's note above describes that inert answer and
-    -- which lint rejects it.
+  | -- | CR 608.2d / Commune with the Gods: a card chosen out of the group a slot
+    -- holds -- the printed "from among them" -- read through
+    -- Pawl.Engine.Resolve.fromAmongMembers.
     ChosenCardFromAmong ChosenCardFromAmong.ChosenCardFromAmong
-  | -- | EVERY card in the GROUP a slot holds that the Filter matches -- the
-    -- printed "all land cards revealed this way", as in Mulch's "reveal the top
-    -- four cards of your library. Put all land cards revealed this way into your
-    -- hand and the rest into your graveyard". The arm above's plural.
-    --
-    -- The SLOT reaches where no zone-keyed arm does, for the arm above's reason:
-    -- the group sits wherever the effect that bound it left the cards, which for
-    -- CR 701.20a's reveal and CR 701.20e's look is the LIBRARY --
-    -- EachCardInYourLibrary's sweep names every match in the whole zone rather
-    -- than the handful an earlier clause bound.
-    --
-    -- A READ, not a question, which is the whole difference from the arm above:
-    -- "all" states no count and hands out no choice, so CR 608.2d has nobody to
-    -- ask and Pawl.Engine.Resolve.objectRefObjects answers this arm for real
-    -- under every opcode. The members are matched against their own CR 613
-    -- projections when the instruction is reached (CR 608.2c), in the group's
-    -- mint order, which CR 608.2f leaves standing.
-    --
-    -- Reads the slot through the arm above's own Pawl.Engine.Resolve.fromAmongMembers,
-    -- so a sentence naming the matches and a sentence naming the rest cannot see
-    -- different groups.
-    --
-    -- NOT A TARGET and never one (CR 115.10a): a slot filled by an instruction of
-    -- this resolution was never announced (CR 601.2c), so CR 608.2b has nothing
-    -- to re-validate.
-    --
-    -- "THE REST" is not an arm at all. A later clause naming the same slot with
-    -- InSlot finds the matched cards gone -- CR 400.7 minted new objects for them
-    -- on the way to their new zone -- so the two halves of Mulch's one sentence
-    -- are this arm and InSlot, in that order. A group holding no match yields
-    -- nothing and that share of the instruction is ignored (CR 609.3, CR 101.3),
-    -- which leaves every member to the InSlot clause.
+  | -- | CR 608.2c / Mulch: every card in the group a slot holds that the Filter
+    -- matches -- the printed "all land cards revealed this way", the arm above's
+    -- plural and a read rather than a question.
     EachCardFromAmong EachCardFromAmong.EachCardFromAmong
-  | -- | A card RANDOMNESS names out of a hand -- Merfolk Spy's "that player
-    -- reveals a card at random from their hand". ChosenCardInHand's PlayerRef,
-    -- doing that arm's double duty (CR 402.3 collapses the seat whose hand it is
-    -- onto the seat who answers), with the seat's own DECISION replaced by
-    -- randomness.
+  | -- | CR 701.9b / Merfolk Spy: a card randomness names out of the hand the
+    -- PlayerRef names, asked of the interpreter through Prompt.RandomObject and
+    -- filtered back against the candidates.
     --
-    -- Its own arm rather than a flag on ChosenCardInHand: the two differ in who
-    -- answers -- a seat, weighing options, against nobody weighing anything --
-    -- and Pawl.Types.Prompt.RandomObject accordingly carries no
-    -- Pawl.Types.Decider where Prompt.ChooseCardInHand does. CR 701.9b is the
-    -- rulebook's own acknowledgment that "at random" and "the player chooses"
-    -- are different instructions over the same zone.
-    --
-    -- The engine does not roll: the candidates are asked of the interpreter
-    -- through Prompt.RandomObject and the answer is FILTERED back against them,
-    -- which is what Prompt.Shuffle and Prompt.RandomFirstPlayer already do. So
-    -- this arm no more picks a card than it lets a player pick one.
-    --
-    -- NO FILTER beside the PlayerRef, where the chosen sibling carries one (gap
-    -- #1742), and ONE card per seat (gap #3060): Merfolk Spy states no
-    -- characteristic and no count, and nothing else in the pool asks for either.
-    --
-    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read -- so objectRefObjects answers nothing for it and only
-    -- Pawl.Engine.Resolve's Reveal arm carries it out -- not even MoveToZone's
-    -- gather, which elides it (#1733). A card writing it under any other opcode
-    -- names no object and does nothing, the inert card-data error
-    -- ChosenCardInGraveyard's note above describes, and the lint that note names
-    -- rejects it.
+    -- Not implemented: a filter beside the PlayerRef (gap #1742), more than one
+    -- card per seat (gap #3060), and the MoveToZone gather, which elides this arm
+    -- so that only Reveal carries it out (#1733).
     RandomCardInHand PlayerRef.PlayerRef
-  | -- | ANY NUMBER of the permanents on the battlefield matching the Filter, the
-    -- set chosen as the effect runs -- Tovolar, Dire Overlord's "transform any
-    -- number of Human Werewolves you control".
-    --
-    -- EachMatching's zone, sweep and Filter position exactly, with the sweep
-    -- turned into an OFFER: that arm takes every match, this one offers every
-    -- match and takes the subset the chooser names. So "you control" is a
-    -- conjunct of the Filter here as it is there (CR 109.5 answers "you" against
-    -- the resolving controller), and the two share one candidate function so a
-    -- card cannot find the sweep and the offer disagreeing about what matches.
-    --
-    -- NOT A TARGET (CR 115.10a): the printed sentence does not say "target", so
-    -- nothing narrows the offered set for the player and CR 608.2b has nothing to
-    -- re-validate. The choice is made while the effect is applied (CR 608.2d),
-    -- which is why this is a QUESTION rather than a read.
-    --
-    -- ANY NUMBER, so no count field and the EMPTY answer is legal: CR 608.2d bars
-    -- only an illegal or impossible option, and naming nothing is neither. That
-    -- is the whole of what parts this arm from EachMatching, and the only reason
-    -- it is asked even at ONE candidate -- a free choice of subset still leaves
-    -- two distinguishable answers, the posture
-    -- Pawl.Types.Prompt.ChooseAnyNumberToSacrifice already takes.
-    --
-    -- THE RESOLVING CONTROLLER chooses, by CR 608.2c, so there is no
-    -- Pawl.Types.Chooser beside the Filter the way ChosenCardInGraveyard carries
-    -- one. Scryfall `o:"any number of" o:"you control" -o:target`, 2026-08-26:
-    -- every hit leaves the choice to the spell or ability's own controller;
-    -- Tovolar is the card that would refute this if it named another seat.
-    --
-    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
-    -- note above says why, and the same lint rejects it under an opcode that
-    -- cannot ask. Two gathers ask: Pawl.Engine.Resolve's turnPermanentsOver,
-    -- reached by Effect.Transform and Effect.Convert alike, and its
-    -- Effect.MoveToZone gather -- Glorious Protector's "you may exile any number
-    -- of non-Angel creatures you control".
+  | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
+    -- battlefield matching the Filter, offered rather than swept, the empty answer
+    -- legal.
     AnyNumberMatching (Filter.Filter Keyword.Keyword)
-  | -- | EXACTLY ONE of the permanents on the battlefield matching the Filter,
-    -- chosen as the effect runs -- the Garrison in Hanweir Battlements' "If you
-    -- both own and control this land and a creature named Hanweir Garrison, exile
-    -- them, then meld them into Hanweir, the Writhing Township" (CR 701.42a).
-    --
-    -- The arm above's singular, and its Filter position exactly: the same zone,
-    -- the same sweep, the same shared candidate function, so a card cannot find
-    -- the sweep and the offer disagreeing about what matches. Every relative
-    -- word the printed sentence uses is a conjunct of that Filter, as it is
-    -- there -- for Hanweir Battlements OWNERSHIP AND CONTROL together, since it
-    -- prints "you both own and control" and a Garrison you control but do not own
-    -- is not one the ability may name. CR 109.5 answers "you" against the
-    -- ability's controller, which for an activated ability is the player who
-    -- activated it. The RESOLVING CONTROLLER chooses, by CR 608.2c, so there is
-    -- no Pawl.Types.Chooser beside the Filter.
-    --
-    -- NOT A TARGET (CR 115.10a): the printed sentence does not say "target", so
-    -- CR 115.1 declares nothing at announcement, nothing narrows the offered set
-    -- for the player, and shroud, hexproof and "becomes the target" triggers must
-    -- not observe the choice. CR 608.2b has nothing to re-validate.
-    --
-    -- EXACTLY ONE, which is the whole of what parts this arm from the one above
-    -- and is why it is NOT asked at a single candidate: CR 608.2d lets the player
-    -- announce only a legal option, so with one candidate there is one legal
-    -- announcement and no decision in the prompt at all -- the posture
-    -- Pawl.Types.Prompt.ChooseAttachment and ChooseSacrifices already take, and
-    -- not an elision, since eliding needs indistinguishable OPTIONS and here
-    -- there is one option. At zero candidates the instruction is impossible and
-    -- CR 101.3 ignores it, CR 609.3 leaving the rest of the effect to do as much
-    -- as it can.
-    --
-    -- MANDATORY: no arm of this type declines, so a card printing "you may"
-    -- around such a choice writes the may as the enclosing effect, never here.
-    --
-    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read, so objectRefObjects answers nothing for it -- ChosenCardInGraveyard's
-    -- note above says why, and the same lint rejects it under an opcode that
-    -- cannot ask. Today Pawl.Types.Effect.MoveToZone's gather is the one that
-    -- asks, which is Hanweir Battlements' exile.
+  | -- | CR 608.2d / 701.42a / Hanweir Battlements: exactly one of the permanents on
+    -- the battlefield matching the Filter, chosen as the effect runs and not asked
+    -- at a single candidate, where CR 608.2d leaves one legal announcement.
     ChosenPermanent (Filter.Filter Keyword.Keyword)
-  | -- | The effect's SOURCE together with exactly one permanent the Filter
-    -- admits -- the "them" in Hanweir Battlements' "exile them, then meld them
-    -- into Hanweir, the Writhing Township" (CR 701.42a).
-    --
-    -- The arm above plus the source, and it exists because those two are ONE
-    -- instruction: CR 608.2f processes an action taken on multiple objects
-    -- simultaneously, so the pair reaches exile in one batch and one event, which
-    -- two Pawl.Types.Effect MoveToZone effects cannot do however they are ordered.
-    -- Proved by Pawl.MeldSpec's "CR 608.2f the pair leaves the battlefield in one
-    -- event".
-    --
-    -- The Filter names the COUNTERPART alone and never the source, so the CR
-    -- 608.2d choice, its candidates and its posture are exactly the arm above's
-    -- -- asked at two or more matches, elided at one, skipped at none. The source
-    -- is not chosen and is not filtered: the printed sentence names it outright.
-    -- A source that is not on the battlefield is not named -- CR 101.3 ignores
-    -- that much of the instruction and CR 609.3 leaves the rest to do as much as
-    -- it can.
-    --
-    -- Not a target and never one (CR 115.10a), the arm above's reason.
-    --
-    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
-    -- read, so objectRefObjects answers nothing for it; Pawl.Types.Effect's
-    -- MoveToZone gather is the one site that asks.
+  | -- | CR 608.2f / 701.42a / Hanweir Battlements: the effect's source together
+    -- with exactly one permanent the Filter admits, named as one instruction so
+    -- that the pair moves in one event -- proved by Pawl.MeldSpec's "CR 608.2f the
+    -- pair leaves the battlefield in one event".
     SourceAndChosenPermanent (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

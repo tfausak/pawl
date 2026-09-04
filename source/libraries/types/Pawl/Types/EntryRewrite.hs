@@ -10,20 +10,8 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.WithCounters as WithCounters
 
--- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
--- (CR 707.5, and a real "may" -- declining is legal), with CR 707.9's
--- exceptions attached Quicksilver Gargantuan, and with its `tapped` set Vesuva; ChoiceOf is Primal Plasma
--- (CR 208.2b); ChoiceByCoinFlip is Molten Sentry, the same options picked by CR
--- 705.2's winnerless coin flip; ChooseColor is Painter's Servant (CR 614.1c);
--- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChoosePlayer is Stuffy
--- Doll (CR 614.1c); ChooseCardName is Runed Halo and ChooseCardNames is Null
--- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
--- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
--- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
--- (CR 614.1c); RevealOrTapped is Rustic Clachan (CR 614.1c); RunEffects is
--- Monstrous War-Leech (CR 614.1c); ReadAhead is CR 702.155b's pair of
--- intrinsic abilities on a Saga (CR 714.3b); Compleated is CR 702.150a's
--- reduction of the loyalty a planeswalker enters with (Tamiyo, Compleated Sage).
+-- | CR 614.1c-d: how an entry replacement modifies the entry. Each arm names its
+-- own producer below.
 --
 -- AsCopy, ChoiceOf and ChoiceByCoinFlip write into the object's COPIABLE
 -- snapshot, which is what makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
@@ -42,448 +30,93 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- what an earlier one already spent (CR 614.13b). Pawl.Engine.Event's arm
 -- states the argument in full and names the board that proves it.
 data EntryRewrite effect
-  = -- | CR 707.5 / 614.1c: "you may have this permanent enter as a copy of ...".
-    -- The payload carries WHICH permanents the printed noun phrase admits and CR
-    -- 707.9's exceptions to the copying process; see Pawl.Types.AsCopy.
+  = -- | CR 707.5 / 614.1c / Clone, Vesuva: "you may have this permanent enter as a
+    -- copy of ...", the payload carrying which permanents the printed noun phrase
+    -- admits and CR 707.9's exceptions.
     AsCopy AsCopy.AsCopy
-  | ChoiceOf [EntryOption.EntryOption]
-  | -- | CR 614.1c decided by CR 705.2's FIRST sentence: "as this creature
-    -- enters, flip a coin. If the coin comes up heads, this creature enters as a
-    -- 5/2 creature with haste. If it comes up tails, this creature enters as a
-    -- 2/5 creature with defender" (Molten Sentry).
-    --
-    -- ChoiceOf one seat over: the same EntryOption values written into the same
-    -- copiable snapshot, picked by the coin instead of by the controller. So a
-    -- Clone of a Molten Sentry copies the as-enters ability (CR 707.5) and flips
-    -- its own coin, exactly as it makes its own choice off a Primal Plasma.
-    --
-    -- NOT ChoiceOf with a flag, because the two differ in who decides: rule
-    -- 208.2b's choice is a player's and this one is nobody's, so the arms ask
-    -- different questions (Prompt.ChooseEntryOption against Prompt.FlipCoin) and
-    -- an elision legal for one is illegal for the other -- a one-option ChoiceOf
-    -- is not a choice and must not prompt, while a flip whose two faces name the
-    -- same option still happens.
-    --
-    -- NO WINNER, which is the whole of rule 705.2's first sentence: nothing here
-    -- asks Prompt.CallCoin, and the GameEvent.CoinFlipped Pawl.Engine.Event
-    -- records carries no outcome -- unless CR 705.3 states one, the exception the
-    -- rule itself names. A flip recorded as LOST would be the same board today
-    -- and the wrong claim -- see Pawl.Types.CoinFlipped.
+  | -- | CR 208.2b / 614.1c / Primal Plasma: the controller chooses one of these
+    -- entry options as it enters.
+    ChoiceOf [EntryOption.EntryOption]
+  | -- | CR 614.1c decided by CR 705.2's winnerless flip / Molten Sentry: the arm
+    -- above's options, picked by a coin rather than by the controller.
     ChoiceByCoinFlip EntryFlip.EntryFlip
-  | -- | CR 614.1c's other choosing shape: choose a colour as this enters
-    -- (Painter's Servant). Nullary -- CR 105.1's five colours are the offer, and
-    -- no card narrows them.
-    --
-    -- Written to Object.chosenColor rather than into the copiable snapshot
-    -- AsCopy and ChoiceOf write to: CR 707.5 makes a copy run the copied
-    -- as-enters ability and make its own choice, so the colour is not a copiable
-    -- value.
+  | -- | CR 614.1c / Painter's Servant: choose a colour as this enters, written to
+    -- Object.chosenColor. Nullary -- CR 105.1's five colours are the offer.
     ChooseColor
-  | -- | CR 614.1c again, with a subtype instead of a colour: choose a basic land
-    -- type as this enters (Convincing Mirage). Nullary -- CR 305.6's five basic
-    -- land types are the offer, and no card narrows them.
-    --
-    -- Written to Object.chosenSubtype rather than into the copiable snapshot,
-    -- for ChooseColor's reason.
+  | -- | CR 614.1c / Convincing Mirage: choose a basic land type as this enters,
+    -- written to Object.chosenSubtype. Nullary -- CR 305.6's five types are the
+    -- offer.
     ChooseBasicLandType
-  | -- | CR 614.1c a third time, with a PLAYER instead of a colour or a subtype:
-    -- "As this creature enters, choose a player" (Stuffy Doll). Nullary -- CR
-    -- 102.1 makes every player in the game the offer, and no card narrows them.
-    --
-    -- The candidates are therefore a property of the BOARD rather than of the
-    -- card, which is the one thing that separates this from ChooseColor and
-    -- ChooseBasicLandType above: rules 105.1 and 305.6 fix their five options, so
-    -- their prompts carry none, while Prompt.ChoosePlayer carries the seats still
-    -- in the game (CR 800.4 takes a player who has left out of them).
-    --
-    -- Written to Object.chosenPlayer rather than into the copiable snapshot
-    -- AsCopy and ChoiceOf write to, for ChooseColor's reason: CR 707.2's copiable
-    -- values are characteristics and a player is not one, and CR 707.6 makes a
-    -- copy's controller choose afresh.
+  | -- | CR 614.1c / Stuffy Doll: choose a player as this enters, written to
+    -- Object.chosenPlayer. Nullary -- CR 102.1's seats are the offer, and the
+    -- prompt carries the ones still in the game.
     ChoosePlayer
-  | -- | CR 614.1c with CR 201.4: as this object enters, its controller AND one
-    -- opponent each choose a card name ("As this enchantment enters, you and an
-    -- opponent each choose a card name other than a basic land card name" --
-    -- Null Chamber). Both names are written to Object.chosenNames, for
-    -- ChooseColor's reason.
+  | -- | CR 614.1c with CR 201.4a / Null Chamber: this object's controller and one
+    -- opponent each choose a card name matching the Filter, both written to
+    -- Object.chosenNames.
     --
-    -- TWO choosers in ONE arm, which is why this is not ChooseColor with a
-    -- PlayerScope bolted on. "You and an opponent" is not a PlayerScope: it
-    -- coincides with EachPlayer at two seats (CR 102.2) and diverges at three,
-    -- where the card names one opponent and the rest of the table choose
-    -- nothing.
-    --
-    -- The Filter is CR 201.4a's restriction on WHICH names may be chosen -- the
-    -- characteristics of the card whose name is named -- read off the card,
-    -- because "other than a basic land card name" is printed card text. Carried
-    -- and passed to the prompt so the answerer can obey it; the engine does not
-    -- check the answer against it (#663).
+    -- The Filter is carried and passed to the prompt so the answerer can obey it;
+    -- the engine does not check the answer against it (#663).
     ChooseCardNames (Filter.Filter Keyword.Keyword)
-  | -- | CR 614.1c with CR 201.4: as this object enters, its CONTROLLER alone
-    -- chooses one card name ("As this enchantment enters, choose a card name" --
-    -- Runed Halo). Written to Object.chosenNames, for ChooseColor's reason.
-    --
-    -- A SEPARATE arm from ChooseCardNames above rather than a count on it,
-    -- because the two differ in WHO chooses and not only in how many: that arm's
-    -- second name is an opponent's, which no number can say.
-    --
-    -- The Filter is CR 201.4a's restriction, read and passed exactly as that
-    -- arm's is; Runed Halo states none and writes `And []`.
+  | -- | CR 614.1c with CR 201.4a / Runed Halo: this object's CONTROLLER alone
+    -- chooses one card name matching the Filter, written to Object.chosenNames.
     ChooseCardName (Filter.Filter Keyword.Keyword)
-  | -- | CR 614.1c's other shape: "[This permanent] enters with ...". Printed
-    -- (Barkhide Troll, Workhorse) and minted alike -- CR 306.5b's intrinsic
-    -- loyalty, CR 310.4b's defense, CR 714.3a's lore counter, and the three
-    -- keywords Pawl.Engine.Keyword mints it for.
-    --
-    -- The counters are accumulated through Pawl.Engine.Event.addEnteringCounters
-    -- and NOT written into the copiable snapshot AsCopy and ChoiceOf write to:
-    -- counters are not characteristics (CR 122.1) and CR 707.2 excludes them from
-    -- the copiable values outright. Their sitting in the entry's own CR 616.1 pool
-    -- is what makes CR 614.16 hold, which is why Doubling Season doubles a
-    -- planeswalker's starting loyalty.
-    --
-    -- Carries the count rather than reading it back off the source, because a
-    -- MINTED row's number is settled at the PROJECTION
-    -- (Pawl.Engine.Projection.intrinsicReplacementsOf), where CR 707.2's copiable
-    -- loyalty is visible. A PRINTED row may still carry a variable one --
-    -- Pawl.Types.WithCounters' amount is a Quantity (Undergrowth Scavenger) --
-    -- evaluated as the permanent enters rather than when the row was minted.
+  | -- | CR 614.1c / Barkhide Troll: "[This permanent] enters with ..." counters,
+    -- printed or minted (CR 306.5b's loyalty, CR 310.4b's defense, CR 714.3a's
+    -- lore counter).
     WithCounters WithCounters.WithCounters
-  | -- | CR 616.1b's shape: a replacement modifying UNDER WHOSE CONTROL an object
-    -- enters the battlefield. Gather Specimens is the one producer, and the whole
-    -- of its text is this rewrite.
-    --
-    -- NULLARY, carrying no PlayerId, because CR 109.5 derives one: "you" is the
-    -- controller of the effect's source, which for a floating row is baked at
-    -- installation (Pawl.Types.ActiveReplacement's `controller`) and for a
-    -- permanent's static ability is read live. A card cannot write a PlayerId
-    -- anyway.
-    --
-    -- Written to the entering object's CR 110.2 default controller
-    -- (Object.enteredUnder), not to a CR 613.1b layer-2 continuous effect: CR
-    -- 800.4c distinguishes an effect that GIVES a player control from the player
-    -- who controlled the object by default, and a permanent that ENTERED under
-    -- your control is the second of those.
+  | -- | CR 616.1b / Gather Specimens: the object enters under the control of the
+    -- effect's source's controller, written to Object.enteredUnder.
     UnderSourceControl
-  | -- | CR 614.1c's two sentences of Shimatsu the Bloodcloaked read as one
-    -- rewrite: "As this creature enters, sacrifice any number of permanents.
-    -- This creature enters with that many +1/+1 counters on it." The Filter is
-    -- which permanents may be chosen; the CounterKind is what the count buys.
+  | -- | CR 614.1c / 614.13a / Shimatsu the Bloodcloaked: sacrifice any number of
+    -- permanents matching the Filter as this enters. The count buys the counters the
+    -- payload's CounterKind names, or is read back through a
+    -- characteristic-defining ability where that is Nothing (Wood Elemental).
     --
-    -- ONE constructor rather than a sacrifice arm beside WithCounters, because
-    -- the number is not known until the choice is made and WithCounters carries a
-    -- Quantity settled before the entry. Splitting them would need a channel
-    -- from one entry replacement to another that nothing else in CR 614.1c wants.
-    --
-    -- The CounterKind is a Maybe because the count need not buy counters at all.
-    -- Wood Elemental sacrifices any number of untapped Forests and reads the
-    -- count back through a characteristic-defining ability (CR 208.2a) instead,
-    -- so it carries Nothing. The count reaches that ability the way CR 615.13's
-    -- prevented amount reaches Selfless Squire's payload: the arm stamps it on
-    -- the entering object under Pawl.Engine.Binding.sacrificedCount, a reserved
-    -- slot the card's Quantity.InSlot reads. Stamped for BOTH shapes, so the
-    -- Maybe says what the count buys and never whether it was recorded.
-    --
-    -- ANY NUMBER, and CR 614.13a's "choose a number of objects that will also
-    -- change zones" is the rule -- so the prompt is
-    -- Prompt.ChooseAnyNumberToSacrifice, which admits every subset, and the empty
-    -- answer is legal. Shimatsu is printed 0/0, so declining is a real option
-    -- with a real consequence (CR 704.5f buries it).
-    --
-    -- The permanents leave through the CR 701.21a sacrifice funnel and the
-    -- counters arrive through the CR 122.6 one, so Rest in Peace and Doubling
-    -- Season both see this the way they see any other sacrifice or counter.
-    --
-    -- CR 702.82a's devour is the same shape with a multiplier -- "N +1/+1
-    -- counters for EACH creature sacrificed this way" -- so it wants this
-    -- constructor plus a per-permanent count. Not carried: one is what Shimatsu
-    -- needs, and no devour card is in the pool.
+    -- Not implemented: CR 702.82a's devour, which is this shape with a
+    -- per-permanent multiplier; no devour card is in the pool.
     SacrificeAnyNumber SacrificeAnyNumber.SacrificeAnyNumber
-  | -- | CR 702.136a via CR 614.1c: riot. "You may have this permanent enter with
-    -- an additional +1/+1 counter on it. If you don't, it gains haste."
-    --
-    -- NOT written by a card. Like CR 306.5b's loyalty, this arm is minted from
-    -- the finished projection -- Pawl.Engine.Keyword.mintedReplacementsOf, called
-    -- by Pawl.Engine.Projection.intrinsicReplacementsOf -- so a card says only
-    -- `Keyword.Riot` and rule 702.136a says what it means. It still round-trips
-    -- through the codec, because every arm of this type does.
-    --
-    -- NULLARY, where WithCounters carries a count per kind: rule 702.136a fixes
-    -- both halves completely, so there is nothing for a card to vary.
-    --
-    -- The two halves land in two different places, which is why this is one arm
-    -- and not two. The counter goes through Pawl.Engine.Event.addEnteringCounters,
-    -- so CR 614.16 applies to it in the entry's own CR 616.1 loop (Doubling Season
-    -- doubles riot's counter). The haste is a stored CR 611.2 continuous effect with CR 611.2a's
-    -- "rest of the game" duration, which is what "it gains haste" with no stated
-    -- end means -- neither value is copiable (CR 707.2), so neither may be
-    -- written into the snapshot AsCopy and ChoiceOf use.
+  | -- | CR 702.136a via CR 614.1c: riot, minted from the projection rather than
+    -- written by a card.
     Riot
   | -- | CR 702.155b / 714.3b via CR 614.1c: read ahead's pair of intrinsic
-    -- abilities. "As this Saga enters, choose a number between one and this
-    -- Saga's final chapter number" and "This Saga enters with the chosen number
-    -- of lore counters on it."
-    --
-    -- ONE constructor for the two sentences rule 702.155b writes, and
-    -- SacrificeAnyNumber's reason above is this one verbatim: the number is not
-    -- known until the choice is made, where WithCounters carries a Quantity
-    -- settled before the entry. Two rows would be worse than merely awkward --
-    -- they would compete for a CR 616.1e order chosen by the applying player, so
-    -- the counter row could be applied first and read a number nobody had chosen
-    -- yet.
-    --
-    -- NOT WRITTEN BY A CARD, and NULLARY, the position Riot and Unleash take. It
-    -- is minted from the finished projection, but by
-    -- Pawl.Engine.Saga.entryReplacementsOf rather than by
-    -- Pawl.Engine.Keyword.mintedReplacementsFor, because rule 714.3b REPLACES
-    -- rule 714.3a's "enters with a lore counter" ability rather than adding to
-    -- it. It still round-trips through the codec, because every arm of this type
-    -- does.
-    --
-    -- THE BOUND is not carried, for EntersTransformed's reason: rule 714.3b reads
-    -- it off the Saga itself (CR 714.2d's final chapter number), so
-    -- Pawl.Engine.Event's arm takes it from the entering permanent's own
-    -- projection rather than from a number baked when the row was minted.
-    --
-    -- The counters go through Pawl.Engine.Event.addEnteringCounters, as
-    -- WithCounters' and riot's do, so CR 614.16 applies to them.
+    -- abilities, minted by Pawl.Engine.Saga.entryReplacementsOf because rule 714.3b
+    -- REPLACES CR 714.3a's lore-counter ability rather than adding to it.
     ReadAhead
-  | -- | CR 702.98a via CR 614.1c: unleash's FIRST static ability. "You may have
-    -- this permanent enter with an additional +1/+1 counter on it."
-    --
-    -- Riot's arm with the declining half deleted -- rule 702.98a states no
-    -- consequence for declining, where rule 702.136a grants haste -- so this is
-    -- not Riot with a flag and not WithCounters with a "may": the first would
-    -- make one arm answer two rules, and the second would put an optionality
-    -- field on an arm CR 306.5b's loyalty must never make optional.
-    --
-    -- NOT written by a card, and NULLARY, for Riot's two reasons: it is minted
-    -- from the finished projection by Pawl.Engine.Keyword.mintedReplacementsOf,
-    -- and rule 702.98a fixes the kind and the count.
-    --
-    -- The counter goes through Pawl.Engine.Event.addEnteringCounters, as riot's
-    -- does, so CR 614.16 applies to it.
+  | -- | CR 702.98a via CR 614.1c: unleash's first static ability, minted from the
+    -- projection -- riot's arm with the declining half deleted.
     Unleash
-  | -- | CR 702.54a via CR 614.1c: bloodthirst N. "If an opponent was dealt
-    -- damage this turn, this permanent enters with N +1/+1 counters on it."
-    --
-    -- WithCounters with rule 702.54a's condition attached, and its own arm rather
-    -- than a flag on that one for two reasons. WithCounters' amounts are placed
-    -- by Pawl.Engine.Event unconditionally, whatever the board looks like, which is what CR 306.5b's intrinsic loyalty needs it to be; and the
-    -- condition is asked in Pawl.Engine.Replacement.admitsEntry, which cases on
-    -- the constructor, so a bloodthirst row indistinguishable from a loyalty row
-    -- could not be gated without gating loyalty too.
-    --
-    -- N RIDES THE CONSTRUCTOR, WithCounters' position and not Riot's: the printed
-    -- number varies by card, where rule 702.136a fixes riot's at one. The
-    -- COUNTER KIND does not, because rule 702.54a fixes it at +1/+1.
-    --
-    -- Nothing is rule 702.54b's "bloodthirst X", Keyword.Bloodthirst's payload
-    -- carried through unchanged. X is NOT settled at mint time as N is: the mint
-    -- is handed a keyword and a count, never a board, so the sum is read where
-    -- the row applies (Pawl.Engine.Event) and rule 702.54b's silence about a
-    -- condition is read where rule 702.54a's is asked
-    -- (Pawl.Engine.Replacement.admitsEntry).
-    --
-    -- NOT WRITTEN BY A CARD -- minted from the finished projection by
-    -- Pawl.Engine.Keyword.mintedReplacementsFor, so a card says only
-    -- `Keyword.Bloodthirst (Just 1)` and rule 702.54a says what it means. It
-    -- still round-trips through the codec, because every arm of this type does.
-    --
-    -- The counters go through Pawl.Engine.Event.addEnteringCounters, as
-    -- WithCounters' and riot's do, so CR 614.16 applies to them.
+  | -- | CR 702.54a via CR 614.1c: bloodthirst N, minted from the projection, with
+    -- Nothing standing for CR 702.54b's "bloodthirst X".
     Bloodthirst (Maybe Natural.Natural)
-  | -- | CR 702.150a via CR 614.1c: compleated. "If this permanent would enter
-    -- with one or more loyalty counters on it and the player who cast it chose to
-    -- pay life for any part of its cost represented by Phyrexian mana symbols, it
-    -- instead enters the battlefield with that many loyalty counters minus two
-    -- for each of those mana symbols."
-    --
-    -- THE PAYLOAD IS THE NUMBER OF PHYREXIAN MANA SYMBOLS life was paid for, not
-    -- the number of counters to subtract: rule 702.150a's "two" is the rule's, so
-    -- doubling it here would put a card's number where a rule's belongs. N rides
-    -- the constructor for Bloodthirst's reason above -- the count is settled when
-    -- the row is minted, off Object.phyrexianLifePaid (CR 118.13a).
-    --
-    -- A ROW rather than arithmetic folded into CR 306.5b's count, which is the
-    -- whole of #1996: only a row can be ORDERED against CR 614.16's counter
-    -- multipliers under CR 616.1e, and the two orders reach different loyalty.
-    -- Tamiyo, Compleated Sage's third Gatherer ruling is what makes them siblings
-    -- rather than CR 616.1g's nesting: "Any other replacement effect that would
-    -- apply to the number of loyalty counters it enters the battlefield with will
-    -- apply as normal."
-    --
-    -- NOT WRITTEN BY A CARD -- minted from the finished projection by
-    -- Pawl.Engine.Projection.intrinsicReplacementsOf, so a card says only
-    -- `Keyword.Compleated` and rule 702.150a says what it means. It still
-    -- round-trips through the codec, because every arm of this type does.
-    --
-    -- SUBTRACTS from the pending count (GameState.enteringCounters) and never
-    -- from Object.counters, so nothing keyed on counter REMOVAL sees it: rule
-    -- 702.150a removes nothing, it changes how many arrive.
+  | -- | CR 702.150a via CR 614.1c: compleated, minted from the projection. The
+    -- payload is the number of Phyrexian mana symbols life was paid for (CR
+    -- 118.13a), rule 702.150a's "two" being the rule's own.
     Compleated Natural.Natural
-  | -- | CR 614.1d: "This permanent enters tapped" (Zof Bloodbog's land half,
-    -- Headless Skaab's creature). The one arm a permanent's OWN printed text
-    -- writes about the STATUS it enters with, where every other writer of an
-    -- entering incarnation's tap state is an EFFECT's rider
-    -- (Pawl.Types.EntryRiders' `tapped`, "put it onto the battlefield tapped").
-    -- CR 110.5b divides the two: a permanent enters untapped "unless a spell or
-    -- ability says otherwise", and this is the ability saying otherwise rather
-    -- than the spell putting it there. A land played as CR 305.1's special
-    -- action goes through no effect at all, so a rider could not reach it.
-    --
-    -- CARD-TYPE-AGNOSTIC, and deliberately: nothing here or in
-    -- Pawl.Engine.Event's arm gates on Land. CR 614.1d says "[This permanent]
-    -- enters", and a creature spell printing the same sentence gets the same
-    -- rewrite.
-    --
-    -- NULLARY. CR 614.1d fixes both halves -- which status, and that the permanent
-    -- gets it -- so there is nothing for a card to vary, the position Riot and
-    -- ChooseColor take.
-    --
-    -- Applied as "enters tapped" and NOT as "enters, then is tapped": the arm
-    -- stamps Object.tapped rather than routing through the tap funnel, so no
-    -- becomes-tapped event exists for anything to watch (CR 110.5b's distinction).
-    -- The write lands on the already-materialized incarnation, which is
-    -- observationally the same as minting it tapped -- Pawl.Engine.Event.runEntry
-    -- runs before the Moved event is recorded, so no trigger scan and no
-    -- state-based action can see the interim untapped object, the same footing
-    -- UnderSourceControl's write to Object.enteredUnder stands on.
+  | -- | CR 614.1d / Zof Bloodbog, Headless Skaab: "This permanent enters tapped",
+    -- stamped on the entering incarnation rather than routed through the tap
+    -- funnel, so no becomes-tapped event exists (CR 110.5b).
     Tapped
-  | -- | CR 614.1c: "As [this permanent] enters, you may pay N life. If you don't,
-    -- it enters tapped" (Razorgrass Field, the land face of Razorgrass Ambush //
-    -- Razorgrass Field). Tapped's rewrite with a PRICE on avoiding it, and the
-    -- one entry rewrite whose choice is paid for in life.
-    --
-    -- CR 614.1c and not CR 614.1d, unlike Tapped beside it: the printed sentence
-    -- opens "As this land enters", which is rule 614.1c's second quoted shape,
-    -- rather than the bare "[This permanent] enters . . ." rule 614.1d names.
-    -- Both are replacement effects and both run through the CR 616.1 loop, so
-    -- the split changes nothing about how this applies -- it is recorded because
-    -- the two arms cite different subrules and a reader will ask why.
-    --
-    -- THE AMOUNT RIDES THE CONSTRUCTOR, and the printed cards settle it: the
-    -- modal-double-faced lands print 3 while the Ravnica shocklands (Steam Vents,
-    -- Godless Shrine) print the same sentence with 2. Nothing in rule 614.1c
-    -- fixes the number, so this is the WithCounters position -- a payload the
-    -- card writes -- and not the Riot or Tapped one, where a rule fixes both
-    -- halves.
-    --
-    -- CARD-TYPE-AGNOSTIC for Tapped's reason: nothing here or in
-    -- Pawl.Engine.Event's arm gates on Land, even though every printing of the
-    -- sentence so far is one.
-    --
-    -- The declining half is Tapped's write, verbatim -- the status is stamped on
-    -- the already-materialized incarnation rather than routed through the tap
-    -- funnel -- so declining here and Zof Bloodbog's unconditional sentence leave
-    -- the same board. The paying half goes through CR 119.4's life-payment door
-    -- (Pawl.Engine.Event.payLife), so it records a life loss and a card watching
-    -- for one sees it.
-    --
-    -- A Natural and not a Quantity, the position Pawl.Types.CostComponent.PayLife
-    -- takes: the printed number is a literal on every card that prints this
-    -- sentence, and CR 614.12a settles the choice before the permanent enters, so
-    -- there is no board for a variable amount to be measured against yet.
+  | -- | CR 614.1c / Razorgrass Field: "you may pay N life. If you don't, it enters
+    -- tapped" -- the arm above's rewrite with a price on avoiding it.
     PayLifeOrTapped Natural.Natural
-  | -- | CR 614.1c: "As [this permanent] enters, you may reveal a [matching] card
-    -- from your hand. If you don't, [this permanent] enters tapped" (Rustic
-    -- Clachan, and the rest of the Lorwyn tribal-land cycle). PayLifeOrTapped one
-    -- price over: the same rewrite, avoided by showing a card instead of by
-    -- spending life.
-    --
-    -- ITS OWN ARM rather than PayLifeOrTapped generalized to a price, though the
-    -- tail is shared (Pawl.Engine.Event.enterTapped). The two prices are not one
-    -- parameter: paying life is a yes/no with an amount, while revealing is a
-    -- choice OF A CARD from a hidden zone, so the prompts differ in arity and
-    -- Pawl.Engine.Event would case on the price anyway. What a shared arm would
-    -- share is one function call.
-    --
-    -- The Filter is which card in the hand may be shown -- "a Kithkin card" --
-    -- read off the printed sentence, and matched against the card's own CR 613
-    -- projection (Pawl.Engine.Replacement.revealableFromHand), the reading CR
-    -- 613.1 requires in every zone.
-    --
-    -- THE HAND is not carried, unlike the filter: every printing of this sentence
-    -- reveals from the revealer's own hand, and CR 614.12a's "before the permanent
-    -- enters" leaves the entering object's controller as the only "you" there is.
-    -- A card that read some other zone would want its own arm, as this one wanted
-    -- one beside PayLifeOrTapped.
-    --
-    -- NOT A COST, so nothing here goes through Pawl.Engine.Cost: CR 701.20a's
-    -- reveal changes no zone and no characteristic (CR 701.20b), which is why the
-    -- paying half is Pawl.Engine.Event.reveal alone and why declining is free.
-    -- The declining half is Tapped's write verbatim, PayLifeOrTapped's position.
+  | -- | CR 614.1c / Rustic Clachan: "you may reveal a [matching] card from your
+    -- hand. If you don't, it enters tapped" -- PayLifeOrTapped one price over, and
+    -- not a cost, CR 701.20a's reveal changing no zone.
     RevealOrTapped (Filter.Filter Keyword.Keyword)
   | -- | CR 702.145b via CR 614.1d: daybound's static ability making a permanent
-    -- enter transformed. CR 616.1d ranks it a bucket of its own
-    -- (Pawl.Types.ReplacementBucket.BackFaceOnEntry), which is what distinguishes
-    -- it from every other arm here.
-    --
-    -- NOT SCOPED TO THE STACK, and CR 616.1d is why -- it speaks of "a card"
-    -- entering with its back face up, naming no origin zone. CR 712.13a is the
-    -- stack road's own rule and governs a RESOLVING double-faced spell alone; the
-    -- entry rewrite here is collected on every entry, which is what lets
-    -- Pawl.MeldSpec's "CR 701.27g a melded permanent that entered with its back
-    -- face up is still not one" reach it from exile.
-    --
-    -- A REPLACEMENT and not Pawl.Types.EntryRiders' `transformed`, which is CR
-    -- 712.14a: that rule is an instruction an effect carries into a move it is
-    -- PERFORMING ("put it onto the battlefield transformed"), while this one
-    -- WATCHES an entry nobody instructed, where the only thing to rewrite is the
-    -- entry itself. Neither can express the other, and CR 616.1d exists because
-    -- only this one competes for an order.
-    --
-    -- NOT WRITTEN BY A CARD, and NULLARY, the position Riot and Unleash take: it
-    -- is minted from the finished projection by
-    -- Pawl.Engine.Keyword.mintedReplacementsOf, so a card says only
-    -- `Keyword.Daybound` and rule 702.145b says what it means. It still
-    -- round-trips through the codec, because every arm of this type does.
-    --
-    -- WHICH FACE is not carried, for CR 712.14a's reason one rule over: the
-    -- ability names none, and the answer falls out of the card's layout
-    -- (Pawl.Engine.Card.backFace). So this stays clear of CR 712.11b's choice of
-    -- face when casting a modal double-faced card, which is a list of castable
-    -- faces offered to the player rather than an instruction.
-    --
-    -- The CONDITION is not carried either, and rule 702.145b is why: "IF IT IS
-    -- NIGHT and this permanent is represented by a double-faced card, it enters
-    -- transformed." Both halves are the rule's, so both are asked by
-    -- Pawl.Engine.Replacement.applies -- the row is collected on every entry and
-    -- admits only the ones the rule admits, which is what keeps a daybound
-    -- permanent entering by day out of CR 616.1d's bucket entirely.
-    --
-    -- Applied by Pawl.Engine.Event's arm as a write to Object.face on the
-    -- already-materialized incarnation, Tapped's footing exactly: runEntry runs
-    -- before the Moved event is recorded, so no trigger scan and no state-based
-    -- action can see the interim front face.
+    -- enter transformed, ranked its own CR 616.1d bucket. Collected on every entry
+    -- and not only the stack's, which is what lets Pawl.MeldSpec's "CR 701.27g a
+    -- melded permanent that entered with its back face up is still not one" reach
+    -- it from exile.
     --
     -- Not implemented: CR 712.13a's second sentence, where a back face that is an
     -- instant or sorcery face sends the spell to its owner's graveyard instead of
     -- the battlefield (#1547).
     EntersTransformed
-  | -- | CR 614.1c: "As [this permanent] enters, [do something]" -- Monstrous
-    -- War-Leech's "as this creature enters, if it was kicked, mill four cards".
-    -- The one arm that RUNS AN EFFECT, where every arm above changes WHAT THE
-    -- PERMANENT IS as it enters; see #1416.
-    --
-    -- NO CONDITION HERE, and Bloodthirst's arm two over is the contrast that
-    -- explains why. Rule 702.54a's condition is a RULE's, so nothing on a card
-    -- could write it and it is asked in Pawl.Engine.Replacement.admitsEntry;
-    -- "if it was kicked" is the CARD's, so it is written where every other
-    -- card-authored gate on a replacement ability goes -- CR 604.2's clause on
-    -- Pawl.Types.PrintedReplacement, asked by
-    -- Pawl.Engine.Projection.replacementsOf against the entering permanent
-    -- (#1597). One condition mechanism, not two.
-    --
-    -- A Seq of effects and not one, DamageR.riders' position: a printed sentence
-    -- may instruct more than once ("mill four cards, then draw a card"), and the
-    -- order is the printed order.
-    --
-    -- DEFERRED, not run inline, and the queue is the reason this is not simply an
-    -- Event.apply call: Pawl.Engine.Event is below Pawl.Engine.Resolve and cannot
-    -- run a card's effects, exactly as Pawl.Engine.Damage cannot run CR 615.5's
-    -- rider. So the arm enqueues onto GameState.pendingEntryEffects and
-    -- Pawl.Engine.Resolve.runEntryEffects drains it -- see that field for what the
-    -- deferral costs.
+  | -- | CR 614.1c / Monstrous War-Leech: "As [this permanent] enters, [do
+    -- something]" -- the one arm that RUNS effects, in printed order, deferred onto
+    -- GameState.pendingEntryEffects for Pawl.Engine.Resolve.runEntryEffects to
+    -- drain.
     RunEffects (Seq.Seq effect)
   deriving (Eq, Ord, Show)
