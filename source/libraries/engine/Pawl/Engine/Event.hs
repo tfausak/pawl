@@ -78,6 +78,7 @@ import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CarryOver as CarryOver
@@ -9593,6 +9594,83 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CoinFlipped {} -> False
     GameEvent.RingTempted _ -> False
     GameEvent.CardArrived _ -> False
+  -- CR 603.10a's third look-back family: PermanentReturnedToHand's match with the
+  -- zone pinned on the DEPARTURE side instead -- the origin is a graveyard and the
+  -- destination is wherever the card went. CR 400.3 files a card in its owner's
+  -- graveyard, so "your graveyard" is an OwnedBy conjunct of the Filter rather
+  -- than a zone this arm could name (Pawl.Types.Zone names no player).
+  --
+  -- The same viewWithLastKnown read on ZoneChange.departed, and CR 603.10a is
+  -- what makes it the only possible read: the card is no longer in the graveyard
+  -- by the time CR 603.10 checks, so a live lookup of the id that left answers
+  -- nothing at all.
+  --
+  -- The TurnScope comes from the GAME STATE, the SpellCast arm's reason: no
+  -- characteristic of the departing card says whose turn it is, and CR 109.5 with
+  -- CR 603.3a fixes "you" as the ability's controller.
+  --
+  -- GameEvent.LeftTheGame is declined, the PermanentReturnedToHand arm's reason
+  -- one zone over: CR 800.4a's departure reaches no zone, so no zone change names
+  -- a graveyard it came out of.
+  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard f scope) ->
+    let admits departed = case Projection.viewWithLastKnown departed gs departed of
+          Nothing -> False
+          Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+     in case event of
+          GameEvent.Moved (Moved.MkMoved zc _ _)
+            | ZoneChange.from zc == Zone.Graveyard ->
+                turnScopeAdmits (Game.teams gs) scope (GameState.activePlayer gs) you
+                  && admits (ZoneChange.departed zc)
+          GameEvent.Moved {} -> False
+          GameEvent.LeftTheGame _ -> False
+          GameEvent.Milled {} -> False
+          GameEvent.Scried _ -> False
+          GameEvent.DungeonCompleted _ -> False
+          GameEvent.Surveiled _ -> False
+          GameEvent.DiceRolled _ -> False
+          GameEvent.ClassLevelSet _ -> False
+          GameEvent.Plotted _ -> False
+          GameEvent.Explored _ -> False
+          GameEvent.Exerted _ -> False
+          GameEvent.BecameAttacked _ -> False
+          GameEvent.AttackersDeclared _ -> False
+          GameEvent.BecameTapped _ -> False
+          GameEvent.CoinFlipped {} -> False
+          GameEvent.RingTempted _ -> False
+          GameEvent.CardArrived _ -> False
+          GameEvent.DamageDealt _ -> False
+          GameEvent.StepBegan {} -> False
+          GameEvent.SpellCast {} -> False
+          GameEvent.DamagePrevented {} -> False
+          GameEvent.BecameMonarch _ -> False
+          GameEvent.TookInitiative _ -> False
+          GameEvent.Discarded {} -> False
+          GameEvent.Drew {} -> False
+          GameEvent.Revealed {} -> False
+          GameEvent.AttackerDeclared {} -> False
+          GameEvent.BecameBlocking {} -> False
+          GameEvent.BlocksDeclared {} -> False
+          GameEvent.AttackerBlocked {} -> False
+          GameEvent.AttackerUnblocked _ -> False
+          GameEvent.SpellCountered _ -> False
+          GameEvent.HalfUnlocked {} -> False
+          GameEvent.TurnedFaceUp _ -> False
+          GameEvent.Transformed {} -> False
+          GameEvent.BecameDesignated {} -> False
+          GameEvent.Evolved _ -> False
+          GameEvent.Mentored {} -> False
+          GameEvent.Trained _ -> False
+          GameEvent.PermanentSacrificed {} -> False
+          GameEvent.AbilityTriggered {} -> False
+          GameEvent.LoyaltyAbilityActivated _ -> False
+          GameEvent.LifeLost {} -> False
+          GameEvent.LifeGained {} -> False
+          GameEvent.CountersPut {} -> False
+          GameEvent.CountersRemoved {} -> False
+          GameEvent.ControlChanged {} -> False
+          GameEvent.VentureMarkerEntered {} -> False
+          GameEvent.BecameTarget {} -> False
+          GameEvent.BecameAttached {} -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -12205,6 +12283,9 @@ reactsToAbilityTriggering cond = case cond of
   -- another ability triggering either.
   TriggerCondition.PermanentReturnedToHand _ -> False
   TriggerCondition.PermanentsReturnedToHand _ -> False
+  -- A card leaving a graveyard is a zone change too, so CR 603.3b's first pass
+  -- takes it like the arms above.
+  TriggerCondition.CardLeavesGraveyard {} -> False
   -- CR 702.55b watches a death, not another ability triggering.
   TriggerCondition.HauntedCreatureDies -> False
   -- CR 701.6a's countering is a spell or ability DOING something, not one
@@ -13335,6 +13416,13 @@ eventBindingSlots cond = case cond of
   -- several owners' hands, and one slot cannot name them all. Tameshi, Reality
   -- Architect's payload names none of them.
   TriggerCondition.PermanentsReturnedToHand _ -> Set.empty
+  -- Nothing either, and not for the batch arm's reason: Kishla Skimmer's payload
+  -- draws a card and names neither the card that left nor what it became, so no
+  -- slot is earned. eventBindings has no arm for this condition, which the empty
+  -- floor pins -- and a FLOOR is what it would have to clear: this condition
+  -- admits every destination, and CR 400.2 makes a hand and a library hidden, so
+  -- CR 400.7e withholds `became` for some of the moves it matches.
+  TriggerCondition.CardLeavesGraveyard {} -> Set.empty
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card and CR 603.10a's
   -- departed permanent: rule 702.55b's ability speaks about the creature it
   -- HAUNTS -- an object GameState.haunting names rather than the event -- and
@@ -13671,6 +13759,9 @@ looksBack condition = case condition of
   -- The batch reading is in the same family, PermanentsDie's reason: a bearer
   -- swept up in its own batch still sees the group-mates returned beside it.
   TriggerCondition.PermanentsReturnedToHand _ -> True
+  -- CR 603.10a's third family, named in that rule's own list: "abilities that
+  -- trigger when a card leaves a graveyard".
+  TriggerCondition.CardLeavesGraveyard {} -> True
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
@@ -13869,6 +13960,15 @@ batchScoped condition = case condition of
   -- and "one or more noncreature permanents are returned to hand" (Tameshi,
   -- Reality Architect) names that whole group as its trigger event.
   TriggerCondition.PermanentsReturnedToHand _ -> True
+  -- Per-card, PermanentReturnedToHand's answer: Kishla Skimmer's "whenever a card
+  -- leaves your graveyard" is CR 603.2c's second sentence, so a resolution that
+  -- moved two cards out of one graveyard fires it twice.
+  --
+  -- Not implemented: the batch reading of the same family, Fang, Fearless l'Cie's
+  -- "whenever one or more cards leave your graveyard", which would stand beside
+  -- this arm as PermanentsReturnedToHand stands beside PermanentReturnedToHand
+  -- (gap #3222).
+  TriggerCondition.CardLeavesGraveyard {} -> False
   TriggerCondition.AttachedCreatureDies -> False
   -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
   -- occurrence; no printing of that event says "one or more".
@@ -15331,6 +15431,10 @@ zonesTriggeredFrom cond = case cond of
   -- left the battlefield.
   TriggerCondition.PermanentReturnedToHand _ -> battlefield
   TriggerCondition.PermanentsReturnedToHand _ -> battlefield
+  -- CR 113.6's default once more: Kishla Skimmer is a creature watching its
+  -- controller's graveyard from the battlefield, and CR 113.6k's exception is for
+  -- a condition that cannot trigger from there at all.
+  TriggerCondition.CardLeavesGraveyard {} -> battlefield
   -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
   -- abilities of cards with haunt that refer to the haunted creature can trigger
   -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
@@ -15577,6 +15681,15 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   TriggerCondition.PermanentReturnedToHand _ -> False
   TriggerCondition.PermanentsReturnedToHand _ -> False
+  -- The third arm carrying a TurnScope, and the classification follows the FIELD
+  -- rather than the constructor: Kishla Skimmer prints "during your turn" and a
+  -- printing of the same family without it would not.
+  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.ControllersTurn) -> True
+  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.EachTurn) -> False
+  -- No printing of this family says "during an opponent's turn", so this arm is
+  -- unreachable from card data; answering True would make the classification wrong
+  -- for the sake of that unreachable case.
+  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.OpponentsTurn) -> False
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
@@ -15785,6 +15898,7 @@ stateTriggers gs
               TriggerCondition.PermanentLeavesTheBattlefield _ -> False
               TriggerCondition.PermanentReturnedToHand _ -> False
               TriggerCondition.PermanentsReturnedToHand _ -> False
+              TriggerCondition.CardLeavesGraveyard {} -> False
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False

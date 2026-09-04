@@ -194,6 +194,8 @@ library codec
     Pawl.Codec.CantSearchLibraries
     Pawl.Codec.CantSearchLibrariesSpec
     Pawl.Codec.Card
+    Pawl.Codec.CardLeavesGraveyard
+    Pawl.Codec.CardLeavesGraveyardSpec
     Pawl.Codec.CardName
     Pawl.Codec.CardNameSpec
     Pawl.Codec.CardSpec
@@ -1412,6 +1414,7 @@ library types
     Pawl.Types.CantBeRegenerated
     Pawl.Types.CantSearchLibraries
     Pawl.Types.Card
+    Pawl.Types.CardLeavesGraveyard
     Pawl.Types.CardName
     Pawl.Types.CardType
     Pawl.Types.CarryOver
