@@ -5416,8 +5416,8 @@ monarchTriggerSpec s registry =
         -- only board where the two readings differ, and no real combat reaches
         -- it (CR 508.1a: only the active player's creatures attack; CR 506.4: a
         -- controller change removes a creature from combat), so the damage is a
-        -- hand-written event and bob's life total is written down by hand to
-        -- match it: 1 going in, 2 dealt.
+        -- hand-written event and bob's life total is written down by hand at
+        -- what the 2 it records would have left him with.
         Spec.it s "CR 725.4/800.4d lethal combat damage to the monarch crowns the active player, not the damager's controller" $ do
           piker <- S.printingOf s registry "Goblin Piker"
           birdMaiden <- S.printingOf s registry "Bird Maiden"
