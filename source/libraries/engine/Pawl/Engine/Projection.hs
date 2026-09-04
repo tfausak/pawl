@@ -2520,8 +2520,8 @@ rewriteEffect pairs effect = case effect of
   -- word, and IsSource holds none -- and every redirect in data/cards/ writes
   -- UntilEndOfTurn, on which rewriteDuration is the identity too. So mutating any
   -- of those three lines reddens nothing.
-  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind from to chosenSource) ->
-    Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (rewriteObjectRef pairs from) (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind amount from whatRecipient whoRecipient to chosenSource) ->
+    Effect.RedirectDamage (RedirectDamage.MkRedirectDamage (rewriteDuration pairs duration) kind (fmap (rewriteQuantity pairs) amount) (fmap (rewriteObjectRef pairs) from) (fmap (Filter.rewrite pairs) whatRecipient) whoRecipient (rewriteObjectRef pairs to) (fmap (Filter.rewrite pairs) chosenSource))
   Effect.Counter (Counter.MkCounter ref mSlot mSources) -> Effect.Counter (Counter.MkCounter (rewriteObjectRef pairs ref) mSlot mSources)
   -- Not implemented: a CR 122.1b keyword counter named in the kind keeps its
   -- printed keyword through the swap, where Filter's HasCounters arm rewrites
@@ -2932,6 +2932,7 @@ rewriteDamageRewrite :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Damage
 rewriteDamageRewrite pairs rewrite = case rewrite of
   DamageRewrite.RedirectMatching f -> DamageRewrite.RedirectMatching (Filter.rewrite pairs f)
   DamageRewrite.Redirect _ -> rewrite
+  DamageRewrite.RedirectNext _ _ -> rewrite
   DamageRewrite.PreventAll -> rewrite
   DamageRewrite.PreventRemovingShieldCounter -> rewrite
   DamageRewrite.PreventNext _ -> rewrite
