@@ -656,7 +656,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- Both keywords are read at GAMEPLAY level in one attack: without haste (CR
   -- 702.10b) the copy could not be declared at all, and dethrone (CR 702.105a)
   -- is the +1/+1 counter it takes for attacking the player with the most life.
-  -- So 3/2 is "both arrived" and 2/1 is "neither did".
+  -- So 3/2 is "both arrived" and 2/1 is "at least one did not" -- the case
+  -- cannot say which, both keywords riding one Set.
   --
   -- A CLONE copying the SAME Piker is the control: the copy without the
   -- exception, entering the same turn, equally sick. It cannot attack and takes
@@ -706,12 +707,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- set read off the projection -- so a copy that is every creature type (CR
   -- 702.73a) is a Merfolk and gets pumped.
   --
-  -- Three readings of one board, all different: bob's Goblin Piker is no
-  -- Merfolk and stays 2/1; a Clone copying it is the copy WITHOUT the exception
-  -- and stays 2/1; the Omni-Changeling copy is 3/2. The token copy is the fourth
-  -- and is where the CDA claim actually bites -- CR 707.2 copies the copiable
-  -- values and leaves every CR 613 layer behind, so a changeling GRANTED over
-  -- the copy would produce a 2/1 token here.
+  -- Two controls on the one board, each 2/1 for its own reason: bob's Goblin
+  -- Piker is no Merfolk, and a Clone copying it is the copy WITHOUT the
+  -- exception. The token copy is where the CDA claim actually bites -- CR 707.2
+  -- copies the copiable values and leaves every CR 613 layer behind, so a
+  -- changeling GRANTED over the copy would produce a 2/1 token here.
   Spec.it s "Omni-Changeling's copy is every creature type, and so is a token copy of it (CR 604.3a)" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
