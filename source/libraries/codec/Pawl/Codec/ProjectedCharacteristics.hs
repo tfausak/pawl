@@ -56,6 +56,7 @@ codec = Fields.object $ do
   textChangedKeywords <- Fields.defaulted "textChangedKeywords" Map.empty (Common.multiset Keyword.codec) PC.textChangedKeywords
   assignsCombatDamageWithToughness <- Fields.defaulted "assignsCombatDamageWithToughness" False Common.boolean PC.assignsCombatDamageWithToughness
   grantsStationToughness <- Fields.defaulted "grantsStationToughness" False Common.boolean PC.grantsStationToughness
+  halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   pure
     PC.MkProjectedCharacteristics
       { PC.names = names,
@@ -80,5 +81,6 @@ codec = Fields.object $ do
         PC.subtypeWordChanges = subtypeWordChanges,
         PC.textChangedKeywords = textChangedKeywords,
         PC.assignsCombatDamageWithToughness = assignsCombatDamageWithToughness,
-        PC.grantsStationToughness = grantsStationToughness
+        PC.grantsStationToughness = grantsStationToughness,
+        PC.halves = halves
       }

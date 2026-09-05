@@ -10,6 +10,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
@@ -48,6 +49,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
@@ -556,8 +558,9 @@ resolveFace mName card = case mName of
 resolveFaceFor :: Maybe Object.Object -> Card -> Face Card
 resolveFaceFor mObj card = case mObj of
   Just obj
-    | Card.hasSharedTypeLine card && Object.zone obj == Zone.Battlefield ->
-        Card.roomFace (Object.unlockedHalves obj) card
+    | Just halves <- halvesCardOf obj card,
+      Object.zone obj == Zone.Battlefield ->
+        Card.roomFace (Object.unlockedHalves obj) halves
   _ -> resolveFace (mObj >>= Object.face) card
 
 -- CR 709.4a: the NAMES the object shows, the plural companion of resolveFaceFor
@@ -572,8 +575,9 @@ resolveFaceFor mObj card = case mObj of
 namesFor :: Maybe Object.Object -> Card -> Set.Set CardName.CardName
 namesFor mObj card = case mObj of
   Just obj
-    | Card.hasSharedTypeLine card && Object.zone obj == Zone.Battlefield ->
-        Card.roomNames (Object.unlockedHalves obj) card
+    | Just halves <- halvesCardOf obj card,
+      Object.zone obj == Zone.Battlefield ->
+        Card.roomNames (Object.unlockedHalves obj) halves
   _ -> case mObj >>= Object.face of
     -- CR 709.4 / 712.8a / 715.4: the layout's own view, whose names are its
     -- contributing halves'.
@@ -582,6 +586,52 @@ namesFor mObj card = case mObj of
     -- characteristics, so only that half's name -- with resolveFace's fallback
     -- to the combined view for a name that resolves to no face.
     Just n -> maybe (Card.combinedNames card) (Set.singleton . Face.name) (Card.faceNamed n card)
+
+-- CR 709.5 / 709.5b: the card whose HALVES this object has -- the copy snapshot's
+-- when the object is copying something, and its own printed card's otherwise.
+--
+-- Rule 709.5's last sentence makes the shared type line's two static abilities
+-- "as well as which half of that permanent a characteristic is in" part of the
+-- object's copiable values, and CR 709.5b says the same of the halves'
+-- existence. So which halves an object has is a question about its COPIABLE
+-- values and not about the card printed underneath it: a Copy Enchantment that
+-- copied a Room has that Room's two doors, and a Room that copied something else
+-- has none. Pawl.RoomSpec's "CR 709.5 a permanent that copied a Room enters with
+-- neither door unlocked" is what proves it.
+--
+-- The object's OWN unlocked designations are what the caller then reads against
+-- them. CR 709.5 lists no designation among the copiable values, so a copy
+-- enters with both doors shut (CR 709.5d) whatever the copied Room had open.
+--
+-- A snapshot that carries no halves ends the question rather than falling back
+-- to the printed card: CR 707.2 leaves a copy with the copied object's values,
+-- so a Room that became a copy of a Blood Moon has stopped having doors.
+halvesCardOf :: Object.Object -> Card -> Maybe Card
+halvesCardOf obj card = case Binding.copyOf (Object.bindings obj) of
+  Just snapshot -> PC.halves snapshot
+  Nothing -> if Card.hasSharedTypeLine card then Just card else Nothing
+
+-- halvesCardOf above for a caller that holds only the id, and the value
+-- Pawl.Engine.Projection.View.baseCharacteristics seeds
+-- ProjectedCharacteristics.halves from -- so a copy of a copy of a Room goes on
+-- carrying the doors.
+--
+-- FACE UP only, which is CR 708.2's substitution read one field over: a
+-- face-down permanent has only the characteristics its allower listed, so it has
+-- no halves to unlock however its card is printed. faceOfObject below takes the
+-- same fork.
+--
+-- Every zone, unlike resolveFaceFor's own gate: CR 709.5b makes the halves'
+-- existence copiable "even if that object is a spell on the stack", where CR
+-- 709.5c's designations belong to a permanent on the battlefield alone.
+halvesOf :: ObjectId -> GameState -> Maybe Card
+halvesOf oid gs = do
+  obj <- lookupObject oid gs
+  case Object.facing obj of
+    Facing.FaceDown _ -> Nothing
+    Facing.FaceUp -> do
+      card <- cardOf oid gs
+      halvesCardOf obj card
 
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).

@@ -244,6 +244,24 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Pawl.Engine.Quantity's StationMeasure arm off every battlefield
     -- permanent the ability's controller controls, so the fact is per-object
     -- here and folded to a per-player question at the one site that asks it.
-    grantsStationToughness :: Bool
+    grantsStationToughness :: Bool,
+    -- | CR 709.5: the card whose HALVES this object has, and Nothing for an
+    -- object with no shared type line. The one field here that is not a
+    -- characteristic: rule 709.5's last sentence makes the shared type line's
+    -- two static abilities "as well as which half of that permanent a
+    -- characteristic is in" copiable, and CR 709.5b copies the halves'
+    -- existence "even if that object is a spell on the stack", so a copy of a
+    -- Room has the copied Room's doors and this is where it carries them.
+    --
+    -- The whole CARD rather than a name or a printing id, because the readers
+    -- need the faces: Pawl.Engine.Card.roomFace subtracts a locked half from
+    -- them and Pawl.Engine.Room.lockedHalves prices one off them (CR 709.5e).
+    --
+    -- The unlocked DESIGNATIONS are not here, and that is CR 709.5's own list
+    -- rather than an omission: it names the abilities and the halves as
+    -- copiable and says nothing about CR 709.5c's designations, so a copy of a
+    -- Room enters with its own doors shut (CR 709.5d) and this field says which
+    -- doors those are.
+    halves :: Maybe Card.Card
   }
   deriving (Eq, Ord, Show)

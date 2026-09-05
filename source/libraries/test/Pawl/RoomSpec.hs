@@ -193,6 +193,27 @@ roomPermanent gs =
 plainEntry :: EntryRiders.EntryRiders Natural
 plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
 
+-- Put a Copy Enchantment onto the stack for alice, resolve it as a copy of the
+-- named permanent, and let the board settle -- castDoor's shape, one card over.
+--
+-- The copy target is PINNED by id rather than searched for, Pawl.CopySpec's
+-- posture: an answerer that looked for a legal enchantment would find the Room
+-- again after a mutation and repair the case.
+copyOf :: ObjectId.ObjectId -> GameState.GameState -> Printing.Printing -> GameState.GameState
+copyOf original gs copyEnchantment =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseCopyTarget {} -> Just original
+        _ -> S.identityAnswer p
+      (_, staged) = S.spellOnStack copyEnchantment S.alice gs
+   in resolveAll (settle (snd (Engine.runGamePure answer staged Stack.resolveTop)))
+
+-- The permanents the step between these two boards added -- how the copy is
+-- found, roomPermanent above being unable to tell it from the Room it copied
+-- (both answer to CR 709.5's subtracted name).
+newPermanent :: GameState.GameState -> GameState.GameState -> [ObjectId.ObjectId]
+newPermanent before after = Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before))
+
 -- Every unlock this player is offered right now, as CR 709.5e's pair.
 unlocksOffered :: GameState.GameState -> [(ObjectId.ObjectId, CardName.CardName)]
 unlocksOffered gs = [(o, n) | A.Unlock o n <- Action.legalActions S.alice gs]
@@ -794,4 +815,144 @@ spec s registry = Spec.describe s "Room" $ do
         -- Enchantment Room on the battlefield.
         Spec.assertEqWith s "though CR 709.5a leaves the card types" (Projection.cardTypesOf permId put) (Set.singleton CardType.Enchantment)
         Spec.assertEqWith s "and the shared subtype" (Projection.subtypesOf permId put) (Set.singleton Subtype.Room)
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5's last sentence and CR 709.5b, which are what a copy effect reads:
+  -- the shared type line's two static abilities, "as well as which half of that
+  -- permanent a characteristic is in", and the existence of each half, are the
+  -- COPIED object's copiable values. So a permanent that copied a Room has the
+  -- copied Room's two doors -- and, CR 709.5 naming no designation among those
+  -- values, none of them open (CR 709.5d: neither half was cast as a spell).
+  --
+  -- Copy Enchantment, {2}{U}: "You may have this enchantment enter as a copy of
+  -- any enchantment on the battlefield." The one printing in data/cards/ whose
+  -- copy is eligible for a Room at all -- Clone's AsCopy carries `HasCardType
+  -- Creature` and Pawl.Engine.Replacement.legalCopyTargets filters the answer,
+  -- so a Clone aimed at a Room copies nothing and the case would pass vacuously.
+  --
+  -- The falsifier is the reading the engine had before this: the gate asked
+  -- whether the COPIER's own printed card has a shared type line, so the copy
+  -- was no Room at all and showed the copied permanent's frozen snapshot --
+  -- Roaring Furnace's name and text, whatever the copy's own doors say.
+  Spec.it s "CR 709.5 a permanent that copied a Room enters with neither door unlocked" $ do
+    (roomId, wallId, gs) <- setUp s registry
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let after = castDoor furnaceName roomId gs
+    case roomPermanent after of
+      [origId] -> do
+        let resolved = copyOf origId after copyEnchantment
+        case newPermanent after resolved of
+          [copyId] -> do
+            -- THE GAMEPLAY-LEVEL ASSERTION: with both of the copied Room's doors
+            -- shut, CR 709.5 subtracts both halves' names and the copy has none.
+            -- The copied Room's own open door is what the old reading left here.
+            Spec.assertEqWith s "the copy has no name at all" (Projection.namesOf copyId resolved) Set.empty
+            -- CR 709.5a, which is what says the copy really is the Room rather
+            -- than an object the projection could not read: the shared type line
+            -- survives the subtraction.
+            Spec.assertEqWith s "though it is an Enchantment Room" (Projection.cardTypesOf copyId resolved) (Set.singleton CardType.Enchantment)
+            Spec.assertEqWith s "with the shared type line's subtype" (Projection.subtypesOf copyId resolved) (Set.singleton Subtype.Room)
+            -- CR 709.5 takes a locked half's MANA COST with its name, and both
+            -- of this permanent's halves are locked -- so the copy of a Room
+            -- that itself cost {1}{R} has no mana cost at all. The read that
+            -- Game.manaCostFacesOf makes, which is a second caller of
+            -- Game.resolveFaceFor.
+            Spec.assertEqWith s "and no mana cost, both halves being locked" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf copyId resolved))) 0
+            -- Neither half's RULES TEXT, read off both doors: the red door's CR
+            -- 709.5h trigger did not fire as the copy entered, and the blue
+            -- door's static ability is not live.
+            Spec.assertEqWith s "the red door's trigger did not fire for the copy" (S.damageOf wallId resolved) (Just 3)
+            Spec.assertEqWith s "and the blue door's static ability is not live" (PlayerEffect.maximumHandSize S.alice resolved) (Just 7)
+            -- CR 709.5c's designations are per-object, so copying took none of
+            -- the original's away.
+            Spec.assertEqWith s "the copied Room still shows its open door" (Projection.namesOf origId resolved) (Set.singleton furnaceName)
+          other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5e over the same board: "a player who controls a permanent that has
+  -- one or more locked halves may pay the mana cost of a locked half of that
+  -- permanent". The halves are the COPIED Room's (CR 709.5b), so the copy's
+  -- controller is offered both of them, at the copied halves' own prices.
+  --
+  -- THREE offers is the number that discriminates: one is the engine reading the
+  -- copier's own card and finding no halves, two is "the copy has the doors that
+  -- were showing", and only CR 709.5b's copiable existence gives three.
+  --
+  -- Roaring Furnace // Steaming Sauna's doors cost {1}{R} and {3}{U}{U}, so the
+  -- five lands the unlock taps are a number neither the other door's cost nor
+  -- Copy Enchantment's own {2}{U} coincides with -- an unlock priced off the
+  -- wrong card is visible in the tally rather than only in the designation.
+  Spec.it s "CR 709.5b a permanent that copied a Room is offered the copied Room's doors" $ do
+    (roomId, _, gs) <- setUp s registry
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    -- Eight spare Islands and four spare Mountains: the board pays for the cast
+    -- door and then for the copy's {3}{U}{U} unlock, and still holds the {1}{R}
+    -- the copy's other door costs. An unlock the board cannot afford is not
+    -- offered whatever the designations say, so the last assertion below is
+    -- about the designation only if the mana is there for both readings.
+    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addCreature printing S.alice g)) g0 [1 .. n :: Int]
+        funded = addAll mountain 4 (addAll island 8 gs)
+        after = castDoor furnaceName roomId funded
+    case roomPermanent after of
+      [origId] -> do
+        let resolved = copyOf origId after copyEnchantment
+        case newPermanent after resolved of
+          [copyId] -> do
+            Spec.assertEqWith
+              s
+              "the copied Room's shut door, and BOTH of the copy's"
+              (List.sort (unlocksOffered resolved))
+              (List.sort [(origId, saunaName), (copyId, furnaceName), (copyId, saunaName)])
+            let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer resolved (Room.unlock S.manaPerformer S.alice copyId saunaName))))
+            -- THE GAMEPLAY-LEVEL ASSERTION: the copy now shows the copied Room's
+            -- BLUE half -- a name the original has never had, so no reading that
+            -- shares the original's designations can produce it.
+            Spec.assertEqWith s "the copy shows the door it opened" (Projection.namesOf copyId opened) (Set.singleton saunaName)
+            Spec.assertEqWith s "and that half's rules text with it" (PlayerEffect.maximumHandSize S.alice opened) Nothing
+            Spec.assertEqWith s "and that half's mana cost" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf copyId opened))) 5
+            Spec.assertEqWith s "CR 709.5e priced it at the copied half's own cost" (S.tappedCount S.alice opened - S.tappedCount S.alice resolved) 5
+            -- CR 709.5c again: the designation went to the copy alone.
+            Spec.assertEqWith s "the copied Room is untouched" (Projection.namesOf origId opened) (Set.singleton furnaceName)
+            Spec.assertEqWith s "and its own door is still on offer" (List.sort (unlocksOffered opened)) (List.sort [(origId, saunaName), (copyId, furnaceName)])
+          other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5i over a copy: "Such an ability triggers when that permanent has one
+  -- of the two unlocked designations and gets the other." The permanent is the
+  -- COPY, whose halves are the copied Room's (CR 709.5b), so the second door it
+  -- opens fully unlocks it -- read off its own card, the question answers False
+  -- for every copy, no copier's printed card having a shared type line.
+  --
+  -- The Leech's other arm is what makes the arithmetic readable rather than a
+  -- nuisance: each enchantment entering costs an opponent a life, so the Room
+  -- and the copy take bob to 18 before either door of the copy is touched. The
+  -- FIRST unlock is the negative -- one designation is not two -- and the second
+  -- is the positive, on the same board and the same trigger.
+  Spec.it s "CR 709.5i a copy of a Room is fully unlocked by its own second door" $ do
+    (roomId, _, gs) <- setUp s registry
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    leech <- S.printingOf s registry "Balemurk Leech"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addCreature printing S.alice g)) g0 [1 .. n :: Int]
+        (_, withLeech) = S.addCreature leech S.alice gs
+        funded = addAll mountain 4 (addAll island 8 withLeech)
+        after = castDoor furnaceName roomId funded
+    case roomPermanent after of
+      [origId] -> do
+        let resolved = copyOf origId after copyEnchantment
+        case newPermanent after resolved of
+          [copyId] -> do
+            Spec.assertEqWith s "two enchantments entered, so bob is down two" (S.lifeOf S.bob resolved) (Just 18)
+            let one = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer resolved (Room.unlock S.manaPerformer S.alice copyId furnaceName))))
+            -- THE NEGATIVE: the copy has one of its two designations, which is
+            -- not CR 709.5i's "gets the other".
+            Spec.assertEqWith s "the copy's first door is not a full unlock" (S.lifeOf S.bob one) (Just 18)
+            let both = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer one (Room.unlock S.manaPerformer S.alice copyId saunaName))))
+            -- THE GAMEPLAY-LEVEL ASSERTION: the second door fully unlocks the
+            -- copy, so the Leech fires once more.
+            Spec.assertEqWith s "the copy's second door fully unlocks it" (S.lifeOf S.bob both) (Just 17)
+            Spec.assertEqWith s "and carol with him" (S.lifeOf S.carol both) (Just 17)
+            Spec.assertEqWith s "CR 109.5: alice, who controls the Leech, loses nothing" (S.lifeOf S.alice both) (Just 20)
+            Spec.assertEqWith s "the control: the copy really has both designations" (fmap Object.unlockedHalves (Game.lookupObject copyId both)) (Just (Set.fromList [furnaceName, saunaName]))
+          other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))

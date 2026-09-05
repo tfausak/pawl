@@ -24,7 +24,6 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
-import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -54,19 +53,21 @@ import qualified Pawl.Types.Zone as Zone
 -- designation. Otherwise, that half is said to be locked."
 --
 -- Empty for everything that is not a Room permanent, which is CR 709.5c's own
--- scope read twice over: only a card with a shared type line has halves for a
--- designation to name (Card.hasSharedTypeLine), and only a permanent on the
--- battlefield can have one.
+-- scope read twice over: only an object with a shared type line among its
+-- copiable values has halves for a designation to name (Game.halvesOf), and only
+-- a permanent on the battlefield can have one.
 --
 -- Answers the FACES rather than their names, because two of its callers need the
 -- mana cost off each (CR 709.5e's unlock cost): canUnlock and unlock below, both
 -- through unlockCostOf. The others -- unlockable below, and Pawl.Engine.Resolve's
 -- SetHalfLocked arm -- take only the name.
 --
--- Read off the object's own STORED card, never a projected view: CR 709.5 makes
--- which half a characteristic is in a copiable value, so the doors of a Room
--- that became a copy of another Room are the copy's -- which falls out of
--- Game.cardOf answering with the card underneath (#925).
+-- Read off the object's COPIABLE halves (Game.halvesOf) rather than off the card
+-- printed underneath it: CR 709.5's last sentence makes which half a
+-- characteristic is in a copiable value and CR 709.5b makes the halves'
+-- existence one, so a permanent that copied a Room is offered the COPIED Room's
+-- doors. Pawl.RoomSpec's "CR 709.5b a permanent that copied a Room is offered
+-- the copied Room's doors" is what proves it.
 lockedHalves :: ObjectId -> GameState -> [Face.Face Card.Type.Card]
 lockedHalves = halvesWhere not
 
@@ -77,9 +78,9 @@ lockedHalves = halvesWhere not
 --
 -- The COMPLEMENT of lockedHalves under the same gate rather than
 -- Object.unlockedHalves read directly, so the two answers cannot disagree about
--- what a half is: a name in that set naming no face of the object's own card is
--- no half at all, and rule 709.5c scopes both questions to a permanent with a
--- shared type line on the battlefield.
+-- what a half is: a name in that set naming no face of the object's copiable
+-- halves is no half at all, and rule 709.5c scopes both questions to a permanent
+-- with a shared type line on the battlefield.
 unlockedHalves :: ObjectId -> GameState -> [Face.Face Card.Type.Card]
 unlockedHalves = halvesWhere id
 
@@ -88,8 +89,8 @@ unlockedHalves = halvesWhere id
 halvesWhere :: (Bool -> Bool) -> ObjectId -> GameState -> [Face.Face Card.Type.Card]
 halvesWhere keep oid gs = Maybe.fromMaybe [] $ do
   obj <- Game.lookupObject oid gs
-  card <- Game.cardOf oid gs
-  if Object.zone obj /= Zone.Battlefield || not (Card.hasSharedTypeLine card)
+  card <- Game.halvesOf oid gs
+  if Object.zone obj /= Zone.Battlefield
     then Nothing
     else
       Just
