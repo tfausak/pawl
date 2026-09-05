@@ -149,8 +149,10 @@
                                               "type": "Members"
                                             },
                                             "filter": {
-                                              "type": "And",
-                                              "value": []
+                                              "type": "Not",
+                                              "value": {
+                                                "type": "IsToken"
+                                              }
                                             },
                                             "scope": {
                                               "type": "InHistory",

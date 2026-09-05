@@ -1305,6 +1305,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
   TriggerCondition.RingTemptsPlayer _ -> condition
+  TriggerCondition.PlayerBlights _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition

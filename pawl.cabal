@@ -91,6 +91,8 @@ library codec
     Pawl.Codec.ActivatedAbilitySource
     Pawl.Codec.ActivatedAbilitySourceSpec
     Pawl.Codec.ActivatedAbilitySpec
+    Pawl.Codec.ActivationProhibition
+    Pawl.Codec.ActivationProhibitionSpec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
     Pawl.Codec.Activator
@@ -933,6 +935,7 @@ library engine
   exposed-modules:
     Pawl.Engine.Action
     Pawl.Engine.Activate
+    Pawl.Engine.ActivationProhibition
     Pawl.Engine.ActivationRestriction
     Pawl.Engine.Amass
     Pawl.Engine.Attach
@@ -1085,6 +1088,20 @@ library extra
     Pawl.Extra.SemigroupSpec
     Pawl.Extra.Word8
     Pawl.Extra.Word8Spec
+
+-- The far side of the engine's interpreter seam: what an answerer needs that the
+-- rules engine deliberately cannot supply itself.
+library interpreter
+  import: library
+  build-depends:
+    pawl:engine,
+    pawl:registry,
+    pawl:types,
+
+  hs-source-dirs: source/libraries/interpreter
+  -- cabal-gild: discover source/libraries/interpreter
+  exposed-modules:
+    Pawl.Interpreter
 
 -- RFC 8259 compliant JSON types, encoders, and decoders. Similar to aeson, but
 -- much simpler.
@@ -1247,6 +1264,7 @@ library test
     pawl:engine,
     pawl:exceptions,
     pawl:extra,
+    pawl:interpreter,
     pawl:json,
     pawl:json-codec,
     pawl:json-pointer,
@@ -1266,6 +1284,7 @@ library test
   exposed-modules:
     Pawl.AbilitySlotLintSpec
     Pawl.ActivateSpec
+    Pawl.ActivationProhibitionSpec
     Pawl.AdventureSpec
     Pawl.AttackKeywordTriggerSpec
     Pawl.AuraSpec
@@ -1395,6 +1414,7 @@ library types
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivatedAbilitySource
+    Pawl.Types.ActivationProhibition
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
     Pawl.Types.Activator

@@ -50,6 +50,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
@@ -316,6 +317,7 @@ vanillaFace name typeLine =
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
+      Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
@@ -899,6 +901,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
   TriggerCondition.PermanentExplores _ -> []
+  -- CR 701.68d's carries a PlayerRelation, which is no Count.
+  TriggerCondition.PlayerBlights _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
   TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
@@ -3206,6 +3210,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
+  -- CR 701.68d's carries a PlayerRelation, which is no Filter.
+  TriggerCondition.PlayerBlights _ -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> unframed [f]
@@ -3373,6 +3379,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
+  TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
@@ -3985,13 +3992,15 @@ data Framing
     -- filter" to that lint, and a stored Effect.Replace's row would otherwise
     -- appear on one side of the comparison and not the other.
     ReplacementRowFramed
-  | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's, the one
-    -- card-authored position whose candidates are never objects in the game:
-    -- Pawl.Engine.Event.eligible matches it against a printed FACE
-    -- (Pawl.Engine.Projection.View.viewOfCard). Marked not because its evaluator
-    -- FILLS a field the others leave empty but because its candidate view leaves
-    -- one empty that every other position fills -- `identity` -- so
-    -- Filter.IsBound is a silent False there and nowhere else.
+  | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's -- and CR 201.4a's
+    -- naming restriction, Effect.ChooseCardName's: the two card-authored
+    -- positions whose candidates are never objects in the game. The first is
+    -- matched by Pawl.Engine.Event.eligible and the second by
+    -- Pawl.Interpreter.legalCardName, both against a printed FACE
+    -- (Pawl.Engine.Projection.View.viewOfCard). Marked not because their
+    -- evaluators FILL a field the others leave empty but because that candidate
+    -- view leaves one empty which every other position fills -- `identity` -- so
+    -- Filter.IsBound is a silent False in these two and nowhere else.
     OutsideTheGameFramed
   | -- | A KEYWORD's own Filter -- CR 702.29e's typecycling predicate, CR 702.11d's
     -- "hexproof from", a cost-carrying keyword's CostComponent.Sacrifice, and CR
@@ -4261,10 +4270,13 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ _ f _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
-  -- CR 201.4a's restriction, UNFRAMED: it is handed to Prompt.ChooseCardName for
-  -- an answerer to obey rather than matched against a candidate at all, so none of
-  -- the framings' evaluators is the one that reads it.
-  Effect.ChooseCardName restriction -> unframed [restriction]
+  -- CR 201.4a's restriction, and the WISH's frame: what judges it is
+  -- Pawl.Interpreter.legalCardName, on the far side of
+  -- Pawl.Engine.Engine.runGameAsked, and it matches a printed FACE
+  -- (Pawl.Engine.Projection.View.viewOfCard) exactly as CR 400.11c's filter does.
+  -- No candidate here is an object in the game either, the named card being one
+  -- the reference has rather than one on the board.
+  Effect.ChooseCardName restriction -> outsideTheGameFramed [restriction]
   -- THE one wish-framed position. CR 400.11c's filter is matched against a
   -- PRINTED FACE (Pawl.Engine.Projection.View.viewOfCard) rather than against an
   -- object any of the other framings' evaluators project, which is what makes
@@ -4621,9 +4633,10 @@ activatedAbilityFilters ability =
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
 --     `entryRestrictions` (CR 400.4a / 101.2),
 --     `counterRestrictions` (CR 122.6 / 101.2),
+--     `activationProhibitions` (CR 602.2 / 101.2),
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
 --     (CR 509.1c), `attackCosts` (CR 508.1h) and `blockCosts` (CR 509.1d) --
---     nine more affected sets, plus each combat cost's Counted share, which is a
+--     an affected set each, plus each combat cost's Counted share, which is a
 --     Quantity, plus the CR 604.2 "as long as" clause an attacking requirement
 --     may carry (CR 508.1d's second reading).
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
@@ -4688,6 +4701,10 @@ cardFilters card =
         -- counters), which may be a whole Keyword carrying a Filter (CR 122.1b);
         -- see #2728. Nothing there is Solemnity's "counters" -- any kind at all.
         <> concatMap (concatMap counterKindFilters . Maybe.maybeToList . CounterRestriction.kind) (Face.counterRestrictions card)
+        -- CR 602.2's activation prohibition. Its own KIND beside the affected
+        -- set is CR 605.1a's classification, which holds no Filter at all --
+        -- unlike the counter kind one line up.
+        <> concatMap (unframed . affectedFilters . ActivationProhibition.affected) (Face.activationProhibitions card)
     )
     <> concatMap printedReplacementFilters (Face.replacementEffects card)
     <> concatMap staticAbilityFilters (Face.staticAbilities card)

@@ -983,6 +983,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent)
       " {\"type\":\"RingTemptsPlayer\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 701.68d. AnyPlayer, which is what Synthetic Blight Chronicler prints,
+  -- beside You:
+  -- the two are observably different readings of the same wire shape.
+  Spec.it s "PlayerBlights round-trips both relations" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerBlights PlayerRelation.AnyPlayer)
+      " {\"type\":\"PlayerBlights\",\"value\":{\"type\":\"AnyPlayer\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerBlights PlayerRelation.You)
+      " {\"type\":\"PlayerBlights\",\"value\":{\"type\":\"You\"}} "
   -- CR 509.3d's bystander form. A real Filter rather than the trivial `And []`:
   -- the payload is over the ATTACKER, and CR 701.54c's is a Ring-bearer test.
   Spec.it s "PermanentBecomesBlockedBy round-trips" $

@@ -34,8 +34,9 @@ that near-mirrors the module under test (`Pawl.Engine.Foo` -> `Pawl.FooSpec`
 engine). Each exposes `spec :: Spec.Spec m n -> Registry.Registry m -> n ()`
 --- the same shape as a library spec, plus the registry --- and heads with a
 comment listing the modules it covers; `Pawl.Test` only aggregates them. A new
-subsystem gets a new `Pawl.<Area>Spec` wired into `Pawl.Test`'s `spec`, or into
-`testTree` if it needs its own timeout. That library's `exposed-modules` is
+subsystem gets a new `Pawl.<Area>Spec` wired into `Pawl.Test`'s `spec`. No spec
+carries a timeout of its own; the suite has one budget, passed on the command
+line. That library's `exposed-modules` is
 `-- cabal-gild: discover`-generated like every other module list: stage
 `pawl.cabal` rather than editing it, and run `cabal-gild pawl.cabal` directly
 when adding a module, since `hooky fix` has skipped that case.

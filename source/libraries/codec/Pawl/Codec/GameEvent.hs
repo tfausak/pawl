@@ -103,5 +103,8 @@ codec =
       Arm.payload "CoinFlipped" CoinFlipped.codec GameEvent.CoinFlipped (\x -> case x of GameEvent.CoinFlipped y -> Just y; _ -> Nothing),
       -- CR 701.54d. One player id, Scried's shape above: the rule names the
       -- tempted player and nothing else.
-      Arm.payload "RingTempted" PlayerId.codec GameEvent.RingTempted (\x -> case x of GameEvent.RingTempted y -> Just y; _ -> Nothing)
+      Arm.payload "RingTempted" PlayerId.codec GameEvent.RingTempted (\x -> case x of GameEvent.RingTempted y -> Just y; _ -> Nothing),
+      -- CR 701.68d. One player id, the arm above's shape: the rule names the
+      -- blighting player and nothing else.
+      Arm.payload "Blighted" PlayerId.codec GameEvent.Blighted (\x -> case x of GameEvent.Blighted y -> Just y; _ -> Nothing)
     ]

@@ -115,6 +115,11 @@ machinery usually turns out to mean.** Before proposing a cluster, name the
 function or constructor all its issues edit. If you cannot, you have found a
 topic, and the issues dispatch separately.
 
+**A containment claim, or a partner labelled `expires:synthetic`, is a
+single-issue dispatch with a note --- not a cluster.** Over eighteen dispatched
+clusters every shared-edit-site claim held, and nearly every "A unblocks B" or
+synthetic-partner one split on contact.
+
 **The clustering pass** is the sweep form of this, and one dispatch of its own:
 index the `Module.function` identifiers every dispatchable issue body names,
 group by shared identifier, and open the cited function with `git show

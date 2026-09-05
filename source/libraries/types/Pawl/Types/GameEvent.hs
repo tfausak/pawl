@@ -461,4 +461,16 @@ data GameEvent
     -- designation are state a reader can look at, and nothing else in the log
     -- says a temptation happened.
     RingTempted PlayerId.PlayerId
+  | -- | CR 701.68d: this player blighted. Recorded by Pawl.Engine.Blight.blight
+    -- once rule 701.68a's process is complete, "regardless of what events
+    -- actually occurred", so a blight of zero and one whose counters a
+    -- replacement kept off write one just the same -- which is why the
+    -- CountersPut above cannot stand in for it. NOT written on rule 701.68b's
+    -- board, where that process never runs: rule 701.68d has no counterpart to
+    -- rule 701.54d's "even if some or all of those actions were impossible".
+    --
+    -- Not implemented: CR 701.68c's blighted creature, which is a
+    -- resolution-time binding of the instructing effect rather than a payload
+    -- here (#1492).
+    Blighted PlayerId.PlayerId
   deriving (Eq, Ord, Show)

@@ -441,4 +441,10 @@ data TriggerCondition
     -- Not implemented: rule 509.3d's remaining producer, an effect that causes a
     -- creature to block, records no event (#1146).
     PermanentBecomesBlockedBy (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.68d: "whenever a player blights"
+    -- (data\/cards\/synthetic-blight-chronicler.json), against
+    -- GameEvent.Blighted. Fires on the blight itself, so one that put no
+    -- counters -- rule 701.68a's N of zero, or a replacement that kept them off
+    -- -- fires it too.
+    PlayerBlights PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)
