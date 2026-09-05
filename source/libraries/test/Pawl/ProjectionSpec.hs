@@ -4748,14 +4748,14 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
 -- other types", Oracle text fetched from Scryfall 2026-08-20) is the pool's
 -- statement of CR 113.6c. Its -2 and -5 are Pawl.PlaneswalkerSpec's GristLoyalty
 -- group, which no board here reaches: Grist is only ever a card in a hidden zone
--- or a spell on the stack below.
+-- or in exile, or a spell on the stack, below.
 --
 -- Not implemented: the +1's "repeat this process" (#1932). That leaves the card
 -- STRICTER than printed.
 hiddenZoneStaticSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
-  -- CR 113.6b/c: gatherGiven walks the two HIDDEN zones (CR 400.2), which no
-  -- default in CR 113.6 reaches. Grist, the Hunger Tide's "as long as Grist
+  -- CR 113.6b/c: gatherGiven walks the two HIDDEN zones (CR 400.2) and exile,
+  -- none of which any default in CR 113.6 reaches. Grist, the Hunger Tide's "as long as Grist
   -- isn't on the battlefield, it's a 1/1 Insect creature in addition to its
   -- other types" is CR 113.6c's negative form, and rule 400.1's zone list being
   -- finite makes it a stated set holding every zone but the battlefield -- so a
@@ -4850,6 +4850,52 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
       "targetable as a creature spell, where an ordinary planeswalker spell is not"
       (S.castable S.bob gristScatter gristBoard, S.castable S.bob jaceScatter jaceBoard)
       (True, False)
+
+  -- EXILE, which is a PUBLIC zone (CR 400.2) but which CR 113.6 gives no default
+  -- reaching either, so gatherGiven's arm asks CR 113.6b's stated set exactly as
+  -- the two hidden arms above do. Bioplasm ({3}{G}{G} Creature -- Ooze 4/4) is
+  -- the reader: its attack trigger exiles the top card of alice's library and,
+  -- if that card is a creature card, pumps by the exiled card's power and
+  -- toughness. Pawl.PowerToughnessSpec's "Bioplasm" group proves that read
+  -- against an ordinary creature card; here the exiled card is a Grist, whose
+  -- 1/1 exists only because this arm functions its static ability from exile.
+  --
+  -- Jace Beleren is the control, and the pair differs in exactly one thing:
+  -- which legendary planeswalker card sits on top of the library. Without the
+  -- arm, both boards read a plain planeswalker card and Bioplasm stays a 4/4.
+  Spec.it s "CR 113.6c a Grist card in exile is a creature card Bioplasm's attack trigger reads" $ do
+    bioplasm <- S.printingOf s registry "Bioplasm"
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    jace <- S.printingOf s registry "Jace Beleren"
+    forest <- S.printingOf s registry "Forest"
+    let attacked top =
+          let (gs0, mine, _) = S.combatBoardOf [bioplasm] []
+              -- S.addLibraryCard prepends, so the last call is the top of CR
+              -- 401.2's ordered pile; the two Forests under it keep alice from
+              -- decking (CR 104.3c).
+              (_, gs1) = S.addLibraryCard forest S.alice gs0
+              (_, gs2) = S.addLibraryCard forest S.alice gs1
+              (_, gs3) = S.addLibraryCard top S.alice gs2
+           in case mine of
+                [oid] -> (oid, S.runCombat S.aggressiveAnswer gs3)
+                _ -> error "Pawl.ProjectionSpec: expected exactly one attacker"
+        (gristBio, gristAfter) = attacked grist
+        (jaceBio, jaceAfter) = attacked jace
+    Spec.assertEqWith
+      s
+      "+1/+1 off the Grist card in exile, where an ordinary planeswalker card there gives nothing"
+      (S.powerToughnessOf gristBio gristAfter, S.powerToughnessOf jaceBio jaceAfter)
+      (Just (5, 5), Just (4, 4))
+    Spec.assertEqWith
+      s
+      "so bob took the pumped 5 rather than the printed 4"
+      (S.lifeOf S.bob gristAfter, S.lifeOf S.bob jaceAfter)
+      (Just 15, Just 16)
+    Spec.assertEqWith
+      s
+      "and it is the Grist that is sitting in exile"
+      (namesOf gristAfter (Game.zoneMembers Zone.Exile S.alice gristAfter))
+      (Set.singleton (Text.pack "Grist, the Hunger Tide"))
 
 -- Is this action an activation of the Ogre? Pinned to the object, since the board
 -- also holds lands whose mana abilities are actions of their own.

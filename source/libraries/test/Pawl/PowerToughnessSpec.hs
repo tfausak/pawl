@@ -629,6 +629,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   malignusSpec s registry
   toxicDelugeSpec s registry
   fortifyingDraughtSpec s registry
+  bioplasmSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -1943,3 +1944,65 @@ fortifyingDraughtSpec s registry = Spec.describe s "Fortifying Draught" $ do
     Spec.assertEqWith s "the first Draught still read 2" (S.powerToughnessOf pikerId afterOne) (Just (4, 3))
     Spec.assertEqWith s "and the second reads 2 across the handoff, not 4" (S.powerToughnessOf wolvesId afterTwo) (Just (5, 5))
     Spec.assertEqWith s "alice still gained 2 twice in total" (S.lifeOf S.alice afterTwo) (Just 24)
+
+-- Bioplasm ({3}{G}{G} Creature -- Ooze 4/4, Oracle text fetched from Scryfall
+-- 2026-09-05): "Whenever this creature attacks, exile the top card of your
+-- library. If it's a creature card, this creature gets +X/+Y until end of turn,
+-- where X is the exiled creature card's power and Y is its toughness."
+--
+-- CR 400.7j is what lets the second sentence find the first sentence's card: the
+-- move binds its arrival in a slot, and both the "if it's a creature card" test
+-- (a Count over Scope.OverBound) and the two AgainstSlot quantities read that
+-- binding back. CR 611.2d then fixes the two numbers as the layer-7c effect is
+-- created, which Projection.freezeQuantities does against the resolution's slot
+-- map -- so the pump outlives the resolution that made it, and is still there at
+-- the combat damage step (CR 510.1) and after combat ends.
+--
+-- alice's library holds two Forests under the card being read, so no board here
+-- runs out of cards (CR 104.3c) and the card exiled is the one this fixture put
+-- on top.
+bioplasmBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+bioplasmBoard bioplasm filler top =
+  let (gs0, mine, _) = S.combatBoardOf [bioplasm] []
+      -- S.addLibraryCard puts each card at the HEAD of CR 401.2's ordered pile,
+      -- which is its top, so `top` is added last.
+      (_, gs1) = S.addLibraryCard filler S.alice gs0
+      (_, gs2) = S.addLibraryCard filler S.alice gs1
+      (_, gs3) = S.addLibraryCard top S.alice gs2
+   in case mine of
+        [oid] -> (oid, gs3)
+        _ -> error "Pawl.PowerToughnessSpec: expected exactly one attacker"
+
+bioplasmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bioplasmSpec s registry = Spec.describe s "Bioplasm" $ do
+  -- THE PROVING CASE. Goblin Piker is a 2/1, so power and toughness take
+  -- DIFFERENT amounts: reading toughness where the card says power leaves a 5/6
+  -- rather than a 6/5. bob's life is the second, independent reading -- the pump
+  -- was live at the combat damage step, not merely at the moment the assertion
+  -- looks.
+  Spec.it s "CR 611.2d the pump reads the exiled card's own power and toughness" $ do
+    bioplasm <- S.printingOf s registry "Bioplasm"
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    let (bioId, board) = bioplasmBoard bioplasm forest piker
+        after = S.runCombat S.aggressiveAnswer board
+    Spec.assertEqWith s "printed 4/4 before it attacks" (S.powerToughnessOf bioId board) (Just (4, 4))
+    Spec.assertEqWith s "+2/+1 off the exiled 2/1, still standing once combat is over" (S.powerToughnessOf bioId after) (Just (6, 5))
+    Spec.assertEqWith s "and bob took the pumped 6" (S.lifeOf S.bob after) (Just 14)
+    Spec.assertEqWith s "the Piker left the library" (S.countByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
+  -- The paired control, differing in exactly one thing: which card is on top.
+  -- The exile still happens; the CR 400.7j read finds a land card, so the
+  -- conditional clause is not performed at all.
+  Spec.it s "CR 608.2c a land on top is exiled and pumps nothing" $ do
+    bioplasm <- S.printingOf s registry "Bioplasm"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let (bioId, board) = bioplasmBoard bioplasm forest mountain
+        after = S.runCombat S.aggressiveAnswer board
+    Spec.assertEqWith s "still the printed 4/4" (S.powerToughnessOf bioId after) (Just (4, 4))
+    Spec.assertEqWith s "and bob took 4" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "the Mountain left the library" (S.countByName (CardName.MkCardName (Text.pack "Mountain")) S.alice after) 0
