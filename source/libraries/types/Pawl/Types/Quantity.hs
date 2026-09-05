@@ -1,6 +1,7 @@
 module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
+import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count
@@ -154,8 +155,9 @@ data Quantity
     -- the battlefield out of that player's copy of that zone? 1 if so and 0 if not.
     EnteredFrom InZone.InZone
   | -- | CR 601.2a / 400.3: did the object this quantity is evaluated against enter
-    -- the battlefield as a spell that player cast out of their copy of that zone?
-    WasCastFrom InZone.InZone
+    -- the battlefield as a spell the payload's caster cast out of the payload's
+    -- zone? The two references are independent; see Pawl.Types.CastFrom.
+    WasCastFrom CastFrom.CastFrom
   | -- | CR 509.1h / 702.23a: how many creatures block the object this quantity
     -- is evaluated against, beyond the first; unblocked reads 0.
     BlockersBeyondFirst

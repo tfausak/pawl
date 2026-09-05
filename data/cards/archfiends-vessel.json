@@ -69,14 +69,16 @@
                   "measured": {
                     "type": "WasCastFrom",
                     "value": {
-                      "player": {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
+                      "from": {
+                        "player": {
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
+                        },
+                        "zone": {
+                          "type": "Graveyard"
                         }
-                      },
-                      "zone": {
-                        "type": "Graveyard"
                       }
                     }
                   },

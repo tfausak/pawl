@@ -7,6 +7,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Count as Count
@@ -435,20 +436,24 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.EnteredThisTurn
       " {\"type\":\"EnteredThisTurn\"} "
-  -- CR 400.7's origin zone and CR 601.2a's cast zone, each carrying an InZone --
-  -- the payload a Count's scope carries, so the decoder that rejects a shared zone
-  -- scoped to one player covers these arms without a second predicate.
-  Spec.it s "EnteredFrom and WasCastFrom carry an InZone" $ do
+  -- CR 400.7's origin zone carries an InZone -- the payload a Count's scope
+  -- carries, so the decoder that rejects a shared zone scoped to one player
+  -- covers this arm without a second predicate.
+  Spec.it s "EnteredFrom carries an InZone" $
     Common.assertCodec
       s
       Quantity.codec
       (Quantity.EnteredFrom (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)))
       " {\"type\":\"EnteredFrom\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}} "
+  -- CR 601.2a's cast wraps that same InZone beside a caster of its own; the
+  -- payload's own arms are Pawl.Codec.CastFromSpec's, and what this proves is
+  -- the TAG that reaches them.
+  Spec.it s "WasCastFrom carries a CastFrom, caster elided at You" $
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.WasCastFrom (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)))
-      " {\"type\":\"WasCastFrom\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}} "
+      (Quantity.WasCastFrom (CastFrom.MkCastFrom (PlayerRef.Relative PlayerRelation.You) (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You))))
+      " {\"type\":\"WasCastFrom\",\"value\":{\"from\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}}} "
   -- CR 509.1h with NOTHING on the wire: the object is the one the quantity is
   -- evaluated against, so this is a bare tag like Power and ManaValue.
   Spec.it s "BlockersBeyondFirst is nullary" $

@@ -8,6 +8,7 @@
 module Pawl.ConditionSpec where
 
 import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
@@ -41,6 +42,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -313,15 +315,12 @@ enteredFromSpec s registry =
 -- The two disjuncts take their references for different reasons. The EnteredFrom
 -- half is exact on its face: PlayerRef.EachPlayer makes its owner conjunct
 -- vacuous, which is the printed "a graveyard", and every case below drives that
--- half. The WasCastFrom half is PlayerRef.Relative You, which reads "you cast it
--- from your graveyard" -- one reference standing for the caster and for the card's
--- owner alike -- and that is exact only because no card in the pool casts a spell
--- out of a graveyard that is not the caster's own (CR 400.3, and the permission
--- #2795 names; Pawl.Engine.Quantity's WasCastFrom arm carries the argument and
--- the two roads that could break it, #2689). EachPlayer would be the wrong call there: it reads
--- "anyone cast it", which is weaker than printed. The last case drives the
--- WasCastFrom disjunct's negative -- the Skeleton is cast from a HAND -- and
--- Archfiend's Vessel above is where its positive is proved.
+-- half. The WasCastFrom half is caster PlayerRef.Relative You over
+-- PlayerRef.EachPlayer's graveyards -- "you cast it", out of anybody's pile --
+-- which is what Pawl.Types.CastFrom's two references are for; foreignGraveyardCastSpec
+-- below is where the two halves name different seats and the reading is proved.
+-- The last case here drives the WasCastFrom disjunct's negative -- the Skeleton is
+-- cast from a HAND -- and Archfiend's Vessel above is where its positive is proved.
 --
 -- Reassembling Skeleton supplies the entrant: "{1}{B}: Return this card from your
 -- graveyard to the battlefield tapped" is one activation, so the entry comes out
@@ -415,6 +414,79 @@ interveningRecheckSpec s registry =
               Spec.assertEqWith s "the Knight is still 2/2" (sizeOf knightId (resolveTop killed)) (Just 2, Just 2)
               Spec.assertEqWith s "because CR 603.4's clause was false, so nothing triggered" (length (GameState.stack raised)) 0
             entrants -> Spec.assertEqWith s "exactly one Skeleton entered" (length entrants) 1
+
+-- Pins the trigger's target to one card by FILTERING the offered set, takes CR
+-- 608.2g's "may", and attacks bob with everything otherwise.
+--
+-- The target is filtered rather than built, so CR 608.2b's re-read at resolution
+-- cannot drop it, and it is pinned by identity rather than searched for: an
+-- answerer picking whatever was legal would find the same card again after a
+-- mutation.
+stealing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+stealing wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just wanted) . Recipient.objectOf) legal) sets
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.attackTo S.bob p
+
+-- CR 601.2a's caster and CR 400.3's zone owner on DIFFERENT seats: the board
+-- Pawl.Engine.Quantity's WasCastFrom arm needed and pawl could not build until
+-- Tinybones, the Pickpocket landed. alice's Tinybones deals combat damage to bob
+-- and casts an Archfiend's Vessel out of BOB's graveyard, so the spell's caster
+-- is alice and the graveyard -- and by CR 400.3 the card -- is bob's.
+--
+-- TWO READERS ON ONE BOARD, answering opposite ways off that one cast:
+--
+--   * Breathless Knight's "you cast it from A graveyard" is caster You over
+--     PlayerRef.EachPlayer's graveyards, and it holds -- the Knight takes its
+--     +1/+1 counter.
+--   * The Vessel's own "you cast it from YOUR graveyard" is caster You over your
+--     own graveyard, and it does not -- no Demon token.
+--
+-- One reference could not have told them apart: naming alice it would have made
+-- both false, naming the table both true, and the pair is what makes a fix that
+-- merely widens the reference visible. The EnteredFrom disjunct each card carries
+-- beside its WasCastFrom one is false either way: a permanent spell enters the
+-- battlefield out of the STACK (CR 608.3), not out of any graveyard.
+foreignGraveyardCastSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+foreignGraveyardCastSpec s registry =
+  Spec.describe s "ForeignGraveyardCast"
+    . Spec.it s "CR 601.2a a creature cast out of ANOTHER player's graveyard grows the Knight"
+    $ do
+      swamp <- S.printingOf s registry "Swamp"
+      tinybones <- S.printingOf s registry "Tinybones, the Pickpocket"
+      knight <- S.printingOf s registry "Breathless Knight"
+      vessel <- S.printingOf s registry "Archfiend's Vessel"
+      amalgam <- S.printingOf s registry "Prized Amalgam"
+      let (combat, mine, _) = S.combatBoardOf [tinybones, knight] []
+          (stolen, staged) = S.addGraveyardCard vessel S.bob (S.landsFor swamp S.alice 2 combat)
+          after = S.runCombat (stealing stolen) (snd (S.addGraveyardCard amalgam S.bob staged))
+          vessels owner =
+            [ oid
+            | oid <- Set.toList (GameState.battlefield after),
+              S.soleFaceName oid after == S.printingName vessel,
+              fmap Object.owner (Map.lookup oid (GameState.objects after)) == Just owner
+            ]
+      case mine of
+        [_, knightId] -> do
+          Spec.assertEqWith s "CR 603.4 the Knight grew, so it read the cast out of bob's graveyard" (Projection.powerOf knightId after, Projection.toughnessOf knightId after) (Just 3, Just 3)
+          -- The same cast, read by the card whose clause names ONE graveyard.
+          -- Without this a fix that widened the reference instead of splitting it
+          -- would pass the assertion above.
+          Spec.assertEqWith s "CR 603.4 and the Vessel's own YOUR graveyard clause was false, so no Demon" (length (S.tokensOf after)) 0
+          -- CR 601.2a's CASTER, on the one board where it comes apart from the
+          -- zone's owner. bob's own Prized Amalgam reads "you cast it from your
+          -- graveyard" -- his graveyard, and the card was cast out of it, but by
+          -- ALICE. Its other two conjuncts both hold, which leaves the caster the
+          -- only one that can answer no, and its delayed ability is what an
+          -- answer of yes would have armed.
+          Spec.assertEqWith s "CR 601.2a bob did not cast it, so his Amalgam armed nothing" (Seq.length (GameState.delayedTriggers after)) 0
+          -- The board, recorded after the behaviour: the cast really happened and
+          -- really was out of a pile that is not alice's, so the negatives above
+          -- are the clauses' answers rather than a cast that never took place.
+          case vessels S.bob of
+            [taken] -> Spec.assertEqWith s "CR 400.3 the Vessel bob owns is alice's permanent" (Projection.controllerOf taken after) (Just S.alice)
+            other -> Spec.assertFailure s ("expected exactly one Vessel bob owns on the battlefield, got " <> show (length other))
+        other -> Spec.assertFailure s ("expected alice's two creatures, got " <> show (length other))
 
 -- Aims an "up to one" target slot at `victim` by FILTERING the offered set, so a
 -- hand-built recipient cannot miss CR 608.2b's re-read. S.identityAnswer declines,
@@ -693,6 +765,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   enteredThisTurnSpec s registry
   enteredFromSpec s registry
   interveningRecheckSpec s registry
+  foreignGraveyardCastSpec s registry
   lastKnownTokenSpec s registry
   lastKnownBlockingSpec s registry
   damageDealtToItSpec s registry
