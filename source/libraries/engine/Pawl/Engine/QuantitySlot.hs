@@ -102,11 +102,11 @@ overSlots f quantity = case quantity of
   -- at all, and PlayerRef.InSlot names a TARGET slot, which is Resolve's half of
   -- the lint. Count's Scope is in the same position.
   --
-  -- Resolve.slotsOf does NOT in fact recover such a nested ref, so inside an
-  -- EFFECT's quantity no lint sees it (#1079). nestedRefs below reports these
-  -- arms, which is what Resolve.targetSlotSlots reads for a CR 202.3 computed
-  -- bound and what slotsAreExhaustive reads so the CR 603.3b elision cannot rest
-  -- on the gap.
+  -- nestedRefs below reports these arms, and Resolve.Slots.quantitySlots folds
+  -- it -- which is what carries the read to the D4 dataflow lint wherever an
+  -- effect's quantity holds one, what Resolve.targetSlotSlots reads for a CR
+  -- 202.3 computed bound, and what slotsAreExhaustive reads so the CR 603.3b
+  -- elision cannot rest on a gap.
   Quantity.ManaCount _ -> pure quantity
   -- The same position a third time: this arm's PlayerRef.InSlot names a TARGET
   -- slot, not an amount one.
@@ -176,10 +176,10 @@ overSlots f quantity = case quantity of
   -- BlockersBeyondFirst is.
   Quantity.StationMeasure -> pure quantity
   -- The one arm that names a TARGET slot and is visited here anyway. Every other
-  -- nested target slot is a PlayerRef this function leaves to Resolve.slotsOf,
-  -- which cannot see it (#1079); reporting this one is what lets slotsOf recover
-  -- it, and so what keeps Soul's Majesty's declared target on the read side of
-  -- the D4 lint. The payload may hide slots of its own.
+  -- nested target slot is a PlayerRef this function leaves to nestedRefs below;
+  -- reporting this one here is what keeps Soul's Majesty's declared target on the
+  -- read side of the D4 lint at SlotArity.One rather than Many, the arity
+  -- Filter.slotOneObject needs. The payload may hide slots of its own.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> fmap Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot <$> f slot <*> recur inner)
   where
     recur = overSlots f
@@ -230,8 +230,8 @@ renameRefSlots rename = go
 
 -- Every read of a slot this quantity makes that `slots` above does not report: a
 -- PlayerRef nested inside it, which names a TARGET slot rather than an amount one
--- and which that function leaves to Resolve.slotsOf -- and slotsOf cannot see a
--- reference buried in a quantity (#1079) -- plus CR 400.7j's Scope.OverBound,
+-- and which that function leaves to Resolve.Slots.quantitySlots, the fold that
+-- carries it to the D4 dataflow lint -- plus CR 400.7j's Scope.OverBound,
 -- which names a slot outright. `Left` is a reference, whose ARITY only the reader
 -- knows (Resolve.playerRefSlots); `Right` is a slot named directly.
 --
@@ -301,6 +301,88 @@ nestedRefs quantity = case quantity of
   -- Its own slot is left out because `slots` above DOES report it, unlike the
   -- nested PlayerRefs; the payload is walked like any other.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> nestedRefs inner
+
+-- Every Count reachable from a Quantity: a leaf Count directly, plus the ones
+-- nested through the arms that compose one (CR 208.2's printed 1+*, CR 107.1a's
+-- rounding, a negation, an aggregation's per-member number) and through
+-- AgainstSlot's redirected payload.
+--
+-- ONE enumeration for two readers that must not disagree about where a Count
+-- sits: Resolve.Slots.quantitySlots reads each Count's FILTER, which is card text
+-- naming slots like any other (a Filter.IsBound under a fold is a read of the
+-- resolving object's bindings), and Pawl.CardSpec's Count sweeps ask the same
+-- Counts about their scopes and counter kinds.
+--
+-- One arm per constructor, no wildcard, for `slots`' and nestedRefs' reason: a
+-- new quantity arm that composes another quantity must answer here rather than
+-- silently hide a Count from both readers.
+nestedCounts :: Quantity -> [Count.Type.Count Quantity]
+nestedCounts quantity = case quantity of
+  Quantity.Literal _ -> []
+  Quantity.ManaValue -> []
+  Quantity.Power -> []
+  Quantity.Toughness -> []
+  -- A slot read, not a fold over game state: the value was bound by an earlier
+  -- effect of the same resolution and there is no Count inside it.
+  Quantity.InSlot _ -> []
+  Quantity.Star -> []
+  Quantity.Plus (Plus.MkPlus a b) -> nestedCounts a <> nestedCounts b
+  -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it halves
+  -- may be one -- Malignus halves a fold over players.
+  Quantity.Halved (Halved.MkHalved _ inner) -> nestedCounts inner
+  -- Not a leaf: a minus sign hides nothing -- Toxic Deluge's -X.
+  Quantity.Negate a -> nestedCounts a
+  -- The leaf itself, and DESCENT into a Greatest's per-member number, which may
+  -- be a Count of its own.
+  Quantity.Count c -> c : foldCount nestedCounts c
+  -- A fold over a MANA POOL (CR 106.4), not over a zone: it holds no
+  -- Pawl.Types.Count and no Pawl.Types.Filter. See Pawl.Types.ManaCount.
+  Quantity.ManaCount _ -> []
+  -- Every remaining arm is a leaf reading a scalar off a player, an object or the
+  -- game, so none of them holds a Count:
+  Quantity.LifeTotal _ -> []
+  Quantity.Speed _ -> []
+  Quantity.IsMonarch _ -> []
+  Quantity.IsStartingPlayer _ -> []
+  Quantity.IsActivePlayer _ -> []
+  Quantity.HasDesignation _ -> []
+  Quantity.ClassLevel -> []
+  Quantity.WasKicked -> []
+  -- CR 702.33d's per-cost tally reads a Cost off the spell's own announcement,
+  -- and no traversal of this type can carry a Cost; Pawl.CardSpec's
+  -- timesKickedWithOffends checks that field off the encoding instead.
+  Quantity.TimesKickedWith {} -> []
+  Quantity.TagWasSpent {} -> []
+  Quantity.WasToken -> []
+  Quantity.WasBlocking -> []
+  Quantity.DamageDealtToThisTurn -> []
+  Quantity.PlayerCounters {} -> []
+  -- CR 122.1's per-OBJECT tally: a CounterKind with no Count beside it. The KIND
+  -- may carry a Filter of its own (CR 122.1b), which Pawl.CardSpec's
+  -- quantityKindFilters is what digs out.
+  Quantity.ObjectCounters _ -> []
+  Quantity.ObjectCountersOfAnyKind -> []
+  Quantity.OpponentsAttacked _ -> []
+  Quantity.CardsDiscardedThisTurn _ -> []
+  Quantity.LifeGainedThisTurn _ -> []
+  Quantity.PlayersDealtDamageThisTurn _ -> []
+  Quantity.DamageDealtToPlayersThisTurn _ -> []
+  Quantity.SpellsCastLastTurn _ -> []
+  Quantity.DungeonsCompleted _ -> []
+  Quantity.CompletedDungeon {} -> []
+  Quantity.EnteredThisTurn -> []
+  -- CR 400.7's logged origin zone and CR 601.2a's logged cast: player references
+  -- and nothing else. The shared-zone pairing either InZone could state is
+  -- rejected at the decoder by Pawl.Codec.InZone.undividedShared, and
+  -- Pawl.CardSpec's cardOffendsSharedZoneScope restates it only over a Count's
+  -- scope, so these two are covered once rather than twice (see #161).
+  Quantity.EnteredFrom _ -> []
+  Quantity.WasCastFrom _ -> []
+  Quantity.BlockersBeyondFirst -> []
+  Quantity.StationMeasure -> []
+  -- Not a leaf: aiming the evaluation at another object does not stop the payload
+  -- from being a Count.
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> nestedCounts inner
 
 -- A scope's own read. Both scopes that name players take a PlayerRef and CR
 -- 608.2i's look-back names nothing, so the same question as the arms above --

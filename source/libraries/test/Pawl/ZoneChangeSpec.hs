@@ -94,6 +94,13 @@ atBobAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
+-- atBobAnswer with CR 701.9a's choice pinned by INDEX rather than left to the
+-- identity answerer, so a discard of two takes two distinct cards.
+discardAtBob :: Prompt.Prompt r -> r
+discardAtBob p = case p of
+  Prompt.ChooseDiscard _ _ ids n -> take (Natural.toIntSaturating n) ids
+  _ -> atBobAnswer p
+
 -- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
 handCards :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameState -> GameState.GameState
 handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
@@ -643,6 +650,40 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "and reached no hand" (S.handSize S.alice after) 0
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
     Spec.assertEqWith s "bob's graveyard holds the piker" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName piker)]
+  -- CR 701.9a's per-turn TALLY, the same log read as a number rather than as the
+  -- set one resolution moved: Dream Salvage's "draw cards equal to the number of
+  -- cards target opponent discarded this turn". The declared target is read ONLY
+  -- through that number -- the draw itself is CR 109.5's caster -- which is the
+  -- shape the D4 dataflow lint could not see until Resolve.Slots.quantitySlots
+  -- folded QuantitySlot.nestedRefs; Pawl.AbilitySlotLintSpec's "the lint itself
+  -- catches a slot read only from inside a number" is the rejecting half.
+  --
+  -- TWO boards differing in exactly one thing, the size of bob's hand, so the
+  -- draw cannot be a literal that happens to agree: Mind Rot names two cards and
+  -- CR 609.3 makes a one-card hand give what it has, so the tallies are two and
+  -- one. Alice's library is stocked past the larger draw, and bob's hand is
+  -- filled with a printing alice's library does not hold, so a drawn card cannot
+  -- be mistaken for a discarded one.
+  Spec.it s "CR 701.9a Dream Salvage draws as many cards as the target discarded this turn" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mindRot <- S.printingOf s registry "Mind Rot"
+    salvage <- S.printingOf s registry "Dream Salvage"
+    let drawnAfterDiscarding held =
+          let base = stockLibrary piker S.alice 3 (S.landsInPlay swamp 4)
+              withHand = handCards swamp S.bob held base
+              (gs, rotId) = S.handOne mindRot withHand
+              (staged, salvageId) = S.handOne salvage gs
+              rotCast = snd (Engine.runGamePure discardAtBob staged (S.cast S.alice rotId))
+              rotted = snd (Engine.runGamePure discardAtBob rotCast Stack.resolveTop)
+              salvageCast = snd (Engine.runGamePure discardAtBob rotted (S.cast S.alice salvageId))
+           in snd (Engine.runGamePure discardAtBob salvageCast Stack.resolveTop)
+        two = drawnAfterDiscarding 3
+        one = drawnAfterDiscarding 1
+    Spec.assertEqWith s "two discarded, two drawn" (namesIn Zone.Hand S.alice two) [Just (S.printingName piker), Just (S.printingName piker)]
+    Spec.assertEqWith s "and bob really discarded two" (namesIn Zone.Graveyard S.bob two) [Just (S.printingName swamp), Just (S.printingName swamp)]
+    Spec.assertEqWith s "one discarded, one drawn" (namesIn Zone.Hand S.alice one) [Just (S.printingName piker)]
+    Spec.assertEqWith s "and bob really discarded one" (namesIn Zone.Graveyard S.bob one) [Just (S.printingName swamp)]
   -- The same rider read through a CR 614 redirect. Rest in Peace replaces the
   -- discard's destination with exile, which CR 400.2 lists among the public
   -- zones, so CR 400.7j keeps the discarded card findable by a later part of the
