@@ -27,9 +27,8 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, noSubgame, performManaAbility, targetSlotsOf)
-import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotsAreExhaustive, slotsOf)
+import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -118,33 +117,21 @@ targetSlotSlots slot =
       -- What it buys is the pairing -- a card whose bound names an amount its
       -- CONDITION does not supply (Pawl.Engine.Event.Binding.eventBindingSlots) is caught
       -- only because the read is reported here. No card in data/cards/ misauthors
-      -- that pairing, so the proof is a planted one; see amountSlots below for
-      -- which case proves it.
-      maybe Map.empty amountSlots (TargetSlot.amount slot)
+      -- that pairing, so the proof is a planted one.
+      --
+      -- quantitySlots' WHOLE answer, which is what makes a bound naming a slot
+      -- only through a PlayerRef buried inside the number ("mana value X or less,
+      -- where X is the amount of life THAT PLAYER gained this turn") or through CR
+      -- 400.7j's Scope.OverBound visible to the equality above.
+      -- Pawl.AbilitySlotLintSpec's "the lint itself catches a computed bound
+      -- naming a slot through a player" is the case that proves it.
+      maybe Map.empty quantitySlots (TargetSlot.amount slot)
     ]
-  where
-    -- The bound's own reads: quantitySlots' -- a Quantity.InSlot naming the
-    -- slot's amount -- plus the ones only QuantitySlot.nestedRefs reports, a slot
-    -- named through a PlayerRef buried inside the number ("mana value X or less,
-    -- where X is the amount of life THAT PLAYER gained this turn") or through CR
-    -- 400.7j's Scope.OverBound. Without them a bound naming a slot its carrier
-    -- never binds is invisible to the equality above, which is the one defect the
-    -- fold exists to catch; Pawl.CardSpec's "the lint itself catches a computed
-    -- bound naming a slot through a player" is what proves it.
-    --
-    -- The arities are playerRefSlots' rather than One across the board, because
-    -- the count lint reads these values: PlayerRef.EachInSlot takes every player
-    -- a slot names and CR 400.7j's fold every object, so neither is damaged by a
-    -- plural slot.
-    amountSlots quantity =
-      joinSlots
-        ( quantitySlots quantity
-            : fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (QuantitySlot.nestedRefs quantity))
-        )
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
--- [a player] pays" names, and every slot a target slot's own pool, filter or
--- bound names. A payer or pool slot no effect also reads would otherwise dangle.
+-- [a player] pays" names, every slot a CR 701.46a "if" tests, and every slot a
+-- target slot's own pool, filter or bound names. A payer, gate or pool slot no
+-- effect also reads would otherwise dangle.
 modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
   joinSlots
@@ -152,6 +139,7 @@ modeSlots mode =
       joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
       joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
       joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
+      joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
       joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
     ]
   where
@@ -168,6 +156,12 @@ modeSlots mode =
     -- 608.2d's announcement is scoped to a clause pair and its reference may
     -- name a slot.
     chooserSlot = maybe Map.empty (playerRefSlots . OrElse.chooser) . Clause.orElse
+    -- And every clause's CR 701.46a "if", which CR 608.2c lets read what an
+    -- earlier clause of the same resolution bound: Psychic Miasma's "if a land
+    -- card is discarded this way" counts over CR 400.7j's fold of the slot its
+    -- first clause binds. A gate is the ONLY place a card may read a slot and
+    -- perform nothing, so a read reported nowhere else dangles here.
+    conditionSlot = maybe Map.empty conditionSlots . Clause.condition
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard), read singly.

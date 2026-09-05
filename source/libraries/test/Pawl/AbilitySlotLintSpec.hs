@@ -51,6 +51,9 @@ import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
@@ -728,6 +731,84 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       "a bound folding over the objects a slot names reports that slot"
       (Map.keysSet (Resolve.targetSlotSlots (TargetSlot.withAmount overBound (TargetSlot.required Pool.Permanents Nothing))))
       (Set.singleton target)
+  -- The same equality on a read that is not an effect's operand, a target slot's
+  -- pool, its filter or its bound: CR 701.46a's per-clause "if". CR 608.2c lets a
+  -- later clause's gate read what an earlier one bound, so a gate is the one
+  -- place a card may read a slot and perform nothing with it -- and until
+  -- Resolve.modeSlots folded Clause.condition such a read was recovered by
+  -- nobody, so a card could gate on a player its condition never binds and
+  -- silently never fire.
+  --
+  -- BOTH carriers of a slot inside a condition, because either alone would pass
+  -- if only the other were folded: a PlayerRef buried in one of the compared
+  -- numbers, and CR 400.7j's fold, whose slot the FILTER of the Count names.
+  Spec.it s "the lint itself catches a slot read only from a clause's condition" $ do
+    let gated condition =
+          Mode.MkMode
+            (Seq.fromList [Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) Nothing))), Clause.MkClause Nothing (Just condition) Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) Nothing)))])
+            Map.empty
+        atLeastOne measured = Condition.Type.Compares (Compares.MkCompares measured Comparison.AtLeast (Quantity.Type.Literal 1))
+        -- "if that player has gained life this turn", the reference nested in the
+        -- number Resolve.slotsOf cannot reach from an effect's own field.
+        throughRef = atLeastOne (Quantity.Type.LifeGainedThisTurn (PlayerRef.InSlot Binding.triggerPlayer))
+        -- "if that player controls a permanent", the same read one carrier over:
+        -- the slot is named by the FILTER of a Count rather than by a PlayerRef.
+        throughCountFilter =
+          atLeastOne
+            ( Quantity.Type.Count
+                (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) (Filter.Type.ControlledByBound Binding.triggerPlayer) Aggregation.Members)
+            )
+        -- And the pair that differs in exactly one thing: the same condition
+        -- reading CR 109.5's caster instead of a slot, which no trigger has to
+        -- bind, so the lint reads the reference rather than rejecting every gate.
+        throughNoSlot = atLeastOne (Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You))
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [gated throughRef]))
+      "CR 608.2c thatPlayer inside a condition's number under an enters trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDealsCombatDamageToPlayer [gated throughRef])))
+      "and under a combat-damage trigger it is accepted"
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [gated throughCountFilter]))
+      "CR 608.2c thatPlayer inside a condition's count filter under an enters trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDealsCombatDamageToPlayer [gated throughCountFilter])))
+      "and that one too is accepted under a combat-damage trigger"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [gated throughNoSlot])))
+      "where a condition naming no slot at all is accepted"
+  -- The same equality on a slot read only from inside an EFFECT's number, which
+  -- is the half the condition boards above cannot prove: Resolve.slotsOf inspects
+  -- a player reference only on an effect's own field, so a reference buried in a
+  -- Quantity was recovered by nobody until quantitySlots folded
+  -- QuantitySlot.nestedRefs. Dream Salvage writes it -- "draw cards equal to the
+  -- number of cards target opponent discarded this turn" -- and
+  -- Pawl.ZoneChangeSpec drives that card at gameplay level.
+  Spec.it s "the lint itself catches a slot read only from inside a number" $ do
+    let drawsTally ref =
+          Mode.MkMode
+            (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.CardsDiscardedThisTurn ref) Nothing)))))
+            Map.empty
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [drawsTally (PlayerRef.InSlot Binding.triggerPlayer)]))
+      "CR 608.2h thatPlayer inside an effect's number under an enters trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDealsCombatDamageToPlayer [drawsTally (PlayerRef.InSlot Binding.triggerPlayer)])))
+      "and under a combat-damage trigger it is accepted"
+    -- The pair that differs in exactly one thing, the arm of the reference: a
+    -- number reading CR 109.5's caster stays accepted, so the lint reads the
+    -- reference rather than rejecting every tally.
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [drawsTally (PlayerRef.Relative PlayerRelation.You)])))
+      "where a number naming no slot at all is accepted"
   -- The same equality over a card's ACTIVATED abilities, the one carrier with no
   -- event slot answering a read at all: an activation is not an event. See
   -- activatedAbilityOffends for the whole of it.

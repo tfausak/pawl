@@ -47,6 +47,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
+import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -179,11 +180,35 @@ insertOne slot = joinTwo (oneSlot slot)
 -- Both halves are reported so that the KEYS stay QuantitySlot.slots' whole answer:
 -- an InSlot read is a read, and the D4 dataflow lint counts it; see #2774.
 -- Map.union is left-biased, so a slot read both ways is One.
+--
+-- Two further halves neither of those two functions reports, and a number that
+-- names a slot only through one of them is a read nobody else recovers --
+-- Resolve.slotsOf inspects a player reference only on an effect's OWN field:
+--
+--   * QuantitySlot.nestedRefs' -- a PlayerRef buried in the number ("cards equal
+--     to the number of cards target opponent discarded this turn", Dream
+--     Salvage), and CR 400.7j's Scope.OverBound, which names a slot outright
+--     (Psychic Miasma's "if a land card is discarded this way"). The arities are
+--     playerRefSlots' rather than One across the board, for targetSlotSlots'
+--     reason: EachInSlot takes every player a slot names and CR 400.7j's fold
+--     every object, so neither is damaged by a plural slot.
+--   * Every nested Count's FILTER (QuantitySlot.nestedCounts). A Filter.IsBound
+--     under a fold is judged against the resolving object's bindings
+--     (Pawl.Engine.Filter.matches' identity arm) exactly as one on an effect's own
+--     field is, and the pool writes the shape -- Caldera Breaker, Into the Wilds,
+--     Wild Evocation. Reported at SlotArity.Many, never One: a filter's own reads
+--     are the group Filter.Context.slotObjects hands it, and WHICH of its atoms is
+--     damaged by a plural slot is Pawl.EffectLintSpec's framedSlotsReadSingly,
+--     which reaches these same filters through CardSpec.effectFilters.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots quantity =
-  Map.union
-    (Map.fromSet (const SlotArity.One) (Quantity.objectSlots quantity))
-    (Map.fromSet (const SlotArity.Amount) (QuantitySlot.slots quantity))
+  joinSlots
+    ( Map.union
+        (Map.fromSet (const SlotArity.One) (Quantity.objectSlots quantity))
+        (Map.fromSet (const SlotArity.Amount) (QuantitySlot.slots quantity))
+        : fmap (Map.fromSet (const SlotArity.Many) . Filter.boundSlots . Count.Type.filter) (QuantitySlot.nestedCounts quantity)
+          <> fmap (either playerRefSlots (`Map.singleton` SlotArity.Many)) (Set.toList (QuantitySlot.nestedRefs quantity))
+    )
 
 -- The Quantities an entry rider carries: CR 122.6's count per counter kind, which
 -- a card may write as anything a Quantity spells. A position the three walkers
@@ -1589,11 +1614,10 @@ boundSlots effect = case effect of
   -- CR 701.9a's cards "discarded this way", as CR 400.7's incarnations. The
   -- These arm has none, for the reason its type carries.
   --
-  -- A REGRESSION FENCE rather than proven behaviour: emptying this arm leaves
-  -- the suite green. The only consumer is Pawl.CardSpec's D4 dataflow lint, and
-  -- the read it would have to notice is a Filter.IsBound inside a Count inside a
-  -- Clause.condition -- which modeSlots does not fold at all, and which
-  -- Count.slots would not descend into if it did (#1079).
+  -- PROVEN rather than fenced: Psychic Miasma's second clause counts over CR
+  -- 400.7j's fold of this slot, Resolve.modeSlots folds a clause's condition and
+  -- quantitySlots above reports that scope, so emptying this arm reddens
+  -- Pawl.CardSpec's "no dangling or unused slots".
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded) -> foldMap Set.singleton mDiscarded
     Discard.These _ -> Set.empty
