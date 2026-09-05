@@ -470,12 +470,13 @@ hasChosenNameCounts card =
 -- a target slot, an affected set, a Count filter or a cost criterion is a silent
 -- False rather than a rejected card. This is where that is made loud.
 --
--- The SAME framing canAttachToSubjectOffends fences, and for a different rule:
--- both atoms are answerable exactly where the search arm's own context and view
--- are built, so one Framing carries two fences.
+-- SearchFramed is the framing canAttachToSubjectOffends fences, and for a
+-- different rule: that atom needs the search arm's own VIEW as well as its
+-- context, so it is admitted in that one position where this atom is admitted in
+-- two.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside a search, or the traversal and the codec
+-- traversal found the atom outside those two positions, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence. Unlike its three siblings' the second disjunct is PROVED here rather
