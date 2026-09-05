@@ -31,12 +31,13 @@ import qualified Pawl.Types.Prompt as Prompt
 -- pool a caller pointed the registry at, the same posture Pawl.Registry's own
 -- header takes about what a registry is for.
 --
--- The face is resolved by the NAME chosen, which is CR 201.4b, CR 201.4d and CR
--- 201.4e in one step: a split card's half, a double-faced card's back face and a
--- meld pair's combined back face are each keyed in Pawl.Registry.index, and each
--- is judged on "only that half's characteristics". Game.resolveFace falls back to
--- CR 709.4a's combined view for a name that is the card's without being any one
--- face's.
+-- The face is resolved by the NAME chosen, which is CR 201.4b and CR 201.4d in
+-- one step: a split card's half and a double-faced card's back face are both
+-- keyed in Pawl.Registry.index, and rule 201.4a is put to "only that half's" or
+-- "only the back face's" characteristics. The alternative names CR 201.4c and CR
+-- 201.4f allow are judged the same way, on the face the index keys under that
+-- name. Game.resolveFace falls back to CR 709.4a's combined view for a name that
+-- is the card's without being any one face's.
 --
 -- Matched through Pawl.Engine.Projection.View.viewOfCard off the printed face,
 -- Pawl.Engine.Companion.fulfilled's posture and for its reason: a card outside
