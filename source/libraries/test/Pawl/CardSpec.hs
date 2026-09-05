@@ -3991,6 +3991,12 @@ blockPermissionFilters permission =
 --     TARGET SLOT filter: CR 702.6c's equip quality. Answered by
 --     Pawl.Engine.Target.admittedGiven like InTargetSlot, with the bindings and
 --     the chosen player of SlotlessCostFramed, which is to say none.
+--   * MillTallyFramed -- CR 701.17's mill tally filter, the second position a
+--     card may write CR 201.4's Filter.HasChosenName in (Predict): the
+--     Effect.Mill arm overlays Filter.Context.sourceChosenNames onto the
+--     resolution's own context, as the search arm does. Not SearchFramed, whose
+--     other promise -- a view filling Filter.View.canAttachToSubject -- it does
+--     not keep.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -4107,6 +4113,18 @@ data Framing
     -- controller or CR 115.10a's bound object into an equip quality is rejected
     -- rather than silently vacuous.
     MintedTargetSlot
+  | -- | CR 701.17's mill TALLY filter -- the one position whose evaluator counts
+    -- CARDS a resolution has just moved rather than candidates it is choosing
+    -- among, and the second position a CARD may write CR 201.4's chosen name in:
+    -- Pawl.Engine.Resolve.Effect's Effect.Mill arm builds its context through
+    -- Resolve.Slots.effectContext and overlays Filter.Context.sourceChosenNames,
+    -- exactly as the Effect.Search arm does (Predict, see #2141).
+    --
+    -- Not SearchFramed, whose other promise this position does not keep:
+    -- Filter.View.canAttachToSubject is unfilled here, so CR 701.3a's atom would
+    -- be a silent False. Not Unframed either, which is what it was until the
+    -- chosen name became answerable.
+    MillTallyFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -4162,6 +4180,10 @@ sweptForSingularSlots framing = case framing of
   -- -- it is only the BINDINGS in it that are empty, so a batch slot read singly
   -- is as reportable as at InTargetSlot.
   MintedTargetSlot -> True
+  -- SWEPT, and here the slots are a resolution's own: effectContext fills them,
+  -- so a batch slot read singly is as reportable as at Unframed, which is the
+  -- framing this position carried before.
+  MillTallyFramed -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -4211,6 +4233,11 @@ keywordFramed = fmap ((,) KeywordFramed)
 -- applies at the leaf.
 mintedTargetSlot :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 mintedTargetSlot = fmap ((,) MintedTargetSlot)
+
+-- Tag a Filter position as a mill TALLY's, the one position whose candidates are
+-- cards a resolution has just milled (CR 701.17).
+millTallyFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+millTallyFramed = fmap ((,) MillTallyFramed)
 
 -- Apply a quoting position's Framing to filters that are ALREADY tagged, filling
 -- in only the ones still Unframed. The lifts above take a bare list, which is
@@ -4334,8 +4361,9 @@ effectFilters effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> frame SourceHostFramed (objectRefFilters ref) <> frame Unframed (riderFilters riders)
   Effect.Draw (Draw.MkDraw _ quantity _) -> frame Unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
-  -- it: rule 728.1's "nonland card" is one of these.
-  Effect.Mill (Mill.MkMill _ quantity mTally _) -> frame Unframed (quantityFilters quantity) <> unframed (fmap MillTally.filter (Maybe.maybeToList mTally))
+  -- it: rule 728.1's "nonland card" is one of these, and Predict's chosen name
+  -- another -- which is why the tally carries a framing of its own.
+  Effect.Mill (Mill.MkMill _ quantity mTally _) -> frame Unframed (quantityFilters quantity) <> millTallyFramed (fmap MillTally.filter (Maybe.maybeToList mTally))
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as Explore's does. Both halves of CR 701.20 answer alike.
   Effect.Reveal (Reveal.MkReveal ref _) -> frame SourceHostFramed (objectRefFilters ref)

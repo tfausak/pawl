@@ -1900,6 +1900,59 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       [Just (CardName.MkCardName (Text.pack "Crucible of Worlds"))]
     Spec.assertEqWith s "bob's hand is empty" (namesIn Zone.Hand S.bob settled) []
     Spec.assertEqWith s "and so is his graveyard" (namesIn Zone.Graveyard S.bob settled) []
+  -- Predict -- "{1}{U} Instant: Choose a card name, then target player mills a
+  -- card. If a card with the chosen name was milled this way, you draw two cards.
+  -- Otherwise, you draw a card." The whole-card proof that a MILL's TALLY reads
+  -- the resolution it sits in (#2141): the tally's filter is CR 201.4's
+  -- HasChosenName, and until the tally took its Context from
+  -- Pawl.Engine.Resolve.Slots.effectContext it was matched in a bare
+  -- Filter.contextFor, where the atom is an empty intersection and the count is
+  -- always zero -- so the card would have drawn one whatever bob milled.
+  --
+  -- A PAIR of boards differing in exactly ONE thing: bob's library holds the same
+  -- two cards in both, and only their order differs, so which card the mill takes
+  -- is the whole difference. Alice names Chromatic Star on both. The draw count is
+  -- what separates them, and neither branch can be reached by an empty tally
+  -- twice: an atom that answers nothing draws one on both boards, and one that
+  -- admits everything draws two on both.
+  Spec.it s "CR 201.4/608.2c whole card: Predict's mill tally reads the name its own first clause chose" $ do
+    settled <- resolvePredict s registry ["Chromatic Star", "Crucible of Worlds"]
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    -- The gameplay assertion, and first: a tally that cannot see the chosen name
+    -- counts zero and alice draws ONE Piker instead of two.
+    Spec.assertEqWith
+      s
+      "the milled card carried the chosen name, so alice drew two cards"
+      (namesIn Zone.Hand S.alice settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+    Spec.assertEqWith
+      s
+      "and her library kept the third"
+      (namesIn Zone.Library S.alice settled)
+      [nameOf "Goblin Piker"]
+    Spec.assertEqWith
+      s
+      "bob milled the top card of his library, and only it"
+      (namesIn Zone.Graveyard S.bob settled)
+      [nameOf "Chromatic Star"]
+  Spec.it s "CR 201.4 the same board with the other card on top draws one instead" $ do
+    settled <- resolvePredict s registry ["Crucible of Worlds", "Chromatic Star"]
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "the milled card did not carry the chosen name, so alice drew one card"
+      (namesIn Zone.Hand S.alice settled)
+      [nameOf "Goblin Piker"]
+    Spec.assertEqWith
+      s
+      "and her library kept the other two"
+      (namesIn Zone.Library S.alice settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+    Spec.assertEqWith
+      s
+      "bob milled the top card of his library, and only it"
+      (namesIn Zone.Graveyard S.bob settled)
+      [nameOf "Crucible of Worlds"]
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3004,6 +3057,39 @@ resolveVendetta :: (GameState.GameState, ObjectId.ObjectId) -> GameState.GameSta
 resolveVendetta (gs, spellId) =
   let cast = snd (Engine.runGamePure vendettaAnswer gs (S.cast S.alice spellId))
    in snd (Engine.runGamePure vendettaAnswer cast Engine.priorityLoop)
+
+-- atBobAnswer with CR 201.4's name pinned: the target is bob and the name is
+-- Chromatic Star, so neither the aim nor the name can drift between the pair of
+-- boards the two Predict cases build.
+predictAnswer :: Prompt.Prompt r -> r
+predictAnswer p = case p of
+  Prompt.ChooseCardName {} -> CardName.MkCardName (Text.pack "Chromatic Star")
+  _ -> atBobAnswer p
+
+-- Alice holds Predict over two Islands with three Pikers to draw from, and bob's
+-- library holds `top` in the order given. The library is stocked so that neither
+-- seat is decked (CR 104.3c) and so that two draws leave one card behind: a hand
+-- of two is then a count and not the whole library.
+predictBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m (GameState.GameState, ObjectId.ObjectId)
+predictBoard s registry top = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  predict <- S.printingOf s registry "Predict"
+  cards <- mapM (S.printingOf s registry) top
+  -- `top` reads TOP FIRST, which is the reverse of the order S.addLibraryCard
+  -- stacks them in: the card added last is the one CR 701.17a mills.
+  let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
+      mine printing gs = snd (S.addLibraryCard printing S.alice gs)
+      g1 = foldr mine (S.landsInPlay island 2) [piker, piker, piker]
+      g2 = foldl (flip stock) g1 (reverse cards)
+   in pure (S.handOne predict g2)
+
+-- The cast and its one resolution, and nothing else: the narrowest path that
+-- shows the tally.
+resolvePredict :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m GameState.GameState
+resolvePredict s registry top = do
+  (gs, spellId) <- predictBoard s registry top
+  pure (S.runPure predictAnswer gs (S.cast S.alice spellId >> Stack.resolveTop))
 
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be

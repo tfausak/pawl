@@ -3408,20 +3408,36 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- a library, so there is no faceless object for the projection to answer
     -- blankly about.
     --
+    -- Through effectContext and NOT Filter.contextFor, so the resolution's own
+    -- reads answer here as they do at every other position of it (CR 608.2c): the
+    -- slots earlier clauses bound, their names and their amounts, and CR 201.4's
+    -- chosen name overlaid the way the Effect.Search arm overlays it -- Predict's
+    -- "a card with the chosen name was milled this way", which Pawl.ResolveSpec
+    -- proves. Read off the LIVE state rather than the pre-effect `gs` the views
+    -- come from, since the clause that chose the name is one this resolution has
+    -- already carried out.
+    --
+    -- The VIEWS stay on the pre-effect `gs` for the reason above: CR 400.7 has
+    -- minted new ids for the cards themselves, and `milled` holds the library
+    -- ones. So the mill's OWN slot, bound just above off the arrival ids, names
+    -- nothing this fold can match -- Filter.IsBound over it is False here whatever
+    -- the map holds, which is the CR 400.7 answer rather than a missing read.
+    --
+    -- The chosen-name half is PROVED (Pawl.ResolveSpec's "Predict's mill tally
+    -- reads the name its own first clause chose"); the SLOT half is a regression
+    -- fence, since no card in the pool names an earlier clause's slot from a
+    -- tally, and swapping effectContext back for a bare Filter.contextFor leaves
+    -- the whole suite green. It is written because CR 608.2c states it.
+    --
     -- Bound onto this effect's SOURCE, so a later effect reads it as
     -- Quantity.InSlot; bound even at zero, since zero is an answer. ONE number
     -- across every miller, as no Quantity has a per-player reader.
-    --
-    -- Not implemented: the tally's filter is matched in a bare Filter.contextFor,
-    -- so an atom naming a slot this same resolution bound -- the mill's own, a
-    -- clause above -- takes its empty-slot value rather than an answer: False for
-    -- Filter.IsBound and its siblings, and TRUE for SameControllerAsBound, which
-    -- widens on an absent key (#2141). No card in the pool writes one there.
-    Monad.forM_ mTally $ \tally ->
-      let tallyContext = Filter.contextFor (Game.teams gs) Nothing Nothing
+    Monad.forM_ mTally $ \tally -> do
+      gs' <- State.get
+      let tallyContext = (effectContext gs' controller source legal (slotBindings resolving gs')) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs'}
           viewOfMilled = Projection.viewsOf gs
           counted oid = Filter.matches tallyContext (viewOfMilled oid) (MillTally.filter tally)
-       in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
+      State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
   -- CR 701.20a: show the named cards to every player. CR 701.20b keeps them where
   -- they are, so the GameEvent.Revealed the funnel appends IS the whole effect.
   --
