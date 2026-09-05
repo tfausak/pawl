@@ -485,6 +485,21 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)))))
       " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"AgainstSlot\",\"value\":{\"slot\":\"creature\",\"quantity\":{\"type\":\"ObjectCounters\",\"value\":{\"type\":\"PlusOnePlusOne\"}}}}}} "
+  -- No slot to carry, so the payload IS the wire value. Nested once for
+  -- AgainstSlot's reason -- a recursive decoder is where a payload gets lost --
+  -- and over the toughness half of CR 607.2a's read, so the two assertions
+  -- cannot agree by accident.
+  Spec.it s "AgainstCardsExiledWith, bare and nested" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.AgainstCardsExiledWith Quantity.Power)
+      " {\"type\":\"AgainstCardsExiledWith\",\"value\":{\"type\":\"Power\"}} "
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstCardsExiledWith Quantity.Toughness)))
+      " {\"type\":\"Plus\",\"value\":{\"left\":{\"type\":\"Literal\",\"value\":1},\"right\":{\"type\":\"AgainstCardsExiledWith\",\"value\":{\"type\":\"Toughness\"}}}} "
   -- CR 107.1a's direction and the value it applies to, in that order. Nested
   -- once for AgainstSlot's reason -- a recursive decoder is where a payload gets
   -- lost -- and over a Count, which is the shape both producers print.

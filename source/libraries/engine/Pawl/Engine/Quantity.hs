@@ -212,6 +212,41 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> case Filter.slotOneObject slot context of
     Nothing -> Nothing
     Just oid -> evaluateAgainst viewOf context gs announcedOn (Just oid) (viewOf oid) inner
+  -- CR 607.2a's other half of the AgainstSlot posture: a STATIC ability has no
+  -- resolution and so no slot to aim at, and the objects it wants are the ones
+  -- GameState.exiledWith files against its own source. Re-aim the fold at each
+  -- of them in turn and SUM, which is CR 607.3: "if these answers are used to
+  -- determine the value of a variable, the sum of the answers is used". One
+  -- exiled card, the ordinary case, sums to itself.
+  --
+  -- The membership test is the relation and not a zone sweep, exactly as
+  -- ObjectRef.EachCardExiledWithSource's is, so a card exiled by a second copy
+  -- of the same printing is not counted. Pawl.PowerToughnessSpec's "CR
+  -- 607.2a/613.4c the static ability reads the card its own trigger exiled" is
+  -- what proves that half: it leaves an unlinked card sitting in exile, which a
+  -- zone sweep would add in.
+  --
+  -- The GameState.exile intersection beside it is a REGRESSION FENCE rather than
+  -- proven behaviour. Dropping it leaves the suite green, because CR 400.7 mints
+  -- a new object as the card leaves exile and the stale key then projects
+  -- nothing -- so both readings answer the same. It is kept because CR 400.7 is
+  -- what the sentence means: the pile is the cards that are in exile now.
+  --
+  -- An empty pile is 0 and not Nothing, which is the sum of no answers; a member
+  -- that cannot answer (an exiled card with no power) makes the whole read
+  -- Nothing, which is Plus' posture.
+  --
+  -- `Filter.source` and not `mOid`, since rule 607.2a links two abilities of one
+  -- OBJECT and the object this quantity is aimed at need not be the ability's
+  -- source. Nothing when the context names no source at all.
+  --
+  -- Terminating: the payload is a strictly smaller subterm.
+  Quantity.AgainstCardsExiledWith inner ->
+    case Filter.source context of
+      Nothing -> Nothing
+      Just src ->
+        let linked = filter (\o -> Map.lookup o (GameState.exiledWith gs) == Just src) (Set.toList (GameState.exile gs))
+         in fmap sum (traverse (\o -> evaluateAgainst viewOf context gs announcedOn (Just o) (viewOf o) inner) linked)
   Quantity.Plus (Plus.MkPlus a b) -> case (recur a, recur b) of
     (Just x, Just y) -> Just (x + y)
     _ -> Nothing
@@ -853,7 +888,7 @@ determineWith eval quantity = case quantity of
 -- the same reason: a composed quantity (1 + X) is still a reader of X. No
 -- descent into Count -- its per-member quantity is read against ANOTHER object,
 -- so an X inside it would be that object's and not this entry's -- nor into
--- AgainstSlot, which re-aims the fold the same way.
+-- AgainstSlot or AgainstCardsExiledWith, which re-aim the fold the same way.
 substituteAnnouncedX :: Natural -> Quantity -> Quantity
 substituteAnnouncedX n quantity = case quantity of
   Quantity.InSlot slot | slot == Binding.variableX -> Quantity.Literal (toInteger n)
@@ -939,6 +974,10 @@ objectSlots quantity = case quantity of
   -- The one arm with an answer, and DESCENT beside it: the payload is evaluated
   -- against the named object and may aim at a further slot of its own.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Set.insert slot (objectSlots inner)
+  -- DESCENT and no slot of its own: the objects come from GameState.exiledWith
+  -- rather than from a binding, so this arm names none, and the payload it aims
+  -- at them may still name one.
+  Quantity.AgainstCardsExiledWith inner -> objectSlots inner
 
 -- CR 603.3b: is QuantitySlot.slots the WHOLE of what evaluating this quantity
 -- reads off the resolving object's bindings? It is not wherever
@@ -1155,6 +1194,9 @@ readsX quantity = case quantity of
   -- Plus above needs. Its own SlotName names a target rather than an amount, and X
   -- is only ever an amount.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> readsX inner
+  -- AgainstSlot's answer: not a leaf, and its payload may read X. It names no
+  -- slot at all, so the target/amount distinction above does not arise.
+  Quantity.AgainstCardsExiledWith inner -> readsX inner
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A

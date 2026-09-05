@@ -2739,6 +2739,11 @@ quantityReads q = case q of
   Quantity.Type.Halved (Halved.MkHalved _ a) -> quantityReads a
   Quantity.Type.Negate a -> quantityReads a
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ a) -> quantityReads a
+  -- AgainstSlot's answer: the payload is what reads an aspect, off CR 607.2a's
+  -- linked cards rather than off a slot. Over-declaring is the safe direction
+  -- here, so the payload's reads are reported even though the cards it reads
+  -- them off are in exile and no modification this screen guards writes there.
+  Quantity.Type.AgainstCardsExiledWith a -> quantityReads a
   Quantity.Type.Literal _ -> Set.empty
   Quantity.Type.ManaValue -> Set.empty
   Quantity.Type.InSlot _ -> Set.empty

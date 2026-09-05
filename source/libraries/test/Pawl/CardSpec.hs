@@ -2938,6 +2938,9 @@ quantityKindFilters quantity = case quantity of
   -- quantityCounts' descent: aiming the evaluation at another object does not
   -- stop the payload from naming a kind.
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> quantityKindFilters inner
+  -- AgainstSlot's answer: aiming the evaluation at CR 607.2a's linked cards
+  -- does not stop the payload from naming a kind.
+  Quantity.Type.AgainstCardsExiledWith inner -> quantityKindFilters inner
 
 -- BOTH axes of every Quantity a Condition compares, off conditionQuantities
 -- above rather than off conditionCounts beside it: reading the Counts alone drops
