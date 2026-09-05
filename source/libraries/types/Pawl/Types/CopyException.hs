@@ -60,8 +60,9 @@ data CopyException
     -- type line rather than replacing it (CR 205.1b).
     --
     -- A Set for GainKeywords' reason: one printed clause names as many as it
-    -- likes, joined by "and" ("a Vehicle artifact"). CR 205.1a's replacement is a
-    -- different sentence and no copy exception prints it.
+    -- likes at once (Dollhouse of Horrors' "a 0/0 Construct artifact creature").
+    -- CR 205.1a's replacement is a different sentence and no copy exception
+    -- prints it.
     --
     -- NOTHING ELSE MOVES, and that is CR 707.9d's last two sentences rather than
     -- an omission: its strip of the copied object's characteristic-defining
