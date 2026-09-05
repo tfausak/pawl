@@ -44,6 +44,11 @@
 -- And that same arm over CR 707.10's other two nouns -- an activated and a
 -- triggered ability on the stack, copied by Lithoform Engine
 -- (copyAbilityOnStackSpec), where CR 707.10b keeps the original's source.
+--
+-- And CR 707.10d's and CR 707.10e's answers whole, end to end: Zada, Hedron
+-- Grinder's one copy per candidate (zadaSpec) and Ivy, Gleeful Spellthief's one
+-- copy on a stated new target (ivySpec), the second of which is where "the copy
+-- isn't created" is read off an illegal one.
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -100,6 +105,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -2519,3 +2525,92 @@ copiedTriggerTargetSpec s registry =
                   Spec.assertBool s (beastId /= engineId) "the Beast and the Engine are distinct objects"
                 (_, _) -> Spec.assertFailure s "the Beast's trigger should be on the stack and the Engine should declare a {2} ability"
             _ -> Spec.assertFailure s "fixture should give alice a Beast and an Engine and carol two planeswalkers"
+
+-- CR 707.10e, end to end: Ivy, Gleeful Spellthief {G}{U} Legendary Creature --
+-- Faerie Rogue 2/1, "Flying. Whenever a player casts a spell that targets only a
+-- single creature other than Ivy, you may copy that spell. The copy targets
+-- Ivy." (data/cards/ivy-gleeful-spellthief.json, Oracle text verified
+-- 2026-09-05.)
+--
+-- Rule 707.10e has two halves and this covers both. The COPY'S TARGET is the
+-- object the effect states rather than the one the original announced, which the
+-- Growth case reads twice -- off the stack by identity, and off the board after
+-- it resolves. And "if that player or object isn't a legal target for each
+-- instance of the word 'target', the copy isn't created", which the Reprisal
+-- pair reads: two boards differing in NOTHING but Ivy's power, one where she
+-- clears the spell's "power 4 or greater" and one where she does not.
+--
+-- bob casts in both, so the trigger's "a player casts" is exercised at a seat
+-- that is not the ability's controller, and carol sits out to keep the three
+-- roles apart.
+ivySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ivySpec s registry =
+  let growthBoard = do
+        forest <- S.printingOf s registry "Forest"
+        ivy <- S.printingOf s registry "Ivy, Gleeful Spellthief"
+        spider <- S.printingOf s registry "Giant Spider"
+        growth <- S.printingOf s registry "Giant Growth"
+        let lands = S.landsFor forest S.bob 1 S.threePlayerGame
+            (ivyId, g1) = S.addCreature ivy S.alice lands
+            (spiderId, g2) = S.addCreature spider S.bob g1
+            (growthId, g3) = S.addHandCard growth S.bob g2
+        pure (ivyId, spiderId, growthId, g3)
+      reprisalBoard = do
+        plains <- S.printingOf s registry "Plains"
+        ivy <- S.printingOf s registry "Ivy, Gleeful Spellthief"
+        berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+        reprisal <- S.printingOf s registry "Reprisal"
+        let lands = S.landsFor plains S.bob 2 S.threePlayerGame
+            (ivyId, g1) = S.addCreature ivy S.alice lands
+            (berserkersId, g2) = S.addCreature berserkers S.bob g1
+            (reprisalId, g3) = S.addHandCard reprisal S.bob g2
+        pure (ivyId, berserkersId, reprisalId, g3)
+      -- bob aims his spell at his own creature -- the trigger's whole condition,
+      -- since it is one creature and it is not Ivy -- and alice takes CR 603.5's
+      -- "may". The copy's target reaches no prompt at all: rule 707.10e states
+      -- it.
+      aimedAt :: ObjectId -> Prompt.Prompt r -> r
+      aimedAt victim p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just victim) . Recipient.objectOf) offered) asked
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      -- What each object on the stack targets, top first, read live off its
+      -- bindings the way Pawl.Engine.Resolve.Effect.targetsOnStack does.
+      stackTargets gs = fmap (\oid -> Set.toList (Foldable.fold (Map.elems (Binding.targetsOf (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))))) (GameState.stack gs)
+      -- The board with bob's spell cast and CR 603.3b's trigger on the stack
+      -- above it, then that trigger alone resolved -- the moment the copy either
+      -- exists or does not.
+      afterTriggerOf :: (forall r. Prompt.Prompt r -> r) -> ObjectId -> GameState.GameState -> GameState.GameState
+      afterTriggerOf answer spellId board =
+        let cast = snd (Engine.runGamePure answer board {GameState.priority = Just S.bob} (S.cast S.bob spellId))
+         in resolveOne answer (snd (Engine.runGamePure answer cast Engine.settleForPriority))
+   in Spec.describe s "Pawl.Engine.Copy" $ do
+        Spec.it s "CR 707.10e the copy targets Ivy rather than what the original announced" $ do
+          (ivyId, spiderId, growthId, board) <- growthBoard
+          let afterTrigger = afterTriggerOf (aimedAt spiderId) growthId board
+              after = drainStack (aimedAt spiderId) afterTrigger
+              pt oid = S.powerToughnessOf oid after
+          -- The fixture's own precondition: two DISTINCT pairs to start with, so
+          -- no read below shares a number with another.
+          Spec.assertEqWith s "Ivy starts 2/1 and the Spider 2/4" (S.powerToughnessOf ivyId board, S.powerToughnessOf spiderId board) (Just (2, 1), Just (2, 4))
+          Spec.assertEqWith s "CR 707.10e the copy pumped Ivy, whom the original never targeted" (pt ivyId) (Just (5, 4))
+          Spec.assertEqWith s "CR 707.10e the copy on the stack names Ivy and nobody else" (fmap (Maybe.mapMaybe Recipient.objectOf) (Maybe.listToMaybe (stackTargets afterTrigger))) (Just [ivyId])
+          Spec.assertEqWith s "CR 707.10 the original still pumped the Spider bob aimed it at" (pt spiderId) (Just (5, 7))
+          Spec.assertEqWith s "CR 707.10e ONE copy, so the stack held the copy and the Growth" (length (stackTargets afterTrigger)) 2
+        -- CR 707.10e's "the copy isn't created", on two boards differing in one
+        -- thing: whether Ivy clears Reprisal's "power 4 or greater". Legality is
+        -- judged for the COPY, whose controller CR 707.10 makes alice, so this is
+        -- a fact about Ivy and not about whose spell it was.
+        Spec.it s "CR 707.10e no copy is created where Ivy is not a legal target" $ do
+          (ivyId, berserkersId, reprisalId, board) <- reprisalBoard
+          let pumped = S.withEffect ivyId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3))) board
+              -- How many objects the trigger left on the stack, then how many
+              -- Ivys and how many Berserkers survive the drain.
+              runOn b =
+                let afterTrigger = afterTriggerOf (aimedAt berserkersId) reprisalId b
+                    after = drainStack (aimedAt berserkersId) afterTrigger
+                 in (length (stackTargets afterTrigger), length (printedOnBattlefield "Ivy, Gleeful Spellthief" after), length (printedOnBattlefield "Berserkers of Blood Ridge" after))
+          Spec.assertEqWith s "Ivy is 2/1 on one board and 5/4 on the other, which is the only difference between them" (S.powerToughnessOf ivyId board, S.powerToughnessOf ivyId pumped) (Just (2, 1), Just (5, 4))
+          Spec.assertEqWith s "CR 707.10e a 2/1 Ivy is no legal target for 'power 4 or greater', so the copy isn't created and she lives" (runOn board) (1, 1, 0)
+          Spec.assertEqWith s "CR 707.10e a 5/4 Ivy is one, so the copy is created and destroys her" (runOn pumped) (2, 0, 0)
+          Spec.assertBool s (ivyId /= berserkersId) "Ivy and the Berserkers are distinct objects"

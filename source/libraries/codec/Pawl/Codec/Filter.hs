@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
+import qualified Pawl.Codec.RecipientKind as RecipientKind
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
@@ -74,6 +75,7 @@ codec keywordCodec =
       Arm.nullary "IsSource" Filter.IsSource,
       Arm.nullary "TargetsSource" Filter.TargetsSource,
       Arm.nullary "TargetsOnlySource" Filter.TargetsOnlySource,
+      Arm.payload "TargetsOnlyOne" RecipientKind.codec Filter.TargetsOnlyOne (\x -> case x of Filter.TargetsOnlyOne y -> Just y; _ -> Nothing),
       Arm.payload "TargetsPlayer" PlayerRelation.codec Filter.TargetsPlayer (\x -> case x of Filter.TargetsPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),

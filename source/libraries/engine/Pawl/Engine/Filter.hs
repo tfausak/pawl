@@ -1341,6 +1341,12 @@ matches context view predicate = case predicate of
   Filter.TargetsOnlySource -> case source context of
     Just src -> not (Set.null (targets view)) && all ((== Just src) . Recipient.objectOf) (targets view)
     Nothing -> False
+  -- The atom above asked by KIND, and ARITY is the whole of what "a single"
+  -- adds: exactly one recipient, tagged the way Pawl.Types.Pool tags that kind.
+  -- Needs no source, which is why it can sit where TargetsOnlySource cannot.
+  Filter.TargetsOnlyOne kind -> case Set.toList (targets view) of
+    [r] -> Recipient.kindOf r == kind
+    _ -> False
   -- CR 115.1's player target, judged against the perspective the way ControlledBy
   -- judges a controller. ONLY a ToPlayer counts: CR 115.10a says an object is a
   -- target only where the word names it, and a spell aimed at a creature names
@@ -1694,6 +1700,7 @@ rewrite pairs predicate = case predicate of
   -- swaps.
   Filter.TargetsSource -> predicate
   Filter.TargetsOnlySource -> predicate
+  Filter.TargetsOnlyOne _ -> predicate
   Filter.TargetsPlayer _ -> predicate
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
@@ -2140,6 +2147,7 @@ bakeBound players predicate = case predicate of
   -- slot.
   Filter.TargetsSource -> predicate
   Filter.TargetsOnlySource -> predicate
+  Filter.TargetsOnlyOne _ -> predicate
   Filter.TargetsPlayer _ -> predicate
   -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
@@ -2275,6 +2283,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsSource -> []
   Filter.TargetsSource -> []
   Filter.TargetsOnlySource -> []
+  Filter.TargetsOnlyOne _ -> []
   Filter.TargetsPlayer _ -> []
   Filter.IsBound _ -> []
   Filter.SameNameAsBound _ -> []
@@ -2404,6 +2413,7 @@ statesAQuality predicate = case predicate of
   -- card in a library targets nothing.
   Filter.TargetsSource -> True
   Filter.TargetsOnlySource -> True
+  Filter.TargetsOnlyOne _ -> True
   Filter.TargetsPlayer _ -> True
   Filter.IsBound _ -> True
   Filter.SameNameAsBound _ -> True
