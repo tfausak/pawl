@@ -193,8 +193,11 @@ playersInScope perspective gs scope =
 -- Projection.copiableSnapshotOf.
 playerAbilitiesOf :: ObjectId -> GameState -> [PlayerStaticAbility.PlayerStaticAbility]
 playerAbilitiesOf oid gs = case Projection.copiableSnapshotOf oid gs of
-  Just snapshot -> PC.playerAbilities snapshot
-  Nothing -> foldMap Face.playerAbilities (Game.faceOf oid gs)
+  Just snapshot | not (Projection.derivesFromCopiedHalves oid gs) -> PC.playerAbilities snapshot
+  -- CR 709.5: a copy of a Room reads the copied card's halves against its OWN
+  -- designations, which Game.faceOf already does, so the printed read is where
+  -- that fork lands -- Projection.staticAbilitiesOf's third arm exactly.
+  _ -> foldMap Face.playerAbilities (Game.faceOf oid gs)
 
 -- CR 613.7a: the PRINTED carrier's rows -- printed as opposed to CR 611.2c's
 -- stored one, the list itself being the COPIABLE one above -- one per player

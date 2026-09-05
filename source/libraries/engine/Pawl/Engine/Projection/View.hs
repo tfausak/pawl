@@ -648,8 +648,39 @@ countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 -- Not a recursion: a copy of a copy stored resolved values when it was stamped.
 copiableCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot -> snapshot
-  Nothing -> baseCharacteristics oid gs
+  Just snapshot | not (derivesFromCopiedHalves oid gs) -> snapshot
+  -- CR 709.5's last sentence: a snapshot that copied HALVES is re-derived rather
+  -- than read back. The rule copies the shared type line's two static abilities
+  -- and which half each characteristic is in, not the subtraction they produced
+  -- on the copied permanent -- and the designations those abilities read are CR
+  -- 709.5c's, which belong to this object and not to the one it copied. So the
+  -- copiable values are rebuilt from the copied card's halves against THIS
+  -- object's doors, which is what baseCharacteristics does with Game.halvesOf
+  -- underneath it. A copy of a Room enters with both doors shut (CR 709.5d) and
+  -- opens them at its own unlock costs.
+  --
+  -- Not implemented: a CR 707.9 exception applied to a copy of a Room, which
+  -- Replacement.applyCopyExceptions stamps into the snapshot this arm discards
+  -- (#3253). No card in data/cards/ pairs an exception with a Room-eligible
+  -- copy.
+  _ -> baseCharacteristics oid gs
+
+-- CR 709.5 / 709.5c: is this object's copiable rules text a set of HALVES it
+-- copied, read against its own unlocked designations? The fork
+-- copiableCharacteristics above and staticAbilitiesOf below both take, and the
+-- one place the two questions it conjoins are asked together.
+--
+-- The BATTLEFIELD conjunct is Game.resolveFaceFor's own, which is what makes the
+-- two agree: only there do CR 709.5c's designations exist for the subtraction to
+-- read, so a card in a graveyard that became a copy of a Room (CR 707.4) keeps
+-- reading the frozen snapshot, which is CR 709.4's combined view of the copied
+-- card.
+derivesFromCopiedHalves :: ObjectId -> GameState -> Bool
+derivesFromCopiedHalves oid gs = case copiableSnapshotOf oid gs of
+  Nothing -> False
+  Just snapshot ->
+    Maybe.isJust (PC.halves snapshot)
+      && fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
 -- CR 707.3: the copy snapshot stamped onto this object, and Nothing for the
 -- object that is copying nothing. The ONE read of Binding.copyOf, so no question
@@ -685,8 +716,13 @@ copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Objec
 -- neither needs an ability minted here.
 staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
 staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
-  Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
+  Just snapshot | not (derivesFromCopiedHalves oid gs) -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+  -- The printed read reaches a copied Room too, and has to: Game.faceOf answers
+  -- with the copied card's halves subtracted by THIS object's designations (CR
+  -- 709.5), where the snapshot froze the copied permanent's. copiableCharacteristics
+  -- above takes the same fork for the same reason, so the two cannot disagree
+  -- about a copy's rules text.
+  _ -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
 
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
@@ -737,7 +773,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.assignsCombatDamageWithToughness = False,
         -- CR 702.184c: an ability on the stack grants nothing to its
         -- controller's station abilities of its own.
-        PC.grantsStationToughness = False
+        PC.grantsStationToughness = False,
+        -- CR 709.5: no card behind the object, so no halves either.
+        PC.halves = Nothing
       }
   Just face ->
     -- The seed predates every layer, so it can describe no object: every view is
@@ -821,7 +859,13 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             PC.assignsCombatDamageWithToughness = False,
             -- CR 613.1's starting point, before layer 6 has run:
             -- applyModification's GrantsStationToughness arm is the only writer.
-            PC.grantsStationToughness = False
+            PC.grantsStationToughness = False,
+            -- CR 709.5 / 709.5b: the halves this object has, which -- like the
+            -- names above -- `face` cannot carry, a Face being one half's worth
+            -- of characteristics. Game.halvesOf decides, and it reads the copy
+            -- snapshot first, so a copy of a copy of a Room goes on carrying the
+            -- doors.
+            PC.halves = Game.halvesOf oid gs
           }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's

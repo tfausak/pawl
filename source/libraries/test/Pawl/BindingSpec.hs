@@ -43,7 +43,8 @@ sampleSnapshot =
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,
-      PC.grantsStationToughness = False
+      PC.grantsStationToughness = False,
+      PC.halves = Nothing
     }
 
 spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
