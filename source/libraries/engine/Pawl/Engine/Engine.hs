@@ -738,6 +738,7 @@ abilityTriggeredOf event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- CR 603.3b's record of one ability triggering: what it hangs on (CR 113.7), its
