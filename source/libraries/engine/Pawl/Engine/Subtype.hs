@@ -47,6 +47,30 @@ subtypeMana subtype = case subtype of
   Subtype.Plains -> Just (ManaType.Colored Color.White)
   _ -> Nothing
 
+-- | CR 305.6 \/ 602.1: does an object with these card types and these subtypes
+-- have the intrinsic "{T}: Add [mana symbol]" activated ability -- the one rule
+-- 305.6 gives it "even if the text box doesn't actually contain that text"?
+--
+-- Both halves are needed: rule 305.6 gives it to "an object with the land card
+-- type AND a basic land type", so a Dryad Arbor that stopped being a land would
+-- lose it and a creature named for a basic land type never had it.
+--
+-- THE ONE READER of this question for every view builder there is --
+-- Pawl.Engine.Projection.View's viewOfCard and viewOfCharacteristics and
+-- Pawl.Engine.Count.viewOfSnapshot. They are three answers to CR 602.1's
+-- question about one object, and Filter.HasActivatedAbility must not depend on
+-- which of them a caller happened to build; Pawl.ProjectionSpec's "CR 305.6 /
+-- 602.1 a Mountain has an activated ability in every view builder" is what holds
+-- the three together.
+--
+-- Not a list of abilities: what the intrinsic ability DOES is
+-- Pawl.Engine.Mana.manaRoutesOfGiven's business, which reads `subtypeMana` below
+-- for the mana it adds. This answers only whether there is one.
+intrinsicManaAbility :: Set.Set CardType.CardType -> Set.Set Subtype.Subtype -> Bool
+intrinsicManaAbility cardTypes subtypes =
+  Set.member CardType.Land cardTypes
+    && any (Maybe.isJust . subtypeMana) (Set.toList subtypes)
+
 -- | CR 205.3i
 isLandType :: Subtype.Subtype -> Bool
 isLandType subtype = case subtype of

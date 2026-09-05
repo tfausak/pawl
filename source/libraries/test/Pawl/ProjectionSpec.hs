@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
@@ -3494,6 +3495,47 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         view = Projection.viewOfObject oid gs
     Spec.assertBool s (Set.member CardType.Creature (Filter.cardTypes view)) "is a creature"
     Spec.assertEqWith s "controller" (Filter.controller view) (Just S.alice)
+
+  -- CR 305.6 gives an object with the land card type and a basic land type the
+  -- intrinsic ability "{T}: Add [mana symbol]" "even if the text box doesn't
+  -- actually contain that text", and CR 602.1 makes that an activated ability. So
+  -- Filter.HasActivatedAbility must answer True for a Mountain -- and answer the
+  -- same in all three view builders, since they are three answers to one question
+  -- about one object rather than three questions.
+  --
+  -- The DOOMED TRAVELER is the negative control on the same board, and is what
+  -- keeps this from passing on a field hardwired True: it is a permanent with no
+  -- activated ability at all, printed or intrinsic.
+  --
+  -- A REGRESSION FENCE and not a proof of observable behaviour, per CLAUDE.md.
+  -- The only card in data/cards/ writing Filter.HasActivatedAbility is Zirda, the
+  -- Dawnwaker, whose CR 702.139a condition is evaluated only through viewOfCard
+  -- (Pawl.Engine.Companion.fulfilled), so no board in the pool can tell the other
+  -- two builders' answers apart yet. Mutating the shared reader out of
+  -- viewOfCharacteristics reddens the second assertion below and nothing else in
+  -- the suite.
+  Spec.it s "CR 305.6 / 602.1 a Mountain has an activated ability in every view builder" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let gs0 = S.landsInPlay mountain 1
+        landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+          oid : _ -> oid
+          [] -> error "Pawl.ProjectionSpec: landsInPlay should place one Mountain"
+        (travelerId, gs) = S.addCreature traveler S.alice gs0
+        snapshotView oid g = Count.viewOfSnapshot Nothing False Map.empty (Projection.project oid g)
+        asks view = Filter.matches (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) view Filter.Type.HasActivatedAbility
+    Spec.assertBool s (asks (Projection.viewOfCard (S.combinedFace mountain))) "viewOfCard: a Mountain card has one"
+    Spec.assertBool s (asks (Projection.viewOfObject landId gs)) "viewOfCharacteristics: and so does the Mountain on the battlefield"
+    Spec.assertBool s (asks (snapshotView landId gs)) "viewOfSnapshot: and so does a snapshot of it"
+    Spec.assertBool s (not (asks (Projection.viewOfCard (S.combinedFace traveler)))) "viewOfCard: the Doomed Traveler has none"
+    Spec.assertBool s (not (asks (Projection.viewOfObject travelerId gs))) "viewOfCharacteristics: nor on the battlefield"
+    Spec.assertBool s (not (asks (snapshotView travelerId gs))) "viewOfSnapshot: nor in a snapshot"
+    -- CR 605.1a: the intrinsic ability IS a mana ability, so the sibling atom
+    -- answers False for the same Mountain in the same builders. Without this pair
+    -- the case above would pass just as well on a reading that dropped rule
+    -- 605.1a's exclusion from both fields.
+    Spec.assertBool s (not (Filter.nonManaActivatedAbility (Projection.viewOfObject landId gs))) "CR 605.1a excludes it from the sibling field"
+    Spec.assertBool s (not (Filter.nonManaActivatedAbility (snapshotView landId gs))) "CR 605.1a again, in the snapshot"
 
   Spec.it s "viewOfCard reads a printed basic land's supertypes off the battlefield" $ do
     mountain <- S.printingOf s registry "Mountain"
