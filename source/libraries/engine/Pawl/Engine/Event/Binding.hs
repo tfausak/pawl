@@ -601,14 +601,14 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   (TriggerCondition.SelfBlocksCreature _, GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker})) ->
     Binding.setBlockedCreature attacker Map.empty
   -- CR 701.3a's "that creature" read from the ATTACHMENT: the host the bearer
-  -- went onto, which Enormous Energy Blade taps. The SelfBecomesAttachedBy arm
-  -- below binds nothing off the same event, and the two together are the pair --
-  -- whichever end is not the bearer is the one that earns a name.
+  -- went onto, which Enormous Energy Blade taps. SelfBecomesAttachedBy has no arm
+  -- here at all, and the two together are the pair -- whichever end of rule
+  -- 701.3a's event is not the bearer is the one that earns a name.
   --
   -- Guaranteed given a match rather than conditional, which is what
   -- eventBindingSlots' per-condition promise needs: matchesTrigger has already
   -- declined every event whose host is a player, so Recipient.objectOf answers
-  -- Just here. Map.empty when it does not, which the promise reads as the floor.
+  -- Just for every event that reaches here and the Map.empty branch is dead.
   (TriggerCondition.SelfBecomesAttachedTo _, GameEvent.BecameAttached (BecameAttached.MkBecameAttached {BecameAttached.host = host})) ->
     maybe Map.empty (`Binding.setAttachedHost` Map.empty) (Recipient.objectOf host)
   -- CR 701.3d's "that permanent": the host the bearer came OFF, which Grafted

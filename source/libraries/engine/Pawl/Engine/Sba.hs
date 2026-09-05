@@ -828,7 +828,8 @@ performStateBasedActions = Event.simultaneously $ do
   Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Command) returningCommanders
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
-  -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.
+  -- through Pawl.Engine.Event's zone-change road: no Moved event and no
+  -- replacement. It does record CR 701.3d's own event, below.
   --
   -- CR 701.3d's becoming unattached, recorded before the write clears the field
   -- the host is read off. `gs` and not the live board: this pass may already have
