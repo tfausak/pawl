@@ -39,7 +39,8 @@ dispatch is fixed whatever its size --- the role docs, re-deriving against
 `origin/main`, worktree setup, the first build --- so a multi-issue dispatch
 costs about what a single-issue one does: one closed three issues for 128k, and
 the run's cheapest unit, 87k, was a two-issue cluster. Sending an agent back
-with audit findings costs ~15--25k incremental. Issues closed per token is what
+with audit findings costs 5k to 80k incremental, median near 40k (measured
+2026-09-05). Issues closed per token is what
 the loop is really spending, and it is what the clustering pass, the fold-in
 rule and the audit rule each buy.
 
@@ -151,7 +152,7 @@ them. They are corrected by the next unit that edits the file, under the
 self-review rule in `CLAUDE.md`.
 
 Act on a finding by sending the unit's agent back, not by filing and
-re-dispatching: a send-back costs ~15--25k against ~200k for a fresh unit, and
+re-dispatching: a send-back costs 5k to 80k against ~200k for a fresh unit, and
 catches the defect before the merge rather than after.
 
 **Run a clustering pass whenever the cluster list runs dry.** The audit
