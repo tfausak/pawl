@@ -579,45 +579,20 @@ testTree registry =
     ( -- Pawl.EngineSpec comes first because tasty hands tests to its thread
       -- pool in tree order, and this group holds the suite's two longest cases
       -- by an order of magnitude. Started last they were the whole tail.
-      fmap
-        (Tasty.localOption (Tasty.mkTimeout 300000000))
-        (Writer.execWriter (Pawl.EngineSpec.spec tasty registry))
+      Writer.execWriter (Pawl.EngineSpec.spec tasty registry)
         <> [Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry]
-        -- These two subtrees are wired separately because their timeouts are
-        -- tasty options and Pawl.Spec cannot express one. Every case now has
-        -- SOME budget under CI: flake.nix's testFlags pass --timeout 15s to the
-        -- `nix build` check phase, which used to run a bare `Setup test` and
-        -- leave tasty at NoTimeout. Read that figure off flake.nix and not off
-        -- here: it was 5s when #1446 added it and 15s since #1882, and a stale
-        -- copy of it in this comment is what sent #2113 chasing a timeout that
-        -- was not happening. These two keep their own budgets anyway, because
-        -- localOption beats the command line -- so they hold whatever an agent
-        -- passes, and ReplacementSpec's five seconds is now TIGHTER than that
-        -- floor, which costs nothing at 250x its slowest case. Each is
-        -- at least 30x its group's slowest case, rounded up to a round
-        -- number: headroom for a loaded shared runner, not a
-        -- speed assertion. The option is deliberately NOT hoisted onto the
-        -- whole "pawl" group, because that same precedence would silently make
-        -- an agent's --timeout ineffective suite-wide.
-        --
-        -- Pawl.ReplacementSpec and its five siblings guard CR 616.1's termination, where a
-        -- regression hangs rather than fails; the fuller rationale is at that
-        -- module's `spec`. Slowest case 0.02s, so five seconds.
-        <> fmap
-          (Tasty.localOption (Tasty.mkTimeout 5000000))
-          ( Writer.execWriter $ do
-              Pawl.ReplacementSpec.spec tasty registry
-              Pawl.PreventionSpec.spec tasty registry
-              Pawl.LifeReplacementSpec.spec tasty registry
-              Pawl.DamageReplacementSpec.spec tasty registry
-              Pawl.EntryReplacementSpec.spec tasty registry
-              Pawl.ShieldCounterSpec.spec tasty registry
-          )
-          -- Pawl.EngineSpec, wired above, guards the same failure mode one level
-          -- up: it asserts that a whole game terminates. Its budget is the looser
-          -- one because each case plays out one or two complete games rather than
-          -- resolving a single event -- slowest case 9.96s measured 2026-08-23,
-          -- so 300 seconds.
+        -- ONE budget for the whole suite, and it is the command line's: the
+        -- figure CI passes lives in flake.nix's testFlags and in the workflow's
+        -- own `cabal run pawl -- test`, and nothing here overrides it. Two
+        -- subtrees used to carry their own through Tasty.localOption -- 300s for
+        -- Pawl.EngineSpec's whole games, 5s for Pawl.ReplacementSpec and its five
+        -- siblings, which guard CR 616.1's termination where a regression hangs
+        -- rather than fails. Both are gone (#3284): localOption BEATS the command
+        -- line, so a per-group budget silently ignores whatever an agent passes,
+        -- and a runner slower than the machine the figures were measured on
+        -- turns the difference into a timeout nobody can reproduce locally. What
+        -- those groups needed was headroom, which the suite-wide figure is now
+        -- where to give.
     )
 
 -- Specs that reach for card data take a registry over the same monad they
@@ -1152,6 +1127,15 @@ spec s registry = do
   Pawl.ProjectionSpec.spec s registry
   Pawl.RadSpec.spec s registry
   Pawl.RegistrySpec.spec s
+  -- CR 616.1's termination guards, where a regression hangs rather than fails.
+  -- Wired here like every other spec since #3284 took away their own 5s budget;
+  -- the suite-wide figure catches the hang just as well.
+  Pawl.ReplacementSpec.spec s registry
+  Pawl.PreventionSpec.spec s registry
+  Pawl.LifeReplacementSpec.spec s registry
+  Pawl.DamageReplacementSpec.spec s registry
+  Pawl.EntryReplacementSpec.spec s registry
+  Pawl.ShieldCounterSpec.spec s registry
   Pawl.ReplaySpec.spec s registry
   Pawl.MoveCounterSpec.spec s registry
   Pawl.PutCounterSpec.spec s registry

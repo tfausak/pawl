@@ -94,15 +94,11 @@ import qualified Pawl.Types.Zone as Zone
 -- Hardened Scales re-triggering each other forever) manifests as this group
 -- hanging, not failing. "CR 614.5 two Hardened Scales are two instances" below
 -- is the case that asserts the CORRECTNESS half (each gets exactly one
--- opportunity); this timeout is the safety net for the TERMINATION half -- it
--- asserts nothing on a green run, and guards a hang rather than a slowdown.
--- Measured 2026-08-09 on GHC 9.14.1 / aarch64-darwin: the
--- slowest case in this group runs 0.02s and all 105 run in 0.08s, so five
--- seconds is 250x the worst case -- more than a loaded shared runner can eat.
--- CI sets the same figure suite-wide through flake.nix's testFlags, so this
--- option is what holds when a local run passes something tighter. The timeout
--- is not applied here -- Pawl.Spec cannot express one -- but where this spec
--- is wired into the tasty runner.
+-- opportunity); the suite's timeout is the safety net for the TERMINATION half
+-- -- it asserts nothing on a green run, and guards a hang rather than a
+-- slowdown. This group used to carry a five-second budget of its own, dropped
+-- with every other per-group budget in #3284: a hang fails at any figure, and
+-- the slowest case here runs 0.02s.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- P9: a pattern's permanent match runs through the lower Pawl.Engine.Filter over
