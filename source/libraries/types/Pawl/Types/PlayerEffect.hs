@@ -36,11 +36,13 @@ data PlayerEffect
   | -- | CR 602.5 / Sen Triplets: this player can't activate abilities at all.
     --
     -- The player-axis twin of CR 701.35a's detain, which stamps one OBJECT
-    -- (Pawl.Types.Object.detainedUntil): this names nobody's permanent and refuses
-    -- every activation the player would make. A MANA ABILITY too, which is why
-    -- detain is the twin rather than split second (CR 702.61b): the sentence
-    -- carves nothing out, so Pawl.Engine.Cost.manaActivationsGiven reads it beside
-    -- detain for CR 605.3a's windows.
+    -- (Pawl.Types.Object.detainedUntil), and of Pawl.Types.ActivationProhibition,
+    -- which is the printed sentence aimed at one: this names nobody's permanent
+    -- and refuses every activation the player would make. A MANA ABILITY too,
+    -- which is why detain is the twin rather than split second (CR 702.61b):
+    -- the sentence carves nothing out, so
+    -- Pawl.Engine.Cost.manaActivationsGiven reads it beside detain for CR
+    -- 605.3a's windows.
     CantActivateAbilities
   | -- | CR 601.3 / Rule of Law: this player can't cast more than this many spells
     -- each turn.

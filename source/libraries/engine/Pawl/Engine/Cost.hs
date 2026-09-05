@@ -26,6 +26,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
@@ -1638,6 +1639,14 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         -- mana ability too. Here rather than in Mana.manaSourcesGiven, because this
         -- is what BOTH of CR 605.3a's windows consult -- sickness's position above.
         && not (Detain.detained oid gs)
+        -- CR 101.2 over CR 605.3a's permission: a printed static ability aimed
+        -- at this permanent saying its activated abilities can't be activated
+        -- (Arrest). Here for detain's reason -- this is what BOTH of CR 605.3a's
+        -- windows consult -- and asked as ManaAbility, which is the only kind
+        -- reaching this function. A row naming NonManaAbility is therefore no
+        -- answer here, which is exactly what Realmbreaker's Grasp's "unless
+        -- they're mana abilities" says.
+        && not (ActivationProhibition.prohibited AbilityKind.ManaAbility oid gs)
         -- CR 602.5's player-axis prohibition (Sen Triplets), read here for
         -- detain's reason: the sentence carves no mana ability out where CR
         -- 702.61b does, so both of CR 605.3a's windows owe it.

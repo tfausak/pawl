@@ -16,6 +16,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -455,6 +456,20 @@ data Face card = MkFace
     -- counters" is scoped to a player and reaches a disjoint kind domain, so it
     -- is a playerAbilities row carrying PlayerEffect.CantGetCounters.
     counterRestrictions :: [CounterRestriction.CounterRestriction],
+    -- | CR 604.1\/604.2 \/ 602.2 \/ 101.2: this face's printed ACTIVATION
+    -- PROHIBITIONS -- "its activated abilities can't be activated" (Arrest);
+    -- read by Pawl.Engine.ActivationProhibition, never by
+    -- Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    --
+    -- Its own field rather than an arm of counterRestrictions above, for the
+    -- reason that field gives: the two forbid unrelated game actions, and this
+    -- one is read at the two windows an activated ability is offered through
+    -- (CR 602.2 and CR 605.3a).
+    --
+    -- The PLAYER half of the same sentence is not here. Sen Triplets' "your
+    -- opponents can't ... activate abilities" is scoped to a player, so it is a
+    -- playerAbilities row carrying PlayerEffect.CantActivateAbilities.
+    activationProhibitions :: [ActivationProhibition.ActivationProhibition],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,
     -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
