@@ -909,6 +909,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
   -- PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy _ -> []
+  -- And so do the attachment-scoped pair, whose Filters are over the host.
+  TriggerCondition.SelfBecomesAttachedTo _ -> []
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> []
   -- CR 603.12's carries nothing at all, so no Count.
   TriggerCondition.Reflexive -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
@@ -2006,7 +2009,9 @@ reservedSlots =
       Binding.attackingCreature,
       Binding.attackingPlayer,
       Binding.combatDamager,
-      Binding.mentoredCreature
+      Binding.mentoredCreature,
+      Binding.attachedHost,
+      Binding.unattachedHost
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -3223,6 +3228,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 701.3a's carries one over the ATTACHMENT -- Bramble Elemental's "an
   -- Aura" -- which this sweep must see for PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy f -> unframed [f]
+  -- CR 701.3a and CR 701.3d read from the attachment carry one over the HOST --
+  -- Enormous Energy Blade's "a creature" -- and it needs the same sweep.
+  TriggerCondition.SelfBecomesAttachedTo f -> unframed [f]
+  TriggerCondition.SelfBecomesUnattachedFrom f -> unframed [f]
   -- CR 603.12's carries nothing, so no Filter either.
   TriggerCondition.Reflexive -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
@@ -3391,6 +3400,10 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.SelfExerted -> []
   TriggerCondition.SelfBecomesAttachedBy _ -> []
+  -- Neither attachment-scoped condition names a slot OUTRIGHT either: each binds
+  -- one (Pawl.Engine.Event.Binding.eventBindingSlots) rather than reading one.
+  TriggerCondition.SelfBecomesAttachedTo _ -> []
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> []
   -- CR 603.7c's captured environment is what a reflexive trigger knows, but the
   -- condition itself admits no event and names nothing.
   TriggerCondition.Reflexive -> []

@@ -171,6 +171,7 @@ library codec
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
     Pawl.Codec.BecameTarget
+    Pawl.Codec.BecameUnattached
     Pawl.Codec.BecomeCopy
     Pawl.Codec.BecomeCopySpec
     Pawl.Codec.BeginningStep
@@ -1460,6 +1461,7 @@ library types
     Pawl.Types.BecameBlocking
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
+    Pawl.Types.BecameUnattached
     Pawl.Types.BecomeCopy
     Pawl.Types.BeginningStep
     Pawl.Types.Binding

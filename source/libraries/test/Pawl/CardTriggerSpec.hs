@@ -2670,6 +2670,162 @@ brambleElementalSpec s registry =
           Spec.assertEqWith s "though the Equipment really did become attached" (attachmentsOn brambleId equipped) [bladeId]
           Spec.assertEqWith s "which CR 301.5f's +2/+0 confirms" (S.powerToughnessOf brambleId equipped) (Just (6, 4))
 
+-- Is this permanent tapped? Read off the object rather than counted, because the
+-- cases below name WHICH creature and a count could not.
+isTapped :: ObjectId.ObjectId -> GameState.GameState -> Bool
+isTapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+
+-- The CR 117.5 boundary and the stack, run until neither has anything left --
+-- what a leg needs when one trigger's resolution is what fires the next.
+settleTriggers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+settleTriggers answer = go (10 :: Int)
+  where
+    go n gs =
+      let placed = S.runPure answer gs Engine.settleForPriority
+       in if n <= 0 || null (GameState.stack placed)
+            then placed
+            else go (n - 1) (S.runPure answer placed Stack.resolveTop)
+
+-- Rule 702.6a's minted equip ability, off the PROJECTION: an Equipment declares
+-- the keyword and prints no activated ability of its own.
+equipAbilityOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+equipAbilityOf oid gs = case Projection.abilitiesOf oid gs of
+  ability : _ -> Just ability
+  [] -> Nothing
+
+-- CR 701.3a's attachment event read from the ATTACHMENT's side, by
+-- TriggerCondition.SelfBecomesAttachedTo -- the mirror of Bramble Elemental's
+-- group above.
+--
+-- Enormous Energy Blade, {2}{B} Artifact -- Equipment: "Equipped creature gets
+-- +4/+0. / Whenever this Equipment becomes attached to a creature, tap that
+-- creature. / Equip {2}" (Oracle text checked against Scryfall on 2026-09-05).
+--
+-- TWO untapped creatures, and the equip aimed at one of them. With a single
+-- candidate every reading of "that creature" agrees -- the bearer's own host, the
+-- only creature on the board, the equip's target -- and a tapped permanent would
+-- be right by accident.
+enormousEnergyBladeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+enormousEnergyBladeSpec s registry =
+  Spec.describe s "CR 701.3a a trigger on becoming attached, read by the Equipment" $ do
+    Spec.it s "CR 702.6a whole card: the equip taps the creature it went onto and not the other" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      maiden <- S.printingOf s registry "Bird Maiden"
+      blade <- S.printingOf s registry "Enormous Energy Blade"
+      let (pikerId, base1) = S.addCreature piker S.alice (S.landsFor swamp S.alice 4 (Setup.emptyGame S.bothPlayers))
+          (maidenId, base2) = S.addCreature maiden S.alice base1
+          (bladeId, base3) = S.addCreature blade S.alice base2
+          ready = base3 {GameState.priority = Just S.alice}
+      case equipAbilityOf bladeId ready of
+        Nothing -> Spec.assertFailure s "Enormous Energy Blade should offer rule 702.6a's minted equip ability"
+        Just equip -> do
+          -- The precondition the two assertions below rest on: S.addCreature
+          -- leaves what it places untapped, and a board that arrived tapped would
+          -- make the first of them true for the fixture's reason.
+          Spec.assertBool s (not (isTapped pikerId ready) && not (isTapped maidenId ready)) "both creatures start untapped"
+          let activated = S.runPure (aimAtOffered pikerId) ready (Activate.activateAbility S.alice bladeId equip)
+              equipped = S.runPure (aimAtOffered pikerId) activated Stack.resolveTop
+              after = settleTriggers (aimAtOffered pikerId) equipped
+          Spec.assertBool s (isTapped pikerId after) "CR 701.3a the creature the Blade went onto is tapped"
+          Spec.assertBool s (not (isTapped maidenId after)) "and the other creature, which it did not, is untapped"
+          -- Proxies, after the two above: without them the pair could pass on a
+          -- board where no equip happened and nothing was ever going to tap.
+          Spec.assertEqWith s "the Blade really is attached to the Piker" (attachmentsOn pikerId after) [bladeId]
+          Spec.assertEqWith s "which CR 301.5f's +4/+0 confirms" (S.powerToughnessOf pikerId after) (Just (6, 1))
+
+-- CR 701.3d's unattachment event, read by the attachment through
+-- TriggerCondition.SelfBecomesUnattachedFrom.
+--
+-- Grafted Wargear, {3} Artifact -- Equipment: "Equipped creature gets +3/+2. /
+-- Whenever this Equipment becomes unattached from a permanent, sacrifice that
+-- permanent. / Equip {0}" (Oracle text checked against Scryfall on 2026-09-05).
+--
+-- THREE legs, because rule 701.3d reaches the same event by three roads in this
+-- engine and each has its own emit site: the Equipment MOVING to another creature
+-- (Pawl.Engine.Event.attach), the host becoming an illegal one (CR 704.5n, the
+-- detach fold in Pawl.Engine.Sba), and the Equipment LEAVING THE BATTLEFIELD (the
+-- zone-change funnel), which is also the leg CR 603.10c's look-back is for --
+-- there the bearer is in a graveyard by the time its own trigger is gathered.
+-- Deleting any one emit leaves the other two green.
+graftedWargearSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graftedWargearSpec s registry =
+  Spec.describe s "CR 701.3d a trigger on becoming unattached" $ do
+    -- CR 701.3a's move: equipping an Equipment that is already equipping
+    -- something makes it cease to be attached to the old host.
+    Spec.it s "CR 701.3a whole card: re-equipping onto another creature sacrifices the one it left" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      maiden <- S.printingOf s registry "Bird Maiden"
+      wargear <- S.printingOf s registry "Grafted Wargear"
+      let (pikerId, base1) = S.addCreature piker S.alice (S.landsFor swamp S.alice 4 (Setup.emptyGame S.bothPlayers))
+          (maidenId, base2) = S.addCreature maiden S.alice base1
+          (gearId, base3) = S.addCreature wargear S.alice base2
+          ready = base3 {GameState.priority = Just S.alice}
+      case equipAbilityOf gearId ready of
+        Nothing -> Spec.assertFailure s "Grafted Wargear should offer rule 702.6a's minted equip ability"
+        Just equip -> do
+          let onPiker = settleTriggers (aimAtOffered pikerId) (S.runPure (aimAtOffered pikerId) ready (Activate.activateAbility S.alice gearId equip >> Stack.resolveTop))
+              moved = S.runPure (aimAtOffered maidenId) (onPiker {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice gearId equip >> Stack.resolveTop)
+              after = settleTriggers (aimAtOffered maidenId) moved
+          Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.3d the creature the Wargear left was sacrificed"
+          Spec.assertBool s (S.onBattlefield maidenId after) "and the creature it moved onto was not"
+          -- The other board this leg needs, one act different: the FIRST equip
+          -- attached the Wargear to a creature that was attached to nothing, so
+          -- no unattachment happened and nothing was sacrificed.
+          Spec.assertBool s (S.onBattlefield pikerId onPiker) "the first equip, which came off nothing, sacrificed no one"
+          Spec.assertEqWith s "and the Wargear really did move" (attachmentsOn maidenId after) [gearId]
+    -- CR 704.5n: the host gains protection from artifacts, so the Equipment is
+    -- attached to an illegal permanent and the state-based action detaches it.
+    -- The host is still on the battlefield when the trigger resolves, which is
+    -- what makes the sacrifice observable at all.
+    Spec.it s "CR 704.5n whole card: a host that turns illegal is sacrificed as the Wargear falls off" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      tower <- S.printingOf s registry "Tower of the Magistrate"
+      piker <- S.printingOf s registry "Goblin Piker"
+      wargear <- S.printingOf s registry "Grafted Wargear"
+      let (pikerId, base1) = S.addCreature piker S.alice (S.landsFor swamp S.alice 4 (Setup.emptyGame S.bothPlayers))
+          (towerId, base2) = S.addCreature tower S.alice base1
+          (gearId, base3) = S.addCreature wargear S.alice base2
+          ready = base3 {GameState.priority = Just S.alice}
+      case equipAbilityOf gearId ready of
+        Nothing -> Spec.assertFailure s "Grafted Wargear should offer rule 702.6a's minted equip ability"
+        Just equip -> do
+          let onPiker = settleTriggers (aimAtOffered pikerId) (S.runPure (aimAtOffered pikerId) ready (Activate.activateAbility S.alice gearId equip >> Stack.resolveTop))
+              protection = drop 1 (Projection.abilitiesOf towerId onPiker)
+          case protection of
+            [] -> Spec.assertFailure s "Tower of the Magistrate should print a protection ability beside its mana ability"
+            grant : _ -> do
+              let granted = S.runPure (aimAtOffered pikerId) (onPiker {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice towerId grant >> Stack.resolveTop)
+                  after = settleTriggers (aimAtOffered pikerId) granted
+              Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.3d the host the Wargear fell off was sacrificed"
+              Spec.assertBool s (S.onBattlefield gearId after) "CR 704.5n and the Wargear itself stayed on the battlefield"
+              -- The precondition: without the equip there is nothing to fall off,
+              -- and the protection alone would leave the same board.
+              Spec.assertBool s (S.onBattlefield pikerId onPiker) "the Piker was alive and equipped before the protection"
+    -- CR 701.3d's third road and CR 603.10c's own case: the EQUIPMENT leaves the
+    -- battlefield. Bane of Progress destroys every artifact on entry, so the
+    -- Wargear is in a graveyard by the time the CR 117.5 boundary gathers its
+    -- trigger, and only the look-back offers it.
+    Spec.it s "CR 603.10c whole card: destroying the Wargear still sacrifices the creature it was on" $ do
+      forest <- S.printingOf s registry "Forest"
+      piker <- S.printingOf s registry "Goblin Piker"
+      wargear <- S.printingOf s registry "Grafted Wargear"
+      bane <- S.printingOf s registry "Bane of Progress"
+      let (pikerId, base1) = S.addCreature piker S.alice (S.landsFor forest S.alice 6 (Setup.emptyGame S.bothPlayers))
+          (gearId, base2) = S.addCreature wargear S.alice base1
+          ready = base2 {GameState.priority = Just S.alice}
+      case equipAbilityOf gearId ready of
+        Nothing -> Spec.assertFailure s "Grafted Wargear should offer rule 702.6a's minted equip ability"
+        Just equip -> do
+          let onPiker = settleTriggers (aimAtOffered pikerId) (S.runPure (aimAtOffered pikerId) ready (Activate.activateAbility S.alice gearId equip >> Stack.resolveTop))
+              (armed, baneSpell) = S.handOne bane onPiker
+              cast = S.runPure S.identityAnswer (armed {GameState.priority = Just S.alice}) (S.cast S.alice baneSpell >> Stack.resolveTop)
+              after = settleTriggers S.identityAnswer cast
+          Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 701.3d the creature the destroyed Wargear was on was sacrificed"
+          Spec.assertBool s (not (S.onBattlefield gearId after)) "the Wargear itself is gone, which is what made this the look-back leg"
+          Spec.assertBool s (S.onBattlefield pikerId onPiker) "and the Piker was alive and equipped before Bane of Progress"
+
 -- CR 613.1f layer 6, the TRIGGERED half of the grant: Sixth Sense ({G}
 -- Enchantment -- Aura, "Enchant creature / Enchanted creature has 'Whenever this
 -- creature deals combat damage to a player, you may draw a card.'", checked
@@ -2965,5 +3121,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   wildgrowthWalkerSpec s registry
   rayOfCommandSpec s registry
   brambleElementalSpec s registry
+  enormousEnergyBladeSpec s registry
+  graftedWargearSpec s registry
   sixthSenseSpec s registry
   betrayalSpec s registry

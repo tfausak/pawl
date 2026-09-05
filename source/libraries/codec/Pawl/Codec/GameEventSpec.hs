@@ -19,6 +19,7 @@ import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
+import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.CardName as CardName
@@ -526,6 +527,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BecameAttached (BecameAttached.MkBecameAttached (ObjectId.MkObjectId 14) (Recipient.ToPlayer (PlayerId.MkPlayerId 3))))
       " {\"type\":\"BecameAttached\",\"value\":{\"attachment\":14,\"host\":{\"type\":\"ToPlayer\",\"value\":3}}} "
+  -- CR 701.3d's mirror of the two above. Encoded under its own tag: the payload
+  -- is BecameAttached's shape field for field, so only the tag keeps a coming-off
+  -- from round-tripping as a coming-on.
+  Spec.it s "BecameUnattached" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameUnattached (BecameUnattached.MkBecameUnattached (ObjectId.MkObjectId 15) (Recipient.ToCreature (ObjectId.MkObjectId 16))))
+      " {\"type\":\"BecameUnattached\",\"value\":{\"attachment\":15,\"host\":{\"type\":\"ToCreature\",\"value\":16}}} "
   -- CR 705.2's two outcomes over the same seat. BOTH legs, because the outcome
   -- is the only thing that separates them: a codec that dropped `won` would
   -- round-trip the won flip and silently turn the lost one into it. The third
