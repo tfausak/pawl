@@ -187,20 +187,20 @@ playersInScope perspective gs scope =
         PlayerScope.ControllingMostPermanents -> Just (Maybe.maybeToList (permanentLeader gs))
 
 -- CR 707.2a: the player abilities this permanent's copiable rules text gives it
--- -- its copy snapshot's when it has one, and its printed face's otherwise or
--- when the snapshot's rules text is a set of copied HALVES, which CR 709.5 reads
--- against this object's own designations. The
+-- -- its copy snapshot's when it has one, its printed face's otherwise. The
 -- Pawl.Engine.Projection.View.staticAbilitiesOf of this axis, and written here rather
 -- than beside it so that Pawl.Engine.Projection goes on never seeing
--- Pawl.Types.PlayerEffect; the one read of Binding.copyOf both share is
--- Projection.copiableSnapshotOf.
+-- Pawl.Types.PlayerEffect; the one accessor both share is
+-- Projection.copiableSnapshotOf, which is also where CR 709.5's copied halves
+-- are forked out for every reader at once.
 playerAbilitiesOf :: ObjectId -> GameState -> [PlayerStaticAbility.PlayerStaticAbility]
 playerAbilitiesOf oid gs = case Projection.copiableSnapshotOf oid gs of
-  Just snapshot | not (Projection.derivesFromCopiedHalves oid gs) -> PC.playerAbilities snapshot
+  Just snapshot -> PC.playerAbilities snapshot
   -- CR 709.5: a copy of a Room reads the copied card's halves against its OWN
-  -- designations, which Game.faceOf already does, so the printed read is where
-  -- that fork lands -- Projection.staticAbilitiesOf's third arm exactly.
-  _ -> foldMap Face.playerAbilities (Game.faceOf oid gs)
+  -- designations, which Game.faceOf already does, so it lands here --
+  -- Projection.copiableSnapshotOf answering Nothing is what puts it here, the
+  -- fork being made once for all six readers rather than per reader.
+  Nothing -> foldMap Face.playerAbilities (Game.faceOf oid gs)
 
 -- CR 613.7a: the PRINTED carrier's rows -- printed as opposed to CR 611.2c's
 -- stored one, the list itself being the COPIABLE one above -- one per player

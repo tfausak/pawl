@@ -648,46 +648,72 @@ countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 -- Not a recursion: a copy of a copy stored resolved values when it was stamped.
 copiableCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot | not (derivesFromCopiedHalves oid gs) -> snapshot
-  -- CR 709.5's last sentence: a snapshot that copied HALVES is re-derived rather
-  -- than read back. The rule copies the shared type line's two static abilities
-  -- and which half each characteristic is in, not the subtraction they produced
-  -- on the copied permanent -- and the designations those abilities read are CR
-  -- 709.5c's, which belong to this object and not to the one it copied. So the
-  -- copiable values are rebuilt from the copied card's halves against THIS
-  -- object's doors, which is what baseCharacteristics does with Game.halvesOf
-  -- underneath it. A copy of a Room enters with both doors shut (CR 709.5d) and
-  -- opens them at its own unlock costs.
+  Just snapshot -> snapshot
+  -- CR 709.5's last sentence puts a copy of a Room on this arm rather than the
+  -- one above, copiableSnapshotOf below answering Nothing for it: the rule copies
+  -- the shared type line's two static abilities and which half each
+  -- characteristic is in, not the subtraction they produced on the copied
+  -- permanent, and the designations those abilities read are CR 709.5c's, which
+  -- belong to this object. So the copiable values are rebuilt from the copied
+  -- card's halves against THIS object's doors, which is what baseCharacteristics
+  -- does with Game.halvesOf underneath it.
   --
   -- Not implemented: a CR 707.9 exception applied to a copy of a Room, which
-  -- Replacement.applyCopyExceptions stamps into the snapshot this arm discards
-  -- (#3249). No card in data/cards/ pairs an exception with a Room-eligible
-  -- copy.
-  _ -> baseCharacteristics oid gs
+  -- Replacement.applyCopyExceptions stamps into the snapshot this arm goes
+  -- around (#3249). No card in data/cards/ pairs an exception with a
+  -- Room-eligible copy.
+  Nothing -> baseCharacteristics oid gs
+
+-- CR 707.3: the copy snapshot an object's copiable RULES TEXT is read from --
+-- Nothing for an object that is copying nothing, and Nothing again for one whose
+-- snapshot copied HALVES, whose rules text every reader must re-derive against
+-- this object's own unlocked designations instead (copiableCharacteristics
+-- above).
+--
+-- THE accessor all six of those readers share -- the record above,
+-- staticAbilitiesOf below, Pawl.Engine.Projection's copiableReplacementsOf,
+-- anyCopiableKeyword and copiableMintsType, and Pawl.Engine.PlayerEffect's
+-- playerAbilitiesOf -- so that no two of them can answer differently about one
+-- object. Four of the six are disjuncts of ONE predicate
+-- (Pawl.Engine.Projection.replacementsAffecting's baseHas), which is what makes a
+-- per-reader fork a bug waiting rather than a style question: that predicate's
+-- False SKIPS the projection, so a reader left behind hides a copy's ability
+-- rather than reporting it.
+--
+-- Two of those six have a producer over a copied door -- copiableReplacementsOf
+-- (Torture Pit, proved by Pawl.RoomSpec's "CR 707.2a a copy of a Room gathers the
+-- replacement effect behind the door IT unlocked") and playerAbilitiesOf
+-- (Steaming Sauna). anyCopiableKeyword and copiableMintsType have none and are
+-- REGRESSION FENCES: no printed Room half prints a keyword, and none is a Saga, a
+-- planeswalker or a battle (Scryfall `t:room`, 2026-09-05), so nothing can redden
+-- if they are left behind again.
+copiableSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
+copiableSnapshotOf oid gs
+  | derivesFromCopiedHalves oid gs = Nothing
+  | otherwise = stampedSnapshotOf oid gs
 
 -- CR 709.5 / 709.5c: is this object's copiable rules text a set of HALVES it
--- copied, read against its own unlocked designations? The fork
--- copiableCharacteristics above and staticAbilitiesOf below both take, and the
--- one place the two questions it conjoins are asked together.
+-- copied, to be read against its own unlocked designations? The one fork
+-- copiableSnapshotOf above makes, so no reader has to know it exists.
 --
 -- The BATTLEFIELD conjunct is Game.resolveFaceFor's own, which is what makes the
 -- two agree: only there do CR 709.5c's designations exist for the subtraction to
 -- read, so a card in a graveyard that became a copy of a Room keeps reading the
 -- frozen snapshot, which is CR 709.4's combined view of the copied card.
 derivesFromCopiedHalves :: ObjectId -> GameState -> Bool
-derivesFromCopiedHalves oid gs = case copiableSnapshotOf oid gs of
+derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
   Nothing -> False
   Just snapshot ->
     Maybe.isJust (PC.halves snapshot)
       && fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
--- CR 707.3: the copy snapshot stamped onto this object, and Nothing for the
--- object that is copying nothing. The ONE read of Binding.copyOf, so no question
--- asked of a copiable value -- the whole record above, the three field-at-a-time
--- readers below, and its player abilities in Pawl.Engine.PlayerEffect -- can
--- disagree with another about which objects have one.
-copiableSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
-copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings)
+-- CR 707.3's raw stamp: what Pawl.Engine.Resolve and Pawl.Engine.Event wrote to
+-- Binding.copyOf, before rule 709.5's question is asked of it. The projection's
+-- ONE read of that binding, and only copiableSnapshotOf and derivesFromCopiedHalves
+-- above call it; Pawl.Engine.Game.halvesCardOf makes the other read in the
+-- engine, off the object it already holds.
+stampedSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
+stampedSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Object.bindings)
 
 -- CR 707.2a: the static abilities this object's copiable rules text gives it --
 -- its copy snapshot's when it has one, its printed face's otherwise. Equal to
@@ -715,18 +741,11 @@ copiableSnapshotOf oid gs = Game.lookupObject oid gs >>= (Binding.copyOf . Objec
 -- neither needs an ability minted here.
 staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
 staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot | not (derivesFromCopiedHalves oid gs) -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
-  -- The printed read reaches a copied Room too, and has to: Game.faceOf answers
-  -- with the copied card's halves subtracted by THIS object's designations (CR
-  -- 709.5), where the snapshot froze the copied permanent's. copiableCharacteristics
-  -- above takes the same fork for the same reason, so the two cannot disagree
-  -- about a copy's rules text.
-  --
-  -- A REGRESSION FENCE on that half rather than a proved behaviour: neither door
-  -- of the pool's one Room prints a static ability, so dropping the guard leaves
-  -- the suite green. Pawl.Engine.PlayerEffect.playerAbilitiesOf is the axis a
-  -- printed door does reach, and its own case is red without it.
-  _ -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
+  Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+  -- The printed read reaches a copied Room too, and has to: copiableSnapshotOf
+  -- above answers Nothing for one, and Game.faceOf answers with the copied card's
+  -- halves subtracted by THIS object's designations (CR 709.5).
+  Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
 
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
