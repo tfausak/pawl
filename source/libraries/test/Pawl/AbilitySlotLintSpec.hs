@@ -1,7 +1,10 @@
 -- Pawl.Engine.Card's lints over the slots an ability reads and declares (CR
 -- 603.7, CR 602.2b): delayed, triggered and activated abilities, and the lints
--- that catch a reserved or shadowed slot. Split out of Pawl.CardSpec, which
--- keeps the machinery and the lints over modes, references and tokens.
+-- that catch a reserved or shadowed slot. The three AbilityName joins are here
+-- too -- CR 603.7's arming, CR 613.1f's named removal and CR 116.2d's ignore --
+-- each an equality between the names one side writes and the names the other
+-- reads. Split out of Pawl.CardSpec, which keeps the machinery and the lints
+-- over modes, references and tokens.
 module Pawl.AbilitySlotLintSpec where
 
 -- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
