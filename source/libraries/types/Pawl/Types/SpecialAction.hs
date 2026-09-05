@@ -1,5 +1,6 @@
 module Pawl.Types.SpecialAction where
 
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
 
@@ -35,13 +36,14 @@ data SpecialAction
     -- until end of turn" is one; Damping Engine, Volrath's Curse and Lost in
     -- Thought are the only others printed.
     --
-    -- WHICH effect is named by the SOURCE PERMANENT and not by an index into
-    -- Face.playerAbilities, so taking this ignores every player-axis static
-    -- ability the permanent has. Exact for every printed producer, none of which
-    -- grants the permission on one of several abilities: Damping Engine's one
-    -- sentence declares two, and its own ignore covers both -- "this effect" is
-    -- the whole sentence. A permanent granting the permission on ONE of two
-    -- unrelated abilities would want a key (#1267).
+    -- WHICH effect is named by an AbilityName, matched against
+    -- PlayerStaticAbility.name on the same face -- CR 116.2d's own subject is
+    -- "the effect from that ability", singular, and a permanent granting the
+    -- permission on one of two unrelated abilities must ignore only the one
+    -- named. A name and not an index, for Pawl.Types.AbilityName's reason, and it
+    -- reaches SEVERAL rows rather than one: Damping Engine's single sentence
+    -- declares two player abilities that both carry its name, so one payment
+    -- still covers both. Pawl.AbilitySlotLintSpec joins the two sides.
     --
     -- The DURATION is not carried: all four print "until end of turn", and CR
     -- 116.2d states only "for a duration" rather than fixing one, so a card that
@@ -60,5 +62,5 @@ data SpecialAction
     -- graveyard. Paid through Pawl.Engine.Cost like every other, and never
     -- totalled through CR 601.2f: a special action is neither a spell being cast
     -- nor an ability being activated.
-    IgnoreThisUntilEndOfTurn (Cost.Cost Keyword.Keyword)
+    IgnoreThisUntilEndOfTurn AbilityName.AbilityName (Cost.Cost Keyword.Keyword)
   deriving (Eq, Ord, Show)

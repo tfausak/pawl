@@ -4016,7 +4016,7 @@ activationsIn =
         A.DiscardFromHand _ -> False
         A.Plot _ -> False
         A.Foretell _ -> False
-        A.Ignore _ -> False
+        A.Ignore _ _ -> False
         A.EndEffect _ -> False
    in filter isActivation
 

@@ -394,7 +394,7 @@ playLandAnswer p = case p of
           A.DiscardFromHand _ -> False
           A.Plot _ -> False
           A.Foretell _ -> False
-          A.Ignore _ -> False
+          A.Ignore _ _ -> False
           A.EndEffect _ -> False
           A.ActivateManaAbility _ -> False
      in case filter isPlay actions of
@@ -1779,7 +1779,7 @@ isCastOf oid action = case action of
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
-  A.Ignore _ -> False
+  A.Ignore _ _ -> False
   A.EndEffect _ -> False
   A.ActivateManaAbility _ -> False
 

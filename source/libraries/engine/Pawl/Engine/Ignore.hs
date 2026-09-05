@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Resolve.Effect as Resolve
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -33,32 +34,41 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.SpecialAction as SpecialAction
 
--- What this permanent charges to be ignored, if its current face grants the
--- permission at all.
+-- Every ignore this permanent's current face grants: which ability each names
+-- (CR 116.2d's "that ability") and what it charges.
 --
 -- Read off Game.faceOf and never Card.combined: CR 604.1 has a static ability
 -- function from the face the permanent actually shows, which is the same
 -- direction Pawl.Engine.PlayerEffect.applying reads Face.playerAbilities from.
 --
--- FIRST grant wins where a face somehow printed two. No printing does -- the
--- four producers print one sentence each.
-ignoreCostOf :: ObjectId -> GameState -> Maybe (Cost.Type.Cost Keyword)
-ignoreCostOf oid gs = case Game.faceOf oid gs of
-  Nothing -> Nothing
-  Just face -> case [c | SpecialAction.IgnoreThisUntilEndOfTurn c <- Face.specialActions face] of
-    [] -> Nothing
-    c : _ -> Just c
+-- A LIST rather than the first grant, now that each names an ability: a face may
+-- grant the permission on one of several, and each grant is its own offer. No
+-- printing grants two -- the four producers print one sentence each -- so the
+-- list is a singleton for every card in the pool.
+ignoreGrants :: ObjectId -> GameState -> [(AbilityName.AbilityName, Cost.Type.Cost Keyword)]
+ignoreGrants oid gs = case Game.faceOf oid gs of
+  Nothing -> []
+  Just face -> [(n, c) | SpecialAction.IgnoreThisUntilEndOfTurn n c <- Face.specialActions face]
 
--- CR 116.2d: may this player ignore this permanent right now? Three conjuncts:
+-- What this permanent charges to be ignored under this ability's name, if its
+-- current face grants that at all. FIRST grant wins where a face somehow named
+-- one ability twice; no printing does.
+ignoreCostOf :: ObjectId -> AbilityName.AbilityName -> GameState -> Maybe (Cost.Type.Cost Keyword)
+ignoreCostOf oid name gs = case [c | (n, c) <- ignoreGrants oid gs, n == name] of
+  [] -> Nothing
+  c : _ -> Just c
+
+-- CR 116.2d: may this player ignore this permanent's NAMED ability right now?
+-- Three conjuncts:
 --
---   * the permanent grants the permission, which also settles that it is on the
---     battlefield with a face to read it from;
---   * the rule's own WHO -- this player is one the permanent's static abilities
---     are actually affecting, which is what every printed producer's sentence
---     says. Leonin Arbiter's "any player" is the EachPlayer scope its own
---     prohibition carries, and Damping Engine's "that player" is the one player
---     its scope reaches; a seat the ability is not changing the game for is
---     offered nothing to ignore. Asked as
+--   * the permanent grants the permission under that name, which also settles
+--     that it is on the battlefield with a face to read it from;
+--   * the rule's own WHO -- this player is one the NAMED ability is actually
+--     affecting, which is what every printed producer's sentence says. Leonin
+--     Arbiter's "any player" is the EachPlayer scope its own prohibition carries,
+--     and Damping Engine's "that player" is the one player its scope reaches; a
+--     seat that ability is not changing the game for is offered nothing to
+--     ignore, however much the rest of the permanent is doing to them. Asked as
 --     Pawl.Engine.PlayerEffect.affectedBy, which is the typed question -- this
 --     module sees no PlayerEffect and no PlayerScope constructor.
 --   * the cost is payable. An action the player cannot take is not offered,
@@ -75,15 +85,21 @@ ignoreCostOf oid gs = case Game.faceOf oid gs of
 -- spends the cost again and changes nothing else -- which is why affectedBy is
 -- asked over the UNFILTERED gather rather than over
 -- Pawl.Engine.PlayerEffect.applying.
-canIgnore :: PlayerId -> ObjectId -> GameState -> Bool
-canIgnore pid oid gs = case ignoreCostOf oid gs of
+canIgnore :: PlayerId -> ObjectId -> AbilityName.AbilityName -> GameState -> Bool
+canIgnore pid oid name gs = case ignoreCostOf oid name gs of
   Nothing -> False
-  Just cost -> PlayerEffect.affectedBy pid oid gs && Cost.canPay pid oid cost gs
+  Just cost -> PlayerEffect.affectedBy pid oid name gs && Cost.canPay pid oid cost gs
 
--- Every permanent this player may pay to ignore right now, in battlefield order
--- -- what Action.Ignore is built from, the shape Room.unlockable has.
-ignorable :: PlayerId -> GameState -> [ObjectId]
-ignorable pid gs = filter (\oid -> canIgnore pid oid gs) (Set.toAscList (GameState.battlefield gs))
+-- Every (permanent, ability name) this player may pay to ignore right now, in
+-- battlefield order -- what Action.Ignore is built from, the shape
+-- Room.unlockable has.
+ignorable :: PlayerId -> GameState -> [(ObjectId, AbilityName.AbilityName)]
+ignorable pid gs =
+  [ (oid, name)
+  | oid <- Set.toAscList (GameState.battlefield gs),
+    (name, _) <- ignoreGrants oid gs,
+    canIgnore pid oid name gs
+  ]
 
 -- CR 116.2d, in the rule's own order: pay the cost, then start ignoring.
 --
@@ -97,10 +113,10 @@ ignorable pid gs = filter (\oid -> canIgnore pid oid gs) (Set.toAscList (GameSta
 -- Pawl.Types.Duration, and CR 116.2d's is not printed as one -- see
 -- Pawl.Types.SpecialAction on why the duration is not carried. CR 514.2 is what
 -- AtCleanup means, and "until end of turn" is what every producer says.
-ignore :: PlayerId -> ObjectId -> Game ()
-ignore pid oid = do
+ignore :: PlayerId -> ObjectId -> AbilityName.AbilityName -> Game ()
+ignore pid oid name = do
   before <- State.get
-  case ignoreCostOf oid before of
+  case ignoreCostOf oid name before of
     Nothing -> pure ()
     Just cost -> do
       -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
@@ -127,6 +143,7 @@ ignore pid oid = do
                       IgnoredAbility.MkIgnoredAbility
                         { IgnoredAbility.player = pid,
                           IgnoredAbility.source = oid,
+                          IgnoredAbility.ability = name,
                           IgnoredAbility.expiry = Expiry.AtCleanup
                         }
                         : GameState.ignoredAbilities gs

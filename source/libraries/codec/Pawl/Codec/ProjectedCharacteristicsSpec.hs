@@ -59,7 +59,7 @@ testCharacteristics =
       PC.cardTypes = Set.singleton CardType.Creature,
       PC.subtypes = Set.singleton Subtype.Human,
       PC.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))],
-      PC.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.EachPlayer Nothing (PlayerEffect.CantCastMoreThan 1)],
+      PC.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.EachPlayer, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.CantCastMoreThan 1}],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
       PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],

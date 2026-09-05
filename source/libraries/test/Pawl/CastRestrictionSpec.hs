@@ -1042,7 +1042,7 @@ offeredPlays pid gs =
         A.DiscardFromHand _ -> False
         A.Plot _ -> False
         A.Foretell _ -> False
-        A.Ignore _ -> False
+        A.Ignore _ _ -> False
         A.EndEffect _ -> False
         A.ActivateManaAbility _ -> False
    in filter isPlay (Action.legalActions pid gs)
@@ -2136,7 +2136,7 @@ manaActivationOffer action = case action of
   A.TurnFaceUp {} -> False
   A.Unlock {} -> False
   A.DiscardFromHand _ -> False
-  A.Ignore _ -> False
+  A.Ignore _ _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
   A.EndEffect _ -> False

@@ -46,6 +46,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityKind as AbilityKind
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -203,8 +204,8 @@ playerAbilitiesOf oid gs = case Projection.copiableSnapshotOf oid gs of
 -- CR 613.7a: the PRINTED carrier's rows -- printed as opposed to CR 611.2c's
 -- stored one, the list itself being the COPIABLE one above -- one per player
 -- ability on one battlefield permanent that still has it, as
--- (timestamp, source, controller, scope, effect) -- the shape `applying` below
--- sorts, filters and strips.
+-- (timestamp, source, ability name, controller, scope, effect) -- the shape
+-- `applying` below sorts, filters and strips.
 --
 -- Top-level and shared rather than local to that function, because a second
 -- question needs the same walk and needs it read DIFFERENTLY: `applying` drops
@@ -214,7 +215,7 @@ playerAbilitiesOf oid gs = case Projection.copiableSnapshotOf oid gs of
 --
 -- UNSORTED and UNFILTERED. Both are `applying`'s job, and neither reader may
 -- assume the other's.
-printedRows :: GameState -> [(Timestamp, Maybe ObjectId, PlayerId, AffectedPlayers.AffectedPlayers PlayerId, PlayerEffect)]
+printedRows :: GameState -> [(Timestamp, Maybe ObjectId, Maybe AbilityName.AbilityName, PlayerId, AffectedPlayers.AffectedPlayers PlayerId, PlayerEffect)]
 printedRows gs =
   let -- Hoisted out of the walk exactly as Projection.gather hoists it: an
       -- inlined call would recompute the whole game's SetLandSubtype list once
@@ -302,7 +303,7 @@ printedRows gs =
                           gs
                           oid
                           (if null changes then c else Projection.rewriteCondition changes c)
-                 in fmap (\ability -> (Object.timestamp object, Just oid, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
+                 in fmap (\ability -> (Object.timestamp object, Just oid, PlayerStaticAbility.name ability, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
               else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
@@ -320,13 +321,16 @@ printedRows gs =
 -- again and changes nothing else -- and Pawl.SpecialActionSpec's answerer relies
 -- on the offer standing.
 --
--- The SOURCE and not one of its abilities, which is the narrowing
--- Pawl.Types.SpecialAction carries (#1267): one ability of the permanent
--- affecting this player is enough to offer the action, and taking it then
--- suppresses them all.
-affectedBy :: PlayerId -> ObjectId -> GameState -> Bool
-affectedBy pid oid gs =
-  let affected (_, source, controller, scope, _) = source == Just oid && applies pid controller gs scope
+-- The SOURCE **and** the ability's name, which is CR 116.2d's own grain -- "the
+-- effect from that ability". A permanent's other abilities do not make the offer:
+-- a player the named ability is not changing the game for is offered nothing,
+-- however much the rest of the permanent is doing to them. Damping Engine's one
+-- sentence declares two rows carrying one name, so either of them affecting this
+-- player offers the action and taking it suppresses both.
+affectedBy :: PlayerId -> ObjectId -> AbilityName.AbilityName -> GameState -> Bool
+affectedBy pid oid name gs =
+  let affected (_, source, abilityName, controller, scope, _) =
+        source == Just oid && abilityName == Just name && applies pid controller gs scope
    in any affected (printedRows gs)
 
 -- CR 604.2: every player effect applying to `pid` right now. Gathered LIVE from
@@ -398,15 +402,26 @@ applying pid gs =
       storedOne active =
         ( ActivePlayerEffect.timestamp active,
           Just (ActivePlayerEffect.source active),
+          -- CR 611.2a: a resolved spell's continuous effect is not an ability, so
+          -- there is no printed name for CR 116.2d's ignore to have named -- which
+          -- is the same reason `notIgnored` below is applied to the printed
+          -- carrier alone.
+          Nothing,
           ActivePlayerEffect.controller active,
           ActivePlayerEffect.scope active,
           ActivePlayerEffect.effect active
         )
       stored = fmap storedOne (GameState.playerEffects gs)
       -- CR 116.2d: a player who has paid to ignore a permanent's static ability
-      -- sees none of that permanent's player abilities. Filtered HERE, at the
-      -- one gather every consumer reads through, so the ignore reaches all of
-      -- them at once and cannot be forgotten by a later gate.
+      -- sees no row that ability produced -- "the effect from that ability",
+      -- matched by the name its face gives it, so a permanent's OTHER abilities
+      -- keep applying. Filtered HERE, at the one gather every consumer reads
+      -- through, so the ignore reaches all of that ability's readers at once and
+      -- cannot be forgotten by a later gate.
+      --
+      -- An UNNAMED row can never be suppressed, which is exact: a face that names
+      -- no ability grants no ignore either (Pawl.AbilitySlotLintSpec joins the
+      -- two), so there is nothing that could have been paid for.
       --
       -- Only the PRINTED carrier can be ignored, which is exact rather than a
       -- shortcut: CR 116.2d's subject is "effects from static abilities", and a
@@ -415,13 +430,14 @@ applying pid gs =
       -- load-bearing now that a stored row names its source: an activated
       -- ability of a permanent stores rows under that permanent's own id, which
       -- a shared filter would suppress on a rule the ability is not subject to.
-      notIgnored (_, source, _, _, _) = not (any (ignores source) (GameState.ignoredAbilities gs))
-      applyingScope (_, _, controller, scope, _) = applies pid controller gs scope
-      ignores source ignored =
+      notIgnored (_, source, name, _, _, _) = not (any (ignores source name) (GameState.ignoredAbilities gs))
+      applyingScope (_, _, _, controller, scope, _) = applies pid controller gs scope
+      ignores source name ignored =
         IgnoredAbility.player ignored == pid
           && Just (IgnoredAbility.source ignored) == source
-      effectOf (_, source, _, _, effect) = (source, effect)
-      stampOf (timestamp, _, _, _, _) = timestamp
+          && Just (IgnoredAbility.ability ignored) == name
+      effectOf (_, source, _, _, _, effect) = (source, effect)
+      stampOf (timestamp, _, _, _, _, _) = timestamp
    in fmap effectOf (List.sortOn stampOf (filter applyingScope (filter notIgnored printed <> stored)))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
