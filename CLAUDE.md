@@ -244,6 +244,12 @@ to agents as written. What it doesn't say:
     suite, which absorbs it in argument order. Grep every construction site of
     the type by hand.
 
+    A new field or disjunct on `Pawl.Types.ProjectedCharacteristics` or
+    `Pawl.Engine.Filter`'s `View` must be filled in EVERY builder ---
+    `Pawl.Engine.Projection.View`'s `viewOfCard`, `viewOfCharacteristics` and
+    `copiableCharacteristics`, and `Pawl.Engine.Count`'s `viewOfSnapshot`.
+    Filling one compiles clean and the rest silently answer the old value.
+
     WIDENING AN EXISTING FUNCTION'S RESULT has no tripwire at all: no type
     changes, so `-Werror` is silent and a mutation proves only that the test is
     sensitive to your line, never that you found the other readers. Grep the

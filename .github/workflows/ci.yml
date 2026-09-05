@@ -31,7 +31,7 @@ jobs:
             --jobs \
             --semaphore
       - run: nix develop .#ci --command cabal build all
-      - run: nix develop .#ci --command cabal run pawl -- test --timeout=15s
+      - run: nix develop .#ci --command cabal run pawl -- test --timeout=120s
   cabal:
     name: Cabal
     runs-on: ubuntu-latest

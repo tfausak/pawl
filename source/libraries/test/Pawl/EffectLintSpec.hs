@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
+import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Card as Card
@@ -95,6 +95,7 @@ import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -1272,6 +1273,33 @@ meldFaceCountOffends :: Card.Type.Card -> Bool
 meldFaceCountOffends card =
   Card.Type.layout card == Layout.Meld && length (Card.Type.faces card) /= 1
 
+-- A MINTED face's own SourceHostFramed filters, for the effect that mints it.
+-- They come through effectFilters -- Effect.Create's arm ends
+-- `overFaces cardFilters card` -- and inside a CARD that tag means the TOKEN's
+-- host, which is not the comparison below's vocabulary: Ashiok, Wicked
+-- Manipulator's Nightmare carries a CR 603.4 intervening "if" and no ObjectRef at
+-- all, and effectObjectRefs' Create arm rightly answers []. A minted face's own
+-- positions are cardFilters' business, and the mintedFaces lints are where they
+-- are read.
+--
+-- Over effectWithNested rather than the effect alone, because effectFilters
+-- recurses into a nested effect list of its own: a Create inside a rider
+-- contributes its token's filters to the enclosing effect's tally too. That
+-- closure is a superset of effectFilters' own recursion, which can only subtract
+-- within the effect whose tally it is being subtracted from.
+mintedOwn :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set.Set (Filter.Type.Filter Keyword.Keyword)
+mintedOwn effect = Set.fromList [f | e <- effectWithNested effect, (_, face) <- effectMintedFaces e, (SourceHostFramed, f) <- cardFilters face]
+
+-- The SourceHostFramed filters a face's resolution effects reach through the
+-- Filter traversal, each effect's minted faces subtracted from that effect's own
+-- tally, leaving the comparison stated in the one vocabulary it means.
+--
+-- PER EFFECT, not card-wide: both sides are sets of filter VALUES, so subtracting
+-- a card-wide minted set cancels a filter contributed by any other effect that
+-- happens to carry an equal one. The case below is the counter-example.
+viaFilters :: Face.Face Card.Type.Card -> Set.Set (Filter.Type.Filter Keyword.Keyword)
+viaFilters card = Set.unions [Set.difference (Set.fromList [f | (SourceHostFramed, f) <- effectFilters effect]) (mintedOwn effect) | effect <- cardResolutionEffects card]
+
 effectLintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 208.1 / 208.2: a printed power or toughness box holds a number, or a value
@@ -2167,19 +2195,36 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- written anywhere else is (#2740).
   Spec.it s "every ObjectRef position the Filter traversal reaches is one the asking traversal reaches" $ do
     ps <- S.allPrintings s
-    let -- A MINTED face's own filters come through effectFilters -- Effect.Create's
-        -- arm ends `overFaces cardFilters card` -- and inside a CARD that tag means
-        -- the TOKEN's host, which is not this comparison's vocabulary: Ashiok,
-        -- Wicked Manipulator's Nightmare carries a CR 603.4 intervening "if" and no
-        -- ObjectRef at all, and effectObjectRefs' Create arm rightly answers []. So
-        -- they are subtracted, leaving the comparison stated in the one vocabulary
-        -- it means. A minted face's own positions are cardFilters' business, and
-        -- the mintedFaces lints above are where they are read.
-        mintedOwn card = Set.fromList [f | effect <- cardResolutionEffects card, (_, face) <- effectMintedFaces effect, (SourceHostFramed, f) <- cardFilters face]
-        viaFilters card = Set.difference (Set.fromList [f | effect <- cardResolutionEffects card, (SourceHostFramed, f) <- effectFilters effect]) (mintedOwn card)
-        viaRefs card = Set.fromList [f | (_, ref) <- concatMap effectObjectRefs (cardResolutionEffects card), (SourceHostFramed, f) <- frame SourceHostFramed (objectRefFilters ref)]
+    let viaRefs card = Set.fromList [f | (_, ref) <- concatMap effectObjectRefs (cardResolutionEffects card), (SourceHostFramed, f) <- frame SourceHostFramed (objectRefFilters ref)]
         offenders = filter (anyFace (\card -> viaFilters card /= viaRefs card) . Printing.card) ps
     Spec.assertEqWith s "the two ObjectRef traversals agree" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The subtraction is PER EFFECT, and this is what says so. Both sides are
+    -- sets of filter VALUES, so a card-wide subtraction cancels a filter wherever
+    -- ANY minted face carries an equal one -- and `And []` is the corpus's
+    -- commonest filter, which is how the Nightmare's own filter hid the +1's
+    -- ChosenCardFromAmong before #3279 tagged it. Here the creating effect's token
+    -- and a SECOND effect's ObjectRef carry the same predicate: the token's copy
+    -- is cancelled and the ObjectRef's survives, where a card-wide subtraction
+    -- takes both and leaves the lint unable to see a miss on the second effect.
+    --
+    -- Proven here rather than by the sweep above, which is green under either
+    -- subtraction: no printing in the pool pairs a minted face with a second
+    -- effect reading an equal filter, so the sweep cannot tell them apart.
+    let victim = Filter.Type.HasCardType CardType.Creature
+        reading = Effect.Transform (ObjectRef.EachMatching victim)
+        oneEffectSpell effects =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) Map.empty))
+            (ModeSelection.ChooseExactly 1)
+        token =
+          oneFaced
+            (vanillaFace "Nightmare" (spellLine CardType.Creature Set.empty Set.empty))
+              { Face.spell = oneEffectSpell [reading]
+              }
+        creating = Effect.Create (Create.MkCreate (Quantity.Type.Literal 1) token EntryRiders.defaultValue Nothing (PlayerRef.Relative PlayerRelation.You))
+        collided = (vanillaFace "Collided" instantLine) {Face.spell = oneEffectSpell [creating, reading]}
+    Spec.assertBool s (Set.member victim (mintedOwn creating)) "the minted face does carry the predicate"
+    Spec.assertBool s (Set.member victim (viaFilters collided)) "a minted face cancels its own effect's position and not another effect's"
   -- CR 406.3's rider is a rule about the EXILE ZONE, so on any other destination
   -- it is inert card data, and on a Create it is inert outright -- a token is
   -- created onto the battlefield, and CR 111.7 makes one anywhere else cease to

@@ -669,8 +669,9 @@ isBoundTag :: Text.Text
 isBoundTag = Text.pack "IsBound"
 
 -- How many CR 115.10a bound-object atoms this card carries in a position with no
--- resolution behind it -- a WISH's filter, a KEYWORD's own, a COST paid with
--- no announcement behind it, or the target slot of an ability rule 702 mints --
+-- resolution behind it -- a WISH's filter or CR 201.4a's naming restriction,
+-- which share OutsideTheGameFramed; a KEYWORD's own; a COST paid with no
+-- announcement behind it; or the target slot of an ability rule 702 mints --
 -- and how many anywhere else. The FIRST
 -- number is the offence here, which is the sibling position lints turned around:
 -- the atom is answerable in every position whose evaluator supplies the
@@ -684,8 +685,10 @@ isBoundCounts card =
 -- affects, so no slot of the resolution names one -- and
 -- Pawl.Engine.Projection.View.viewOfCard, the view they are matched through, fills no
 -- `identity` for Filter.IsBound to compare in any case. The atom in a wish's
--- filter is therefore a silent False rather than a rejected card. This is where
--- that is made loud.
+-- filter is therefore a silent False rather than a rejected card. CR 201.4a's
+-- naming restriction is matched through the same view by
+-- Pawl.Interpreter.legalCardName, so it is silent there too. This is where that
+-- is made loud.
 --
 -- Two offences under one name, for hostOfSourceOffends' two reasons turned
 -- around: the traversal found the atom inside a wish's filter, or the traversal
