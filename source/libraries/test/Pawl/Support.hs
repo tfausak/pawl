@@ -394,6 +394,7 @@ playLandAnswer p = case p of
           A.DiscardFromHand _ -> False
           A.Plot _ -> False
           A.Foretell _ -> False
+          A.PutCompanionIntoHand -> False
           A.Ignore _ _ -> False
           A.EndEffect _ -> False
           A.ActivateManaAbility _ -> False
@@ -1779,6 +1780,7 @@ isCastOf oid action = case action of
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
+  A.PutCompanionIntoHand -> False
   A.Ignore _ _ -> False
   A.EndEffect _ -> False
   A.ActivateManaAbility _ -> False
@@ -1954,6 +1956,7 @@ stubView table oid =
                 -- reason `owner` above gives -- no Count in the pool filters on
                 -- one.
                 Filter.nonManaActivatedAbility = False,
+                Filter.hasActivatedAbility = False,
                 -- CR 702.184c: the table registers no such grant, and no Count
                 -- in the pool reads this stub through Quantity.StationMeasure.
                 Filter.grantsStationToughness = False

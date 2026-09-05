@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
+import qualified Pawl.Engine.Companion as Companion
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
@@ -155,7 +156,18 @@ emptyGame order =
               -- CR 309.7: nobody has completed a dungeon in a game that has not
               -- started, there having been no venture to remove one from it.
               Player.completedDungeons = 0,
-              Player.completedDungeonNames = Set.empty
+              Player.completedDungeonNames = Set.empty,
+              -- CR 103.2a: the starting deck is what is left once the sideboard
+              -- is set aside, and which cards a player brought is their deck's
+              -- business -- createDeck below.
+              Player.startingDeck = Map.empty,
+              -- CR 103.2b: nobody has revealed a companion in a game whose decks
+              -- have not been built yet -- createDeck's caller below is where
+              -- that round runs.
+              Player.companion = Nothing,
+              -- CR 116.2g's "only if they haven't done so yet this game": nobody
+              -- has, the game not having started.
+              Player.companionTaken = False
             }
         )
    in GameState.MkGameState
@@ -336,18 +348,35 @@ createDeck pid deck = do
           -- keeps anything else from reaching these until a card brings one in.
           Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck) (Vanguard.lifeModifierOf pid gs), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
-  Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) -> do
-    printingId <- State.state (Game.intern printing)
+  cardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.cards deck))
+  Monad.forM_ cardIds $ \(printingId, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
   -- One intern, and the id goes to BOTH the object and the designation below --
   -- which is why Commander.isCommander's comparison holds without leaning on
   -- Game.intern's idempotence. That idempotence is what keeps a malformed deck
   -- listing its commander among its cards too (CR 903.5b forbids it; #940 means
   -- pawl does not enforce it) down to one entry.
-  Monad.forM_ (Deck.commander deck) $ \printing -> do
-    printingId <- State.state (Game.intern printing)
+  commanderId <- Monad.mapM (State.state . Game.intern) (Deck.commander deck)
+  Monad.forM_ commanderId $ \printingId -> do
     Monad.void (createInCommandZone pid printingId)
     State.modify' (Commander.designate pid printingId)
+  -- CR 103.2a / CR 702.139b: the starting deck, recorded once and never rewritten
+  -- -- rule 103.2a names a moment before the game begins, and by the time a
+  -- companion's condition could be asked again the opening hands have been drawn.
+  --
+  -- Deck.cards PLUS the commander, which is rule 702.139b's second sentence: "in a
+  -- Commander game, this is also before you've set aside your commander". The
+  -- sideboard interned above is not among them, which is rule 103.2a's first
+  -- sentence; nor is the vanguard or a dungeon, neither of which CR 902.3 or CR
+  -- 309.2 puts in the deck to begin with.
+  let starting = case commanderId of
+        Nothing -> Map.fromListWith (+) cardIds
+        Just printingId -> Map.insertWith (+) printingId 1 (Map.fromListWith (+) cardIds)
+  State.modify' $ \gs ->
+    gs
+      { GameState.players =
+          Map.adjust (\p -> p {Player.startingDeck = starting}) pid (GameState.players gs)
+      }
 
 -- CR 903.6 / CR 902.3: mint one of this player's cards straight into the command
 -- zone, which is where both of the cards a deck starts outside its library begin.
@@ -376,6 +405,15 @@ newGame perform matchup = do
   Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
     createDeck pid deck
     Event.shuffleLibrary pid
+  -- CR 103.2b: the companion reveal round, after every starting deck is recorded
+  -- (CR 103.2a, createDeck above) and before CR 103.5's opening hands -- rule
+  -- 103.2's steps come first, and rule 702.139b's condition reads the deck rather
+  -- than the library the draws are about to eat into.
+  --
+  -- In TURN ORDER, which is the order rule 103.2's steps are taken in; nothing in
+  -- rule 103.2b makes one player's reveal depend on another's, so the order is not
+  -- observable today.
+  Monad.forM_ (NonEmpty.toList matchup) (Companion.reveal . fst)
   Mulligan.openingHands perform (fmap fst (NonEmpty.toList matchup))
 
 -- CR 712.21 / CR 108.2: a melded permanent is ONE object represented by TWO
@@ -593,7 +631,22 @@ resetPlayers settings seats lifeModifier players =
               -- having been spent as they were brought in. What is left in it is
               -- what stayed outside the game, which the restart does not reach.
               Player.completedDungeons = 0,
-              Player.completedDungeonNames = Set.empty
+              Player.completedDungeonNames = Set.empty,
+              -- CR 116.2g counts "this game", and CR 727.1 / CR 729.2 make both of
+              -- this function's callers' games a new one, so the once-per-game
+              -- action is available again. Pawl.Engine.Companion.canTake still asks
+              -- whether the card is out there, which is what keeps a companion
+              -- already brought in from being taken twice.
+              --
+              -- Player.startingDeck and Player.companion are deliberately NOT
+              -- reset beside it, for Player.commander's reason: CR 727.2 reuses
+              -- the same cards and the designation was made from the deck before
+              -- the restarted game began.
+              --
+              -- Not implemented: CR 727.1's own re-run of rule 103, which would
+              -- put CR 103.2b's reveal round to the players again -- this reader
+              -- keeps the designation the first game made instead (#3260).
+              Player.companionTaken = False
             }
         Status.Departed _ -> player
    in Map.mapWithKey reset players

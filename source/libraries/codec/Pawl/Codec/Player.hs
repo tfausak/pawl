@@ -42,6 +42,9 @@ codec = Fields.object $ do
   outsideTheGame <- Fields.defaulted "outsideTheGame" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.outsideTheGame
   completedDungeons <- Fields.defaulted "completedDungeons" 0 Common.natural Player.completedDungeons
   completedDungeonNames <- Fields.defaulted "completedDungeonNames" Set.empty (Common.set CardName.codec) Player.completedDungeonNames
+  startingDeck <- Fields.defaulted "startingDeck" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.startingDeck
+  companion <- Fields.defaulted "companion" Nothing (Common.maybe PrintingId.codec) Player.companion
+  companionTaken <- Fields.defaulted "companionTaken" False Common.boolean Player.companionTaken
   pure
     Player.MkPlayer
       { Player.life = life,
@@ -55,5 +58,8 @@ codec = Fields.object $ do
         Player.dungeons = dungeons,
         Player.outsideTheGame = outsideTheGame,
         Player.completedDungeons = completedDungeons,
-        Player.completedDungeonNames = completedDungeonNames
+        Player.completedDungeonNames = completedDungeonNames,
+        Player.startingDeck = startingDeck,
+        Player.companion = companion,
+        Player.companionTaken = companionTaken
       }

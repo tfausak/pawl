@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
@@ -72,7 +73,6 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
-import Pawl.Types.Subtype (Subtype)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -170,16 +170,6 @@ supplyCapacity capacity _measure pcs pid oid cost restrictions gs = case Cost.ma
 noActivations :: Activations.Activations
 noActivations = Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
 
--- | CR 305.6
-subtypeMana :: Subtype -> Maybe ManaType
-subtypeMana subtype = case subtype of
-  Subtype.Mountain -> Just (ManaType.Colored Color.Red)
-  Subtype.Swamp -> Just (ManaType.Colored Color.Black)
-  Subtype.Forest -> Just (ManaType.Colored Color.Green)
-  Subtype.Island -> Just (ManaType.Colored Color.Blue)
-  Subtype.Plains -> Just (ManaType.Colored Color.White)
-  _ -> Nothing
-
 -- CR 105.4: a player asked to choose a color must choose one of the five;
 -- multicolored and colorless are not colors. So an any-colour producer offers
 -- exactly five options and never {C} -- which is also why AnyColor cannot be
@@ -272,7 +262,7 @@ manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =
         fmap
           (\manaType -> (intrinsicManaCost, [], [intrinsicManaAddition manaType], []))
-          (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
+          (Maybe.mapMaybe Subtype.Engine.subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
       selectionRoutes ability =
         fmap
           (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects))

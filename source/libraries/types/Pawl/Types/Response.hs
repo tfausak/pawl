@@ -264,6 +264,14 @@ data Response
     -- dungeon already in the command zone, this one names the CARD, and a
     -- transcript of one must not satisfy the other.
     ChoseDungeon PrintingId.PrintingId
+  | -- | CR 103.2b \/ 702.139a: the card a player revealed as their companion
+    -- before the game began, or Nothing for a player who revealed none.
+    --
+    -- Its own constructor rather than ChoseDungeon reused, that one's reason: rule
+    -- 103.2b admits a card with a companion ability whose condition the starting
+    -- deck fulfills and rule 309.2a a dungeon card, and a transcript of one must
+    -- not satisfy the other.
+    ChoseCompanion (Maybe PrintingId.PrintingId)
   | -- | CR 400.11c \/ 729.4: the card a player chose to bring in from outside the
     -- game -- either CR 103.2a's sideboard pool or, from inside a subgame, CR
     -- 729.4's main game. Pawl.Types.OutsideCard's header comment gives the full

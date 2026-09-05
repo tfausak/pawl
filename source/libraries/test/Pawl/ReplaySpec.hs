@@ -1035,6 +1035,26 @@ combatReplaySpec s =
           -- CR 309.2a again: with nothing recorded, the head is what the engine
           -- would have entered.
           Spec.assertEqWith s "a short transcript enters the first offered" (Replay.defaultAnswer p) a
+        -- CR 103.2b: whether a player revealed a companion before the game began,
+        -- and which, is a decision, so it has to survive a transcript like any
+        -- other.
+        Spec.it s "ChooseCompanion round-trips through the transcript" $ do
+          let a = PrintingId.MkPrintingId 7
+              b = PrintingId.MkPrintingId 9
+              p = Prompt.ChooseCompanion decider S.alice (a NonEmpty.:| [b])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p (Just b))) (Just (Just b))
+          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p (Just a))) (Just (Just a))
+          -- CR 103.2b's "if any players WISH to reveal": declining is an answer
+          -- and has to survive too, which is what the Maybe carries.
+          Spec.assertEqWith s "declining round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+          -- Discriminating: fails if the prompt reuses Response.ChoseDungeon
+          -- rather than getting its own constructor. Both name a PrintingId chosen
+          -- from outside the game, so nothing but a distinct constructor keeps a
+          -- transcript of one from replaying as the other.
+          Spec.assertEqWith s "a dungeon choice does not decode as this one" (Replay.decode p (Response.ChoseDungeon a)) Nothing
+          -- CR 103.2b again: with nothing recorded, nobody reveals -- an absent
+          -- transcript must not make a choice for a player.
+          Spec.assertEqWith s "a short transcript reveals nothing" (Replay.defaultAnswer p) Nothing
         -- CR 400.11c: which card a wish brought in from outside the game is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseFromOutsideTheGame round-trips through the transcript" $ do

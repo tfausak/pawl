@@ -49,6 +49,63 @@
           }
         }
       ],
+      "keywords": [
+        {
+          "type": "Companion",
+          "value": {
+            "type": "Or",
+            "value": [
+              {
+                "type": "Not",
+                "value": {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Artifact"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Battle"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Enchantment"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Planeswalker"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "HasActivatedAbility"
+              }
+            ]
+          }
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",

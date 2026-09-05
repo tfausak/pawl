@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Subtype as SubtypeEngine
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -210,18 +211,18 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertEqWith
       s
       "red"
-      (Mana.subtypeMana Subtype.Mountain)
+      (SubtypeEngine.subtypeMana Subtype.Mountain)
       (Just (ManaType.Colored Color.Red))
 
   Spec.it s "a Goblin grants no mana ability" $
-    Spec.assertEqWith s "none" (Mana.subtypeMana Subtype.Goblin) Nothing
+    Spec.assertEqWith s "none" (SubtypeEngine.subtypeMana Subtype.Goblin) Nothing
 
   Spec.it s "CR 305.6 Island taps blue, Plains taps white" $ do
-    Spec.assertEqWith s "island" (Mana.subtypeMana Subtype.Island) (Just (ManaType.Colored Color.Blue))
-    Spec.assertEqWith s "plains" (Mana.subtypeMana Subtype.Plains) (Just (ManaType.Colored Color.White))
+    Spec.assertEqWith s "island" (SubtypeEngine.subtypeMana Subtype.Island) (Just (ManaType.Colored Color.Blue))
+    Spec.assertEqWith s "plains" (SubtypeEngine.subtypeMana Subtype.Plains) (Just (ManaType.Colored Color.White))
 
   Spec.it s "CR 205.3h: Aura is an enchantment type, so it has no CR 305.6 intrinsic mana" $
-    Spec.assertEqWith s "no mana" (Mana.subtypeMana Subtype.Aura) Nothing
+    Spec.assertEqWith s "no mana" (SubtypeEngine.subtypeMana Subtype.Aura) Nothing
 
   -- CR 305.6 grants its intrinsic ability to "an object with the land card
   -- type and A BASIC LAND TYPE", and CR 205.3i lists which of the land types
@@ -231,7 +232,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- (asserted in Pawl.ProjectionSpec) come apart, and the reason they are two
   -- functions.
   Spec.it s "CR 305.6 Desert is a land type but not a BASIC one, so it grants no mana" $
-    Spec.assertEqWith s "no mana" (Mana.subtypeMana Subtype.Desert) Nothing
+    Spec.assertEqWith s "no mana" (SubtypeEngine.subtypeMana Subtype.Desert) Nothing
 
   Spec.it s "an empty pool starts empty" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1310,6 +1311,7 @@ isManaActivation action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
+  Action.Type.PutCompanionIntoHand -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
   Action.Type.Pass -> False
@@ -2830,12 +2832,10 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
   -- the reduction's Filter is asked of. Scryfall o:"aren't mana abilities cost",
   -- 2026-08-29, one hit -- Zirda; a second such printing would join it here.
   --
-  -- One of Zirda's three clauses is not in its card file, and the omission leaves
-  -- pawl's Zirda STRICTER than printed rather than weaker: the Companion clause,
-  -- which nothing can choose or pay for (gap #2451). Its "{1}, {T}: Target
-  -- creature can't block this turn" is transcribed, and proved by
-  -- Pawl.CombatSpec's StoredBlockRestriction group. Neither bears on the sentence
-  -- this case is about.
+  -- Zirda's other two clauses are transcribed too: the Companion condition, proved
+  -- by Pawl.CompanionSpec, and "{1}, {T}: Target creature can't block this turn",
+  -- proved by Pawl.CombatSpec's StoredBlockRestriction group. Neither bears on the
+  -- sentence this case is about.
   --
   -- Proved at the PAYMENT and not at the offer, for the reason the Field's case
   -- is: Cost.tapForManaWith is what folds the gathered reduction into the mana

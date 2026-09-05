@@ -32,7 +32,6 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
-import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
@@ -43,6 +42,7 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Subtype as SubtypeEngine
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
@@ -2542,6 +2542,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Disguise cost -> costFilters cost
   -- CR 702.143a: the foretell cost, reached the same way.
   Keyword.Foretell cost -> costFilters cost
+  -- CR 702.139a's condition, which is a Filter rather than a Cost. KeywordFramed
+  -- like the rest: Pawl.Engine.Companion.fulfilled matches it against a printed
+  -- face through a bare Context, so no slot is in scope.
+  Keyword.Companion predicate -> [predicate]
   Keyword.Ward cost -> costFilters cost
   -- CR 702.94a's payload is a Cost too, so its filters are reached the same way.
   Keyword.Miracle cost -> costFilters cost
@@ -3594,6 +3598,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasCounters _ -> []
   Filter.Type.HasCountersOfAnyKind -> []
   Filter.Type.HasNonManaActivatedAbility -> []
+  Filter.Type.HasActivatedAbility -> []
   Filter.Type.IsInZone _ -> []
   Filter.Type.WasCastFrom _ -> []
   Filter.Type.And fs -> concatMap filterSlotsReadSingly fs
@@ -5690,13 +5695,13 @@ basicLandSpec s = Spec.describe s "BasicLand" $ do
     Spec.assertEqWith
       s
       "black"
-      (Mana.subtypeMana Subtype.Swamp)
+      (SubtypeEngine.subtypeMana Subtype.Swamp)
       (Just (ManaType.Colored Color.Black))
   Spec.it s "CR 305.6 a Forest's intrinsic ability is green mana" $
     Spec.assertEqWith
       s
       "green"
-      (Mana.subtypeMana Subtype.Forest)
+      (SubtypeEngine.subtypeMana Subtype.Forest)
       (Just (ManaType.Colored Color.Green))
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()

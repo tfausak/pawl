@@ -352,6 +352,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasCounters _ -> predicate
   Filter.Type.HasCountersOfAnyKind -> predicate
   Filter.Type.HasNonManaActivatedAbility -> predicate
+  Filter.Type.HasActivatedAbility -> predicate
   Filter.Type.IsInZone _ -> predicate
   Filter.Type.WasCastFrom _ -> predicate
   where
@@ -930,6 +931,15 @@ viewOfSnapshot mController isToken counters snapshot =
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
               )
           ),
+      -- CR 602.1 off the same three lists, without CR 605.1a's exclusion.
+      Filter.hasActivatedAbility =
+        not
+          ( null
+              ( PC.activatedAbilities snapshot
+                  <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
+                  <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+              )
+          ),
       -- CR 702.184c off the snapshot, which carries the field: the marker
       -- outlives the object exactly as a keyword or a P/T does.
       Filter.grantsStationToughness = PC.grantsStationToughness snapshot
@@ -968,5 +978,6 @@ overlaySnapshot snapshot live =
           Filter.toughness = Filter.toughness sampled,
           Filter.manaValue = Filter.manaValue sampled,
           Filter.nonManaActivatedAbility = Filter.nonManaActivatedAbility sampled,
+          Filter.hasActivatedAbility = Filter.hasActivatedAbility sampled,
           Filter.grantsStationToughness = Filter.grantsStationToughness sampled
         }

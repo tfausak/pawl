@@ -1333,6 +1333,7 @@ isActivation a = case a of
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
+  A.PutCompanionIntoHand -> False
   A.ActivateManaAbility _ -> False
   A.Ignore _ _ -> False
   A.EndEffect _ -> False

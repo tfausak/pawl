@@ -2392,6 +2392,9 @@ filterReads f = case f of
   -- abilitiesFromCharacteristics runs through Condition.holds and which a
   -- Quantity can take anywhere (#2633).
   Filter.Type.HasNonManaActivatedAbility -> Set.singleton Keywords
+  -- CR 602.1 reads the same abilities one exclusion out, so it reads the same
+  -- layer.
+  Filter.Type.HasActivatedAbility -> Set.singleton Keywords
   -- CR 400.1 / 109.3: a zone is not a characteristic, so no Modification writes
   -- one and no layer's ordering turns on this atom.
   Filter.Type.IsInZone _ -> Set.empty
@@ -2441,6 +2444,7 @@ filterReadsPeers f = case f of
   -- The fifth: abilitiesFromCharacteristics runs CR 604.2's gate through
   -- Condition.holds, which takes `peers` to any object at all (#2633).
   Filter.Type.HasNonManaActivatedAbility -> True
+  Filter.Type.HasActivatedAbility -> True
   -- Over-declared, as filterReads over-declares the same two: viewOfCharacteristics
   -- answers both False outright, so no board can move them, but the subject whose
   -- characteristics CR 301.5 and CR 702.5a compare against is another object.

@@ -137,6 +137,7 @@ landPlays actions =
         A.DiscardFromHand _ -> Nothing
         A.Plot _ -> Nothing
         A.Foretell _ -> Nothing
+        A.PutCompanionIntoHand -> Nothing
         A.Ignore _ _ -> Nothing
         A.EndEffect _ -> Nothing
         A.ActivateManaAbility _ -> Nothing

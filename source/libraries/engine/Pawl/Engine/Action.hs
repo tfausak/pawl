@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Companion as Companion
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -237,6 +238,15 @@ legalActions pid gs =
       -- 116.2b's (any priority at all) nor CR 116.2a's sorcery speed. The gate is
       -- asked inside Foretell.canForetell beside the {2}, for plots' reason.
       foretells = fmap Action.Foretell (Foretell.foretellable pid gs)
+      -- CR 116.2g / 702.139a: the eighth special action, back on CR 116.2a's
+      -- window -- "any time they have priority and the stack is empty during a
+      -- main phase of their turn" -- plus a once-per-game clause no other
+      -- special action carries. Both are asked inside Companion.canTake beside
+      -- the {3}, for plots' reason.
+      --
+      -- A list of at most one, where the two above are a list per card: rule
+      -- 116.2g's subject is the one companion CR 103.2b let this player reveal.
+      companions = [Action.PutCompanionIntoHand | Companion.canTake pid gs]
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -322,4 +332,4 @@ legalActions pid gs =
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
       manaAbilityActivations = fmap Action.ActivateManaAbility manaSources
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> endings <> plots <> foretells <> activations <> manaAbilityActivations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> endings <> plots <> foretells <> companions <> activations <> manaAbilityActivations
