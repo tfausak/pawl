@@ -739,7 +739,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- CR 702.184c: Power's arm, with the substitution asked first. `perspective`
   -- is CR 109.5's "you" of the ability being resolved -- its controller (CR
   -- 113.8), unmoved by the re-aiming arms (AgainstSlot,
-  -- AgainstCardsExiledWith), which only ever repoint `mOid`/`mView`, and unmoved by whoever controls the stationing permanent
+  -- AgainstCardsExiledWith), which only ever repoint `mOid`/`mView`, and unmoved
+  -- by whoever controls the stationing permanent
   -- NOW: Tapestry Warden's ruling gates on the station ability's controller
   -- controlling the Warden as it resolves. grantsStationToughnessFor walks the
   -- battlefield through the same `viewOf` every other arm reads, so a snapshot

@@ -166,8 +166,7 @@ data Quantity
     -- the effect's source (CR 113.7); Nothing when the slot names no object.
     AgainstSlot (AgainstSlot.AgainstSlot Quantity)
   | -- | CR 607.2a: the inner quantity read against each card this quantity's
-    -- source exiled, summed (CR 607.3); an empty pile reads 0. Phyrexian
-    -- Ingester's "where X is the exiled creature card's power".
+    -- source exiled, summed (CR 607.3); an empty pile reads 0.
     AgainstCardsExiledWith Quantity
   | -- | CR 702.184c: the tapped creature's power, or its toughness where that is
     -- greater and the ability's controller controls a permanent carrying

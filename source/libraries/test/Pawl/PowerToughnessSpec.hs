@@ -2084,7 +2084,9 @@ ingesterSpec s registry = Spec.describe s "Phyrexian Ingester" $ do
     Spec.assertEqWith s "the Asp is the card in exile" (length (exiledNamed "Nessian Asp" after)) 1
     -- The bonus is not frozen: CR 400.7 makes the card in the graveyard a new
     -- object, GameState.exile no longer holds the one the link names, and the
-    -- static ability recomputes to nothing.
+    -- static ability recomputes to nothing. A REGRESSION FENCE against a future
+    -- freeze rather than a proof of the zone read -- the evaluator's arm says
+    -- why neither reading of the pile can tell this board apart.
     Spec.assertEqWith
       s
       "and it falls back to 3/3 once the exiled card leaves exile"
