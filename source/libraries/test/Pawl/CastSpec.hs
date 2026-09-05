@@ -2532,10 +2532,14 @@ harnessTheStormSpec s registry = Spec.describe s "HarnessTheStorm" $ do
 -- what reads them apart, and Pawl.ConditionSpec's Breathless Knight case is
 -- where the two references disagree.
 --
--- CR 608.2g is the road, and it needs no permission: the offer IS the
--- permission, so Cast.castableWhenOffered asks no zone at all and nothing has to
--- grant alice a cast from bob's graveyard. Havengul Lich would take the CR 601.3
--- road instead, which still has no one-object permission to write.
+-- CR 608.2g is the road, and it grants CR 601.3's permission itself: the effect
+-- naming the object IS it, so Cast.castableWhenOffered asks no zone at all and
+-- nothing has to grant alice a cast from bob's graveyard. That was only half
+-- true until this card arrived -- Cost.candidateCostsFor priced a graveyard card
+-- at nothing without a permission it could FIND on the board, so the offer was
+-- made and then withdrawn for want of a cost; Cost.candidateCostsGiven is where
+-- the offer now says so. Havengul Lich would take the CR 601.3 road instead,
+-- which still has no one-object permission to write.
 --
 -- Not implemented: "mana of any type can be spent to cast that spell" (CR
 -- 118.14). Effect.OfferCast carries no spending rider where

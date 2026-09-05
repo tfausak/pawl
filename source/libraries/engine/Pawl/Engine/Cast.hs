@@ -1508,6 +1508,12 @@ castSpell perform = castSpellWith perform False Nothing
 -- Nothing about the offer is re-checked here: `castSpellWith` casts, and whether
 -- the cast may be offered at all is `castableWhenOffered`'s question, asked by
 -- the caller that made the offer.
+--
+-- `offered` is a different question from `applied`, and it is CR 601.3's rather
+-- than CR 118.9's: whether an EFFECT is what permits this cast (CR 608.2g),
+-- which is what lets Cost.candidateCostsGiven price a card in a graveyard at all.
+-- It is passed to the SAME function the gate above priced the offer with, so the
+-- announcement cannot be offered a candidate the cast then refuses to find.
 castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
 castSpellWith perform offered applied pid oid name facing = do
   before <- State.get

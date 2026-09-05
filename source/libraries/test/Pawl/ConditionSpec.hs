@@ -445,8 +445,8 @@ stealing wanted p = case p of
 -- One reference could not have told them apart: naming alice it would have made
 -- both false, naming the table both true, and the pair is what makes a fix that
 -- merely widens the reference visible. The EnteredFrom disjunct each card carries
--- beside its WasCastFrom one is false either way, the Vessel entering from the
--- STACK (CR 400.7) rather than out of any graveyard.
+-- beside its WasCastFrom one is false either way: a permanent spell enters the
+-- battlefield out of the STACK (CR 608.3), not out of any graveyard.
 foreignGraveyardCastSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 foreignGraveyardCastSpec s registry =
   Spec.describe s "ForeignGraveyardCast"
