@@ -84,9 +84,9 @@ data EntryRewrite effect
     -- (#3006).
     --
     -- Not implemented: the two halves as ONE row. A card printing both writes two
-    -- (Faerie Squadron, Voidpouncer), which CR 616.1 counts as two replacement
-    -- effects where the printed sentence is one, so the entry prompts for an order
-    -- the rules never ask for (#3288).
+    -- (Faerie Squadron, Voidpouncer), which the CR 616.1 loop then counts as two
+    -- replacement effects where the printed sentence is one, so the entry prompts
+    -- for an order the rules never ask for (#3288).
     WithKeywords (Set.Set Keyword.Keyword)
   | -- | CR 616.1b / Gather Specimens: the object enters under the control of the
     -- effect's source's controller, written to Object.enteredUnder.
