@@ -237,6 +237,7 @@ viewOfCard face =
           -- CR 602.1 over the same two lists, without CR 605.1a's exclusion --
           -- Zirda, the Dawnwaker's companion condition is read here, since a card
           -- outside the game has no object to project.
+          --
           -- CR 305.6's intrinsic ability is the disjunct, through the reader every
           -- view builder shares: a Mountain must answer the same here as it does
           -- on the battlefield.

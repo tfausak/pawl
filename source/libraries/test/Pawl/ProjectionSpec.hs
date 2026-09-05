@@ -3520,7 +3520,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let gs0 = S.landsInPlay mountain 1
         landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
           oid : _ -> oid
-          [] -> error "the fixture places one Mountain"
+          [] -> error "Pawl.ProjectionSpec: landsInPlay should place one Mountain"
         (travelerId, gs) = S.addCreature traveler S.alice gs0
         snapshotView oid g = Count.viewOfSnapshot Nothing False Map.empty (Projection.project oid g)
         asks view = Filter.matches (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) view Filter.Type.HasActivatedAbility
