@@ -6,10 +6,12 @@
 -- Split out of Pawl.PlayerEffectSpec, which keeps the machinery.
 module Pawl.CastProhibitionSpec where
 
+import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
@@ -29,6 +31,7 @@ import qualified Pawl.Engine.Target as Target
 -- Aliased Card.Type, per the project-wide convention (CardSpec): the logic
 -- module Pawl.Engine.Card may later be imported and must not collide.
 
+import qualified Pawl.Interpreter as Interpreter
 import Pawl.PlayerEffectSpec (anySpell, anySpellId, isCast, isSilenceActivate, silenceAfter, swapAt, threeSeatSilenceBoard)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -37,6 +40,7 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -1098,8 +1102,8 @@ chamberAnswer opponent pick p = case p of
 -- chamberAnswer, also RECORDING each name ask as the (chooser, restriction) pair
 -- it arrived as. Both halves are invisible from the finished board:
 -- Object.chosenNames is a set and has forgotten CR 101.4's order, and CR 201.4a's
--- restriction is never written down at all, since the engine does not check the
--- answer against it (#663). Reading the prompt is the only way to see either.
+-- restriction is never written to the board at all. Reading the prompt is the
+-- only way to see either.
 recordingChamberAnswer ::
   PlayerId.PlayerId ->
   (PlayerId.PlayerId -> CardName.CardName) ->
@@ -1111,11 +1115,67 @@ recordingChamberAnswer opponent pick p = case p of
     pure (pick chooser)
   _ -> pure (chamberAnswer opponent pick p)
 
+-- chamberAnswer, taking each name off a QUEUE rather than off a function of the
+-- chooser. CR 201.4 refuses an illegal name and the same chooser is asked again,
+-- so the two cases below need an answerer whose second answer differs from its
+-- first, which a pure Prompt r -> r cannot be -- State-threaded, as
+-- Pawl.CopySpec's countingAnswer is.
+--
+-- Over Asked, because Pawl.Interpreter.policingCardNames wraps the primitive
+-- seam (Pawl.Engine.Engine.runGameAsked); nothing here reads the tag.
+--
+-- An exhausted queue answers `fallback` rather than looping or failing: a legal
+-- name neither case expects, so drawing past the end reddens the chosenNames
+-- assertion instead of hanging the re-ask.
+queuedChamberAnswer ::
+  (Monad m) =>
+  PlayerId.PlayerId ->
+  CardName.CardName ->
+  Asked.Asked r ->
+  State.StateT [CardName.CardName] m r
+queuedChamberAnswer opponent fallback asked = case Asked.prompt asked of
+  Prompt.ChooseCardName {} -> do
+    queue <- State.get
+    case queue of
+      [] -> pure fallback
+      name : rest -> do
+        State.put rest
+        pure name
+  p -> pure (chamberAnswer opponent (const fallback) p)
+
+-- castChamber, with the name answers coming off `queue` through
+-- Pawl.Interpreter.policingCardNames -- the wrapper an interpreter installs over
+-- its own answerer. Hands back the finished board and what the queue has LEFT,
+-- which is how the cases below count the asks.
+--
+-- The registry is lifted into the answerer's own monad: Registry.Registry is
+-- parameterized over the monad a lookup works in exactly so that a caller can.
+policedChamber ::
+  (Monad m) =>
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  CardName.CardName ->
+  [CardName.CardName] ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  m (GameState.GameState, [CardName.CardName])
+policedChamber registry opponent fallback queue gs oid = do
+  let lifted = Registry.MkRegistry (Trans.lift . Registry.fetchCard registry)
+      play = Engine.runGameAsked (Interpreter.policingCardNames lifted (queuedChamberAnswer opponent fallback)) gs (S.cast S.alice oid >> Stack.resolveTop)
+  ((_, after), left) <- State.runStateT play queue
+  pure (after, left)
+
 -- CR 201.4a's restriction as Null Chamber prints it: "other than a basic land
 -- card name", which is a supertype and a card type together (CR 205.4a: a basic
 -- land card is the one carrying both).
 nonBasicLandName :: Filter.Type.Filter Keyword.Keyword
 nonBasicLandName = Filter.Type.Not (Filter.Type.And [Filter.Type.HasSupertype Supertype.Basic, Filter.Type.HasCardType CardType.Land])
+
+-- A name CR 201.4's reference does not have, which the refusal case needs one of.
+-- Scryfall !"No Such Card", 2026-09-05, no hit; `data/cards/` has no file for it
+-- either, and Pawl.Registry is the reference Pawl.Interpreter.legalCardName reads.
+noSuchCard :: CardName.CardName
+noSuchCard = CardName.MkCardName (Text.pack "No Such Card")
 
 -- Cast the Chamber and let it resolve, answering both name choices.
 --
@@ -1190,10 +1250,11 @@ nullChamberSpec s registry =
     -- CR 201.4a: "If a player is instructed to choose a card name with certain
     -- characteristics, the player must choose the name of a card whose Oracle
     -- text matches those characteristics." Null Chamber's characteristics are
-    -- "other than a basic land card name", and the engine does NOT check the
-    -- answer against them (#663) -- so what is provable, and what the card is
-    -- carried for, is that the restriction reaches the player being asked,
-    -- unaltered, for BOTH choosers.
+    -- "other than a basic land card name". The engine hands them to the prompt
+    -- and does not judge the answer -- it cannot resolve a name at all -- so this
+    -- case proves the half the engine owns: the restriction reaches the player
+    -- being asked, unaltered, for BOTH choosers. The two cases after it prove the
+    -- half the interpreter owns.
     --
     -- Nothing else in this group would notice its loss: the restriction is never
     -- written to the board, so authoring Filter.And [] -- the trivial predicate,
@@ -1211,6 +1272,66 @@ nullChamberSpec s registry =
               (Engine.runGame (recordingChamberAnswer S.bob picks) board (S.cast S.alice oid >> Stack.resolveTop))
               []
       Spec.assertEqWith s "the card's own restriction, on both asks" (fmap snd asked) [nonBasicLandName, nonBasicLandName]
+
+    -- CR 201.4: "the player must choose the name of a card in the Oracle card
+    -- reference." Pawl.Registry is that reference, and it sits on the far side of
+    -- Pawl.Engine.Engine.runGameAsked, so the refusal is
+    -- Pawl.Interpreter.policingCardNames: an answer no card answers to is not
+    -- recorded and the same chooser is asked again.
+    --
+    -- THE FALSIFIER is the queue's length. Alice is asked twice and bob once, so
+    -- an unpoliced answerer records the name no card has AND leaves bob holding
+    -- alice's second answer -- two names, both wrong, and one answer unconsumed.
+    Spec.it s "CR 201.4 a name no card has is refused and the chooser is asked again" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      cancel <- S.printingOf s registry "Cancel"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          queue = [noSuchCard, S.printingName piker, S.printingName cancel]
+      (after, left) <- policedChamber registry S.bob (S.printingName lightningBolt) queue board oid
+      case enteredOne board after >>= \chamber -> Game.lookupObject chamber after of
+        Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
+        Just chamber -> do
+          Spec.assertEqWith
+            s
+            "the two legal names, and not the name no card has"
+            (Object.chosenNames chamber)
+            (Set.fromList [S.printingName piker, S.printingName cancel])
+          Spec.assertEqWith s "every queued answer was drawn, so alice was asked twice" left []
+
+    -- CR 201.4a's own half, which the case above cannot reach: Island is a name
+    -- the reference HAS, and it is refused only because Null Chamber's
+    -- restriction forbids a basic land card name. The two legalCardName
+    -- assertions are what keep the rules apart -- without them a check that
+    -- resolved no name at all would pass this case too -- and they sit LAST so
+    -- that a mutation reaches the board assertion first.
+    Spec.it s "CR 201.4a a real card the restriction forbids is refused and the chooser is asked again" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      cancel <- S.printingOf s registry "Cancel"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          queue = [S.printingName island, S.printingName piker, S.printingName cancel]
+      unrestricted <- Interpreter.legalCardName registry board S.alice (Filter.Type.And []) (S.printingName island)
+      restricted <- Interpreter.legalCardName registry board S.alice nonBasicLandName (S.printingName island)
+      (after, left) <- policedChamber registry S.bob (S.printingName lightningBolt) queue board oid
+      case enteredOne board after >>= \chamber -> Game.lookupObject chamber after of
+        Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
+        Just chamber -> do
+          Spec.assertEqWith
+            s
+            "the two legal names, and not the basic land the card forbids"
+            (Object.chosenNames chamber)
+            (Set.fromList [S.printingName piker, S.printingName cancel])
+          Spec.assertEqWith s "every queued answer was drawn, so alice was asked twice" left []
+      Spec.assertBool s unrestricted "Island is a name the reference has"
+      Spec.assertBool s (not restricted) "and the restriction is the only thing refusing it"
 
     -- CR 613.10 / PlayerScope.EachPlayer: neither printed prohibition names a
     -- player -- "Spells with the chosen names can't be cast and lands with the

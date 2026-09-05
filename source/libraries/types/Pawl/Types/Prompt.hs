@@ -340,9 +340,11 @@ data Prompt r where
   -- the Filter is CR 201.4a's restriction, and the PlayerId is the chooser,
   -- asked in APNAP order.
   --
-  -- Not implemented: no candidate list and no validation of the answer against
-  -- the Filter, CR 201.4's Oracle card reference not being a set the engine
-  -- holds (#663).
+  -- No candidate list: rule 201.4's offer is every card in the Oracle card
+  -- reference, which is not a set the engine holds. The answer is judged on the
+  -- far side of Pawl.Engine.Engine.runGameAsked instead, by
+  -- Pawl.Interpreter.policingCardNames, which resolves the name and matches the
+  -- Filter against it.
   ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Prompt CardName.CardName
   -- | Which opponent a card's text names, as a permanent enters (CR 614.12a),
   -- at resolution for CR 701.29a's fateseal, or for a resolving

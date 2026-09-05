@@ -785,7 +785,9 @@ defaultAnswer p = case p of
   -- have the same name as any other object, so the prompt's asker prohibits
   -- nothing. Every arm reaching here is already a reported desync (the
   -- transcript ran out or did not match), and conjuring a REAL card's name would
-  -- silently prohibit that card in the replay instead.
+  -- silently prohibit that card in the replay instead. Which is why this is the
+  -- one answerer Pawl.Interpreter.policingCardNames must not wrap: that wrapper
+  -- asks again until rule 201.4 is satisfied, and this answer never satisfies it.
   Prompt.ChooseCardName {} -> CardName.MkCardName Text.empty
   -- Every candidate is an opponent the card's own text offered, and the prompt
   -- is raised only when there are two or more.
