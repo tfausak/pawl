@@ -898,6 +898,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 700.4's is nullary as well, for the same reason.
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.AttachedPermanentTappedForMana -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   -- CR 701.21a's carries a PlayerRelation and a Filter, neither of which holds a
@@ -2085,6 +2086,7 @@ reservedSlots =
       Binding.sacrificedCount,
       Binding.sacrificedPermanent,
       Binding.tappedPermanent,
+      Binding.manaSource,
       Binding.castSpell,
       Binding.thisAbility,
       Binding.targetingObject,
@@ -3172,6 +3174,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- them too, so this condition carries no Filter either.
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.AttachedPermanentTappedForMana -> []
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
@@ -3411,6 +3414,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.CardLeavesGraveyard {} -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.AttachedPermanentTappedForMana -> []
   -- CR 702.55a names the haunted creature through the haunting object's own
   -- attachment rather than through a slot.
   TriggerCondition.HauntedCreatureDies -> []
@@ -5461,6 +5465,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 fmap (\t -> t {TriggeredAbility.modal = overModal (rebind slot) (TriggeredAbility.modal t)}) (Face.triggeredAbilities card)
             }
         offender = withBind Binding.eventAmount (S.combinedFace baneOfProgress)
+        manaOffender = withBind Binding.manaSource (S.combinedFace baneOfProgress)
     Spec.assertEqWith
       s
       "CR 615.13 thatMuch bound by a Destroy is caught, and the declaration sweep misses it"
@@ -5471,6 +5476,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and the real card binds no reserved slot"
       (reservedBindings (S.combinedFace baneOfProgress))
       Set.empty
+    -- CR 106.12a's `thatManaSource`, asserted for the same reason reservedSlots
+    -- is Pawl.Engine.Binding's whole list rather than a subset: a name missing
+    -- from it is in NEITHER sweep, and nothing else in the tree would say so.
+    Spec.assertEqWith
+      s
+      "CR 106.12a thatManaSource bound by a Destroy is caught"
+      (reservedBindings manaOffender)
+      (Set.singleton Binding.manaSource)
   -- Both sweeps above range over a face's MINTED cards as well as the face
   -- itself, and this is what proves that half. CR 111.3 makes the abilities a
   -- token's creator defines "functionally equivalent to the characteristic

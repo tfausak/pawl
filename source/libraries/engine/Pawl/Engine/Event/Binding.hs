@@ -660,6 +660,17 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- answers the Aura's "you" from Binding.triggerSource. There is no second
   -- object for the payload to name.
   (TriggerCondition.AttachedCreatureBecomesTapped, _) -> Map.empty
+  -- CR 106.12a's permanent, bound because the attachment link is NOT enough
+  -- here where it is enough above: Wild Growth's "its controller" is the
+  -- enchanted land's controller, and PlayerRef.ControllerOfBound is how a card
+  -- names it -- CR 109.5's "you" would answer the Aura's controller instead,
+  -- which an Aura on an opponent's land makes a different seat.
+  --
+  -- Unconditional given a match, AttachedCreatureDies' claim and for its
+  -- reason: matchesTrigger accepts only a GameEvent.TappedForMana whose
+  -- permanent IS the bearer's host, so the id is always there.
+  (TriggerCondition.AttachedPermanentTappedForMana, GameEvent.TappedForMana tapped) ->
+    Binding.setManaSource tapped Map.empty
   -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
   -- whose creature the trigger then targets and whose crown its duration watches.
   -- Bound whichever relation matched, for the reason the PlayerLosesLife arm
@@ -1334,6 +1345,9 @@ eventBindingSlots cond = case cond of
   -- is no arrival for a payload to find. The tapped permanent is still the one
   -- Object.attachedTo names.
   TriggerCondition.AttachedCreatureBecomesTapped -> Set.empty
+  -- The permanent tapped for mana, which the arm above stamps for every
+  -- match: Wild Growth reads it through PlayerRef.ControllerOfBound.
+  TriggerCondition.AttachedPermanentTappedForMana -> Set.singleton Binding.manaSource
   -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.

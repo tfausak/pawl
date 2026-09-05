@@ -167,6 +167,7 @@ movedOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
 
@@ -254,6 +255,10 @@ looksBack condition = case condition of
   -- battlefield, so the ordinary CR 603.10 reading -- the board as it is now --
   -- is the right one.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- Not on CR 603.10a's list either, the arm above's reason: the permanent
+  -- tapped for mana is standing on the battlefield when the ability is
+  -- gathered.
+  TriggerCondition.AttachedPermanentTappedForMana -> False
   -- CR 603.10a's first family again, read off the event rather than off the
   -- bearer: this triggers when a permanent leaves the battlefield. Inert today --
   -- the bearer is a card in exile, which no look-back source can offer -- but a
@@ -455,6 +460,9 @@ batchScoped condition = case condition of
   -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
   -- occurrence; no printing of that event says "one or more".
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- CR 106.12a names one resolution of one mana ability, so one occurrence;
+  -- no printing of it says "one or more".
+  TriggerCondition.AttachedPermanentTappedForMana -> False
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.AnyOf conditions -> any batchScoped conditions
@@ -820,6 +828,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -1060,6 +1069,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -1267,6 +1277,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -1400,6 +1411,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
@@ -1581,6 +1593,9 @@ enchantedObjectLeaves condition = case condition of
   -- attachment link, but for an event that leaves the enchanted permanent right
   -- where it was, so CR 113.6m's Aura clause has nothing to exempt.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- False for the arm above's reason: the enchanted permanent stays exactly
+  -- where it was, so CR 113.6m's Aura clause has nothing to exempt.
+  TriggerCondition.AttachedPermanentTappedForMana -> False
   TriggerCondition.AnyOf conditions -> any enchantedObjectLeaves conditions
   _ -> False
 
@@ -1793,6 +1808,8 @@ zonesTriggeredFrom cond = case cond of
   -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
   -- is for a condition that cannot trigger from there at all.
   TriggerCondition.AttachedCreatureBecomesTapped -> battlefield
+  -- The same default and the same reason, one event over.
+  TriggerCondition.AttachedPermanentTappedForMana -> battlefield
   -- The same default from the training creature's own side: rule 702.149a's ability
   -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
   -- exception -- for a condition that cannot trigger from there at all -- does not
@@ -2197,6 +2214,10 @@ stateTriggers gs
               -- False: CR 603.2e says a "becomes" condition does not retrigger
               -- while the state persists, and a state trigger would do nothing but.
               TriggerCondition.AttachedCreatureBecomesTapped -> False
+              -- CR 106.12a is an EVENT too, and more plainly than the arm
+              -- above: a mana ability having resolved is nothing a later
+              -- board read can recover.
+              TriggerCondition.AttachedPermanentTappedForMana -> False
               -- CR 702.149c the same: it fires on a resolution, and the counter
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.

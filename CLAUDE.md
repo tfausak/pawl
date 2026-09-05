@@ -72,6 +72,10 @@ to agents as written. What it doesn't say:
   `cabal`, so every file edit made there lands on whatever branch the owner
   has checked out, alongside their uncommitted changes.
 
+- Every worktree shares ONE stash stack, so a stash made in yours can be popped
+  by an agent in another --- losing your edits and landing theirs in your tree.
+  Never stash; copy the file aside and move it back.
+
 - Prefix every `cabal` call with `script/with-build-lock.sh`, which caps
   builds at two machine-wide (the machine has 8 GB). Never `pkill -f 'cabal
   test'` --- it reaches other agents' worktrees; kill your own PID. Never pipe

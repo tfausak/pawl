@@ -90,6 +90,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -2953,6 +2954,69 @@ recordingManaSources p = case p of
     pure (Replay.defaultAnswer p)
   _ -> pure (S.identityAnswer p)
 
+-- CR 106.12a's "is tapped for mana" and CR 605.4a's off-stack resolution, on the
+-- cheapest printing that needs both: Wild Growth, "{G} Enchantment -- Aura /
+-- Enchant land / Whenever enchanted land is tapped for mana, its controller adds
+-- an additional {G}".
+--
+-- The Aura is ALICE's and the land is BOB's, which is the board CR 605.1b's
+-- recipient clause needs: "its controller" is the land's controller, and CR
+-- 109.5's "you" would answer the Aura's. On one seat the two readings agree and
+-- the test would prove nothing.
+wildGrowthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wildGrowthSpec s registry = Spec.describe s "Wild Growth" $ do
+  Spec.it s "CR 106.12a tapping the enchanted land adds the Aura's mana to the LAND's controller" $ do
+    (aliceForest, bobForest, _, board) <- wildGrowthBoard s registry
+    let after = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer bobForest)
+        -- The same board differing in exactly one thing: which Forest was
+        -- tapped. Alice's carries no Aura, so it must add one and only one.
+        unenchanted = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceForest)
+        -- CR 605.4a from the other side: the next time the game settles for
+        -- priority it scans the very event this tap recorded, and the ability
+        -- must NOT be gathered onto the stack there -- it has already resolved.
+        settled = resolveDown (S.runPure S.identityAnswer after Engine.settleForPriority)
+    Spec.assertEqWith s "CR 106.12a bob's pool holds the land's {G} and the Aura's additional one" (poolTypes S.bob after) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
+    Spec.assertEqWith s "CR 106.4 alice, who controls the Aura, is given none of it" (poolTypes S.alice after) []
+    Spec.assertEqWith s "CR 605.4a and the triggered mana ability never reached the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "CR 605.4a and settling for priority does not place a second copy of it to resolve" (poolTypes S.bob settled) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
+    Spec.assertEqWith s "nor leave anything of it on the stack" (length (GameState.stack settled)) 0
+    Spec.assertEqWith s "the control: the unenchanted Forest on the same board adds one" (poolTypes S.alice unenchanted) [ManaType.Colored Color.Green]
+    Spec.assertEqWith s "and bob, whose land was not the one tapped, gets nothing there" (poolTypes S.bob unenchanted) []
+  Spec.it s "CR 106.12 a tap that is not for mana leaves the Aura silent" $ do
+    (_, bobForest, _, board) <- wildGrowthBoard s registry
+    let after = S.runPure S.identityAnswer board (Event.tap bobForest >> Engine.settleForPriority)
+    Spec.assertEqWith s "CR 106.12 nothing was tapped FOR MANA, so no mana was added" (poolTypes S.bob after) []
+    Spec.assertEqWith s "nor did an ordinary triggered ability go on the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "and the land really is tapped, so the boards differ in nothing else" (fmap Object.tapped (Game.lookupObject bobForest after)) (Just TapState.Tapped)
+
+-- Resolve the whole stack down, so a board that placed a triggered mana ability
+-- CR 605.4a forbids the stack reads differently from one that placed nothing: a
+-- reading taken with the trigger still waiting could not tell them apart at
+-- gameplay level.
+resolveDown :: GameState.GameState -> GameState.GameState
+resolveDown = go (8 :: Int)
+  where
+    go n gs =
+      if n <= 0 || null (GameState.stack gs)
+        then gs
+        else go (n - 1) (S.runPure S.identityAnswer gs Stack.resolveTop)
+
+-- alice and bob hold one Forest each; alice controls a Wild Growth enchanting
+-- BOB's. Returns alice's Forest, bob's Forest, the Aura and the board.
+wildGrowthBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+wildGrowthBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  growth <- S.printingOf s registry "Wild Growth"
+  let base = S.landsFor forest S.bob 1 (S.landsInPlay forest 1)
+  case (Game.zoneMembers Zone.Battlefield S.alice base, Game.zoneMembers Zone.Battlefield S.bob base) of
+    ([aliceForest], [bobForest]) ->
+      let (auraId, withAura) = S.addCreature growth S.alice base
+       in -- ToObject and not S.attach's ToCreature: "Enchant land" is a
+          -- Pool.Permanents slot narrowed by a Land filter, so a cast would leave
+          -- this tag (Pawl.Support.attach says so of Convincing Mirage).
+          pure (aliceForest, bobForest, auraId, S.attachTo auraId (Recipient.ToObject bobForest) withAura)
+    _ -> Spec.assertFailure s "fixture should give each player exactly one Forest" >> pure (S.noSource, S.noSource, S.noSource, base)
+
 -- A fixture write making one permanent summoning sick, the mirror of
 -- S.tapObject: what an object that arrived this turn carries (CR 400.7).
 sicken :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
@@ -2986,6 +3050,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   grinningIgnusSpec s registry
   mysticGateSpec s registry
   activationAdjustmentSpec s registry
+  wildGrowthSpec s registry
 
 -- The units of Alice's pool, so a test can look at a mana's TAGS and not only at
 -- its type -- which is the whole of what CR 107.4h reads.

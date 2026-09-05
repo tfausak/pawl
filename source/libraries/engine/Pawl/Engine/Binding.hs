@@ -368,6 +368,31 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 tappedPermanent :: SlotName
 tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 
+-- CR 106.12a: the reserved slot under which the permanent that was TAPPED FOR
+-- MANA is bound -- the "its" in Wild Growth's "whenever enchanted land is tapped
+-- for mana, its controller adds an additional {G}", read through
+-- PlayerRef.ControllerOfBound. Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered.
+--
+-- Distinct from `tappedPermanent` above, which is a COST slot Pawl.Engine.Activate
+-- stamps off CR 601.2h's payment: that one names what an activation's cost
+-- tapped, this one what CR 106.12's activation was made OF. Merging them would
+-- make Binding.onlyOne answer Nothing for an ability whose cost taps other
+-- permanents.
+--
+-- Not redundant with `triggerSource` (CR 113.7): the bearer is the Aura and the
+-- permanent tapped for mana is its host, which is exactly the pair CR 106.12a's
+-- Aura wording keeps apart.
+--
+-- Every read is CURRENT information, `tappedPermanent`'s reason: tapping is not
+-- a zone change, so the permanent is still on the battlefield when CR 605.4a
+-- applies the ability, and Pawl.Engine.Resolve.Slots.effectViewOf needs no arm.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as the slots above.
+manaSource :: SlotName
+manaSource = SlotName.MkSlotName (Text.pack "thatManaSource")
+
 -- CR 603.6c: the reserved slot under which the permanent a leaves-the-battlefield
 -- trigger WATCHED is bound -- the printed "it" in Resourceful Defense's "whenever
 -- a permanent you control leaves the battlefield, if it had counters on it, put
@@ -726,6 +751,10 @@ setBecame oid = Map.insert became (toObject oid)
 -- why the shape differs from setBecame's.
 setBecameGroup :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecameGroup oids = Map.insert became (toObjects oids)
+
+-- Bind an object under the reserved manaSource slot (CR 106.12a).
+setManaSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setManaSource oid = Map.insert manaSource (toObject oid)
 
 -- Bind an object under the reserved departedPermanent slot (CR 603.10a).
 setDepartedPermanent :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

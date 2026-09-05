@@ -87,6 +87,7 @@ codec =
       Arm.payload "CardLeavesGraveyard" CardLeavesGraveyard.codec TriggerCondition.CardLeavesGraveyard (\x -> case x of TriggerCondition.CardLeavesGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "AttachedCreatureDies" TriggerCondition.AttachedCreatureDies,
       Arm.nullary "AttachedCreatureBecomesTapped" TriggerCondition.AttachedCreatureBecomesTapped,
+      Arm.nullary "AttachedPermanentTappedForMana" TriggerCondition.AttachedPermanentTappedForMana,
       Arm.nullary "HauntedCreatureDies" TriggerCondition.HauntedCreatureDies,
       Arm.payload "SpellOrAbilityCounters" PlayerRelation.codec TriggerCondition.SpellOrAbilityCounters (\x -> case x of TriggerCondition.SpellOrAbilityCounters y -> Just y; _ -> Nothing),
       Arm.payload "DamageToPlayerPrevented" PlayerRelation.codec TriggerCondition.DamageToPlayerPrevented (\x -> case x of TriggerCondition.DamageToPlayerPrevented y -> Just y; _ -> Nothing),

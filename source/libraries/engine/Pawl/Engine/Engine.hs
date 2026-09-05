@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.Initiative as Initiative
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
@@ -551,7 +552,17 @@ placePendingTriggers = do
         GameState.battlefieldWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
-  gathered <- reactions (pending <> inherent <> initiative <> revving <> irradiated <> entered)
+  -- CR 605.4a: a triggered mana ability "doesn't go on the stack ... it resolves
+  -- immediately after the mana ability that triggered it". Dropped from the
+  -- batch HERE rather than never gathered, because the same gather is what an
+  -- ordinary trigger watching the same event rides;
+  -- Pawl.Engine.Cost.applyManaTriggers has already applied these off the one
+  -- event that fired them, reading the same classifier.
+  --
+  -- Only `pending` is filtered. CR 605.1b's conditions are all EVENT conditions
+  -- (ManaAbility.triggersFromMana), so no state trigger, no delayed entry and
+  -- none of the five inherent gathers above can produce one.
+  gathered <- reactions (filter (not . ManaAbility.isTriggeredManaAbility . PendingTrigger.ability) pending <> inherent <> initiative <> revving <> irradiated <> entered)
   -- CR 603.3b's two sentences, run one after the other rather than ordered
   -- together and placed at the end: the rule's first sentence PUTS its abilities
   -- on the stack before its second is reached, which is observable both in the
@@ -713,6 +724,7 @@ abilityTriggeredOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
