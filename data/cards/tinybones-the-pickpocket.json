@@ -49,37 +49,51 @@
                 "targetSlots": {
                   "stolen": {
                     "filter": {
-                      "type": "Or",
+                      "type": "And",
                       "value": [
                         {
-                          "type": "HasCardType",
+                          "type": "Not",
                           "value": {
-                            "type": "Artifact"
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
                           }
                         },
                         {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Battle"
-                          }
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Creature"
-                          }
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Enchantment"
-                          }
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Planeswalker"
-                          }
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Battle"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Enchantment"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Planeswalker"
+                              }
+                            }
+                          ]
                         }
                       ]
                     },
