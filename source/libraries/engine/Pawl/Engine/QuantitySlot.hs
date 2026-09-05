@@ -181,6 +181,10 @@ overSlots f quantity = case quantity of
   -- read side of the D4 lint at SlotArity.One rather than Many, the arity
   -- Filter.slotOneObject needs. The payload may hide slots of its own.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> fmap Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot <$> f slot <*> recur inner)
+  -- DESCENT and no slot of its own: CR 607.2a's linked pile comes from
+  -- GameState.exiledWith rather than from a binding, so the arm names nothing
+  -- here and only the payload can.
+  Quantity.AgainstCardsExiledWith inner -> fmap Quantity.AgainstCardsExiledWith (recur inner)
   where
     recur = overSlots f
 
@@ -301,6 +305,10 @@ nestedRefs quantity = case quantity of
   -- Its own slot is left out because `slots` above DOES report it, unlike the
   -- nested PlayerRefs; the payload is walked like any other.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> nestedRefs inner
+  -- Nothing of its own to report -- CR 607.2a's pile is a relation on the board,
+  -- named by no reference and no slot -- and the payload is walked like any
+  -- other.
+  Quantity.AgainstCardsExiledWith inner -> nestedRefs inner
 
 -- Every Count reachable from a Quantity: a leaf Count directly, plus the ones
 -- nested through the arms that compose one (CR 208.2's printed 1+*, CR 107.1a's
@@ -383,6 +391,9 @@ nestedCounts quantity = case quantity of
   -- Not a leaf: aiming the evaluation at another object does not stop the payload
   -- from being a Count.
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> nestedCounts inner
+  -- AgainstSlot's answer: re-aiming the evaluation at CR 607.2a's linked cards
+  -- does not stop the payload from being a Count.
+  Quantity.AgainstCardsExiledWith inner -> nestedCounts inner
 
 -- A scope's own read. Both scopes that name players take a PlayerRef and CR
 -- 608.2i's look-back names nothing, so the same question as the arms above --
@@ -499,6 +510,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (recur inner))
   Quantity.Negate a -> Quantity.Negate (recur a)
   Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (recur inner))
+  Quantity.AgainstCardsExiledWith inner -> Quantity.AgainstCardsExiledWith (recur inner)
   -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT
   -- slot rather than a player one, so nothing here substitutes it -- an amount an
   -- earlier effect bound is not a seat.

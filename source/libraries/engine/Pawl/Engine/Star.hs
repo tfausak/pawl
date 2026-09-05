@@ -73,6 +73,9 @@ substituteStar star quantity = case quantity of
   -- ability with no resolution and so no slots, and Pawl.CardSpec's
   -- powerToughnessSlots keeps a slot-naming quantity out of a printed P/T.
   Quantity.AgainstSlot {} -> quantity
+  -- No descent, the Count arm's reason again: the payload is read against the
+  -- exiled card, where a star would be THAT card's box and not this one's.
+  Quantity.AgainstCardsExiledWith {} -> quantity
 
 -- Does a printed box hold CR 208.2's star anywhere inside it? The three
 -- calculations descend for substituteStar's reason: 1+* is a star box, and the
@@ -90,8 +93,8 @@ containsStar quantity = case quantity of
   Quantity.Plus (Plus.MkPlus a b) -> containsStar a || containsStar b
   Quantity.Halved (Halved.MkHalved _ inner) -> containsStar inner
   Quantity.Negate a -> containsStar a
-  -- No descent into a Count: CR 208.2a's star is a printed box's own symbol, and
-  -- Pawl.Types.Count has no room for one -- its per-member quantity is read
-  -- against another object, where a star would be that object's box and not this
-  -- one's.
+  -- No descent into a Count, nor into AgainstSlot or AgainstCardsExiledWith:
+  -- CR 208.2a's star is a printed box's own symbol, and each of those three
+  -- reads its payload against ANOTHER object, where a star would be that
+  -- object's box and not this one's.
   _ -> False
