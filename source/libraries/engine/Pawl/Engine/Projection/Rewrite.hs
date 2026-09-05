@@ -773,6 +773,7 @@ rewriteCopyTargets pairs targets = case targets of
   CopyTargets.Copied -> targets
   CopyTargets.ChosenByController -> targets
   CopyTargets.ForEach ref -> CopyTargets.ForEach (rewriteObjectRef pairs ref)
+  CopyTargets.Stated ref -> CopyTargets.Stated (rewriteObjectRef pairs ref)
 
 -- CR 612.1/612.2a through the CARD an Effect.Create or an Effect.CreateEmblem
 -- defines its token or emblem with: the type line, the name, and the rules text.

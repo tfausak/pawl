@@ -20,4 +20,10 @@ spec s = Spec.describe s "Pawl.Codec.CopyTargets" $ do
       CopyTargets.codec
       (CopyTargets.ForEach (ObjectRef.EachMatching (Filter.ControlledBy PlayerRelation.You)))
       " {\"type\":\"ForEach\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}} "
+  Spec.it s "Stated" $
+    Common.assertCodec
+      s
+      CopyTargets.codec
+      (CopyTargets.Stated (ObjectRef.EachMatching Filter.IsSource))
+      " {\"type\":\"Stated\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CopyTargets.codec

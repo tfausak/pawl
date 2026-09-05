@@ -1602,16 +1602,13 @@ stackTargetSlots obj oid gs =
         Source.OfToken _ -> fromFace
         Source.OfEmblem _ -> fromFace
 
--- CR 707.10d: the copies' targets, one map per candidate, in the order their
--- controller chose. Answers the empty list where nothing is copied at all.
---
--- The candidates are the card's own description ("each other creature you
--- control"), narrowed by the rule's "could target": a candidate is kept only
--- where it is a legal target for EVERY instance of the word "target" and the
--- whole assignment survives CR 601.2c's joint check, which is rule 707.10d's
--- last sentence -- "if that player or object isn't a legal target for each
--- instance of the word 'target', a copy isn't created for that player or
--- object".
+-- CR 707.10d and CR 707.10e's shared test, and the whole of what either rule
+-- leaves to arithmetic: for each candidate, the target maps the copy would carry
+-- if EVERY instance of the word "target" named that candidate. A candidate that
+-- cannot fill them all is dropped, which is rule 707.10d's last sentence -- "if
+-- that player or object isn't a legal target for each instance of the word
+-- 'target', a copy isn't created for that player or object" -- and rule 707.10e's
+-- second sentence, the same test with one candidate.
 --
 -- A slot the original filled with TWO targets keeps nobody, and that is the
 -- rule rather than a shortcut: every one of the copy's targets must be the same
@@ -1622,6 +1619,50 @@ stackTargetSlots obj oid gs =
 -- controller's seat, whose copy it will be. Rule 707.10c's own derivation, with
 -- the same seed: the slots being written are dropped from the environment, so a
 -- sibling read is not answered off the target it is about to replace.
+copyRetargets :: PlayerId -> ObjectId -> GameState -> [ObjectId] -> [(ObjectId, Map.Map SlotName (Set Recipient))]
+copyRetargets controller original gs candidates = Maybe.fromMaybe [] $ do
+  obj <- Game.lookupObject original gs
+  let slots = stackTargetSlots obj original gs
+      current = targetsOnStack original gs
+      seed = Map.withoutKeys (Object.bindings obj) (Map.keysSet slots)
+      fresh = Target.legalSets (Just controller) False seed original slots gs
+      takes oid slot = Set.filter ((== Just oid) . Recipient.objectOf) (Map.findWithDefault Set.empty slot fresh)
+      pick oid =
+        let chosen = Map.mapWithKey (\slot _ -> takes oid slot) current
+         in if not (Map.null current)
+              && and (Map.elems (Map.map ((== 1) . Set.size) current))
+              && and (Map.elems (Map.map ((== 1) . Set.size) chosen))
+              && Target.jointlyCoherent (Just controller) seed original slots chosen gs
+              then Just (oid, chosen)
+              else Nothing
+  pure (Maybe.mapMaybe pick candidates)
+
+-- CR 707.10e: ONE copy, every one of whose targets is the object the effect
+-- names. Answers the empty list where "the copy isn't created", so the copy does
+-- not exist rather than existing and being countered for an illegal target (CR
+-- 608.2b).
+--
+-- A ref naming anything but exactly ONE object also answers the empty list: rule
+-- 707.10e specifies "a new target", singular, so a ref that swept several has
+-- not said which, and a ref that named none has said nothing. Ivy, Gleeful
+-- Spellthief's ref is the effect's own source, so a departed source is what
+-- reaches the second case.
+--
+-- No prompt of any kind: rule 707.10d's order is a choice among several copies,
+-- and there is only ever one here.
+copyStatedTargets :: PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
+copyStatedTargets controller resolving source legal original newRef = do
+  gs <- State.get
+  pure $ case objectRefObjects legal resolving controller source gs newRef of
+    [new] -> fmap snd (copyRetargets controller original gs [new])
+    _ -> []
+
+-- CR 707.10d: the copies' targets, one map per candidate, in the order their
+-- controller chose. Answers the empty list where nothing is copied at all.
+--
+-- The candidates are the card's own description ("each other creature you
+-- control"), narrowed by the rule's "could target" -- copyRetargets above, whose
+-- test rule 707.10e shares.
 --
 -- The ORDER is the whole of what CR 707.10d leaves to a player, and
 -- Prompt.OrderForEach is the question; the rule states no primary key, so the
@@ -1630,23 +1671,7 @@ stackTargetSlots obj oid gs =
 copyForEachTargets :: PlayerId -> ObjectId -> ObjectId -> Map.Map SlotName (Set Recipient) -> ObjectId -> ObjectRef -> Game [Map.Map SlotName (Set Recipient)]
 copyForEachTargets controller resolving source legal original candidateRef = do
   gs <- State.get
-  let candidates = objectRefObjects legal resolving controller source gs candidateRef
-      picks = Maybe.fromMaybe [] $ do
-        obj <- Game.lookupObject original gs
-        let slots = stackTargetSlots obj original gs
-            current = targetsOnStack original gs
-            seed = Map.withoutKeys (Object.bindings obj) (Map.keysSet slots)
-            fresh = Target.legalSets (Just controller) False seed original slots gs
-            takes oid slot = Set.filter ((== Just oid) . Recipient.objectOf) (Map.findWithDefault Set.empty slot fresh)
-            pick oid =
-              let chosen = Map.mapWithKey (\slot _ -> takes oid slot) current
-               in if not (Map.null current)
-                    && and (Map.elems (Map.map ((== 1) . Set.size) current))
-                    && and (Map.elems (Map.map ((== 1) . Set.size) chosen))
-                    && Target.jointlyCoherent (Just controller) seed original slots chosen gs
-                    then Just (oid, chosen)
-                    else Nothing
-        pure (Maybe.mapMaybe pick candidates)
+  let picks = copyRetargets controller original gs (objectRefObjects legal resolving controller source gs candidateRef)
   ordered <- case picks of
     _ : _ : _ -> do
       answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor controller gs) controller resolving (fmap (Recipient.ToObject . fst) picks))
@@ -4190,12 +4215,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(copySource, kind) -> do
           -- CR 707.10's answers, as the target maps to write: one EMPTY map
           -- where the copy keeps the decisions rule 707.10 copied (rule 707.10c
-          -- included, its offer below being a separate act), and CR 707.10d's
-          -- one map per candidate, in the order its controller chose.
+          -- included, its offer below being a separate act), CR 707.10d's one
+          -- map per candidate, in the order its controller chose, and CR
+          -- 707.10e's single map for the target the effect states. The list's
+          -- LENGTH is how both of the latter two say "a copy isn't created".
           plan <- case targets of
             CopyTargets.Copied -> pure [Map.empty]
             CopyTargets.ChosenByController -> pure [Map.empty]
             CopyTargets.ForEach candidateRef -> copyForEachTargets controller resolving source legal original candidateRef
+            CopyTargets.Stated newRef -> copyStatedTargets controller resolving source legal original newRef
           Monad.forM_ plan $ \retarget -> do
             gsNow <- State.get
             let (copyId, gs1) = Game.freshObjectId gsNow
@@ -4259,9 +4287,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- a DECISION, which CR 707.10 copies verbatim -- including an
                       -- ability's self slot, so CR 707.10b's "the copy refers to
                       -- that same object" needs no write of its own.
-                      -- CR 707.10d's targets, where the effect chose them, over
-                      -- the decisions CR 707.10 copied. Empty for the other two
-                      -- answers, which leave every one of them standing.
+                      -- CR 707.10d's and CR 707.10e's targets, where the effect
+                      -- chose them, over the decisions CR 707.10 copied. Empty
+                      -- for the other two answers, which leave every one of them
+                      -- standing.
                       Object.bindings = Binding.setYou controller (stampCopiable (Map.union (fmap Binding.toRecipients retarget) (Object.bindings obj)))
                     }
             State.put (Game.insertIntoZone Zone.Stack LibraryPosition.defaultValue controller copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})

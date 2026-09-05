@@ -3,6 +3,7 @@ module Pawl.Types.Recipient where
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Pile as Pile
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.RecipientKind as RecipientKind
 
 -- | CR 510.1: combat damage is assigned to a blocking creature, or to the player,
 -- planeswalker or battle being attacked. Ord because it is a Map key.
@@ -62,3 +63,16 @@ playerOf r = case r of
   ToBattle _ -> Nothing
   ToObject _ -> Nothing
   ToPile _ -> Nothing
+
+-- | WHICH KIND of thing a recipient names -- 'objectOf' and 'playerOf' generalized
+-- to the whole arm set, for the one Filter atom that asks what a candidate targets
+-- without holding the board (TargetsOnlyOne). Exhaustive for those two functions'
+-- reason: a new arm must break this build rather than be classified by default.
+kindOf :: Recipient -> RecipientKind.RecipientKind
+kindOf r = case r of
+  ToCreature _ -> RecipientKind.Creature
+  ToPlaneswalker _ -> RecipientKind.Planeswalker
+  ToBattle _ -> RecipientKind.Battle
+  ToPlayer _ -> RecipientKind.Player
+  ToObject _ -> RecipientKind.Object
+  ToPile _ -> RecipientKind.Pile

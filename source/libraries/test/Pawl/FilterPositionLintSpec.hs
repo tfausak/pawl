@@ -229,6 +229,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsSource -> 0
   Filter.Type.TargetsSource -> 0
   Filter.Type.TargetsOnlySource -> 0
+  Filter.Type.TargetsOnlyOne _ -> 0
   Filter.Type.TargetsPlayer _ -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0

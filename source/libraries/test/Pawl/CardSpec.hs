@@ -2762,6 +2762,7 @@ copyTargetsRefs targets = case targets of
   CopyTargets.Copied -> []
   CopyTargets.ChosenByController -> []
   CopyTargets.ForEach ref -> [ref]
+  CopyTargets.Stated ref -> [ref]
 
 copyTargetsFilters :: CopyTargets.CopyTargets -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyTargetsFilters = concatMap objectRefFilters . copyTargetsRefs
@@ -3449,6 +3450,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsSource -> []
   Filter.Type.TargetsSource -> []
   Filter.Type.TargetsOnlySource -> []
+  Filter.Type.TargetsOnlyOne _ -> []
   Filter.Type.TargetsPlayer _ -> []
   -- Reads the whole bound set off Filter.Context, so a group is every one of its
   -- members rather than nothing -- the atom this lint must NOT report.
