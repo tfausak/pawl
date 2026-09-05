@@ -236,6 +236,9 @@ data TriggerCondition
   | -- | CR 701.26a's "became tapped" read off the permanent the bearer is
     -- attached to (Betrayal), live rather than through last known information.
     AttachedCreatureBecomesTapped
+  | -- | CR 701.26b's "becomes untapped" read off the bearer itself (Oreskos Sun
+    -- Guide), the other direction of the status the arm above watches.
+    SelfBecomesUntapped
   | -- | CR 106.12a's "is tapped for mana" read off the permanent the bearer is
     -- attached to (Wild Growth), live rather than through last known
     -- information, as for the arm above.

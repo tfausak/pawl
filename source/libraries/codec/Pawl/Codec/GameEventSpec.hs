@@ -483,6 +483,18 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       (Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 8)) /= Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 8)))
       "a tap and an exert of the same object encode differently"
+  -- CR 701.26b. BecameTapped's payload exactly, so the TAG is the whole
+  -- difference between the two directions of one status.
+  Spec.it s "BecameUntapped" $ do
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameUntapped (ObjectId.MkObjectId 8))
+      " {\"type\":\"BecameUntapped\",\"value\":8} "
+    Spec.assertBool
+      s
+      (Codec.encode GameEvent.codec (GameEvent.BecameUntapped (ObjectId.MkObjectId 8)) /= Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 8)))
+      "an untap and a tap of the same object encode differently"
   -- CR 106.12a. BecameTapped's payload exactly, so the TAG is the whole
   -- difference -- and it is the difference between two events one mana
   -- activation writes about the same permanent.

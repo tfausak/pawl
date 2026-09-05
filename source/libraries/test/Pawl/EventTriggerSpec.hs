@@ -1857,6 +1857,87 @@ brinebornCutthroatSpec s registry =
           Spec.assertBool s (S.castable S.alice cutthroatId bobsTurn) "flash makes the Cutthroat castable on bob's turn"
           Spec.assertBool s (not (S.castable S.alice pikerId bobsTurn)) "and a creature without it is not"
 
+-- CR 701.26b's untap as a TRIGGER EVENT, which nothing could watch until
+-- Oreskos Sun Guide, {1}{W} Creature -- Cat Monk: "Inspired -- Whenever this
+-- creature becomes untapped, you gain 2 life." ("Inspired" is CR 207.2c's
+-- ability word and carries no rules meaning.) One trigger condition over one event, and
+-- the effect is a life gain the engine already had, so the only new thing these
+-- cases can be passing on is the condition and the event behind it.
+--
+-- BOTH ROADS that untap are driven: CR 502.3's turn-based batch in
+-- Pawl.Engine.Engine.untapAll, which writes its own events so the step stays
+-- simultaneous, and Pawl.Engine.Event.untap, the one-at-a-time funnel an
+-- Effect.Untap and CR 107.6's untap symbol share. Nothing in data/cards/ pairs a
+-- "becomes untapped" trigger with an untap effect on one board, so the second
+-- road is driven through its funnel directly, the way the cycling case above
+-- drives Pawl.Engine.Event.discard.
+--
+-- alice's Goblin Piker is the second permanent on every board but the entry
+-- one: it makes the untap step a BATCH rather than a single permanent, so the
+-- first two cases separate "an untap happened" from "the BEARER's untap
+-- happened" rather than "nothing happened at all".
+oreskosSunGuideSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oreskosSunGuideSpec s registry =
+  let untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+      placeTriggers gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveOne gs = S.runPure S.identityAnswer gs Stack.resolveTop
+   in Spec.describe s "Oreskos Sun Guide" $ do
+        -- The whole card on its printed road: the Guide is tapped when alice's
+        -- untap step runs, so CR 502.3 untaps it, CR 701.26b records the event,
+        -- and the trigger resolves for 2 life.
+        Spec.it s "CR 502.3 the untap step untaps the Guide and its trigger gains alice 2 life" $ do
+          guide <- S.printingOf s registry "Oreskos Sun Guide"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (guideId, g0) = S.addCreature guide S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, g1) = S.addCreature piker S.alice g0
+              board = S.tapObject pikerId (S.tapObject guideId g1)
+              stepped = untapStep board
+              placed = placeTriggers stepped
+          Spec.assertEqWith s "alice gains 2 once the trigger resolves" (S.lifeOf S.alice (resolveOne placed)) (Just 22)
+          Spec.assertEqWith s "one trigger reached the stack, and only one" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "and the Guide is upright" (fmap Object.tapped (Game.lookupObject guideId stepped)) (Just TapState.Untapped)
+        -- The discriminating twin, one tap state apart: the Guide is ALREADY
+        -- upright, so rule 701.26b's second sentence leaves it alone while the
+        -- Piker beside it still untaps. An untap event is recorded on this board
+        -- too, which is what makes this the bearer check rather than a board
+        -- where nothing happened.
+        Spec.it s "CR 701.26b an already-upright Guide is not untapped, and the Piker's untap is not its own" $ do
+          guide <- S.printingOf s registry "Oreskos Sun Guide"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, g0) = S.addCreature guide S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, g1) = S.addCreature piker S.alice g0
+              board = S.tapObject pikerId g1
+              stepped = untapStep board
+              placed = placeTriggers stepped
+          Spec.assertEqWith s "alice's life is untouched" (S.lifeOf S.alice (resolveOne placed)) (Just 20)
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "though the Piker did untap" (fmap Object.tapped (Game.lookupObject pikerId stepped)) (Just TapState.Untapped)
+        -- CR 603.2e's second sentence, the collapse this condition has to
+        -- survive: the Guide ENTERS the battlefield untapped, which is not a
+        -- transition, so nothing triggers. Through the stack rather than through
+        -- S.addCreature, so the real entry funnel runs.
+        Spec.it s "CR 603.2e a Guide that ENTERS untapped does not trigger" $ do
+          guide <- S.printingOf s registry "Oreskos Sun Guide"
+          let (_, staged) = S.spellOnStack guide S.alice (Setup.emptyGame S.bothPlayers)
+              entered = resolveOne staged
+              placed = placeTriggers entered
+          Spec.assertEqWith s "alice's life is untouched" (S.lifeOf S.alice (resolveOne placed)) (Just 20)
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "though the Guide is on the battlefield and upright" (S.countOnBattlefieldByName (S.printingName guide) S.alice entered) 1
+        -- The OTHER road, one permanent at a time: Pawl.Engine.Event.untap is
+        -- what an Effect.Untap and CR 107.6's untap symbol both call, and it
+        -- writes the same event. The Piker is untapped through the same funnel
+        -- on the same board and fires nothing.
+        Spec.it s "CR 701.26b the one-at-a-time funnel records the same event" $ do
+          guide <- S.printingOf s registry "Oreskos Sun Guide"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (guideId, g0) = S.addCreature guide S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, g1) = S.addCreature piker S.alice g0
+              board = S.tapObject pikerId (S.tapObject guideId g1)
+              untapOne oid = placeTriggers (S.runPure S.identityAnswer board (Event.untap oid))
+          Spec.assertEqWith s "untapping the Guide gains alice 2" (S.lifeOf S.alice (resolveOne (untapOne guideId))) (Just 22)
+          Spec.assertEqWith s "untapping the Piker instead gains nothing" (S.lifeOf S.alice (resolveOne (untapOne pikerId))) (Just 20)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   discardTriggerSpec s registry
@@ -1875,3 +1956,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   presenceOfTheMasterSpec s registry
   kambalSpec s registry
   brinebornCutthroatSpec s registry
+  oreskosSunGuideSpec s registry
