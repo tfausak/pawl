@@ -1309,8 +1309,8 @@ priorityLoop = do
                                 settleForPriority
                                 loop
                               -- CR 116.2d: a special action too.
-                              Action.Type.Ignore oid -> do
-                                Ignore.ignore p oid
+                              Action.Type.Ignore oid name -> do
+                                Ignore.ignore p oid name
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

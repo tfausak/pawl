@@ -30,6 +30,7 @@
               }
             }
           },
+          "name": "search ban",
           "scope": {
             "type": "EachPlayer"
           }
@@ -43,12 +44,15 @@
         {
           "type": "IgnoreThisUntilEndOfTurn",
           "value": {
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 2
-              }
-            ]
+            "ability": "search ban",
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 2
+                }
+              ]
+            }
           }
         }
       ],

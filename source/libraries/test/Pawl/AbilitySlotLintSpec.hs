@@ -78,6 +78,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
@@ -89,6 +90,7 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -464,6 +466,20 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
     let faceOffends face = namedRemovals face /= declaredAbilityNames face
         offenders = filter (anyFace faceOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused ability names" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 116.2d's join, the same shape one rule over: an ignore naming an ability
+  -- its face does not declare is a payment that suppresses nothing, and a named
+  -- player ability no ignore grants is a name for nobody --
+  -- PlayerStaticAbility.name exists only so that grant can refer to it. Equality
+  -- for both directions at once.
+  --
+  -- Its own namespace rather than declaredAbilityNames' above, because the two
+  -- joins never meet: no card both names a player ability and removes one by
+  -- name, and folding them together would make each card's unused half dangle.
+  Spec.it s "CR 116.2d every ignore names a player ability its face declares, and every named player ability is ignorable" $ do
+    ps <- S.allPrintings s
+    let faceOffends face = ignoredAbilityNames face /= declaredPlayerAbilityNames face
+        offenders = filter (anyFace faceOffends . Printing.card) ps
+    Spec.assertEqWith s "no dangling or unused ignore names" (fmap (S.nameOf . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, a token bound by a Create, the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
@@ -1063,17 +1079,33 @@ namedRemovals face =
             <> concatMap removals (concatMap stored (cardAuthoredEffects face))
         )
 
--- Every AbilityName a face declares -- the other side of the join above. Both
--- carriers of one: an activated ability (Gliding Licid) and a printed
--- replacement (Glittering Lion). A HAND-KEPT union, so a third carrier added to
--- Pawl.Types.AbilityName's readers must be added here too, or its cards' names
--- read as dangling.
+-- Every AbilityName a face declares FOR A LAYER-6 REMOVAL to name -- the other
+-- side of the join above. Both carriers of one: an activated ability (Gliding
+-- Licid) and a printed replacement (Glittering Lion). A HAND-KEPT union, so a
+-- third carrier added to Pawl.Types.AbilityName's readers must be added here
+-- too, or its cards' names read as dangling.
+--
+-- PlayerStaticAbility.name is deliberately NOT here: it belongs to CR 116.2d's
+-- join below, which has its own pair of sides.
 declaredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
 declaredAbilityNames face =
   Set.fromList
     ( Maybe.mapMaybe ActivatedAbility.name (Face.activatedAbilities face)
         <> Maybe.mapMaybe PrintedReplacement.name (Face.replacementEffects face)
     )
+
+-- CR 116.2d: every ability name a face's ignore grants refer to. One grant per
+-- name, and every printed producer prints exactly one grant.
+ignoredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
+ignoredAbilityNames face =
+  Set.fromList [name | SpecialAction.IgnoreThisUntilEndOfTurn name _ <- Face.specialActions face]
+
+-- Every AbilityName a face's player abilities declare -- the other side of that
+-- join. SEVERAL rows may carry one name, which is Damping Engine's one sentence
+-- declaring two, so this is a set rather than a list.
+declaredPlayerAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
+declaredPlayerAbilityNames face =
+  Set.fromList (Maybe.mapMaybe PlayerStaticAbility.name (Face.playerAbilities face))
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do

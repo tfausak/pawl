@@ -2,6 +2,7 @@
 
 module Pawl.Codec.IgnoredAbility where
 
+import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
@@ -13,10 +14,12 @@ codec :: Codec.Codec IgnoredAbility.IgnoredAbility
 codec = Fields.object $ do
   player <- Fields.required "player" PlayerId.codec IgnoredAbility.player
   source <- Fields.required "source" ObjectId.codec IgnoredAbility.source
+  ability <- Fields.required "ability" AbilityName.codec IgnoredAbility.ability
   expiry <- Fields.required "expiry" Expiry.codec IgnoredAbility.expiry
   pure
     IgnoredAbility.MkIgnoredAbility
       { IgnoredAbility.player = player,
         IgnoredAbility.source = source,
+        IgnoredAbility.ability = ability,
         IgnoredAbility.expiry = expiry
       }

@@ -1,0 +1,102 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Warden of Divided Edicts",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantCastMatching",
+            "value": {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          },
+          "name": "creature ban",
+          "scope": {
+            "type": "Opponents"
+          }
+        },
+        {
+          "effect": {
+            "type": "CantPlayLands"
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "specialActions": [
+        {
+          "type": "IgnoreThisUntilEndOfTurn",
+          "value": {
+            "ability": "creature ban",
+            "cost": {
+              "components": [
+                {
+                  "type": "Sacrifice",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "And",
+                      "value": []
+                    }
+                  }
+                }
+              ],
+              "mana": []
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Advisor"
+          },
+          {
+            "type": "Human"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

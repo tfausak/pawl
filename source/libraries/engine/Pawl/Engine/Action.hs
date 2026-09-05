@@ -209,12 +209,13 @@ legalActions pid gs =
       -- by an empty stack -- "a player can take such an action any time they
       -- have priority", CR 116.2b's window again.
       --
-      -- ONE ACTION PER PERMANENT, not per ability: which of a permanent's static
-      -- abilities is ignored is not a choice the rules leave open once the
-      -- permanent is chosen, because no printed producer grants the permission on
-      -- one of several -- Damping Engine's two abilities come from one sentence,
-      -- and its "this effect" is that sentence (#1267).
-      ignores = fmap Action.Ignore (Ignore.ignorable pid gs)
+      -- ONE ACTION PER GRANT, which is per NAMED ABILITY rather than per
+      -- permanent: CR 116.2d's subject is "the effect from that ability", so a
+      -- permanent granting the permission on one of two unrelated abilities
+      -- offers two actions and the player chooses. No printed producer does --
+      -- Damping Engine's two abilities come from one sentence and share one name,
+      -- so its offer is still a single action.
+      ignores = fmap (uncurry Action.Ignore) (Ignore.ignorable pid gs)
       -- CR 116.2c: the eighth special action, and the FOURTH ungated by phase and
       -- by an empty stack -- "a player can take such an action any time they have
       -- priority, unless that effect specifies another timing restriction", which

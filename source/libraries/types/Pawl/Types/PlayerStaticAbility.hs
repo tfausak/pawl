@@ -1,5 +1,6 @@
 module Pawl.Types.PlayerStaticAbility where
 
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -31,6 +32,17 @@ data PlayerStaticAbility = MkPlayerStaticAbility
     -- reads the finished projection, the answer CR 702.178a's max speed gate takes
     -- for the same reason.
     condition :: Maybe Condition.Condition,
+    -- | CR 116.2d: the name this face gives the ability, so its own
+    -- SpecialAction.IgnoreThisUntilEndOfTurn can say WHICH effect a payment
+    -- ignores -- "the effect from that ability", singular. Pawl.Types.AbilityName
+    -- named rather than positional, its third carrier, and joined to the grant by
+    -- a dataflow lint in Pawl.AbilitySlotLintSpec.
+    --
+    -- Nothing for the overwhelming majority, which grant no such permission and
+    -- so have nothing to be referred to by. Damping Engine's one sentence
+    -- declares two of these rows and both carry the SAME name, which is what
+    -- makes one payment cover both.
+    name :: Maybe AbilityName.AbilityName,
     effect :: PlayerEffect.PlayerEffect
   }
   deriving (Eq, Ord, Show)

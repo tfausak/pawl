@@ -1,5 +1,6 @@
 module Pawl.Types.Action where
 
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
@@ -127,13 +128,14 @@ data Action
     -- the stack (CR 116.1), so it is an Action rather than anything that goes
     -- through Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
     --
-    -- Carries only the SOURCE PERMANENT, DiscardFromHand's shape. What it costs is
-    -- printed on that permanent, and which of its abilities is ignored is not a
-    -- choice pawl offers -- see Pawl.Types.SpecialAction (#1267). WHO ignores it
+    -- Carries the SOURCE PERMANENT and the NAME of the ability being ignored --
+    -- CR 116.2d's "that ability" -- so a permanent granting the permission on two
+    -- unrelated abilities offers two actions and the player picks which. What it
+    -- costs is printed beside that name on the permanent. WHO ignores it
     -- is the player taking the action, which is the priority holder; whether it
     -- is offered to them at all is CR 116.2d's own question, answered by
     -- Pawl.Engine.Ignore.canIgnore.
-    Ignore ObjectId.ObjectId
+    Ignore ObjectId.ObjectId AbilityName.AbilityName
   | -- | CR 116.2k / 702.170a: pay a card's plot cost and exile it from your hand,
     -- making it a plotted card. "Any time you have priority during your main
     -- phase while the stack is empty", and it does not use the stack (CR

@@ -1334,7 +1334,7 @@ isActivation a = case a of
   A.Plot _ -> False
   A.Foretell _ -> False
   A.ActivateManaAbility _ -> False
-  A.Ignore _ -> False
+  A.Ignore _ _ -> False
   A.EndEffect _ -> False
 
 -- The life events the whole step logged, by player and amount. CR 701.12c makes
