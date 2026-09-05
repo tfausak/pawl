@@ -872,9 +872,9 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 113.1c, the line above widened: still no ability on the stack here to
       -- be one of either kind.
       Filter.ability = False,
-      -- CR 114.5 / 114.3: an emblem never leaves the command zone, so CR 608.2h
-      -- never takes a record of one -- and the record holds characteristics,
-      -- which CR 114.3 says an emblem has none of anyway.
+      -- CR 114.5, the line above's reason one rule over: CR 608.2h's record holds
+      -- characteristics, and CR 114.3 gives an emblem none, so nothing here can
+      -- say the snapshot was taken of one.
       Filter.emblem = False,
       -- CR 113.7, for the line above's reason: no ability, so no source.
       Filter.abilitySource = Nothing,
