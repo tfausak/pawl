@@ -1081,6 +1081,14 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 -- part of the question. The trigger board below exiles from a HAND, never a
 -- library, which is what separates "put into exile" from the library-to-exile
 -- move Ashiok's own replacement makes.
+--
+-- The count's filter is Not IsToken and not the empty one, because the printed
+-- word is "a CARD was put into exile" and CR 111.6 says a token is not one --
+-- data/cards/synthetic-grave-census.json's spelling of the same shape. The shape
+-- itself cannot say so: EventShape.CardArrivedIn tests the destination alone, so
+-- the card-versus-token half is the filter's. The CR 111.6 pair below is what
+-- proves it: two boards holding the same objects, differing only in whether the
+-- one permanent exiled that turn was a card.
 ashiokPlusOne, ashiokMinusTwo :: Int
 ashiokPlusOne = 0
 ashiokMinusTwo = 1
@@ -1219,3 +1227,47 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
     Spec.assertEqWith s "still two tokens" (length tokens) 2
     mapM_ (\oid -> Spec.assertEqWith s "each token is still 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
     mapM_ (\oid -> Spec.assertEqWith s "no +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne oid after) 0) tokens
+
+  -- CR 111.6's pair. Both boards hold the same objects -- Ashiok, its two
+  -- Nightmares, and a Goblin Piker card permanent -- and both exile exactly one
+  -- battlefield permanent this turn. The ONE thing that differs is whether that
+  -- permanent was a card, so an empty filter over the count agrees with the card
+  -- leg and contradicts the token leg. The Nightmare is the token victim rather
+  -- than a Piker token because a Nightmare is already on the board: nothing about
+  -- the victim but its tokenhood is read.
+  --
+  -- CR 111.7's parenthetical is what makes a token victim observable at all: the
+  -- token changes zones, applicable abilities trigger, and only then does it cease
+  -- to exist -- so the arrival IS in the log for the count to fold or refuse.
+  Spec.it s "CR 111.6 a card put into exile from the battlefield satisfies the token's intervening if" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (ashiokId, board) = ashiokBoard ashiok [swamp]
+        (pikerId, withPiker) = S.addCreature piker S.alice board
+        minted = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId withPiker
+        exiled = S.runPure S.identityAnswer minted (Event.changeZone pikerId Zone.Exile)
+        after = throughBeginningOfCombat exiled
+        tokens = S.tokensOf after
+    Spec.assertEqWith s "CR 603.4: a card arrived in exile, so both tokens' abilities trigger" (length (filter isAbilityTriggered (S.eventsOf after))) 2
+    Spec.assertEqWith s "the Piker is the one thing in alice's exile" (namesIn Zone.Exile S.alice after) [Just (CardName.MkCardName (Text.pack "Goblin Piker"))]
+    Spec.assertEqWith s "still two tokens" (length tokens) 2
+    mapM_ (\oid -> Spec.assertEqWith s "each token is 2/2" (S.powerToughnessOf oid after) (Just (2, 2))) tokens
+
+  Spec.it s "CR 111.6 a TOKEN put into exile is not a card, so the intervening if fails" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (ashiokId, board) = ashiokBoard ashiok [swamp]
+        (pikerId, withPiker) = S.addCreature piker S.alice board
+        minted = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId withPiker
+        victim = Maybe.listToMaybe (S.tokensOf minted)
+        exiled = S.runPure S.identityAnswer minted (mapM_ (`Event.changeZone` Zone.Exile) victim)
+        after = throughBeginningOfCombat exiled
+        tokens = S.tokensOf after
+    Spec.assertEqWith s "CR 603.4: no CARD arrived in exile, so neither surviving ability triggers" (length (filter isAbilityTriggered (S.eventsOf after))) 0
+    Spec.assertBool s (Maybe.isJust victim) "a Nightmare was there to exile"
+    Spec.assertEqWith s "CR 111.7: the exiled token ceased to exist, and the Piker stayed put" (S.onBattlefield pikerId after, length (Game.zoneMembers Zone.Exile S.alice after)) (True, 0)
+    Spec.assertEqWith s "one Nightmare left" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "which is still 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "with no +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne oid after) 0) tokens
