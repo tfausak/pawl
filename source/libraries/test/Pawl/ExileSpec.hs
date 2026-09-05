@@ -1,7 +1,9 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers: CR 406.3's face-down exile -- Object.exiledFaceDown, the
--- EntryRiders.exiledFaceDown rider Pawl.Engine.Event.changeZoneEntering reads,
+-- Covers: CR 406.3's face-down exile -- Object.exiledFaceDown, CR 406.3a's
+-- absent characteristics as Pawl.Engine.Projection.gatherGiven's exile walk
+-- reads them, the EntryRiders.exiledFaceDown rider
+-- Pawl.Engine.Event.changeZoneEntering reads,
 -- CR 406.4's two halves over Pawl.Engine.Target's Pool.CardsInExile arm -- the
 -- permission Pawl.Engine.Exile.mayLookAt answers, the pile
 -- Pawl.Engine.Exile.pileOf sorts a card into and Pawl.Engine.Target's piledOffer
