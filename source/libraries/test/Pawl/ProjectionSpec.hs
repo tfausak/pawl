@@ -4841,8 +4841,9 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
     forest <- S.printingOf s registry "Forest"
     let attacked top =
           let (gs0, mine, _) = S.combatBoardOf [bioplasm] []
-              -- S.addLibraryCard prepends, so the last call is CR 121.1's top;
-              -- the two Forests under it keep alice from decking (CR 104.3c).
+              -- S.addLibraryCard prepends, so the last call is the top of CR
+              -- 401.2's ordered pile; the two Forests under it keep alice from
+              -- decking (CR 104.3c).
               (_, gs1) = S.addLibraryCard forest S.alice gs0
               (_, gs2) = S.addLibraryCard forest S.alice gs1
               (_, gs3) = S.addLibraryCard top S.alice gs2

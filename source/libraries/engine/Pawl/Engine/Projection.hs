@@ -3967,7 +3967,7 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- emblem is neither a card nor a permanent and a vanguard card is not a permanent
 -- either (CR 114.4 / 114.5 / 902.7 / 313.2, the arm CR 113.6p names), and CR
 -- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
--- hand or a library.
+-- hand, a library or exile.
 --
 -- anyConditional's walk with its predicate swapped, and sound for that
 -- function's reason: each arm reads the SAME list its walk in gatherGiven does.
@@ -4002,6 +4002,7 @@ elsewhereGrants p gs =
         || any (grants Zone.Graveyard) (graveyardCards gs)
         || anyZoneCard GameState.hand (grantsStating Zone.Hand) gs
         || anyZoneCard GameState.library (grantsStating Zone.Library) gs
+        || any (grantsStating Zone.Exile) (Set.toList (GameState.exile gs))
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands

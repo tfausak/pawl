@@ -1968,8 +1968,8 @@ bioplasmBoard ::
   (ObjectId.ObjectId, GameState.GameState)
 bioplasmBoard bioplasm filler top =
   let (gs0, mine, _) = S.combatBoardOf [bioplasm] []
-      -- S.addLibraryCard puts each card at the HEAD of the pile, which CR 121.1
-      -- makes the top, so `top` is added last.
+      -- S.addLibraryCard puts each card at the HEAD of CR 401.2's ordered pile,
+      -- which is its top, so `top` is added last.
       (_, gs1) = S.addLibraryCard filler S.alice gs0
       (_, gs2) = S.addLibraryCard filler S.alice gs1
       (_, gs3) = S.addLibraryCard top S.alice gs2
