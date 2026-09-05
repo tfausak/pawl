@@ -9,6 +9,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.RecipientKind as RecipientKind
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -130,6 +131,21 @@ data Filter keyword
     -- Vacuously False where the candidate targets nothing, a player target
     -- alone being enough to fail it.
     TargetsOnlySource
+  | -- | CR 115.1 the atom above by KIND rather than by identity: the candidate, a
+    -- stack object, targets exactly one thing, and that one target is a recipient
+    -- of this kind (Ivy, Gleeful Spellthief's "a spell that targets only a single
+    -- creature"). Vacuously False where the candidate targets nothing.
+    --
+    -- The KIND is the tag Pawl.Types.Pool minted at CR 601.2c, so a card that
+    -- says "creature" is matched only where the spell's own slot named CR 115.1a's
+    -- creature pool: a "target permanent" spell aimed at a creature carries
+    -- Recipient.ToObject and is passed over. Stricter than printed, and stated as
+    -- a limit of the tag rather than of the rule.
+    --
+    -- Not implemented: a Filter over the target itself, which "a single creature
+    -- you control" (Frontline Heroism) and "a single Golem" (Precursor Golem)
+    -- want and this module cannot see, holding no board (gap #3272).
+    TargetsOnlyOne RecipientKind.RecipientKind
   | -- | CR 115.1 / 115.10a: the candidate has a player in this relation to the
     -- perspective among its targets, a ToPlayer alone counting (Shell of the
     -- Last Kappa's "spell that targets you").

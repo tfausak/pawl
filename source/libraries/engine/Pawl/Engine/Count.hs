@@ -290,6 +290,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsSource -> predicate
   Filter.Type.TargetsSource -> predicate
   Filter.Type.TargetsOnlySource -> predicate
+  Filter.Type.TargetsOnlyOne _ -> predicate
   Filter.Type.TargetsPlayer _ -> predicate
   Filter.Type.IsBound _ -> predicate
   Filter.Type.SameNameAsBound _ -> predicate

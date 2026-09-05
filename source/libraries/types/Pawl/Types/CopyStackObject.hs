@@ -23,9 +23,6 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- copy carries the original's targets (CR 707.10) unless the effect says
 -- otherwise, and Twincast, Fork and Reverberate all print the sentence
 -- separately from the copy instruction.
---
--- Not implemented: CR 707.10e's "copy ... and specify a new target for the
--- copy" (gap #3141).
 data CopyStackObject = MkCopyStackObject
   { ref :: ObjectRef.ObjectRef,
     targets :: CopyTargets.CopyTargets

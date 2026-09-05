@@ -2280,6 +2280,7 @@ filterReads f = case f of
   -- characteristic, so no Modification writes one.
   Filter.Type.TargetsSource -> Set.empty
   Filter.Type.TargetsOnlySource -> Set.empty
+  Filter.Type.TargetsOnlyOne _ -> Set.empty
   Filter.Type.TargetsPlayer _ -> Set.empty
   -- Reads an IDENTITY, which CR 109.3 does not count as a characteristic.
   Filter.Type.IsBound _ -> Set.empty
@@ -2531,6 +2532,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsSource -> False
   Filter.Type.TargetsSource -> False
   Filter.Type.TargetsOnlySource -> False
+  Filter.Type.TargetsOnlyOne _ -> False
   Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
   Filter.Type.SameNameAsBound _ -> False
