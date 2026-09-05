@@ -40,14 +40,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Subtype as Subtype
 
--- CR 602.2 with CR 101.2: which of `candidates` an effect in force right now
--- says can't have an activated ability of this CR 605.1a kind activated. Arrest,
--- Realmbreaker's Grasp and Volrath's Curse are the pool's printings.
---
--- A set of ids and not a per-candidate predicate, for the reason
--- Pawl.Engine.CombatRestriction.restricted gives: a caller narrowing a whole
--- battlefield asks this once and tests against the answer, where a predicate
--- would re-walk the battlefield per candidate.
 -- Every activation prohibition some permanent on the battlefield states right
 -- now, each paired with its SOURCE and with CR 612.1's word swap over that
 -- source's own text -- Pawl.Engine.CombatRestriction.gathered's shape on this

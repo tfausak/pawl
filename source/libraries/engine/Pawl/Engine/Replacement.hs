@@ -1799,6 +1799,15 @@ readsApplier re = case re of
 -- the one arm that hands it on as a Filter.Context, which readsApplier's own
 -- comment argues (#3215).
 --
+-- Not implemented: one PRINTED replacement effect written as TWO rows is two
+-- candidates here, so the entry of a Voidpouncer or a Faerie Squadron -- "enters
+-- with [counters] ... and with [keyword]", an EntryRewrite.WithCounters row
+-- beside an EntryRewrite.WithKeywords one because no arm carries both -- raises a
+-- prompt on a board where CR 616.1 asks nobody anything, and offers two choices
+-- over three candidates where a scaler beside it makes the rules offer one over
+-- two (#3288). The rows differ in `effect`, so `distinguishing` tells them apart;
+-- the board converges either way and the divergence is the prompt.
+--
 -- `origin` is NOT such a hole: highestBucket has already partitioned by bucket,
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every
 -- candidate reaching this comparison shares one origin.

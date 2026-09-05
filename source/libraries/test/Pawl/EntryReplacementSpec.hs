@@ -1713,6 +1713,9 @@ pounceOrders seasonFirst seasonId p = case p of
 -- modified event once the counters row has been applied -- the row still unapplied
 -- beside Doubling Season and Vorinclex, then the two of those three left. The
 -- control board, with no scaler on it, asks the first of those and nothing else.
+-- Those counts are pawl's and not the rules': one printed sentence is one
+-- replacement effect, so CR 616.1 asks nothing on the control board and once on
+-- the scaling one. The order prompt the split raises is #3288's.
 --
 -- THE BOARD is toolkitSpec's with the mana changed: five Radiant Fountains and a
 -- Mountain pay {1}{R} and the kicker's {2}{C} exactly. Every case kicks; the
