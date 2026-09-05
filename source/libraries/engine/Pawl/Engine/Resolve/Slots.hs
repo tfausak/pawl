@@ -193,13 +193,13 @@ insertOne slot = joinTwo (oneSlot slot)
 --     reason: EachInSlot takes every player a slot names and CR 400.7j's fold
 --     every object, so neither is damaged by a plural slot.
 --   * Every nested Count's FILTER (QuantitySlot.nestedCounts). A Filter.IsBound
---     under a fold is judged against the resolving object's bindings
---     (Pawl.Engine.Filter.matches' identity arm) exactly as one on an effect's own
---     field is, and the pool writes the shape -- Caldera Breaker, Into the Wilds,
---     Wild Evocation. Reported at SlotArity.Many, never One: a filter's own reads
---     are the group Filter.Context.slotObjects hands it, and WHICH of its atoms is
+--     under a fold is judged against the resolving object's bindings --
+--     Filter.matches' IsBound arm, against the Context's slotObjects -- exactly as
+--     one on an effect's own field is, and the pool writes the shape (Caldera
+--     Breaker, Into the Wilds, Wild Evocation). Reported at SlotArity.Many, never
+--     One: that arm reads the whole GROUP a slot names, and WHICH filter atom is
 --     damaged by a plural slot is Pawl.EffectLintSpec's framedSlotsReadSingly,
---     which reaches these same filters through CardSpec.effectFilters.
+--     which reaches these same filters through Pawl.CardSpec's effectFilters.
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots quantity =
   joinSlots

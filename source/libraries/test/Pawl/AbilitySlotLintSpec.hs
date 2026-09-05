@@ -741,7 +741,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- BOTH carriers of a slot inside a condition, because either alone would pass
   -- if only the other were folded: a PlayerRef buried in one of the compared
-  -- numbers, and CR 400.7j's fold, whose slot the FILTER of the Count names.
+  -- numbers, and the FILTER of a Count under one of them.
   Spec.it s "the lint itself catches a slot read only from a clause's condition" $ do
     let gated condition =
           Mode.MkMode
