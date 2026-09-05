@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
+import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
@@ -931,7 +932,12 @@ viewOfSnapshot mController isToken counters snapshot =
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
               )
           ),
-      -- CR 602.1 off the same three lists, without CR 605.1a's exclusion.
+      -- CR 602.1 off the same three lists, without CR 605.1a's exclusion, plus CR
+      -- 305.6's intrinsic ability -- which none of the three lists holds, since
+      -- they carry rule 702's abilities and the face's own. Read off the snapshot's
+      -- types for Pawl.Engine.Projection.View.viewOfCharacteristics' reason, and
+      -- through the reader every view builder shares so that the three cannot
+      -- disagree about one object.
       Filter.hasActivatedAbility =
         not
           ( null
@@ -939,7 +945,8 @@ viewOfSnapshot mController isToken counters snapshot =
                   <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
               )
-          ),
+          )
+          || Subtype.intrinsicManaAbility (PC.cardTypes snapshot) (PC.subtypes snapshot),
       -- CR 702.184c off the snapshot, which carries the field: the marker
       -- outlives the object exactly as a keyword or a P/T does.
       Filter.grantsStationToughness = PC.grantsStationToughness snapshot
