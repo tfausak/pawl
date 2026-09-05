@@ -570,6 +570,11 @@ data View = MkView
     -- handed, so a filter forcing this from inside the fold reads the board at
     -- that caller's own layer rather than restarting the projection (CR 613.1).
     nonManaActivatedAbility :: Bool,
+    -- CR 602.1: does this candidate have one or more activated abilities at all?
+    -- The field beside it without CR 605.1a's exclusion, filled by the same
+    -- builders and LAZY and bounded for the same two reasons. Named apart from
+    -- `activatedAbility` above, which asks whether the candidate IS one.
+    hasActivatedAbility :: Bool,
     -- CR 702.184c: does this candidate's controller's station abilities read a
     -- tapped creature's toughness instead of its power? The projected mirror
     -- of ProjectedCharacteristics.grantsStationToughness -- read off the
@@ -734,6 +739,8 @@ playerView pid =
       -- list of what an object is has no player in it -- `keywords` above, one
       -- rule over.
       nonManaActivatedAbility = False,
+      -- CR 602.1 again, one exclusion out: a player has no abilities either.
+      hasActivatedAbility = False,
       -- CR 702.184c reaches a permanent's controller, and a player view built
       -- from a bare PlayerId has no permanent behind it to grant this at all.
       grantsStationToughness = False
@@ -1526,6 +1533,8 @@ matches context view predicate = case predicate of
   -- land Humility has stripped stops matching at once, and CR 702.29b's and CR
   -- 702.77b's abilities are in the list the builder measured.
   Filter.HasNonManaActivatedAbility -> nonManaActivatedAbility view
+  -- CR 602.1 off the same builders, without CR 605.1a's exclusion.
+  Filter.HasActivatedAbility -> hasActivatedAbility view
   -- CR 400.1 off Object.zone, a live read like `token` and `tapped` above: the
   -- object moves and the atom answers about where it is NOW. That is what makes
   -- it answer CR 601.2's "from where it is" at a cast gate, which runs before CR
@@ -1708,6 +1717,7 @@ rewrite pairs predicate = case predicate of
   -- atom names none -- "an activated ability that isn't a mana ability" has no
   -- word inside it for Artificial Evolution to reach.
   Filter.HasNonManaActivatedAbility -> predicate
+  Filter.HasActivatedAbility -> predicate
   Filter.IsInZone _ -> predicate
   -- Untouched for IsInZone's reason: CR 612.1 swaps a subtype, a colour or a card
   -- type word, and a zone name is none of the three.
@@ -1941,6 +1951,11 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Plot cost -> Keyword.Type.Plot (rewriteCost pairs cost)
   -- CR 702.143a states a cost too, so it is reached the same way.
   Keyword.Type.Foretell cost -> Keyword.Type.Foretell (rewriteCost pairs cost)
+  -- CR 702.139a states a CONDITION rather than a cost, so `rewrite` reaches it
+  -- as landwalk's criterion is reached. No text-changing effect can be in play
+  -- when it is read (CR 103.2b runs before the game begins), so this descent is
+  -- structural rather than something a board exercises.
+  Keyword.Type.Companion condition -> Keyword.Type.Companion (rewrite pairs condition)
   -- CR 702.94a states a cost too, so it is reached the same way.
   Keyword.Type.Miracle cost -> Keyword.Type.Miracle (rewriteCost pairs cost)
   Keyword.Type.StartYourEngines -> keyword
@@ -2150,6 +2165,7 @@ bakeBound players predicate = case predicate of
   Filter.HasCounters _ -> predicate
   Filter.HasCountersOfAnyKind -> predicate
   Filter.HasNonManaActivatedAbility -> predicate
+  Filter.HasActivatedAbility -> predicate
   Filter.IsInZone _ -> predicate
   Filter.WasCastFrom _ -> predicate
 
@@ -2272,6 +2288,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasCounters _ -> []
   Filter.HasCountersOfAnyKind -> []
   Filter.HasNonManaActivatedAbility -> []
+  Filter.HasActivatedAbility -> []
   Filter.IsInZone _ -> []
   Filter.WasCastFrom _ -> []
 
@@ -2404,6 +2421,7 @@ statesAQuality predicate = case predicate of
   Filter.HasCounters _ -> True
   Filter.HasCountersOfAnyKind -> True
   Filter.HasNonManaActivatedAbility -> True
+  Filter.HasActivatedAbility -> True
   -- CR 400.1 states a quality like any other atom here: a search whose predicate
   -- names a zone is looking for cards with a stated quality, so CR 701.23b's
   -- shortfall applies rather than CR 701.23d's "must find".

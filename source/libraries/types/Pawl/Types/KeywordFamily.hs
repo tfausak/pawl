@@ -138,6 +138,11 @@ data KeywordFamily
     Plot
   | -- | CR 702.143a: foretell [cost].
     Foretell
+  | -- | CR 702.139a: companion--[condition]. The family a card writing "a card
+    -- with companion" would name, as against Zirda's own condition; no card in
+    -- the pool asks yet, and it is owed at the keyword rather than at the first
+    -- asker.
+    Companion
   | -- | CR 702.103a: bestow [cost]. No card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Bestow

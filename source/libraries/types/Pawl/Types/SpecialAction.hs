@@ -16,10 +16,10 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- The carrier for the rows of CR 116.2 a card grants IN PROSE. The rules grant
 -- CR 116.2a's land play to every player, so it needs no printed permission; CR
--- 116.2f, CR 116.2h and CR 116.2k are granted by KEYWORDS (suspend, foretell,
--- plot), so they belong to Pawl.Types.Keyword rather than here whenever those
--- land; and CR 116.2c's permission is created by a RESOLUTION rather than
--- printed, so it rides the stored effect it ends (Pawl.Types.Expiry's WhenPaid)
+-- 116.2f, CR 116.2g, CR 116.2h and CR 116.2k are granted by KEYWORDS (suspend,
+-- companion, foretell, plot), so they belong to Pawl.Types.Keyword rather than
+-- here whenever those land; and CR 116.2c's permission is created by a
+-- RESOLUTION rather than printed, so it rides the stored effect it ends (Pawl.Types.Expiry's WhenPaid)
 -- rather than a face's text (#875).
 data SpecialAction
   = -- | CR 116.2e: "You may discard this card any time you could cast an

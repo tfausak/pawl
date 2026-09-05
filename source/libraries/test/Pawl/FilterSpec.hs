@@ -95,6 +95,7 @@ blackCreature =
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
       -- atom's own cases below say which view they want rather than inheriting it.
       Filter.nonManaActivatedAbility = False,
+      Filter.hasActivatedAbility = False,
       Filter.grantsStationToughness = False
     }
 
@@ -150,6 +151,7 @@ devoidBigCreature =
       Filter.kicked = Map.empty,
       Filter.manaSpentTags = Set.empty,
       Filter.nonManaActivatedAbility = False,
+      Filter.hasActivatedAbility = False,
       Filter.grantsStationToughness = False
     }
 
@@ -1791,3 +1793,21 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 109.1: a player is not an object and has no abilities.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.HasNonManaActivatedAbility)) "player"
+
+  -- CR 602.1 without rule 605.1a's exclusion, the atom beside it. The pair of
+  -- views below is what keeps the two apart: a candidate whose ONLY activated
+  -- ability is a mana ability -- Birds of Paradise, and the reason Zirda, the
+  -- Dawnwaker's condition needs this atom -- records the second field and not the
+  -- first.
+  Spec.describe s "HasActivatedAbility" $ do
+    Spec.it s "matches a permanent whose only activated ability is a mana ability" $ do
+      let birds = blackCreature {Filter.hasActivatedAbility = True}
+      Spec.assertBool s (Filter.matches self birds Filter.Type.HasActivatedAbility) "has one"
+      Spec.assertBool s (not (Filter.matches self birds Filter.Type.HasNonManaActivatedAbility)) "and rule 605.1a excludes it from the atom beside this one"
+
+    Spec.it s "does not match one whose view records none" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.HasActivatedAbility)) "vanilla"
+
+    -- CR 109.1: a player is not an object and has no abilities.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.HasActivatedAbility)) "player"

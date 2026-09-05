@@ -385,6 +385,12 @@ data Filter keyword
     -- outside the zone they can be activated from. Characteristic, unlike the
     -- atoms above it: CR 613.1f writes abilities, so Humility stops it matching.
     HasNonManaActivatedAbility
+  | -- | CR 602.1: does the CANDIDATE have one or more activated abilities, mana
+    -- abilities among them? Zirda, the Dawnwaker's companion condition -- "each
+    -- permanent card in your starting deck has an activated ability" -- is the
+    -- card asking, and the atom above is the same question with CR 605.1a's
+    -- exclusion, which Zirda does not write.
+    HasActivatedAbility
   | -- | CR 400.1: the candidate OBJECT is in this zone; "from anywhere other than
     -- their hands" is @Not (IsInZone Hand)@ (#163). A cast gate reads it before
     -- CR 601.2a moves the card to the stack, which is what CR 601.2's "take it

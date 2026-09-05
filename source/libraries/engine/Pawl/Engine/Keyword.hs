@@ -285,6 +285,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
   -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
   -- reason. Minted HERE rather than in a hand-only roster because WHERE it
   -- functions is CR 113.6k's question, answered in Event.zonesTriggeredFrom.
@@ -405,6 +406,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
   -- CR 702.94a's hand ability is TRIGGERED rather than activated, so it is
   -- minted by `abilitiesFor` above and reached from a hand by CR 113.6k.
   Keyword.Miracle _ -> []
@@ -625,6 +627,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
@@ -1092,6 +1095,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- a hand, and CR 702.143d's permission belonging to the FORETOLD card
   -- (Object.foretold) rather than the keyword.
   Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
   -- CR 702.94a's cast is one CR 608.2g offers during the linked ability's
   -- resolution, so it is not a standing CR 601.3 permission the way flashback's
   -- graveyard cast is: nothing may be cast from a hand by miracle at a player's
@@ -1666,6 +1670,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
   -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
   -- 121.9's window changes nothing about the draw, so there is no event to
   -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
@@ -1828,6 +1833,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
@@ -1988,6 +1994,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
   Keyword.Foretell _ -> []
+  Keyword.Companion _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Exert -> []
@@ -2054,6 +2061,9 @@ familyGranting counts ability =
 -- the next parameterized keyword.
 familyOf :: Keyword -> Maybe KeywordFamily.KeywordFamily
 familyOf keyword = case keyword of
+  -- CR 702.139a's parameterized keyword: "a card with companion" drops the
+  -- condition.
+  Keyword.Companion _ -> Just KeywordFamily.Companion
   -- CR 702.6a's parameterized keyword: "equip abilities" drops the cost, which
   -- is what Bureau Headmaster's reduction names -- Pawl.ActivateSpec's "Equip"
   -- group is what proves it.

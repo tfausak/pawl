@@ -129,6 +129,7 @@ codec =
       Arm.payload "Disguise" (Cost.codec codec) Keyword.Disguise (\x -> case x of Keyword.Disguise y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),
       Arm.payload "Foretell" (Cost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),
+      Arm.payload "Companion" (Filter.codec codec) Keyword.Companion (\x -> case x of Keyword.Companion y -> Just y; _ -> Nothing),
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
       Arm.nullary "Exert" Keyword.Exert,
       Arm.payload "Bestow" (Cost.codec codec) Keyword.Bestow (\x -> case x of Keyword.Bestow y -> Just y; _ -> Nothing),

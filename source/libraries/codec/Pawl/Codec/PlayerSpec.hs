@@ -39,7 +39,10 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.dungeons = Set.empty,
           Player.outsideTheGame = Map.empty,
           Player.completedDungeons = 0,
-          Player.completedDungeonNames = Set.empty
+          Player.completedDungeonNames = Set.empty,
+          Player.startingDeck = Map.empty,
+          Player.companion = Nothing,
+          Player.companionTaken = False
         }
       " {\"life\":20,\"speed\":null} "
   -- Every axis away from the case above. `life` is NEGATIVE, which CR 104.3b
@@ -68,13 +71,17 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.dungeons = Set.fromList [PrintingId.MkPrintingId 9, PrintingId.MkPrintingId 11],
           Player.outsideTheGame = Map.singleton (PrintingId.MkPrintingId 12) 13,
           Player.completedDungeons = 10,
-          Player.completedDungeonNames = Set.fromList [CardName.MkCardName (Text.pack "Tomb of Annihilation"), CardName.MkCardName (Text.pack "Undercity")]
+          Player.completedDungeonNames = Set.fromList [CardName.MkCardName (Text.pack "Tomb of Annihilation"), CardName.MkCardName (Text.pack "Undercity")],
+          Player.startingDeck = Map.singleton (PrintingId.MkPrintingId 14) 15,
+          Player.companion = Just (PrintingId.MkPrintingId 16),
+          Player.companionTaken = True
         }
       ( " {\"life\":-1,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":2}"
           <> ",{\"key\":{\"type\":\"Poison\"},\"value\":0}]"
           <> ",\"ringTemptations\":3,\"speed\":4,\"commander\":5,\"commanderCasts\":6"
-          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]} "
+          <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]"
+          <> ",\"startingDeck\":{\"14\":15},\"companion\":16,\"companionTaken\":true} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s Player.codec

@@ -119,6 +119,7 @@ codec keywordCodec =
       Arm.payload "HasCounters" (CounterKind.codec keywordCodec) Filter.HasCounters (\x -> case x of Filter.HasCounters y -> Just y; _ -> Nothing),
       Arm.nullary "HasCountersOfAnyKind" Filter.HasCountersOfAnyKind,
       Arm.nullary "HasNonManaActivatedAbility" Filter.HasNonManaActivatedAbility,
+      Arm.nullary "HasActivatedAbility" Filter.HasActivatedAbility,
       Arm.payload "IsInZone" Zone.codec Filter.IsInZone (\x -> case x of Filter.IsInZone y -> Just y; _ -> Nothing),
       Arm.payload "WasCastFrom" Zone.codec Filter.WasCastFrom (\x -> case x of Filter.WasCastFrom y -> Just y; _ -> Nothing),
       Arm.payload "And" (Common.list (codec keywordCodec)) Filter.And (\x -> case x of Filter.And y -> Just y; _ -> Nothing),

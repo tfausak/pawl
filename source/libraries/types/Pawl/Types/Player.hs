@@ -187,6 +187,61 @@ data Player = MkPlayer
     -- NAMES and not PrintingIds, because a name is what Acererak's text names and
     -- CR 201.2a makes sameness of name the question: two printings of one dungeon
     -- are the same dungeon to it, and a printing id would tell them apart.
-    completedDungeonNames :: Set.Set CardName.CardName
+    completedDungeonNames :: Set.Set CardName.CardName,
+    -- | CR 103.2a \/ 702.139b: this player's STARTING DECK, counted per printing --
+    -- their deck once the sideboard has been set aside, and, in a Commander game,
+    -- before the commander is set aside. Empty for a game built without decks.
+    --
+    -- A SNAPSHOT and not a live read of the library, which is the whole reason the
+    -- field exists: CR 702.139b fixes the set at one moment before the game begins,
+    -- and by the time a companion's condition could be asked again the opening hands
+    -- have been drawn and the library no longer holds the deck. Pawl.Engine.Setup.createDeck
+    -- is the sole writer, and nothing rewrites it -- CR 103.2a names a moment, not a
+    -- state that tracks.
+    --
+    -- The COMMANDER is counted in, which is CR 702.139b's second sentence: "in a
+    -- Commander game, this is also before you've set aside your commander". So this
+    -- is Deck.cards plus Deck.commander, and not what Pawl.Engine.Setup.createDeck
+    -- dealt into the library.
+    --
+    -- The SIDEBOARD is not, which is CR 103.2a's first sentence and the reason
+    -- Player.outsideTheGame is a different field: what is set aside is outside the
+    -- game, and what is left is this.
+    --
+    -- The VANGUARD and the DUNGEONS are not either, and for a sharper reason than
+    -- the sideboard's: CR 902.3 and CR 309.2 keep both out of the deck to begin
+    -- with, so neither was ever among the cards a sideboard could be set aside from.
+    --
+    -- PrintingIds and not Printings, and COUNTED, for Player.outsideTheGame's two
+    -- reasons: the ids are interned by Pawl.Engine.Setup.createDeck before any of
+    -- this is read, and CR 100.2a lets a deck hold four copies of a card, which a
+    -- set would collapse.
+    --
+    -- Read by Pawl.Engine.Companion, which is where CR 702.139a's condition is
+    -- evaluated against it.
+    startingDeck :: Map.Map PrintingId.PrintingId Natural.Natural,
+    -- | CR 103.2b \/ 702.139a: the card this player revealed from outside the game
+    -- as their companion, or Nothing for the players who revealed none -- which is
+    -- every player in a game whose decks brought no companion.
+    --
+    -- A PRINTING and not an ObjectId, for Player.commander's reason turned inside
+    -- out: CR 103.2b leaves the revealed card OUTSIDE the game, where CR 400.11
+    -- gives it no object at all until CR 116.2g brings it in.
+    --
+    -- ONE, which is CR 103.2b's own cap: "a player may reveal no more than one card
+    -- this way".
+    --
+    -- NOT taken out of Player.outsideTheGame when it is chosen: CR 103.2b's last
+    -- sentence keeps the revealed card out there, and CR 116.2g is what spends it.
+    companion :: Maybe PrintingId.PrintingId,
+    -- | CR 116.2g: has this player already taken the companion special action this
+    -- game? "Only if they haven't done so yet this game" is this flag, and
+    -- Pawl.Engine.Companion.take is its sole writer.
+    --
+    -- A FLAG and not a count, because rule 116.2g permits the action exactly once
+    -- and nothing in rule 702.139 gives it back; and separate from `companion`
+    -- above rather than clearing it, because CR 702.139c keeps the card in the game
+    -- afterwards and a card that reads "your chosen companion" would still find it.
+    companionTaken :: Bool
   }
   deriving (Eq, Ord, Show)

@@ -234,10 +234,29 @@ viewOfCard face =
                   ManaAbility.isManaAbility
                   (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face))
               ),
+          -- CR 602.1 over the same two lists, without CR 605.1a's exclusion --
+          -- Zirda, the Dawnwaker's companion condition is read here, since a card
+          -- outside the game has no object to project.
+          Filter.hasActivatedAbility =
+            not (null (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face)))
+              || intrinsicManaAbility face,
           -- CR 702.184c reaches a permanent's CONTROLLER; this builder describes
           -- a printed FACE with no controller and no board to grant it one.
           Filter.grantsStationToughness = False
         }
+
+-- CR 305.6: does this face have the land card type and a basic land type, and so
+-- an intrinsic "{T}: Add [mana symbol]" ability the text box does not print?
+--
+-- Read off the FACE and not off a projection, viewOfCard's reason: the caller has
+-- a card with no object behind it. viewOfCharacteristics needs no counterpart,
+-- because Pawl.Engine.Projection.View.abilitiesFromCharacteristics mints the
+-- intrinsic ability through Pawl.Engine.Mana's CR 305.6 reader for an object with
+-- projected subtypes.
+intrinsicManaAbility :: Face.Face Card.Type.Card -> Bool
+intrinsicManaAbility face =
+  Set.member CardType.Land (TypeLine.types (Face.typeLine face))
+    && any (Maybe.isJust . Subtype.subtypeMana) (TypeLine.subtypes (Face.typeLine face))
 
 -- CR 208.1's PRINTED power box, for a card off the battlefield. Nothing for a
 -- face with no power box, since CR 208.1 gives power only to creature cards.
@@ -633,6 +652,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- HAS, not the list it can activate here. LAZY -- see the field's own comment
       -- in Pawl.Engine.Filter.
       Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesFromCharacteristics peers pc oid gs)),
+      -- CR 602.1 off the same list, without CR 605.1a's exclusion. LAZY for its
+      -- neighbour's reason.
+      Filter.hasActivatedAbility = not (null (abilitiesFromCharacteristics peers pc oid gs)),
       -- CR 702.184c off the PROJECTION, applyModification's GrantsStationToughness
       -- arm being layer 6's only writer.
       Filter.grantsStationToughness = PC.grantsStationToughness pc

@@ -205,6 +205,15 @@ data Prompt r where
   -- player brings in from outside the game (CR 400.11), there being no object
   -- for it yet.
   ChooseDungeon :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt PrintingId.PrintingId
+  -- | CR 103.2b \/ 702.139a: which card, if any, a player reveals from outside
+  -- the game as their companion, before the game begins. A PrintingId for
+  -- ChooseDungeon's reason -- outside the game is not a zone (CR 400.11), so
+  -- there is no object.
+  --
+  -- A Maybe, unlike every other pre-game choice: rule 103.2b's "if any players
+  -- WISH to reveal" makes declining an answer, so the prompt is raised even where
+  -- one card is offered.
+  ChooseCompanion :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt (Maybe PrintingId.PrintingId)
   -- | CR 400.11c \/ 729.4: which card a player brings in from outside the game;
   -- an OutsideCard rather than a printing because which zone it leaves decides
   -- what triggers (CR 729.4a). Two copies of one printing are one offer.

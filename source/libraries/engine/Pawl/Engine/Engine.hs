@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Companion as Companion
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Daytime as Daytime
@@ -1296,6 +1297,15 @@ priorityLoop = do
                               -- CR 116.2h / 702.143b: a special action too.
                               Action.Type.Foretell oid -> do
                                 Foretell.foretell p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 116.2g / 702.139a: a special action too, and
+                              -- the one that takes no object -- Player.companion
+                              -- names the card, outside the game having no
+                              -- object to name it with (CR 400.11).
+                              Action.Type.PutCompanionIntoHand -> do
+                                Companion.take Resolve.performManaAbility p
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

@@ -433,6 +433,7 @@ import qualified Pawl.CombatCostSpec
 import qualified Pawl.CombatEffectSpec
 import qualified Pawl.CombatSpec
 import qualified Pawl.CommanderSpec
+import qualified Pawl.CompanionSpec
 import qualified Pawl.ConditionSpec
 import qualified Pawl.ConjureSpec
 import qualified Pawl.CopySpec
@@ -1049,6 +1050,7 @@ spec s registry = do
   Pawl.CombatCostSpec.spec s registry
   Pawl.CombatSpec.spec s registry
   Pawl.CommanderSpec.spec s registry
+  Pawl.CompanionSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.ConjureSpec.spec s registry
   Pawl.CopySpec.spec s registry

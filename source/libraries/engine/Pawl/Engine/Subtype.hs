@@ -11,6 +11,8 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 
@@ -26,6 +28,24 @@ inFamily :: SubtypeFamily.SubtypeFamily -> Subtype.Subtype -> Bool
 inFamily family = case family of
   SubtypeFamily.BasicLandType -> isLandType
   SubtypeFamily.CreatureType -> isCreatureType
+
+-- | CR 305.6: the mana an object with the land card type and this basic land
+-- type has an intrinsic "{T}: Add [mana symbol]" ability for, or Nothing for
+-- every other subtype.
+--
+-- Here rather than in Pawl.Engine.Mana, whose CR 305.6 reader it used to live in,
+-- because Pawl.Engine.Projection.View needs it too -- Filter.HasActivatedAbility
+-- must see this ability on a card off the battlefield, and Mana imports
+-- Projection, so the list had to sit below both. `isLandType` above is the wider
+-- CR 205.3i family, not these five.
+subtypeMana :: Subtype.Subtype -> Maybe ManaType.ManaType
+subtypeMana subtype = case subtype of
+  Subtype.Mountain -> Just (ManaType.Colored Color.Red)
+  Subtype.Swamp -> Just (ManaType.Colored Color.Black)
+  Subtype.Forest -> Just (ManaType.Colored Color.Green)
+  Subtype.Island -> Just (ManaType.Colored Color.Blue)
+  Subtype.Plains -> Just (ManaType.Colored Color.White)
+  _ -> Nothing
 
 -- | CR 205.3i
 isLandType :: Subtype.Subtype -> Bool

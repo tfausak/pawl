@@ -444,6 +444,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.HasNonManaActivatedAbility
       " {\"type\":\"HasNonManaActivatedAbility\"} "
+  Spec.it s "HasActivatedAbility" $
+    Common.assertCodec
+      s
+      codec
+      Filter.HasActivatedAbility
+      " {\"type\":\"HasActivatedAbility\"} "
   Spec.it s "IsInZone Graveyard" $
     Common.assertCodec
       s

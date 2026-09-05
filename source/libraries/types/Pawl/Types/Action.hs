@@ -166,6 +166,17 @@ data Action
     -- with foretell" rather than a half. No printing has foretell on a
     -- multi-faced card.
     Foretell ObjectId.ObjectId
+  | -- | CR 116.2g / 702.139a: pay {3} and put your chosen companion into your
+    -- hand from outside the game. "Any time you have priority and the stack is
+    -- empty, but only during a main phase of your turn", once per game, and it
+    -- does not use the stack -- so it is an Action, exactly as CR 116.2a's land
+    -- play is.
+    --
+    -- Carries NOTHING, where Plot and Foretell each carry a card: rule 116.2g's
+    -- subject is "that card", the one companion CR 103.2b let this player reveal,
+    -- which Player.companion already names. Outside the game is not a zone (CR
+    -- 400.11), so there is no ObjectId to carry in any case.
+    PutCompanionIntoHand
   | -- | CR 116.2c: pay a cost an effect named to END that effect. "You may pay
     -- {U} to end this effect", the clause every Licid prints. "A player can take
     -- such an action any time they have priority, unless that effect specifies
