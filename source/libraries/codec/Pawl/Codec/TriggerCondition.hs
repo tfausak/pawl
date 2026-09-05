@@ -133,6 +133,10 @@ codec =
       Arm.nullary "SelfExerted" TriggerCondition.SelfExerted,
       Arm.nullary "Reflexive" TriggerCondition.Reflexive,
       Arm.payload "SelfBecomesAttachedBy" filterCodec TriggerCondition.SelfBecomesAttachedBy (\x -> case x of TriggerCondition.SelfBecomesAttachedBy y -> Just y; _ -> Nothing),
+      -- CR 701.3a read from the attachment, and CR 701.3d's mirror of it. Same
+      -- shape as the arm above with the Filter over the HOST instead.
+      Arm.payload "SelfBecomesAttachedTo" filterCodec TriggerCondition.SelfBecomesAttachedTo (\x -> case x of TriggerCondition.SelfBecomesAttachedTo y -> Just y; _ -> Nothing),
+      Arm.payload "SelfBecomesUnattachedFrom" filterCodec TriggerCondition.SelfBecomesUnattachedFrom (\x -> case x of TriggerCondition.SelfBecomesUnattachedFrom y -> Just y; _ -> Nothing),
       -- CR 701.54d's "whenever the Ring tempts you", PlayerScries' shape above.
       Arm.payload "RingTemptsPlayer" PlayerRelation.codec TriggerCondition.RingTemptsPlayer (\x -> case x of TriggerCondition.RingTemptsPlayer y -> Just y; _ -> Nothing),
       -- CR 509.3d from the attacking side's bystander, SelfBecomesBlockedBy's

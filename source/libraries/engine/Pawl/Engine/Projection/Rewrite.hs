@@ -1314,6 +1314,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
   TriggerCondition.SelfExerted -> condition
   TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
+  TriggerCondition.SelfBecomesAttachedTo f -> TriggerCondition.SelfBecomesAttachedTo (Filter.rewrite pairs f)
+  TriggerCondition.SelfBecomesUnattachedFrom f -> TriggerCondition.SelfBecomesUnattachedFrom (Filter.rewrite pairs f)
   -- CR 603.12's reflexive carries nothing at all, so there is no subtype to swap.
   TriggerCondition.Reflexive -> condition
 

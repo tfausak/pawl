@@ -971,6 +971,23 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesAttachedBy (Filter.HasSubtype Subtype.Aura))
       " {\"type\":\"SelfBecomesAttachedBy\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}} "
+  -- CR 701.3a read from the ATTACHMENT, the mirror of the arm above: the tag is
+  -- the only thing that separates the two, so both are round-tripped rather than
+  -- one standing in for the other.
+  Spec.it s "SelfBecomesAttachedTo round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfBecomesAttachedTo (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"SelfBecomesAttachedTo\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 701.3d. Grafted Wargear says "from a permanent" and narrows nothing, so
+  -- the trivial `And []` is the payload the card actually prints.
+  Spec.it s "SelfBecomesUnattachedFrom round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfBecomesUnattachedFrom (Filter.And []))
+      " {\"type\":\"SelfBecomesUnattachedFrom\",\"value\":{\"type\":\"And\",\"value\":[]}} "
   -- CR 701.54d. Both relations, for PlayerScries' reason above.
   Spec.it s "RingTemptsPlayer round-trips both relations" $ do
     Common.assertCodec

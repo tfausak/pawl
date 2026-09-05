@@ -684,6 +684,45 @@ combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
 mentoredCreature :: SlotName
 mentoredCreature = SlotName.MkSlotName (Text.pack "thatMentoredCreature")
 
+-- CR 701.3a's "that creature": the object the BEARER became attached to, which
+-- Enormous Energy Blade's "tap that creature" reads. Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered.
+--
+-- NOT `triggerSource` (CR 113.7a), which is the whole point of the pair: the
+-- bearer here is the ATTACHMENT, so the host is a second object. The host-scoped
+-- reading of the same event binds nothing at all -- there the bearer IS the host,
+-- and the attachment has no printed reader.
+--
+-- One object, never a group: CR 701.3a attaches one permanent to one object, and
+-- two attachments are two events. Not a target (nothing was chosen), so the same
+-- CR 608.2b posture and the same "no card's targetSlots may name it" sweep as
+-- `blockingCreature`.
+attachedHost :: SlotName
+attachedHost = SlotName.MkSlotName (Text.pack "thatHost")
+
+-- CR 701.3d's "that permanent": the object the bearer became UNATTACHED from,
+-- which Grafted Wargear's "sacrifice that permanent" reads. `attachedHost`'s
+-- mirror, stamped the same way off the other event.
+--
+-- Distinct from `attachedHost` rather than one "the host in this act" slot, for
+-- `blockedCreature`'s reason: a payload naming the wrong one would still
+-- typecheck, and two slots make the mismatch a dead name instead.
+--
+-- The id is routinely DEAD by resolution -- CR 701.3d counts the host leaving its
+-- zone as becoming unattached -- which is what CR 603.10c's look-back is for, and
+-- is the payload's problem exactly as it is for `blockingCreature`.
+--
+-- NOT named by Pawl.Engine.Resolve.Slots.effectViewOf, unlike
+-- `sacrificedPermanent` and `departedPermanent` there, so a CHARACTERISTIC of a
+-- dead former host reads blank. Nothing in print asks for one: Scryfall
+-- o:"becomes unattached", 2026-09-05, returns Captain's Hook, Grafted
+-- Exoskeleton, Grafted Wargear, Killer Cosplay and Stitcher's Graft, and every
+-- one of them names the ex-host as a whole object rather than reading anything
+-- off it. A printing that read "equal to that permanent's power" would want the
+-- arm.
+unattachedHost :: SlotName
+unattachedHost = SlotName.MkSlotName (Text.pack "thatFormerHost")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -795,6 +834,14 @@ setCombatDamager oid = Map.insert combatDamager (toObject oid)
 -- Bind an object under the reserved mentoredCreature slot (CR 702.134c).
 setMentoredCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
+
+-- Bind an object under the reserved attachedHost slot (CR 701.3a).
+setAttachedHost :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setAttachedHost oid = Map.insert attachedHost (toObject oid)
+
+-- Bind an object under the reserved unattachedHost slot (CR 701.3d).
+setUnattachedHost :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setUnattachedHost oid = Map.insert unattachedHost (toObject oid)
 
 -- Fold the slots a COST PAYMENT bound (Pawl.Types.Payment.Paid) into a binding
 -- environment. Left-biased, and harmlessly so: every key here is a reserved

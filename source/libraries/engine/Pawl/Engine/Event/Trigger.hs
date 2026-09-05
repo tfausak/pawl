@@ -154,6 +154,7 @@ movedOf event = case event of
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
   GameEvent.BecameAttached {} -> Nothing
+  GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -228,6 +229,14 @@ looksBack condition = case condition of
   -- is a zone change -- CR 608.3c's Aura spell arriving attached -- leaves both
   -- objects on the battlefield for a live read.
   TriggerCondition.SelfBecomesAttachedBy _ -> False
+  -- The attachment's own scope on the same event, for the same reason: CR 701.3a
+  -- moves it onto the host without changing its zone.
+  TriggerCondition.SelfBecomesAttachedTo _ -> False
+  -- CR 603.10c NAMES this one: "abilities that trigger specifically when an
+  -- object becomes unattached look back in time". The rule earns it -- CR 701.3d
+  -- counts the attachment leaving the battlefield as becoming unattached, so the
+  -- bearer is routinely gone by the CR 117.5 boundary.
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> True
   -- CR 603.6c's two written forms, which CR 603.10a names first:
   -- leaves-the-battlefield abilities. CR 700.4 narrows the second to a
   -- graveyard, and narrowing the destination does not leave the family.
@@ -443,6 +452,10 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.SelfExerted -> False
   TriggerCondition.SelfBecomesAttachedBy _ -> False
+  TriggerCondition.SelfBecomesAttachedTo _ -> False
+  -- Per-occurrence too: CR 701.3d's routes each unattach one permanent from one
+  -- host, and no printing reads a batch of them.
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> False
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.PermanentsDie _ -> True
@@ -881,6 +894,7 @@ eventTriggers events gs =
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
         GameEvent.BecameAttached {} -> Map.empty
+        GameEvent.BecameUnattached {} -> Map.empty
       -- CR 603.10a's look-back at the permanent this event removed: the
       -- abilities it had that functioned on the battlefield, `battlefieldAbilitiesOf`
       -- above's filter and `conditionPutsSelfInto`'s exception both applying.
@@ -1071,6 +1085,7 @@ eventTriggers events gs =
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
         GameEvent.BecameAttached {} -> Map.empty
+        GameEvent.BecameUnattached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
@@ -1281,6 +1296,7 @@ eventTriggers events gs =
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
         GameEvent.BecameAttached {} -> Map.empty
+        GameEvent.BecameUnattached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
@@ -1417,6 +1433,7 @@ eventTriggers events gs =
         GameEvent.VentureMarkerEntered {} -> Map.empty
         GameEvent.BecameTarget {} -> Map.empty
         GameEvent.BecameAttached {} -> Map.empty
+        GameEvent.BecameUnattached {} -> Map.empty
         GameEvent.LeftTheGame _ -> Map.empty
         GameEvent.Milled {} -> Map.empty
         GameEvent.Scried _ -> Map.empty
@@ -1765,6 +1782,11 @@ zonesTriggeredFrom cond = case cond of
   -- exert arm's reason: the host of an attachment is a permanent, so the bearer
   -- is on the battlefield whenever this can match.
   TriggerCondition.SelfBecomesAttachedBy _ -> battlefield
+  TriggerCondition.SelfBecomesAttachedTo _ -> battlefield
+  -- The battlefield too, even though CR 701.3d's own routes include the bearer
+  -- leaving it: this names where the ability FUNCTIONS (CR 113.6), and CR 603.10c
+  -- is what lets a bearer that has left be offered anyway.
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> battlefield
   -- EXILE, and this arm is CR 113.6k's exception rather than its default:
   -- CR 702.170b's special action exiles the card as it becomes plotted, so
   -- the object bearing Aloe Alchemist's "when this card becomes plotted" is
@@ -2136,6 +2158,11 @@ stateTriggers gs
               -- with its own log entry. Standing attached is a state, but no
               -- condition here asks about it.
               TriggerCondition.SelfBecomesAttachedBy _ -> False
+              TriggerCondition.SelfBecomesAttachedTo _ -> False
+              -- And becoming unattached likewise. Standing UNattached is a state
+              -- CR 704.5m acts on, but it is a state-based action rather than a
+              -- CR 603.8 trigger, and no condition here asks about it.
+              TriggerCondition.SelfBecomesUnattachedFrom _ -> False
               -- CR 603.6a is an EVENT trigger, matched against the log; nothing
               -- about it is a CR 603.8 state.
               TriggerCondition.PermanentEnters _ -> False
