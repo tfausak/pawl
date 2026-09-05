@@ -250,6 +250,9 @@ finished worktree, never by pattern. Leave any branch you did not create that
 still carries commits, and say so; the owner keeps review branches. The warm
 worktree is exempt from all of this: leave it, and run
 `script/warm-worktree.sh refresh` in the background once the reap is done.
+Reaping a worktree also makes its agent unresumable, so the send-back path in
+"Audit every few merges" no longer reaches it. When an audit round is about to
+run over a unit, reap it only once the audit has reported.
 
 **Merging.** Arm auto-merge (squash) on each PR. The ruleset requires branches
 be up to date, so every merge invalidates every other armed PR and the queue
