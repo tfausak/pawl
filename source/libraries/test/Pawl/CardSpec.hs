@@ -50,6 +50,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
@@ -316,6 +317,7 @@ vanillaFace name typeLine =
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
+      Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
@@ -4626,9 +4628,10 @@ activatedAbilityFilters ability =
 --     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
 --     `entryRestrictions` (CR 400.4a / 101.2),
 --     `counterRestrictions` (CR 122.6 / 101.2),
+--     `activationProhibitions` (CR 602.2 / 101.2),
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
 --     (CR 509.1c), `attackCosts` (CR 508.1h) and `blockCosts` (CR 509.1d) --
---     nine more affected sets, plus each combat cost's Counted share, which is a
+--     an affected set each, plus each combat cost's Counted share, which is a
 --     Quantity, plus the CR 604.2 "as long as" clause an attacking requirement
 --     may carry (CR 508.1d's second reading).
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
@@ -4693,6 +4696,10 @@ cardFilters card =
         -- counters), which may be a whole Keyword carrying a Filter (CR 122.1b);
         -- see #2728. Nothing there is Solemnity's "counters" -- any kind at all.
         <> concatMap (concatMap counterKindFilters . Maybe.maybeToList . CounterRestriction.kind) (Face.counterRestrictions card)
+        -- CR 602.2's activation prohibition. Its own KIND beside the affected
+        -- set is CR 605.1a's classification, which holds no Filter at all --
+        -- unlike the counter kind one line up.
+        <> concatMap (unframed . affectedFilters . ActivationProhibition.affected) (Face.activationProhibitions card)
     )
     <> concatMap printedReplacementFilters (Face.replacementEffects card)
     <> concatMap staticAbilityFilters (Face.staticAbilities card)

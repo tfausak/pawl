@@ -97,6 +97,7 @@ soldier =
               Face.untapRestrictions = [],
               Face.attachRestrictions = [],
               Face.counterRestrictions = [],
+              Face.activationProhibitions = [],
               Face.entryRestrictions = [],
               Face.attackCosts = [],
               Face.blockCosts = [],
