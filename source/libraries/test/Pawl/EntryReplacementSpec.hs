@@ -2319,7 +2319,7 @@ zameckGuildmageSpec s registry = Spec.describe s "Zameck Guildmage (CR 614.3)" $
         S.runPure S.identityAnswer ready (Activate.activateAbility S.alice mageId ability >> Stack.resolveTop)
       castFor pid gs pikerId = S.runPure S.identityAnswer gs (S.cast pid pikerId >> Stack.resolveTop)
   -- THE PROVING CASE. The Piker is printed 2/1 and enters 3/2, the counter being
-  -- the observable and the power/toughness what it is for (CR 613.4c layer 7d).
+  -- the observable and the power/toughness what it is for (CR 613.4c layer 7c).
   Spec.it s "CR 614.1c a creature entering after the ability resolved enters with the additional counter" $ do
     built@(_, mageId, alicesPiker, _, _) <- board
     let after = castFor S.alice (arm built) alicesPiker
