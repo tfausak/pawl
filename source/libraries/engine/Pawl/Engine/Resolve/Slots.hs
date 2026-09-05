@@ -1003,7 +1003,7 @@ conditionSlots condition = case condition of
 --
 -- SYNTACTIC rather than per-reader: a slot NAME anywhere in the row's own data is
 -- an object the row refers to, whether or not the arm reading it happens to build
--- a slot-aware Filter.Context today (#2141 names the callers that do not). That is
+-- a slot-aware Filter.Context today (#2141 names the caller that does not). That is
 -- what CR 609.7a asks for, and it is the safe direction for the capture.
 --
 -- CR 614.9's printed DESTINATION is walked with the damage pattern beside it and

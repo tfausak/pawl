@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, InTargetSlot, KeywordFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Cost as Cost.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -79,6 +79,8 @@ import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Mill as Mill
+import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -295,6 +297,10 @@ hostFramed framing = case framing of
   -- Pawl.Engine.Target.slotContext leaves it empty as well, so the minted equip
   -- ability's quality cannot ask a CR 303.4b question either.
   MintedTargetSlot -> False
+  -- Pawl.Engine.Resolve.Slots.effectContext fills it only where the caller
+  -- overlays it (Resolve.Slots.objectRefObjects), and the mill arm does not, so
+  -- the tally cannot ask a CR 303.4b question either.
+  MillTallyFramed -> False
 
 -- How many CR 701.3a atoms this card carries in an attach opcode's destination
 -- filter -- Effect.AttachTarget's or Effect.AttachTargetToEach's -- and how many
@@ -444,29 +450,33 @@ canAttachToSubjectOffends card =
 hasChosenNameTag :: Text.Text
 hasChosenNameTag = Text.pack "HasChosenName"
 
--- How many CR 201.4 chosen-name atoms this card carries inside a SEARCH's filter,
--- and how many anywhere else. The second number is the offence; the first is what
--- Ancient Vendetta legitimately has one of.
+-- How many CR 201.4 chosen-name atoms this card carries inside one of the two
+-- positions that overlay Filter.Context.sourceChosenNames -- a CR 701.23 search's
+-- filter or a CR 701.17 mill's tally -- and how many anywhere else. The second
+-- number is the offence; the first is what Ancient Vendetta and Predict
+-- legitimately have one each of.
 hasChosenNameCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenNameCounts card =
-  let total wanted = sum [filterAtoms hasChosenNameTag f | (framing, f) <- cardFilters card, (framing == SearchFramed) == wanted]
+  let total wanted = sum [filterAtoms hasChosenNameTag f | (framing, f) <- cardFilters card, elem framing [SearchFramed, MillTallyFramed] == wanted]
    in (total True, total False)
 
 -- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
--- is filled, and Pawl.Engine.Resolve's Effect.Search arm is the one site a CARD
--- can reach that fills it -- Pawl.Engine.Replacement.candidateContext is the
--- other, and rule 702.16e's minted shield is the only filter written there.
+-- is filled, and two sites a CARD can reach fill it: Pawl.Engine.Resolve.Effect's
+-- Effect.Search arm and its Effect.Mill arm's tally, each overlaying the field on
+-- the resolution's own context -- Pawl.Engine.Replacement.candidateContext is the
+-- third, and rule 702.16e's minted shield is the only filter written there.
 -- Filter.contextFor, Filter.contextWithSlots, Filter.contextComparingPower and
 -- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
 -- a target slot, an affected set, a Count filter or a cost criterion is a silent
 -- False rather than a rejected card. This is where that is made loud.
 --
--- The SAME framing canAttachToSubjectOffends fences, and for a different rule:
--- both atoms are answerable exactly where the search arm's own context and view
--- are built, so one Framing carries two fences.
+-- SearchFramed is the framing canAttachToSubjectOffends fences, and for a
+-- different rule: that atom needs the search arm's own VIEW as well as its
+-- context, so it is admitted in that one position where this atom is admitted in
+-- two.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside a search, or the traversal and the codec
+-- traversal found the atom outside those two positions, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence. Unlike its three siblings' the second disjunct is PROVED here rather
@@ -559,8 +569,8 @@ sameNameAsBoundCounts card =
 -- CR 709.4a's bound-name comparison is answerable only where
 -- Filter.Context.slotNames is filled, which two callers do:
 -- Pawl.Engine.Target.admittedGiven, matching a MODE's target slot Filter, and
--- Pawl.Engine.Resolve.Slots.effectContext, which all but two of a resolution's
--- positions go through -- the search filter among them.
+-- Pawl.Engine.Resolve.Slots.effectContext, which all but one of a resolution's
+-- positions go through -- the search filter and the mill tally among them.
 -- Filter.contextFor and Filter.contextComparingPower leave it empty, so
 -- Filter.SameNameAsBound in a Count filter, an affected set or a cost criterion
 -- is a silent False rather than a rejected card. This is where that is made loud.
@@ -865,26 +875,35 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- nothing.
     let positions = concatMap (cardFilters . S.combinedFace) ps
     Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 5) "the pool gives the accepted side search filters to be about"
-  -- CR 201.4's chosen name is CR 701.3a's atom in the same frame: answerable only
-  -- where Pawl.Engine.Resolve's Effect.Search arm builds the context, and a silent
-  -- False everywhere else. See hasChosenNameOffends for the two offences.
-  Spec.it s "CR 201.4 no card asks HasChosenName outside a search's filter" $ do
+  -- CR 201.4's chosen name is CR 701.3a's atom in nearly the same frame:
+  -- answerable only where a resolution overlays the field, which
+  -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its Effect.Mill tally each
+  -- do, and a silent False everywhere else. See hasChosenNameOffends for the two
+  -- offences.
+  Spec.it s "CR 201.4 no card asks HasChosenName outside a search's filter or a mill's tally" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace hasChosenNameOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and the one card that does is
-    -- ACCEPTED here rather than skipped.
+    Spec.assertEqWith s "the atom sits only where the resolution overlays the chosen names" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: the pool authors the atom, and BOTH cards that do are ACCEPTED
+    -- here rather than skipped -- one per admitted position, so a framing that
+    -- stopped marking either would redden.
     vendetta <- S.printingOf s registry "Ancient Vendetta"
     Spec.assertEqWith
       s
       "Ancient Vendetta's one atom is framed by its own search"
       (hasChosenNameCounts (S.combinedFace vendetta))
       (1, 0)
+    predict <- S.printingOf s registry "Predict"
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "Predict's one atom is framed by its own mill tally"
+      (hasChosenNameCounts (S.combinedFace predict))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and the two are the pool's only ones"
       (sum (fmap (uncurry (+) . hasChosenNameCounts . S.combinedFace) ps))
-      1
+      2
   -- CR 702.16k's chosen player in the same frame one atom over: answerable only
   -- where a protection quality is read, and every one of those four positions
   -- takes its filter off a keyword. See ofChosenPlayerOffends for the two
@@ -1648,7 +1667,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (OutsideTheGameFramed, [bound]),
         (KeywordFramed, []),
         (SlotlessCostFramed, [bound]),
-        (MintedTargetSlot, [bound])
+        (MintedTargetSlot, [bound]),
+        (MillTallyFramed, [bound])
       ]
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
@@ -2192,7 +2212,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- Every fixture buries the atom under all three combinators, for the sibling's
   -- reason, and each is asserted through hasChosenNameCounts as well as the
   -- predicate.
-  Spec.it s "the lint itself catches HasChosenName outside a search's filter" $ do
+  Spec.it s "the lint itself catches HasChosenName outside a search's filter or a mill's tally" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     vendetta <- S.printingOf s registry "Ancient Vendetta"
@@ -2275,6 +2295,15 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       s
       "a buried atom in a search's filter is accepted"
       (hasChosenNameOffends searched, hasChosenNameCounts searched)
+      (False, (1, 0))
+    -- The second accepting position, grafted the same way (#2141): the mill arm
+    -- overlays the chosen names onto the resolution's own context, so the tally's
+    -- filter answers exactly as the search's does.
+    let tallied = base {Face.spell = spellOf [Effect.Mill (Mill.MkMill (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) (Just (MillTally.MkMillTally slot buried)) Nothing)] Map.empty}
+    Spec.assertEqWith
+      s
+      "a buried atom in a mill's tally is accepted"
+      (hasChosenNameOffends tallied, hasChosenNameCounts tallied)
       (False, (1, 0))
     Spec.assertEqWith
       s

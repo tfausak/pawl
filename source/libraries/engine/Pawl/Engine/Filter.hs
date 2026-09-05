@@ -855,11 +855,13 @@ data Context = MkContext
     -- raising. That is honest wherever no announcement is in flight -- the layer
     -- fold, trigger matching, a cost paid with nothing announced, combat
     -- declarations, duration expiry -- but it is NOT honest of every
-    -- in-resolution caller: Pawl.Engine.Resolve's mill tally and
-    -- Pawl.Engine.Attach.hostsFor build a bare contextFor while a resolution's
-    -- bindings do exist (#2141). Pawl.Engine.Projection.freezeQuantities was one
-    -- until it took its context from the caller, and Resolve's Effect.Search arm
-    -- until it did the same.
+    -- in-resolution caller: Pawl.Engine.Attach.hostsFor builds a bare contextFor
+    -- while a resolution's bindings do exist (#2141), and its signature is shared
+    -- with a Pawl.Engine.Event caller that has no resolution behind it, so fixing
+    -- it means splitting the function rather than changing the context in place.
+    -- Pawl.Engine.Projection.freezeQuantities was another until it took its
+    -- context from the caller, Resolve's Effect.Search arm until it did the same,
+    -- and its Effect.Mill tally last.
     --
     -- Pawl.Engine.Event.eligible is a further in-resolution caller and is
     -- NOT one of #2141's, honest for a reason of its own rather than for the
@@ -883,10 +885,10 @@ data Context = MkContext
     -- sourcePower's reason -- this module holds no game state and cannot read an
     -- object's names -- and by two callers: Pawl.Engine.Target.admittedGiven,
     -- where a target slot's Filter is matched, and
-    -- Pawl.Engine.Resolve.Slots.effectContext, which is what all but two of a
-    -- resolution's positions go through (Bifurcate's search filter). The two
-    -- that do not are slotObjects' pair above, and are its elision rather than
-    -- this field's: a caller building a bare contextFor has neither map.
+    -- Pawl.Engine.Resolve.Slots.effectContext, which is what all but one of a
+    -- resolution's positions go through (Bifurcate's search filter). The one that
+    -- does not is slotObjects' Attach.hostsFor above, and is its elision rather
+    -- than this field's: a caller building a bare contextFor has neither map.
     --
     -- Separate from `slotObjects` above rather than derived from it, and that is
     -- the same division sourcePower makes against `source`: an id is not a name
@@ -1005,9 +1007,10 @@ data Context = MkContext
     -- CR 201.4: the names the SOURCE has chosen, for the one atom that compares a
     -- candidate's against them (HasChosenName, Ancient Vendetta). Supplied by the
     -- caller for slotNames' reason -- this module holds no game state and cannot
-    -- read an object's chosen names -- and by TWO callers:
-    -- Pawl.Engine.Resolve's Effect.Search arm, which is the only position a CARD
-    -- may write the atom in (CR 608.2c's choice during a resolution), and
+    -- read an object's chosen names -- and by THREE callers:
+    -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its Effect.Mill tally,
+    -- the two positions a CARD may write the atom in (CR 608.2c's choice during a
+    -- resolution -- Ancient Vendetta's search, Predict's tally), and
     -- Pawl.Engine.Replacement.candidateContext, where the atom is written by rule
     -- 702.16e's MINTED player-protection shield rather than by card data (CR
     -- 614.1c's as-enters choice, Runed Halo).
@@ -1024,14 +1027,14 @@ data Context = MkContext
     --
     -- EMPTY in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is
-    -- vacuously False in every position but those two -- an empty
+    -- vacuously False in every position but those three -- an empty
     -- intersection, which is this atom's arm answering rather than a posture the
     -- record enforces; slotControllers' atom answers True on ITS unfilled read.
     -- What keeps a card out of those positions
     -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
-    -- filter", the sweep sourcePower's, slotNames' and sourceAttachedTo's siblings
-    -- each have -- a fence over CARD data, which the replacement filler above is
-    -- not.
+    -- filter or a mill's tally", the sweep sourcePower's, slotNames' and
+    -- sourceAttachedTo's siblings each have -- a fence over CARD data, which the
+    -- replacement filler above is not.
     sourceChosenNames :: Set.Set CardName.CardName,
     -- CR 702.16k: the player chosen (CR 614.1c) by the permanent whose
     -- PROTECTION ability wrote the filter being matched, for the one atom that
@@ -1083,11 +1086,12 @@ data Context = MkContext
 -- no honest player to substitute.
 --
 -- CR 201.4's chosen-name atom is a further one a CARD may write (Ancient
--- Vendetta), and it reads the empty set here in every position but the two that
--- supply it -- Pawl.Engine.Resolve's Effect.Search arm, which builds its context
--- from this function and then overlays sourceChosenNames, and
--- Pawl.Engine.Replacement.candidateContext, which does the same for a minted row.
--- See that field above for the lint that keeps a card to the first.
+-- Vendetta, Predict), and it reads the empty set here in every position but the
+-- three that supply it -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its
+-- Effect.Mill tally, each building its context from effectContext and then
+-- overlaying sourceChosenNames, and Pawl.Engine.Replacement.candidateContext,
+-- which does the same for a minted row. See that field above for the lint that
+-- keeps a card to the first two.
 --
 -- CR 702.16k's chosen-player atom (True-Name Nemesis) is a further one a CARD may
 -- write, and it reads the Nothing here in every position but the four rule 702.16
