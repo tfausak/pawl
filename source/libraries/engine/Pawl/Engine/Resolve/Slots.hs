@@ -1086,10 +1086,10 @@ addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
 -- Effect.Replace rows in data/cards/ carry Tapped, UnderSourceControl (Gather
 -- Specimens) and WithCounters (Zameck Guildmage), and none of the three names a
 -- slot -- Zameck's count is a Quantity.Literal -- so neutralizing any arm leaves
--- the whole suite green. They are written
--- because the narrowing one caller over is only sound if this list is complete --
--- a rewrite read left out is a slot the installed row does not carry, and the
--- Filter or Quantity that wanted it then answers vacuously at the event.
+-- the whole suite green. They are written because the narrowing one caller over
+-- is only sound if this list is complete -- a rewrite read left out is a slot the
+-- installed row does not carry, and the Filter or Quantity that wanted it then
+-- answers vacuously at the event.
 entryRewriteReads :: EntryRewrite.EntryRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 entryRewriteReads rewrite = case rewrite of
   EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], [])
