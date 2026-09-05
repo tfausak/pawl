@@ -5,10 +5,10 @@
 -- the rules engine deliberately cannot supply itself.
 --
 -- The engine's dependency list has no pawl:registry edge, so nothing inside it
--- can answer "what card is this name?" (#3047). An interpreter holds a registry
--- by construction, which is why a question about the Oracle card reference is
--- settled here rather than there: this module depends on both halves, and
--- neither half depends on it.
+-- can answer "what card is this name?"; see #3047. An interpreter holds a
+-- registry by construction, which is why a question about the Oracle card
+-- reference is settled here rather than there: this module depends on both
+-- halves, and neither half depends on it.
 module Pawl.Interpreter where
 
 import qualified Pawl.Engine.Filter as Filter
