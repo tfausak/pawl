@@ -1423,6 +1423,8 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.StationMeasure -> quantity
   -- Not a leaf: the payload is a whole Quantity and may hide a Count.
   Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (rewriteQuantity pairs inner))
+  -- AgainstSlot's answer: not a leaf, and the payload may hide a Count.
+  Quantity.Type.AgainstCardsExiledWith inner -> Quantity.Type.AgainstCardsExiledWith (rewriteQuantity pairs inner)
 
 -- CR 612.1 over a damage clause: the recipient's ref, and the amount CR 120.1
 -- has that recipient dealt.

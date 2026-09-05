@@ -21,7 +21,9 @@
 -- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
 -- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b),
 -- and CR 107.1a's rounding -- both directions in one modification (Aspect of
--- Wolf), and a CDA halving a maximum folded over the PLAYERS (Malignus).
+-- Wolf), and a CDA halving a maximum folded over the PLAYERS (Malignus), and CR
+-- 607.2a's linked exile pile read from a static ability, where there is no
+-- resolution slot to aim at (Phyrexian Ingester).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -60,6 +62,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -630,6 +633,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   toxicDelugeSpec s registry
   fortifyingDraughtSpec s registry
   bioplasmSpec s registry
+  ingesterSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -2006,3 +2010,99 @@ bioplasmSpec s registry = Spec.describe s "Bioplasm" $ do
     Spec.assertEqWith s "still the printed 4/4" (S.powerToughnessOf bioId after) (Just (4, 4))
     Spec.assertEqWith s "and bob took 4" (S.lifeOf S.bob after) (Just 16)
     Spec.assertEqWith s "the Mountain left the library" (S.countByName (CardName.MkCardName (Text.pack "Mountain")) S.alice after) 0
+
+-- Phyrexian Ingester ({6}{U} Creature -- Phyrexian Beast 3/3, Oracle text fetched
+-- from Scryfall 2026-09-05): "Imprint -- When this creature enters, you may exile
+-- target nontoken creature. / This creature gets +X/+Y, where X is the exiled
+-- creature card's power and Y is its toughness."
+--
+-- CR 607.2a is what makes the second ability find the first one's card, and
+-- Quantity.AgainstCardsExiledWith is the read: a STATIC ability (CR 604.1) has no
+-- resolution and so no slot for Quantity.AgainstSlot to aim at, which is what
+-- separates this card from Bioplasm above. The number is recomputed at every
+-- projection rather than frozen (CR 613.4c layer 7c, applied by
+-- Projection.applyModification), so it FALLS when CR 400.7 takes the card out of
+-- exile.
+--
+-- The board is built so no two readings agree. bob's Nessian Asp is a 4/5, so
+-- reading toughness where the card says power gives 8/7 rather than 7/8; bob's
+-- Goblin Piker (2/1) is a second legal target the trigger is not aimed at, so the
+-- prompt offers more candidates than it takes; and alice already has a Russet
+-- Wolves (3/3) sitting in exile that NOTHING exiled, so a read that swept the
+-- exile zone instead of following GameState.exiledWith would give 10/11.
+ingesterBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ingesterBoard ingester asp piker wolves =
+  let gs0 = Setup.emptyGame S.bothPlayers
+      (aspId, gs1) = S.addCreature asp S.bob gs0
+      (_, gs2) = S.addCreature piker S.bob gs1
+      (_, gs3) = S.addExiledCard wolves S.alice gs2
+      (ingesterId, gs4) = S.entersWithTrigger ingester S.alice gs3
+   in (ingesterId, aspId, gs4)
+
+-- Aims the imprint trigger at `victim` by FILTERING the offered set (never by
+-- building a recipient of its own, which CR 608.2b would drop at resolution), and
+-- answers the "you may" with `decision`. Rank-1 like S.attackTo, so partially
+-- applying it gives the rank-2 answerer S.runPure wants.
+ingesterAnswer :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+ingesterAnswer decision victim p = case p of
+  Prompt.ChooseTargets _ _ _ offered -> S.preferring (== Recipient.ToCreature victim) offered
+  Prompt.ChooseOptional {} -> decision
+  _ -> S.identityAnswer p
+
+-- The trigger placed on the stack (CR 603.3d, where its target is chosen) and then
+-- resolved, under one answerer.
+ingesterPlay :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, GameState.GameState)
+ingesterPlay decision victim board =
+  let staged = S.runPure (ingesterAnswer decision victim) board Engine.settleForPriority
+   in (staged, S.runPure (ingesterAnswer decision victim) staged (Stack.resolveTop >> Engine.settleForPriority))
+
+-- The card in exile whose printed name is `name`.
+exiledNamed :: String -> GameState.GameState -> [ObjectId.ObjectId]
+exiledNamed name gs = filter matches (Set.toList (GameState.exile gs))
+  where
+    matches oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+
+ingesterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ingesterSpec s registry = Spec.describe s "Phyrexian Ingester" $ do
+  -- THE PROVING CASE. Power and toughness are asserted together and take
+  -- DIFFERENT amounts, and the assertion runs on the finished projection rather
+  -- than on any proxy.
+  Spec.it s "CR 607.2a/613.4c the static ability reads the card its own trigger exiled" $ do
+    ingester <- S.printingOf s registry "Phyrexian Ingester"
+    asp <- S.printingOf s registry "Nessian Asp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    let (ingesterId, aspId, board) = ingesterBoard ingester asp piker wolves
+        (staged, after) = ingesterPlay OptionalDecision.Exercises aspId board
+    Spec.assertEqWith s "printed 3/3 while the trigger is still on the stack" (S.powerToughnessOf ingesterId staged) (Just (3, 3))
+    Spec.assertEqWith s "+4/+5 off the exiled 4/5" (S.powerToughnessOf ingesterId after) (Just (7, 8))
+    Spec.assertEqWith s "the Asp is the card in exile" (length (exiledNamed "Nessian Asp" after)) 1
+    -- The bonus is not frozen: CR 400.7 makes the card in the graveyard a new
+    -- object, GameState.exile no longer holds the one the link names, and the
+    -- static ability recomputes to nothing. A REGRESSION FENCE against a future
+    -- freeze rather than a proof of the zone read -- the evaluator's arm says
+    -- why neither reading of the pile can tell this board apart.
+    Spec.assertEqWith
+      s
+      "and it falls back to 3/3 once the exiled card leaves exile"
+      (S.powerToughnessOf ingesterId (foldr (\oid gs -> S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)) after (exiledNamed "Nessian Asp" after)))
+      (Just (3, 3))
+  -- The paired control, differing in exactly one thing: the "you may" is
+  -- declined, so nothing is exiled and the link names nothing. The Russet Wolves
+  -- is still sitting in exile, which is what makes this a control on the RELATION
+  -- rather than on the zone being empty.
+  Spec.it s "CR 607.3 an empty linked pile leaves the printed 3/3" $ do
+    ingester <- S.printingOf s registry "Phyrexian Ingester"
+    asp <- S.printingOf s registry "Nessian Asp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    let (ingesterId, aspId, board) = ingesterBoard ingester asp piker wolves
+        after = snd (ingesterPlay OptionalDecision.Declines aspId board)
+    Spec.assertEqWith s "still the printed 3/3" (S.powerToughnessOf ingesterId after) (Just (3, 3))
+    Spec.assertEqWith s "the Asp never left the battlefield" (S.onBattlefield aspId after) True
+    Spec.assertEqWith s "and the unlinked card is still in exile" (length (exiledNamed "Russet Wolves" after)) 1
