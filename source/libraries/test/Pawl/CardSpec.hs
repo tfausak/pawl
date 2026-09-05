@@ -5229,8 +5229,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- EVERY face a printing can put an object on the battlefield with, which is
   -- `card : mintedFaces card` and not the printing's own faces: an activated
   -- ability printed on a CR 111.1 token's face reaches Keyword.familyGranting by
-  -- the same road, and fourteen cards in the pool print one (Thraben Inspector's
-  -- Clue, The Underworld Cookbook's Food). mintedFaces reaches an emblem and a
+  -- the same road, and the pool prints several (Thraben Inspector's Clue, The
+  -- Underworld Cookbook's Food). mintedFaces reaches an emblem and a
   -- conjured card too, and the granted abilities grantedActivatedAbilities
   -- collects are the third channel, a layer-6 grant carrying text printed on the
   -- granter.
@@ -5243,8 +5243,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offenders = filter (any claims . everyFace . Printing.card) ps
         stamp ability = ability {ActivatedAbility.keyword = Just Keyword.Flying}
         liarAbility = stamp (oneEffectActivated (costOf []) (youDraw 1))
-        -- A face reachable ONLY through Effect.Create, so the second assertion
-        -- below fails on the printing's own faces and passes on the walk.
+        -- A face reachable ONLY through Effect.Create, which is what lets the
+        -- last two assertions below split: the minting face itself claims
+        -- nothing, and the claim is found only once the walk descends.
         tokenLiar = oneFaced ((vanillaFace "Liar Token" instantLine) {Face.activatedAbilities = [liarAbility]})
         minter =
           (vanillaFace "Liar" instantLine)
