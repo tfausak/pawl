@@ -1172,10 +1172,11 @@ policedChamber registry opponent fallback queue gs oid = do
 nonBasicLandName :: Filter.Type.Filter Keyword.Keyword
 nonBasicLandName = Filter.Type.Not (Filter.Type.And [Filter.Type.HasSupertype Supertype.Basic, Filter.Type.HasCardType CardType.Land])
 
--- Goblin Piker's SLUG, which Pawl.Registry.slugFor maps the card's own name onto
--- and which therefore fetches the card -- and which is not a name in CR 201.4's
--- reference, no printed card being called that. The gap between the two lookups
--- is what Pawl.Interpreter.legalCardName's exact face-name comparison closes.
+-- Goblin Piker's SLUG -- the second spelling Pawl.Registry.named's haddock says
+-- fetches the same card, Pawl.Registry.slugFor mapping the card's own name onto
+-- it. A slug is not what CR 201.4's reference holds, and the gap between the two
+-- lookups is what Pawl.Interpreter.legalCardName's exact face-name comparison
+-- closes.
 pikerSlug :: CardName.CardName
 pikerSlug = CardName.MkCardName (Text.pack "goblin-piker")
 

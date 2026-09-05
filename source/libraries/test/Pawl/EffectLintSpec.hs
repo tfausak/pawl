@@ -2207,9 +2207,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- is cancelled and the ObjectRef's survives, where a card-wide subtraction
     -- takes both and leaves the lint unable to see a miss on the second effect.
     --
-    -- No live victim in the pool -- no printing pairs a minted face with another
-    -- effect reading the same filter -- so the discrimination is proven here
-    -- rather than by the sweep above.
+    -- Proven here rather than by the sweep above, which is green under either
+    -- subtraction: no printing in the pool pairs a minted face with a second
+    -- effect reading an equal filter, so the sweep cannot tell them apart.
     let victim = Filter.Type.HasCardType CardType.Creature
         reading = Effect.Transform (ObjectRef.EachMatching victim)
         oneEffectSpell effects =
