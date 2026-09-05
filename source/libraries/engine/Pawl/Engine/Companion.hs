@@ -86,6 +86,13 @@ conditionOf printingId gs = do
 -- Matched through a BARE Filter.contextFor with no source and no slot bindings,
 -- Pawl.Engine.Event.eligible's posture: nothing is resolving before the game
 -- begins, so no slot could be bound and no object could be the source.
+--
+-- Against the PRINTED face, though a starting-deck card does have a library
+-- object by the time this runs: CR 103.2b's moment is before the first turn, so
+-- no CR 611 continuous effect exists to have changed anything, and the printed
+-- face is the whole of what a projection could answer. It is also the only
+-- reading available for a Commander game's commander, which CR 702.139b counts
+-- and CR 903.6 has already put in the command zone.
 fulfilled :: Filter.Type.Filter Keyword -> PlayerId -> GameState -> Bool
 fulfilled predicate pid gs =
   let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
@@ -148,9 +155,9 @@ reveal pid = do
 -- window too), and the {3} is payable.
 --
 -- A FIFTH that rule 116.2g leaves implicit: the card is still outside the game.
--- It can only fail after CR 727.1's restart, which starts a new game and so gives
--- the action back (Pawl.Engine.Setup.resetPlayers) while CR 727.2 has already
--- pulled a companion brought in during the restarted game into a library.
+-- It can only fail where Pawl.Engine.Setup.resetPlayers has given the action back
+-- -- CR 727.1's restart and CR 729.2's subgame, each a new game -- while the pool
+-- it would spend was already spent in the game before.
 --
 -- The payability check is Cost.canPay and NOT Cost.total's CR 601.2f
 -- adjustments, Pawl.Engine.Foretell.canForetell's reason: that rule totals the
@@ -176,10 +183,13 @@ canTake pid gs = case Map.lookup pid (GameState.players gs) of
 -- reasons: a payment that fails restores the state from before it was attempted
 -- and the card stays outside the game.
 --
--- The cost is priced against GameState.nextObjectId -- an id naming nothing.
+-- The cost is priced against an id taken off the supply and given to no object.
 -- There is no source object to name, outside the game being no zone (CR 400.11),
--- and rule 116.2g fixes the amount, so nothing a source could contribute is
--- read: the id is a stand-in that makes every object lookup answer Nothing.
+-- and rule 116.2g fixes the amount, so nothing a source could contribute is read;
+-- the id is a stand-in that makes every object lookup answer Nothing. TAKEN off
+-- the supply rather than peeked at, unlike canTake's, because a mana ability
+-- activated to pay this cost may mint an object, and the peeked id is exactly the
+-- one such an object would be given.
 --
 -- Event.bringIn and not a zone change, its own haddock's reason: no object stood
 -- for the card, so the card is MINTED into the hand. That call spends the pool
@@ -197,8 +207,9 @@ take perform pid = do
         -- CR 118.13c, Pawl.Engine.Foretell.foretell's announcement and for its
         -- reasons. CR 116.2g fixes this cost at {3}, so no symbol here is ever
         -- payable in multiple ways and no prompt is ever raised.
-        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid (GameState.nextObjectId before) pure actionCost
-        payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid (GameState.nextObjectId before) announced
+        noSource <- State.state Game.freshObjectId
+        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid noSource pure actionCost
+        payment <- Cost.pay perform PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
         case payment of
           -- CR 733.1's last sentence, Pawl.Engine.Foretell.foretell's reason: a
           -- mana ability tapped in the window this payment opened may have
