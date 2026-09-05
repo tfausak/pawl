@@ -47,6 +47,8 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
@@ -75,11 +77,8 @@ import qualified Pawl.Types.Zone as Zone
 -- "{T}, Mill a card: Add {C}" is disqualified by its cost alone, which is what
 -- its own reminder text ("Activate only as an instant") records.
 --
--- ACTIVATED abilities only, which is CR 605.1a's own scope. Not implemented: CR
--- 605.1b's triggered mana ability. No Pawl.Types.TriggerCondition watches mana
--- being added or a mana ability being activated, so no triggered ability can meet
--- the rule, and every one that adds mana resolves off the stack instead --
--- Pawl.Engine.Resolve's Effect.AddMana arm (#1572).
+-- ACTIVATED abilities only, which is CR 605.1a's own scope; `isTriggeredManaAbility`
+-- below is CR 605.1b's, and the two rules share no criterion but the no-target one.
 --
 -- CR 605.1a's closing sentence -- do not take replacement effects other than
 -- self-replacement effects into account -- holds by construction rather than by
@@ -94,6 +93,59 @@ isManaAbility ab =
     && not (any costMovesLibraryCard (Cost.components (ActivatedAbility.cost ab)))
   where
     effects = Modal.allEffects (ActivatedAbility.modal ab)
+
+-- CR 605.1b: a TRIGGERED ability is a mana ability if it doesn't require a
+-- target, triggers from the activation or resolution of an activated mana
+-- ability or from mana being added to a player's mana pool, and could add mana
+-- when it resolves. `isManaAbility` above is the rule's other half.
+--
+-- Read at two sites, which are the two halves of CR 605.4a: Pawl.Engine.Cost.tapForManaWith
+-- applies one inline as the activation that triggered it finishes, and
+-- Pawl.Engine.Engine.placePendingTriggers refuses to put one on the stack.
+--
+-- No library clause and no loyalty clause: CR 605.1b states neither, where CR
+-- 605.1a states both. A triggered ability that mills and adds mana is a mana
+-- ability by this rule, and answering otherwise would keep it off the stack of
+-- neither road.
+--
+-- Asked of the WHOLE ability across every mode, `isManaAbility`'s reading of
+-- "could add mana", and CR 605.2 keeps it a mana ability where the game state
+-- stops it producing.
+isTriggeredManaAbility :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+isTriggeredManaAbility ab =
+  triggersFromMana (TriggeredAbility.condition ab)
+    && not (null (Maybe.mapMaybe manaProduced effects))
+    && Map.null (Modal.allTargetSlots (TriggeredAbility.modal ab))
+  where
+    effects = Modal.allEffects (TriggeredAbility.modal ab)
+
+-- CR 605.1b's middle clause, asked of one condition: does it trigger from the
+-- activation or resolution of an activated mana ability, or from mana being
+-- added to a player's mana pool?
+--
+-- A CLASSIFICATION of a trigger condition and not a case on an effect's
+-- identity: the question is the one CR 605.1b asks, and every arm answers it.
+-- The engine already cases on this type for CR 603.8, CR 603.10a and CR 113.6
+-- (Pawl.Engine.Event.Trigger's looksBack, batchScoped and zonesTriggeredFrom).
+--
+-- A WILDCARD and not the exhaustive posture `costMovesLibraryCard` takes,
+-- Pawl.Engine.Event.Trigger.enchantedObjectLeaves' shape and its reason: CR
+-- 605.1b names three events out of the whole trigger vocabulary, and every other
+-- condition in it watches something that is not mana. -Werror will therefore not
+-- name this site when a mana-watching condition is added, and each such
+-- condition owes an arm here -- CR 106.12a read by a BYSTANDER (Mirari's Wake),
+-- mana being added, and a mana ability being activated, all of which #1572 still
+-- holds open.
+--
+-- CR 603.1b's AnyOf falls to the wildcard, which answers False for a disjunction
+-- one of whose disjuncts watches mana. No card prints one, and the rule would
+-- want it a mana ability only if EVERY disjunct met CR 605.1b (#1572).
+triggersFromMana :: TriggerCondition.TriggerCondition -> Bool
+triggersFromMana condition = case condition of
+  -- CR 106.12 makes "tapped for mana" the resolution of an activated mana
+  -- ability, which is CR 605.1b's first alternative in as many words.
+  TriggerCondition.AttachedPermanentTappedForMana -> True
+  _ -> False
 
 -- CR 605.1a's library clause read of ONE cost component: does paying it move a
 -- card to or from a library? `movesLibraryCard`'s cost-side twin, and the two

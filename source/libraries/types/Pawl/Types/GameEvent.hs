@@ -427,6 +427,19 @@ data GameEvent
     -- transitioned. The id alone, no card in `data/cards/` distinguishing what
     -- caused the tap.
     BecameTapped ObjectId.ObjectId
+  | -- | CR 106.12a: this permanent WAS TAPPED FOR MANA -- a mana ability of it
+    -- whose activation cost includes {T} resolved and produced mana. Appended by
+    -- Pawl.Engine.Cost.tapForManaWith alone, the funnel every mana activation
+    -- goes through, after CR 405.6c's non-mana effects have run.
+    --
+    -- Distinct from BecameTapped above, which every tapping route writes: CR
+    -- 106.12 asks what the tap was FOR, so Icy Manipulator's tap and an attack
+    -- write that event and not this one. The two always co-occur here, {T}
+    -- (CR 107.5) being payable only by an untapped permanent.
+    --
+    -- The id alone. CR 106.12a's "of a specified type" narrowing would want the
+    -- produced mana here as well; no card in data/cards/ prints it.
+    TappedForMana ObjectId.ObjectId
   | -- | CR 705.1: a player flipped a coin, and CR 705.2 decided whether they won
     -- it -- or left it winnerless. Recorded by both roads that flip:
     -- Pawl.Engine.Resolve's Effect.FlipCoin arm, after the outcome is settled and

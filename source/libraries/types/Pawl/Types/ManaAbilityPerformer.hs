@@ -5,6 +5,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Game as Game
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | CR 405.6c: how the closed half runs the NON-MANA effects of a mana ability
@@ -24,4 +25,18 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- Deliberately has NO default: "no performer" is not a real state of the world,
 -- and one would silently drop the damage Ancient Tomb charges for its mana at
 -- whichever call site forgot it.
-type ManaAbilityPerformer = ObjectId.ObjectId -> PlayerId.PlayerId -> [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)] -> Game.Game ()
+--
+-- A RECORD of two functions rather than one, so that CR 605.4a's triggered mana
+-- ability rides the same injection: the payment path applies that one too, and
+-- it too resolves through Pawl.Engine.Resolve, so a parameter of its own would
+-- have to be threaded through every caller of Pawl.Engine.Cost.pay for no gain.
+data ManaAbilityPerformer = MkManaAbilityPerformer
+  { -- | CR 405.6c: the ability's source, its controller, and the non-mana
+    -- effects to run.
+    effects :: ObjectId.ObjectId -> PlayerId.PlayerId -> [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)] -> Game.Game (),
+    -- | CR 605.4a: apply one triggered mana ability where it stands, without
+    -- putting it on the stack. Pawl.Engine.Cost.tapForManaWith gathers and
+    -- classifies (Pawl.Engine.ManaAbility.isTriggeredManaAbility); this runs the
+    -- ability's effects.
+    triggered :: PendingTrigger.PendingTrigger -> Game.Game ()
+  }

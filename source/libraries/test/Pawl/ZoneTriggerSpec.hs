@@ -2305,6 +2305,7 @@ representativeEvents cond =
         -- eventBindings claims nothing either way, and the floor is what this
         -- pins.
         TriggerCondition.AttachedCreatureBecomesTapped -> one (GameEvent.BecameTapped departed)
+        TriggerCondition.AttachedPermanentTappedForMana -> one (GameEvent.TappedForMana departed)
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
@@ -2516,6 +2517,7 @@ everyTriggerCondition =
     TriggerCondition.AttachedCreatureMentors,
     TriggerCondition.AttachedCreatureDies,
     TriggerCondition.AttachedCreatureBecomesTapped,
+    TriggerCondition.AttachedPermanentTappedForMana,
     TriggerCondition.SelfTrains,
     -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
     -- eventBindings arm that had cased on the relation and stamped nothing under

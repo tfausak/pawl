@@ -41,6 +41,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Interchangeable as Interchangeable
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -96,6 +97,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
@@ -3159,8 +3161,52 @@ tapForManaWith perform inFlight oid = do
               -- The performer runs it against no ability object, CR 605.3b
               -- leaving one uncreated; Pawl.Engine.Resolve.Effect.performManaAbility is
               -- where the source stands in for it.
-              perform oid controller (ManaOption.effects chosen)
+              ManaAbilityPerformer.effects perform oid controller (ManaOption.effects chosen)
+              -- CR 106.12: this activation "tapped [the permanent] for mana"
+              -- exactly when {T} was in its cost and it produced mana, which is
+              -- what CR 106.12a's condition watches. Recorded LAST, after CR
+              -- 405.6c's other effects, because CR 605.4a puts what it triggers
+              -- immediately after the whole mana ability.
+              --
+              -- The events, not the board: a permanent tapped by {T} is also
+              -- tapped by Icy Manipulator, and Pawl.Engine.Event.tap has already
+              -- written GameEvent.BecameTapped for both.
+              Monad.when (List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null (Mana.unitsOf (ManaOption.yield chosen)))) $
+                applyManaTriggers perform oid
               pure True
+
+-- CR 605.4a: record CR 106.12a's event and apply, where they stand, the
+-- triggered mana abilities it fired -- "a triggered mana ability doesn't go on
+-- the stack ... it resolves immediately after the mana ability that triggered
+-- it, without waiting for priority".
+--
+-- The event is recorded whatever it fires, since an ordinary triggered ability
+-- watching the same moment is CR 603.3's business and reaches the stack through
+-- Pawl.Engine.Engine.placePendingTriggers like any other. What this consumes is
+-- only the CR 605.1b subset, and that same predicate is what
+-- placePendingTriggers uses to refuse them a stack object -- one classifier, two
+-- readers, so an ability cannot both resolve here and be placed there.
+--
+-- Gathered against the ONE event just recorded rather than everything unscanned:
+-- a payment taps several permanents in turn (payManaWindow), and the earlier
+-- taps' triggers have already been applied here. The watermark is deliberately
+-- NOT moved -- it belongs to the CR 117.5 scan, and moving it would swallow the
+-- ordinary triggers this same event owes that scan.
+--
+-- CR 603.4's intervening "if" is applied, Event.reactionTriggers doing it; CR
+-- 603.3b's ordering prompt is not, and needs no arm: these never share a stack
+-- to be ordered on, and each is applied as its own activation finishes.
+--
+-- Not implemented: CR 603.3b's "triggers only once each turn" rider, which
+-- Engine.withinTurnLimit spends over the log for a trigger that reaches the
+-- stack. No triggered mana ability prints one (#1572).
+applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game ()
+applyManaTriggers perform oid = do
+  State.modify' (Event.recordEvent (GameEvent.TappedForMana oid))
+  gs <- State.get
+  let recorded = Foldable.toList (Seq.drop (Seq.length (GameState.events gs) - 1) (GameState.events gs))
+      fired = filter (ManaAbility.isTriggeredManaAbility . PendingTrigger.ability) (Event.reactionTriggers recorded gs)
+  Monad.mapM_ (ManaAbilityPerformer.triggered perform) fired
 
 -- CR 602.2b sends an activation cost through CR 601.2b-i, so a mana ability pays
 -- its whole cost. All or nothing, `pay`'s posture and for CR 601.2h's reason --
