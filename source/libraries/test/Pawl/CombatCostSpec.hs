@@ -2138,9 +2138,9 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
 -- Surfer, Galactus's Herald"). Public Enemy above is the same axis spelled as a
 -- relation.
 --
--- THREE seats, and both opponents defending: CR 802.3's declarableTargets is a
--- concatenation in APNAP order, so the leader on life can be the SECOND
--- announcement rather than the first. That is what makes
+-- THREE seats, and both opponents defending (CR 802.2): Combat.declarableTargets
+-- concatenates CR 508.1b's announcements defending player by defending player,
+-- so the leader on life can be the SECOND announcement. That is what makes
 -- Combat.attackCeilingGiven's `bestFor` a maximization observable at gameplay
 -- level -- "the earliest freely announceable target" and "the earliest of those
 -- obeying the most" disagree here, where on every board reachable before this
@@ -2156,8 +2156,9 @@ mostLifeRequirementSpec s registry = Spec.describe s "MostLifeRequirement" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (base, mine, _, _) = S.threePlayerCombat [galactus] [piker] [piker]
         -- threePlayerCombat sits at the beginning of combat with no defending
-        -- player, since CR 703.4h is what fills that in. Both opponents defend,
-        -- which is CR 802.2, and bob is named first because Game.apnapOrder is.
+        -- player, so the pair is stated here. CR 802.2 is why it is BOTH
+        -- opponents, and bob is named first because Game.apnapOrder names him
+        -- first (CR 101.4).
         defending gs =
           gs
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,

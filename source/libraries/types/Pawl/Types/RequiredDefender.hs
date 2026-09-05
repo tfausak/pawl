@@ -17,19 +17,25 @@ module Pawl.Types.RequiredDefender where
 -- Pawl.Engine.AttackRequirement's `admissible` is where that becomes a filter
 -- over CR 508.1b's announcements rather than a single seat.
 --
--- Two arms, because two printings spell the object. The third spelling in the
--- pool is Trove of Temptation's "you or a planeswalker you control", which mixes
--- a seat with CR 508.1b's planeswalker announcements; that card's subject clause
--- is unwritable too, so nothing needs the arm until #3257 lands.
+-- Two arms, and the sweep that says which printings would want a third:
+-- Scryfall `o:/attacks [a-z ]{2,40} if able/ game:paper` (2026-09-05), read
+-- clause by clause. Every other printing narrowing the object either creates
+-- its requirement by RESOLUTION -- Ruhan of the Fomori, Raving Dead, Nahiri the
+-- Unforgiving, Dulcet Sirens -- which is ActiveAttackRequirement's family, or
+-- prints the narrowing as a CR 508.1c RESTRICTION beside an unnarrowed
+-- requirement -- Xantcha, Sleeper Agent, Fealty to the Realm -- which
+-- Pawl.Types.CombatRestriction carries. Two would want an arm here: Cogwork
+-- Tracker's "a player you noted for cards named Cogwork Tracker", a draft
+-- designation with no carrier in pawl at all, and Trove of Temptation's "you or
+-- a planeswalker you control", whose subject clause is unwritable anyway
+-- (#3257).
 data RequiredDefender
   = -- | CR 108.4 / 303.4m: the controller of the object the source is attached
     -- to. Names nobody when the source is attached to nothing, or to a player
     -- (Pawl.Engine.Projection.View.hostOf answers Nothing for both).
     ControllerOfAttached
-  | -- | CR 109.5 / 102.3: an opponent of the source's controller whose life
-    -- total is the greatest among that controller's opponents. Galactus,
-    -- Devourer of Worlds' "attacks an opponent with the most life among your
-    -- opponents each combat if able". Names every opponent tied for the lead,
-    -- and nobody when the controller has no opponent left.
+  | -- | CR 109.5 / 102.3: an opponent of the source's controller holding the
+    -- greatest life total among them (Galactus, Devourer of Worlds). Names every
+    -- opponent tied for the lead, and nobody when there is no opponent left.
     OpponentWithMostLife
   deriving (Bounded, Enum, Eq, Ord, Show)
