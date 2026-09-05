@@ -174,6 +174,8 @@ import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Milled as Milled
+import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
@@ -188,6 +190,7 @@ import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -246,6 +249,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
@@ -1968,10 +1972,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 608.2b: an illegal target is not affected by this part, and CR 608.2d's
     -- announcement belongs to an effect that IS applied, so nothing is asked.
     _ -> pure ()
-  -- The second place mana reaches a pool (CR 106.3). A mana ability is applied by
-  -- Cost.tapForMana and never resolves (CR 605.3b), but CR 605.1a/605.1b leave a
-  -- triggered producer like Burning-Tree Emissary out, so it adds its mana here;
-  -- see #1572.
+  -- The second place mana reaches a pool (CR 106.3). An ACTIVATED mana ability is
+  -- applied by Cost.tapForMana and never resolves (CR 605.3b), and CR 605.4a's
+  -- triggered one reaches this arm through performTriggeredManaAbility rather
+  -- than off the stack; what resolves here in the ordinary way is a triggered
+  -- producer CR 605.1b leaves out, Burning-Tree Emissary's shape.
+  --
+  -- Not implemented: CR 605.1b's other two triggers -- mana being added, and a
+  -- mana ability being activated -- so a producer that watches either still
+  -- resolves off the stack here (#1572).
   --
   -- CR 106.4: into the pool of the player the effect names, read through
   -- playerRefPlayers like every other slot read (CR 608.2b). The type and the CR
@@ -6401,9 +6410,66 @@ performHandAction source player =
         (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
     )
 
--- CR 405.6c: run the non-mana effects of a mana ability, which
--- Pawl.Engine.Cost.tapForManaWith reaches through the
--- Pawl.Types.ManaAbilityPerformer parameter.
+-- The two halves Pawl.Engine.Cost reaches through the
+-- Pawl.Types.ManaAbilityPerformer parameter: CR 405.6c's other effects of the
+-- activated mana ability being paid, and CR 605.4a's triggered mana ability.
+--
+-- Both stand on the noSubgame floor, performHandAction's reason: no mana ability
+-- starts a subgame (#1900).
+performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
+performManaAbility =
+  ManaAbilityPerformer.MkManaAbilityPerformer
+    { ManaAbilityPerformer.effects = performManaAbilityEffects,
+      ManaAbilityPerformer.triggered = performTriggeredManaAbility
+    }
+
+-- CR 605.4a: apply one triggered mana ability where it stands. CR 605.1b's
+-- classification and CR 603.4's intervening "if" are already spent by
+-- Pawl.Engine.Cost.applyManaTriggers, which is the only caller; this is the
+-- resolution half, and it lives here because Pawl.Engine.Cost cannot reach
+-- applyEffect.
+--
+-- No stack object, exactly as for the activated mana ability above, so the
+-- SOURCE stands in for the resolving one and the slots are stamped rather than
+-- read off an object. CR 605.1b leaves no targets to bind, so what the event
+-- bound (Pawl.Engine.Event.Binding.eventBindings) is the whole environment --
+-- Binding.manaSource, which is how Wild Growth's "its controller" names the
+-- land rather than the Aura.
+--
+-- A SOURCELESS pending trigger cannot arrive: no inherent ability the rulebook
+-- states adds mana, and Pawl.Engine.Cost gathers only from an object's
+-- conditions. Answered by doing nothing rather than by a partial pattern.
+--
+-- CR 700.2b's mode choice is FORCED or nothing: a modal triggered mana ability
+-- would want the prompt Engine.placeBorne raises, and CR 605.4a leaves no stack
+-- object to raise it against. Not implemented: such an ability; no card prints
+-- one (#1572).
+performTriggeredManaAbility :: PendingTrigger.PendingTrigger -> Game ()
+performTriggeredManaAbility pending = case PendingTrigger.source pending of
+  TriggerSource.Sourceless -> pure ()
+  TriggerSource.OfObject source -> do
+    let controller = PendingTrigger.controller pending
+        modal = TriggeredAbility.modal (PendingTrigger.ability pending)
+        -- Every PRINTED mode is fillable: CR 605.1b's no-target clause leaves
+        -- nothing for Target.fillableModes to reject, which is the gate
+        -- Engine.placeBorne applies instead. Zipped against the modes themselves
+        -- rather than counted through Modal.modeCount, whose Natural predecessor
+        -- would underflow on a modeless ability.
+        every = Set.fromList (fmap fst (zip (fmap ModeIndex.MkModeIndex [0 ..]) (Modal.modeEffects modal)))
+        bound =
+          Map.union
+            (Binding.targetsOf (PendingTrigger.bindings pending))
+            ( Map.fromList
+                [ (Binding.triggerSource, Set.singleton (Recipient.ToObject source)),
+                  (Binding.you, Set.singleton (Recipient.ToPlayer controller))
+                ]
+            )
+    case Modal.forcedSelection every (Modal.Type.selection modal) of
+      Nothing -> pure ()
+      Just selection -> Monad.mapM_ (applyEffect source source controller bound bound) (Modal.modesEffects selection modal)
+
+-- CR 405.6c: run the non-mana effects of a mana ability, once
+-- Pawl.Engine.Cost.tapForManaWith has added the mana.
 --
 -- CR 605.3b gives the ability no stack object, so the SOURCE stands in for the
 -- resolving one, performHandAction's posture.
@@ -6415,11 +6481,8 @@ performHandAction source player =
 -- Pawl.CardSpec's activatedAbilityOffends admits a read of are ones the payment
 -- binds and Cost.tapForManaWith's Paid branch drops, which no mana ability in
 -- data/cards/ reads (#3124).
---
--- Stands on the noSubgame floor, performHandAction's reason: no mana ability
--- starts a subgame (#1900).
-performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
-performManaAbility source controller =
+performManaAbilityEffects :: ObjectId -> PlayerId -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Game ()
+performManaAbilityEffects source controller =
   Monad.mapM_
     ( applyEffect
         source

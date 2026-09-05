@@ -483,6 +483,19 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       (Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 8)) /= Codec.encode GameEvent.codec (GameEvent.Exerted (ObjectId.MkObjectId 8)))
       "a tap and an exert of the same object encode differently"
+  -- CR 106.12a. BecameTapped's payload exactly, so the TAG is the whole
+  -- difference -- and it is the difference between two events one mana
+  -- activation writes about the same permanent.
+  Spec.it s "TappedForMana" $ do
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.TappedForMana (ObjectId.MkObjectId 9))
+      " {\"type\":\"TappedForMana\",\"value\":9} "
+    Spec.assertBool
+      s
+      (Codec.encode GameEvent.codec (GameEvent.TappedForMana (ObjectId.MkObjectId 9)) /= Codec.encode GameEvent.codec (GameEvent.BecameTapped (ObjectId.MkObjectId 9)))
+      "a tap for mana and a plain tap of the same object encode differently"
   -- CR 701.3a's two ends, and the ORDER is what the distinct ids prove: the
   -- attachment first, then what it went onto. A swap would credit the host with
   -- becoming attached to the Aura.

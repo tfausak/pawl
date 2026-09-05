@@ -236,6 +236,14 @@ data TriggerCondition
   | -- | CR 701.26a's "became tapped" read off the permanent the bearer is
     -- attached to (Betrayal), live rather than through last known information.
     AttachedCreatureBecomesTapped
+  | -- | CR 106.12a's "is tapped for mana" read off the permanent the bearer is
+    -- attached to (Wild Growth), live rather than through last known
+    -- information, as for the arm above.
+    --
+    -- Not implemented: CR 106.12a read by a BYSTANDER -- "whenever you tap a
+    -- land for mana" (Mirari's Wake) -- nor CR 605.1b's other two triggers,
+    -- mana being added and a mana ability being activated (#1572).
+    AttachedPermanentTappedForMana
   | -- | CR 702.55b / 702.55c: "when the creature this card haunts dies", borne
     -- by the haunting card in exile.
     HauntedCreatureDies

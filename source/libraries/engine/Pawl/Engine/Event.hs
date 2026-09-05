@@ -547,6 +547,7 @@ damageOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -601,6 +602,7 @@ revealOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
@@ -6407,6 +6409,8 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 701.26a's tap is a first-pass event as well, and not an ability
   -- triggering.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- CR 106.12a is a first-pass event as well, and not an ability triggering.
+  TriggerCondition.AttachedPermanentTappedForMana -> False
   TriggerCondition.PermanentSacrificed {} -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
@@ -6510,6 +6514,9 @@ controllerTurnScoped cond = case cond of
   -- and Betrayal's whole point is that the Aura's controller is not the tapping
   -- creature's.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- Nor does CR 106.12a: an enchanted land can be tapped for mana on anyone's
+  -- turn, and Wild Growth's whole point is that the mana is its controller's.
+  TriggerCondition.AttachedPermanentTappedForMana -> False
   -- Rule 702.149c names no turn either, and the SelfAttacks arm below settles the
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.

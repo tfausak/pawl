@@ -898,6 +898,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 700.4's is nullary as well, for the same reason.
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.AttachedPermanentTappedForMana -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   -- CR 701.21a's carries a PlayerRelation and a Filter, neither of which holds a
@@ -3172,6 +3173,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- them too, so this condition carries no Filter either.
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.AttachedPermanentTappedForMana -> []
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
@@ -3411,6 +3413,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.CardLeavesGraveyard {} -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.AttachedPermanentTappedForMana -> []
   -- CR 702.55a names the haunted creature through the haunting object's own
   -- attachment rather than through a slot.
   TriggerCondition.HauntedCreatureDies -> []

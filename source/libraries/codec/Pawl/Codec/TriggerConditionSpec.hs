@@ -477,6 +477,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedCreatureBecomesTapped
       " {\"type\":\"AttachedCreatureBecomesTapped\"} "
+  -- CR 106.12a's tap for mana read off the same attachment link. Nullary for the
+  -- arm above's reason, and the TAG is again the whole difference: the two watch
+  -- one link for a plain tap and for a tap that produced mana.
+  Spec.it s "AttachedPermanentTappedForMana" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.AttachedPermanentTappedForMana
+      " {\"type\":\"AttachedPermanentTappedForMana\"} "
   -- CR 702.55b/702.55c's exile-zone death watch. Nullary: the link it matches on
   -- is board state, so nothing about it rides the condition.
   Spec.it s "HauntedCreatureDies" $
