@@ -140,7 +140,7 @@ dave = PlayerId.MkPlayerId 3
 newtype ObjectAlias = MkObjectAlias Text.Text
   deriving (Eq, Ord, Show)
 
--- The observable state of one permanent in an arrangement. This first vertical
+-- The observable state of one permanent on a Board. This first vertical
 -- slice needs battlefield objects only; other zones join when a migrated test
 -- supplies their vocabulary.
 data ObjectSetup = MkObjectSetup
@@ -209,8 +209,8 @@ battlefield :: PlayerId.PlayerId -> [ObjectSetup] -> PlayerSetup
 battlefield pid objects =
   (playerSetup pid) {setupBattlefield = Seq.fromList objects}
 
--- A structurally coherent arrangement to construct, not a claim that the board
--- is rules-reachable or settled. Construction performs no engine advancement.
+-- A structurally coherent board to construct, not a claim that it is
+-- rules-reachable or settled. Construction performs no engine advancement.
 data Board = MkBoard
   { players :: NonEmpty.NonEmpty PlayerSetup,
     activePlayer :: PlayerId.PlayerId,
@@ -326,19 +326,19 @@ assignDamage = MkAssignDamage . Map.fromList
 newtype Untimed = MkUntimed (Natural -> Timed)
 
 on :: Phase.Phase -> PlayerId.PlayerId -> Entry -> Untimed
-on step pid command =
+on step pid verb =
   MkUntimed $ \number ->
     MkTimed
       { when = MkWhen number step pid,
         qualifier = Nothing,
-        entry = command
+        entry = verb
       }
 
 -- `on`, qualified by the object whose prompt this answers -- the combat-damage
 -- source, today. Timed's qualifier field says how it selects.
 onSource :: Phase.Phase -> PlayerId.PlayerId -> ObjectRef -> Entry -> Untimed
-onSource step pid source command =
-  let MkUntimed f = on step pid command
+onSource step pid source verb =
+  let MkUntimed f = on step pid verb
    in MkUntimed (\number -> (f number) {qualifier = Just source})
 
 turn :: Natural -> [Untimed] -> Seq.Seq Timed
@@ -347,7 +347,7 @@ turn number entries = Seq.fromList (fmap (\(MkUntimed f) -> f number) entries)
 data PromptLocation = MkPromptLocation Natural Phase.Phase (Maybe PlayerId.PlayerId)
   deriving (Eq, Ord, Show)
 
--- Testable failures rather than partial functions: malformed arrangements,
+-- Testable failures rather than partial functions: malformed boards,
 -- prompt drift, and scripts that silently stopped exercising their subject are
 -- all ordinary assertion values.
 data HarnessFailure
@@ -356,12 +356,12 @@ data HarnessFailure
   | MkUnknownController PlayerId.PlayerId
   | MkDuplicateAlias ObjectAlias
   | MkUnknownCard CardName.CardName
-  | -- | The reference named no live object, with whether the arrangement did
+  | -- | The reference named no live object, with whether the board did
     -- record an alias by that name -- a stale alias and a typo read alike
     -- otherwise. Always False for a card-name reference, which has no alias.
     MkUnknownObject ObjectRef Bool
   | -- | The reference resolved, but the prompt did not offer that object, so the
-    -- engine would have dropped it after the command was popped and the script
+    -- engine would have dropped it after the entry was popped and the script
     -- would have passed while proving nothing. Carries the named thing and the
     -- offered ones, rendered as a script would name them.
     MkUnofferedObject When Text.Text Text.Text [Text.Text]
@@ -372,8 +372,8 @@ data HarnessFailure
   | MkUnscheduledPrompt PromptLocation Text.Text [Text.Text]
   | MkUnexpectedPrompt When Entry Text.Text [Text.Text]
   | -- | Guard 2 from #3050, with the turn and phase the game stopped at: a
-    -- command whose moment never arrived usually means the board never got
-    -- there, not that the command was wrong.
+    -- entry whose moment never arrived usually means the board never got
+    -- there, not that the entry was wrong.
     MkUnreachedEntries Natural Phase.Phase (Seq.Seq Timed)
   deriving (Eq, Ord, Show)
 
@@ -489,7 +489,7 @@ cardOf s registry name = do
     Nothing -> Spec.assertFailure s ("no such card: " <> name)
     Just card -> pure card
 
--- Construct an arrangement directly, without zone-change events or settlement.
+-- Construct a board directly, without zone-change events or settlement.
 -- The guaranteed validity is REPRESENTATIONAL only: players and controllers
 -- exist, aliases are unique, and every object is inserted into exactly the zone
 -- its Object records. Rules-unreachable and pre-SBA positions are intentional
@@ -519,14 +519,14 @@ buildBoard registry setup = case boardFailure setup of
             }
      in fmap (fmap designateBoardDefenders) (buildPlayers registry seats (MkBuiltBoard positioned Map.empty))
 
--- CR 506.2 / CR 703.4h: an arrangement positioned AFTER the beginning of combat
+-- CR 506.2 / CR 703.4h: a board positioned AFTER the beginning of combat
 -- step is one where the defending players are already settled, so it runs the
 -- same turn-based action that step would have. Without it Combat.defenders stays
 -- empty, declareAttackers finds nobody to attack and skips its prompt, and a
 -- script that meant to attack fails as MkUnreachedEntries.
 --
 -- The engine's own answer to CR 507.1's choice, which is the first candidate in
--- turn order (Replay.defaultAnswer): a three-seat arrangement that wants the
+-- turn order (Replay.defaultAnswer): a three-seat board that wants the
 -- other opponent defending sets Combat.defenders itself.
 designateBoardDefenders :: BuiltBoard -> BuiltBoard
 designateBoardDefenders built = case setupPhaseOf built of
@@ -1608,7 +1608,7 @@ data HarnessState = MkHarnessState
   }
 
 -- Run one explicit engine entry point under a keyed decision script. The final
--- queue check is guard 2 from #3050: a command whose moment never arrives is a
+-- queue check is guard 2 from #3050: an entry whose moment never arrives is a
 -- failure, not a silently skipped claim.
 runScript :: Seq.Seq Timed -> BuiltBoard -> Game.Type.Game a -> Either HarnessFailure (a, GameState.GameState)
 runScript script built game =
@@ -1657,7 +1657,7 @@ answerPrompt asked =
       gs = Asked.game asked
       kind = promptKind prompt
       location = MkPromptLocation (GameState.turnNumber gs) (GameState.phase gs) (promptDecider prompt)
-   in -- Hoisted above the entry arms: a nested game (CR 726) is out of scope for
+   in -- Hoisted above the entry arms: a nested game (CR 729.1) is out of scope for
       -- every verb alike, so the check belongs to the prompt and not to each arm
       -- that answers one.
       if not (null (Asked.enclosing asked))
@@ -1680,7 +1680,7 @@ answerPrompt asked =
           Prompt.DeclareAttackers decider _ candidates -> do
             let key = whenOf gs (Decider.unwrap decider)
             offers <- describeAll gs candidates
-            onEntry location key kind offers (takeUnqualified key kind) $ \command -> case command of
+            onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
               MkAttack refs ->
                 Just $ do
                   resolved <- mapM (resolveOffered gs key kind candidates) refs
@@ -1690,7 +1690,7 @@ answerPrompt asked =
             let candidates = blockers <> attackers
                 key = whenOf gs (Decider.unwrap decider)
             offers <- describeAll gs candidates
-            onEntry location key kind offers (takeUnqualified key kind) $ \command -> case command of
+            onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
               MkBlock blocks ->
                 Just $ do
                   pairs <- mapM (resolveBlock gs key kind candidates) (Map.toAscList blocks)
@@ -1700,7 +1700,7 @@ answerPrompt asked =
             let key = whenOf gs (Decider.unwrap decider)
                 offered = Map.keysSet thresholds
             offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
-            onEntry location key kind offers (takeForSource gs key source) $ \command -> case command of
+            onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
               MkAssignDamage assignment ->
                 Just $ do
                   pairs <- mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)
@@ -1829,7 +1829,7 @@ resolveObject ref gs = case ref of
       [] -> failHarness (MkUnknownObject ref False)
 
 -- resolveObject, plus the check that the prompt actually offered what it found.
--- Without it the engine filters the non-candidate out AFTER the command was
+-- Without it the engine filters the non-candidate out AFTER the entry was
 -- popped, and the script passes with nobody attacking.
 resolveOffered :: GameState.GameState -> When -> Text.Text -> [ObjectId.ObjectId] -> ObjectRef -> State.StateT HarnessState (Either HarnessFailure) ObjectId.ObjectId
 resolveOffered gs moment kind offered ref = do
@@ -1848,7 +1848,7 @@ resolveBlock gs moment kind offered (blocker, attackers) = do
 
 -- CR 510.1a: the assignment's recipients must be ones the prompt offered a
 -- threshold for, for resolveOffered's reason -- the engine drops an unoffered
--- recipient after the command was popped.
+-- recipient after the entry was popped.
 resolveDamage :: GameState.GameState -> When -> Text.Text -> Set.Set Recipient.Recipient -> (DamageRecipient, Natural) -> State.StateT HarnessState (Either HarnessFailure) (Recipient.Recipient, Natural)
 resolveDamage gs moment kind offered (recipient, amount) = do
   resolved <- case recipient of
@@ -1860,7 +1860,7 @@ resolveDamage gs moment kind offered (recipient, amount) = do
       offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
       failHarness (MkUnofferedObject moment kind (renderRecipient recipient) offers)
 
--- How a failure message names one object: the alias the arrangement gave it, or
+-- How a failure message names one object: the alias the board gave it, or
 -- its card name and 1-based occurrence -- the two ways a script could have
 -- written it.
 describeObject :: GameState.GameState -> Map.Map ObjectAlias ObjectId.ObjectId -> ObjectId.ObjectId -> Text.Text
@@ -1929,7 +1929,7 @@ renderLocation (MkPromptLocation number step pid) =
   Text.intercalate (Text.pack ", ") ([renderTurn number, renderPhase step] <> foldMap (pure . renderPlayer) pid)
 
 renderEntry :: Entry -> Text.Text
-renderEntry command = case command of
+renderEntry verb = case verb of
   MkAttack refs -> Text.pack "attack " <> renderList (fmap renderRef (Foldable.toList refs))
   MkBlock blocks ->
     Text.pack "block "
@@ -1963,7 +1963,7 @@ renderOffers offers =
 
 -- One human line per failure. Derived Show is kept for assertEq, which wants a
 -- value; this is what a failing case prints, since a nested record of ids tells
--- a reader nothing about which command went wrong where.
+-- a reader nothing about which entry went wrong where.
 renderFailure :: HarnessFailure -> String
 renderFailure failure =
   Text.unpack $ case failure of
@@ -1976,7 +1976,7 @@ renderFailure failure =
       renderRef ref
         <> Text.pack " names nothing in the game"
         <> ( if known
-               then Text.pack " (the arrangement did alias it, so it has since left)"
+               then Text.pack " (the board did alias it, so it has since left)"
                else Text.empty
            )
     MkUnofferedObject moment kind named offers ->
@@ -2001,10 +2001,10 @@ renderFailure failure =
         <> kind
         <> Text.pack " prompt"
         <> renderOffers offers
-    MkUnexpectedPrompt moment command kind offers ->
+    MkUnexpectedPrompt moment verb kind offers ->
       renderWhen moment
         <> Text.pack ": "
-        <> renderEntry command
+        <> renderEntry verb
         <> Text.pack " does not answer the "
         <> kind
         <> Text.pack " prompt"
