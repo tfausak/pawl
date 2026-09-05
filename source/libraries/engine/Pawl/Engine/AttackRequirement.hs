@@ -29,6 +29,8 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Player as Player
+import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.RequiredDefender as RequiredDefender
 
 -- CR 508.1d: every requirement in force right now, INSTANTIATED as the
@@ -168,6 +170,38 @@ instances candidates targets gs =
           case Projection.hostOf source gs >>= \host -> Projection.controllerOf host gs of
             Nothing -> []
             Just pid -> filter (== AttackTarget.OfPlayer pid) targets
+        Just RequiredDefender.OpponentWithMostLife ->
+          -- CR 109.5 fixes the "your" as the source's controller, and CR 102.3
+          -- its opponents; Game.opponentsOf drops a departed seat (CR 102.1), so
+          -- a player who has lost is not counted into the maximum they used to
+          -- lead. EVERY opponent tied for the lead, not one of them: CR 508.1d
+          -- asks whether a declaration attacks a player the requirement names,
+          -- and "an opponent with the most life" names each of them.
+          --
+          -- Life is read live off the board, as this module reads everything
+          -- else: CR 613.11 puts the effect after every layer, so a life total
+          -- changing between the beginning of combat and the declaration moves
+          -- the requirement with it.
+          --
+          -- The intersection with `targets` and not a bare seat list, so a
+          -- leader who is not a defending player this combat contributes no pair
+          -- at all -- the same pruning ControllerOfAttached gets, and Alluring
+          -- Siren's ruling read off membership.
+          case Projection.controllerOf source gs of
+            Nothing -> []
+            Just you -> case fmap (\pid -> (pid, lifeOf pid gs)) (Game.opponentsOf you gs) of
+              [] -> []
+              lives ->
+                let best = maximum (fmap snd lives)
+                    leaders = [pid | (pid, life) <- lives, life == best]
+                 in filter (\target -> any (\pid -> target == AttackTarget.OfPlayer pid) leaders) targets
+      -- CR 119.1, as an Integer and not the Natural Pawl.Engine.Cost.lifeTotalOf
+      -- answers with: CR 104.3b lets a total sit below zero until a state-based
+      -- action sees it, and a clamp there would order two such seats alike. The
+      -- default is unreachable, Game.opponentsOf naming only seats
+      -- GameState.players holds.
+      lifeOf :: PlayerId -> GameState -> Integer
+      lifeOf pid state = maybe 0 Player.life (Map.lookup pid (GameState.players state))
       -- CR 508.1d's second shape -- "or that it attacks if some condition is
       -- met" -- read as CR 604.2's "as long as" clause and asked exactly as
       -- BlockPermission.instances asks its own `while`: a gate that does not

@@ -2131,6 +2131,91 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
         Spec.assertEqWith s "where a requirement naming no object leaves the announcement alone" (announced control) (Just (AttackTarget.OfPlaneswalker jaceId))
       _ -> Spec.assertFailure s "fixture should have one attacker and bob's two permanents"
 
+-- CR 508.1d's OBJECT axis naming a SET of players rather than a relation to one
+-- object, proved by Galactus, Devourer of Worlds ("{10} 12/12 / Insatiable
+-- Hunger --- Galactus attacks an opponent with the most life among your
+-- opponents each combat if able unless you control a creature named Silver
+-- Surfer, Galactus's Herald"). Public Enemy above is the same axis spelled as a
+-- relation.
+--
+-- THREE seats, and both opponents defending (CR 802.2): Combat.declarableTargets
+-- concatenates CR 508.1b's announcements defending player by defending player,
+-- so the leader on life can be the SECOND announcement. That is what makes
+-- Combat.attackCeilingGiven's `bestFor` a maximization observable at gameplay
+-- level -- "the earliest freely announceable target" and "the earliest of those
+-- obeying the most" disagree here, where on every board reachable before this
+-- card they agreed.
+--
+-- The two legs differ in the two life totals alone, and the leg where bob leads
+-- is the control: there the requirement names the FIRST announcement, so it
+-- cannot tell the two readings apart and every assertion must still hold.
+mostLifeRequirementSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mostLifeRequirementSpec s registry = Spec.describe s "MostLifeRequirement" $ do
+  Spec.it s "CR 508.1d the requirement is obeyed only by attacking the opponent with the most life" $ do
+    galactus <- S.printingOf s registry "Galactus, Devourer of Worlds"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, _, _) = S.threePlayerCombat [galactus] [piker] [piker]
+        -- threePlayerCombat sits at the beginning of combat with no defending
+        -- player, so the pair is stated here. CR 802.2 is why it is BOTH
+        -- opponents, and bob is named first because Game.apnapOrder names him
+        -- first (CR 101.4).
+        defending gs =
+          gs
+            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob, S.carol]}
+            }
+        carolAhead = defending (atLife S.bob 17 (atLife S.carol 23 base))
+        bobAhead = defending (atLife S.bob 23 (atLife S.carol 17 base))
+    case mine of
+      [devourer] -> do
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclarationAs S.alice [(devourer, AttackTarget.OfPlayer S.bob)] carolAhead))
+          "CR 508.1d: attacking bob obeys nothing while carol has the most life, and bob is the FIRST announcement"
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(devourer, AttackTarget.OfPlayer S.carol)] carolAhead)
+          "attacking carol obeys it"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] carolAhead)) "and declining obeys nothing"
+        -- The control: the same board with the two life totals exchanged. The
+        -- leader is now the first announcement, so the two readings of the fold
+        -- agree and the narrowing is the life comparison rather than seat order.
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(devourer, AttackTarget.OfPlayer S.bob)] bobAhead)
+          "with the totals exchanged bob is the legal announcement"
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclarationAs S.alice [(devourer, AttackTarget.OfPlayer S.carol)] bobAhead))
+          "and carol is not"
+      _ -> Spec.assertFailure s "fixture should have one Galactus"
+  Spec.it s "CR 508.1d whole cards: a real declare attackers step sends the creature at the opponent with the most life" $ do
+    -- Through Combat.declareAttackers rather than the legality predicate, with
+    -- an interpreter that announces BOB for every attacker: CR 508.1d refuses
+    -- that declaration on the leg where carol leads, and the combat record is the
+    -- assertion. Combat.forcedAttackDeclaration reads `bestFor`'s target
+    -- directly, so this is the fold's own output.
+    galactus <- S.printingOf s registry "Galactus, Devourer of Worlds"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, _, _) = S.threePlayerCombat [galactus] [piker] [piker]
+        defending gs =
+          gs
+            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob, S.carol]}
+            }
+        carolAhead = defending (atLife S.bob 17 (atLife S.carol 23 base))
+        bobAhead = defending (atLife S.bob 23 (atLife S.carol 17 base))
+        announcingBob :: Prompt.Prompt r -> r
+        announcingBob p = case p of
+          Prompt.ChooseAttackTarget {} -> AttackTarget.OfPlayer S.bob
+          _ -> S.aggressiveAnswer p
+        announced gs oid = Map.lookup oid (Combat.Type.attackers (GameState.combat (S.runPure announcingBob gs (Combat.declareAttackers S.manaPerformer S.alice))))
+    case mine of
+      [devourer] -> do
+        Spec.assertEqWith s "the announcement against bob is refused and Galactus is redirected to carol" (announced carolAhead devourer) (Just (AttackTarget.OfPlayer S.carol))
+        Spec.assertEqWith s "with the totals exchanged the same announcement stands" (announced bobAhead devourer) (Just (AttackTarget.OfPlayer S.bob))
+      _ -> Spec.assertFailure s "fixture should have one Galactus"
+
 -- CR 508.1d's second shape -- "or that it attacks if some condition is met" --
 -- proved by Otarian Juggernaut, whose whole threshold line is one CR 604.2 "as
 -- long as" clause: "as long as there are seven or more cards in your graveyard,
@@ -2348,6 +2433,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   attackCostSpec s registry
   alluringSirenSpec s registry
   publicEnemySpec s registry
+  mostLifeRequirementSpec s registry
   conditionalAttackRequirementSpec s registry
   randomOpponentSpec s registry
   declarationRetrySpec s registry
