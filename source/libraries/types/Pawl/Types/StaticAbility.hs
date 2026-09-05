@@ -77,7 +77,8 @@ data StaticAbility card = MkStaticAbility
     -- no second field and no inversion flag: rule 400.1's list is finite, so
     -- Grist, the Hunger Tide's "as long as Grist isn't on the battlefield" is
     -- this field holding every zone but the battlefield, and
-    -- Projection.gatherGiven walks the two hidden zones to find it there.
+    -- Projection.gatherGiven walks the two hidden zones and exile to find it
+    -- there.
     functionsFrom :: Set.Set Zone.Zone,
     -- | Titania's Song's second sentence: "If this enchantment leaves the
     -- battlefield, this effect continues until end of turn." Nothing -- almost

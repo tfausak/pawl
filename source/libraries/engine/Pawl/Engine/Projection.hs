@@ -1244,9 +1244,9 @@ alwaysFunctioning _ _ _ = True
 
 -- Does any static ability in play carry a CR 604.2 "as long as" clause at all?
 -- gather's cheap structural precondition, with no projection behind it. Emblems,
--- the stack, graveyards, hands and libraries are all walked, because gatherGiven
--- gathers abilities from each (CR 114.4 / 113.6 / 113.6b / 113.6f) and skipping
--- one would leave its clause wired open by alwaysFunctioning.
+-- the stack, graveyards, hands, libraries and exile are all walked, because
+-- gatherGiven gathers abilities from each (CR 114.4 / 113.6 / 113.6b / 113.6f)
+-- and skipping one would leave its clause wired open by alwaysFunctioning.
 --
 -- Each arm reads the SAME list its walk in gatherGiven does, which is the whole
 -- of what makes this precondition sound. On the battlefield that is the copiable
@@ -1277,14 +1277,15 @@ anyConditional gs =
         -- gatherGiven will keep: a superset costs a second walk, where a subset
         -- ungates a clause.
         || any conditional (graveyardCards gs)
-        -- The two hidden zones narrow instead, and cost nothing for it: CR
-        -- 113.6b's stated set is a printed field, so asking it here is the same
-        -- read this function was already doing, and an ability that does not
-        -- state the zone is one gatherGiven's hidden walks cannot keep however
-        -- the clause answers. Without the narrowing an ordinary Kird Ape in hand
-        -- would buy a second whole-board walk on every projection.
+        -- The two hidden zones and exile narrow instead, and cost nothing for
+        -- it: CR 113.6b's stated set is a printed field, so asking it here is the
+        -- same read this function was already doing, and an ability that does not
+        -- state the zone is one gatherGiven's fromStatingCard walks cannot keep
+        -- however the clause answers. Without the narrowing an ordinary Kird Ape
+        -- in hand would buy a second whole-board walk on every projection.
         || anyZoneCard GameState.hand (conditionalStating Zone.Hand) gs
         || anyZoneCard GameState.library (conditionalStating Zone.Library) gs
+        || any (conditionalStating Zone.Exile) (Set.toList (GameState.exile gs))
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -1489,44 +1490,59 @@ gatherGiven stripped functioning seed gs =
                 indexed = zip [0 :: Natural ..] (Face.staticAbilities face)
              in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False) n sa | (n, sa) <- indexed, keeps sa]
       graveyards = concatMap fromGraveyardCard (graveyardCards gs)
-      -- CR 113.6b/c: the two HIDDEN zones (CR 400.2), which no default in CR
-      -- 113.6 ever reaches -- a card in a hand or a library has its abilities
-      -- function only where CR 113.6b's stated set says so. So this arm asks
-      -- `statesZone` rather than `functionsFromZone`: an ability that states no
-      -- zone must NOT be gathered here, or every creature card in a library
-      -- would start pumping the board from inside it. CR 613.7a: the effect
-      -- shares the card's own timestamp. Never stripped, for the emblem
-      -- branch's reason.
+      -- CR 113.6b/c: the three zones no default in CR 113.6 ever reaches -- the
+      -- two HIDDEN ones (CR 400.2) and exile, whose being public buys it no
+      -- default. A card in a hand, a library or exile has its abilities function
+      -- only where CR 113.6b's stated set says so. So this arm asks `statesZone`
+      -- rather than `functionsFromZone`: an ability that states no zone must NOT
+      -- be gathered here, or every creature card in a library would start pumping
+      -- the board from inside it. CR 613.7a: the effect shares the card's own
+      -- timestamp. Never stripped, for the emblem branch's reason.
       --
-      -- Walked on EVERY projection, once per card in every hand and every
-      -- library, so what the walk costs per card is the whole of what it costs:
+      -- CR 113.6f's classification gets no limb here, where fromGraveyardCard
+      -- above has one: Pawl.Types.CastingPermission carries a single
+      -- constructor, so a keyword rule 702 turns into a permission to cast an
+      -- object from somewhere can only ever name the GRAVEYARD, and a limb
+      -- asking castZoneKeyword in any of these three zones could not answer
+      -- True.
+      --
+      -- CR 406.3a leaves a card exiled face down with no characteristics at all,
+      -- so it carries no ability to function. Object.exiledFaceDown is CR
+      -- 406.3's status, distinct from CR 110.5's face-down permanent, and is
+      -- False on every card in a hand or a library.
+      --
+      -- Walked on EVERY projection, once per card in every hand, every library
+      -- and exile, so what the walk costs per card is the whole of what it costs:
       -- mayStateZone below settles the common card without building a face, and
       -- Game.faceOfObject takes one lookup where the chain through Game.faceOf
       -- took three. Not implemented: nothing asserts what that walk costs per
       -- card -- a per-library-card ceiling held both until measuring bytes was
       -- judged too compiler-specific to keep (gap #578). See #1935, which
       -- measured the walk at 26% of the suite before them.
-      --
-      -- Not implemented: exile gets no arm of its own, so a stated set naming it
-      -- is ignored -- Grist's does (gap #1933).
-      fromHiddenCard zone cardId = case Game.lookupObject cardId gs of
+      fromStatingCard zone cardId = case Game.lookupObject cardId gs of
         Nothing -> []
+        Just cardObj | Object.exiledFaceDown cardObj -> []
         Just cardObj | not (mayStateZone gs zone cardObj) -> []
         Just cardObj -> case Game.faceOfObject gs cardObj of
           Nothing -> []
           Just face ->
             concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
-      hands = foldZoneCards GameState.hand (fromHiddenCard Zone.Hand) gs
-      libraries = foldZoneCards GameState.library (fromHiddenCard Zone.Library) gs
+      hands = foldZoneCards GameState.hand (fromStatingCard Zone.Hand) gs
+      libraries = foldZoneCards GameState.library (fromStatingCard Zone.Library) gs
+      -- Grist, the Hunger Tide's CR 113.6c clause names every zone but the
+      -- battlefield, so a Grist card in exile is a 1/1 Insect creature card --
+      -- Pawl.ProjectionSpec's "CR 113.6c a Grist card in exile is a creature card
+      -- Bioplasm's attack trigger reads" proves it.
+      exiles = concatMap (fromStatingCard Zone.Exile) (Set.toList (GameState.exile gs))
       counters = counterGathered gs
       designations = designationGathered gs
       bestows = bestowGathered gs
-   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> counters <> designations <> bestows
+   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows
 
 -- CR 113.6b's stated set, without the empty-set default that
 -- functionsFromZone folds in: does this ability SAY it functions from `zone`?
--- The question the two hidden zones take, where "states no zone" has to mean
--- "not here" rather than "wherever the caller is looking".
+-- The question the two hidden zones and exile take, where "states no zone" has
+-- to mean "not here" rather than "wherever the caller is looking".
 statesZone :: Zone.Zone -> StaticAbility.StaticAbility card -> Bool
 statesZone zone = Set.member zone . StaticAbility.functionsFrom
 
@@ -1543,8 +1559,9 @@ statesZone zone = Set.member zone . StaticAbility.functionsFrom
 -- Here because it is CHEAP where the exact test is not: a field read and a fold
 -- over the printed faces, against BUILDING the face the object shows --
 -- Game.resolveFaceFor's layout case, a NonEmpty, and Card.foldSplit's merge.
--- gatherGiven's hidden walks read it once per card in every hand and every
--- library on every projection, so that difference is the walk; see #1935.
+-- gatherGiven's stating walks read it once per card in every hand, every
+-- library and exile on every projection, so that difference is the walk; see
+-- #1935.
 --
 -- A FACE-DOWN object is the one case it cannot narrow, and it does not try: CR
 -- 708.2's substituted face comes from the ability that turned the object down
@@ -3870,10 +3887,13 @@ replacementsAffecting gs =
       -- the trip off the battlefield (CR 122.2), and every other minted row is
       -- CR 614.1c's entry rewrite, which a card that is not entering cannot use.
       --
-      -- Not implemented: a row stating the exile zone, which gets no arm here --
-      -- the same hole gatherGiven's static walk has (gap #1933).
+      -- CR 406.3a: a card exiled face down has no characteristics, so it carries
+      -- no row to state anything. Object.exiledFaceDown is CR 406.3's status,
+      -- and False on every card in the four other zones this walk reaches --
+      -- gatherGiven's fromStatingCard takes the same guard for the same rule.
       statedFrom zone oid = case Game.lookupObject oid gs of
         Nothing -> []
+        Just obj | Object.exiledFaceDown obj -> []
         Just obj | not (mayStateZoneOfRow gs zone obj) -> []
         Just obj -> case Game.faceOfObject gs obj of
           Nothing -> []
@@ -3911,11 +3931,12 @@ replacementsAffecting gs =
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)
           <> foldZoneCards GameState.hand (statedFrom Zone.Hand) gs
           <> foldZoneCards GameState.library (statedFrom Zone.Library) gs
+          <> concatMap (statedFrom Zone.Exile) (Set.toList (GameState.exile gs))
           <> concatMap (statedFrom Zone.Command) statingCommand
       -- The short-circuit guards the two walks that PROJECT, and nothing else:
       -- `stated` reads printed faces, behind mayStateZoneOfRow everywhere but the
-      -- stack, so it costs what gatherGiven's hidden walks cost and answers [] on
-      -- a board with no such row without any of the reads baseHas makes.
+      -- stack, so it costs what gatherGiven's stating walks cost and answers []
+      -- on a board with no such row without any of the reads baseHas makes.
       onBoard =
         if not (any baseHas onBattlefield || elsewhereHas || any commandZoneHas inCommand)
           then []
@@ -3946,7 +3967,7 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- emblem is neither a card nor a permanent and a vanguard card is not a permanent
 -- either (CR 114.4 / 114.5 / 902.7 / 313.2, the arm CR 113.6p names), and CR
 -- 113.6b / 113.6f put a card's abilities to work from the stack, a graveyard, a
--- hand or a library.
+-- hand, a library or exile.
 --
 -- anyConditional's walk with its predicate swapped, and sound for that
 -- function's reason: each arm reads the SAME list its walk in gatherGiven does.
@@ -3955,14 +3976,14 @@ storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuou
 -- states no zone this admits it against gatherGiven's narrower default (rule
 -- 113.6's card types on the stack, rule 113.6f's classification in a graveyard).
 -- A superset costs the board one walk it did not need; a subset would drop a
--- rule 614.1 row. The two HIDDEN zones narrow instead and cost nothing for it,
--- for the reason anyConditional states: rule 113.6b's stated set is a printed
--- field, and an ability that states no zone is one gatherGiven's hidden walks
--- cannot keep however `p` answers.
+-- rule 614.1 row. The two HIDDEN zones and exile narrow instead and cost nothing
+-- for it, for the reason anyConditional states: rule 113.6b's stated set is a
+-- printed field, and an ability that states no zone is one gatherGiven's stating
+-- walks cannot keep however `p` answers.
 --
 -- Walked on every replacement gather and every combat declaration, where the
 -- command zone alone was nearly free. What that costs per card is mayStateZone's
--- printed-field read, the same bound gatherGiven's own hidden walks carry; see
+-- printed-field read, the same bound gatherGiven's own stating walks carry; see
 -- #1935, which measured those walks.
 elsewhereGrants :: (Modification -> Bool) -> GameState -> Bool
 elsewhereGrants p gs =
@@ -3981,6 +4002,7 @@ elsewhereGrants p gs =
         || any (grants Zone.Graveyard) (graveyardCards gs)
         || anyZoneCard GameState.hand (grantsStating Zone.Hand) gs
         || anyZoneCard GameState.library (grantsStating Zone.Library) gs
+        || any (grantsStating Zone.Exile) (Set.toList (GameState.exile gs))
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands
