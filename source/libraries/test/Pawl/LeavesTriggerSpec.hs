@@ -865,13 +865,13 @@ becameSlotSpec s registry =
 -- hand." -- Endless Cockroaches's payload under CR 603.6c's wider condition,
 -- where becameSlotSpec above has it under CR 700.4's narrower one.
 --
--- SYNTHETIC because no printing has the shape. Scryfall, 2026-09-04:
--- o:/when(ever)? (this|~)[^.]*leaves the battlefield/ include:extras and
--- o:/leaves the battlefield, (exile|return|shuffle|put) it/ include:extras
--- return nothing that reads the object it BECAME -- Broodguard Elite, Hei Bai
--- Spirit of Balance and Selfless Police Captain all read "its counters", which
--- is CR 608.2h about the departed permanent. Nothing in the CR forbids the
--- printing; CR 400.7e states exactly what it would do.
+-- SYNTHETIC because no printing has the shape. Scryfall
+-- o:/leaves the battlefield, (exile|return|shuffle|put) it/ include:extras,
+-- 2026-09-04, three hits -- Broodguard Elite, Hei Bai, Spirit of Balance and
+-- Selfless Police Captain -- and all three read "its counters", which is CR
+-- 608.2h about the DEPARTED permanent rather than CR 400.7e's new object. A
+-- printing whose payload moved the card it became would refute this. Nothing in
+-- the CR forbids one; CR 400.7e states exactly what it would do.
 --
 -- WHY THIS IS THE PAIR. Event.eventBindingSlots answers per CONDITION with no
 -- event in hand, so it can only promise the FLOOR, and this condition's floor is

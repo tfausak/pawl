@@ -1427,11 +1427,13 @@ eventBindingSlots cond = case cond of
 -- wants the floor, a slot bound sometimes being no guarantee at all.
 --
 -- Two arms and no more, which is a fact about eventBindings above rather than a
--- convenience: CR 400.7e's public-zone proviso is the only guard there that a
--- MATCH does not already settle, and it stands on exactly these two conditions
--- (CR 603.6c admits every destination for both). AttachedCreatureDies is the
--- near miss -- its `became` rides on CR 400.7f's arrival rather than on the
--- event -- and the floor claims it outright, for the reasons that arm gives.
+-- convenience: CR 400.7e's public-zone proviso is the only guard there that
+-- turns on the EVENT's own shape and that a match does not already settle, and
+-- it stands on exactly these two conditions (CR 603.6c admits every destination
+-- for both). The other two conditional arms turn on GAME STATE instead --
+-- AttachedCreatureDies on CR 400.7f's arrival and PermanentReturnedToHand on CR
+-- 608.2h's record -- and the floor claims both outright, each for the reasons
+-- its own arm gives.
 --
 -- A WILDCARD here where eventBindingSlots forbids one, the asymmetry being which
 -- way each default fails. Defaulting a new condition to "binds nothing" there
