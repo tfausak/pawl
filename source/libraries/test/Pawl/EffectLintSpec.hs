@@ -2167,7 +2167,16 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- written anywhere else is (#2740).
   Spec.it s "every ObjectRef position the Filter traversal reaches is one the asking traversal reaches" $ do
     ps <- S.allPrintings s
-    let viaFilters card = Set.fromList [f | effect <- cardResolutionEffects card, (SourceHostFramed, f) <- effectFilters effect]
+    let -- A MINTED face's own filters come through effectFilters -- Effect.Create's
+        -- arm ends `overFaces cardFilters card` -- and inside a CARD that tag means
+        -- the TOKEN's host, which is not this comparison's vocabulary: Ashiok,
+        -- Wicked Manipulator's Nightmare carries a CR 603.4 intervening "if" and no
+        -- ObjectRef at all, and effectObjectRefs' Create arm rightly answers []. So
+        -- they are subtracted, leaving the comparison stated in the one vocabulary
+        -- it means. A minted face's own positions are cardFilters' business, and
+        -- the mintedFaces lints above are where they are read.
+        mintedOwn card = Set.fromList [f | effect <- cardResolutionEffects card, (_, face) <- effectMintedFaces effect, (SourceHostFramed, f) <- cardFilters face]
+        viaFilters card = Set.difference (Set.fromList [f | effect <- cardResolutionEffects card, (SourceHostFramed, f) <- effectFilters effect]) (mintedOwn card)
         viaRefs card = Set.fromList [f | (_, ref) <- concatMap effectObjectRefs (cardResolutionEffects card), (SourceHostFramed, f) <- frame SourceHostFramed (objectRefFilters ref)]
         offenders = filter (anyFace (\card -> viaFilters card /= viaRefs card) . Printing.card) ps
     Spec.assertEqWith s "the two ObjectRef traversals agree" (fmap (S.nameOf . Printing.card) offenders) []
