@@ -22,6 +22,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
+import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Halved as Halved
@@ -163,8 +164,8 @@ overSlots f quantity = case quantity of
   -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
   -- against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.EnteredThisTurn -> pure quantity
-  -- And two more with nothing beside their InZone's PlayerRef, CR 400.7's origin
-  -- zone and CR 601.2a's cast zone alike.
+  -- And two more with nothing beside their PlayerRefs, CR 400.7's origin zone
+  -- and CR 601.2a's cast zone alike -- the latter carrying two of them.
   Quantity.EnteredFrom _ -> pure quantity
   Quantity.WasCastFrom _ -> pure quantity
   -- And a nullary arm, which names nothing at all: CR 509.1h's declaration is
@@ -290,7 +291,9 @@ nestedRefs quantity = case quantity of
   Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref _) -> Set.singleton (Left ref)
   Quantity.EnteredThisTurn -> Set.empty
   Quantity.EnteredFrom inZone -> Set.singleton (Left (InZone.player inZone))
-  Quantity.WasCastFrom inZone -> Set.singleton (Left (InZone.player inZone))
+  -- BOTH references, CR 601.2a's caster beside CR 400.1's zone: a walk that
+  -- reported one would leave the other's slot unnamed.
+  Quantity.WasCastFrom castFrom -> Set.fromList [Left (CastFrom.caster castFrom), Left (InZone.player (CastFrom.from castFrom))]
   Quantity.BlockersBeyondFirst -> Set.empty
   -- Reads a live grant off the resolving object rather than a bound reference
   -- or slot: nothing here for a target-slot walk to find.
@@ -402,7 +405,12 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.DungeonsCompleted ref -> Quantity.DungeonsCompleted (f ref)
   Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon ref name) -> Quantity.CompletedDungeon (CompletedDungeon.MkCompletedDungeon (f ref) name)
   Quantity.EnteredFrom z -> Quantity.EnteredFrom z {InZone.player = f (InZone.player z)}
-  Quantity.WasCastFrom z -> Quantity.WasCastFrom z {InZone.player = f (InZone.player z)}
+  Quantity.WasCastFrom c ->
+    Quantity.WasCastFrom
+      c
+        { CastFrom.caster = f (CastFrom.caster c),
+          CastFrom.from = (CastFrom.from c) {InZone.player = f (InZone.player (CastFrom.from c))}
+        }
   Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = f (ManaCount.Type.player c)}
   Quantity.Count c -> Quantity.Count (intoCount c)
   Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (recur a) (recur b))

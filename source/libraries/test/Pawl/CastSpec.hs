@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as View
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -2518,6 +2519,114 @@ harnessTheStormSpec s registry = Spec.describe s "HarnessTheStorm" $ do
     Spec.assertEqWith s "the trigger's slot was never offered" offered []
     Spec.assertEqWith s "and no cast was offered" offers []
 
+-- Tinybones, the Pickpocket {B} Legendary Creature -- Skeleton Rogue 1/1 (oracle
+-- text checked against Scryfall, 2026-09-05): "Deathtouch. Whenever Tinybones
+-- deals combat damage to a player, you may cast target nonland permanent card
+-- from that player's graveyard, and mana of any type can be spent to cast that
+-- spell."
+--
+-- THE FIRST CARD IN data/cards/ that casts a spell out of a graveyard its caster
+-- does not own. CR 400.3 puts a card only in its OWNER's graveyard, so on every
+-- other board pawl can build the caster, the zone's owner and the card's owner
+-- are one seat; here they are two. Pawl.Engine.Quantity's WasCastFrom arm is
+-- what reads them apart, and Pawl.ConditionSpec's Breathless Knight case is
+-- where the two references disagree.
+--
+-- CR 608.2g is the road, and it grants CR 601.3's permission itself: the effect
+-- naming the object IS it, so Cast.castableWhenOffered asks no zone at all and
+-- nothing has to grant alice a cast from bob's graveyard. That was only half
+-- true until this card arrived -- Cost.candidateCostsFor priced a graveyard card
+-- at nothing without a permission it could FIND on the board, so the offer was
+-- made and then withdrawn for want of a cost; Cost.candidateCostsGiven is where
+-- the offer now says so. Havengul Lich would take the CR 601.3 road instead,
+-- which still has no one-object permission to write.
+--
+-- Not implemented: "mana of any type can be spent to cast that spell" (CR
+-- 118.14). Effect.OfferCast carries no spending rider where
+-- Effect.GrantPlayFromExile does, so pawl's Tinybones is STRICTER than printed
+-- -- the caster owes the stolen card's own coloured mana, which is why the
+-- Swamps below and the {B} Vessel are chosen to match (#3251).
+
+-- alice attacks with a Tinybones and holds two Swamps; bob's graveyard holds an
+-- Archfiend's Vessel, a Goblin Piker and a Swamp, and alice's own graveyard
+-- holds a second Vessel.
+--
+-- Three decoys, one per way the offer could be wrong. The Piker is the COUNT
+-- decoy: a one-candidate slot is answered with no prompt at all, so a set
+-- assertion over a single member could not tell "bob's graveyard" from "the one
+-- card anywhere". The Swamp is the FILTER decoy, "nonland" being the only thing
+-- keeping it out. alice's Vessel is the ZONE decoy -- the same printing, the same
+-- card types, a different pile -- so the only thing that keeps it out of the
+-- offer is whose graveyard it is in, which is the axis this whole group is about.
+pickpocketBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], Printing.Printing)
+pickpocketBoard s registry = do
+  swamp <- S.printingOf s registry "Swamp"
+  tinybones <- S.printingOf s registry "Tinybones, the Pickpocket"
+  vessel <- S.printingOf s registry "Archfiend's Vessel"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (combat, _, _) = S.combatBoardOf [tinybones] []
+      (stolen, g1) = S.addGraveyardCard vessel S.bob (S.landsFor swamp S.alice 2 combat)
+      (decoy, g2) = S.addGraveyardCard piker S.bob g1
+      (_, g3) = S.addGraveyardCard swamp S.bob g2
+      (_, g4) = S.addGraveyardCard vessel S.alice g3
+  pure (g4, stolen, [stolen, decoy], vessel)
+
+-- Records what Tinybones' own slot was offered and which casts it went on to
+-- offer, pinning the target to `wanted` and taking the offer.
+--
+-- The target is PINNED by identity rather than searched for: an answerer that
+-- picked whatever was legal would find the Vessel again after a mutation, and
+-- the recording is what tells a candidate set drawn from bob's graveyard from
+-- one drawn from every graveyard on the board.
+pickpocketAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State ([Set.Set Recipient.Recipient], [CardName.CardName]) r
+pickpocketAnswer wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> do
+    Monad.forM_
+      (Map.lookup (SlotName.MkSlotName (Text.pack "stolen")) sets)
+      (\(_, rs) -> State.modify' (\(ts, os) -> (ts <> [rs], os)))
+    pure (fmap (\(_, legal) -> Set.filter ((== Just wanted) . Recipient.objectOf) legal) sets)
+  Prompt.OfferedCast _ _ _ name -> do
+    State.modify' (\(ts, os) -> (ts, os <> [name]))
+    pure OptionalDecision.Exercises
+  _ -> pure (S.attackTo S.bob p)
+
+-- S.runCombat with a recording answerer: run whole steps while combat lasts.
+runPickpocket :: ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, ([Set.Set Recipient.Recipient], [CardName.CardName]))
+runPickpocket wanted =
+  let go n g
+        | n <= (0 :: Int) = pure g
+        | not (S.inCombatPhase (GameState.phase g)) = pure g
+        | otherwise = do
+            (_, g') <- Engine.runGame (pickpocketAnswer wanted) g Engine.runStep
+            go (n - 1) g'
+   in \gs -> State.runState (go 24 gs) ([], [])
+
+pickpocketSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+pickpocketSpec s registry =
+  Spec.describe s "Pickpocket"
+    . Spec.it s "CR 601.2a alice casts a spell out of bob's graveyard"
+    $ do
+      (board, stolen, candidates, vessel) <- pickpocketBoard s registry
+      let (after, (offered, offers)) = runPickpocket stolen board
+          vessels owner =
+            [ oid
+            | oid <- Set.toList (GameState.battlefield after),
+              S.soleFaceName oid after == S.printingName vessel,
+              fmap Object.owner (Game.lookupObject oid after) == Just owner
+            ]
+      -- The gameplay reading, first: a card BOB owns is a permanent ALICE
+      -- controls, and it got there by being cast. CR 400.3 is why the two seats
+      -- are the whole point -- the Vessel was never in a pile of alice's.
+      case vessels S.bob of
+        [taken] -> Spec.assertEqWith s "CR 601.2a alice controls the Vessel she cast out of bob's graveyard" (View.controllerOf taken after) (Just S.alice)
+        other -> Spec.assertFailure s ("expected exactly one Vessel bob owns on the battlefield, got " <> show (length other))
+      Spec.assertEqWith s "and alice's own copy stayed in her graveyard" (length (vessels S.alice)) 0
+      -- Then the two proxies. The candidate set is the pool's reading of "that
+      -- player's graveyard": identity, not count, since the Piker and the Vessel
+      -- are both bob's and the Swamp and alice's Vessel are not offered at all.
+      Spec.assertEqWith s "the offer reached bob's graveyard, nonland cards only" offered [Set.fromList (fmap Recipient.ToObject candidates)]
+      Spec.assertEqWith s "and one cast was offered, of the targeted card" offers [S.printingName vessel]
+
 flashbackCardTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
   Spec.it s "CR 702.34a a creature card with flashback is not castable from the graveyard" $ do
@@ -2832,6 +2941,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   lierSpec s registry
   mirrorOfTheFallenSpec s registry
   harnessTheStormSpec s registry
+  pickpocketSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry
 

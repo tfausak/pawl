@@ -1012,10 +1012,11 @@ geistBoard island thinkTwice n =
 --
 -- The OwnedBy conjunct is a REGRESSION FENCE rather than a proven behaviour, and
 -- CR 400.3 is what makes it exact: a card in a graveyard is in its owner's, so
--- "your graveyard" is the spell's owner being the caster. Nothing discriminates
--- it today -- Pawl.Engine.Cast.zoneCandidates reads a graveyard through
--- Game.zoneMembers, which is per-player, so no board lets one player cast out of
--- another's. Dropping the conjunct leaves the suite green.
+-- "your graveyard" is the spell's owner being the caster. A board that
+-- discriminates it now exists -- Tinybones, the Pickpocket casts a card out of
+-- the graveyard of the player it damaged (Pawl.CastSpec's Pickpocket group) --
+-- but no case in the tree drives the Geist's reduction on such a cast, so
+-- dropping the conjunct still leaves the suite green.
 --
 -- Think Twice ({1}{U} Instant, "Draw a card." / "Flashback {2}{U}") is the spell,
 -- for the reason Pawl.CastSpec's tax group gives: the two zones it can be cast
