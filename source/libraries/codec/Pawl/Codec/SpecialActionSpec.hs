@@ -1,8 +1,10 @@
 module Pawl.Codec.SpecialActionSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.SpecialAction as SpecialAction
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -16,17 +18,19 @@ spec s = Spec.describe s "Pawl.Codec.SpecialAction" $ do
       SpecialAction.codec
       SpecialAction.DiscardThisAnyTime
       " {\"type\":\"DiscardThisAnyTime\"} "
-  -- Leonin Arbiter's {2}, which is the whole of its ignore cost.
+  -- Leonin Arbiter's {2}, which is the whole of its ignore cost, under the name
+  -- its own face gives the ability the payment ignores.
   Spec.it s "IgnoreThisUntilEndOfTurn" $
     Common.assertCodec
       s
       SpecialAction.codec
       ( SpecialAction.IgnoreThisUntilEndOfTurn
+          (AbilityName.MkAbilityName (Text.pack "search ban"))
           Cost.MkCost
             { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
               Cost.components = []
             }
       )
-      " {\"type\":\"IgnoreThisUntilEndOfTurn\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+      " {\"type\":\"IgnoreThisUntilEndOfTurn\",\"value\":{\"ability\":\"search ban\",\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s SpecialAction.codec

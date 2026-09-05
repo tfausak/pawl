@@ -2757,7 +2757,7 @@ alternativeCostFilters alternative =
 -- CR 116.2d's ignore carries.
 specialActionFilters :: SpecialAction.SpecialAction -> [Filter.Type.Filter Keyword.Keyword]
 specialActionFilters specialAction = case specialAction of
-  SpecialAction.IgnoreThisUntilEndOfTurn cost -> costFilters cost
+  SpecialAction.IgnoreThisUntilEndOfTurn _ cost -> costFilters cost
   -- CR 116.2e names one card and nothing about it.
   SpecialAction.DiscardThisAnyTime -> []
 

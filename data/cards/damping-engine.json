@@ -13,6 +13,7 @@
           "effect": {
             "type": "CantPlayLands"
           },
+          "name": "the lead",
           "scope": {
             "type": "ControllingMostPermanents"
           }
@@ -44,6 +45,7 @@
               ]
             }
           },
+          "name": "the lead",
           "scope": {
             "type": "ControllingMostPermanents"
           }
@@ -53,19 +55,22 @@
         {
           "type": "IgnoreThisUntilEndOfTurn",
           "value": {
-            "components": [
-              {
-                "type": "Sacrifice",
-                "value": {
-                  "count": 1,
-                  "whichPermanents": {
-                    "type": "And",
-                    "value": []
+            "ability": "the lead",
+            "cost": {
+              "components": [
+                {
+                  "type": "Sacrifice",
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
+                      "type": "And",
+                      "value": []
+                    }
                   }
                 }
-              }
-            ],
-            "mana": []
+              ],
+              "mana": []
+            }
           }
         }
       ],

@@ -46,6 +46,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Expiry as Expiry
@@ -58,6 +59,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -102,6 +104,22 @@ board vultures traveler mountain bolt =
           }
       )
 
+-- CR 116.2d names an ability rather than a permanent, and these are the names
+-- the two fixtures' faces print. Damping Engine's one sentence declares TWO
+-- player-ability rows and both carry "the lead", which is what keeps one payment
+-- covering both.
+theLead :: AbilityName.AbilityName
+theLead = AbilityName.MkAbilityName (Text.pack "the lead")
+
+searchBan :: AbilityName.AbilityName
+searchBan = AbilityName.MkAbilityName (Text.pack "search ban")
+
+-- Synthetic Warden of Divided Edicts names ONE of its two player abilities. Its
+-- "players can't play lands" names none, which is what makes the two readings of
+-- CR 116.2d disagree observably.
+creatureBan :: AbilityName.AbilityName
+creatureBan = AbilityName.MkAbilityName (Text.pack "creature ban")
+
 isPlay :: Action.Type.Action -> Bool
 isPlay action = case action of
   Action.Type.Play {} -> True
@@ -113,7 +131,7 @@ isPlay action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
-  Action.Type.Ignore _ -> False
+  Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -208,7 +226,7 @@ playing wanted action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
-  Action.Type.Ignore _ -> False
+  Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -224,7 +242,7 @@ casting wanted action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
-  Action.Type.Ignore _ -> False
+  Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -296,6 +314,58 @@ bobLeading :: Printing.Printing -> GameState.GameState -> GameState.GameState
 bobLeading forest gs =
   let add g = snd (S.addCreature forest S.bob g)
    in add (add (add gs))
+
+-- Synthetic Warden of Divided Edicts on bob's precombat main. alice controls the
+-- Warden and three Forests; bob controls four and holds a Forest, a Woodland
+-- Changeling and a Rampant Growth.
+--
+-- WHAT MAKES THE TWO READINGS DISAGREE: the Warden prints two unrelated player
+-- abilities and grants the ignore on ONE of them by name -- "your opponents
+-- can't cast creature spells" carries the name, "players can't play lands" does
+-- not. So alice is reached by the permanent but not by the named ability, and a
+-- payment that lifted the permanent would lift a land ban the deal never
+-- mentioned.
+--
+-- THE SEATS ARE ASYMMETRIC on purpose: the named ability's scope is Opponents, so
+-- alice (its controller) is outside it while bob is inside, and every seat
+-- controls a permanent so the sacrifice is payable at both -- which leaves CR
+-- 116.2d's own WHO as the only conjunct that can separate them.
+--
+-- The Growth is the cost control and shares the Changeling's exact {1}{G} off the
+-- same Forests: the Warden stops creature spells only, so a sorcery must stay
+-- castable on every board here.
+--
+-- Taking the permanent to place as an argument is what gives the land-play
+-- assertions their pair: passing a vanilla creature builds the same board with
+-- nothing prohibiting anything.
+wardenBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+wardenBoard warden forest changeling growth =
+  let (wardenId, gs1) = S.addCreature warden S.alice (S.landsInPlay forest 3)
+      (victimId, gs2) = S.addCreature forest S.bob gs1
+      (_, gs3) = S.addCreature forest S.bob gs2
+      (_, gs4) = S.addCreature forest S.bob gs3
+      (_, gs5) = S.addCreature forest S.bob gs4
+      (aliceForestId, gs6) = S.addHandCard forest S.alice gs5
+      (bobForestId, gs7) = S.addHandCard forest S.bob gs6
+      (changelingId, gs8) = S.addHandCard changeling S.bob gs7
+      (growthId, gs9) = S.addHandCard growth S.bob gs8
+   in ( wardenId,
+        victimId,
+        aliceForestId,
+        bobForestId,
+        changelingId,
+        growthId,
+        gs9
+          { GameState.activePlayer = S.bob,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.bob
+          }
+      )
 
 -- Djinn of Fool's Fall (OTJ 43) on alice's own precombat main with the stack
 -- empty -- CR 702.170a's window -- holding four Islands, the Djinn and a Doomed
@@ -816,16 +886,19 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
   dampingEngine s registry
+  dividedEdicts s registry
   leoninArbiter s registry
   plotting s registry
   makePlotted s registry
   foretelling s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
--- offered to (its own scope is EachPlayer, so every seat is offered it) and what
--- one payment covers (it prints one player ability, so a permanent-wide ignore
--- and an ability-wide one agree). Damping Engine (ULG 124) narrows the first and
--- prints two abilities to observe the second.
+-- offered to (its own scope is EachPlayer, so every seat is offered it) and how
+-- far ONE NAME reaches. Damping Engine (ULG 124) narrows the first, and its one
+-- printed sentence declares two player abilities that carry one name -- so one
+-- payment covers both, which is what makes "this effect" the sentence rather than
+-- the row. The Warden group below is the other side of that: two names on one
+-- permanent, where a payment covers one.
 dampingEngine :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 dampingEngine s registry = Spec.describe s "CR 116.2d Damping Engine" $ do
   -- The pair is the whole case: on one board alice is the player the ability
@@ -840,11 +913,11 @@ dampingEngine s registry = Spec.describe s "CR 116.2d Damping Engine" $ do
     let (engineId, _, _, _, _, aliceLeads) = dampingBoard engine forest changeling growth
         bobLeads = bobLeading forest aliceLeads
         asked pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
-    Spec.assertBool s (List.elem (Action.Type.Ignore engineId) (asked S.alice aliceLeads)) "alice controls the most permanents, so she may pay to ignore it"
-    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.bob aliceLeads)) "bob is not affected, so there is nothing for him to ignore"
-    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.carol aliceLeads)) "nor carol"
-    Spec.assertBool s (List.elem (Action.Type.Ignore engineId) (asked S.bob bobLeads)) "and bob IS offered it once the lead is his -- so his cost was payable all along"
-    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.alice bobLeads)) "while alice, no longer affected, is offered nothing"
+    Spec.assertBool s (List.elem (Action.Type.Ignore engineId theLead) (asked S.alice aliceLeads)) "alice controls the most permanents, so she may pay to ignore it"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId theLead) (asked S.bob aliceLeads)) "bob is not affected, so there is nothing for him to ignore"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId theLead) (asked S.carol aliceLeads)) "nor carol"
+    Spec.assertBool s (List.elem (Action.Type.Ignore engineId theLead) (asked S.bob bobLeads)) "and bob IS offered it once the lead is his -- so his cost was payable all along"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId theLead) (asked S.alice bobLeads)) "while alice, no longer affected, is offered nothing"
   -- "More permanents than each other player" is a STRICT comparison, so a tie for
   -- the lead leaves the ability affecting nobody -- which is the third value this
   -- scope can take and the one a "whoever has the most" reading would miss.
@@ -856,8 +929,8 @@ dampingEngine s registry = Spec.describe s "CR 116.2d Damping Engine" $ do
     let (engineId, _, forestId, _, _, aliceLeads) = dampingBoard engine forest changeling growth
         tied = snd (S.addCreature forest S.bob (snd (S.addCreature forest S.bob aliceLeads)))
         asked pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
-    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.alice tied)) "alice has no lead to be affected by"
-    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.bob tied)) "and neither does bob"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId theLead) (asked S.alice tied)) "alice has no lead to be affected by"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId theLead) (asked S.bob tied)) "and neither does bob"
     Spec.assertBool s (any (playing forestId) (asked S.alice tied)) "the control: with the ability affecting nobody, alice may play her land"
   -- CR 305.1 and CR 601.3a, from ONE printed sentence declaring two player
   -- abilities. The Growth is what makes the Filter discriminating: same {1}{G},
@@ -876,23 +949,70 @@ dampingEngine s registry = Spec.describe s "CR 116.2d Damping Engine" $ do
     Spec.assertBool s (any (casting growthId) actions) "but the sorcery of the same cost is still castable"
     Spec.assertBool s (any (playing forestId) unaffected) "the pair: with bob leading, alice may play the land"
     Spec.assertBool s (any (casting changelingId) unaffected) "and cast the creature"
-  -- The narrowing Pawl.Types.SpecialAction carries, asserted rather than assumed:
-  -- one payment covers the WHOLE permanent, so both of the Engine's abilities stop
-  -- applying to the player who paid. A per-ability ignore would lift one.
-  Spec.it s "CR 116.2d one payment lifts every one of that permanent's player abilities" $ do
+  -- CR 116.2d's "the effect from that ability" is the printed SENTENCE, and
+  -- Damping Engine's declares two rows: both carry the one name its ignore refers
+  -- to, so one payment lifts both. An implementation that let one name reach only
+  -- the first row it matched would lift one.
+  Spec.it s "CR 116.2d one payment lifts every row that ability's name declares" $ do
     engine <- S.printingOf s registry "Damping Engine"
     forest <- S.printingOf s registry "Forest"
     changeling <- S.printingOf s registry "Woodland Changeling"
     growth <- S.printingOf s registry "Rampant Growth"
     let (engineId, victimId, forestId, changelingId, _, aliceLeads) = dampingBoard engine forest changeling growth
-        afterIgnore = S.runPure (sacrificing victimId) aliceLeads (Ignore.ignore S.alice engineId)
+        afterIgnore = S.runPure (sacrificing victimId) aliceLeads (Ignore.ignore S.alice engineId theLead)
         actions = Action.legalActions S.alice afterIgnore
     Spec.assertEqWith s "the sacrifice was paid: one of alice's three Forests is gone" (S.countOnBattlefieldByName (S.printingName forest) S.alice afterIgnore) 2
     Spec.assertBool s (any (playing forestId) actions) "CR 305.1's half is lifted"
     Spec.assertBool s (any (casting changelingId) actions) "and CR 601.3a's half with it, off the same one payment"
     -- CR 116.2d forbids no repeat, and Pawl.Engine.PlayerEffect.affectedBy is
     -- asked over the unfiltered gather so that the offer survives being taken.
-    Spec.assertBool s (List.elem (Action.Type.Ignore engineId) actions) "and the action is still offered, since paying again is legal"
+    Spec.assertBool s (List.elem (Action.Type.Ignore engineId theLead) actions) "and the action is still offered, since paying again is legal"
+
+-- CR 116.2d's GRAIN: "the effect from that ability", singular. No printing can
+-- observe it -- Scryfall o:"ignore this effect" returns four producers (checked
+-- 2026-09-05) and each states its restriction in one sentence, so "this effect"
+-- covers the whole of what the permanent does and an ignore keyed to the
+-- permanent agrees with one keyed to the ability. Synthetic Warden of Divided
+-- Edicts is the permanent that separates them, and both halves of the rule are
+-- asserted: which players are OFFERED the deal, and what taking it SUPPRESSES.
+dividedEdicts :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dividedEdicts s registry = Spec.describe s "CR 116.2d Synthetic Warden of Divided Edicts" $ do
+  -- The OFFER half. alice is reached by the Warden -- its land ban stops her own
+  -- land play on her own turn -- and is still offered nothing, because the
+  -- ability the deal NAMES is her opponents' only. An offer derived from the
+  -- permanent rather than from the named ability offers it to her.
+  Spec.it s "CR 116.2d the deal is offered to the players the NAMED ability reaches, and to no other" $ do
+    warden <- S.printingOf s registry "Synthetic Warden of Divided Edicts"
+    forest <- S.printingOf s registry "Forest"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (wardenId, _, aliceForestId, _, _, _, gs) = wardenBoard warden forest changeling growth
+        aliceTurn = gs {GameState.activePlayer = S.alice}
+        asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
+    Spec.assertBool s (List.elem (Action.Type.Ignore wardenId creatureBan) (asked S.bob gs)) "bob's creature spells are banned, so the deal is offered to him"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore wardenId creatureBan) (asked S.alice aliceTurn)) "and not to alice, whom the ability the deal names does not reach"
+    Spec.assertBool s (not (any (playing aliceForestId) (asked S.alice aliceTurn))) "though the Warden's other, unnamed ability IS reaching her: her own land play is stopped"
+    Spec.assertBool s (List.elem (Action.Type.Ignore wardenId creatureBan) (asked S.bob aliceTurn)) "and bob keeps the offer on alice's turn, so her absence is not about the window"
+  -- The SUPPRESSION half, and the assertion this unit exists to prove is the last
+  -- one: a payment lifts the ability it named and leaves the permanent's other
+  -- one in force. The pair for that last one is the same board built around a
+  -- vanilla creature, which differs in exactly the Warden.
+  Spec.it s "CR 116.2d paying lifts the ability the payment named and nothing else" $ do
+    warden <- S.printingOf s registry "Synthetic Warden of Divided Edicts"
+    forest <- S.printingOf s registry "Forest"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (wardenId, victimId, _, bobForestId, changelingId, growthId, gs) = wardenBoard warden forest changeling growth
+        (_, _, _, controlForestId, _, _, vanilla) = wardenBoard changeling forest changeling growth
+        before = Action.legalActions S.bob gs
+        afterIgnore = S.runPure (sacrificing victimId) gs (Ignore.ignore S.bob wardenId creatureBan)
+        actions = Action.legalActions S.bob afterIgnore
+    Spec.assertBool s (not (any (casting changelingId) before)) "before paying, bob's creature spell is stopped"
+    Spec.assertBool s (any (casting growthId) before) "while the sorcery of the same cost is not -- the cost control"
+    Spec.assertBool s (any (playing controlForestId) (Action.legalActions S.bob vanilla)) "and the pair: with a vanilla creature in the Warden's place, that same land play IS offered"
+    Spec.assertEqWith s "the sacrifice was paid: one of bob's four Forests is gone" (S.countOnBattlefieldByName (S.printingName forest) S.bob afterIgnore) 3
+    Spec.assertBool s (any (casting changelingId) actions) "the ability the payment named is lifted"
+    Spec.assertBool s (not (any (playing bobForestId) actions)) "and the Warden's OTHER ability still bites, so the payment lifted one ability rather than the permanent"
 
 -- CR 116.2d: "some effects from static abilities allow a player to take an
 -- action to ignore the effect from that ability for a duration". Leonin Arbiter
@@ -919,9 +1039,9 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
               GameState.phase = Phase.PrecombatMain,
               GameState.priority = Just S.alice
             }
-    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId) (Action.legalActions S.alice gs)) "the Arbiter may be ignored"
-    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId) (Action.legalActions S.alice instantSpeed)) "on another player's turn with a spell on the stack too"
-    Spec.assertBool s (List.notElem (Action.Type.Ignore poorId) (Action.legalActions S.alice broke)) "but not with one Forest, which cannot pay {2}"
+    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice gs)) "the Arbiter may be ignored"
+    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice instantSpeed)) "on another player's turn with a spell on the stack too"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore poorId searchBan) (Action.legalActions S.alice broke)) "but not with one Forest, which cannot pay {2}"
     Spec.assertBool s (any isPlay (Action.legalActions S.alice broke)) "the control: that same board still offers a land play"
   -- The WHO conjunct read the other way, and the pair Damping Engine's cases are
   -- the other half of: Leonin Arbiter's own prohibition is possessive-free
@@ -935,8 +1055,8 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     let (arbiterId, _, gs) = arbiterBoard forest arbiter growth
         (_, withBobsLands) = S.addCreature forest S.bob (snd (S.addCreature forest S.bob gs))
         asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
-    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId) (asked S.alice withBobsLands)) "the Arbiter's own controller may pay"
-    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId) (asked S.bob withBobsLands)) "and so may bob, whose two Forests pay the {2}"
+    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (asked S.alice withBobsLands)) "the Arbiter's own controller may pay"
+    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (asked S.bob withBobsLands)) "and so may bob, whose two Forests pay the {2}"
   -- CR 101.2: the prohibition wins, so the search does not happen -- and CR
   -- 701.23 describes only how to look, so the card's own "then shuffle" still
   -- does. Without the log both outcomes are indistinguishable from CR 701.23b's
@@ -958,7 +1078,7 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     arbiter <- S.printingOf s registry "Leonin Arbiter"
     growth <- S.printingOf s registry "Rampant Growth"
     let (arbiterId, growthId, gs) = arbiterBoard forest arbiter growth
-        afterIgnore = snd (State.evalState (Engine.runGame (takeOnce (Action.Type.Ignore arbiterId)) gs Engine.priorityLoop) False)
+        afterIgnore = snd (State.evalState (Engine.runGame (takeOnce (Action.Type.Ignore arbiterId searchBan)) gs Engine.priorityLoop) False)
         (after, asked) = growAndResolve growthId afterIgnore
     Spec.assertEqWith s "the Forest left the library" (S.countByName (S.printingName forest) S.alice after) 0
     Spec.assertEqWith s "and is the tenth on the battlefield" (S.countOnBattlefieldByName (S.printingName forest) S.alice after) 10
@@ -973,7 +1093,7 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     arbiter <- S.printingOf s registry "Leonin Arbiter"
     growth <- S.printingOf s registry "Rampant Growth"
     let (arbiterId, growthId, gs) = arbiterBoard forest arbiter growth
-        afterIgnore = snd (State.evalState (Engine.runGame (takeOnce (Action.Type.Ignore arbiterId)) gs Engine.priorityLoop) False)
+        afterIgnore = snd (State.evalState (Engine.runGame (takeOnce (Action.Type.Ignore arbiterId searchBan)) gs Engine.priorityLoop) False)
         (after, asked) = growAndResolve growthId (Expiry.dropAtCleanup afterIgnore)
     Spec.assertEqWith s "the Forest is still in the library" (S.countByName (S.printingName forest) S.alice after) 1
     Spec.assertEqWith s "and the search was not offered again" asked ["shuffle"]

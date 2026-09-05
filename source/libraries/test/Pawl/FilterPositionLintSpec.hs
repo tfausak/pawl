@@ -30,6 +30,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
@@ -1363,7 +1364,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost [] (spellOf []) [] Activator.Controller Nothing Nothing]}
         -- CR 116.2d: a special action uses no stack (CR 116.1), so no
         -- announcement could answer in any engine.
-        ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn sacrificeCost]}
+        ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn (AbilityName.MkAbilityName (Text.pack "the prohibition")) sacrificeCost]}
         -- CR 116.2c: the same special action, as the price of ending an effect.
         ending = base {Face.spell = spellOf [Effect.AffectPlayers (AffectPlayers.MkAffectPlayers (Duration.UntilPaid sacrificeCost) (AffectedPlayers.Scoped PlayerScope.You) PlayerEffect.CantCastSpells)]}
         -- CR 508.1h and CR 509.1d: a declaration announces no target.
@@ -1925,7 +1926,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 613.11's spell-cost modifier",
               base
                 { Face.playerAbilities =
-                    [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1))]
+                    [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1)}]
                 }
             ),
             ( "CR 508.1c's combat restriction",
