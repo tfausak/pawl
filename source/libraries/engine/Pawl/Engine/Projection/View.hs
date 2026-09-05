@@ -661,7 +661,7 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   --
   -- Not implemented: a CR 707.9 exception applied to a copy of a Room, which
   -- Replacement.applyCopyExceptions stamps into the snapshot this arm discards
-  -- (#3253). No card in data/cards/ pairs an exception with a Room-eligible
+  -- (#3249). No card in data/cards/ pairs an exception with a Room-eligible
   -- copy.
   _ -> baseCharacteristics oid gs
 
@@ -722,6 +722,11 @@ staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
   -- 709.5), where the snapshot froze the copied permanent's. copiableCharacteristics
   -- above takes the same fork for the same reason, so the two cannot disagree
   -- about a copy's rules text.
+  --
+  -- A REGRESSION FENCE on that half rather than a proved behaviour: neither door
+  -- of the pool's one Room prints a static ability, so dropping the guard leaves
+  -- the suite green. Pawl.Engine.PlayerEffect.playerAbilitiesOf is the axis a
+  -- printed door does reach, and its own case is red without it.
   _ -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
 
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star

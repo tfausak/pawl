@@ -570,9 +570,10 @@ resolveFaceFor mObj card = case mObj of
 -- "as well as which half of that permanent a characteristic is in" part of the
 -- object's copiable values, and CR 709.5b says the same of the halves'
 -- existence. So which halves an object has is a question about its COPIABLE
--- values and not about the card printed underneath it (#925, #3056): a Copy
--- Enchantment that copied a Room has that Room's two doors, and a Room that
--- copied something else has none.
+-- values and not about the card printed underneath it: a Copy Enchantment that
+-- copied a Room has that Room's two doors, and a Room that copied something else
+-- has none. Pawl.RoomSpec's "CR 709.5 a permanent that copied a Room enters with
+-- neither door unlocked" is what proves it.
 --
 -- The object's OWN unlocked designations are what the caller then reads against
 -- them. CR 709.5 lists no designation among the copiable values, so a copy
