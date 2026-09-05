@@ -19,6 +19,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -77,9 +78,22 @@ import qualified Pawl.Types.Zone as Zone
 combatDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.1b an unblocked attacker damages the defending player" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoard piker 1 0
-        after = S.fightWith S.aggressiveAnswer gs
+    let attacker = S.aliasRef "attacker"
+        setup =
+          S.arrangement
+            ( S.battlefield S.alice [S.ready (S.aliased "attacker" (S.permanent "Goblin Piker"))]
+                NonEmpty.:| [S.battlefield S.bob []]
+            )
+            S.alice
+            (Phase.Combat CombatStep.BeginningOfCombat)
+        attack =
+          S.at
+            1
+            (Phase.Combat CombatStep.DeclareAttackers)
+            S.alice
+            (S.attack [attacker])
+    built <- S.arrangeOrFail s registry setup
+    (_, after) <- S.runScriptOrFail s (Seq.singleton attack) built S.combatGame
     -- A Piker is a 2/1, and bob starts at 20.
     Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 510.1a Tapestry Warden substitutes toughness only where greater than power" $ do
@@ -173,13 +187,31 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.1e an illegal division is rejected and deals nothing" $ do
     -- Not a reachable game state: this is the engine's defense against a
     -- broken interpreter. See the spec, section 3.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoard piker 1 2
-        cheat :: Prompt.Prompt r -> r
-        cheat p = case p of
-          Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 99)) (filter S.isCreatureRecipient (Map.keys thresholds)))
-          _ -> S.aggressiveAnswer p
-        after = S.settleSba (S.fightWith cheat gs)
+    let permanent name = S.ready (S.aliased name (S.permanent "Goblin Piker"))
+        setup =
+          S.arrangement
+            ( S.battlefield S.alice [permanent "attacker"]
+                NonEmpty.:| [S.battlefield S.bob [permanent "first blocker", permanent "second blocker"]]
+            )
+            S.alice
+            (Phase.Combat CombatStep.BeginningOfCombat)
+        attacker = S.aliasRef "attacker"
+        first = S.aliasRef "first blocker"
+        second = S.aliasRef "second blocker"
+        script =
+          Seq.fromList
+            [ S.at 1 (Phase.Combat CombatStep.DeclareAttackers) S.alice (S.attack [attacker]),
+              S.at 1 (Phase.Combat CombatStep.DeclareBlockers) S.bob (S.block [(first, attacker), (second, attacker)]),
+              S.atSource
+                1
+                (Phase.Combat CombatStep.CombatDamage)
+                S.alice
+                attacker
+                (S.assignDamage [(S.MkCreatureRecipient first, 99), (S.MkCreatureRecipient second, 99)])
+            ]
+    built <- S.arrangeOrFail s registry setup
+    (_, fought) <- S.runScriptOrFail s script built S.combatGame
+    let after = S.settleSba fought
     Spec.assertEqWith s "both blockers survive" (S.creaturesInPlay S.bob after) 2
   -- The deterministic successor to the retired "combat happens" property: an
   -- unblocked 2/1 attacker reduces the defender's life by its power.

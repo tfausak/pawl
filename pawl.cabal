@@ -1364,6 +1364,7 @@ library test
     Pawl.SplitSecondSpec
     Pawl.StationSpec
     Pawl.Support
+    Pawl.SupportSpec
     Pawl.TargetSpec
     Pawl.TeamSpec
     Pawl.Test
