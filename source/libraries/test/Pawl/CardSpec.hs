@@ -218,6 +218,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
@@ -626,7 +627,7 @@ objectRefPlayerRefPositions =
   [ ("top-of-library", ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (plantedPlayer "tl") (Quantity.Type.Literal 1)), [plantedPlayer "tl"]),
     ("top-of-library-until", ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (plantedPlayer "tu") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "tu"]),
     ("chosen-card-in-hand", ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (plantedPlayer "ch") (Filter.Type.And [])), [plantedPlayer "ch"]),
-    ("random-card-in-hand", ObjectRef.RandomCardInHand (plantedPlayer "rh"), [plantedPlayer "rh"])
+    ("random-card-in-hand", ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (plantedPlayer "rh") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "rh"])
   ]
 
 -- plantedRef's player half, named for its position for that function's reason.
@@ -2844,10 +2845,12 @@ objectRefFilters ref = case ref of
   -- The arm above's plural: the same Filter position, saying which members are
   -- taken rather than which may be picked, and linted the same way.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ f) -> unframed [f]
-  -- Merfolk Spy's "a card at random from their hand" carries no Filter at all,
-  -- only the PlayerRef naming whose hand, so there is nothing here to lint
-  -- (gap #1742).
-  ObjectRef.RandomCardInHand _ -> []
+  -- Lumbering Lightshield's "a nonland card at random from their hand"; its
+  -- PlayerRef names the seats whose hands are reached, so the Filter is the whole
+  -- of what there is to lint -- the chosen hand card's arm's answer, for its
+  -- reason -- and Fall's count goes through refFilters beside it, TopOfLibrary's
+  -- route above.
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ f _) -> unframed [f] <> refFilters ref
   -- Tovolar's "any number of Human Werewolves you control": EachMatching's
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.

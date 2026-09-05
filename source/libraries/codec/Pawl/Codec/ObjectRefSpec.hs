@@ -21,6 +21,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -291,14 +292,29 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"ChosenCardFromAmong\",\"value\":\"revealed\"} ") >>= Codec.decode ObjectRef.codec))
       "a bare slot name is rejected"
   -- Merfolk Spy's "that player reveals a card at random from their hand": the
-  -- chosen arm's PlayerRef with no filter beside it (gap #1742), and the slot is the
-  -- one the trigger bound to the damaged player.
+  -- unnarrowed singular, so the defaulted filter and count write no key and the
+  -- slot is the one the trigger bound to the damaged player.
   Spec.it s "RandomCardInHand" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.RandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))))
-      " {\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}} "
+      (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (Filter.And []) (Quantity.Literal 1)))
+      " {\"type\":\"RandomCardInHand\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}}} "
+  -- Both narrowings at once: Fall's count beside Lumbering Lightshield's filter,
+  -- which is the pair no single printing writes.
+  Spec.it s "RandomCardInHand narrowed and counted" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (Filter.Not (Filter.HasCardType CardType.Land)) (Quantity.Literal 2)))
+      " {\"type\":\"RandomCardInHand\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"count\":{\"type\":\"Literal\",\"value\":2}}} "
+  -- The bare PlayerRef this arm used to take is not a whole payload any more,
+  -- ChosenCardFromAmong's slot-name case above and for its reason.
+  Spec.it s "RandomCardInHand rejects a bare player reference" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}} ") >>= Codec.decode ObjectRef.codec))
+      "a bare player reference is rejected"
   -- The one Arm.tagged risk this file exists for (#2262): the arm's payload is a
   -- bare Filter, exactly EachMatching's above, so a MISSING codec arm would
   -- compile and only this case would notice. The distinct-tag case below is what
@@ -364,7 +380,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1) (PlayerRef.Relative PlayerRelation.You))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land))),
-                Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)),
+                Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature))

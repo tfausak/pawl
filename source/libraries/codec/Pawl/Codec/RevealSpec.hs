@@ -4,8 +4,11 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Reveal as Reveal
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -18,20 +21,20 @@ spec s = Spec.describe s "Pawl.Codec.Reveal" $ do
       s
       Reveal.codec
       ( Reveal.MkReveal
-          { Reveal.ref = ObjectRef.RandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))),
+          { Reveal.ref = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (Filter.And []) (Quantity.Literal 1)),
             Reveal.slot = Nothing
           }
       )
-      " {\"ref\":{\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}}} "
+      " {\"ref\":{\"type\":\"RandomCardInHand\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}}}} "
   -- Wild Evocation's reveal, whose later clauses name what it showed.
   Spec.it s "MkReveal, slot written" $
     Common.assertCodec
       s
       Reveal.codec
       ( Reveal.MkReveal
-          { Reveal.ref = ObjectRef.RandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))),
+          { Reveal.ref = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (Filter.And []) (Quantity.Literal 1)),
             Reveal.slot = Just (SlotName.MkSlotName (Text.pack "revealed"))
           }
       )
-      " {\"ref\":{\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}},\"slot\":\"revealed\"} "
+      " {\"ref\":{\"type\":\"RandomCardInHand\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}}},\"slot\":\"revealed\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Reveal.codec
