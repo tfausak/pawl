@@ -44,6 +44,11 @@
 -- And that same arm over CR 707.10's other two nouns -- an activated and a
 -- triggered ability on the stack, copied by Lithoform Engine
 -- (copyAbilityOnStackSpec), where CR 707.10b keeps the original's source.
+--
+-- And CR 707.10d's and CR 707.10e's answers whole, end to end: Zada, Hedron
+-- Grinder's one copy per candidate (zadaSpec) and Ivy, Gleeful Spellthief's one
+-- copy on a stated new target (ivySpec), the second of which is where "the copy
+-- isn't created" is read off an illegal one.
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -2592,7 +2597,7 @@ ivySpec s registry =
           Spec.assertEqWith s "CR 707.10e the copy on the stack names Ivy and nobody else" (fmap (Maybe.mapMaybe Recipient.objectOf) (Maybe.listToMaybe (stackTargets afterTrigger))) (Just [ivyId])
           Spec.assertEqWith s "CR 707.10 the original still pumped the Spider bob aimed it at" (pt spiderId) (Just (5, 7))
           Spec.assertEqWith s "CR 707.10e ONE copy, so the stack held the copy and the Growth" (length (stackTargets afterTrigger)) 2
-        -- CR 707.10e's second sentence, on two boards differing in exactly one
+        -- CR 707.10e's "the copy isn't created", on two boards differing in one
         -- thing: whether Ivy clears Reprisal's "power 4 or greater". Legality is
         -- judged for the COPY, whose controller CR 707.10 makes alice, so this is
         -- a fact about Ivy and not about whose spell it was.

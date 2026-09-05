@@ -33,10 +33,10 @@ data CopyTargets
     -- Ivy").
     --
     -- The arm above's shape with the count fixed at one rather than at the
-    -- candidate set's size, and rule 707.10e's last-but-one sentence is the same
-    -- test rule 707.10d's is -- "if that player or object isn't a legal target
-    -- for each instance of the word 'target', the copy isn't created" -- so the
-    -- two share an executor.
+    -- candidate set's size, and rule 707.10e states the same test rule 707.10d
+    -- does -- "if that player or object isn't a legal target for each instance of
+    -- the word 'target', the copy isn't created" -- so the two share an
+    -- executor.
     --
     -- A ref naming SEVERAL objects names none: the rule specifies "a new target",
     -- singular, and no printing states a set here.

@@ -1607,8 +1607,8 @@ stackTargetSlots obj oid gs =
 -- if EVERY instance of the word "target" named that candidate. A candidate that
 -- cannot fill them all is dropped, which is rule 707.10d's last sentence -- "if
 -- that player or object isn't a legal target for each instance of the word
--- 'target', a copy isn't created for that player or object" -- and rule 707.10e's
--- second sentence, the same test with one candidate.
+-- 'target', a copy isn't created for that player or object" -- and rule
+-- 707.10e's "the copy isn't created", the same test with one candidate.
 --
 -- A slot the original filled with TWO targets keeps nobody, and that is the
 -- rule rather than a shortcut: every one of the copy's targets must be the same
