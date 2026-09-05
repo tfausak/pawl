@@ -32,6 +32,7 @@ import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEf
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.CombatRestriction as CombatRestriction.Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Keyword as Keyword.Engine
@@ -43,6 +44,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card.Type
@@ -474,16 +476,20 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no dangling or unused ability names" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 116.2d's join, the same shape one rule over: an ignore naming an ability
   -- its face does not declare is a payment that suppresses nothing, and a named
-  -- player ability no ignore grants is a name for nobody --
-  -- PlayerStaticAbility.name exists only so that grant can refer to it. Equality
-  -- for both directions at once.
+  -- ignorable ability no ignore grants is a name for nobody -- each carrier's
+  -- name field exists only so that grant can refer to it. Equality for both
+  -- directions at once.
+  --
+  -- BOTH AXES in one namespace, because CR 116.2d's grant does not know which:
+  -- Damping Engine names two player abilities, and Volrath's Curse names two
+  -- combat restrictions and an activation prohibition, one sentence each.
   --
   -- Its own namespace rather than declaredAbilityNames' above, because the two
-  -- joins never meet: no card both names a player ability and removes one by
+  -- joins never meet: no card both names an ignorable ability and removes one by
   -- name, and folding them together would make each card's unused half dangle.
-  Spec.it s "CR 116.2d every ignore names a player ability its face declares, and every named player ability is ignorable" $ do
+  Spec.it s "CR 116.2d every ignore names an ability its face declares, and every named ignorable ability is ignorable" $ do
     ps <- S.allPrintings s
-    let faceOffends face = ignoredAbilityNames face /= declaredPlayerAbilityNames face
+    let faceOffends face = ignoredAbilityNames face /= declaredIgnorableAbilityNames face
         offenders = filter (anyFace faceOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused ignore names" (fmap (S.nameOf . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
@@ -1184,12 +1190,22 @@ ignoredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityNa
 ignoredAbilityNames face =
   Set.fromList [name | SpecialAction.IgnoreThisUntilEndOfTurn name _ <- Face.specialActions face]
 
--- Every AbilityName a face's player abilities declare -- the other side of that
--- join. SEVERAL rows may carry one name, which is Damping Engine's one sentence
--- declaring two, so this is a set rather than a list.
-declaredPlayerAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
-declaredPlayerAbilityNames face =
-  Set.fromList (Maybe.mapMaybe PlayerStaticAbility.name (Face.playerAbilities face))
+-- Every AbilityName a face's IGNORABLE abilities declare -- the other side of
+-- that join. SEVERAL rows may carry one name, which is Damping Engine's one
+-- sentence declaring two and Volrath's Curse's one sentence declaring three, so
+-- this is a set rather than a list.
+--
+-- A HAND-KEPT union over the carriers CR 116.2d can reach, declaredAbilityNames'
+-- posture: a fourth carrier given a name field must be added here too, or its
+-- cards' names read as dangling. The two BOUNDING combat restrictions have no
+-- name field to read (Pawl.Engine.CombatRestriction.nameOf says why).
+declaredIgnorableAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
+declaredIgnorableAbilityNames face =
+  Set.fromList
+    ( Maybe.mapMaybe PlayerStaticAbility.name (Face.playerAbilities face)
+        <> Maybe.mapMaybe CombatRestriction.Engine.nameOf (Face.combatRestrictions face)
+        <> Maybe.mapMaybe ActivationProhibition.name (Face.activationProhibitions face)
+    )
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do

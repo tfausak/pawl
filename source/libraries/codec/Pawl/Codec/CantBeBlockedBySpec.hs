@@ -20,7 +20,8 @@ spec s = Spec.describe s "Pawl.Codec.CantBeBlockedBy" $ do
       ( CantBeBlockedBy.MkCantBeBlockedBy
           { CantBeBlockedBy.affected = Affected.Matching (Filter.HasCardType CardType.Creature),
             CantBeBlockedBy.blockers = Filter.PowerGreaterThanSource,
-            CantBeBlockedBy.unless = Nothing
+            CantBeBlockedBy.unless = Nothing,
+            CantBeBlockedBy.name = Nothing
           }
       )
       " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}} "
