@@ -2468,7 +2468,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       gs <- State.get
       -- CR 706.4: WHICH result the instruction uses, where it threw more than
       -- one ("roll two d6 and choose one result"). A choice and not a roll, so
-      -- it goes through Game.choose and CR 723.1's controller may make it.
+      -- it goes through Game.choose and CR 723.5's controller may make it.
       -- Elided where every result is the same number: both bindings below come
       -- out the same whichever die is named, so no board can tell the answers
       -- apart. FILTERED, NOT TRUSTED, the ChooseBolster posture: an index past
