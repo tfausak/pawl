@@ -190,8 +190,9 @@ playersInScope perspective gs scope =
 -- -- its copy snapshot's when it has one, its printed face's otherwise. The
 -- Pawl.Engine.Projection.View.staticAbilitiesOf of this axis, and written here rather
 -- than beside it so that Pawl.Engine.Projection goes on never seeing
--- Pawl.Types.PlayerEffect; the one read of Binding.copyOf both share is
--- Projection.copiableSnapshotOf.
+-- Pawl.Types.PlayerEffect; the one accessor both share is
+-- Projection.copiableSnapshotOf, which is also where CR 709.5's copied halves
+-- are forked out for every reader at once.
 playerAbilitiesOf :: ObjectId -> GameState -> [PlayerStaticAbility.PlayerStaticAbility]
 playerAbilitiesOf oid gs = case Projection.copiableSnapshotOf oid gs of
   Just snapshot -> PC.playerAbilities snapshot

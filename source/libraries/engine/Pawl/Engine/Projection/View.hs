@@ -657,6 +657,11 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   -- belong to this object. So the copiable values are rebuilt from the copied
   -- card's halves against THIS object's doors, which is what baseCharacteristics
   -- does with Game.halvesOf underneath it.
+  --
+  -- Not implemented: a CR 707.9 exception applied to a copy of a Room, which
+  -- Replacement.applyCopyExceptions stamps into the snapshot this arm goes
+  -- around (#3249). No card in data/cards/ pairs an exception with a
+  -- Room-eligible copy.
   Nothing -> baseCharacteristics oid gs
 
 -- CR 707.3: the copy snapshot an object's copiable RULES TEXT is read from --
