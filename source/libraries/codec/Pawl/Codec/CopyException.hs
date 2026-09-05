@@ -1,5 +1,6 @@
 module Pawl.Codec.CopyException where
 
+import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.SetPowerToughness as SetPowerToughness
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -15,5 +16,8 @@ codec =
         _ -> Nothing,
       Arm.payload "GainKeywords" (Common.set Keyword.codec) CopyException.GainKeywords $ \x -> case x of
         CopyException.GainKeywords y -> Just y
+        _ -> Nothing,
+      Arm.payload "AddCardTypes" (Common.set CardType.codec) CopyException.AddCardTypes $ \x -> case x of
+        CopyException.AddCardTypes y -> Just y
         _ -> Nothing
     ]

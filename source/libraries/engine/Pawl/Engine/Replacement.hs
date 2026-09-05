@@ -1969,6 +1969,20 @@ applyCopyException snapshot exception = case exception of
   -- characteristic, and gaining an ability provides none.
   CopyException.GainKeywords keywords ->
     snapshot {PC.keywords = Map.unionWith (+) (PC.keywords snapshot) (Map.fromSet (const 1) keywords)}
+  -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
+  -- copied type line rather than the replacement CR 205.1a's own sentence would
+  -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.
+  --
+  -- Nothing else moves, and CR 707.9d is why: its strip "does not apply to copy
+  -- effects with exceptions that state the object is a certain card type,
+  -- supertype, and/or subtype 'in addition to its other types'", so unlike the
+  -- SetPowerToughness arm above this one leaves the copied
+  -- characteristic-defining ability in place. A Metamorph copying a Tarmogoyf is
+  -- an artifact and still recomputes its P/T off the graveyards --
+  -- Pawl.CopySpec's "a type exception keeps the copied CDA where a value
+  -- exception does not" is what proves it.
+  CopyException.AddCardTypes types ->
+    snapshot {PC.cardTypes = Set.union (PC.cardTypes snapshot) types}
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- permanents matching the rewrite's printed noun phrase, other than itself, minus

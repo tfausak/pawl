@@ -3,7 +3,9 @@
 
 -- Covers: Pawl.Engine.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
 -- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
--- (Replacement.applyCopyExceptions -- CR 707.9b's Quicksilver Gargantuan, and CR
+-- (Replacement.applyCopyExceptions -- CR 707.9b's Quicksilver Gargantuan and
+-- Phyrexian Metamorph, the second of which is where CR 707.9d's carve-out keeps
+-- the copied characteristic-defining ability, and CR
 -- 707.9a's Dack's Duplicate and Omni-Changeling, the second of which is where CR
 -- 604.3a makes the gained ability characteristic-defining), its CR 707.5 eligible set
 -- (Replacement.legalCopyTargets, Copy Enchantment's "any enchantment" against Clone's
@@ -121,6 +123,12 @@ printedOnBattlefield :: String -> GameState.GameState -> [ObjectId]
 printedOnBattlefield name gs = filter isIt (Set.toList (GameState.battlefield gs))
   where
     isIt oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+
+-- Whether an object is still on the battlefield -- what a destroy is read
+-- through, where printedOnBattlefield above answers by PRINTED name and so
+-- cannot tell two copies of one card apart.
+onBattlefield :: ObjectId -> GameState.GameState -> Bool
+onBattlefield oid gs = Set.member oid (GameState.battlefield gs)
 
 clonesOnBattlefield :: GameState.GameState -> [ObjectId]
 clonesOnBattlefield = printedOnBattlefield "Clone"
@@ -749,6 +757,115 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertBool s (not (Set.member Subtype.Island (Projection.subtypesOf omniId resolved))) "and no land type (CR 205.3m)"
           tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
       _ -> Spec.assertFailure s "the Clone and the Omni-Changeling should both be on the battlefield"
+
+  -- THE PROVING TEST for CR 707.9b's OTHER arm, the exception that adds a CARD
+  -- TYPE. Phyrexian Metamorph {3}{U/P} Artifact Creature -- Phyrexian
+  -- Shapeshifter 0/0: "You may have this creature enter as a copy of any
+  -- artifact or creature on the battlefield, except it's an artifact in addition
+  -- to its other types."
+  --
+  -- Read at GAMEPLAY level by a sweeper that asks the type rather than by a
+  -- projection field: Bane of Progress destroys every artifact and enchantment as
+  -- it enters, so the excepted copy of a Goblin Piker is destroyed and a CLONE of
+  -- the SAME Piker -- the copy without the exception, entering the same way -- is
+  -- not. The Piker itself is the third reading and survives too.
+  --
+  -- The Metamorph's PRINTED type line is artifact creature, which is exactly what
+  -- CR 707.2 replaced when it copied the Piker: without the exception the copy is
+  -- a plain creature. So "it is still an artifact" is the exception's doing and
+  -- not the printed card's, and the name assertion ahead of the sweep is what
+  -- pins that the copy happened at all.
+  --
+  -- The Bane's own +1/+1 counter is a diagnostic after the behaviour: it takes
+  -- one per permanent destroyed, so 3/3 says EXACTLY ONE artifact was there and
+  -- the sweep did not also take the Clone.
+  Spec.it s "Phyrexian Metamorph's copy is an artifact and a sweeper takes it (CR 707.9b)" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    metamorph <- S.printingOf s registry "Phyrexian Metamorph"
+    bane <- S.printingOf s registry "Bane of Progress"
+    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        (_, stagedClone) = S.spellOnStack clone S.alice board
+        withClone = resolveAndSettle (copyNamed pikerId) stagedClone
+        (_, stagedMetamorph) = S.spellOnStack metamorph S.alice withClone
+        entered = resolveAndSettle (copyNamed pikerId) stagedMetamorph
+    case (cloneOnBattlefield entered, newest (printedOnBattlefield "Phyrexian Metamorph" entered)) of
+      (Just cloneId, Just metamorphId) -> do
+        let (baneId, staged) = S.entersWithTrigger bane S.alice entered
+            -- The settle puts the Bane's CR 603.6a trigger on the stack; the
+            -- resolve runs it.
+            onStack = settle (copyNamed pikerId) staged
+            swept = resolveAndSettle (copyNamed pikerId) onStack
+        Spec.assertBool s (not (null (GameState.stack onStack))) "the Bane's trigger really was on the stack"
+        -- CR 707.2 ran: the exception modified the copy, it did not replace it.
+        Spec.assertEqWith s "the Metamorph is the Piker by name (CR 707.2)" (Projection.namesOf metamorphId entered) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
+        Spec.assertEqWith s "and has the Piker's 2/1" (S.powerToughnessOf metamorphId entered) $ Just (2, 1)
+        -- THE GAMEPLAY ASSERTION: the sweeper's type question found an artifact.
+        Spec.assertBool s (not (onBattlefield metamorphId swept)) "the excepted copy was destroyed as an artifact (CR 707.9b)"
+        -- The two controls, on the same board and copied from the same Piker.
+        Spec.assertBool s (onBattlefield cloneId swept) "the copy without the exception is no artifact and survives"
+        Spec.assertBool s (onBattlefield pikerId swept) "and the Piker they both copied is no artifact either"
+        -- Diagnostics, after the behaviour: the copied type line kept its creature
+        -- half (CR 205.1b's "in addition"), and exactly one permanent was swept.
+        Spec.assertEqWith s "the copy is an artifact creature, not an artifact instead" (PC.cardTypes (Projection.project metamorphId entered)) (Set.fromList [CardType.Artifact, CardType.Creature])
+        Spec.assertEqWith s "the Bane counted exactly one destroyed permanent" (S.powerToughnessOf baneId swept) $ Just (3, 3)
+      _ -> Spec.assertFailure s "the Clone and the Metamorph should both be on the battlefield"
+
+  -- THE PROVING TEST for CR 707.9d's CARVE-OUT: its strip of the copied object's
+  -- characteristic-defining ability "does not apply to copy effects with
+  -- exceptions that state the object is a certain card type, supertype, and/or
+  -- subtype 'in addition to its other types'".
+  --
+  -- Two copies of ONE Tarmogoyf on one board, differing only in which CR 707.9b
+  -- arm their card writes. Quicksilver Gargantuan's "except it's 7/7" PROVIDES
+  -- values, so CR 707.9d takes the Goyf's CDA and the Gargantuan is deaf to the
+  -- graveyards; the Metamorph's "in addition to its other types" is the
+  -- carve-out's own wording, so the CDA came across and its copy moves when a
+  -- second card type reaches a graveyard.
+  --
+  -- The graveyards move AFTER both copies entered, which is what makes the CDA
+  -- claim bite: at entry both readings of the Metamorph agree at 1/2, and only
+  -- the later board tells "kept the ability" from "kept the number".
+  Spec.it s "a type exception keeps the copied CDA where a value exception does not (CR 707.9d)" $ do
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    gargantuan <- S.printingOf s registry "Quicksilver Gargantuan"
+    metamorph <- S.printingOf s registry "Phyrexian Metamorph"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        -- One card type in a graveyard: the Goyf's CDA is 1/2.
+        (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
+        (goyfId, board) = S.addCreature tarmogoyf S.alice withBolt
+        (_, stagedGargantuan) = S.spellOnStack gargantuan S.alice board
+        withGargantuan = resolveAndSettle (copyNamed goyfId) stagedGargantuan
+        (_, stagedMetamorph) = S.spellOnStack metamorph S.alice withGargantuan
+        entered = resolveAndSettle (copyNamed goyfId) stagedMetamorph
+        -- A second card type reaches a graveyard AFTER both copies entered.
+        (_, later) = S.addGraveyardCard piker S.bob entered
+        gargantuanId = newest (printedOnBattlefield "Quicksilver Gargantuan" entered)
+        metamorphId = newest (printedOnBattlefield "Phyrexian Metamorph" entered)
+        -- Read through the Maybe rather than behind a `case` guard, and that is
+        -- the mutation talking: the wrong reading of CR 707.9d strips the copied
+        -- CDA, which leaves the copy with NO power or toughness at all and a
+        -- state-based action takes it off the battlefield (CR 704.5f). A guard
+        -- would have absorbed that
+        -- into "should be on the battlefield" and the gameplay assertion below
+        -- would never have run.
+        ptOf oid gs = oid >>= \o -> S.powerToughnessOf o gs
+        projected f oid gs = fmap (\o -> f (Projection.project o gs)) oid
+    -- THE GAMEPLAY ASSERTION, ahead of every reading taken at entry: the
+    -- type-excepted copy is still there and still recomputes the Goyf's CDA.
+    Spec.assertEqWith s "the type-excepted copy moves with the graveyards (CR 707.9d)" (ptOf metamorphId later) $ Just (2, 3)
+    Spec.assertEqWith s "the original moves with them too" (S.powerToughnessOf goyfId later) $ Just (2, 3)
+    -- The control, on the same board and off the same Goyf: the value exception
+    -- DID strip the ability, which is CR 707.9d's main sentence.
+    Spec.assertEqWith s "the value-excepted copy does not" (ptOf gargantuanId later) $ Just (7, 7)
+    -- Diagnostics, after the behaviour: both copies are the Goyf, and only the
+    -- Metamorph's gained the card type its card names.
+    Spec.assertEqWith s "at entry the type-excepted copy is the bare CDA" (ptOf metamorphId entered) $ Just (1, 2)
+    Spec.assertEqWith s "the type-excepted copy is the Goyf by name (CR 707.2)" (fmap (\o -> Projection.namesOf o entered) metamorphId) . Just . Set.singleton . CardName.MkCardName $ Text.pack "Tarmogoyf"
+    Spec.assertEqWith s "and an artifact creature" (projected PC.cardTypes metamorphId entered) . Just $ Set.fromList [CardType.Artifact, CardType.Creature]
+    Spec.assertEqWith s "where the value-excepted copy is a creature alone" (projected PC.cardTypes gargantuanId entered) . Just $ Set.singleton CardType.Creature
 
   Spec.it s "Cackling Counterpart mints a token copy of the targeted creature (CR 707.2, CR 111.3)" $ do
     island <- S.printingOf s registry "Island"

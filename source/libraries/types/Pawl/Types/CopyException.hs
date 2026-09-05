@@ -1,13 +1,15 @@
 module Pawl.Types.CopyException where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 
 -- | CR 707.9: one exception to the copying process, the "except ..." clause of a
 -- copy effect. Quicksilver Gargantuan's "except it's 7/7" is CR 707.9d's own
 -- worked example; Dack's Duplicate's "except it has haste and dethrone" is CR
--- 707.9a's.
+-- 707.9a's; Phyrexian Metamorph's "except it's an artifact in addition to its
+-- other types" is the carve-out CR 707.9d's last two sentences make.
 --
 -- A LIST of these rides EntryRewrite.AsCopy rather than one: the printed clauses
 -- are joined by "and" (Moritte of the Frost states three), and CR 707.9f reads
@@ -20,9 +22,12 @@ import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 -- layer-7b write on the object would be left behind (CR 707.2's exclusion of
 -- "other effects").
 --
--- Not implemented: CR 707.9c's exception that declines to copy a characteristic,
--- CR 707.9d's "in addition to its other types" carve-out, and CR 707.9e's
--- exception that is an additional effect rather than a characteristic (#1292).
+-- Not implemented: CR 707.9c's exception that declines to copy a characteristic
+-- (Vesuvan Doppelganger's "except it doesn't copy that creature's color"), the
+-- SUBTYPE and SUPERTYPE halves of CR 707.9b's "in addition to its other types"
+-- (Visage Bandit's "a Shapeshifter Rogue", Sakashima the Impostor's "legendary"),
+-- and CR 707.9e's exception that is an additional effect rather than a
+-- characteristic (Altered Ego's additional counters) (#1292).
 data CopyException
   = -- | CR 707.9b: the copy's power and toughness are these numbers instead of
     -- the copied object's ("except it's 7/7").
@@ -50,4 +55,20 @@ data CopyException
     -- picks up an excepted changeling at CR 613.3's start-of-layer moment rather
     -- than in timestamp order (Omni-Changeling).
     GainKeywords (Set.Set Keyword.Keyword)
+  | -- | CR 707.9b: the copy is these card types "in addition to its other types"
+    -- (Phyrexian Metamorph's "except it's an artifact"), so they JOIN the copied
+    -- type line rather than replacing it (CR 205.1b).
+    --
+    -- A Set for GainKeywords' reason: one printed clause names as many as it
+    -- likes, joined by "and" ("a Vehicle artifact"). CR 205.1a's replacement is a
+    -- different sentence and no copy exception prints it.
+    --
+    -- NOTHING ELSE MOVES, and that is CR 707.9d's last two sentences rather than
+    -- an omission: its strip of the copied object's characteristic-defining
+    -- ability "does not apply to copy effects with exceptions that state the
+    -- object is a certain card type, supertype, and/or subtype 'in addition to
+    -- its other types'". So this arm must NOT clear characteristicPT the way
+    -- SetPowerToughness above does, and it must not touch the keywords a CDA is
+    -- written as -- a Metamorph copying a Tarmogoyf keeps the Goyf's CDA.
+    AddCardTypes (Set.Set CardType.CardType)
   deriving (Eq, Ord, Show)
