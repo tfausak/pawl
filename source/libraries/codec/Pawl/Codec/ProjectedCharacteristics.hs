@@ -19,6 +19,7 @@ import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Codec.SpecialAction as SpecialAction
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
@@ -48,6 +49,7 @@ codec = Fields.object $ do
   subtypes <- Fields.defaulted "subtypes" Set.empty (Common.set Subtype.codec) PC.subtypes
   staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list (StaticAbility.codec Card.codec)) PC.staticAbilities
   playerAbilities <- Fields.defaulted "playerAbilities" [] (Common.list PlayerStaticAbility.codec) PC.playerAbilities
+  specialActions <- Fields.defaulted "specialActions" [] (Common.list SpecialAction.codec) PC.specialActions
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.activatedAbilities
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.triggeredAbilities
@@ -74,6 +76,7 @@ codec = Fields.object $ do
         PC.subtypes = subtypes,
         PC.staticAbilities = staticAbilities,
         PC.playerAbilities = playerAbilities,
+        PC.specialActions = specialActions,
         PC.activatedAbilities = activatedAbilities,
         PC.replacementEffects = replacementEffects,
         PC.triggeredAbilities = triggeredAbilities,

@@ -14,13 +14,12 @@ module Pawl.Engine.Ignore where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Cost as Cost
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Expiry as Expiry
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -34,24 +33,25 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.SpecialAction as SpecialAction
 
--- Every ignore this permanent's current face grants: which ability each names
--- (CR 116.2d's "that ability") and what it charges.
+-- Every ignore this permanent's copiable rules text grants: which ability each
+-- names (CR 116.2d's "that ability") and what it charges.
 --
--- Read off Game.faceOf and never Card.combined: CR 604.1 has a static ability
--- function from the face the permanent actually shows, which is the same
--- direction Pawl.Engine.PlayerEffect.applying reads Face.playerAbilities from.
+-- Read off Projection.specialActionsOf and never Card.combined: CR 604.1 has a
+-- static ability function from the face the permanent actually shows, and CR
+-- 707.2a has a copy derive its abilities from the rules text it copied -- which
+-- is the same accessor, and so the same answer, as
+-- Pawl.Engine.PlayerEffect.playerAbilitiesOf gives for the prohibition this
+-- permission accompanies.
 --
 -- A LIST rather than the first grant, now that each names an ability: a face may
 -- grant the permission on one of several, and each grant is its own offer. No
 -- printing grants two -- the four producers print one sentence each -- so the
 -- list is a singleton for every card in the pool.
 ignoreGrants :: ObjectId -> GameState -> [(AbilityName.AbilityName, Cost.Type.Cost Keyword)]
-ignoreGrants oid gs = case Game.faceOf oid gs of
-  Nothing -> []
-  Just face -> [(n, c) | SpecialAction.IgnoreThisUntilEndOfTurn n c <- Face.specialActions face]
+ignoreGrants oid gs = [(n, c) | SpecialAction.IgnoreThisUntilEndOfTurn n c <- Projection.specialActionsOf oid gs]
 
 -- What this permanent charges to be ignored under this ability's name, if its
--- current face grants that at all. FIRST grant wins where a face somehow named
+-- rules text grants that at all. FIRST grant wins where a face somehow named
 -- one ability twice; no printing does.
 ignoreCostOf :: ObjectId -> AbilityName.AbilityName -> GameState -> Maybe (Cost.Type.Cost Keyword)
 ignoreCostOf oid name gs = case [c | (n, c) <- ignoreGrants oid gs, n == name] of
