@@ -672,9 +672,8 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
 --
 -- The BATTLEFIELD conjunct is Game.resolveFaceFor's own, which is what makes the
 -- two agree: only there do CR 709.5c's designations exist for the subtraction to
--- read, so a card in a graveyard that became a copy of a Room (CR 707.4) keeps
--- reading the frozen snapshot, which is CR 709.4's combined view of the copied
--- card.
+-- read, so a card in a graveyard that became a copy of a Room keeps reading the
+-- frozen snapshot, which is CR 709.4's combined view of the copied card.
 derivesFromCopiedHalves :: ObjectId -> GameState -> Bool
 derivesFromCopiedHalves oid gs = case copiableSnapshotOf oid gs of
   Nothing -> False

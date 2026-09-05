@@ -563,6 +563,30 @@ resolveFaceFor mObj card = case mObj of
         Card.roomFace (Object.unlockedHalves obj) halves
   _ -> resolveFace (mObj >>= Object.face) card
 
+-- CR 709.4a: the NAMES the object shows, the plural companion of resolveFaceFor
+-- above -- one arm for each of that function's, in the same order, because the
+-- two answer the same question about the same object and must not disagree
+-- about which halves are showing.
+--
+-- Separate from resolveFaceFor rather than folded into it because a Face has one
+-- name by construction: the combined view Face.name carries is the halves'
+-- names joined for rendering (Pawl.Engine.Card.merge2), which is not a name the
+-- object has. The set is what CR 709.4a's "one of its names" asks about.
+namesFor :: Maybe Object.Object -> Card -> Set.Set CardName.CardName
+namesFor mObj card = case mObj of
+  Just obj
+    | Just halves <- halvesCardOf obj card,
+      Object.zone obj == Zone.Battlefield ->
+        Card.roomNames (Object.unlockedHalves obj) halves
+  _ -> case mObj >>= Object.face of
+    -- CR 709.4 / 712.8a / 715.4: the layout's own view, whose names are its
+    -- contributing halves'.
+    Nothing -> Card.combinedNames card
+    -- CR 709.3b: a spell on the stack has only the named half's
+    -- characteristics, so only that half's name -- with resolveFace's fallback
+    -- to the combined view for a name that resolves to no face.
+    Just n -> maybe (Card.combinedNames card) (Set.singleton . Face.name) (Card.faceNamed n card)
+
 -- CR 709.5 / 709.5b: the card whose HALVES this object has -- the copy snapshot's
 -- when the object is copying something, and its own printed card's otherwise.
 --
@@ -608,30 +632,6 @@ halvesOf oid gs = do
     Facing.FaceUp -> do
       card <- cardOf oid gs
       halvesCardOf obj card
-
--- CR 709.4a: the NAMES the object shows, the plural companion of resolveFaceFor
--- above -- one arm for each of that function's, in the same order, because the
--- two answer the same question about the same object and must not disagree
--- about which halves are showing.
---
--- Separate from resolveFaceFor rather than folded into it because a Face has one
--- name by construction: the combined view Face.name carries is the halves'
--- names joined for rendering (Pawl.Engine.Card.merge2), which is not a name the
--- object has. The set is what CR 709.4a's "one of its names" asks about.
-namesFor :: Maybe Object.Object -> Card -> Set.Set CardName.CardName
-namesFor mObj card = case mObj of
-  Just obj
-    | Just halves <- halvesCardOf obj card,
-      Object.zone obj == Zone.Battlefield ->
-        Card.roomNames (Object.unlockedHalves obj) halves
-  _ -> case mObj >>= Object.face of
-    -- CR 709.4 / 712.8a / 715.4: the layout's own view, whose names are its
-    -- contributing halves'.
-    Nothing -> Card.combinedNames card
-    -- CR 709.3b: a spell on the stack has only the named half's
-    -- characteristics, so only that half's name -- with resolveFace's fallback
-    -- to the combined view for a name that resolves to no face.
-    Just n -> maybe (Card.combinedNames card) (Set.singleton . Face.name) (Card.faceNamed n card)
 
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).

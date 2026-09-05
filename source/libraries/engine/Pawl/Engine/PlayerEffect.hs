@@ -186,7 +186,9 @@ playersInScope perspective gs scope =
         PlayerScope.ControllingMostPermanents -> Just (Maybe.maybeToList (permanentLeader gs))
 
 -- CR 707.2a: the player abilities this permanent's copiable rules text gives it
--- -- its copy snapshot's when it has one, its printed face's otherwise. The
+-- -- its copy snapshot's when it has one, and its printed face's otherwise or
+-- when the snapshot's rules text is a set of copied HALVES, which CR 709.5 reads
+-- against this object's own designations. The
 -- Pawl.Engine.Projection.View.staticAbilitiesOf of this axis, and written here rather
 -- than beside it so that Pawl.Engine.Projection goes on never seeing
 -- Pawl.Types.PlayerEffect; the one read of Binding.copyOf both share is
