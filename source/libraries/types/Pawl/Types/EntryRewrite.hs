@@ -75,8 +75,9 @@ data EntryRewrite effect
     -- snapshot ChoiceOf writes, which would be a different rule: CR 707.2 makes
     -- an "as . . . enters" ability copiable only where it SETS POWER AND
     -- TOUGHNESS, and this clause sets neither, so a copy of the entered permanent
-    -- does not have the keyword. Pawl.ReplacementSpec's "CR 707.2 a token copy of
-    -- the kicked Squadron does not have flying" is what proves the two apart.
+    -- does not have the keyword. Pawl.ReplacementSpec's "CR 707.2 a token copy
+    -- of the kicked Squadron has neither the flying nor the counters" is what
+    -- proves the two apart.
     --
     -- Not implemented: the same clause granting a whole quoted ability rather
     -- than a keyword -- Degavolver's "Pay 3 life: Regenerate this creature"

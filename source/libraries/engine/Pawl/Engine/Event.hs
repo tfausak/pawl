@@ -2043,8 +2043,8 @@ apply batch candidate event =
       -- ChoiceOf's: CR 707.2 copies an "as . . . enters" ability's values only
       -- where it SETS POWER AND TOUGHNESS, and this clause sets neither, so a
       -- token copy of the entered Squadron has no flying. Pawl.ReplacementSpec's
-      -- "CR 707.2 a token copy of the kicked Squadron does not have flying" is the
-      -- half that proves it.
+      -- "CR 707.2 a token copy of the kicked Squadron has neither the flying nor
+      -- the counters" is the half that proves it.
       --
       -- ONE timestamp for the whole set, taken once: CR 613.7a gives a static
       -- ability's continuous effect the timestamp of the object it is on, and
