@@ -1,6 +1,7 @@
 module Pawl.Types.EntryRewrite where
 
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.EntryFlip as EntryFlip
@@ -65,6 +66,22 @@ data EntryRewrite effect
     -- printed or minted (CR 306.5b's loyalty, CR 310.4b's defense, CR 714.3a's
     -- lore counter).
     WithCounters WithCounters.WithCounters
+  | -- | CR 614.1c / Faerie Squadron: "[This permanent] enters ... with [keywords]",
+    -- the keyword half of a clause whose counter half is WithCounters above.
+    --
+    -- Granted as a stored CR 611.2 continuous effect with CR 611.2a's
+    -- rest-of-the-game duration, which is where riot's own grant lands and for
+    -- its reason (Pawl.Engine.Event's Riot arm states it). NOT into the copiable
+    -- snapshot ChoiceOf writes, which would be a different rule: CR 707.2 makes
+    -- an "as . . . enters" ability copiable only where it SETS POWER AND
+    -- TOUGHNESS, and this clause sets neither, so a copy of the entered permanent
+    -- does not have the keyword. Pawl.ReplacementSpec's "CR 707.2 a token copy of
+    -- the kicked Squadron does not have flying" is what proves the two apart.
+    --
+    -- Not implemented: the same clause granting a whole quoted ability rather
+    -- than a keyword -- Degavolver's "Pay 3 life: Regenerate this creature"
+    -- (#3006).
+    WithKeywords (Set.Set Keyword.Keyword)
   | -- | CR 616.1b / Gather Specimens: the object enters under the control of the
     -- effect's source's controller, written to Object.enteredUnder.
     UnderSourceControl

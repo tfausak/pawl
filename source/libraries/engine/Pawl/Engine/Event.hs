@@ -2028,6 +2028,61 @@ apply batch candidate event =
             Nothing -> pure () -- unevaluable quantity: no counters (Resolve's PutCounters posture)
             Just n -> addEnteringCounters oid kind (Integer.toNaturalSaturating n)
         pure (Just event)
+      -- CR 614.1c: "[This permanent] enters ... with [keywords]" -- Faerie
+      -- Squadron's "and with flying", the keyword half of the clause whose counter
+      -- half the arm above places.
+      --
+      -- A STORED continuous effect (CR 611.2), riot's landing and every word of
+      -- its argument: the clause says the permanent has the keyword and names no
+      -- end, which is CR 611.2a's rest-of-the-game duration, and a stored effect
+      -- is what puts the grant in CR 613.1f's layer 6 with a timestamp for
+      -- Humility to be ordered against. Its source is the entering permanent
+      -- itself (CR 113.7).
+      --
+      -- NOT a write into the copiable snapshot, which is what tells this arm from
+      -- ChoiceOf's: CR 707.2 copies an "as . . . enters" ability's values only
+      -- where it SETS POWER AND TOUGHNESS, and this clause sets neither, so a
+      -- token copy of the entered Squadron has no flying. Pawl.ReplacementSpec's
+      -- "CR 707.2 a token copy of the kicked Squadron does not have flying" is the
+      -- half that proves it.
+      --
+      -- ONE timestamp for the whole set, taken once: CR 613.7a gives a static
+      -- ability's continuous effect the timestamp of the object it is on, and
+      -- Cetavolver's "with first strike and trample" is one clause, so its two
+      -- keywords cannot be ordered against each other.
+      --
+      -- No prompt, and none is owed: the clause offers nothing to choose.
+      EntryRewrite.WithKeywords keywords -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the reason riot's arm gives below: the
+          -- object is materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            State.modify' $ \gs2 ->
+              -- Armed through Pawl.Engine.Expiry rather than naming Expiry.Never,
+              -- riot's posture: Indefinite always arms, so the Nothing branch is
+              -- unreachable and is written out only because arm is total over
+              -- Duration. No bindings -- CR 614.1c's rewrite is a replacement's,
+              -- not a resolution's, so its duration can name no slot.
+              case Expiry.arm Map.empty controller oid Duration.Indefinite gs2 of
+                Nothing -> gs2
+                Just expiry ->
+                  let (ts, gs3) = Game.freshTimestamp gs2
+                      effectFor keyword =
+                        ContinuousEffect.MkContinuousEffect
+                          { ContinuousEffect.source = oid,
+                            ContinuousEffect.timestamp = ts,
+                            ContinuousEffect.expiry = expiry,
+                            ContinuousEffect.modification = Modification.GainKeyword keyword,
+                            -- CR 611.2c: a fixed set of one, settled here -- the
+                            -- permanent that entered.
+                            ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+                          }
+                   in gs3 {GameState.continuousEffects = fmap effectFor (Set.toList keywords) <> GameState.continuousEffects gs3}
+            pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
       -- controller, baked when the row was installed -- and that is a permanent

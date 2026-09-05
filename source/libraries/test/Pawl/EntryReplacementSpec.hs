@@ -1675,9 +1675,9 @@ toolkitOrders seasonFirst seasonId p = case p of
 -- 2026-08-25), whose kicked clause reads exactly that. The kicked condition
 -- itself is writable -- CR 604.2's clause on Pawl.Types.PrintedReplacement, the
 -- way Monstrous War-Leech writes it -- and this test does not exercise it: the
--- counter placement is unconditional here. What keeps the real card out of the
--- pool is the REST of that sentence, "and with haste", which no EntryRewrite
--- grants (gap #2323).
+-- counter placement is unconditional here. The rest of that sentence, "and with
+-- haste", is writable too since EntryRewrite.WithKeywords landed, so the real
+-- card now outranks this synthetic and the swap is what #3245 tracks.
 unevenToolkitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 unevenToolkitSpec s registry = Spec.describe s "Synthetic Uneven Toolkit (CR 614.5)" $ do
   let toolkitName = CardName.MkCardName (Text.pack "Synthetic Uneven Toolkit")

@@ -1077,6 +1077,11 @@ entryRewriteReads rewrite = case rewrite of
   -- Context (Pawl.Engine.Event's WithCounters arm), so a Quantity.InSlot in one
   -- reads the captured map. The KINDS beside them cannot name a slot.
   EntryRewrite.WithCounters counters -> ([], Map.elems (WithCounters.counters counters))
+  -- CR 614.1c's granted keywords name no slot: a keyword may CARRY a Filter (CR
+  -- 702.14c's landwalk), and that Filter is judged against the board rather than
+  -- against a resolution's bindings -- the answer AsCopy's exceptions get above,
+  -- whose CR 707.9a keywords are not reported either.
+  EntryRewrite.WithKeywords _ -> ([], [])
   EntryRewrite.UnderSourceControl -> ([], [])
   EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [])
   EntryRewrite.Riot -> ([], [])
