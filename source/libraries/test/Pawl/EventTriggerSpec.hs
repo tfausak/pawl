@@ -1859,8 +1859,8 @@ brinebornCutthroatSpec s registry =
 
 -- CR 701.26b's untap as a TRIGGER EVENT, which nothing could watch until
 -- Oreskos Sun Guide, {1}{W} Creature -- Cat Monk: "Inspired -- Whenever this
--- creature becomes untapped, you gain 2 life." ("Inspired" is CR 207.2c ability
--- word and carries no rules meaning.) One trigger condition over one event, and
+-- creature becomes untapped, you gain 2 life." ("Inspired" is CR 207.2c's
+-- ability word and carries no rules meaning.) One trigger condition over one event, and
 -- the effect is a life gain the engine already had, so the only new thing these
 -- cases can be passing on is the condition and the event behind it.
 --
@@ -1872,10 +1872,10 @@ brinebornCutthroatSpec s registry =
 -- road is driven through its funnel directly, the way the cycling case above
 -- drives Pawl.Engine.Event.discard.
 --
--- alice's Goblin Piker is the second permanent on every board here, tapped
--- alongside the Guide: it makes the untap step a BATCH rather than a single
--- permanent, so the pair of cases below separates "an untap happened" from
--- "the BEARER's untap happened".
+-- alice's Goblin Piker is the second permanent on every board but the entry
+-- one: it makes the untap step a BATCH rather than a single permanent, so the
+-- first two cases separate "an untap happened" from "the BEARER's untap
+-- happened" rather than "nothing happened at all".
 oreskosSunGuideSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 oreskosSunGuideSpec s registry =
   let untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
