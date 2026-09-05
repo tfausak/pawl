@@ -5226,20 +5226,48 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- nothing minted, and Bureau Headmaster's "equip abilities you activate" would
   -- reach an ability the card printed.
   --
-  -- BOTH places a face holds an activated ability, grantedActivatedAbilities'
-  -- reason: a layer-6 grant carries text printed on the granter.
+  -- EVERY face a printing can put an object on the battlefield with, which is
+  -- `card : mintedFaces card` and not the printing's own faces: an activated
+  -- ability printed on a CR 111.1 token's face reaches Keyword.familyGranting by
+  -- the same road, and fourteen cards in the pool print one (Thraben Inspector's
+  -- Clue, The Underworld Cookbook's Food). mintedFaces reaches an emblem and a
+  -- conjured card too, and the granted abilities grantedActivatedAbilities
+  -- collects are the third channel, a layer-6 grant carrying text printed on the
+  -- granter.
   Spec.it s "CR 702 no card claims a keyword minted an ability it printed" $ do
     ps <- S.allPrintings s
     let claimed f = filter (Maybe.isJust . ActivatedAbility.keyword) (Face.activatedAbilities f <> grantedActivatedAbilities f)
-        offenders = filter (anyFace (not . null . claimed) . Printing.card) ps
+        claims f = not (null (claimed f))
+        printsAbilities f = not (null (Face.activatedAbilities f))
+        everyFace = overFaces (\f -> f : mintedFaces f)
+        offenders = filter (any claims . everyFace . Printing.card) ps
+        stamp ability = ability {ActivatedAbility.keyword = Just Keyword.Flying}
+        liarAbility = stamp (oneEffectActivated (costOf []) (youDraw 1))
+        -- A face reachable ONLY through Effect.Create, so the second assertion
+        -- below fails on the printing's own faces and passes on the walk.
+        tokenLiar = oneFaced ((vanillaFace "Liar Token" instantLine) {Face.activatedAbilities = [liarAbility]})
+        minter =
+          (vanillaFace "Liar" instantLine)
+            { Face.activatedAbilities =
+                [ oneEffectActivated
+                    (costOf [])
+                    (Effect.Create (Create.MkCreate (Quantity.Type.Literal 1) tokenLiar EntryRiders.defaultValue Nothing (PlayerRef.Relative PlayerRelation.You)))
+                ]
+            }
     Spec.assertEqWith s "no printing writes the key" (fmap (S.nameOf . Printing.card) offenders) []
     -- The sweep is green on a corpus that simply has no activated abilities, so
-    -- the pool is asserted non-empty and a face that DOES claim one is caught.
-    Spec.assertBool s (any (anyFace (not . null . Face.activatedAbilities) . Printing.card) ps) "the pool has printed activated abilities"
+    -- the pool is asserted non-empty, on both channels, and a face that DOES
+    -- claim one is caught on each.
+    Spec.assertBool s (any (anyFace printsAbilities . Printing.card) ps) "the pool has printed activated abilities"
+    Spec.assertBool s (any (any printsAbilities . overFaces mintedFaces . Printing.card) ps) "and minted faces that print them"
     Spec.assertBool
       s
-      (not (null (claimed ((vanillaFace "Liar" instantLine) {Face.activatedAbilities = [(oneEffectActivated (costOf []) (youDraw 1)) {ActivatedAbility.keyword = Just Keyword.Flying}]}))))
+      (claims ((vanillaFace "Liar" instantLine) {Face.activatedAbilities = [liarAbility]}))
       "and a face claiming one is caught"
+    Spec.assertBool s (null (claimed minter)) "the minting face itself claims nothing"
+    -- Through `everyFace`, the sweep's own walk, so this reddens if that walk
+    -- narrows back to the printing's own faces.
+    Spec.assertBool s (any claims (everyFace (oneFaced minter))) "and a claim on a face only Effect.Create reaches is caught"
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
     -- Every FACE of every token, since CR 707.8a's double-faced token names two.
