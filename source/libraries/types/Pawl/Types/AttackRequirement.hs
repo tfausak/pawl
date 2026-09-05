@@ -22,6 +22,11 @@ data AttackRequirement = MkAttackRequirement
     -- CR 613.11 are why Affected.TheseObjects is the arm this field has no use
     -- for: a rule-modifying continuous effect can affect objects that were not
     -- affected when it began.
+    --
+    -- One requirement per creature the Affected matches, which is CR 508.1d's
+    -- own counting. Not implemented: a requirement over a GROUP, obeyed once by
+    -- any member -- Seeker of Slaanesh's "each opponent must attack with at
+    -- least one creature each combat if able" (#3257).
     subject :: Affected.Affected,
     -- | CR 508.1d's OBJECT axis -- WHOM the creature has to attack. Nothing is
     -- the unnarrowed requirement (Curse of the Nightly Hunt's "attack each
@@ -32,10 +37,6 @@ data AttackRequirement = MkAttackRequirement
     -- Pawl.Types.ActiveAttackRequirement carries: that carrier's producer names
     -- its player by TARGETING it, and a static ability has no target to read.
     -- The type says why neither PlayerRef nor PlayerScope reaches the phrase.
-    --
-    -- Not implemented: any other way of naming the player -- Galactus, Devourer
-    -- of Worlds' "an opponent with the most life among your opponents", Trove of
-    -- Temptation's "you or a planeswalker you control" (#2820).
     object :: Maybe RequiredDefender.RequiredDefender,
     -- | CR 508.1d's second shape -- "or that it attacks if some condition is
     -- met" -- read as CR 604.2's "as long as" clause. Otarian Juggernaut's
