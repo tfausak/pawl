@@ -18,8 +18,10 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
       RollDie.codec
       RollDie.MkRollDie
         { RollDie.sides = 20,
+          RollDie.count = Quantity.Literal 1,
           RollDie.modifier = Nothing,
-          RollDie.slot = SlotName.MkSlotName (Text.pack "result")
+          RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
+          RollDie.other = Nothing
         }
       " {\"sides\":20,\"slot\":\"result\"} "
   -- CR 706.2's first sentence: the instruction's own modifier, which an
@@ -30,8 +32,25 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
       RollDie.codec
       RollDie.MkRollDie
         { RollDie.sides = 20,
+          RollDie.count = Quantity.Literal 1,
           RollDie.modifier = Just (Quantity.Literal 3),
-          RollDie.slot = SlotName.MkSlotName (Text.pack "result")
+          RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
+          RollDie.other = Nothing
         }
       " {\"modifier\":{\"type\":\"Literal\",\"value\":3},\"sides\":20,\"slot\":\"result\"} "
+  -- CR 706.1's count beside CR 706.4's second reading, the Endeavor cycle's wire
+  -- form: neither field elides here, and an always-defaulted field would
+  -- round-trip vacuously.
+  Spec.it s "two dice read for both results" $
+    Common.assertCodec
+      s
+      RollDie.codec
+      RollDie.MkRollDie
+        { RollDie.sides = 6,
+          RollDie.count = Quantity.Literal 2,
+          RollDie.modifier = Nothing,
+          RollDie.slot = SlotName.MkSlotName (Text.pack "chosen"),
+          RollDie.other = Just (SlotName.MkSlotName (Text.pack "other"))
+        }
+      " {\"count\":{\"type\":\"Literal\",\"value\":2},\"other\":\"other\",\"sides\":6,\"slot\":\"chosen\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RollDie.codec

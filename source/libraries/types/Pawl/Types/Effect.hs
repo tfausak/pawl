@@ -487,9 +487,9 @@ data Effect card ability
     -- Not implemented: a scope beside this slot, so "choose a player at random"
     -- (Scrambleverse, Wildfire Devils) has no spelling (#3230).
     ChooseOpponentAtRandom SlotName.SlotName
-  | -- | CR 706.1: roll a die of the stated kind, and bind the result as an
-    -- amount at the payload's slot for a later effect to read as
-    -- Quantity.InSlot (Ancient Copper Dragon).
+  | -- | CR 706.1: roll dice of the stated kind and number, and bind the result
+    -- as an amount at the payload's slot for a later effect to read as
+    -- Quantity.InSlot (Ancient Copper Dragon, Valiant Endeavor).
     --
     -- CR 706.3's results table needs no arm here: a striation is one Clause of
     -- the same mode gated on a Condition.Compares over this slot, which CR

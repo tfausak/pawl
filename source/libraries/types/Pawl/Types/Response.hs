@@ -189,6 +189,15 @@ data Response
     -- transcript of one replaying as another would be a silently wrong answer
     -- rather than a desync.
     ChoseDelayedTriggerEvent Natural.Natural
+  | -- | CR 706.4: which of one roll instruction's results the roller chose, as
+    -- a position in the results the prompt offered.
+    --
+    -- Its own constructor and not ChoseDelayedTriggerEvent, whose payload and
+    -- indexing posture it shares, for ChoseReadAheadChapter's reason: the
+    -- candidates are numbers rather than events, so a transcript of one
+    -- replaying as the other would be a silently wrong answer rather than a
+    -- desync.
+    ChoseDieResult Natural.Natural
   | -- | CR 122.5: the KIND of counter a player chose to move off the first
     -- object. Its own constructor for ChoseDamageSource's reason -- the answer
     -- is not even an object, so no counter-placing response could stand in for

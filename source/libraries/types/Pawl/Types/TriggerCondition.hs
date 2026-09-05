@@ -377,9 +377,10 @@ data TriggerCondition
   | -- | CR 706.1: "whenever you roll one or more dice" (Feywild Trickster). The
     -- event and not the result, which is what lets CR 706.7's planar die fire it.
     --
-    -- Not implemented: the printed "one or more", which needs CR 706.1's die
-    -- count (#2085); one roll is one event, so the batch and per-occurrence
-    -- readings coincide today. See #934 for the planar die.
+    -- The printed "one or more" is the whole of one instruction's throw:
+    -- Pawl.Engine.Resolve records one GameEvent.DiceRolled per roll
+    -- instruction, however many dice it named, so the batch and per-occurrence
+    -- readings coincide. See #934 for the planar die.
     PlayerRollsDice PlayerRelation.PlayerRelation
   | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
     -- event's win where PlayerRollsDice ignores what the die showed.

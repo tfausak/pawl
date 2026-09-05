@@ -1204,6 +1204,12 @@ matches context view predicate = case predicate of
   Filter.PowerIsAmountInSlot slot -> case (power view, Map.lookup slot (boundAmounts context)) of
     (Just p, Just n) -> p == toInteger n
     _ -> False
+  -- The same pair of readings, compared the other way -- Valiant Endeavor's
+  -- "power greater than or equal to that result" -- and False on an absent
+  -- number at either end for the arm above's reason.
+  Filter.PowerAtLeastAmountInSlot slot -> case (power view, Map.lookup slot (boundAmounts context)) of
+    (Just p, Just n) -> p >= toInteger n
+    _ -> False
   -- CR 202.3, and answerable in every zone -- see the View field's own note.
   -- Vacuously False for a player, which has no mana value to compare.
   Filter.ManaValueAtMost n -> case manaValue view of
@@ -1624,6 +1630,7 @@ rewrite pairs predicate = case predicate of
   -- Untouched for the two above's reason: a slot name is not a word CR 612.1's
   -- swap can find in the text.
   Filter.PowerIsAmountInSlot _ -> predicate
+  Filter.PowerAtLeastAmountInSlot _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -2070,6 +2077,7 @@ bakeBound players predicate = case predicate of
   -- number. It stays answerable where it is written, boundAmounts carrying the
   -- number into the match rather than a substitution making it.
   Filter.PowerIsAmountInSlot _ -> predicate
+  Filter.PowerAtLeastAmountInSlot _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ManaValueIsEven -> predicate
   Filter.ManaValueAtMostAmount -> predicate
@@ -2203,6 +2211,7 @@ manaValueThresholds predicate = case predicate of
   Filter.PowerLessThanSource -> []
   Filter.PowerGreaterThanSource -> []
   Filter.PowerIsAmountInSlot _ -> []
+  Filter.PowerAtLeastAmountInSlot _ -> []
   Filter.ControlledBy _ -> []
   Filter.ControlledByDefendingPlayer -> []
   Filter.ControlledByBound _ -> []
@@ -2326,6 +2335,7 @@ statesAQuality predicate = case predicate of
   Filter.PowerLessThanSource -> True
   Filter.PowerGreaterThanSource -> True
   Filter.PowerIsAmountInSlot _ -> True
+  Filter.PowerAtLeastAmountInSlot _ -> True
   Filter.ControlledBy _ -> True
   Filter.ControlledByDefendingPlayer -> True
   Filter.ControlledByBound _ -> True
@@ -2446,6 +2456,9 @@ overBoundSlots f predicate = case predicate of
   -- filter reads an amount no clause of the mode ever bound is then a failing
   -- test rather than a sweep that silently admits nothing.
   Filter.PowerIsAmountInSlot slot -> fmap Filter.PowerIsAmountInSlot (f slot)
+  -- Named for the arm above's reason: the slot is an amount, and the dataflow
+  -- lint is what the report is for.
+  Filter.PowerAtLeastAmountInSlot slot -> fmap Filter.PowerAtLeastAmountInSlot (f slot)
   Filter.And fs -> fmap Filter.And (traverse (overBoundSlots f) fs)
   Filter.Or fs -> fmap Filter.Or (traverse (overBoundSlots f) fs)
   Filter.Not g -> fmap Filter.Not (overBoundSlots f g)

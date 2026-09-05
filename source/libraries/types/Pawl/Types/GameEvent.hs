@@ -384,8 +384,9 @@ data GameEvent
     -- die being ignored by every effect reading a numerical result while still
     -- firing this trigger (#934).
     --
-    -- Not implemented: how MANY dice one roll instruction threw (#2085), so one
-    -- entry is one Effect.RollDie.
+    -- ONE ENTRY PER INSTRUCTION and not per die, however many CR 706.1's count
+    -- threw, where CoinFlipped records one per coin: the condition reading this
+    -- event is worded "one or more dice", which scopes it to the instruction.
     DiceRolled PlayerId.PlayerId
   | -- | CR 716.2a: a permanent's class level BECAME something -- the level BEFORE
     -- and the level AFTER, CountersPut's shape and for CR 714.2b's reason, since

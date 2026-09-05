@@ -698,9 +698,15 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.ChoosePlayer _ -> effect
   Effect.ChooseOpponentAtRandom _ -> effect
-  -- CR 706.1's number of sides is a numeral rather than a computed count; the
-  -- modifier added to the result is the Quantity, PutCounters' descent above.
-  Effect.RollDie x -> Effect.RollDie x {RollDie.modifier = fmap (rewriteQuantity pairs) (RollDie.modifier x)}
+  -- CR 706.1's number of sides is a numeral rather than a computed count; how
+  -- many dice, and the modifier added to each result, are the Quantities,
+  -- PutCounters' descent above. The slots no word rule 612 can swap.
+  Effect.RollDie x ->
+    Effect.RollDie
+      x
+        { RollDie.count = rewriteQuantity pairs (RollDie.count x),
+          RollDie.modifier = fmap (rewriteQuantity pairs) (RollDie.modifier x)
+        }
   -- The number of coins is the Quantity, PutCounters' descent above; the reading
   -- and the slot name no word rule 612 can swap.
   Effect.FlipCoin x -> Effect.FlipCoin x {FlipCoin.count = rewriteQuantity pairs (FlipCoin.count x)}
