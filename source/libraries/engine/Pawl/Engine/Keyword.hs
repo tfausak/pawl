@@ -298,10 +298,21 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.184a is an ACTIVATED ability; battlefieldAbilitiesFor mints it.
   Keyword.Station -> []
 
+-- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
+-- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
+--
+-- Applied by the two rosters rather than inside each minter, so the next keyword
+-- that states an activated ability is stamped whether or not whoever adds it
+-- remembers -- and so the stamp cannot disagree with the keyword it was minted
+-- from, which reconstructing the payload inside the minter could.
+mintedBy :: Keyword -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card) -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
+mintedBy keyword ability = ability {ActivatedAbility.keyword = Just keyword}
+
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
 -- owner's hand. Named for the ZONE rather than for cycling, because that is the
 -- classification its reader wants: Activate.abilitiesFor asks "what can be
--- activated from here" and never learns which rule produced any of them.
+-- activated from here" rather than which rule produced any of them, which each
+-- ability carries for itself once `mintedBy` has stamped it.
 --
 -- Printed keywords rather than a projection's post-layer ones, the same rules fact
 -- castingPermissionsOf records: CR 113.6b confines an ability to the zones it
@@ -318,7 +329,7 @@ handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 -- Exhaustive for the reason permissionsFor is: the next keyword that functions
 -- from a hand must break this build rather than silently produce nothing.
 handAbilitiesFor :: Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
-handAbilitiesFor keyword = case keyword of
+handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Cycling (Cycling.MkCycling cost searchFor) -> [cycling cost searchFor]
   Keyword.Reinforce (Reinforce.MkReinforce n cost) -> [reinforce n cost]
   Keyword.Afflict _ -> []
@@ -443,7 +454,10 @@ cycling cost searchFor =
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     -- The only difference between rule 702.29a and rule 702.29e: what the ability
@@ -499,7 +513,10 @@ reinforce n cost =
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     slot = TargetSlot.required Pool.Creatures Nothing
@@ -531,7 +548,7 @@ battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map
 
 -- Exhaustive, exactly as handAbilitiesFor is, and for the same reason.
 battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
-battlefieldAbilitiesFor keyword count = case keyword of
+battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword of
   Keyword.Crew n -> List.genericReplicate count (crew n)
   Keyword.Fabricate _ -> []
   Keyword.Cycling {} -> []
@@ -683,7 +700,10 @@ crew n =
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     criterion =
@@ -753,7 +773,10 @@ station =
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     criterion =
@@ -806,7 +829,10 @@ levelUp cost =
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     gain = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.Level (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
@@ -834,7 +860,10 @@ outlast cost =
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
@@ -887,7 +916,10 @@ equip payload =
       ActivatedAbility.condition = Nothing,
       -- Nothing on every keyword-minted ability: no clause of a card refers to
       -- one, CR 702's own text being what mints it.
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     slot = TargetSlot.required Pool.Creatures (Just (Filter.And (Filter.ControlledBy PlayerRelation.You : Maybe.maybeToList (Equip.quality payload))))
@@ -928,7 +960,10 @@ fortify cost =
       ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      -- Nothing here and written by `mintedBy` at the roster, the one place that
+      -- knows the keyword by identity rather than by reconstructing it.
+      ActivatedAbility.keyword = Nothing
     }
   where
     slot =
@@ -2005,47 +2040,29 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- CR 702.184a attaches nothing.
   Keyword.Station -> []
 
--- CR 702: WHICH RULE MINTED this activated ability of an object whose keywords
--- are `counts`, as a family designator -- the classification
--- Pawl.Types.ReduceActivationCost.grantedBy compares, so that Fluctuator's
--- "cycling abilities you activate" reaches rule 702.29a's minted ability and
--- nothing else. Nothing is "no keyword of this object minted it", which
--- is every ability the card itself prints.
+-- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
+-- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
+-- Fluctuator's "cycling abilities you activate" reaches rule 702.29a's minted
+-- ability and nothing else. Nothing is "no keyword minted it", which is every
+-- ability the card itself prints.
 --
--- Answered by re-minting rather than by a provenance field on the ability:
--- handAbilitiesOf and battlefieldAbilitiesOf both throw the keyword away, and an
--- ActivatedAbility that carried its own origin would put an engine-only fact on
--- the wire where a card could author a lie. Value equality is the idiom
--- Pawl.Types.ActivatedAbility's header already fixes for this type -- "carries
--- the value and validates by membership, never an index".
+-- Answered from the ability's own stamp (Pawl.Types.ActivatedAbility.keyword,
+-- which `mintedBy` writes) rather than by re-minting each of the object's
+-- keywords and testing value equality. Origin rather than shape: the old
+-- classification could not tell rule 702.6a's equip ability from a card that
+-- printed the same words, and Pawl.ActivateSpec's "CR 118.7 a printed twin of
+-- rule 702.6a's ability is not an equip ability" is what proves the difference.
 --
--- BOTH minters are asked, so that this is one question rather than one per zone:
--- the caller supplies whichever keyword map its zone calls for, and the two are
--- disjoint by construction -- no keyword has a non-empty arm in both
--- handAbilitiesFor and battlefieldAbilitiesFor -- so asking both cannot answer
--- twice for one keyword.
+-- No keywords argument, and so no zone argument either: the minter that made the
+-- ability knew its keyword, so the caller no longer has to guess which roster to
+-- re-mint from.
 --
--- Every minting keyword -- cycling, reinforce, crew, level up, outlast, equip,
--- fortify -- carries a payload, so familyOf answers Just for every one of them
--- and its Nothing is unreachable from here. Its Nothing is still let through rather than made an
--- error: a nullary keyword that minted an activated ability would have no family
--- to name, and CR 702 would have to grow one first.
---
--- Not implemented: telling a keyword-minted ability from a PRINTED ability that
--- happens to be byte-identical to one -- a card printing "{2}, Discard this card:
--- Draw a card" functioning from a hand would be read as cycling here. No printing
--- in data/cards/ is such a twin (gap #2072).
-familyGranting :: Map Keyword Natural -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe KeywordFamily.KeywordFamily
-familyGranting counts ability =
-  Maybe.listToMaybe
-    ( Maybe.mapMaybe
-        ( \(keyword, count) ->
-            if elem ability (handAbilitiesFor keyword <> battlefieldAbilitiesFor keyword count)
-              then familyOf keyword
-              else Nothing
-        )
-        (Map.toAscList counts)
-    )
+-- CR 702.184a's station is a NULLARY minting keyword, so familyOf answers
+-- Nothing for it and this does too. That is the same answer a reducer got
+-- before, and it is correct rather than accidental: no card can name a station
+-- family, Pawl.Types.KeywordFamily having no arm for a nullary keyword.
+familyGranting :: ActivatedAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe KeywordFamily.KeywordFamily
+familyGranting ability = familyOf =<< ActivatedAbility.keyword ability
 
 -- CR 702: WHICH KEYWORD this is, with its payload dropped -- the classification
 -- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
