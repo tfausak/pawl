@@ -17,7 +17,7 @@
 -- Event.fullyUnlockedAfter at both writers of an unlocked designation and
 -- Event.matchesTrigger's RoomFullyUnlocked and AnyOf arms.
 --
--- THREE printed cards and one synthetic. Roaring Furnace // Steaming Sauna, DSK 230, picked because
+-- The printed cards, and one synthetic. Roaring Furnace // Steaming Sauna, DSK 230, picked because
 -- its two doors disagree about everything a reader can see -- {1}{R} against
 -- {3}{U}{U}, a triggered ability that fires on the door opening against a
 -- persistent pair (a static "you have no maximum hand size" and an end-step
@@ -40,6 +40,15 @@
 -- singular, and CR 709.5e's special action is controller-only by rule (Scryfall
 -- oracle:unlock, 2026-08-31; a printing saying "unlock each door of target Room"
 -- would refute the second half).
+--
+-- And Spiked Corridor // Torture Pit, DSC 28, the SECOND Room, which the copy
+-- cases at the end spend: its back door is data/cards' only Room half printing a
+-- replacement effect ("If a source you control would deal noncombat damage to an
+-- opponent, it deals that much damage plus 2 instead"), which is what gives
+-- Pawl.Engine.Projection.copiableReplacementsOf a producer over a copied door.
+-- Copy Enchantment is the copier, being the one printing in data/cards/ whose
+-- copy is eligible for an enchantment, and Lightning Bolt is the noncombat
+-- damage the replacement reads.
 --
 -- Pawl.Engine.Room's own coverage is here rather than beside Resolve's, since
 -- rule 709.5c's derivation is what both the action and the opcode filter their
@@ -192,6 +201,32 @@ roomPermanent gs =
 -- 712.14's untransformed default.
 plainEntry :: EntryRiders.EntryRiders Natural
 plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = Nothing}
+
+-- The second Room's two doors, and the burn spell the CR 707.2a case below reads
+-- its replacement effect through.
+corridorName, tortureName, boltName :: CardName.CardName
+corridorName = CardName.MkCardName (Text.pack "Spiked Corridor")
+tortureName = CardName.MkCardName (Text.pack "Torture Pit")
+boltName = CardName.MkCardName (Text.pack "Lightning Bolt")
+
+-- The battlefield permanents that HAVE this name (CR 709.4a's membership test),
+-- which is how a Room is found when roomPermanent above cannot help: that helper
+-- knows Roaring Furnace's two doors by name.
+namedOnBattlefield :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
+namedOnBattlefield name gs = filter (Projection.hasName name `flip` gs) (Set.toList (GameState.battlefield gs))
+
+-- Cast Lightning Bolt at BOB and resolve it -- three noncombat damage from a
+-- source alice controls, which is the event CR 707.2a's copied replacement
+-- effect has to be gathered for. The target is answered by FILTERING the offered
+-- recipients, keysAnswer's reason.
+boltBob :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+boltBob boltId gs =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter ((==) (Just S.bob) . Recipient.playerOf) . snd) asked
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure answer gs (Cast.castSpell S.manaPerformer S.alice boltId boltName Facing.FaceUp))
+   in resolveAll (settle (snd (Engine.runGamePure answer cast Stack.resolveTop)))
 
 -- Put a Copy Enchantment onto the stack for alice, resolve it as a copy of the
 -- named permanent, and let the board settle -- castDoor's shape, one card over.
@@ -956,3 +991,56 @@ spec s registry = Spec.describe s "Room" $ do
             Spec.assertEqWith s "the control: the copy really has both designations" (fmap Object.unlockedHalves (Game.lookupObject copyId both)) (Just (Set.fromList [furnaceName, saunaName]))
           other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 707.2a over the ability kind CR 614 asks about: "A copy acquires the
+  -- abilities of the object it's copying because those values are derived from
+  -- its rules text." A copy of a Room whose OTHER door was locked when it was
+  -- copied still has that door (CR 709.5b), and the replacement effect printed on
+  -- it is live once the copy pays its own unlock cost (CR 709.5e) -- read against
+  -- the copy's designations, never against the frozen snapshot of the permanent
+  -- it copied.
+  --
+  -- Spiked Corridor // Torture Pit, {3}{R} // {3}{R}: the pool's one Room half
+  -- that prints a replacement effect ("If a source you control would deal
+  -- noncombat damage to an opponent, it deals that much damage plus 2 instead"),
+  -- which is what gives Pawl.Engine.Projection.copiableReplacementsOf a producer
+  -- at all. Its partner half prints the unlock trigger, so the ORIGINAL is cast
+  -- with the replacement door SHUT and never contributes to either board here.
+  --
+  -- The two boards differ in exactly one thing -- whether the copy's Torture Pit
+  -- door was unlocked -- and both bolt bob for the same printed 3. 17 is the
+  -- unreplaced damage and 15 the replaced one; neither coincides with the other
+  -- seat's total, with the Devils' 1/1 or with either door's mana value.
+  Spec.it s "CR 707.2a a copy of a Room gathers the replacement effect behind the door IT unlocked" $ do
+    corridor <- S.printingOf s registry "Spiked Corridor"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addCreature printing S.alice g)) g0 [1 .. n :: Int]
+        (roomId, withRoom) = S.addHandCard corridor S.alice (addAll mountain 12 (Setup.emptyGame S.threePlayers))
+        (boltId, withBolt) = S.addHandCard bolt S.alice withRoom
+        board =
+          withBolt
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        after = castDoor corridorName roomId board
+    case namedOnBattlefield corridorName after of
+      [origId] -> do
+        let resolved = copyOf origId after copyEnchantment
+        case newPermanent after resolved of
+          [copyId] -> do
+            -- The control that the copy really copied the Room: CR 709.5d shut
+            -- both of its doors, so it shows neither name.
+            Spec.assertEqWith s "the copy shows neither door" (Projection.namesOf copyId resolved) Set.empty
+            Spec.assertEqWith s "and the copied Room's own back door is still shut" (Projection.hasName tortureName origId resolved) False
+            -- THE NEGATIVE, on the board one action short: nobody has unlocked
+            -- Torture Pit, so bob takes the bolt's printed 3.
+            Spec.assertEqWith s "with the door shut the bolt deals its printed 3" (S.lifeOf S.bob (boltBob boltId resolved)) (Just 17)
+            let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer resolved (Room.unlock S.manaPerformer S.alice copyId tortureName))))
+            Spec.assertEqWith s "the control: the copy opened the copied Room's other door" (Projection.hasName tortureName copyId opened) True
+            -- THE GAMEPLAY-LEVEL ASSERTION: the copy's own door supplies the
+            -- CR 614.1a replacement, so the same bolt deals 3 plus 2.
+            Spec.assertEqWith s "and behind it the bolt deals that much plus 2" (S.lifeOf S.bob (boltBob boltId opened)) (Just 15)
+          other -> Spec.assertFailure s ("expected one new permanent, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Spiked Corridor, got " <> show (length other))
