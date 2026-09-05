@@ -2423,23 +2423,74 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- state a later effect of this resolution would. Nothing observes the order --
   -- the trigger goes on the stack only once this resolution finishes.
   --
-  -- Not implemented: CR 706.1's other half, how MANY dice (#2085), so one entry
-  -- here is one roll instruction.
+  -- ONE ENTRY PER INSTRUCTION, however many dice CR 706.1's count named, where
+  -- FlipCoin below records one per coin: the condition reading this event is
+  -- Feywild Trickster's "whenever you roll one or more dice", which the printed
+  -- words scope to the instruction rather than to the die. An instruction that
+  -- rolls no dice at all records nothing, having rolled none.
   Effect.RollDie rollDie -> do
+    before <- State.get
     let sides = RollDie.sides rollDie
-    rolled <- Game.ask (Prompt.RollDie sides)
-    gs <- State.get
-    let viewOf = effectViewOf source legal gs
-        context = effectContext gs controller source legal (slotBindings resolving gs)
-        -- CR 706.2, read AFTER the roll as the rule words it. CR 107.2's posture
-        -- for a modifier that cannot be evaluated: no modifier at all.
-        modifier = case RollDie.modifier rollDie of
-          Nothing -> 0
-          Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
-        natural = if rolled >= 1 && rolled <= sides then rolled else 1
-        result = Integer.toNaturalSaturating (toInteger natural + modifier)
-    State.modify' (bindAmountSlot source (RollDie.slot rollDie) result)
-    State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+        -- How many dice the instruction throws, read ONCE before the first of
+        -- them, FlipCoin's count below and for its reason: the number is part of
+        -- the instruction, and re-reading it per die would let a count over the
+        -- board throw a different number than the instruction named. CR 107.2's
+        -- posture for a quantity that cannot be evaluated: no dice at all.
+        dice =
+          Integer.toNaturalSaturating
+            ( Maybe.fromMaybe
+                0
+                ( Quantity.evaluateFor
+                    (effectViewOf source legal before)
+                    (effectContext before controller source legal (slotBindings resolving before))
+                    before
+                    resolving
+                    source
+                    (RollDie.count rollDie)
+                )
+            )
+        rollOne = do
+          rolled <- Game.ask (Prompt.RollDie sides)
+          gs <- State.get
+          let viewOf = effectViewOf source legal gs
+              context = effectContext gs controller source legal (slotBindings resolving gs)
+              -- CR 706.2, read AFTER the roll as the rule words it, and per die:
+              -- the rule adds the modifier to the natural result of a roll, so a
+              -- count above one adds it to each. CR 107.2's posture for a
+              -- modifier that cannot be evaluated: no modifier at all.
+              modifier = case RollDie.modifier rollDie of
+                Nothing -> 0
+                Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
+              natural = if rolled >= 1 && rolled <= sides then rolled else 1
+          pure (Integer.toNaturalSaturating (toInteger natural + modifier))
+    results <- traverse (const rollOne) [1 .. dice]
+    Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
+      gs <- State.get
+      -- CR 706.4: WHICH result the instruction uses, where it threw more than
+      -- one ("roll two d6 and choose one result"). A choice and not a roll, so
+      -- it goes through Game.choose and CR 723.1's controller may make it.
+      -- Elided where every result is the same number: both bindings below come
+      -- out the same whichever die is named, so no board can tell the answers
+      -- apart. FILTERED, NOT TRUSTED, the ChooseBolster posture: an index past
+      -- the end takes the first die rolled.
+      index <-
+        if all (== NonEmpty.head offered) (NonEmpty.tail offered)
+          then pure 0
+          else do
+            answer <- Game.choose (Prompt.ChooseDieResult (Decide.deciderFor controller gs) controller resolving offered)
+            pure (if answer < List.genericLength results then answer else 0)
+      State.modify' (bindAmountSlot source (RollDie.slot rollDie) (Replacement.at results index (NonEmpty.head offered)))
+      -- CR 706.4's "the other result", off the same throw rather than re-derived
+      -- from the count, FlipCoin's `misses` below and for its reason. Only a
+      -- two-die instruction has an "other": at any other count what is left is
+      -- not one number, and the slot stays unbound rather than guessing which of
+      -- them the card meant. Pawl.CardSpec's lint keeps data/cards/ to counts
+      -- this can answer for.
+      Foldable.for_ (RollDie.other rollDie) $ \other ->
+        case [result | (i, result) <- zip [0 ..] results, i /= index] of
+          [rest] -> State.modify' (bindAmountSlot source other rest)
+          _ -> pure ()
+      State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
   -- CR 705.1's flip, in RollDie's holder and for its reason: bindAmountSlot's
   -- `source` is the resolving object, and on a SPELL -- which Winter Sky is --
   -- `source` and `resolving` are the same object, so the ambiguity the arm above
@@ -3421,7 +3472,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- minted new ids for the cards themselves, and `milled` holds the library
     -- ones. So the mill's OWN slot, bound just above off the arrival ids, names
     -- nothing this fold can match -- Filter.IsBound over it is False here whatever
-    -- the map holds, which is the CR 400.7 answer rather than a missing read.
+    -- the map holds. Not implemented, and not what the rule says: CR 400.7j makes
+    -- a card the same effect moved to a PUBLIC zone findable by the rest of that
+    -- effect, and a graveyard is one, so the False is this fold's pre-move views
+    -- rather than a rule-sanctioned answer (gap #2141).
     --
     -- The chosen-name half is PROVED (Pawl.ResolveSpec's "Predict's mill tally
     -- reads the name its own first clause chose"); the SLOT half is a regression

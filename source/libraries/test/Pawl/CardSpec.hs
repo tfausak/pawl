@@ -1196,8 +1196,9 @@ ownCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
-  -- CR 706.2's modifier is a Quantity, so its Counts are reachable here.
-  Effect.RollDie rollDie -> foldMap quantityCounts (RollDie.modifier rollDie)
+  -- CR 706.2's modifier and CR 706.1's count are Quantities, so their Counts
+  -- are reachable here.
+  Effect.RollDie rollDie -> quantityCounts (RollDie.count rollDie) <> foldMap quantityCounts (RollDie.modifier rollDie)
   -- CR 705.1's number of coins is a Quantity, so its Counts are reachable here.
   Effect.FlipCoin flipCoin -> quantityCounts (FlipCoin.count flipCoin)
   -- CR 500.7's number of turns is a Quantity, so its Counts are reachable here.
@@ -3516,6 +3517,7 @@ filterSlotsReadSingly predicate = case predicate of
   -- (Pawl.Engine.Filter.Context's boundAmounts), a namespace disjoint from the
   -- object slots a binder mints, which is ControlledByBound's position above.
   Filter.Type.PowerIsAmountInSlot _ -> []
+  Filter.Type.PowerAtLeastAmountInSlot _ -> []
   Filter.Type.ManaValueAtMost _ -> []
   Filter.Type.ManaValueIsEven -> []
   Filter.Type.ManaValueAtMostAmount -> []
@@ -4510,7 +4512,7 @@ effectFilters effect = case effect of
   Effect.ChoosePlayer _ -> []
   Effect.ChooseOpponentAtRandom _ -> []
   -- CR 706.2's modifier is a Quantity, so its filters are reachable here.
-  Effect.RollDie rollDie -> frame Unframed (foldMap quantityFilters (RollDie.modifier rollDie))
+  Effect.RollDie rollDie -> frame Unframed (quantityFilters (RollDie.count rollDie) <> foldMap quantityFilters (RollDie.modifier rollDie))
   -- CR 705.1's number of coins is a Quantity, so its filters are reachable here.
   Effect.FlipCoin flipCoin -> frame Unframed (quantityFilters (FlipCoin.count flipCoin))
   -- CR 500.7's number of turns is a Quantity, so its filters are reachable here.
@@ -4866,6 +4868,24 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (prints Face.enchant) "the pool prints an enchant slot"
     Spec.assertBool s (prints grantedEnchantSlots) "the pool grants an enchant slot"
     Spec.assertEqWith s "no enchant slot names a slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 706.4's "the other result", which only a TWO-die instruction has: with
+  -- any other count what the roller did not choose is not one number, and
+  -- Pawl.Engine.Resolve leaves the slot unbound rather than guessing which of
+  -- them the card meant. So a card writing the slot at another count is asking
+  -- for a number nothing will ever bind, which compiles and reads as zero.
+  Spec.it s "a roll binds the other result only where it rolls two dice" $ do
+    ps <- S.allPrintings s
+    let binds effect = case effect of
+          Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie)
+          _ -> False
+        offends effect = case effect of
+          Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie) && RollDie.count rollDie /= Quantity.Type.Literal 2
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- A guard, since a pool binding no other result at all would pass saying
+    -- nothing (Valiant Endeavor).
+    Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool binds a roll's other result"
+    Spec.assertEqWith s "no roll binds an other result it cannot name" (fmap (S.nameOf . Printing.card) offenders) []
   -- The REJECTING direction, against printed Auras restated rather than card
   -- files, as the hand-action lint below does it. Filter.IsBound is the atom, since
   -- Filter.boundSlots is one of the three folds targetSlotSlots joins.

@@ -6,7 +6,7 @@
 -- roll is externalised through. The transcript legs live in Pawl.ReplaySpec
 -- with the other randomness prompts.
 --
--- THREE FIXTURES. Ancient Copper Dragon ("Flying /
+-- FOUR FIXTURES. Ancient Copper Dragon ("Flying /
 -- Whenever this creature deals combat damage to a player, roll a d20. You create
 -- a number of Treasure tokens equal to the result") is CR 706.4's, the result
 -- read straight into a count; Djinni Windseer ("Flying / When this creature
@@ -15,9 +15,14 @@
 -- Portent ("Roll a d20 and add the number of cards in your hand. / 1-14 | Draw X
 -- cards. / 15+ | Scry X, then draw X cards.") is CR 706.2's modifier, printed in
 -- the instruction that ordered the roll. Between them that is the whole of CR
--- 706 this file can reach: one die (#2085), no reroll and no modifier from
--- another source (#2083), and no "Roll again" (#2124). CR 706.1's roll does
--- record its event now, but the trigger reading it lives in
+-- 706 this file can reach with ONE die; Valiant Endeavor ("Roll two d6 and
+-- choose one result. Destroy each creature with power greater than or equal to
+-- that result. Then create a number of 2/2 white Knight creature tokens with
+-- vigilance equal to the other result") is the fourth fixture and CR 706.1's
+-- count, CR 706.4's choice among the results and the "other result" beside it.
+-- Left out: no reroll and no modifier from another source (#2083), no "Roll
+-- again" (#2124), and no reading that takes the results as a set (#3243). CR
+-- 706.1's roll does record its event, but the trigger reading it lives in
 -- Pawl.EventTriggerSpec beside the other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
@@ -65,6 +70,7 @@ module Pawl.DiceSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -86,9 +92,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   rollDieSpec s registry
   resultsTableSpec s registry
   modifierSpec s registry
+  severalDiceSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
+
+knight :: CardName.CardName
+knight = CardName.MkCardName (Text.pack "Knight Token")
 
 -- Pins BOTH questions this combat asks: alice attacks bob (CR 508.1), and the
 -- d20 comes up `n`. The roll is answered by CONSTANT rather than by anything
@@ -388,3 +398,136 @@ modifierSpec s registry = Spec.describe s "RollDieModifier" $ do
   Spec.it s "CR 706.1 a modified roll is still one roll of the printed die" $ do
     (_, spell, board) <- portentBoard s registry 1
     Spec.assertEqWith s "asked once, offering twenty sides" (portentOffers spell board) [20]
+
+-- alice holds Valiant Endeavor with six untapped Plains, and BOB controls the
+-- two creatures the destruction judges: Bird Maiden (power 1) and Barkhide
+-- Mauler (power 4). The two powers straddle every result the cases below choose,
+-- so which creature survives IS the number the roller chose.
+--
+-- Under bob so that the Knight tokens, which arrive under alice (CR 111.2), are
+-- the only things she owns on the battlefield -- S.countOnBattlefieldByName
+-- indexes by owner, so a victim of hers would be counted while it lived.
+endeavorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+endeavorBoard s registry = do
+  endeavor <- S.printingOf s registry "Valiant Endeavor"
+  plains <- S.printingOf s registry "Plains"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  mauler <- S.printingOf s registry "Barkhide Mauler"
+  let (held, spell) = S.handOne endeavor (S.landsInPlay plains 6)
+      (weak, withWeak) = S.addCreature maiden S.bob held
+      (strong, withBoth) = S.addCreature mauler S.bob withWeak
+  pure (spell, weak, strong, withBoth)
+
+-- Pins both questions the resolution asks: each die comes up the next number of
+-- `rolls`, in the order they are rolled, and the roller chooses the result at
+-- `index`.
+--
+-- STATEFUL, because the two roll prompts are structurally identical: a pure
+-- @Prompt r -> r@ cannot tell them apart, so it answers both the same number and
+-- the two results coincide whatever the engine did. Six for a roll the script
+-- did not plan, which is the die's top face rather than CR 706.1a's floor, so a
+-- third die shows up as a number no assertion here expects.
+endeavorAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State [Natural.Natural] r
+endeavorAnswer index p = case p of
+  Prompt.RollDie _ -> do
+    rolls <- State.get
+    case rolls of
+      h : t -> do
+        State.put t
+        pure h
+      [] -> pure 6
+  Prompt.ChooseDieResult {} -> pure index
+  _ -> pure (S.identityAnswer p)
+
+-- Cast the Endeavor and resolve it, one run under one answerer.
+runEndeavor :: [Natural.Natural] -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+runEndeavor rolls index spell board =
+  snd (State.evalState (Engine.runGame (endeavorAnswer index) board (S.cast S.alice spell >> Stack.resolveTop)) rolls)
+
+-- The same cast under an answerer that RECORDS what each roll prompt offered and
+-- what each choice prompt was shown, neither being readable off the board.
+endeavorPrompts :: [Natural.Natural] -> ObjectId.ObjectId -> GameState.GameState -> ([Natural.Natural], [[Natural.Natural]])
+endeavorPrompts rolls spell board =
+  let logging :: Prompt.Prompt r -> State.State ([Natural.Natural], [[Natural.Natural]], [Natural.Natural]) r
+      logging p = case p of
+        Prompt.RollDie sides -> do
+          (seen, asked, scripted) <- State.get
+          case scripted of
+            h : t -> do
+              State.put (sides : seen, asked, t)
+              pure h
+            [] -> do
+              State.put (sides : seen, asked, [])
+              pure 6
+        Prompt.ChooseDieResult _ _ _ candidates -> do
+          State.modify' (\(seen, asked, scripted) -> (seen, NonEmpty.toList candidates : asked, scripted))
+          pure 0
+        _ -> pure (S.identityAnswer p)
+      (offers, choices, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], [], rolls)
+   in (reverse offers, reverse choices)
+
+severalDiceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+severalDiceSpec s registry = Spec.describe s "RollSeveralDice" $ do
+  -- CR 706.1's other half. The pair of boards differs in ONE thing -- which of
+  -- the two results the roller chose -- and every reading of the resolution
+  -- moves with it: 5 and 2 are distinct, so are the creatures' powers, and the
+  -- token count is the result the roller did NOT choose.
+  Spec.it s "CR 706.4 the roller chooses one result and the other is the other" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    -- THE GAMEPLAY ASSERTION, first so nothing ahead of it can absorb a
+    -- mutation: choosing the 2 leaves the 5 as "the other result", so five
+    -- Knights. An engine that bound the chosen result twice mints two, one that
+    -- rolled a single die mints none, and one that ignored the choice mints two.
+    Spec.assertEqWith
+      s
+      "CR 706.4: choosing the second die's 2 leaves the first die's 5 to count"
+      (S.countOnBattlefieldByName knight S.alice (runEndeavor [5, 2] 1 spell board))
+      5
+    -- The paired board, one thing different: the SAME two rolls with the first
+    -- result chosen instead. Falsifies an engine that binds the results by
+    -- position rather than by the answer.
+    Spec.assertEqWith
+      s
+      "CR 706.4: choosing the first die's 5 leaves the second die's 2 to count"
+      (S.countOnBattlefieldByName knight S.alice (runEndeavor [5, 2] 0 spell board))
+      2
+  -- The chosen result read as a BOUND rather than as a count, off the same pair
+  -- of boards: CR 208.1 against the number the roller chose.
+  Spec.it s "CR 706.4 the destruction judges power against the chosen result" $ do
+    (spell, weak, strong, board) <- endeavorBoard s registry
+    let chose2 = runEndeavor [5, 2] 1 spell board
+        chose5 = runEndeavor [5, 2] 0 spell board
+    Spec.assertBool s (not (S.onBattlefield strong chose2)) "power 4 is at least the chosen 2, so it is destroyed"
+    Spec.assertBool s (S.onBattlefield weak chose2) "power 1 is not, so it survives"
+    -- The same two creatures under the other choice: 4 is less than 5, so
+    -- nothing dies. A filter comparing the wrong way, or against the other
+    -- result, separates these two boards.
+    Spec.assertBool s (S.onBattlefield strong chose5) "power 4 is less than the chosen 5, so it survives"
+    Spec.assertBool s (S.onBattlefield weak chose5) "and so does power 1"
+  -- CR 706.1a's own boundary, on the "greater than or equal" the card prints:
+  -- the creature whose power EQUALS the chosen result is destroyed, which a
+  -- strict comparison spares.
+  Spec.it s "CR 208.1 a power equal to the result is destroyed" $ do
+    (spell, weak, strong, board) <- endeavorBoard s registry
+    let chose4 = runEndeavor [1, 4] 1 spell board
+    Spec.assertBool s (not (S.onBattlefield strong chose4)) "power 4 equals the chosen 4, so it is destroyed"
+    Spec.assertBool s (S.onBattlefield weak chose4) "power 1 is below it, so it survives"
+  -- The choice is ELIDED where it is not one. Two dice showing the same number
+  -- leave both slots holding that number whichever is named, so the engine asks
+  -- nothing -- and the resolution still reads both results.
+  Spec.it s "CR 706.4 two equal results are not a choice" $ do
+    (spell, _, strong, board) <- endeavorBoard s registry
+    let (offers, choices) = endeavorPrompts [3, 3] spell board
+    Spec.assertEqWith s "nothing was asked to choose" choices []
+    Spec.assertEqWith s "asked twice, offering six sides each" offers [6, 6]
+    let after = runEndeavor [3, 3] 0 spell board
+    Spec.assertEqWith s "CR 706.4: the other result is the other 3" (S.countOnBattlefieldByName knight S.alice after) 3
+    Spec.assertBool s (not (S.onBattlefield strong after)) "and power 4 is at least 3, so it is destroyed"
+  -- Supporting, and in its own case so it cannot stand in for a count above:
+  -- what the engine ASKED. Two dice of six sides, and one choice offering both
+  -- results in roll order.
+  Spec.it s "CR 706.1 the count is how many dice the instruction offers" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    let (offers, choices) = endeavorPrompts [5, 2] spell board
+    Spec.assertEqWith s "asked twice, offering six sides each" offers [6, 6]
+    Spec.assertEqWith s "and offered both results, in roll order" choices [[5, 2]]

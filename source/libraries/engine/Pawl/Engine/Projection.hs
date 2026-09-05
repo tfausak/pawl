@@ -2248,6 +2248,7 @@ filterReads f = case f of
   -- The candidate's power alone: the number at the other end is a binding rather
   -- than a projection.
   Filter.Type.PowerIsAmountInSlot _ -> Set.singleton PowerA
+  Filter.Type.PowerAtLeastAmountInSlot _ -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   -- The candidate's controller; who defends is a combat-record fact.
   Filter.Type.ControlledByDefendingPlayer -> Set.singleton Controller
@@ -2479,6 +2480,7 @@ filterReadsPeers f = case f of
   -- The bound arrives on the Context as a number, so no second projection is
   -- read.
   Filter.Type.PowerIsAmountInSlot _ -> False
+  Filter.Type.PowerAtLeastAmountInSlot _ -> False
   Filter.Type.ControlledBy _ -> False
   Filter.Type.ControlledByDefendingPlayer -> False
   Filter.Type.ControlledByBound _ -> False

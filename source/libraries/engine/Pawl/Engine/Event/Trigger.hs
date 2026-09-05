@@ -420,11 +420,11 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
-  -- Per-occurrence, and today indistinguishable from the batch reading of
-  -- Feywild Trickster's "one or more dice": CR 706.1's other half, how MANY
-  -- dice, is unimplemented (#2085), so one Effect.RollDie records exactly one
-  -- event and the ability can fire at most once either way. A card rolling
-  -- several dice at once would have to answer True here.
+  -- Per-occurrence, and indistinguishable from the batch reading of Feywild
+  -- Trickster's "one or more dice": one Effect.RollDie records exactly one
+  -- GameEvent.DiceRolled however many dice CR 706.1's count threw, so the
+  -- ability fires at most once either way. What would make the two readings
+  -- differ is an event per DIE, which the printed words do not ask for.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.SelfExerted -> False

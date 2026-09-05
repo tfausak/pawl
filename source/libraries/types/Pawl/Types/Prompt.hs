@@ -80,6 +80,13 @@ data Prompt r where
   -- instruction's modifier added afterwards. RandomObject's reasons for
   -- carrying neither Decider nor PlayerId.
   RollDie :: Natural.Natural -> Prompt Natural.Natural
+  -- | CR 706.4: which result of one roll instruction the roller uses (Valiant
+  -- Endeavor's "roll two d6 and choose one result"); the answer indexes the
+  -- results, which are in roll order and may compare equal. A choice and not a
+  -- roll, so unlike RollDie above it carries a Decider and the seat. Not
+  -- raised where every result is the same number, which no card can tell from
+  -- either answer.
+  ChooseDieResult :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Natural.Natural -> Prompt Natural.Natural
   -- | CR 705.1: which face a flipped coin came up, asked after CallCoin (CR
   -- 705.2). RandomObject's reasons for carrying neither Decider nor PlayerId.
   FlipCoin :: Prompt CoinFace.CoinFace

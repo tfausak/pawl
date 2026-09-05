@@ -937,7 +937,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- a Count naming no slot (Diviner's Portent), so leaving this Map.empty leaves
   -- the suite green. A card whose roll added "the number of cards you drew this
   -- way" would refute that. The same holds of the two arms below.
-  Effect.RollDie rollDie -> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
+  Effect.RollDie rollDie -> quantitySlots (RollDie.count rollDie) <> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
   -- And a DEFINITION too, on top of the slots the coin count reads.
   Effect.FlipCoin flipCoin -> quantitySlots (FlipCoin.count flipCoin)
   -- The slots the turn count reads (Ral Zarek's tally of heads).
@@ -1324,7 +1324,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- PlaySubgame's answer: a definition reads no slot.
   Effect.ChoosePlayer _ -> True
   Effect.ChooseOpponentAtRandom _ -> True
-  Effect.RollDie rollDie -> all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
+  Effect.RollDie rollDie -> Quantity.slotsAreExhaustive (RollDie.count rollDie) && all Quantity.slotsAreExhaustive (RollDie.modifier rollDie)
   Effect.FlipCoin flipCoin -> Quantity.slotsAreExhaustive (FlipCoin.count flipCoin)
   Effect.TakeExtraTurn takeExtraTurn -> Quantity.slotsAreExhaustive (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> True
@@ -1484,9 +1484,10 @@ readsX = any effectReadsX
       Effect.PlaySubgame _ -> False
       Effect.ChoosePlayer _ -> False
       Effect.ChooseOpponentAtRandom _ -> False
-      -- CR 706.2's modifier is an ordinary Quantity, so it may be the X the
-      -- caster announced (CR 601.2b).
-      Effect.RollDie rollDie -> any Quantity.readsX (RollDie.modifier rollDie)
+      -- CR 706.2's modifier and CR 706.1's count are ordinary Quantities, so
+      -- either may be the X the caster announced (CR 601.2b; Neverwinter
+      -- Hydra's "roll X dice").
+      Effect.RollDie rollDie -> Quantity.readsX (RollDie.count rollDie) || any Quantity.readsX (RollDie.modifier rollDie)
       -- The number of coins is an ordinary Quantity, so it may be the X the
       -- caster announced (Flock of Rabid Sheep's "flip X coins").
       Effect.FlipCoin flipCoin -> Quantity.readsX (FlipCoin.count flipCoin)
@@ -1523,9 +1524,10 @@ boundSlots effect = case effect of
   -- CR 608.2d: the player this effect chose.
   Effect.ChoosePlayer choice -> Set.singleton (ChoosePlayer.slot choice)
   Effect.ChooseOpponentAtRandom slot -> Set.singleton slot
-  -- CR 706.4: the number the die came up, for a later effect of this resolution
+  -- CR 706.4: the result the roller used, and, where the card reads it, the
+  -- other result of the same instruction, for a later effect of this resolution
   -- to read as Quantity.InSlot.
-  Effect.RollDie rollDie -> Set.singleton (RollDie.slot rollDie)
+  Effect.RollDie rollDie -> Set.singleton (RollDie.slot rollDie) <> foldMap Set.singleton (RollDie.other rollDie)
   -- CR 705.2: how many of the instruction's flips the flipping player won (or
   -- how many coins came up heads), and, where the card reads it, how many they
   -- lost, for a later effect of this resolution to read as Quantity.InSlot.

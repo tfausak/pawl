@@ -113,6 +113,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.PowerIsAmountInSlot (SlotName.MkSlotName (Text.pack "paid")))
       " {\"type\":\"PowerIsAmountInSlot\",\"value\":\"paid\"} "
+  Spec.it s "PowerAtLeastAmountInSlot" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.PowerAtLeastAmountInSlot (SlotName.MkSlotName (Text.pack "chosen")))
+      " {\"type\":\"PowerAtLeastAmountInSlot\",\"value\":\"chosen\"} "
   Spec.it s "ControlledByDefendingPlayer" $
     Common.assertCodec
       s

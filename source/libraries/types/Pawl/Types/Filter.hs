@@ -70,6 +70,12 @@ data Filter keyword
     -- the amount of {E} paid this way". Exact equality, and vacuously False where
     -- either number is absent.
     PowerIsAmountInSlot SlotName.SlotName
+  | -- | CR 208.1 against the same kind of bound number, one comparison over:
+    -- the object's power is >= the amount an earlier clause of the resolution
+    -- bound at this slot -- Valiant Endeavor's "power greater than or equal to
+    -- that result". PowerAtLeast's comparison with PowerIsAmountInSlot's right
+    -- operand, and vacuously False where either number is absent.
+    PowerAtLeastAmountInSlot SlotName.SlotName
   | -- | CR 202.3: the object's mana value is <= this literal. Answerable off the
     -- battlefield, rule 202.3 reading the printed mana cost.
     ManaValueAtMost Integer

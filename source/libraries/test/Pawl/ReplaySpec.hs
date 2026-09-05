@@ -728,6 +728,26 @@ combatReplaySpec s =
           Spec.assertEqWith s "7 round trips" (Replay.decode p (Replay.encode p 7)) (Just 7)
         Spec.it s "a short transcript takes the floor of the die's range" $
           Spec.assertEqWith s "the floor" (Replay.defaultAnswer (Prompt.RollDie 20)) 1
+        -- CR 706.4: which result of a multi-die roll the roller used. The answer
+        -- is a POSITION in the results, so it round-trips as one -- and the
+        -- results may compare equal, which is why it is a position and not the
+        -- number itself.
+        Spec.it s "ChooseDieResult round-trips through the transcript" $ do
+          let p = Prompt.ChooseDieResult decider S.alice oid (5 NonEmpty.:| [2])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p 1)) (Just 1)
+          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p 0)) (Just 0)
+        -- Discriminating: fails if ChooseDieResult reuses ChoseDelayedTriggerEvent
+        -- rather than getting its own constructor. Both index an offer the prompt
+        -- made, so the types would not object, and replaying one as the other
+        -- would name a result off a roll nobody made.
+        Spec.it s "a chosen die result does not decode as a simultaneous occurrence" $
+          Spec.assertEqWith
+            s
+            "mismatch"
+            (Replay.decode (Prompt.ChooseDieResult decider S.alice oid (5 NonEmpty.:| [2])) (Response.ChoseDelayedTriggerEvent 1))
+            Nothing
+        Spec.it s "a short die-result transcript takes the first die rolled" $
+          Spec.assertEqWith s "the head" (Replay.defaultAnswer (Prompt.ChooseDieResult decider S.alice oid (5 NonEmpty.:| [2]))) 0
         -- The assertion that fails if RollDie reuses Response.ChoseX rather than
         -- getting its own constructor: both carry one Natural, so the types
         -- would not object, and a player's ANNOUNCED X replaying as a die roll

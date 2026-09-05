@@ -206,6 +206,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.PowerLessThanSource -> 0
   Filter.Type.PowerGreaterThanSource -> 0
   Filter.Type.PowerIsAmountInSlot _ -> 0
+  Filter.Type.PowerAtLeastAmountInSlot _ -> 0
   Filter.Type.ControlledByDefendingPlayer -> 0
   -- Zero for ControlledBy's reason: one carries a slot name and the other a
   -- PlayerId, and neither holds a Filter for a card author to reach.

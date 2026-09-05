@@ -50,6 +50,7 @@ encode p answer = case p of
   Prompt.RandomObject _ -> Response.SelectedAtRandom answer
   Prompt.RandomOpponent _ -> Response.SelectedOpponentAtRandom answer
   Prompt.RollDie _ -> Response.RolledDie answer
+  Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
   Prompt.FlipCoin -> Response.FlippedCoin answer
   Prompt.CallCoin {} -> Response.CalledCoin answer
   Prompt.ChooseAction {} -> Response.ChoseAction answer
@@ -180,6 +181,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RollDie _ -> case response of
     Response.RolledDie n -> Just n
+    _ -> Nothing
+  Prompt.ChooseDieResult {} -> case response of
+    Response.ChoseDieResult n -> Just n
     _ -> Nothing
   Prompt.FlipCoin -> case response of
     Response.FlippedCoin face -> Just face
@@ -524,6 +528,11 @@ defaultAnswer p = case p of
   -- answer that is in range for any N -- including the degenerate N of a
   -- malformed card. FIXED for the reason RandomObject gives above.
   Prompt.RollDie _ -> 1
+  -- CR 706.4: the prompt is only raised where one instruction's results are not
+  -- all the same number, and every position in them is a legal choice.
+  -- Answering 0 takes the first die rolled, ChooseDelayedTriggerEvent's posture
+  -- and for its reason.
+  Prompt.ChooseDieResult {} -> 0
   -- CR 705.1 designates the two sides, so either is a legal answer and neither
   -- is "least eventful" -- which branch of a card's flip is quieter is the
   -- CARD's business, not this function's. FIXED for the reason RandomObject
