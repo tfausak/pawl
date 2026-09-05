@@ -79,6 +79,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -904,7 +905,7 @@ gristWith loyalty grist gs =
 
 -- Activate alice's `i`th loyalty ability and resolve it, with an answerer of the
 -- caller's choosing -- which Grist's -2 needs for its CR 118.12 gate and its
--- reflexive ability's target, and Ashiok's +1 for its CR 608.2c choice.
+-- reflexive ability's target, and Ashiok's +1 for its CR 608.2d choice.
 useLoyaltyAbility ::
   (forall r. Prompt.Prompt r -> r) ->
   Int ->
@@ -1072,14 +1073,14 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 --
 -- Not implemented: the -7, "target player exiles the top X cards of their
 -- library, where X is the total mana value of cards you own in exile" -- X is a
--- SUM over a scope and Pawl.Types.Aggregation has no summing arm (#2482). That
+-- SUM over a scope and Pawl.Types.Aggregation has no summing arm (#3108). That
 -- leaves pawl's Ashiok STRICTER than printed.
 --
--- The -2's token clause is the pool's producer of EventShape.CardArrivedIn read as
--- an intervening "if": the printed sentence names only where the card ARRIVED, so
--- the origin is not part of the question. The trigger board below exiles from a
--- HAND, never a library, which is what separates "put into exile" from the
--- library-to-exile move Ashiok's own replacement makes.
+-- The -2's token clause reads EventShape.CardArrivedIn as an intervening "if":
+-- the printed sentence names only where the card ARRIVED, so the origin is not
+-- part of the question. The trigger board below exiles from a HAND, never a
+-- library, which is what separates "put into exile" from the library-to-exile
+-- move Ashiok's own replacement makes.
 ashiokPlusOne, ashiokMinusTwo :: Int
 ashiokPlusOne = 0
 ashiokMinusTwo = 1
@@ -1101,6 +1102,12 @@ takingNth n p = case p of
   Prompt.ChooseCardFromAmong _ _ _ offered ->
     Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
   _ -> S.identityAnswer p
+
+-- Whether a logged event is CR 603.2's record that an ability triggered.
+isAbilityTriggered :: GameEvent.GameEvent -> Bool
+isAbilityTriggered event = case event of
+  GameEvent.AbilityTriggered {} -> True
+  _ -> False
 
 -- The names of pid's cards in a zone, MassEffectSpec's reader of the same name.
 namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
@@ -1188,6 +1195,7 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
         exiled = S.runPure S.identityAnswer minted (Event.changeZone heldId Zone.Exile)
         after = throughBeginningOfCombat exiled
         tokens = S.tokensOf after
+    Spec.assertEqWith s "CR 603.4: the intervening if holds, so both tokens' abilities trigger" (length (filter isAbilityTriggered (S.eventsOf after))) 2
     Spec.assertEqWith s "the held card left the hand for exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
     Spec.assertEqWith s "still two tokens" (length tokens) 2
     mapM_ (\oid -> Spec.assertEqWith s "each token is 2/2" (S.powerToughnessOf oid after) (Just (2, 2))) tokens
@@ -1206,6 +1214,7 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
         minted = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId withHeld
         after = throughBeginningOfCombat minted
         tokens = S.tokensOf after
+    Spec.assertEqWith s "CR 603.4: the ability did not trigger at all" (length (filter isAbilityTriggered (S.eventsOf after))) 0
     Spec.assertEqWith s "alice's exile is empty" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
     Spec.assertEqWith s "still two tokens" (length tokens) 2
     mapM_ (\oid -> Spec.assertEqWith s "each token is still 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
