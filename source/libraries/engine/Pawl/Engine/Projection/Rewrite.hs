@@ -1017,12 +1017,16 @@ rewriteDrawRewrite pairs rewrite = case rewrite of
 -- keyword that CARRIES a word changes, and neither producer of the CR 707.9a arm
 -- names one (Dack's Duplicate grants haste and dethrone, Omni-Changeling
 -- changeling). The arm is the rule rather than a proven behaviour -- an
--- "except it has islandwalk" would be what proves it. CR 707.9b's pair is two
--- literals and names nothing.
+-- "except it has islandwalk" would be what proves it. Neither of CR 707.9b's
+-- arms names a word either: the pair is two literals, and the type clause names
+-- CR 205.2a's card types, which CR 612.2's subtype swap does not reach.
 rewriteCopyException :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CopyException.CopyException -> CopyException.CopyException
 rewriteCopyException pairs exception = case exception of
   CopyException.SetPowerToughness _ -> exception
   CopyException.GainKeywords keywords -> CopyException.GainKeywords (Set.map (Filter.rewriteKeyword pairs) keywords)
+  -- CR 707.9b's type clause names CARD types (CR 205.2a's list), and CR 612.2's
+  -- swap reaches only subtypes, so there is nothing here for a pair to change.
+  CopyException.AddCardTypes _ -> exception
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.

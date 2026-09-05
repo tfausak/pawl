@@ -3715,11 +3715,13 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.StateCoinFlip _ -> []
 
 -- CR 707.9's "except ..." clauses. Only the CR 707.9a arm reaches a Filter, and
--- only through the keyword it names; CR 707.9b's pair is two literals.
+-- only through the keyword it names; CR 707.9b's two arms name a pair of literals
+-- and a set of card types, neither of which narrows anything.
 copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyExceptionFilters exception = case exception of
   CopyException.SetPowerToughness _ -> []
   CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
+  CopyException.AddCardTypes _ -> []
 
 -- The Filters an EntryRewrite carries, on five different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
