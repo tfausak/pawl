@@ -30,7 +30,7 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
-import Pawl.PreventionSpec (answersFor, castAndResolve, counterBoard, countersOn, newestNamed, nextTurn, raceAnswer, theAbility, wasAskedToReplace)
+import Pawl.PreventionSpec (answersFor, atPostcombatMain, castAndResolve, counterBoard, countersOn, newestNamed, nextTurn, raceAnswer, theAbility, wasAskedToReplace)
 import qualified Pawl.Registry as Registry
 import Pawl.ReplacementSpec (atDeclareAttackers, attackersIn, controlledNamed, declineLastRiot, riotAsks, riotBoard, riotChoosing, wasAskedForRiot)
 import qualified Pawl.Spec as Spec
@@ -2224,6 +2224,109 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
             -- layer 7c leaves a 3/3 rather than something CR 704.5f removes.
             Spec.assertEqWith s "CR 613.4c so the 0/0 token is a 3/3" (S.powerToughnessOf token after) (Just (3, 3))
 
+-- Zameck Guildmage {G}{U} Creature -- Elf Wizard 2/2, whole text: "{G}{U}: This
+-- turn, each creature you control enters with an additional +1/+1 counter on it.
+-- / {G}{U}, Remove a +1\/+1 counter from a creature you control: Draw a card."
+-- (oracle checked on Scryfall 2026-09-05)
+--
+-- CR 614.3's FLOATING row carrying CR 614.1c's counter rewrite, aimed at other
+-- permanents by Filter: Gather Specimens' shape with the rewrite swapped from
+-- EntryRewrite.UnderSourceControl to EntryRewrite.WithCounters. Every other
+-- WithCounters in data/cards rides the entering permanent's own static ability
+-- with Filter.IsSource -- Faerie Squadron's, Barkhide Troll's, and the ones
+-- Pawl.Engine.Keyword mints for vanishing, fading and modular -- so this is the
+-- first row that reads the counter count for a permanent OTHER than the one the
+-- row came from.
+--
+-- Not implemented: the second ability, whose "Remove a +1/+1 counter from a
+-- creature you control" cost has no Pawl.Types.CostComponent -- the counter-
+-- removing components all come off the object the cost is on (#3286). The face
+-- is STRICTER than printed for it: alice loses a draw outlet, never gains one.
+--
+-- THE BOARD: alice's Guildmage plus a Forest, an Island, a Mountain and a Plains
+-- -- the ability's {G}{U} and the Goblin Piker's {1}{R} with nothing over -- and
+-- bob holds a Piker of his own over a Mountain and a Plains. The three cases
+-- below are the SAME board and differ in one action each: whether the ability
+-- resolved before the Piker was cast, and whose Piker it was.
+zameckGuildmageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+zameckGuildmageSpec s registry = Spec.describe s "Zameck Guildmage (CR 614.3)" $ do
+  let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      board = do
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        guildmage <- S.printingOf s registry "Zameck Guildmage"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let alicesLands = S.landsFor plains S.alice 1 (S.landsFor mountain S.alice 1 (S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (Setup.emptyGame S.bothPlayers))))
+            lands = S.landsFor plains S.bob 1 (S.landsFor mountain S.bob 1 alicesLands)
+            (mageId, withMage) = S.addCreature guildmage S.alice lands
+            (alicesPiker, withAlices) = S.addHandCard piker S.alice withMage
+            (bobsPiker, withBobs) = S.addHandCard piker S.bob withAlices
+            -- Stocked so CR 104.3c does not decide the last case before its
+            -- assertion runs: it advances two whole turns, and both players draw.
+            stock g _ = snd (S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.bob g)))
+            stocked = List.foldl' stock withBobs [1 .. (4 :: Int)]
+            ready =
+              stocked
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+        pure (theAbility guildmage, mageId, alicesPiker, bobsPiker, ready)
+      -- Activate the first ability and resolve it, which is what installs the row.
+      arm (ability, mageId, _, _, ready) =
+        S.runPure S.identityAnswer ready (Activate.activateAbility S.alice mageId ability >> Stack.resolveTop)
+      castFor pid gs pikerId = S.runPure S.identityAnswer gs (S.cast pid pikerId >> Stack.resolveTop)
+  -- THE PROVING CASE. The Piker is printed 2/1 and enters 3/2, the counter being
+  -- the observable and the power/toughness what it is for (CR 613.4c layer 7d).
+  Spec.it s "CR 614.1c a creature entering after the ability resolved enters with the additional counter" $ do
+    built@(_, mageId, alicesPiker, _, _) <- board
+    let after = castFor S.alice (arm built) alicesPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "one +1/+1 counter on the Piker that entered" (countersOn CounterKind.PlusOnePlusOne oid after) 1
+        Spec.assertEqWith s "so the printed 2/1 is a 3/2" (S.powerToughnessOf oid after) (Just (3, 2))
+        -- CR 614.1's row replaces an ENTRY, so the permanent that was already on
+        -- the battlefield when the ability resolved gets nothing.
+        Spec.assertEqWith s "and the Guildmage, already on the battlefield, has none" (countersOn CounterKind.PlusOnePlusOne mageId after) 0
+      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
+  -- CR 614.4: the row cannot go back in time. Same board, same Piker, same mana;
+  -- the ability is simply never activated.
+  Spec.it s "CR 614.4 a creature entering before the ability resolved enters without it" $ do
+    (_, _, alicesPiker, _, ready) <- board
+    let after = castFor S.alice ready alicesPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
+      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
+  -- CR 109.5 on an ACTIVATED ability: "you" is the player who activated it, so
+  -- the row's Filter.ControlledBy passes over bob's creature. Without this case
+  -- a row matching every creature would look identical to the printed one.
+  Spec.it s "CR 109.5 the opponent's creature is not one alice controls, so the row passes over it" $ do
+    built@(_, _, _, bobsPiker, _) <- board
+    let after = castFor S.bob (arm built) bobsPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter on bob's Piker" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
+      _ -> Spec.assertFailure s "bob's Piker did not reach the battlefield"
+  -- CR 614.3's "until . . . their duration has expired", through CR 514.2's
+  -- cleanup: two handoffs put alice back in a main phase of her own with the
+  -- Piker still in hand and the lands untapped, and the row gone.
+  Spec.it s "CR 514.2 a creature entering on a later turn enters without it" $ do
+    built@(_, _, alicesPiker, _, _) <- board
+    let armed = arm built
+        alicesNext = atPostcombatMain S.identityAnswer (nextTurn S.identityAnswer (nextTurn S.identityAnswer armed))
+        after = castFor S.alice alicesNext alicesPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
+        Spec.assertEqWith s "setup: it is alice's own later turn, so the same cast was legal" (GameState.activePlayer after, GameState.turnNumber after > GameState.turnNumber armed) (S.alice, True)
+      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   riotSpec s registry
@@ -2244,3 +2347,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   magneticLockdownSpec s registry
   squadCaptainSpec s registry
   printlifterSpec s registry
+  zameckGuildmageSpec s registry

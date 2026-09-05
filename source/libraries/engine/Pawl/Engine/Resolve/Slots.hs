@@ -1082,10 +1082,11 @@ addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
 -- undeclared. The arms answering nothing carry Naturals, constructors and literal
 -- card data, none of which can name a slot.
 --
--- Every arm here is a REGRESSION FENCE rather than a proven behaviour: no
--- Effect.Replace in data/cards/ carries an EntryR whose rewrite is anything but
--- Tapped or UnderSourceControl (Gather Specimens), and both answer nothing here,
--- so neutralizing any arm leaves the whole suite green. They are written
+-- Every arm here is a REGRESSION FENCE rather than a proven behaviour: the
+-- Effect.Replace rows in data/cards/ carry Tapped, UnderSourceControl (Gather
+-- Specimens) and WithCounters (Zameck Guildmage), and none of the three names a
+-- slot -- Zameck's count is a Quantity.Literal -- so neutralizing any arm leaves
+-- the whole suite green. They are written
 -- because the narrowing one caller over is only sound if this list is complete --
 -- a rewrite read left out is a slot the installed row does not carry, and the
 -- Filter or Quantity that wanted it then answers vacuously at the event.
