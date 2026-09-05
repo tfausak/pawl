@@ -10,6 +10,7 @@ import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
@@ -1171,6 +1172,14 @@ policedChamber registry opponent fallback queue gs oid = do
 nonBasicLandName :: Filter.Type.Filter Keyword.Keyword
 nonBasicLandName = Filter.Type.Not (Filter.Type.And [Filter.Type.HasSupertype Supertype.Basic, Filter.Type.HasCardType CardType.Land])
 
+-- Goblin Piker's SLUG -- the second spelling Pawl.Registry.named's haddock says
+-- fetches the same card, Pawl.Registry.slugFor mapping the card's own name onto
+-- it. A slug is not what CR 201.4's reference holds, and the gap between the two
+-- lookups is what Pawl.Interpreter.legalCardName's exact face-name comparison
+-- closes.
+pikerSlug :: CardName.CardName
+pikerSlug = CardName.MkCardName (Text.pack "goblin-piker")
+
 -- A name CR 201.4's reference does not have, which the refusal case needs one of.
 -- Scryfall !"No Such Card", 2026-09-05, no hit; `data/cards/` has no file for it
 -- either, and Pawl.Registry is the reference Pawl.Interpreter.legalCardName reads.
@@ -1301,6 +1310,37 @@ nullChamberSpec s registry =
             (Object.chosenNames chamber)
             (Set.fromList [S.printingName piker, S.printingName cancel])
           Spec.assertEqWith s "every queued answer was drawn, so alice was asked twice" left []
+
+    -- CR 201.4's OTHER refusal, which the case above cannot reach: a string the
+    -- registry answers to that is still not a card's name. The file registry
+    -- looks up a slug, so "goblin-piker" fetches the Goblin Piker; rule 201.4
+    -- asks for the name of a card, and Pawl.Engine.Filter's HasChosenName
+    -- compares names exactly, so admitting the slug would write a name into
+    -- Object.chosenNames that prohibits nothing.
+    --
+    -- THE DISCRIMINATOR is the last assertion: without it this case passes for
+    -- the case above's reason -- a name the registry cannot resolve at all.
+    Spec.it s "CR 201.4 a slug the registry answers to is not a card's name" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      cancel <- S.printingOf s registry "Cancel"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          queue = [pikerSlug, S.printingName piker, S.printingName cancel]
+      fetched <- Registry.fetchCard registry pikerSlug
+      (after, left) <- policedChamber registry S.bob (S.printingName lightningBolt) queue board oid
+      case enteredOne board after >>= \chamber -> Game.lookupObject chamber after of
+        Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
+        Just chamber -> do
+          Spec.assertEqWith
+            s
+            "the card's own name, and not the slug that fetches it"
+            (Object.chosenNames chamber)
+            (Set.fromList [S.printingName piker, S.printingName cancel])
+          Spec.assertEqWith s "every queued answer was drawn, so alice was asked twice" left []
+      Spec.assertBool s (Maybe.isJust fetched) "the registry does answer to the slug"
 
     -- CR 201.4a's own half, which the case above cannot reach: Island is a name
     -- the reference HAS, and it is refused only because Null Chamber's

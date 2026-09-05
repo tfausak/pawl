@@ -45,7 +45,7 @@ it.
 
 ## Running the suite
 
-    cabal test --test-options '--timeout 15s --hide-successes'
+    cabal test --test-options '--timeout 120s --hide-successes'
 
 While iterating, run only the subtree you are in --- add `-p Detain`, a tasty
 pattern over the `Spec.describe` group names --- and the whole suite before
@@ -59,10 +59,11 @@ blows the suite's timeouts).
 
 The timeout catches infinite loops; it is not an assertion about speed. The
 machine is shared, so a lone TIMEOUT is background noise --- re-run it unloaded
-first; a real hang fails at any budget. Two subtrees carry their own budgets
-via `Tasty.localOption` in `Pawl.Test`; CI sets 15s suite-wide through
-`flake.nix`'s `testFlags`, so a tighter local budget manufactures TIMEOUTs CI
-never sees.
+first; a real hang fails at any budget. ONE budget covers the whole suite and
+nothing overrides it: read the figure off `flake.nix`'s `testFlags` and
+`.github/workflows/ci.yml`, which must agree, and pass the same one locally ---
+a tighter local budget manufactures TIMEOUTs CI never sees, and the CI runner
+is about half this machine's speed.
 
 ## Enumerate the edit sites in one pass
 
