@@ -59,6 +59,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -74,6 +75,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
@@ -900,16 +902,17 @@ gristWith loyalty grist gs =
   let (oid, placed) = S.addCreature grist S.alice gs
    in (oid, S.addCounter CounterKind.Loyalty loyalty oid placed)
 
--- useAbility with an answerer of the caller's choosing, which the -2 needs: its CR
--- 118.12 gate and the reflexive ability's target are both real choices here.
-useGristAbility ::
+-- Activate alice's `i`th loyalty ability and resolve it, with an answerer of the
+-- caller's choosing -- which Grist's -2 needs for its CR 118.12 gate and its
+-- reflexive ability's target, and Ashiok's +1 for its CR 608.2c choice.
+useLoyaltyAbility ::
   (forall r. Prompt.Prompt r -> r) ->
   Int ->
   Printing.Printing ->
   ObjectId.ObjectId ->
   GameState.GameState ->
   GameState.GameState
-useGristAbility answer i p oid gs = case abilityAt i p of
+useLoyaltyAbility answer i p oid gs = case abilityAt i p of
   ability : _ -> S.runPure answer gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)
   [] -> gs
 
@@ -1000,7 +1003,7 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
             . bury 2 bolt S.alice
             $ bury 3 piker S.alice S.threePlayerGame
         (gristId, board) = gristWith 6 grist stocked
-        after = useGristAbility S.identityAnswer minusFive grist gristId board
+        after = useLoyaltyAbility S.identityAnswer minusFive grist gristId board
     Spec.assertEqWith
       s
       "both opponents lost three and alice lost nothing"
@@ -1022,7 +1025,7 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
     let (gristId, pikerId, jaceId, mountainId, board) = gristMinusTwoBoard grist piker jace ogre mountain
         answer :: Prompt.Prompt r -> r
         answer = gristAnswer PaymentDecision.Pays [mountainId, jaceId]
-        after = firedTrigger answer (useGristAbility answer minusTwo grist gristId board)
+        after = firedTrigger answer (useLoyaltyAbility answer minusTwo grist gristId board)
     Spec.assertEqWith
       s
       "the Jace died and the Mountain the answerer asked for first did not"
@@ -1043,7 +1046,7 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
     let (gristId, pikerId, jaceId, mountainId, board) = gristMinusTwoBoard grist piker jace ogre mountain
         answer :: Prompt.Prompt r -> r
         answer = gristAnswer PaymentDecision.Declines [mountainId, jaceId]
-        after = firedTrigger answer (useGristAbility answer minusTwo grist gristId board)
+        after = firedTrigger answer (useLoyaltyAbility answer minusTwo grist gristId board)
     Spec.assertEqWith
       s
       "the Jace the paying board destroyed is untouched, and so is alice's creature"
@@ -1051,3 +1054,159 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
       (True, True)
     Spec.assertEqWith s "bob's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
     Spec.assertEqWith s "CR 606.4: the loyalty cost was paid either way" (S.counterOf CounterKind.Loyalty gristId after) 1
+
+-- Ashiok, Wicked Manipulator -- {3}{B}{B} Legendary Planeswalker -- Ashiok,
+-- printed loyalty 5 (name, cost, type line, loyalty and Oracle text checked
+-- against api.scryfall.com 2026-09-05) -- carries two of its three loyalty
+-- abilities here:
+--
+--   +1: "Look at the top two cards of your library. Exile one of them and put the
+--       other into your hand."
+--   -2: "Create two 1/1 black Nightmare creature tokens with 'At the beginning of
+--       combat on your turn, if a card was put into exile this turn, put a +1/+1
+--       counter on this token.'"
+--
+-- Its static replacement -- "if you would pay life while your library has at
+-- least that many cards in it, exile that many cards from the top of your library
+-- instead" -- is Pawl.LifeReplacementSpec's, and stays there.
+--
+-- Not implemented: the -7, "target player exiles the top X cards of their
+-- library, where X is the total mana value of cards you own in exile" -- X is a
+-- SUM over a scope and Pawl.Types.Aggregation has no summing arm (#2482). That
+-- leaves pawl's Ashiok STRICTER than printed.
+--
+-- The -2's token clause is the pool's producer of EventShape.CardArrivedIn read as
+-- an intervening "if": the printed sentence names only where the card ARRIVED, so
+-- the origin is not part of the question. The trigger board below exiles from a
+-- HAND, never a library, which is what separates "put into exile" from the
+-- library-to-exile move Ashiok's own replacement makes.
+ashiokPlusOne, ashiokMinusTwo :: Int
+ashiokPlusOne = 0
+ashiokMinusTwo = 1
+
+-- Ashiok on the battlefield under alice's control at the printed loyalty 5, with
+-- `stock` in her library BOTTOM FIRST (S.addLibraryCard puts each new card on
+-- top). PLACED rather than cast, as gristWith is and for the same reason: no case
+-- here is about CR 306.5b.
+ashiokBoard :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+ashiokBoard ashiok stock =
+  let stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) S.threePlayerGame stock
+      (oid, placed) = S.addCreature ashiok S.alice stocked
+   in (oid, S.addCounter CounterKind.Loyalty 5 oid placed)
+
+-- The +1's one ask, pinned by INDEX into the offered group rather than by a
+-- search for a legal option, so a mutation cannot be silently repaired.
+takingNth :: Int -> Prompt.Prompt r -> r
+takingNth n p = case p of
+  Prompt.ChooseCardFromAmong _ _ _ offered ->
+    Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+  _ -> S.identityAnswer p
+
+-- The names of pid's cards in a zone, MassEffectSpec's reader of the same name.
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
+namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+
+-- Rule 507's beginning of combat step on alice's turn, staged and then RUN:
+-- Engine.runStep writes the CR 603.2b StepBegan record the token's trigger
+-- matches, and the priority loop resolves what it put on the stack.
+throughBeginningOfCombat :: GameState.GameState -> GameState.GameState
+throughBeginningOfCombat gs =
+  S.runPure
+    S.identityAnswer
+    ( S.runPure
+        S.identityAnswer
+        gs
+          { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+        Engine.runStep
+    )
+    Engine.priorityLoop
+
+ashiokLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
+  -- The +1's two destinations are DIFFERENT zones, so which card went where is
+  -- observable. The pair below runs the same board twice and differs in exactly
+  -- one thing -- which of the two the answerer names -- so an implementation that
+  -- exiled the top card regardless would agree with one leg and contradict the
+  -- other.
+  Spec.it s "CR 608.2d the +1 exiles the card that was chosen and the other goes to hand" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    moon <- S.printingOf s registry "Bad Moon"
+    swamp <- S.printingOf s registry "Swamp"
+    let named = Just . CardName.MkCardName . Text.pack
+        -- Bottom to top: Swamp, Bad Moon, Bird Maiden. The look offers the Bird
+        -- Maiden first and the Bad Moon second; the Swamp is never looked at.
+        (ashiokId, board) = ashiokBoard ashiok [swamp, moon, maiden]
+        after = useLoyaltyAbility (takingNth 1) ashiokPlusOne ashiok ashiokId board
+    Spec.assertEqWith s "the SECOND card the look offered is in exile" (namesIn Zone.Exile S.alice after) [named "Bad Moon"]
+    Spec.assertEqWith s "and the first is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
+    Spec.assertEqWith s "the third card was never looked at" (namesIn Zone.Library S.alice after) [named "Swamp"]
+    Spec.assertEqWith s "CR 606.4: one loyalty counter went on" (S.counterOf CounterKind.Loyalty ashiokId after) 6
+
+  Spec.it s "CR 400.7 the +1's remainder read finds the chosen card gone, so the other answer exiles the other card" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    moon <- S.printingOf s registry "Bad Moon"
+    swamp <- S.printingOf s registry "Swamp"
+    let named = Just . CardName.MkCardName . Text.pack
+        (ashiokId, board) = ashiokBoard ashiok [swamp, moon, maiden]
+        after = useLoyaltyAbility (takingNth 0) ashiokPlusOne ashiok ashiokId board
+    Spec.assertEqWith s "the FIRST card the look offered is in exile" (namesIn Zone.Exile S.alice after) [named "Bird Maiden"]
+    Spec.assertEqWith s "and the second is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Bad Moon"]
+
+  -- CR 111.3: the creating ability defines the tokens, so the count and the
+  -- identity are both read here. A board that minted one token, or two 1/1 black
+  -- creatures with no subtype, would pass a count-only assertion.
+  Spec.it s "CR 111.3 the -2 creates two 1/1 black Nightmare creature tokens" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    swamp <- S.printingOf s registry "Swamp"
+    let (ashiokId, board) = ashiokBoard ashiok [swamp]
+        after = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId board
+        tokens = S.tokensOf after
+    Spec.assertEqWith s "no token before the ability resolved" (S.tokensOf board) []
+    Spec.assertEqWith s "exactly two tokens" (length tokens) 2
+    mapM_ (\oid -> Spec.assertEqWith s "each is 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "each is mono-black" (Projection.colorsOf oid after) (Set.singleton Color.Black)) tokens
+    mapM_ (\oid -> Spec.assertBool s (Set.member Subtype.Nightmare (Projection.subtypesOf oid after)) "each is a Nightmare") tokens
+    mapM_ (\oid -> Spec.assertBool s (Set.member CardType.Creature (PC.cardTypes (Projection.project oid after))) "each is a creature") tokens
+    Spec.assertEqWith s "CR 606.4: two loyalty counters came off" (S.counterOf CounterKind.Loyalty ashiokId after) 3
+
+  -- The token's own trigger. The exile is out of alice's HAND, which is what makes
+  -- this a claim about "put into exile" rather than about the library-to-exile
+  -- move the rest of the card makes: a condition that pinned the ORIGIN would find
+  -- no match here.
+  Spec.it s "CR 603.4 a card put into exile from a hand satisfies the token's intervening if" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    swamp <- S.printingOf s registry "Swamp"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    let (ashiokId, board) = ashiokBoard ashiok [swamp]
+        (heldId, withHeld) = S.addHandCard maiden S.alice board
+        minted = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId withHeld
+        exiled = S.runPure S.identityAnswer minted (Event.changeZone heldId Zone.Exile)
+        after = throughBeginningOfCombat exiled
+        tokens = S.tokensOf after
+    Spec.assertEqWith s "the held card left the hand for exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+    Spec.assertEqWith s "still two tokens" (length tokens) 2
+    mapM_ (\oid -> Spec.assertEqWith s "each token is 2/2" (S.powerToughnessOf oid after) (Just (2, 2))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "CR 122.6: one +1/+1 counter each" (S.counterOf CounterKind.PlusOnePlusOne oid after) 1) tokens
+
+  -- The pair, differing in exactly one thing: nothing was exiled. CR 603.4 says the
+  -- ability does not trigger at all, which is a stronger claim than "no counter
+  -- appeared" -- an ability that triggered and then did nothing would leave the
+  -- same counters.
+  Spec.it s "CR 603.4 with nothing exiled this turn the token's ability never triggers" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    swamp <- S.printingOf s registry "Swamp"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    let (ashiokId, board) = ashiokBoard ashiok [swamp]
+        (_, withHeld) = S.addHandCard maiden S.alice board
+        minted = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId withHeld
+        after = throughBeginningOfCombat minted
+        tokens = S.tokensOf after
+    Spec.assertEqWith s "alice's exile is empty" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    Spec.assertEqWith s "still two tokens" (length tokens) 2
+    mapM_ (\oid -> Spec.assertEqWith s "each token is still 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "no +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne oid after) 0) tokens

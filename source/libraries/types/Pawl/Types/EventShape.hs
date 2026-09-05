@@ -36,7 +36,10 @@ data EventShape
     -- ONE zone and it is the DESTINATION, where MovedBetween names both ends.
     -- CR 712.21e's "changed zones" puts no condition on where a card came from,
     -- and the pool's producers ask the same way -- "put into graveyards from
-    -- anywhere". CR 903.9c is what makes the destination the load-bearing half:
+    -- anywhere", and Ashiok, Wicked Manipulator's Nightmare token's "if a card was
+    -- put into exile this turn" (Pawl.PlaneswalkerSpec's AshiokLoyalty group is
+    -- what proves the origin is not read: it exiles out of a HAND).
+    -- CR 903.9c is what makes the destination the load-bearing half:
     -- a melded commander's two cards can land in two different zones, and only
     -- the one that arrived in the named zone is counted.
     --
