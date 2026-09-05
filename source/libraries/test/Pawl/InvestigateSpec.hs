@@ -649,9 +649,10 @@ randomRevealSpec s registry =
           h : _ -> h
           [] -> NonEmpty.head offered
         _ -> S.aggressiveAnswer p
-      -- rolling, with every target aimed at bob: both cards below name an
-      -- opponent, and a two-seat board would otherwise let the answerer take
-      -- alice and leave the reveal reading her own empty hand.
+      -- rolling, with every target aimed at bob: Fall names a target PLAYER and
+      -- Lumbering Lightshield a target opponent, and on the first of those a
+      -- two-seat board would otherwise let the answerer take alice and leave the
+      -- reveal reading her own emptied hand.
       aiming :: Int -> Prompt.Prompt r -> r
       aiming i p = case p of
         Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
