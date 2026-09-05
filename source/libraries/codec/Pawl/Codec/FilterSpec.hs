@@ -396,6 +396,18 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsActivatedAbility
       " {\"type\":\"IsActivatedAbility\"} "
+  Spec.it s "IsAbility" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsAbility
+      " {\"type\":\"IsAbility\"} "
+  Spec.it s "IsEmblem" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsEmblem
+      " {\"type\":\"IsEmblem\"} "
   Spec.it s "FromSource" $
     Common.assertCodec
       s

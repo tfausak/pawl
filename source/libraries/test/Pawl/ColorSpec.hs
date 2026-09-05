@@ -45,6 +45,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -111,6 +112,18 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
 spellAbility :: Int
 spellAbility = 0
 
+-- Koth's loyalty abilities in printed order: +2, -3, -7.
+kothUltimate :: Int
+kothUltimate = 2
+
+-- Prodigal Sorcerer prints exactly one activated ability.
+pingAbility :: Int
+pingAbility = 0
+
+-- The only mode of a card that prints no "choose one".
+soleMode :: ModeIndex.ModeIndex
+soleMode = ModeIndex.MkModeIndex 0
+
 permanentAbility :: Int
 permanentAbility = 1
 
@@ -131,6 +144,34 @@ choosingBlue p = case p of
   Prompt.ChooseColor {} -> Color.Blue
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  _ -> S.identityAnswer p
+
+-- choosingBlue for the two cases below that need RED -- the colour Burrenton
+-- Forge-Tender's protection names, and the one Synthetic Prismatic Silence
+-- looks for on an ability.
+choosingRed :: Prompt.Prompt r -> r
+choosingRed p = case p of
+  Prompt.ChooseColor {} -> Color.Red
+  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
+  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  _ -> S.identityAnswer p
+
+-- Aims every ChooseTargets slot at one recipient, FILTERING the offered set for
+-- it rather than building it: whether the engine offers the recipient at all is
+-- the question the Koth case below asks, and a hand-built ToCreature would
+-- answer it by construction, CR 608.2b then dropping the illegal target
+-- silently. Falls back to the offered set's first member where the wanted one is
+-- absent, so the ability still resolves and the assertion is about what it hit.
+aimingAt :: Recipient.Recipient -> Prompt.Prompt r -> r
+aimingAt wanted p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap
+      ( \(_, offered) ->
+          if Set.member wanted offered
+            then Set.singleton wanted
+            else Set.take 1 offered
+      )
+      sets
   _ -> S.identityAnswer p
 
 -- Aims every ChooseTargets slot at one object, deferring the rest to
@@ -872,3 +913,97 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
               s
               (not (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSlot after)))
               "and no longer a legal 'target blue spell'"
+
+  -- THE PROVING TEST for #1551, CR 114.3 / 114.5 read through CR 702.16b.
+  --
+  -- Koth, Fire of Resistance {2}{R}{R} Legendary Planeswalker -- Koth, loyalty
+  -- 4: "+2: Search your library for a basic Mountain card, reveal it, put it
+  -- into your hand, then shuffle. -3: Koth deals damage to target creature equal
+  -- to the number of Mountains you control. -7: You get an emblem with 'Whenever
+  -- a Mountain you control enters, this emblem deals 4 damage to any target.'"
+  -- (Name, cost, type line, loyalty and all three loyalty abilities checked
+  -- against api.scryfall.com 2026-09-05.) The pool's first emblem that is a
+  -- DAMAGE SOURCE, which is what makes an emblem's colour observable at all.
+  --
+  -- Painter's Servant names RED and Burrenton Forge-Tender has protection from
+  -- red, so the emblem's 4 damage lands only if the emblem is still colourless.
+  -- Transcribe Painter's "all cards that aren't on the battlefield, spells, and
+  -- permanents" as And [] -- every object -- and the emblem is red, CR 702.16b
+  -- keeps it out of the offered target set, and the 1/1 lives.
+  --
+  -- The assertion is that the Forge-Tender DIED, not that the emblem reads
+  -- colourless: a fix that recoloured the emblem and left the protection reader
+  -- alone would agree about the colour. `aimingAt` filters the offered set, so
+  -- the answerer cannot repair a target the engine declined to offer.
+  --
+  -- The seat split is load-bearing twice over. The Forge-Tender is BOB's, so
+  -- Painter's Servant colouring it red as well changes nothing about whose
+  -- protection is read; and the Mountain that triggers the emblem enters under
+  -- ALICE, the emblem's condition naming a Mountain its controller controls.
+  Spec.it s "CR 114.3 a Koth emblem's damage lands through protection from the colour Painter's Servant named" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    koth <- S.printingOf s registry "Koth, Fire of Resistance"
+    forgeTender <- S.printingOf s registry "Burrenton Forge-Tender"
+    let base = S.landsInPlay mountain 2
+        (inHand, psId) = S.handOne paintersServant base
+        cast = snd (Engine.runGamePure choosingRed inHand (S.cast S.alice psId))
+        withPainter = snd (Engine.runGamePure choosingRed cast Stack.resolveTop)
+        (kothId, withKoth) = S.addCreature koth S.alice withPainter
+        armed = S.addCounter CounterKind.Loyalty 7 kothId withKoth
+        (tenderId, withTender) = S.addCreature forgeTender S.bob armed
+    case abilityAt kothUltimate koth of
+      Nothing -> Spec.assertFailure s "Koth prints three loyalty abilities"
+      Just ultimate -> do
+        let emblemed = snd (Engine.runGamePure choosingRed withTender (do Activate.activateAbility S.alice kothId ultimate; Stack.resolveTop))
+            (_, landed) = S.entersWithTrigger mountain S.alice emblemed
+            answer :: Prompt.Prompt r -> r
+            answer = aimingAt (Recipient.ToCreature tenderId)
+            onStack = snd (Engine.runGamePure answer landed Engine.settleForPriority)
+            after = S.settleSba (snd (Engine.runGamePure answer onStack Stack.resolveTop))
+        Spec.assertEqWith s "Painter's Servant really did name red: the white Forge-Tender is red too" (Projection.colorsOf tenderId landed) $ Set.fromList [Color.Red, Color.White]
+        Spec.assertBool s (not (null (GameState.stack onStack))) "the emblem's landfall trigger really is on the stack"
+        Spec.assertEqWith s "and its 4 damage buried the 1/1 with protection from red" (Set.member tenderId (GameState.battlefield after)) False
+        Spec.assertEqWith s "the emblem itself is colourless (CR 114.3), which is why" (fmap (`Projection.colorsOf` after) (Set.toList (GameState.command after))) [Set.empty]
+
+  -- THE PROVING TEST for #3061, CR 113.1c. Synthetic Prismatic Silence {1}{U}
+  -- Instant, "Counter target red activated or triggered ability"
+  -- (data/cards/synthetic-prismatic-silence.json) -- Stifle plus a HasColor
+  -- filter on its Pool.Abilities slot. Synthetic because no printing narrows an
+  -- ability target by the ABILITY's own colour: every hit of Scryfall's
+  -- o:/counter target [a-z ]{0,30}abilit/ (2026-09-05) narrows by the ability's
+  -- SOURCE instead -- "from an artifact source", "that targets a creature".
+  --
+  -- Painter's Servant names red, and colours the Sorcerer whose ability is on
+  -- the stack. The ABILITY is not a card, a spell or a permanent (CR 113.1c), so
+  -- it stays colourless and is no legal target. Transcribe Painter's set as
+  -- And [] and it is red and the Silence may counter it.
+  --
+  -- Two Sorcerers, one per seat: alice's activates, bob's is what the ping aims
+  -- at, so the ability on the stack has a target and stays there.
+  Spec.it s "CR 113.1c Painter's Servant does not colour an ability on the stack" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    silence <- S.printingOf s registry "Synthetic Prismatic Silence"
+    let base = S.landsInPlay mountain 2
+        (inHand, psId) = S.handOne paintersServant base
+        cast = snd (Engine.runGamePure choosingRed inHand (S.cast S.alice psId))
+        withPainter = snd (Engine.runGamePure choosingRed cast Stack.resolveTop)
+        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice withPainter
+        (victimId, withVictim) = S.addCreature sorcerer S.bob withSorcerer
+    case abilityAt pingAbility sorcerer of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer prints one activated ability"
+      Just ping -> do
+        let answer :: Prompt.Prompt r -> r
+            answer = aimingAt (Recipient.ToCreature victimId)
+            pinged = snd (Engine.runGamePure answer withVictim (Activate.activateAbility S.alice sorcererId ping))
+        Spec.assertEqWith s "Painter's Servant really did name red: the blue Sorcerer is red too" (Projection.colorsOf sorcererId pinged) $ Set.fromList [Color.Blue, Color.Red]
+        case (filter (`Game.isAbility` pinged) (GameState.stack pinged), modeTargetSlot silence soleMode) of
+          ([abilityId], Just slot) -> do
+            Spec.assertBool
+              s
+              (not (Set.member (Recipient.ToObject abilityId) (Target.legalRecipients Nothing S.noSource slot pinged)))
+              "the ability on the stack is no legal 'target red activated or triggered ability'"
+            Spec.assertEqWith s "because CR 113.1c leaves it colourless" (Projection.colorsOf abilityId pinged) Set.empty
+          _ -> Spec.assertFailure s "expected exactly one ability on the stack and one target slot"

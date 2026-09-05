@@ -1842,10 +1842,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- case below. The mana sentence is CR 609.4b's two halves as a pair of
   -- PlayerEffect.SpendManaAsThough entries, proved in Pawl.ManaSpec.
   --
-  -- Not implemented, recorded here because the card JSON carries no comment: no
-  -- Filter can say "a card or a spell", so both sets also reach an ability on the
-  -- stack (CR 113.1c) and the ownership one an emblem in the command zone (CR
-  -- 114.5). Painter's Servant's over-reach, and the same issues (#1551, #3061).
+  -- Each off-battlefield set writes out what the printed clause does NOT name,
+  -- recorded here because the card JSON carries no comment: the control half
+  -- excludes an ability on the stack (CR 113.1c) and the ownership half excludes
+  -- an emblem too (CR 114.5), both through Filter.IsAbility / Filter.IsEmblem.
+  -- Painter's Servant carries the same pair; Pawl.ColorSpec's Koth and Synthetic
+  -- Prismatic Silence cases are what prove the exclusions bite.
   --
   -- CR 305.7's gate reached by an affected set that asks who CONTROLS the
   -- candidate, which is the shape that used to make Projection.controllerOf
@@ -1914,6 +1916,33 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "bob's stays red, the clause naming the cards you own" (Projection.colorsOf bobPiker gs) (Set.singleton Color.Red)
     Spec.assertEqWith s "her Forest card, being a land, stays colorless" (Projection.colorsOf aliceForest gs) Set.empty
     Spec.assertEqWith s "and without Celestial Dawn hers is red too" (Projection.colorsOf alicePiker dawnless) (Set.singleton Color.Red)
+    -- CR 114.5's exclusion on the same set, since an emblem is a nonland object
+    -- alice owns off the battlefield and the clause names cards. Synthetic
+    -- Emblem Forge's artifact goes out and is tapped for it (forgedBoard).
+    forge <- S.printingOf s registry "Synthetic Emblem Forge"
+    let forged = forgedBoard forge gs
+    Spec.assertEqWith s "but her emblem in the command zone stays colourless (CR 114.3)" (fmap (`Projection.colorsOf` forged) (Set.toList (GameState.command forged))) [Set.empty]
+
+  -- CR 113.1c's exclusion on the same two off-battlefield sets, the emblem
+  -- assertion's sibling: an activated ability on the stack is neither a card
+  -- nor a spell, and alice both controls and owns this one, so the control half
+  -- and the ownership half would each reach it without Filter.IsAbility.
+  --
+  -- bob's Sorcerer is the ping's target, so the ability has one and stays on the
+  -- stack to be asked about.
+  Spec.it s "CR 113.1c Celestial Dawn leaves an ability on the stack colourless" $ do
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let base = Setup.emptyGame S.bothPlayers
+        (sorcererId, g1) = S.addCreature sorcerer S.alice base
+        (_, g2) = S.addCreature dawn S.alice g1
+        (victimId, g3) = S.addCreature sorcerer S.bob g2
+    case Face.activatedAbilities (S.combinedFace sorcerer) of
+      [] -> Spec.assertFailure s "Prodigal Sorcerer prints one activated ability"
+      ping : _ -> do
+        let pinged = snd (Engine.runGamePure (aimAtCreature victimId) g3 (Activate.activateAbility S.alice sorcererId ping))
+        Spec.assertEqWith s "the blue Sorcerer is white, so Celestial Dawn is live" (Projection.colorsOf sorcererId pinged) (Set.singleton Color.White)
+        Spec.assertEqWith s "but its ability on the stack stays colourless" (fmap (`Projection.colorsOf` pinged) (filter (`Game.isAbility` pinged) (GameState.stack pinged))) [Set.empty]
 
   Spec.it s "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Blood Moon older)" $ do
     forest <- S.printingOf s registry "Forest"

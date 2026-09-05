@@ -267,6 +267,8 @@ canHostSubjects predicate = case predicate of
   Filter.Type.CanAttachToSubject -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsActivatedAbility -> 0
+  Filter.Type.IsAbility -> 0
+  Filter.Type.IsEmblem -> 0
   -- A DESCENT for RepresentedByCard's reason below, the nest describing the
   -- ability's SOURCE.
   Filter.Type.FromSource f -> canHostSubjects f

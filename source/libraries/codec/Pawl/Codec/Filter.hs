@@ -104,6 +104,8 @@ codec keywordCodec =
       Arm.nullary "CanAttachToSubject" Filter.CanAttachToSubject,
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsActivatedAbility" Filter.IsActivatedAbility,
+      Arm.nullary "IsAbility" Filter.IsAbility,
+      Arm.nullary "IsEmblem" Filter.IsEmblem,
       -- Recursive for AttachedTo's reason, the payload describing the ability's
       -- SOURCE rather than the ability.
       Arm.payload "FromSource" (codec keywordCodec) Filter.FromSource (\x -> case x of Filter.FromSource y -> Just y; _ -> Nothing),
