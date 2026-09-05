@@ -19,7 +19,6 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -78,22 +77,9 @@ import qualified Pawl.Types.Zone as Zone
 combatDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.1b an unblocked attacker damages the defending player" $ do
-    let attacker = S.aliasRef "attacker"
-        setup =
-          S.arrangement
-            ( S.battlefield S.alice [S.ready (S.aliased "attacker" (S.permanent "Goblin Piker"))]
-                NonEmpty.:| [S.battlefield S.bob []]
-            )
-            S.alice
-            (Phase.Combat CombatStep.BeginningOfCombat)
-        attack =
-          S.at
-            1
-            (Phase.Combat CombatStep.DeclareAttackers)
-            S.alice
-            (S.attack [attacker])
-    built <- S.arrangeOrFail s registry setup
-    (_, after) <- S.runScriptOrFail s (Seq.singleton attack) built S.combatGame
+    let board = S.duel S.beginningOfCombat [S.settled "attacker" "Goblin Piker"] []
+        script = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "attacker"])]
+    after <- S.play s registry board script S.combatGame
     -- A Piker is a 2/1, and bob starts at 20.
     Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 510.1a Tapestry Warden substitutes toughness only where greater than power" $ do
@@ -187,60 +173,51 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
   Spec.it s "CR 510.1e an illegal division is rejected and deals nothing" $ do
     -- Not a reachable game state: this is the engine's defense against a
     -- broken interpreter. See the spec, section 3.
-    let permanent name = S.ready (S.aliased name (S.permanent "Goblin Piker"))
-        setup =
-          S.arrangement
-            ( S.battlefield S.alice [permanent "attacker"]
-                NonEmpty.:| [S.battlefield S.bob [permanent "first blocker", permanent "second blocker"]]
-            )
-            S.alice
-            (Phase.Combat CombatStep.BeginningOfCombat)
+    let board =
+          S.duel
+            S.beginningOfCombat
+            [S.settled "attacker" "Goblin Piker"]
+            [S.settled "first" "Goblin Piker", S.settled "second" "Goblin Piker"]
         attacker = S.aliasRef "attacker"
-        first = S.aliasRef "first blocker"
-        second = S.aliasRef "second blocker"
+        first = S.aliasRef "first"
+        second = S.aliasRef "second"
         script =
-          Seq.fromList
-            [ S.at 1 (Phase.Combat CombatStep.DeclareAttackers) S.alice (S.attack [attacker]),
-              S.at 1 (Phase.Combat CombatStep.DeclareBlockers) S.bob (S.block [(first, attacker), (second, attacker)]),
-              S.atSource
-                1
-                (Phase.Combat CombatStep.CombatDamage)
+          S.turn
+            1
+            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
+              S.on S.declareBlockers S.bob (S.block [(first, attacker), (second, attacker)]),
+              S.onSource
+                S.combatDamage
                 S.alice
                 attacker
                 (S.assignDamage [(S.MkCreatureRecipient first, 99), (S.MkCreatureRecipient second, 99)])
             ]
-    built <- S.arrangeOrFail s registry setup
-    (_, fought) <- S.runScriptOrFail s script built S.combatGame
-    let after = S.settleSba fought
-    Spec.assertEqWith s "both blockers survive" (S.creaturesInPlay S.bob after) 2
+    fought <- S.play s registry board script S.combatGame
+    Spec.assertEqWith s "both blockers survive" (S.creaturesInPlay S.bob (S.settleSba fought)) 2
   Spec.it s "CR 510.1a a legal division deals the damage it names" $ do
     -- The accepting counterpart to the rejection above: the same board, a legal
     -- 1/1 division, and both blockers dead. A rejection outcome alone is green
     -- for any recipient-resolution bug, since a misdirected map is illegal too.
-    let permanent name = S.ready (S.aliased name (S.permanent "Goblin Piker"))
-        setup =
-          S.arrangement
-            ( S.battlefield S.alice [permanent "attacker"]
-                NonEmpty.:| [S.battlefield S.bob [permanent "first blocker", permanent "second blocker"]]
-            )
-            S.alice
-            (Phase.Combat CombatStep.BeginningOfCombat)
+    let board =
+          S.duel
+            S.beginningOfCombat
+            [S.settled "attacker" "Goblin Piker"]
+            [S.settled "first" "Goblin Piker", S.settled "second" "Goblin Piker"]
         attacker = S.aliasRef "attacker"
-        first = S.aliasRef "first blocker"
-        second = S.aliasRef "second blocker"
+        first = S.aliasRef "first"
+        second = S.aliasRef "second"
         script =
-          Seq.fromList
-            [ S.at 1 (Phase.Combat CombatStep.DeclareAttackers) S.alice (S.attack [attacker]),
-              S.at 1 (Phase.Combat CombatStep.DeclareBlockers) S.bob (S.block [(first, attacker), (second, attacker)]),
-              S.atSource
-                1
-                (Phase.Combat CombatStep.CombatDamage)
+          S.turn
+            1
+            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
+              S.on S.declareBlockers S.bob (S.block [(first, attacker), (second, attacker)]),
+              S.onSource
+                S.combatDamage
                 S.alice
                 attacker
                 (S.assignDamage [(S.MkCreatureRecipient first, 1), (S.MkCreatureRecipient second, 1)])
             ]
-    built <- S.arrangeOrFail s registry setup
-    (_, fought) <- S.runScriptOrFail s script built S.combatGame
+    fought <- S.play s registry board script S.combatGame
     -- A Piker is a 2/1, so one point is lethal (CR 510.1c) and both blockers die.
     Spec.assertEqWith s "both blockers died" (S.creaturesInPlay S.bob (S.settleSba fought)) 0
   -- The deterministic successor to the retired "combat happens" property: an
