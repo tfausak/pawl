@@ -2554,11 +2554,11 @@ harnessTheStormSpec s registry = Spec.describe s "HarnessTheStorm" $ do
 -- Four decoys, one per way the offer could be wrong. The Piker is the COUNT
 -- decoy: a one-candidate slot is answered with no prompt at all, so a set
 -- assertion over a single member could not tell "bob's graveyard" from "the one
--- card anywhere". The Swamp is the CARD TYPE decoy, "permanent card" (CR 110.4a)
--- being what admits the other four. The Dryad Arbor is the NONLAND decoy, and it
--- is the one the other three cannot stand in for: a Land Creature satisfies the
--- permanent-card half and CR 305.9 is what subtracts it, so only a card that is
--- BOTH tells the printed "nonland permanent card" from a bare "permanent card".
+-- card anywhere". The Swamp is the CARD TYPE decoy: a land alone is kept out by
+-- the "nonland" and by the permanent-card Or's silence about lands alike, so it
+-- cannot tell the two readings apart. The Dryad Arbor is what can, and it is the
+-- decoy none of the others stands in for -- a Land Creature satisfies the
+-- permanent-card half (CR 110.4a) and only CR 305.9's "nonland" subtracts it.
 -- alice's Vessel is the ZONE decoy -- the same printing, the same card types, a
 -- different pile -- so the only thing that keeps it out of the offer is whose
 -- graveyard it is in, which is the axis this whole group is about.
@@ -2671,8 +2671,8 @@ arborTargetSpec s registry =
     $ do
       (board, arborId) <- arborOnlyBoard s registry
       let (after, (offered, offers)) = runPickpocket arborId board
-      -- CR 603.3d: no legal choice, so the ability never reaches a target
-      -- prompt and never reaches the stack.
+      -- CR 603.3d: no legal choice can be made for the slot, so the ability is
+      -- removed from the stack and no target prompt is ever raised.
       Spec.assertEqWith s "CR 305.9 the slot was offered nothing, so the trigger had no legal target" offered []
       Spec.assertEqWith s "and no cast was offered off it" offers []
       -- The preconditions, AFTER the behaviour so neither can absorb a mutation
