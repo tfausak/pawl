@@ -80,9 +80,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- Alice's two.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (a1, gs1) = S.addCreature swampPrinting S.alice gs0
-        (a2, gs2) = S.addCreature swampPrinting S.alice gs1
-        (b1, gs) = S.addCreature swampPrinting S.bob gs2
+        (a1, gs1) = S.addPermanent swampPrinting S.alice gs0
+        (a2, gs2) = S.addPermanent swampPrinting S.alice gs1
+        (b1, gs) = S.addPermanent swampPrinting S.bob gs2
         swamp = Set.singleton Subtype.Swamp
         land = Set.singleton CardType.Land
         viewOf =
@@ -239,9 +239,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- three Swamps across both players count.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (a1, gs1) = S.addCreature swampPrinting S.alice gs0
-        (a2, gs2) = S.addCreature swampPrinting S.alice gs1
-        (b1, gs) = S.addCreature swampPrinting S.bob gs2
+        (a1, gs1) = S.addPermanent swampPrinting S.alice gs0
+        (a2, gs2) = S.addPermanent swampPrinting S.alice gs1
+        (b1, gs) = S.addPermanent swampPrinting S.bob gs2
         swamp = Set.singleton Subtype.Swamp
         land = Set.singleton CardType.Land
         viewOf =
@@ -262,9 +262,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- Swamp.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (a1, gs1) = S.addCreature swampPrinting S.alice gs0
-        (a2, gs2) = S.addCreature swampPrinting S.alice gs1
-        (b1, gs) = S.addCreature swampPrinting S.bob gs2
+        (a1, gs1) = S.addPermanent swampPrinting S.alice gs0
+        (a2, gs2) = S.addPermanent swampPrinting S.alice gs1
+        (b1, gs) = S.addPermanent swampPrinting S.bob gs2
         swamp = Set.singleton Subtype.Swamp
         land = Set.singleton CardType.Land
         viewOf =
@@ -281,7 +281,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (srcId, gs1) = S.addCreature piker S.alice gs0
+        (srcId, gs1) = S.addPermanent piker S.alice gs0
         slot = SlotName.MkSlotName (Text.pack "target")
         bind obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer S.bob) (Object.bindings obj)}
         gs2 = gs1 {GameState.objects = Map.adjust bind srcId (GameState.objects gs1)}
@@ -311,7 +311,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- `maximum (0 : values)`.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (b1, gs) = S.addCreature swampPrinting S.bob gs0
+        (b1, gs) = S.addPermanent swampPrinting S.bob gs0
         land = Set.singleton CardType.Land
         viewOf = S.stubView [(b1, land, Set.singleton Subtype.Swamp, Just S.bob)]
         count =
@@ -337,9 +337,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, gs1) = S.addCreature elves S.alice gs0
-        (pikerId, gs2) = S.addCreature piker S.alice gs1
-        (_, printed) = S.addCreature mammoth S.alice gs2
+        (_, gs1) = S.addPermanent elves S.alice gs0
+        (pikerId, gs2) = S.addPermanent piker S.alice gs1
+        (_, printed) = S.addPermanent mammoth S.alice gs2
         pumped = S.addCounter CounterKind.PlusOnePlusOne 2 pikerId printed
         count =
           Count.Type.MkCount
@@ -359,7 +359,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- report the maximum of a set the card never named.
     swampPrinting <- S.printingOf s registry "Swamp"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (a1, gs) = S.addCreature swampPrinting S.alice gs0
+        (a1, gs) = S.addPermanent swampPrinting S.alice gs0
         count =
           Count.Type.MkCount
             (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
@@ -416,9 +416,9 @@ aetherfluxReservoirSpec s registry =
       -- Six covers the four Fogs the turn-boundary case casts, none of which
       -- untaps: no untap step runs between them.
       board forest reservoir =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature forest pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent forest pid g')) g [1 .. (n :: Int)]
             withLands = addLands S.bob 2 (addLands S.alice 6 S.threePlayerGame)
-            (_, withReservoir) = S.addCreature reservoir S.alice withLands
+            (_, withReservoir) = S.addPermanent reservoir S.alice withLands
          in withReservoir
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -520,7 +520,7 @@ tobiasSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tobiasSpec s registry =
   let zombie = CardName.MkCardName (Text.pack "Zombie Token")
       board tobias =
-        let (tid, gs) = S.addCreature tobias S.alice S.threePlayerGame
+        let (tid, gs) = S.addPermanent tobias S.alice S.threePlayerGame
          in ( tid,
               gs
                 { GameState.phase = Phase.PrecombatMain,
@@ -540,9 +540,9 @@ tobiasSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           giant <- S.printingOf s registry "Hill Giant"
           let (tid, gs0) = board tobias
-              (a1, gs1) = S.addCreature piker S.alice gs0
-              (a2, gs2) = S.addCreature piker S.alice gs1
-              (b1, gs3) = S.addCreature giant S.bob gs2
+              (a1, gs1) = S.addPermanent piker S.alice gs0
+              (a2, gs2) = S.addPermanent piker S.alice gs1
+              (b1, gs3) = S.addPermanent giant S.bob gs2
               dead = kill b1 (kill a2 (kill a1 gs3))
               after = kill tid dead
           Spec.assertEqWith s "no Zombie before Tobias dies" (zombies dead) 0
@@ -562,8 +562,8 @@ tobiasSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           traveler <- S.printingOf s registry "Doomed Traveler"
           let (tid, gs0) = board tobias
-              (a1, gs1) = S.addCreature piker S.alice gs0
-              (a2, gs2) = S.addCreature traveler S.alice gs1
+              (a1, gs1) = S.addPermanent piker S.alice gs0
+              (a2, gs2) = S.addPermanent traveler S.alice gs1
               travelerDead = kill a2 (kill a1 gs2)
               spirit = S.tokensOf travelerDead
               dead = List.foldl' (flip kill) travelerDead spirit
@@ -578,7 +578,7 @@ tobiasSpec s registry =
           tobias <- S.printingOf s registry "Tobias, Doomed Conqueror"
           giant <- S.printingOf s registry "Hill Giant"
           let (tid, gs0) = board tobias
-              (b1, gs1) = S.addCreature giant S.bob gs0
+              (b1, gs1) = S.addPermanent giant S.bob gs0
               stolen = S.giveControl b1 S.alice gs1
               after = kill tid (kill b1 stolen)
           Spec.assertEqWith s "bob's Giant and Tobias" (zombies after) 2
@@ -615,9 +615,9 @@ charnelTallySpec s registry =
                 (GameState.objects gs)
           }
       board tally piker =
-        let (tid, gs0) = S.addCreature tally S.alice S.threePlayerGame
-            (a1, gs1) = S.addCreature piker S.alice gs0
-            (b1, gs2) = S.addCreature piker S.bob gs1
+        let (tid, gs0) = S.addPermanent tally S.alice S.threePlayerGame
+            (a1, gs1) = S.addPermanent piker S.alice gs0
+            (b1, gs2) = S.addPermanent piker S.bob gs1
          in ( tid,
               a1,
               b1,
@@ -683,9 +683,9 @@ isDeath zc = ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.
 roothaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 roothaSpec s registry =
   let board rootha forest mountain island =
-        let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+        let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
             withLands = addLands island S.bob 8 (addLands mountain S.alice 6 (addLands forest S.alice 10 S.threePlayerGame))
-            (_, withRootha) = S.addCreature rootha S.alice withLands
+            (_, withRootha) = S.addPermanent rootha S.alice withLands
          in withRootha
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -794,7 +794,7 @@ roothaSpec s registry =
 -- every other number in the group.
 mimingSlimeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 mimingSlimeSpec s registry =
-  let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+  let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
       board forest =
         (addLands forest S.alice 6 S.threePlayerGame)
           { GameState.phase = Phase.PrecombatMain,
@@ -812,7 +812,7 @@ mimingSlimeSpec s registry =
           slime <- S.printingOf s registry "Miming Slime"
           piker <- S.printingOf s registry "Goblin Piker"
           wurm <- S.printingOf s registry "Panglacial Wurm"
-          let staged = snd (S.addCreature wurm S.bob (snd (S.addCreature piker S.alice (board forest))))
+          let staged = snd (S.addPermanent wurm S.bob (snd (S.addPermanent piker S.alice (board forest))))
               after = castOne slime S.alice staged
           Spec.assertEqWith s "a 2/2 Ooze: alice's Piker is a 2/1 and bob's Wurm a 9/9" (oozes after) [Just (2, 2)]
           Spec.assertEqWith s "beside the Piker, so the Ooze did not replace it" (S.creaturesInPlay S.alice after) 2
@@ -838,7 +838,7 @@ mimingSlimeSpec s registry =
           slime <- S.printingOf s registry "Miming Slime"
           anthem <- S.printingOf s registry "Glorious Anthem"
           wurm <- S.printingOf s registry "Panglacial Wurm"
-          let staged = snd (S.addCreature wurm S.bob (snd (S.addCreature anthem S.alice (board forest))))
+          let staged = snd (S.addPermanent wurm S.bob (snd (S.addPermanent anthem S.alice (board forest))))
               after = castOne slime S.alice staged
           Spec.assertEqWith s "a 1/1 Ooze: a stamped 0/0 plus the Anthem, not bob's 9 and not a box that reads nothing" (oozes after) [Just (1, 1)]
           Spec.assertEqWith s "the Ooze is the only creature alice controls" (S.creaturesInPlay S.alice after) 1
@@ -852,7 +852,7 @@ mimingSlimeSpec s registry =
           forest <- S.printingOf s registry "Forest"
           slime <- S.printingOf s registry "Miming Slime"
           wurm <- S.printingOf s registry "Panglacial Wurm"
-          let staged = snd (S.addCreature wurm S.bob (board forest))
+          let staged = snd (S.addPermanent wurm S.bob (board forest))
               after = castOne slime S.alice staged
           Spec.assertEqWith s "no Ooze is left on the battlefield" (oozes after) []
           Spec.assertEqWith s "alice controls no creatures at all" (S.creaturesInPlay S.alice after) 0
@@ -896,7 +896,7 @@ tyranidInvasionSpec s registry =
   let -- alice has four Forests and nothing else; bob and carol have empty
       -- boards, so every token on the battlefield afterwards is the spell's.
       board forest =
-        let withLands = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) S.threePlayerGame [1 .. (4 :: Int)]
+        let withLands = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) S.threePlayerGame [1 .. (4 :: Int)]
          in withLands
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -1034,7 +1034,7 @@ censusOfTheCursedSpec s registry =
             withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard forest S.alice g)) withLands [1 .. (3 :: Int)]
             withCurses =
               List.foldl'
-                (\g (curse, pid) -> let (oid, g1) = S.addCreature curse S.alice g in S.attachTo oid (Recipient.ToPlayer pid) g1)
+                (\g (curse, pid) -> let (oid, g1) = S.addPermanent curse S.alice g in S.attachTo oid (Recipient.ToPlayer pid) g1)
                 withLibrary
                 curses
          in withCurses
@@ -1236,8 +1236,8 @@ flunkSpec s registry =
       -- caller's, since which seat holds how many is what each case varies.
       board swamp piker wall =
         let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
-            (wallId, withWall) = S.addCreature wall S.bob lands
-            (_, withPiker) = S.addCreature piker S.alice withWall
+            (wallId, withWall) = S.addPermanent wall S.bob lands
+            (_, withPiker) = S.addPermanent piker S.alice withWall
          in (wallId, withPiker)
    in Spec.describe s "Flunk" $ do
         Spec.it s "CR 613.1b X counts the hand of the creature's CONTROLLER, not the caster's" $ do
@@ -1306,7 +1306,7 @@ keeningStoneSpec s registry =
         stone <- S.printingOf s registry "Keening Stone"
         swamp <- S.printingOf s registry "Swamp"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (stoneId, withStone) = S.addCreature stone S.alice (S.landsFor swamp S.alice 5 S.threePlayerGame)
+        let (stoneId, withStone) = S.addPermanent stone S.alice (S.landsFor swamp S.alice 5 S.threePlayerGame)
             staged =
               stock S.addGraveyardCard piker S.carol 1
                 . stock S.addGraveyardCard piker S.bob 3
@@ -1446,7 +1446,7 @@ priceOfKnowledgeSpec s registry =
       board = do
         price <- S.printingOf s registry "Price of Knowledge"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (_, withPrice) = S.addCreature price S.alice S.threePlayerGame
+        let (_, withPrice) = S.addPermanent price S.alice S.threePlayerGame
         pure
           ( library piker S.carol 10
               . library piker S.bob 10

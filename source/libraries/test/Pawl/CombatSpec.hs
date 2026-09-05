@@ -213,6 +213,36 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
     (_, fought) <- S.runScriptOrFail s script built S.combatGame
     let after = S.settleSba fought
     Spec.assertEqWith s "both blockers survive" (S.creaturesInPlay S.bob after) 2
+  Spec.it s "CR 510.1a a legal division deals the damage it names" $ do
+    -- The accepting counterpart to the rejection above: the same board, a legal
+    -- 1/1 division, and both blockers dead. A rejection outcome alone is green
+    -- for any recipient-resolution bug, since a misdirected map is illegal too.
+    let permanent name = S.ready (S.aliased name (S.permanent "Goblin Piker"))
+        setup =
+          S.arrangement
+            ( S.battlefield S.alice [permanent "attacker"]
+                NonEmpty.:| [S.battlefield S.bob [permanent "first blocker", permanent "second blocker"]]
+            )
+            S.alice
+            (Phase.Combat CombatStep.BeginningOfCombat)
+        attacker = S.aliasRef "attacker"
+        first = S.aliasRef "first blocker"
+        second = S.aliasRef "second blocker"
+        script =
+          Seq.fromList
+            [ S.at 1 (Phase.Combat CombatStep.DeclareAttackers) S.alice (S.attack [attacker]),
+              S.at 1 (Phase.Combat CombatStep.DeclareBlockers) S.bob (S.block [(first, attacker), (second, attacker)]),
+              S.atSource
+                1
+                (Phase.Combat CombatStep.CombatDamage)
+                S.alice
+                attacker
+                (S.assignDamage [(S.MkCreatureRecipient first, 1), (S.MkCreatureRecipient second, 1)])
+            ]
+    built <- S.arrangeOrFail s registry setup
+    (_, fought) <- S.runScriptOrFail s script built S.combatGame
+    -- A Piker is a 2/1, so one point is lethal (CR 510.1c) and both blockers die.
+    Spec.assertEqWith s "both blockers died" (S.creaturesInPlay S.bob (S.settleSba fought)) 0
   -- The deterministic successor to the retired "combat happens" property: an
   -- unblocked 2/1 attacker reduces the defender's life by its power.
   Spec.it s "combat deals damage to the defending player" $ do
@@ -410,7 +440,7 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
     piker <- S.printingOf s registry "Goblin Piker"
     guard <- S.printingOf s registry "Palace Guard"
     let (board, mine, _, hers) = S.threePlayerCombat [piker, piker, piker, piker] [] [guard]
-        (bobsGuard, staged) = S.addCreature guard S.bob board
+        (bobsGuard, staged) = S.addPermanent guard S.bob board
     case (mine, hers) of
       ([atBob1, atBob2, atCarol1, atCarol2], [carolsGuard]) -> do
         let -- CR 508.1b / CR 802.3: each creature announces whom it attacks, by
@@ -515,7 +545,7 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
     guard <- S.printingOf s registry "Palace Guard"
     lure <- S.printingOf s registry "Lure"
     let (board, mine, _, hers) = S.threePlayerCombat [piker, piker, piker, piker] [] [guard]
-        (bobsGuard, staged) = S.addCreature guard S.bob board
+        (bobsGuard, staged) = S.addPermanent guard S.bob board
     case (mine, hers) of
       ([atBob1, atBob2, atCarol1, atCarol2], [carolsGuard]) -> do
         let aimed oid = if List.elem oid [atBob1, atBob2] then S.bob else S.carol
@@ -526,7 +556,7 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
               _ -> S.aggressiveAnswer p
             settled = S.runPure S.identityAnswer staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
             declared = S.runPure declaring settled (Combat.declareAttackers S.manaPerformer S.alice)
-            (aura, withAura) = S.addCreature lure S.alice declared
+            (aura, withAura) = S.addPermanent lure S.alice declared
             lured = S.attach aura atBob1 withAura
         -- THE GAMEPLAY ASSERTION, and first so nothing ahead of it can absorb a
         -- mutation: the Lured creature is attacking bob, so CR 802.4b has carol
@@ -602,7 +632,7 @@ attackLeftRightSpec s registry = Spec.describe s "AttackLeftRight" $ do
     -- the nearest opponent that way, is two seats off. GameState.turnOrder is
     -- the permanent seating roster, which is what makes that distance real
     -- rather than closing the gap.
-    let (_, seated) = S.addCreature piker S.alice S.fourPlayerGame
+    let (_, seated) = S.addPermanent piker S.alice S.fourPlayerGame
         board = seated {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat}
         gone = S.departs Departure.Type.Conceded S.bob board
         declaredWith option gs =
@@ -934,7 +964,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     crossroads <- S.printingOf s registry "Concordant Crossroads"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        (_, enchanted) = S.addCreature crossroads S.alice (justArrived gs)
+        (_, enchanted) = S.addPermanent crossroads S.alice (justArrived gs)
         after = snd (Engine.runGamePure S.aggressiveAnswer enchanted (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
   -- CR 113.6b, the zone half of the same contrast. Anger's ability states where
@@ -949,7 +979,7 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        (_, withMountain) = S.addCreature mountain S.alice (justArrived gs)
+        (_, withMountain) = S.addPermanent mountain S.alice (justArrived gs)
         (_, buried) = S.addGraveyardCard anger S.alice withMountain
         after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
@@ -962,8 +992,8 @@ hasteSpec s registry = Spec.describe s "Haste" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        (_, withMountain) = S.addCreature mountain S.alice (justArrived gs)
-        (_, onBattlefield) = S.addCreature anger S.alice withMountain
+        (_, withMountain) = S.addPermanent mountain S.alice (justArrived gs)
+        (_, onBattlefield) = S.addPermanent anger S.alice withMountain
         after = snd (Engine.runGamePure S.aggressiveAnswer onBattlefield (Combat.declareAttackers S.manaPerformer S.alice))
     case mine of
       [pikerId] -> Spec.assertBool s (notElem pikerId (declaredAttackers after)) "the Piker still cannot attack"
@@ -998,9 +1028,9 @@ controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.bob base
+        (creature, withCreature) = S.addPermanent piker S.bob base
         settled = S.runPure S.identityAnswer withCreature (Engine.settleAll S.bob)
-        (aura, withAura) = S.addCreature controlMagic S.alice settled
+        (aura, withAura) = S.addPermanent controlMagic S.alice settled
         attached = S.attach aura creature withAura
     Spec.assertEqWith s "alice controls it" (Projection.controllerOf creature attached) (Just S.alice)
     Spec.assertBool s (not (Combat.canAttack S.alice creature attached)) "but it is summoning sick, so it cannot attack this turn"
@@ -1016,9 +1046,9 @@ controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.alice base
+        (creature, withCreature) = S.addPermanent piker S.alice base
         settled = S.runPure S.identityAnswer withCreature (Engine.settleAll S.alice)
-        (aura, withAura) = S.addCreature controlMagic S.bob settled
+        (aura, withAura) = S.addPermanent controlMagic S.bob settled
         -- The steal is observed the next time the board settles -- the CR
         -- 117.5 sweep, which runs wherever the board can change.
         stolen = S.runPure S.identityAnswer (S.attach aura creature withAura) Engine.settleForPriority
@@ -1028,7 +1058,7 @@ controlChangeSicknessSpec s registry = Spec.describe s "ControlChangeSickness" $
     Spec.assertBool s (not (Combat.canAttack S.alice creature returned)) "but not continuously, so it cannot attack"
 
 -- CR 614.1c's as-enters choice of a player, stamped onto a permanent a fixture
--- placed rather than cast (S.addCreature runs no entry loop).
+-- placed rather than cast (S.addPermanent runs no entry loop).
 chosePlayer :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 chosePlayer pid oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just pid}) oid (GameState.objects gs)}
 
@@ -1107,10 +1137,10 @@ withLands :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
 withLands = withPermanents S.bob
 
 -- Any printings at all onto `who`'s battlefield, on a board that already exists.
--- S.addCreature is any-printing rather than creature-only, which is how the CR
+-- S.addPermanent is any-printing rather than creature-only, which is how the CR
 -- 509.1a Mountain case below reaches a land.
 withPermanents :: PlayerId.PlayerId -> [Printing.Printing] -> GameState.GameState -> GameState.GameState
-withPermanents who ps gs = List.foldl' (\g p -> snd (S.addCreature p who g)) gs ps
+withPermanents who ps gs = List.foldl' (\g p -> snd (S.addPermanent p who g)) gs ps
 
 -- Put `printing` onto bob's battlefield already attached to `host` -- CR 301.5a
 -- for an Equipment, CR 303.4b for an Aura. A STATE fixture, as S.attach's own
@@ -1118,7 +1148,7 @@ withPermanents who ps gs = List.foldl' (\g p -> snd (S.addCreature p who g)) gs 
 -- part in what the CR 509.1a arity below reads.
 withAttachment :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 withAttachment printing host gs =
-  let (oid, gs1) = S.addCreature printing S.bob gs
+  let (oid, gs1) = S.addPermanent printing S.bob gs
    in S.attach oid host gs1
 
 evasionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1190,7 +1220,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, _) = S.combatBoardOf [birdMaiden, birdMaiden] []
     case mine of
       [tethered, other] -> do
-        let (aura, withAura) = S.addCreature skyTether S.alice gs
+        let (aura, withAura) = S.addPermanent skyTether S.alice gs
             board = S.attach aura tethered withAura
         Spec.assertBool s (not (Combat.canAttack S.alice tethered board)) "the tethered creature cannot attack"
         Spec.assertBool s (Combat.canAttack S.alice other board) "the one beside it can"
@@ -1321,7 +1351,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     mountain <- S.printingOf s registry "Mountain"
     let (gs, mine, _) = attacking [birdMaiden] []
-        withLand = snd (S.addCreature mountain S.bob gs)
+        withLand = snd (S.addPermanent mountain S.bob gs)
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
       _ : _ -> Spec.assertEqWith s "no legal blockers" (Combat.legalBlockers S.bob withLand) []
@@ -1656,7 +1686,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     island <- S.printingOf s registry "Island"
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let (gs0, mine, theirs) = attacking [bogWraith] [piker]
-        gs = snd (S.addCreature urborg S.alice (withLands [island] gs0))
+        gs = snd (S.addPermanent urborg S.alice (withLands [island] gs0))
     case (mine, theirs) of
       (a : _, b : _) ->
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
@@ -1764,7 +1794,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) -> do
-        let (glovesId, equipped) = S.addCreature gloves S.alice (withLands [seat] gs0)
+        let (glovesId, equipped) = S.addPermanent gloves S.alice (withLands [seat] gs0)
             armed = S.attach glovesId a equipped
         -- The premise: the Gloves really grant it, and the Piker prints none.
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) armed)) "illegal while equipped"
@@ -1784,7 +1814,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) -> do
-        let (glovesId, board) = S.addCreature gloves S.alice (withLands [swamp] gs0)
+        let (glovesId, board) = S.addPermanent gloves S.alice (withLands [swamp] gs0)
             armed = S.attach glovesId a board
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) armed) "legal"
         let after = S.runPure S.aggressiveAnswer armed (Combat.declareBlockers S.manaPerformer)
@@ -1847,8 +1877,8 @@ hackedLandwalkBoard s registry mine hackTarget hacked from to defendersLand = do
   island <- S.printingOf s registry "Island"
   magicalHack <- S.printingOf s registry "Magical Hack"
   let (gs0, ours, theirs) = S.combatBoardOf mine [piker]
-      (_, gs1) = S.addCreature island S.alice gs0
-      (_, gs2) = S.addCreature defendersLand S.bob gs1
+      (_, gs1) = S.addPermanent island S.alice gs0
+      (_, gs2) = S.addPermanent defendersLand S.bob gs1
       (hackId, gs3) = S.addHandCard magicalHack S.alice gs2
       board = case (hacked, hackTarget ours) of
         (True, Just t) -> castHackAt hackId t from to gs3
@@ -2024,7 +2054,7 @@ goblinScoutsBoard s registry hacked defendersLand = do
   magicalHack <- S.printingOf s registry "Magical Hack"
   let (gs0, _, theirs) = S.combatBoardOf [] [piker]
       gs1 = S.landsFor island S.alice 1 (S.landsFor mountain S.alice 5 gs0)
-      (_, gs2) = S.addCreature defendersLand S.bob gs1
+      (_, gs2) = S.addPermanent defendersLand S.bob gs1
       (scoutsId, gs3) = S.addHandCard goblinScouts S.alice gs2
       (hackId, gs4) = S.addHandCard magicalHack S.alice gs3
       onStack = S.runPure S.identityAnswer (gs4 {GameState.priority = Just S.alice}) (S.cast S.alice scoutsId)
@@ -2096,8 +2126,8 @@ hammerheimBoard s registry activated = do
   crossroads <- S.printingOf s registry "Concordant Crossroads"
   hammerheim <- S.printingOf s registry "Hammerheim"
   let (gs0, ours, theirs) = attacking [stalkerHag] [piker]
-      (_, hasted) = S.addCreature crossroads S.alice (withLands [swamp, forest] gs0)
-      (hammerheimId, placed) = S.addCreature hammerheim S.alice hasted
+      (_, hasted) = S.addPermanent crossroads S.alice (withLands [swamp, forest] gs0)
+      (hammerheimId, placed) = S.addPermanent hammerheim S.alice hasted
   case (ours, theirs) of
     (hag : _, blocker : _) -> do
       board <- if activated then removingLandwalk s hammerheimId hag placed else pure placed
@@ -2173,7 +2203,7 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
         (control, _, plain) = attacking [piker, piker] [piker]
     case (mine, theirs, plain) of
       ([first, second], [b], [other]) -> do
-        let enchanted = snd (S.addCreature highGround S.bob gs)
+        let enchanted = snd (S.addPermanent highGround S.bob gs)
         Spec.assertEqWith
           s
           "with the enchantment two, without it one"
@@ -2203,7 +2233,7 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
             Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [first, second])) gs,
             -- The last reading is the SUM's absorbing case: a second permission
             -- must leave "any number" alone rather than collapse it to a count.
-            Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.fromList [first, second, third])) (snd (S.addCreature highGround S.bob gs))
+            Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.fromList [first, second, third])) (snd (S.addPermanent highGround S.bob gs))
           )
           (True, False, True, True)
       _ -> Spec.assertFailure s "fixture should have three attackers and two blockers"
@@ -2268,9 +2298,9 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
     case (mine, theirs) of
       ([first, second], [guard]) -> do
         let both = Map.singleton guard (Set.fromList [first, second])
-            (rayId, withRay) = S.addCreature ray S.bob gs
+            (rayId, withRay) = S.addPermanent ray S.bob gs
             enchanted = S.attach rayId guard withRay
-            humbled = snd (S.addCreature humility S.bob gs)
+            humbled = snd (S.addPermanent humility S.bob gs)
         Spec.assertEqWith
           s
           "the Guard blocks both under the Ray, and only one under Humility"
@@ -2480,7 +2510,7 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
 luringAll :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 luringAll lure mine theirs =
   let (gs, ours, yours) = attacking mine theirs
-      enchant g attacker = let (aura, withAura) = S.addCreature lure S.alice g in S.attach aura attacker withAura
+      enchant g attacker = let (aura, withAura) = S.addPermanent lure S.alice g in S.attach aura attacker withAura
    in (List.foldl' enchant gs ours, ours, yours)
 
 -- Blocks every attacker in `attackers` with every creature offered, which is
@@ -2713,7 +2743,7 @@ luring lure mine theirs =
         -- Unreachable: every caller passes at least one attacking printing.
         [] -> (gs, ours, yours)
         attacker : _ ->
-          let (aura, withAura) = S.addCreature lure S.alice gs
+          let (aura, withAura) = S.addPermanent lure S.alice gs
            in (S.attach aura attacker withAura, ours, yours)
 
 -- CR 509.1c, proved by Lure ("All creatures able to block enchanted creature do
@@ -2819,7 +2849,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
         withLure = case mine of
           -- Unreachable: the fixture has one attacking printing.
           [] -> gs
-          a : _ -> let (aura, withAura) = S.addCreature lure S.alice gs in S.attach aura a withAura
+          a : _ -> let (aura, withAura) = S.addPermanent lure S.alice gs in S.attach aura a withAura
         after = S.settleSba (S.fightWith declining withLure)
     Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "alice's attacker is dead" (S.creaturesInPlay S.alice after) 0
@@ -2885,7 +2915,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     lure <- S.printingOf s registry "Lure"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = attacking [piker] [piker]
-        withAura = snd (S.addCreature lure S.alice gs)
+        withAura = snd (S.addPermanent lure S.alice gs)
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty withAura) "no blocks is legal"
   -- CR 509.1c's SUBJECT axis, and the SUBJECTLESS shape: Razorgrass Screen ({1}
   -- Artifact Creature -- Wall 2/1, "Defender. This creature blocks each combat if
@@ -2977,7 +3007,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     let (plain, mine, theirs) = attacking [piker, piker] [screen]
     case (mine, theirs) of
       ([first, second], [wall]) -> do
-        let (aura, withAura) = S.addCreature lure S.alice plain
+        let (aura, withAura) = S.addPermanent lure S.alice plain
             lured = S.attach aura second withAura
             blocks attacker = Map.singleton wall (Set.singleton attacker)
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (blocks first) plain) "without the Lure, blocking the first attacker is legal"
@@ -3035,7 +3065,7 @@ cursing curse who mine theirs =
 -- needs its loyalty counters placed first -- reaches for instead.
 cursingBoard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 cursingBoard curse who gs =
-  let (aura, withAura) = S.addCreature curse S.alice gs
+  let (aura, withAura) = S.addPermanent curse S.alice gs
    in S.attachTo aura (Recipient.ToPlayer who) withAura
 
 -- CR 508.1d, proved by Curse of the Nightly Hunt ("Creatures enchanted player
@@ -3135,7 +3165,7 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     curse <- S.printingOf s registry "Curse of the Nightly Hunt"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoardOf [piker] []
-        withAura = snd (S.addCreature curse S.alice gs)
+        withAura = snd (S.addPermanent curse S.alice gs)
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] withAura) "no attack is legal"
   Spec.it s "CR 508.1d whole cards: a Curse forces an attack through a real declare attackers step" $ do
     -- The gameplay-level case, run through Engine.runStep -- the priority loop
@@ -3179,7 +3209,7 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
 -- creatures, not about whose ability is talking.
 pacifying :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 pacifying pacifism host gs =
-  let (aura, withAura) = S.addCreature pacifism S.alice gs
+  let (aura, withAura) = S.addPermanent pacifism S.alice gs
    in (aura, S.attach aura host withAura)
 
 -- CR 508.1c and CR 509.1b, proved by Pacifism ("Enchanted creature can't attack
@@ -3302,7 +3332,7 @@ combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
     pacifism <- S.printingOf s registry "Pacifism"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, mine, _) = S.combatBoardOf [piker] []
-        withAura = snd (S.addCreature pacifism S.alice gs)
+        withAura = snd (S.addPermanent pacifism S.alice gs)
     case mine of
       [creature] -> Spec.assertBool s (Combat.canAttack S.alice creature withAura) "it may still attack"
       _ -> Spec.assertFailure s "fixture should have a creature"
@@ -3372,7 +3402,7 @@ suspecting oid p = case p of
 -- bob's suspect, a Goblin Piker beside it and his two Islands, with `ahead`
 -- placed under him BEFORE the pair and `behind` after them -- which is how the
 -- pair below puts one Humility on either side of the same permanent and changes
--- nothing else. Placement order is timestamp order (Pawl.Support.addCreature
+-- nothing else. Placement order is timestamp order (Pawl.Support.addPermanent
 -- allocates one per object), so the two boards differ in exactly one timestamp
 -- comparison.
 --
@@ -3397,8 +3427,8 @@ suspectBoard s registry suspected ahead behind = do
   island <- S.printingOf s registry "Island"
   doubt <- S.printingOf s registry "Reasonable Doubt"
   let (gs0, mine, _) = S.combatBoardOf [piker] []
-      (suspect, gsA) = S.addCreature suspected S.bob (withPermanents S.bob ahead gs0)
-      (other, gsB) = S.addCreature piker S.bob gsA
+      (suspect, gsA) = S.addPermanent suspected S.bob (withPermanents S.bob ahead gs0)
+      (other, gsB) = S.addPermanent piker S.bob gsA
       gs2 = withPermanents S.bob (behind <> [island, island]) gsB
       declared = S.runPure S.aggressiveAnswer gs2 (Combat.declareAttackers S.manaPerformer S.alice)
       (victim, gs3) = S.spellOnStack piker S.alice declared
@@ -4028,8 +4058,8 @@ textChangedCombatRestrictionSpec s registry = Spec.describe s "TextChangedCombat
         mountain <- S.printingOf s registry "Mountain"
         magicalHack <- S.printingOf s registry "Magical Hack"
         let (gs0, ours, _) = S.combatBoardOf [crasher] []
-            (_, gs1) = S.addCreature island S.alice gs0
-            gs2 = if withMountain then snd (S.addCreature mountain S.bob gs1) else gs1
+            (_, gs1) = S.addPermanent island S.alice gs0
+            gs2 = if withMountain then snd (S.addPermanent mountain S.bob gs1) else gs1
             (hackId, gs3) = S.addHandCard magicalHack S.alice gs2
         case ours of
           [crasherId] -> pure (if hacked then castHackAt hackId crasherId from to gs3 else gs3, crasherId)
@@ -4152,8 +4182,8 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
         magicalHack <- S.printingOf s registry "Magical Hack"
         printing <- S.printingOf s registry name
         let (gs0, ours, yours) = S.combatBoardOf [bell, swamp] theirs
-            (islandId, gs1) = S.addCreature island S.alice gs0
-            (sourceId, gs2) = S.addCreature printing S.alice gs1
+            (islandId, gs1) = S.addPermanent island S.alice gs0
+            (sourceId, gs2) = S.addPermanent printing S.alice gs1
             (hackId, gs3) = S.addHandCard magicalHack S.alice gs2
         case ours of
           [_, swampId] -> pure (if hacked then castHackPaying islandId hackId sourceId from to gs3 else gs3, swampId, sourceId, yours)
@@ -4274,10 +4304,10 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
 renewBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 renewBoard rakshasa swamp piker =
   let (gyId, withCard) = S.addGraveyardCard rakshasa S.alice (S.landsInPlay swamp 8)
-      (attacker, withAttacker) = S.addCreature piker S.alice withCard
+      (attacker, withAttacker) = S.addPermanent piker S.alice withCard
       (theirs, board) =
         List.foldl'
-          (\(ids, g) _ -> let (oid, g1) = S.addCreature piker S.bob g in (ids <> [oid], g1))
+          (\(ids, g) _ -> let (oid, g1) = S.addPermanent piker S.bob g in (ids <> [oid], g1))
           ([], withAttacker)
           [1 .. (3 :: Int)]
    in ( gyId,
@@ -4477,10 +4507,10 @@ zirdaResolved s registry pick = do
   zirda <- S.printingOf s registry "Zirda, the Dawnwaker"
   mountain <- S.printingOf s registry "Mountain"
   piker <- S.printingOf s registry "Goblin Piker"
-  let (zirdaId, withZirda) = S.addCreature zirda S.alice (S.landsInPlay mountain 2)
-      (attacker, withAttacker) = S.addCreature piker S.alice withZirda
-      (victim, withVictim) = S.addCreature piker S.bob withAttacker
-      (twin, placed) = S.addCreature piker S.bob withVictim
+  let (zirdaId, withZirda) = S.addPermanent zirda S.alice (S.landsInPlay mountain 2)
+      (attacker, withAttacker) = S.addPermanent piker S.alice withZirda
+      (victim, withVictim) = S.addPermanent piker S.bob withAttacker
+      (twin, placed) = S.addPermanent piker S.bob withVictim
       board =
         placed
           { GameState.activePlayer = S.alice,
@@ -4509,9 +4539,9 @@ zirdaScreenBoards s registry = do
   mountain <- S.printingOf s registry "Mountain"
   piker <- S.printingOf s registry "Goblin Piker"
   screen <- S.printingOf s registry "Razorgrass Screen"
-  let (zirdaId, withZirda) = S.addCreature zirda S.alice (S.landsInPlay mountain 2)
-      (attacker, withAttacker) = S.addCreature piker S.alice withZirda
-      (wall, placed) = S.addCreature screen S.bob withAttacker
+  let (zirdaId, withZirda) = S.addPermanent zirda S.alice (S.landsInPlay mountain 2)
+      (attacker, withAttacker) = S.addPermanent piker S.alice withZirda
+      (wall, placed) = S.addPermanent screen S.bob withAttacker
       board = mainPhaseFor placed
       abilities = Activate.abilitiesFor zirdaId board
       run named = declaringAttackers (activatingZirda zirdaId named board)
@@ -4606,11 +4636,11 @@ netterResolved s registry pick = do
   netter <- S.printingOf s registry "Netter en-Dal"
   plains <- S.printingOf s registry "Plains"
   piker <- S.printingOf s registry "Goblin Piker"
-  let (netterId, withNetter) = S.addCreature netter S.alice (S.landsInPlay plains 1)
+  let (netterId, withNetter) = S.addPermanent netter S.alice (S.landsInPlay plains 1)
       (_, withCard) = S.addHandCard plains S.alice withNetter
-      (victim, withVictim) = S.addCreature piker S.alice withCard
-      (twin, withTwin) = S.addCreature piker S.alice withVictim
-      (elsewhere, placed) = S.addCreature piker S.bob withTwin
+      (victim, withVictim) = S.addPermanent piker S.alice withCard
+      (twin, withTwin) = S.addPermanent piker S.alice withVictim
+      (elsewhere, placed) = S.addPermanent piker S.bob withTwin
       board = mainPhaseFor placed
       abilities = Activate.abilitiesFor netterId board
       resolved = activatingNetter netterId (pick victim twin elsewhere) board
@@ -4631,11 +4661,11 @@ cursedNetterBoards s registry = do
   plains <- S.printingOf s registry "Plains"
   piker <- S.printingOf s registry "Goblin Piker"
   curse <- S.printingOf s registry "Curse of the Nightly Hunt"
-  let (netterId, withNetter) = S.addCreature netter S.alice (S.landsInPlay plains 1)
+  let (netterId, withNetter) = S.addPermanent netter S.alice (S.landsInPlay plains 1)
       (_, withCard) = S.addHandCard plains S.alice withNetter
-      (piker1, withPiker) = S.addCreature piker S.alice withCard
-      (elsewhere, withBob) = S.addCreature piker S.bob withPiker
-      (aura, withAura) = S.addCreature curse S.alice withBob
+      (piker1, withPiker) = S.addPermanent piker S.alice withCard
+      (elsewhere, withBob) = S.addPermanent piker S.bob withPiker
+      (aura, withAura) = S.addPermanent curse S.alice withBob
       board = mainPhaseFor (S.attachTo aura (Recipient.ToPlayer S.alice) withAura)
       abilities = Activate.abilitiesFor netterId board
       run named = activatingNetter netterId named board
@@ -4723,7 +4753,7 @@ storedClassAttackRestrictionSpec s registry = Spec.describe s "StoredClassAttack
 -- precombat main phase and resolved, then the turn handed to bob. Bob's `early`
 -- Piker was on the battlefield as the Escape resolved; his `late` one is placed
 -- AFTER the handoff, so it was nowhere when the effect began -- the fixture
--- settles it (S.addCreature writes Sickness.Settled), standing in for haste. The
+-- settles it (S.addPermanent writes Sickness.Settled), standing in for haste. The
 -- pair is the same board, in the same order, with the Escape left in alice's
 -- hand -- its late Piker under its own id, since casting spends fresh ones (CR
 -- 400.7).
@@ -4736,12 +4766,12 @@ escapeBoards s registry = do
   escape <- S.printingOf s registry "Chronomantic Escape"
   plains <- S.printingOf s registry "Plains"
   piker <- S.printingOf s registry "Goblin Piker"
-  let (early, withEarly) = S.addCreature piker S.bob (S.landsFor plains S.alice 6 S.threePlayerGame)
+  let (early, withEarly) = S.addPermanent piker S.bob (S.landsFor plains S.alice 6 S.threePlayerGame)
       (escapeId, withCard) = S.addHandCard escape S.alice withEarly
       board = mainPhaseFor withCard
       resolved = S.runPure S.identityAnswer board (S.cast S.alice escapeId >> Stack.resolveTop)
-      (late, restricted) = S.addCreature piker S.bob (handoff resolved)
-      (lateControl, control) = S.addCreature piker S.bob (handoff board)
+      (late, restricted) = S.addPermanent piker S.bob (handoff resolved)
+      (lateControl, control) = S.addPermanent piker S.bob (handoff board)
   Spec.assertEqWith s "the Escape resolved and stored one row" (length (GameState.attackProhibitions resolved)) 1
   Spec.assertEqWith s "and left the pair nothing" (GameState.attackProhibitions control) []
   pure (early, late, restricted, lateControl, control)

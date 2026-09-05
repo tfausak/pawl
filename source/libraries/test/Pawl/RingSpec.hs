@@ -112,8 +112,8 @@ copyThe wanted p = case p of
 twoCreatureBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId, ObjectId, ObjectId, GameState.GameState)
 twoCreatureBoard island piker escape lands =
   let (_, g0) = S.addLibraryCard piker S.alice (S.landsInPlay island lands)
-      (a, g1) = S.addCreature piker S.alice g0
-      (b, g2) = S.addCreature piker S.alice g1
+      (a, g1) = S.addPermanent piker S.alice g0
+      (b, g2) = S.addPermanent piker S.alice g1
       (gs, spellId) = S.handOne escape g2
       -- Ring.tempt sorts its candidates, so name them in that order rather than in
       -- the order they were added.
@@ -135,7 +135,7 @@ twoCreatureBoard island piker escape lands =
 -- were given.
 ringCombatBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> [Printing.Printing] -> [Printing.Printing] -> ([ObjectId], [ObjectId], [ObjectId], GameState.GameState)
 ringCombatBoard island escape filler copies mine theirs =
-  let addAll pid ps g = List.foldl' (\(ids, acc) p -> let (oid, acc1) = S.addCreature p pid acc in (ids <> [oid], acc1)) ([], g) ps
+  let addAll pid ps g = List.foldl' (\(ids, acc) p -> let (oid, acc1) = S.addPermanent p pid acc in (ids <> [oid], acc1)) ([], g) ps
       g0 = List.foldl' (\g _ -> snd (S.addLibraryCard filler S.alice g)) (S.landsInPlay island copies) [1 .. copies]
       (ours, g1) = addAll S.alice mine g0
       (yours, g2) = addAll S.bob theirs g1
@@ -317,7 +317,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     escape <- S.printingOf s registry "Birthday Escape"
     let withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) (S.landsInPlay island 2) [1 .. (2 :: Int)]
-        (_, g1) = S.addCreature piker S.alice withLibrary
+        (_, g1) = S.addPermanent piker S.alice withLibrary
         (g2, firstSpell) = S.handOne escape g1
         (secondSpell, g3) = S.addHandCard escape S.alice g2
         once = castAndResolve S.identityAnswer S.alice firstSpell g3
@@ -351,13 +351,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     escape <- S.printingOf s registry "Birthday Escape"
     let (_, g1) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
-        (aliceCreature, g2) = S.addCreature piker S.alice g1
+        (aliceCreature, g2) = S.addPermanent piker S.alice g1
         -- bob's own side, one object at a time: S.landsInPlay only ever fills
         -- alice's, and Birthday Escape's draw half needs bob a library to draw from
         -- or CR 704.5b takes him out of the game before anything can be asserted.
-        (_, g3) = S.addCreature island S.bob g2
+        (_, g3) = S.addPermanent island S.bob g2
         (_, g4) = S.addLibraryCard piker S.bob g3
-        (bobCreature, g5) = S.addCreature piker S.bob g4
+        (bobCreature, g5) = S.addPermanent piker S.bob g4
         (g6, aliceSpell) = S.handOne escape g5
         (bobSpell, g7) = S.addHandCard escape S.bob g6
         aliceTempted = castAndResolve S.identityAnswer S.alice aliceSpell g7
@@ -380,12 +380,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     treason <- S.printingOf s registry "Act of Treason"
     mountain <- S.printingOf s registry "Mountain"
     let (_, withLibrary) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
-        (bearer, g1) = S.addCreature piker S.alice withLibrary
+        (bearer, g1) = S.addPermanent piker S.alice withLibrary
         -- bob's own lands, one at a time: S.landsInPlay only ever fills alice's
-        -- side (S.addCreature puts a printing onto the battlefield whatever its
+        -- side (S.addPermanent puts a printing onto the battlefield whatever its
         -- card types are, despite the name). Mountains, because Act of Treason
         -- costs {2}{R}.
-        withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) g1 [1 .. (3 :: Int)]
+        withBobsLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.bob g)) g1 [1 .. (3 :: Int)]
         (g2, escapeId) = S.handOne escape withBobsLands
         (treasonId, g3) = S.addHandCard treason S.bob g2
         designated = castAndResolve S.identityAnswer S.alice escapeId g3
@@ -409,7 +409,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     escape <- S.printingOf s registry "Birthday Escape"
     clone <- S.printingOf s registry "Clone"
     let (_, withLibrary) = S.addLibraryCard piker S.alice (S.landsInPlay island 5)
-        (bearer, g1) = S.addCreature piker S.alice withLibrary
+        (bearer, g1) = S.addPermanent piker S.alice withLibrary
         (g2, escapeId) = S.handOne escape g1
         (cloneId, g3) = S.addHandCard clone S.alice g2
         designated = castAndResolve S.identityAnswer S.alice escapeId g3
@@ -464,16 +464,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     escape <- S.printingOf s registry "Birthday Escape"
     sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    let withPlains = List.foldl' (\g _ -> snd (S.addCreature plains S.alice g)) (S.landsInPlay island 2) [1 .. (5 :: Int)]
+    let withPlains = List.foldl' (\g _ -> snd (S.addPermanent plains S.alice g)) (S.landsInPlay island 2) [1 .. (5 :: Int)]
         withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withPlains [1 .. (2 :: Int)]
-        (a, g1) = S.addCreature piker S.alice withLibrary
-        (b, g2) = S.addCreature piker S.alice g1
+        (a, g1) = S.addPermanent piker S.alice withLibrary
+        (b, g2) = S.addPermanent piker S.alice g1
         -- Ring.tempt sorts its candidates, so name them in that order.
         (lower, higher) = if a < b then (a, b) else (b, a)
         (g3, firstEscape) = S.handOne escape g2
         (secondEscape, g4) = S.addHandCard escape S.alice g3
         (sorceryId, gs) = S.addHandCard sorcery S.alice g4
-        withThalia = snd (S.addCreature thalia S.alice gs)
+        withThalia = snd (S.addPermanent thalia S.alice gs)
         -- The first temptation takes the LAST candidate, the second the FIRST, so
         -- the grant has to move backwards along the list.
         tempted = castAndResolve lastCandidate S.alice firstEscape gs
@@ -510,8 +510,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     treason <- S.printingOf s registry "Act of Treason"
     mountain <- S.printingOf s registry "Mountain"
     let (_, withLibrary) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
-        (bearer, g1) = S.addCreature piker S.alice withLibrary
-        withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) g1 [1 .. (3 :: Int)]
+        (bearer, g1) = S.addPermanent piker S.alice withLibrary
+        withBobsLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.bob g)) g1 [1 .. (3 :: Int)]
         (g2, escapeId) = S.handOne escape withBobsLands
         (treasonId, g3) = S.addHandCard treason S.bob g2
         designated = castAndResolve S.identityAnswer S.alice escapeId g3
@@ -792,8 +792,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     nazgul <- S.printingOf s registry "Nazgûl"
     let (base, _) = S.handOne piker (S.landsInPlay island 0)
-        (bystander, g1) = S.addCreature piker S.alice base
-        (standing, g2) = S.addCreature nazgul S.alice g1
+        (bystander, g1) = S.addPermanent piker S.alice base
+        (standing, g2) = S.addPermanent nazgul S.alice g1
         (entrant, g3) = S.entersWithTrigger nazgul S.alice g2
         after = S.runPure S.identityAnswer g3 (Monad.replicateM_ (4 :: Int) (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
     Spec.assertEqWith s "CR 701.54d the entering Nazgul took a counter from each trigger" (S.powerToughnessOf entrant after) (Just (3, 4))

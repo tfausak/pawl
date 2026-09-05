@@ -78,9 +78,9 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         protector <- S.printingOf s registry "Swooping Protector"
         extras <- Monad.mapM (S.printingOf s registry) extra
         seat <- Monad.mapM (\(name, _) -> S.printingOf s registry name) scaler
-        let landed = List.foldl' (\g p -> snd (S.addCreature p S.alice g)) (S.landsInPlay plains 4) extras
+        let landed = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) (S.landsInPlay plains 4) extras
             seated = case (seat, scaler) of
-              (Just printing, Just (_, pid)) -> snd (S.addCreature printing pid landed)
+              (Just printing, Just (_, pid)) -> snd (S.addPermanent printing pid landed)
               _ -> landed
             (held, g1) = S.addHandCard protector S.alice seated
             after = S.runPure S.identityAnswer g1 (S.cast S.alice held >> Stack.resolveTop)
@@ -103,9 +103,9 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         mountain <- S.printingOf s registry "Mountain"
         guardPrinting <- S.printingOf s registry "Palace Guard"
         punkPrinting <- S.printingOf s registry "Spider-Punk"
-        let (guard_, g1) = S.addCreature guardPrinting S.alice (S.landsInPlay mountain 2)
+        let (guard_, g1) = S.addPermanent guardPrinting S.alice (S.landsInPlay mountain 2)
             shielded = S.addCounter CounterKind.Shield n guard_ g1
-        pure (guard_, if withPunk then snd (S.addCreature punkPrinting S.bob shielded) else shielded)
+        pure (guard_, if withPunk then snd (S.addPermanent punkPrinting S.bob shielded) else shielded)
       -- Spend the counter on `src`'s hit first (CR 101.4c), keyed on the SOURCE
       -- id rather than on a batch position, so the assertion does not depend on
       -- the order the batch was gathered in.
@@ -245,7 +245,7 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     swamp <- S.printingOf s registry "Swamp"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (pikerId, g1) = S.addCreature pikerPrinting S.alice (S.landsInPlay swamp 2)
+    let (pikerId, g1) = S.addPermanent pikerPrinting S.alice (S.landsInPlay swamp 2)
         shielded = S.addCounter CounterKind.Shield 1 pikerId g1
         after = S.settleSba (castAt pikerId doomBlade shielded)
     Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "the Piker survived the Doom Blade"
@@ -276,9 +276,9 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     plains <- S.printingOf s registry "Plains"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     giantPrinting <- S.printingOf s registry "Hill Giant"
-    let (giant, g1) = S.addCreature giantPrinting S.alice (S.landsInPlay plains 1)
-        (big, g2) = S.addCreature pikerPrinting S.bob g1
-        (small, g3) = S.addCreature pikerPrinting S.bob g2
+    let (giant, g1) = S.addPermanent giantPrinting S.alice (S.landsInPlay plains 1)
+        (big, g2) = S.addPermanent pikerPrinting S.bob g1
+        (small, g3) = S.addPermanent pikerPrinting S.bob g2
         shielded = S.addCounter CounterKind.Shield 1 giant g3
         batch = [hit big (Recipient.ToCreature giant) 5, hit small (Recipient.ToCreature giant) 2]
         tookTheBig = settleDamage (counterFirst big) shielded batch
@@ -308,9 +308,9 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     plains <- S.printingOf s registry "Plains"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     giantPrinting <- S.printingOf s registry "Hill Giant"
-    let (giant, g1) = S.addCreature giantPrinting S.alice (S.landsInPlay plains 1)
-        (big, g2) = S.addCreature pikerPrinting S.bob g1
-        (small, g3) = S.addCreature pikerPrinting S.bob g2
+    let (giant, g1) = S.addPermanent giantPrinting S.alice (S.landsInPlay plains 1)
+        (big, g2) = S.addPermanent pikerPrinting S.bob g1
+        (small, g3) = S.addPermanent pikerPrinting S.bob g2
         shielded = S.addCounter CounterKind.Shield 2 giant g3
         batch = [hit big (Recipient.ToCreature giant) 5, hit small (Recipient.ToCreature giant) 2]
         after = settleDamage S.identityAnswer shielded batch
@@ -334,7 +334,7 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     case bird of
       Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
       Just oid -> do
-        let (pikerId, staged) = S.addCreature pikerPrinting S.bob entered
+        let (pikerId, staged) = S.addPermanent pikerPrinting S.bob entered
             castAtBob gs =
               let (held, g1) = S.addHandCard bolt S.alice gs
                in S.runPure (aimPlayer S.bob) g1 (S.cast S.alice held >> Stack.resolveTop)
@@ -453,9 +453,9 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     guardPrinting <- S.printingOf s registry "Palace Guard"
     excruciator <- S.printingOf s registry "Excruciator"
-    let (guard_, g1) = S.addCreature guardPrinting S.alice (S.landsInPlay plains 1)
-        (avatar, g2) = S.addCreature excruciator S.bob g1
-        (piker, g3) = S.addCreature pikerPrinting S.bob g2
+    let (guard_, g1) = S.addPermanent guardPrinting S.alice (S.landsInPlay plains 1)
+        (avatar, g2) = S.addPermanent excruciator S.bob g1
+        (piker, g3) = S.addPermanent pikerPrinting S.bob g2
         shielded = S.addCounter CounterKind.Shield 1 guard_ g3
         batch = [hit avatar (Recipient.ToCreature guard_) 3, hit piker (Recipient.ToCreature guard_) 2]
         tookTheAvatar = settleDamage (counterFirst avatar) shielded batch
@@ -502,7 +502,7 @@ globeChain s registry swap entering = do
   evolution <- S.printingOf s registry "Artificial Evolution"
   creature <- S.printingOf s registry entering
   let base = S.landsFor mountain S.alice 6 (S.landsInPlay island 1)
-      (globeId, g1) = S.addCreature globe S.alice base
+      (globeId, g1) = S.addPermanent globe S.alice base
       (evolutionId, g2) = S.addHandCard evolution S.alice g1
       (creatureId, g3) = S.addHandCard creature S.alice g2
       ready =
@@ -731,7 +731,7 @@ redirectedSpellChain s registry interdict = do
   paladin <- S.printingOf s registry "Queen's Bay Paladin"
   interdiction <- S.printingOf s registry "Synthetic Entry Interdiction"
   let lands = S.landsFor swamp S.alice 7 (S.landsFor island S.alice 4 (S.landsInPlay forest 4))
-      warded = if interdict then snd (S.addCreature interdiction S.alice lands) else lands
+      warded = if interdict then snd (S.addPermanent interdiction S.alice lands) else lands
       (spiderId, g1) = S.addHandCard spider S.alice warded
       (evolutionId, g2) = S.addHandCard evolution S.alice g1
       (paladinId, g3) = S.addHandCard paladin S.alice g2
@@ -792,9 +792,9 @@ takingEveryTarget p = case p of
 jackalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 jackalBoard jackal piker mammoth =
   let base = Setup.emptyGame S.bothPlayers
-      (jackalId, g1) = S.addCreature jackal S.alice base
-      (victim, g2) = S.addCreature piker S.bob g1
-      (bystander, g3) = S.addCreature mammoth S.bob g2
+      (jackalId, g1) = S.addPermanent jackal S.alice base
+      (victim, g2) = S.addPermanent piker S.bob g1
+      (bystander, g3) = S.addPermanent mammoth S.bob g2
       control = (S.addRegenShield bystander (S.addRegenShield victim g3)) {GameState.priority = Just S.alice}
       activated = S.runPure (aimingAtObject victim) control (Activate.activateAbility S.alice jackalId (theAbility jackal) >> Stack.resolveTop)
    in (control, victim, bystander, activated)
@@ -889,8 +889,8 @@ hurrJackalSpec s registry = Spec.describe s "Hurr Jackal (CR 701.19c)" $ do
 queenAllenalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.1a)" $ do
   let board mountain island queen =
-        let lands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) (S.landsInPlay mountain 2) [1 .. (2 :: Int)]
-         in S.addCreature queen S.alice lands
+        let lands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) (S.landsInPlay mountain 2) [1 .. (2 :: Int)]
+         in S.addPermanent queen S.alice lands
       soldierName = CardName.MkCardName (Text.pack "Soldier Token")
       goblinName = CardName.MkCardName (Text.pack "Goblin Token")
       clueName = CardName.MkCardName (Text.pack "Clue Token")
@@ -938,7 +938,7 @@ queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.
     doublingSeason <- S.printingOf s registry "Doubling Season"
     dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let (queenId, g1) = board mountain island queen
-        (seasonId, g2) = S.addCreature doublingSeason S.alice g1
+        (seasonId, g2) = S.addPermanent doublingSeason S.alice g1
         (g3, spellId) = S.handOne dragonFodder g2
         queenFirst = castAndResolve (raceAnswer queenId queenId) g3 spellId
         seasonFirst = castAndResolve (raceAnswer seasonId queenId) g3 spellId
@@ -979,7 +979,7 @@ quinaSpec s registry = Spec.describe s "Quina, Qu Gourmet (CR 614.1a)" $ do
     island <- S.printingOf s registry "Island"
     quina <- S.printingOf s registry "Quina, Qu Gourmet"
     eliminate <- S.printingOf s registry "Eliminate the Impossible"
-    let (_, g1) = S.addCreature quina S.alice (S.landsInPlay island 2)
+    let (_, g1) = S.addPermanent quina S.alice (S.landsInPlay island 2)
         (g2, spellId) = S.handOne eliminate g1
         after = castAndResolve S.identityAnswer g2 spellId
     Spec.assertEqWith s "one Frog" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Frog Token")) S.alice after) 1

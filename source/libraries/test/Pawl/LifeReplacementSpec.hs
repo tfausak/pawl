@@ -74,9 +74,9 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     celestine <- S.printingOf s registry "Celestine, the Living Saint"
     let base = S.landsInPlay plains 2
-        (_, g1) = S.addCreature worship S.alice base
-        (_, g2) = S.addCreature piker S.alice g1
-        (_, g3) = S.addCreature celestine S.bob g2
+        (_, g1) = S.addPermanent worship S.alice base
+        (_, g2) = S.addPermanent piker S.alice g1
+        (_, g3) = S.addPermanent celestine S.bob g2
         after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g3))
     Spec.assertEqWith s "CR 614.1a alice stops at 1 rather than the -1 the damage would give" (S.lifeOf S.alice after) (Just 1)
     Spec.assertEqWith s "CR 120.3f the whole 3 was still dealt, so lifelink gains bob 3 and not 1" (S.lifeOf S.bob after) (Just 23)
@@ -90,9 +90,9 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     celestine <- S.printingOf s registry "Celestine, the Living Saint"
     let base = S.landsInPlay plains 2
-        (_, g1) = S.addCreature worship S.alice base
-        (_, g2) = S.addCreature piker S.alice g1
-        (_, g3) = S.addCreature celestine S.bob g2
+        (_, g1) = S.addPermanent worship S.alice base
+        (_, g2) = S.addPermanent piker S.alice g1
+        (_, g3) = S.addPermanent celestine S.bob g2
         after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 5 g3))
     Spec.assertEqWith s "the 3 lands whole: 5 - 3 = 2, not clamped to anything" (S.lifeOf S.alice after) (Just 2)
   -- The CONTROL is the same board with alice's creature taken away, so the only
@@ -102,8 +102,8 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     worship <- S.printingOf s registry "Worship"
     celestine <- S.printingOf s registry "Celestine, the Living Saint"
     let base = S.landsInPlay plains 2
-        (_, g1) = S.addCreature worship S.alice base
-        (_, g2) = S.addCreature celestine S.bob g1
+        (_, g1) = S.addPermanent worship S.alice base
+        (_, g2) = S.addPermanent celestine S.bob g1
         after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g2))
     Spec.assertEqWith s "alice controls no creature, so she takes all 3 and ends at -1" (S.lifeOf S.alice after) (Just (-1))
   -- CR 510.2's simultaneity, and CR 120.4d's first Worship example scaled down:
@@ -120,10 +120,10 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     -- amounts differ anyway, which no single number could tell apart.
     child <- S.printingOf s registry "Child of Night"
     let base = S.landsInPlay plains 2
-        (_, g1) = S.addCreature worship S.alice base
-        (_, g2) = S.addCreature piker S.alice g1
-        (_, g3) = S.addCreature celestine S.bob g2
-        (_, g4) = S.addCreature child S.bob g3
+        (_, g1) = S.addPermanent worship S.alice base
+        (_, g2) = S.addPermanent piker S.alice g1
+        (_, g3) = S.addPermanent celestine S.bob g2
+        (_, g4) = S.addPermanent child S.bob g3
         after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g4))
     Spec.assertEqWith s "alice is at 1, not at the 0 a pre-batch reading would give" (S.lifeOf S.alice after) (Just 1)
     Spec.assertEqWith s "CR 702.15e each lifelink source gained its own amount, 3 and 2" (S.lifeOf S.bob after) (Just 25)
@@ -148,10 +148,10 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     jedit <- S.printingOf s registry "Jedit Ojanen"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay plains 2
-        (_, g1) = S.addCreature worship S.alice base
-        (blocker, g2) = S.addCreature celestine S.alice g1
-        (_, g3) = S.addCreature jedit S.bob g2
-        (blocked, g4) = S.addCreature piker S.bob g3
+        (_, g1) = S.addPermanent worship S.alice base
+        (blocker, g2) = S.addPermanent celestine S.alice g1
+        (_, g3) = S.addPermanent jedit S.bob g2
+        (blocked, g4) = S.addPermanent piker S.bob g3
         after = S.runCombat (attackAndBlock blocker blocked) (bobAttacks (atLife S.alice 4 g4))
     Spec.assertEqWith s "CR 120.4c alice ends at 4 - 5 + 3 = 2, the floor never applying" (S.lifeOf S.alice after) (Just 2)
     Spec.assertEqWith s "setup: the block happened, so Celestine's 3 killed the 2/1 Piker (CR 704.5g)" (S.creaturesInPlay S.bob after) 1
@@ -166,10 +166,10 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     discipline <- S.printingOf s registry "Stronghold Discipline"
     let base = S.landsInPlay swamp 4
-        (_, g1) = S.addCreature worship S.alice base
-        (_, g2) = S.addCreature piker S.alice g1
-        (_, g3) = S.addCreature piker S.alice g2
-        (_, g4) = S.addCreature piker S.alice g3
+        (_, g1) = S.addPermanent worship S.alice base
+        (_, g2) = S.addPermanent piker S.alice g1
+        (_, g3) = S.addPermanent piker S.alice g2
+        (_, g4) = S.addPermanent piker S.alice g3
         (held, g5) = S.addHandCard discipline S.alice g4
         ready = inMainPhase S.alice (atLife S.alice 2 g5)
         after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
@@ -227,9 +227,9 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     greed <- S.printingOf s registry "Greed"
     bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
-        (bobsGreed, g2) = S.addCreature greed S.bob g1
-        (alicesGreed, g3) = S.addCreature greed S.alice g2
+    let (_, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
+        (bobsGreed, g2) = S.addPermanent greed S.bob g1
+        (alicesGreed, g3) = S.addPermanent greed S.alice g2
         -- A card to draw for each activation, so no seat is decked out from under
         -- the assertion (CR 104.3c) and the draw is a real one.
         (_, g4) = S.addLibraryCard piker S.bob g3
@@ -252,11 +252,11 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     greed <- S.printingOf s registry "Greed"
     worship <- S.printingOf s registry "Worship"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addCreature worship S.alice S.threePlayerGame
-        (_, g2) = S.addCreature piker S.alice g1
-        (alicesGreed, g3) = S.addCreature greed S.alice g2
+    let (_, g1) = S.addPermanent worship S.alice S.threePlayerGame
+        (_, g2) = S.addPermanent piker S.alice g1
+        (alicesGreed, g3) = S.addPermanent greed S.alice g2
         (_, g4) = S.addLibraryCard piker S.alice g3
-        (bobsPiker, g5) = S.addCreature piker S.bob g4
+        (bobsPiker, g5) = S.addPermanent piker S.bob g4
         base = atLife S.alice 2 (S.landsFor swamp S.alice 3 g5)
         paid = S.runPure S.identityAnswer base (Activate.activateAbility S.alice alicesGreed (theAbility greed))
         damaged =
@@ -272,8 +272,8 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
   Spec.it s "CR 120.4c the damage road proposes its loss once, and the row resizes it once" $ do
     bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (source, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
-        (_, g2) = S.addCreature piker S.bob g1
+    let (source, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
+        (_, g2) = S.addPermanent piker S.bob g1
         after =
           S.runPure
             S.identityAnswer
@@ -296,10 +296,10 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     biorhythm <- S.printingOf s registry "Biorhythm"
     bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
-        (_, g2) = S.addCreature piker S.carol g1
-        (_, g3) = S.addCreature piker S.carol g2
-        (_, g4) = S.addCreature piker S.carol g3
+    let (_, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
+        (_, g2) = S.addPermanent piker S.carol g1
+        (_, g3) = S.addPermanent piker S.carol g2
+        (_, g4) = S.addPermanent piker S.carol g3
         (held, g5) = S.addHandCard biorhythm S.alice g4
         ready = inMainPhase S.alice (atLife S.carol 2 (S.landsFor forest S.alice 8 g5))
         after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
@@ -328,8 +328,8 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     mirror <- S.printingOf s registry "Mirror Universe"
     bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
     let board aliceLife bobLife =
-          let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
-              (mirrorId, g2) = S.addCreature mirror S.alice g1
+          let (_, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
+              (mirrorId, g2) = S.addPermanent mirror S.alice g1
               upkeep =
                 (atLife S.alice aliceLife (atLife S.bob bobLife (atLife S.carol 13 g2)))
                   { GameState.activePlayer = S.alice,
@@ -365,7 +365,7 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
     plains <- S.printingOf s registry "Plains"
     sands <- S.printingOf s registry "Reverse the Sands"
     bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
-    let (_, g1) = S.addCreature bloodletter S.alice S.threePlayerGame
+    let (_, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
         (held, g2) = S.addHandCard sands S.alice g1
         ready = inMainPhase S.alice (atLife S.alice 20 (atLife S.bob 30 (atLife S.carol 12 (S.landsFor plains S.alice 8 g2))))
         assigning :: Prompt.Prompt r -> r
@@ -497,7 +497,7 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
     confiscate <- S.printingOf s registry "Confiscate"
     piker <- S.printingOf s registry "Goblin Piker"
     let (armed, enchantment) = wordsBoard plains wordsOfWorship piker True
-        (aura, g1) = S.addCreature confiscate S.bob armed
+        (aura, g1) = S.addPermanent confiscate S.bob armed
         stolen = S.attachTo aura (Recipient.ToObject enchantment) g1
         after = S.runPure S.identityAnswer stolen (Event.drawCard S.alice)
     Spec.assertEqWith s "setup: bob really controls the enchantment now" (Projection.controllerOf enchantment stolen) (Just S.bob)
@@ -510,7 +510,7 @@ wordsOfWorshipSpec s registry = Spec.describe s "Words of Worship (CR 614.11)" $
 wordsBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
 wordsBoard plains wordsOfWorship stock arm =
   let base = S.landsInPlay plains 1
-      (enchantment, g1) = S.addCreature wordsOfWorship S.alice base
+      (enchantment, g1) = S.addPermanent wordsOfWorship S.alice base
       g2 = snd (S.addLibraryCard stock S.alice (snd (S.addLibraryCard stock S.alice g1)))
       final =
         if arm
@@ -522,7 +522,7 @@ wordsBoard plains wordsOfWorship stock arm =
 emptyLibraryBoard :: Printing.Printing -> Printing.Printing -> Bool -> GameState.GameState
 emptyLibraryBoard plains wordsOfWorship arm =
   let base = S.landsInPlay plains 1
-      (enchantment, g1) = S.addCreature wordsOfWorship S.alice base
+      (enchantment, g1) = S.addPermanent wordsOfWorship S.alice base
    in if arm
         then S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice enchantment (theAbility wordsOfWorship) >> Stack.resolveTop)
         else g1
@@ -592,8 +592,8 @@ almsCollectorSpec s registry = Spec.describe s "Alms Collector (CR 121.2a)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     collector <- S.printingOf s registry "Alms Collector"
     greed <- S.printingOf s registry "Greed"
-    let (_, g1) = S.addCreature collector S.alice S.threePlayerGame
-        (bobsGreed, g2) = S.addCreature greed S.bob g1
+    let (_, g1) = S.addPermanent collector S.alice S.threePlayerGame
+        (bobsGreed, g2) = S.addPermanent greed S.bob g1
         g3 = snd (S.addLibraryCard piker S.alice (snd (S.addLibraryCard piker S.bob g2)))
         ready = inMainPhase S.alice (S.landsFor swamp S.bob 3 g3)
         after = S.runPure S.identityAnswer ready (Activate.activateAbility S.bob bobsGreed (theAbility greed) Monad.>> Stack.resolveTop)
@@ -614,7 +614,7 @@ almsCollectorSpec s registry = Spec.describe s "Alms Collector (CR 121.2a)" $ do
     recall <- S.printingOf s registry "Ancestral Recall"
     wordsOfWorship <- S.printingOf s registry "Words of Worship"
     let (gs, held) = collectorBoard island piker collector recall True
-        (enchantment, g1) = S.addCreature wordsOfWorship S.alice gs
+        (enchantment, g1) = S.addPermanent wordsOfWorship S.alice gs
         armed = S.runPure S.identityAnswer (S.landsFor plains S.alice 1 g1) (Activate.activateAbility S.alice enchantment (theAbility wordsOfWorship) Monad.>> Stack.resolveTop)
         after = S.runPure (atPlayerAnswer S.bob) armed (S.cast S.carol held Monad.>> Stack.resolveTop)
     Spec.assertEqWith s "CR 614.6 alice's half of the rewrite was itself replaced, so she gained 5" (S.lifeOf S.alice after) (Just 25)
@@ -632,8 +632,8 @@ almsCollectorSpec s registry = Spec.describe s "Alms Collector (CR 121.2a)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     collector <- S.printingOf s registry "Alms Collector"
     recall <- S.printingOf s registry "Ancestral Recall"
-    let (alices, g1) = S.addCreature collector S.alice S.threePlayerGame
-        (carols, g2) = S.addCreature collector S.carol g1
+    let (alices, g1) = S.addPermanent collector S.alice S.threePlayerGame
+        (carols, g2) = S.addPermanent collector S.carol g1
         g3 = stockLibraries piker g2
         (held, g4) = S.addHandCard recall S.bob g3
         ready = inMainPhase S.alice (S.landsFor island S.bob 1 g4)
@@ -676,7 +676,7 @@ stockLibraries piker gs =
 collectorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
 collectorBoard island piker collector recall collecting =
   let g0 = S.threePlayerGame
-      g1 = if collecting then snd (S.addCreature collector S.alice g0) else g0
+      g1 = if collecting then snd (S.addPermanent collector S.alice g0) else g0
       (held, g2) = S.addHandCard recall S.carol (stockLibraries piker g1)
    in (inMainPhase S.alice (S.landsFor island S.carol 1 g2), held)
 
@@ -748,7 +748,7 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     plains <- S.printingOf s registry "Plains"
     calm <- S.printingOf s registry "Blossoming Calm"
     boon <- S.printingOf s registry "Boon Reflection"
-    let (_, g1) = S.addCreature boon S.alice S.threePlayerGame
+    let (_, g1) = S.addPermanent boon S.alice S.threePlayerGame
         (alicesCalm, g2) = S.addHandCard calm S.alice g1
         (bobsCalm, g3) = S.addHandCard calm S.bob g2
         ready = S.landsFor plains S.bob 1 (S.landsFor plains S.alice 1 (inMainPhase S.alice g3))
@@ -773,8 +773,8 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     plains <- S.printingOf s registry "Plains"
     calm <- S.printingOf s registry "Blossoming Calm"
     boon <- S.printingOf s registry "Boon Reflection"
-    let (_, g1) = S.addCreature boon S.alice S.threePlayerGame
-        (_, g2) = S.addCreature boon S.alice g1
+    let (_, g1) = S.addPermanent boon S.alice S.threePlayerGame
+        (_, g2) = S.addPermanent boon S.alice g1
         (alicesCalm, g3) = S.addHandCard calm S.alice g2
         ready = S.landsFor plains S.alice 1 (inMainPhase S.alice g3)
         after = S.runPure S.identityAnswer ready (S.cast S.alice alicesCalm Monad.>> Stack.resolveTop)
@@ -801,10 +801,10 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     bond <- S.printingOf s registry "Sanguine Bond"
     celestine <- S.printingOf s registry "Celestine, the Living Saint"
     let armed extra =
-          let (_, g1) = S.addCreature bond S.bob (S.landsInPlay plains 2)
-              (_, g2) = S.addCreature celestine S.bob g1
+          let (_, g1) = S.addPermanent bond S.bob (S.landsInPlay plains 2)
+              (_, g2) = S.addPermanent celestine S.bob g1
            in S.runCombat attackNoBlock (bobAttacks (extra g2))
-        doubled = armed (snd . S.addCreature boon S.bob)
+        doubled = armed (snd . S.addPermanent boon S.bob)
         control = armed id
     Spec.assertEqWith s "CR 614.1a bob's lifelink 3 becomes 6" (S.lifeOf S.bob doubled) (Just 26)
     Spec.assertEqWith s "and the Bond drains the SETTLED 6, so alice takes 3 + 6" (S.lifeOf S.alice doubled) (Just 11)
@@ -823,7 +823,7 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     boon <- S.printingOf s registry "Boon Reflection"
     piker <- S.printingOf s registry "Goblin Piker"
     let (armed, _) = wordsBoard plains wordsOfWorship piker True
-        after = S.runPure S.identityAnswer (snd (S.addCreature boon S.alice armed)) (Event.drawCard S.alice)
+        after = S.runPure S.identityAnswer (snd (S.addPermanent boon S.alice armed)) (Event.drawCard S.alice)
     Spec.assertEqWith s "CR 614.1a the substituted 5 becomes 10, so alice is at 30" (S.lifeOf S.alice after) (Just 30)
     Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
   -- CR 119.5's upward direction, through Pawl.Engine.Resolve's changeLifeByDelta:
@@ -844,13 +844,13 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     biorhythm <- S.printingOf s registry "Biorhythm"
     boon <- S.printingOf s registry "Boon Reflection"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addCreature boon S.carol S.threePlayerGame
-        (_, g2) = S.addCreature piker S.alice g1
-        (_, g3) = S.addCreature piker S.bob g2
-        (_, g4) = S.addCreature piker S.bob g3
-        (_, g5) = S.addCreature piker S.carol g4
-        (_, g6) = S.addCreature piker S.carol g5
-        (_, g7) = S.addCreature piker S.carol g6
+    let (_, g1) = S.addPermanent boon S.carol S.threePlayerGame
+        (_, g2) = S.addPermanent piker S.alice g1
+        (_, g3) = S.addPermanent piker S.bob g2
+        (_, g4) = S.addPermanent piker S.bob g3
+        (_, g5) = S.addPermanent piker S.carol g4
+        (_, g6) = S.addPermanent piker S.carol g5
+        (_, g7) = S.addPermanent piker S.carol g6
         (held, g8) = S.addHandCard biorhythm S.alice g7
         ready = inMainPhase S.alice (atLife S.carol 2 (S.landsFor forest S.alice 8 g8))
         after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
@@ -872,8 +872,8 @@ ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 
     greed <- S.printingOf s registry "Greed"
     ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addCreature ashiok S.alice S.threePlayerGame
-        (alicesGreed, g2) = S.addCreature greed S.alice g1
+    let (_, g1) = S.addPermanent ashiok S.alice S.threePlayerGame
+        (alicesGreed, g2) = S.addPermanent greed S.alice g1
         (bottom, g3) = S.addLibraryCard piker S.alice g2
         (_, g4) = S.addLibraryCard piker S.alice g3
         (_, g5) = S.addLibraryCard piker S.alice g4
@@ -890,8 +890,8 @@ ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 
     greed <- S.printingOf s registry "Greed"
     ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addCreature ashiok S.alice S.threePlayerGame
-        (alicesGreed, g2) = S.addCreature greed S.alice g1
+    let (_, g1) = S.addPermanent ashiok S.alice S.threePlayerGame
+        (alicesGreed, g2) = S.addPermanent greed S.alice g1
         (_, g3) = S.addLibraryCard piker S.alice g2
         ready = S.landsFor swamp S.alice 1 g3
         after = S.runPure S.identityAnswer ready (Activate.activateAbility S.alice alicesGreed (theAbility greed))
@@ -907,8 +907,8 @@ ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 
   Spec.it s "CR 120.4c damage is not a payment, so the row does not see it" $ do
     ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addCreature ashiok S.alice S.threePlayerGame
-        (bobsPiker, g2) = S.addCreature piker S.bob g1
+    let (_, g1) = S.addPermanent ashiok S.alice S.threePlayerGame
+        (bobsPiker, g2) = S.addPermanent piker S.bob g1
         stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g2 [1 .. (3 :: Int)]
         after =
           S.runPure

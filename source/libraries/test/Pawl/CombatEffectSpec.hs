@@ -78,10 +78,10 @@ attacking mine theirs =
    in (after, ours, yours)
 
 -- Any printings at all onto `who`'s battlefield, on a board that already exists.
--- S.addCreature is any-printing rather than creature-only, which is how
+-- S.addPermanent is any-printing rather than creature-only, which is how
 -- landSubtypeStripSpec below reaches an enchantment.
 withPermanents :: PlayerId.PlayerId -> [Printing.Printing] -> GameState.GameState -> GameState.GameState
-withPermanents who ps gs = List.foldl' (\g p -> snd (S.addCreature p who g)) gs ps
+withPermanents who ps gs = List.foldl' (\g p -> snd (S.addPermanent p who g)) gs ps
 
 -- An attacking board with a Lure attached to the first attacker.
 luring :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
@@ -91,7 +91,7 @@ luring lure mine theirs =
         -- Unreachable: every caller passes at least one attacking printing.
         [] -> (gs, ours, yours)
         attacker : _ ->
-          let (aura, withAura) = S.addCreature lure S.alice gs
+          let (aura, withAura) = S.addPermanent lure S.alice gs
            in (S.attach aura attacker withAura, ours, yours)
 
 -- A Curse of the Nightly Hunt attached to `who`, on a fresh combat board.
@@ -105,7 +105,7 @@ cursing curse who mine theirs =
 -- planeswalker's loyalty counters placed first -- reaches for instead.
 cursingBoard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 cursingBoard curse who gs =
-  let (aura, withAura) = S.addCreature curse S.alice gs
+  let (aura, withAura) = S.addPermanent curse S.alice gs
    in S.attachTo aura (Recipient.ToPlayer who) withAura
 
 -- CR 508.1c read through CR 506.5, proved by Bonded Construct ("{1} Artifact
@@ -596,7 +596,7 @@ exampleBoard s registry theirs = do
   piker <- S.printingOf s registry "Goblin Piker"
   frenzy <- S.printingOf s registry "Synthetic Wetland Frenzy"
   let (gs0, ours, _) = S.combatBoardOf [bell, swamp, piker] theirs
-      gs1 = snd (S.addCreature frenzy S.alice gs0)
+      gs1 = snd (S.addPermanent frenzy S.alice gs0)
   case ours of
     [_, swampId, pikerId] -> pure (gs1, swampId, pikerId)
     _ -> Spec.assertFailure s "fixture should have the Bell, the Swamp and the Piker"
@@ -697,7 +697,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
     Spec.assertEqWith s "two" (Combat.legalAttackers S.alice gs) mine
   Spec.it s "CR 508.1a a player can attack with a creature they control but do not own" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         gs0 = S.giveControl oid S.alice base
     Spec.assertBool s (elem oid (Combat.legalAttackers S.alice gs0)) "alice may attack with it"
     Spec.assertBool s (notElem oid (Combat.legalAttackers S.bob gs0)) "bob may not (not the controller, not active)"
@@ -760,13 +760,13 @@ keywordSpec s registry = Spec.describe s "Keyword" $ do
       carriesOnly (name, keyword) =
         Spec.it s (name <> " carries exactly " <> show keyword) $ do
           printing <- S.printingOf s registry name
-          let (oid, gs) = S.addCreature printing S.alice gs0
+          let (oid, gs) = S.addPermanent printing S.alice gs0
           Spec.assertEqWith s "keywords" (Projection.keywordsOf oid gs) (Map.singleton keyword 1)
           Spec.assertBool s (Projection.hasKeyword keyword oid gs) "hasKeyword"
   mapM_ carriesOnly S.m2aKeywords
   Spec.it s "a Piker has no keywords" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.alice gs0
+    let (oid, gs) = S.addPermanent piker S.alice gs0
     Spec.assertEqWith s "none" (Projection.keywordsOf oid gs) Map.empty
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying oid gs)) "no flying"
   Spec.it s "a Mountain has no keywords" $ do
@@ -782,7 +782,7 @@ keywordSpec s registry = Spec.describe s "Keyword" $ do
   -- are genuinely distinct rather than one flag.
   Spec.it s "reach is not flying" $ do
     nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
-    let (oid, gs) = S.addCreature nimbleBirdsticker S.alice gs0
+    let (oid, gs) = S.addPermanent nimbleBirdsticker S.alice gs0
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying oid gs)) "no flying"
 
 -- Run whole steps until the first-strike combat damage step has been dealt
@@ -885,13 +885,13 @@ attackAndCast p = case p of
 -- Plains that pay for it; bob has nothing, so the attack is unblocked. Sits at
 -- the declare attackers step like every combatBoardOf board, so the ENGINE
 -- declares the attack and carries it forward -- the combat record this group
--- observes is never hand-written. S.addCreature is what puts the Plains out: it
+-- observes is never hand-written. S.addPermanent is what puts the Plains out: it
 -- is the "any printing, on the battlefield, untapped and Settled" helper its
 -- haddock says it is, and lands need exactly that.
 killShotBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
 killShotBoard plains piker killShot =
   let (gs0, _, _) = S.combatBoardOf [piker] []
-      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature plains S.alice g))
+      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent plains S.alice g))
       (withCard, _) = S.handOne killShot (addLands 3 gs0)
    in -- handOne parks its state in a precombat main phase; this board is mid-combat.
       withCard {GameState.phase = GameState.phase gs0, GameState.priority = GameState.priority gs0}
@@ -964,12 +964,12 @@ m2bExitSpec s registry = Spec.describe s "M2bExit" $ do
 -- the four Islands that pay for it, and controls nothing else. The board sits at
 -- the declare attackers step like every combatBoardOf board, so the ENGINE
 -- declares the attack and carries it forward: no test here writes the combat
--- record. S.addCreature is what puts the Islands out -- the "any printing, on the
+-- record. S.addPermanent is what puts the Islands out -- the "any printing, on the
 -- battlefield, untapped and Settled" helper its haddock says it is.
 rayBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, [ObjectId.ObjectId])
 rayBoard island piker ray =
   let (gs0, mine, _) = S.combatBoardOf [piker, piker, piker] []
-      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature island S.bob g))
+      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent island S.bob g))
    in (snd (S.addHandCard ray S.bob (addLands 4 gs0)), mine)
 
 -- Attack with everything except `homebody`, never block, cast whenever a cast is
@@ -1068,7 +1068,7 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
     piker <- S.printingOf s registry "Goblin Piker"
     rayOfCommand <- S.printingOf s registry "Ray of Command"
     let (gs0, mine, theirs) = S.combatBoardOf [piker] [piker]
-        addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature island S.alice g))
+        addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent island S.alice g))
         gs = snd (S.addHandCard rayOfCommand S.alice (addLands 4 gs0))
     case (mine, theirs) of
       (attacker : _, blocker : _) -> do
@@ -1111,7 +1111,7 @@ removalTargetSlot ability =
 
 -- alice is mid-combat with one creature per printing in `mine`; bob defends with
 -- one per printing in `theirs`. `who` also controls a Labyrinth of Skophos and
--- the four lands that pay its {4}. S.addCreature is what puts all five out --
+-- the four lands that pay its {4}. S.addPermanent is what puts all five out --
 -- the "any printing, on the battlefield, untapped and Settled" helper its
 -- haddock says it is, which is what a land needs.
 skophosBoard ::
@@ -1123,8 +1123,8 @@ skophosBoard ::
   (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId)
 skophosBoard labyrinth land who mine theirs =
   let (gs0, ours, yours) = S.combatBoardOf mine theirs
-      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addCreature land who g))
-      (mazeId, gs1) = S.addCreature labyrinth who (addLands 4 gs0)
+      addLands n g = if n <= (0 :: Int) then g else addLands (n - 1) (snd (S.addPermanent land who g))
+      (mazeId, gs1) = S.addPermanent labyrinth who (addLands 4 gs0)
    in (gs1, ours, yours, mazeId)
 
 -- Fire the Labyrinth's removal ability once, aim it at `victim`, and pay the {4}
@@ -1334,7 +1334,7 @@ savePointSpec s registry = Spec.describe s "Save Point" $ do
     let (gs0, ours, theirs) = S.combatBoardOf [piker, piker] [piker]
     case (savePointAbility savePoint, ours, theirs) of
       (Just ability, [blocked, unblocked], [blocker]) -> do
-        let (pointId, staged) = S.addCreature savePoint S.alice gs0
+        let (pointId, staged) = S.addPermanent savePoint S.alice gs0
             atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer staged
             atEnd = runToEndOfCombatWith (savePointAnswer pointId ability) atBlockers
             idle = runToEndOfCombat S.aggressiveAnswer atBlockers
@@ -1361,7 +1361,7 @@ savePointSpec s registry = Spec.describe s "Save Point" $ do
     let (gs0, ours, theirs) = S.combatBoardOf [piker, piker] [piker]
     case (savePointAbility savePoint, ours, theirs) of
       (Just ability, [blocked, unblocked], [_]) -> do
-        let (pointId, staged) = S.addCreature savePoint S.alice gs0
+        let (pointId, staged) = S.addPermanent savePoint S.alice gs0
             atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer staged
             atEnd = runToEndOfCombatWith (savePointAnswer pointId ability) atBlockers
             idle = runToEndOfCombat S.aggressiveAnswer atBlockers
@@ -1391,8 +1391,8 @@ unmakeBoard ::
   (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId)
 unmakeBoard opalescence livingPlane piker forest swamp doomBlade =
   let (gs0, mine, _) = S.combatBoardOf [opalescence, livingPlane, piker] []
-      (land, gs1) = S.addCreature forest S.alice gs0
-      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addCreature swamp S.bob g))
+      (land, gs1) = S.addPermanent forest S.alice gs0
+      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addPermanent swamp S.bob g))
    in (snd (S.addHandCard doomBlade S.bob (addSwamps 2 gs1)), mine, land)
 
 -- alice attacks with `land` alone, nobody blocks, and whoever is offered a cast
@@ -1423,8 +1423,8 @@ unblockBoard ::
   (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId)
 unblockBoard opalescence livingPlane piker forest swamp doomBlade =
   let (gs0, mine, theirs) = S.combatBoardOf [piker] [opalescence, livingPlane]
-      (land, gs1) = S.addCreature forest S.bob gs0
-      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addCreature swamp S.alice g))
+      (land, gs1) = S.addPermanent forest S.bob gs0
+      addSwamps n g = if n <= (0 :: Int) then g else addSwamps (n - 1) (snd (S.addPermanent swamp S.alice g))
    in (snd (S.addHandCard doomBlade S.alice (addSwamps 2 gs1)), mine, theirs, land)
 
 -- Attack with `attacker` alone and cast nothing. The declare attackers step of
@@ -1630,9 +1630,9 @@ creaturePlaneswalkerBoard ::
   Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 creaturePlaneswalkerBoard jace elves coating march plains waxWane =
   let (gs0, mine, theirs) = S.combatBoardOf [elves, elves] [jace]
-      (marchId, gs1) = S.addCreature march S.alice gs0
-      (coatingId, gs2) = S.addCreature coating S.alice gs1
-      (_, gs3) = S.addCreature plains S.alice gs2
+      (marchId, gs1) = S.addPermanent march S.alice gs0
+      (coatingId, gs2) = S.addPermanent coating S.alice gs1
+      (_, gs3) = S.addPermanent plains S.alice gs2
       (_, gs4) = S.addHandCard waxWane S.alice gs3
    in case (mine, theirs, Face.activatedAbilities (S.combinedFace coating)) of
         ([atJace, atBob], [jaceId], coat : _) ->
@@ -1746,14 +1746,14 @@ attackThePlaneswalker p = case p of
 imprisoning :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> [Printing.Printing] -> Int -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 imprisoning prison forest who mine lands =
   let (gs, ours, _) = S.combatBoardOf mine []
-      (forests, board) = addForests forest lands (snd (S.addCreature prison who gs))
+      (forests, board) = addForests forest lands (snd (S.addPermanent prison who gs))
    in (board, ours, forests)
 
 -- `n` untapped Forests under alice's control, ids first. Not S.landsInPlay, which
 -- builds a whole fresh game: these go onto a board that already exists.
 addForests :: Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
 addForests forest n gs =
-  let add (ids, g) _ = let (oid, g1) = S.addCreature forest S.alice g in (ids <> [oid], g1)
+  let add (ids, g) _ = let (oid, g1) = S.addPermanent forest S.alice g in (ids <> [oid], g1)
    in List.foldl' add ([], gs) [1 .. n]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

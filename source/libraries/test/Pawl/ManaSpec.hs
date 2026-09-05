@@ -162,13 +162,13 @@ castabilitySpec s registry = Spec.describe s "Castability" $ do
 -- the discriminator, and colorless is a mana type this board can produce no
 -- other way -- a Mountain'd Tower makes red.
 --
--- Zhao's "Nonbasic lands enter tapped" never fires here: S.addCreature writes
+-- Zhao's "Nonbasic lands enter tapped" never fires here: S.addPermanent writes
 -- the Object record directly rather than going through Event.placeObject, so the
 -- Tower arrives untapped and there is mana to tap for.
 zhaoBoard :: Printing.Printing -> Printing.Printing -> [CounterKind.CounterKind Keyword.Keyword] -> (ObjectId.ObjectId, GameState.GameState)
 zhaoBoard zhao reliquaryTower kinds =
-  let (towerId, g1) = S.addCreature reliquaryTower S.alice (Setup.emptyGame S.bothPlayers)
-      (zhaoId, g2) = S.addCreature zhao S.alice g1
+  let (towerId, g1) = S.addPermanent reliquaryTower S.alice (Setup.emptyGame S.bothPlayers)
+      (zhaoId, g2) = S.addPermanent zhao S.alice g1
    in (towerId, foldr (\k -> S.addCounter k 1 zhaoId) g2 kinds)
 
 -- CR 122.1: the kind Zhao's two sentences both name. A counter's identity is its
@@ -292,7 +292,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   Spec.it s "CR 122.1 a luck counter swaps Gemstone Caverns' {C} for any color" $ do
     caverns <- S.printingOf s registry "Gemstone Caverns"
     let base = Setup.emptyGame S.bothPlayers
-        (cavernsId, gs) = S.addCreature caverns S.alice base
+        (cavernsId, gs) = S.addPermanent caverns S.alice base
         lucky = S.addCounter (CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "luck"))) 1 cavernsId gs
     Spec.assertEqWith s "no counter: colorless and nothing else" (Mana.manaTypesOf cavernsId gs) [ManaType.Colorless]
     Spec.assertBool s (ManaType.Colored Color.White `elem` Mana.manaTypesOf cavernsId lucky) "with a luck counter, white is available"
@@ -304,8 +304,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     mountain <- S.printingOf s registry "Mountain"
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let base = Setup.emptyGame S.bothPlayers
-        (mountainId, g1) = S.addCreature mountain S.alice base
-        (_, gs) = S.addCreature urborg S.alice g1
+        (mountainId, g1) = S.addPermanent mountain S.alice base
+        (_, gs) = S.addPermanent urborg S.alice g1
     -- Urborg adds Swamp to all lands, so the Mountain taps for black too.
     Spec.assertBool s (ManaType.Colored Color.Black `elem` Mana.manaTypesOf mountainId gs) "black available"
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf mountainId gs) "red still available"
@@ -314,8 +314,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (urborgId, g1) = S.addCreature urborg S.alice base
-        (_, gs) = S.addCreature bloodMoon S.alice g1
+        (urborgId, g1) = S.addPermanent urborg S.alice base
+        (_, gs) = S.addPermanent bloodMoon S.alice g1
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf urborgId gs) "red available"
     Spec.assertBool s (ManaType.Colored Color.Black `notElem` Mana.manaTypesOf urborgId gs) "black not available (stripped)"
 
@@ -330,8 +330,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (towerId, g1) = S.addCreature reliquaryTower S.alice base
-        (_, gs) = S.addCreature bloodMoon S.alice g1
+        (towerId, g1) = S.addPermanent reliquaryTower S.alice base
+        (_, gs) = S.addPermanent bloodMoon S.alice g1
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf towerId gs) "red available (CR 305.6, from the new Mountain type)"
     Spec.assertBool s (ManaType.Colorless `notElem` Mana.manaTypesOf towerId gs) "colorless gone (the printed {T}: Add {C} was stripped)"
 
@@ -393,8 +393,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
     island <- S.printingOf s registry "Island"
-    let (zhaoId, g1) = S.addCreature zhao S.alice (S.landsInPlay island 7)
-        (towerId, g2) = S.addCreature reliquaryTower S.alice g1
+    let (zhaoId, g1) = S.addPermanent zhao S.alice (S.landsInPlay island 7)
+        (towerId, g2) = S.addPermanent reliquaryTower S.alice g1
         gs = g2 {GameState.priority = Just S.alice}
         ability = case Face.activatedAbilities (S.combinedFace zhao) of
           ab : _ -> Just ab
@@ -420,8 +420,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
     convincingMirage <- S.printingOf s registry "Convincing Mirage"
     let base = Setup.emptyGame S.bothPlayers
-        (towerId, g1) = S.addCreature reliquaryTower S.alice base
-        (mirageId, g2) = S.addCreature convincingMirage S.alice g1
+        (towerId, g1) = S.addPermanent reliquaryTower S.alice base
+        (mirageId, g2) = S.addPermanent convincingMirage S.alice g1
         gs = S.withChosenSubtype Subtype.Plains mirageId (S.attach mirageId towerId g2)
     Spec.assertBool s (ManaType.Colored Color.White `elem` Mana.manaTypesOf towerId gs) "white available (CR 305.6, from the chosen Plains)"
     Spec.assertBool s (ManaType.Colorless `notElem` Mana.manaTypesOf towerId gs) "colorless gone (the printed {T}: Add {C} was stripped)"
@@ -431,8 +431,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     evolvingWilds <- S.printingOf s registry "Evolving Wilds"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (wildsId, g1) = S.addCreature evolvingWilds S.alice base
-        (_, gs) = S.addCreature bloodMoon S.alice g1
+        (wildsId, g1) = S.addPermanent evolvingWilds S.alice base
+        (_, gs) = S.addPermanent bloodMoon S.alice g1
     Spec.assertEqWith s "the fetch ability is gone" (Projection.abilitiesOf wildsId gs) []
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf wildsId gs) "and it taps for red instead"
 
@@ -444,8 +444,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (_, gs) = S.addCreature ashaya S.alice g1
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        (_, gs) = S.addPermanent ashaya S.alice g1
     Spec.assertBool s (ManaType.Colored Color.Green `elem` Mana.manaTypesOf pikerId gs) "green available"
     Spec.assertBool s (pikerId `elem` Mana.manaSources Cost.manaActivations S.alice gs) "and it is a mana source"
 
@@ -454,9 +454,9 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (_, g2) = S.addCreature bloodMoon S.alice g1
-        (_, gs) = S.addCreature ashaya S.alice g2
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        (_, g2) = S.addPermanent bloodMoon S.alice g1
+        (_, gs) = S.addPermanent ashaya S.alice g2
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf pikerId gs) "red available"
     Spec.assertBool s (ManaType.Colored Color.Green `notElem` Mana.manaTypesOf pikerId gs) "green gone"
 
@@ -470,8 +470,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (_, g2) = S.addCreature ashaya S.alice g1
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        (_, g2) = S.addPermanent ashaya S.alice g1
         sick = g2 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) pikerId (GameState.objects g2)}
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pikerId sick)) "it is a land now"
     Spec.assertBool s (Projection.isCreatureOf pikerId sick) "and still a creature"
@@ -527,13 +527,13 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 
   Spec.it s "CR 605 a settled Llanowar Elves is a green mana source" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    let (elfId, gs) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
+    let (elfId, gs) = S.addPermanent llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertBool s (elem (ManaType.Colored Color.Green) (Mana.manaTypesOf elfId gs)) "taps green"
     Spec.assertBool s (elem elfId (Mana.manaSources Cost.manaActivations S.alice gs)) "is a mana source"
 
   Spec.it s "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    let (elfId, g0) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
+    let (elfId, g0) = S.addPermanent llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
         sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
     Spec.assertBool s (notElem elfId (Mana.manaSources Cost.manaActivations S.alice sick)) "sick elf excluded"
 
@@ -543,9 +543,9 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   Spec.it s "CR 302.6 a stolen Llanowar Elves is not a mana source for the thief" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     controlMagic <- S.printingOf s registry "Control Magic"
-    let (elfId, g0) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
+    let (elfId, g0) = S.addPermanent llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
         settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
-        (aura, withAura) = S.addCreature controlMagic S.alice settled
+        (aura, withAura) = S.addPermanent controlMagic S.alice settled
         stolen = S.attach aura elfId withAura
     Spec.assertBool s (elem elfId (Mana.manaSources Cost.manaActivations S.bob settled)) "bob could tap it"
     Spec.assertBool s (elem elfId (Projection.controls S.alice stolen)) "alice controls it now"
@@ -566,7 +566,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     actOfTreason <- S.printingOf s registry "Act of Treason"
     let base0 = S.landsInPlay mountain 3
-        (elfId, base1) = S.addCreature llanowarElves S.bob base0
+        (elfId, base1) = S.addPermanent llanowarElves S.bob base0
         base = S.runPure S.identityAnswer base1 (Engine.settleAll S.bob)
         (withSpell, spellId) = S.handOne actOfTreason base
         cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
@@ -584,7 +584,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     forest <- S.printingOf s registry "Forest"
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let base0 = S.landsInPlay forest 1
-        (elfId, base1) = S.addCreature llanowarElves S.alice base0
+        (elfId, base1) = S.addPermanent llanowarElves S.alice base0
         gs = S.runPure S.identityAnswer base1 (Engine.settleAll S.alice)
         green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         cost = Cost.Type.MkCost (Just green) []
@@ -690,7 +690,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 
   Spec.it s "mana from a controlled permanent goes to its controller, not owner" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
         gs0 = S.giveControl oid S.alice base
         after = S.runPure S.identityAnswer gs0 (Cost.tapForMana S.manaPerformer oid)
         manaUnitsOf pool = case pool of
@@ -749,7 +749,7 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- So AnyColor offers exactly five options, and {C} is not among them.
   Spec.it s "CR 105.4 Birds of Paradise offers the five colors and not colorless" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
-    let (birdsId, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+    let (birdsId, gs) = S.addPermanent birds S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "exactly the five colors"
@@ -785,15 +785,15 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   Spec.it s "CR 118.3 a Forest and a Birds of Paradise can pay {G}{B}" $ do
     forest <- S.printingOf s registry "Forest"
     birds <- S.printingOf s registry "Birds of Paradise"
-    let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
-        (_, gs) = S.addCreature birds S.alice g1
+    let (_, g1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs) = S.addPermanent birds S.alice g1
         cost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Black)]
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice cost gs) "affordable"
 
   Spec.it s "CR 118.3 two Birds of Paradise can pay {B}{B}, one cannot" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
-    let (_, one) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
-        (_, two) = S.addCreature birds S.alice one
+    let (_, one) = S.addPermanent birds S.alice (Setup.emptyGame S.bothPlayers)
+        (_, two) = S.addPermanent birds S.alice one
         black = ManaSymbol.OfType (ManaType.Colored Color.Black)
         cost = ManaCost.MkManaCost [black, black]
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice cost two) "two suffice"
@@ -808,9 +808,9 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   Spec.it s "CR 118.3 a Birds and two Forests cannot pay {W}{W}" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     forest <- S.printingOf s registry "Forest"
-    let (_, g1) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g2) = S.addCreature forest S.alice g1
-        (_, gs) = S.addCreature forest S.alice g2
+    let (_, g1) = S.addPermanent birds S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent forest S.alice g1
+        (_, gs) = S.addPermanent forest S.alice g2
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [white, white]) gs)) "only one white source"
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [white, ManaSymbol.Generic 2]) gs) "but one {W} plus {2} is fine"
@@ -822,8 +822,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
     mountain <- S.printingOf s registry "Mountain"
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     let base = Setup.emptyGame S.bothPlayers
-        (mountainId, g1) = S.addCreature mountain S.alice base
-        (_, gs) = S.addCreature urborg S.alice g1
+        (mountainId, g1) = S.addPermanent mountain S.alice base
+        (_, gs) = S.addPermanent urborg S.alice g1
     Spec.assertEqWith s "choosing black" (tappedFor (prefersColor Color.Black) mountainId gs) [ManaType.Colored Color.Black]
     Spec.assertEqWith s "choosing red" (tappedFor (prefersColor Color.Red) mountainId gs) [ManaType.Colored Color.Red]
 
@@ -839,7 +839,7 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
         asks printing =
-          let (oid, gs) = S.addCreature printing S.alice (Setup.emptyGame S.bothPlayers)
+          let (oid, gs) = S.addPermanent printing S.alice (Setup.emptyGame S.bothPlayers)
            in State.execState (Engine.runGame countingAnswer gs (Cost.tapForMana S.manaPerformer oid)) 0
     Spec.assertEqWith s "a Forest: nothing to ask" (asks forest) 0
     Spec.assertEqWith s "a Birds of Paradise: one real decision" (asks birds) 1
@@ -857,11 +857,11 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
 floatedPools :: [Printing.Printing] -> Printing.Printing -> ([ObjectId.ObjectId], GameState.GameState)
 floatedPools alices forest =
   let addOne (ids, gs) printing =
-        let (oid, gs1) = S.addCreature printing S.alice gs
+        let (oid, gs1) = S.addPermanent printing S.alice gs
          in (ids <> [oid], gs1)
       (extras, withAlices) = List.foldl' addOne ([], Setup.emptyGame S.bothPlayers) alices
-      (aliceForest, g1) = S.addCreature forest S.alice withAlices
-      (bobForest, g2) = S.addCreature forest S.bob g1
+      (aliceForest, g1) = S.addPermanent forest S.alice withAlices
+      (bobForest, g2) = S.addPermanent forest S.bob g1
       g3 = S.runPure S.identityAnswer g2 (Cost.tapForMana S.manaPerformer aliceForest)
    in (extras, S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer bobForest))
 
@@ -929,9 +929,9 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     unsummon <- S.printingOf s registry "Unsummon"
     let base = Setup.emptyGame S.bothPlayers
-        (_, g1) = S.addCreature upwelling S.alice base
-        (birdsId, g2) = S.addCreature birds S.alice g1
-        (_, g3) = S.addCreature forest S.alice g2
+        (_, g1) = S.addPermanent upwelling S.alice base
+        (birdsId, g2) = S.addPermanent birds S.alice g1
+        (_, g3) = S.addPermanent forest S.alice g2
         (withElves, elvesId) = S.handOne llanowarElves g3
         (unsummonId, board) = S.addHandCard unsummon S.alice withElves
         -- Prefer the Birds and take blue from it: it cannot pay {G}, so the
@@ -971,9 +971,9 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
     forest <- S.printingOf s registry "Forest"
     island <- S.printingOf s registry "Island"
     omnath <- S.printingOf s registry "Omnath, Locus of Mana"
-    let (_, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
-        (forestId, g2) = S.addCreature forest S.alice g1
-        (islandId, g3) = S.addCreature island S.alice g2
+    let (_, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (forestId, g2) = S.addPermanent forest S.alice g1
+        (islandId, g3) = S.addPermanent island S.alice g2
         floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer forestId)) (Cost.tapForMana S.manaPerformer islandId)
         ended = Mana.emptyManaPools floated
     Spec.assertEqWith s "two floated" (poolSize S.alice floated) 2
@@ -991,9 +991,9 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
   Spec.it s "CR 613.11 Omnath is You-scoped: an opponent's green mana still empties" $ do
     forest <- S.printingOf s registry "Forest"
     omnath <- S.printingOf s registry "Omnath, Locus of Mana"
-    let (_, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
-        (alicesForest, g2) = S.addCreature forest S.alice g1
-        (bobsForest, g3) = S.addCreature forest S.bob g2
+    let (_, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (alicesForest, g2) = S.addPermanent forest S.alice g1
+        (bobsForest, g3) = S.addPermanent forest S.bob g2
         floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer alicesForest)) (Cost.tapForMana S.manaPerformer bobsForest)
         ended = Mana.emptyManaPools floated
     Spec.assertEqWith s "alice keeps hers" (poolSize S.alice ended) 1
@@ -1008,9 +1008,9 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
     forest <- S.printingOf s registry "Forest"
     island <- S.printingOf s registry "Island"
     omnath <- S.printingOf s registry "Omnath, Locus of Mana"
-    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
-        (forestId, g2) = S.addCreature forest S.alice g1
-        (islandId, g3) = S.addCreature island S.alice g2
+    let (omnathId, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (forestId, g2) = S.addPermanent forest S.alice g1
+        (islandId, g3) = S.addPermanent island S.alice g2
         floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer forestId)) (Cost.tapForMana S.manaPerformer islandId)
         afterStep = S.runPure S.identityAnswer floated Engine.runStep
     Spec.assertEqWith s "before: two floating, and only the green pumps" (Projection.powerOf omnathId floated) (Just 2)
@@ -1031,8 +1031,8 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
     forest <- S.printingOf s registry "Forest"
     omnath <- S.printingOf s registry "Omnath, Locus of Mana"
     mongoose <- S.printingOf s registry "Blurred Mongoose"
-    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
-        withForests = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) g1 [1 .. 4 :: Int]
+    let (omnathId, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
+        withForests = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) g1 [1 .. 4 :: Int]
         (board, mongooseId) = S.handOne mongoose withForests
         castWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
         castWith answer = S.runPure answer board (S.cast S.alice mongooseId)
@@ -1127,7 +1127,7 @@ priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" 
   -- CR 117.4's pass count is what makes him asked a second time at all.
   Spec.it s "CR 117.3c the activator receives priority again afterward" $ do
     forest <- S.printingOf s registry "Forest"
-    let (_, withForest) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, withForest) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
         board = withForest {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
         asked = State.execState (Engine.runGame tapOnceThenPass board Engine.priorityLoop) []
     Spec.assertEqWith s "bob passes, alice taps, alice is asked again, and only then is bob asked again" asked [S.bob, S.alice, S.alice, S.bob]
@@ -1137,18 +1137,18 @@ priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" 
 -- pool is mana she activated a mana ability for while holding priority.
 priorityWindowBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 priorityWindowBoard omnath forest =
-  let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
-      board = foldr (\_ gs -> snd (S.addCreature forest S.alice gs)) g1 [1 :: Int, 2, 3]
+  let (omnathId, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
+      board = foldr (\_ gs -> snd (S.addPermanent forest S.alice gs)) g1 [1 :: Int, 2, 3]
    in (omnathId, board {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: one Phyrexian Tower, and a
 -- creature to sacrifice or not.
 towerBoard :: Printing.Printing -> Maybe Printing.Printing -> GameState.GameState
 towerBoard tower victim =
-  let g1 = snd (S.addCreature tower S.alice (Setup.emptyGame S.bothPlayers))
+  let g1 = snd (S.addPermanent tower S.alice (Setup.emptyGame S.bothPlayers))
       g2 = case victim of
         Nothing -> g1
-        Just printing -> snd (S.addCreature printing S.alice g1)
+        Just printing -> snd (S.addPermanent printing S.alice g1)
    in g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
 
 -- CR 605.3a's two windows, gated by the "activate only ..." rider CR 602.5 makes
@@ -1294,12 +1294,12 @@ laviniaTurnRiderSpec s registry = Spec.describe s "CR 102.1 a rider naming a tur
 -- whose turn it is and is the ONE thing the three boards differ in; an empty
 -- `remaining` pins the phase, so a priority loop cannot wander out of the turn
 -- the rider is being asked about. Both permanents arrive Settled and untapped
--- (S.addCreature), which is the precondition CR 302.6 and CR 107.5 put on
+-- (S.addPermanent), which is the precondition CR 302.6 and CR 107.5 put on
 -- Lavinia's {T}.
 laviniaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
 laviniaBoard lavinia wretch piker active =
-  let (_, g1) = S.addCreature lavinia S.alice S.threePlayerGame
-      (wretchId, g2) = S.addCreature wretch S.alice g1
+  let (_, g1) = S.addPermanent lavinia S.alice S.threePlayerGame
+      (wretchId, g2) = S.addPermanent wretch S.alice g1
       (_, g3) = S.addGraveyardCard piker S.bob g2
    in (wretchId, g3 {GameState.activePlayer = active, GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
@@ -1354,7 +1354,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- yielding two mana, not a choice between two singles.
   Spec.it s "CR 605 tapping Sol Ring adds two colorless mana, not one" $ do
     solRing <- S.printingOf s registry "Sol Ring"
-    let (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+    let (solRingId, gs) = S.addPermanent solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "two units of {C}"
@@ -1366,7 +1366,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   -- Ring is two supplies and pays {2} by itself.
   Spec.it s "CR 118.3 a lone Sol Ring pays {2} by itself" $ do
     solRing <- S.printingOf s registry "Sol Ring"
-    let (_, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, gs) = S.addPermanent solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
 
@@ -1377,8 +1377,8 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   Spec.it s "CR 118.3 a Sol Ring and a Mountain pay {2}{R}, but not {R}{R}" $ do
     solRing <- S.printingOf s registry "Sol Ring"
     mountain <- S.printingOf s registry "Mountain"
-    let (_, g1) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
-        (_, gs) = S.addCreature mountain S.alice g1
+    let (_, g1) = S.addPermanent solRing S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs) = S.addPermanent mountain S.alice g1
         red = ManaSymbol.OfType (ManaType.Colored Color.Red)
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]) gs) "{2}{R} is affordable"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
@@ -1407,7 +1407,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
             State.modify' (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        (solRingId, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
+        (solRingId, gs) = S.addPermanent solRing S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (Cost.tapForMana S.manaPerformer solRingId)) 0) 0
 
 -- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
@@ -1450,8 +1450,8 @@ ancientTombSpec s registry = Spec.describe s "Ancient Tomb" $ do
   Spec.it s "CR 405.6c the damage lands before the rest of the mana window" $ do
     ancientTomb <- S.printingOf s registry "Ancient Tomb"
     manaConfluence <- S.printingOf s registry "Mana Confluence"
-    let (_, withConfluence) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
-        (tombId, board) = S.addCreature ancientTomb S.alice withConfluence
+    let (_, withConfluence) = S.addPermanent manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+        (tombId, board) = S.addPermanent ancientTomb S.alice withConfluence
         cost = ManaCost.MkManaCost [ManaSymbol.Generic 3]
         attempt life = fst (S.runPureWith (prefersSource tombId) (atLife life board) (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice cost))
     Spec.assertBool s (not (attempt 2)) "at 2 life the Confluence can no longer be paid"
@@ -1463,7 +1463,7 @@ ancientTombSpec s registry = Spec.describe s "Ancient Tomb" $ do
   -- the whole of what it adds.
   Spec.it s "CR 605.1a Ancient Tomb's damage leaves it a mana ability" $ do
     ancientTomb <- S.printingOf s registry "Ancient Tomb"
-    let (tombId, board) = S.addCreature ancientTomb S.alice (Setup.emptyGame S.bothPlayers)
+    let (tombId, board) = S.addPermanent ancientTomb S.alice (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer tombId)
     Spec.assertEqWith s "the yield is two colorless and nothing else" (tappedFor S.identityAnswer tombId board) [ManaType.Colorless, ManaType.Colorless]
     Spec.assertBool s (elem tombId (Mana.manaSources Cost.manaActivations S.alice board)) "and it is a mana source"
@@ -1497,8 +1497,8 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
   Spec.it s "CR 305.6 an Ashaya'd Palladium Myr offers {G} or {C}{C}, and nothing between" $ do
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
-    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
-        (myrId, gs) = S.addCreature palladiumMyr S.alice g1
+    let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (myrId, gs) = S.addPermanent palladiumMyr S.alice g1
         green = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
         colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
     Spec.assertEqWith
@@ -1516,9 +1516,9 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
   Spec.it s "CR 118.3 Ashaya and two Palladium Myrs cannot pay {3}{G}{G}" $ do
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
-    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g2) = S.addCreature palladiumMyr S.alice g1
-        (_, gs) = S.addCreature palladiumMyr S.alice g2
+    let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent palladiumMyr S.alice g1
+        (_, gs) = S.addPermanent palladiumMyr S.alice g2
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
     Spec.assertBool
       s
@@ -1530,9 +1530,9 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
   Spec.it s "CR 118.3 the same board still pays {2}{G}{G}, {5} and {G}{G}{G}" $ do
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
-    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g2) = S.addCreature palladiumMyr S.alice g1
-        (_, gs) = S.addCreature palladiumMyr S.alice g2
+    let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent palladiumMyr S.alice g1
+        (_, gs) = S.addPermanent palladiumMyr S.alice g2
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
         pays cost = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost cost) gs
     -- One Myr on its Forest, one on its {C}{C}: {G}{G}{C}{C}.
@@ -1555,9 +1555,9 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
     livingPlane <- S.printingOf s registry "Living Plane"
     towershell <- S.printingOf s registry "Meandering Towershell"
-    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g2) = S.addCreature palladiumMyr S.alice g1
-        (_, g3) = S.addCreature palladiumMyr S.alice g2
+    let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent palladiumMyr S.alice g1
+        (_, g3) = S.addPermanent palladiumMyr S.alice g2
         (planeId, g4) = S.addHandCard livingPlane S.alice g3
         (towershellId, g5) = S.addHandCard towershell S.alice g4
         -- CR 303.1 (the enchantment) and CR 302.1 (the creature) name the same
@@ -1575,9 +1575,9 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     palladiumMyr <- S.printingOf s registry "Palladium Myr"
     livingPlane <- S.printingOf s registry "Living Plane"
-    let (_, g1) = S.addCreature ashaya S.alice (Setup.emptyGame S.bothPlayers)
-        (firstMyrId, g2) = S.addCreature palladiumMyr S.alice g1
-        (_, g3) = S.addCreature palladiumMyr S.alice g2
+    let (_, g1) = S.addPermanent ashaya S.alice (Setup.emptyGame S.bothPlayers)
+        (firstMyrId, g2) = S.addPermanent palladiumMyr S.alice g1
+        (_, g3) = S.addPermanent palladiumMyr S.alice g2
         (withSpell, planeId) = S.handOne livingPlane g3
         cast = S.runPure (prefersLongYieldFrom firstMyrId) withSpell (S.cast S.alice planeId)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
@@ -1643,7 +1643,7 @@ wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
   -- which is the first two modes.
   Spec.it s "CR 605.3b tapping a Wellspring adds two mana, one per chosen mode" $ do
     wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
-    let (wellspringId, gs) = S.addCreature wellspring S.alice (Setup.emptyGame S.bothPlayers)
+    let (wellspringId, gs) = S.addPermanent wellspring S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "{R} and {G}, from one activation"
@@ -1723,7 +1723,7 @@ chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2
   -- that the engine invents nothing when it finds one.
   Spec.it s "CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing" $ do
     coldsteel <- S.printingOf s registry "Coldsteel Heart"
-    let (oid, gs) = S.addCreature coldsteel S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent coldsteel S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "chosenColor is unset" (fmap Object.chosenColor (Game.lookupObject oid gs)) (Just Nothing)
     Spec.assertEqWith s "so it offers no mana" (Mana.manaTypesOf oid gs) []
     Spec.assertEqWith s "and tapping it adds none" (tappedFor S.identityAnswer oid gs) []
@@ -1740,7 +1740,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
   -- first assertion and fails the second.
   Spec.it s "CR 602.2b tapping it adds a mana and pays the 1 life" $ do
     manaConfluence <- S.printingOf s registry "Mana Confluence"
-    let (oid, gs) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
         after = S.runPure (prefersColor Color.Black) gs (Cost.tapForMana S.manaPerformer oid)
     Spec.assertEqWith s "the colour asked for" (tappedFor (prefersColor Color.Black) oid gs) [ManaType.Colored Color.Black]
     Spec.assertEqWith s "exactly 1 life" (S.lifeOf S.alice after) (Just 19)
@@ -1753,9 +1753,9 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
   Spec.it s "CR 602.2b each activation pays its own cost, and a Forest's is free" $ do
     manaConfluence <- S.printingOf s registry "Mana Confluence"
     forest <- S.printingOf s registry "Forest"
-    let (firstId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
-        (secondId, g2) = S.addCreature manaConfluence S.alice g1
-        (forestId, g3) = S.addCreature forest S.alice g2
+    let (firstId, g1) = S.addPermanent manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+        (secondId, g2) = S.addPermanent manaConfluence S.alice g1
+        (forestId, g3) = S.addPermanent forest S.alice g2
         tapEach = List.foldl' (\g oid -> S.runPure (prefersColor Color.Black) g (Cost.tapForMana S.manaPerformer oid)) g3
     Spec.assertEqWith s "one Confluence, 1 life" (S.lifeOf S.alice (tapEach [firstId])) (Just 19)
     Spec.assertEqWith s "both of them, 2 life" (S.lifeOf S.alice (tapEach [firstId, secondId])) (Just 18)
@@ -1786,7 +1786,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
   Spec.it s "CR 118.3c a player at 1 life may decline to tap their only Mana Confluence" $ do
     manaConfluence <- S.printingOf s registry "Mana Confluence"
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let (confluenceId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+    let (confluenceId, g1) = S.addPermanent manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
         (withRats, ratsId) = S.handOne typhoidRats g1
         board = atLife 1 withRats
         declines :: Prompt.Prompt r -> r
@@ -1818,8 +1818,8 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
   Spec.it s "CR 305.6/602.2b an Urborg'd Mana Confluence's black is free or costs a life" $ do
     manaConfluence <- S.printingOf s registry "Mana Confluence"
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
-    let (confluenceId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
-        (_, gs) = S.addCreature urborg S.alice g1
+    let (confluenceId, g1) = S.addPermanent manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs) = S.addPermanent urborg S.alice g1
         black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
         -- The offered black option that is CR 305.6's free one, or the printed
         -- one that charges the life -- `printed` picks which.
@@ -1887,8 +1887,8 @@ phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
   Spec.it s "CR 118.3 the sacrifice option is offered only with a creature to give" $ do
     tower <- S.printingOf s registry "Phyrexian Tower"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (towerId, alone) = S.addCreature tower S.alice (Setup.emptyGame S.bothPlayers)
-        withPiker = snd (S.addCreature piker S.alice alone)
+    let (towerId, alone) = S.addPermanent tower S.alice (Setup.emptyGame S.bothPlayers)
+        withPiker = snd (S.addPermanent piker S.alice alone)
     Spec.assertEqWith s "CR 106.7: it produces {C} and {B} with nothing to sacrifice" (Mana.manaTypesOf towerId alone) [ManaType.Colorless, ManaType.Colored Color.Black]
     Spec.assertEqWith s "with no creature, only the {C} can be paid for" (tappedFor prefersDoubleBlack towerId alone) [ManaType.Colorless]
     Spec.assertEqWith s "so there is no colour question to ask" (yieldsOffered towerId alone) []
@@ -1908,7 +1908,7 @@ phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
   Spec.it s "CR 602.2b taking that option pays the sacrifice" $ do
     tower <- S.printingOf s registry "Phyrexian Tower"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (towerId, board) = S.addCreature tower S.alice (snd (S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)))
+    let (towerId, board) = S.addPermanent tower S.alice (snd (S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)))
         tapWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
         tapWith answer = S.runPure answer board (Cost.tapForMana S.manaPerformer towerId)
     Spec.assertEqWith s "the Piker is gone" (S.creaturesInPlay S.alice (tapWith prefersDoubleBlack)) 0
@@ -1921,8 +1921,8 @@ phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
   Spec.it s "CR 118.3 an unpayable activation is no supply either" $ do
     tower <- S.printingOf s registry "Phyrexian Tower"
     piker <- S.printingOf s registry "Goblin Piker"
-    let alone = snd (S.addCreature tower S.alice (Setup.emptyGame S.bothPlayers))
-        withPiker = snd (S.addCreature piker S.alice alone)
+    let alone = snd (S.addPermanent tower S.alice (Setup.emptyGame S.bothPlayers))
+        withPiker = snd (S.addPermanent piker S.alice alone)
         black = ManaSymbol.OfType (ManaType.Colored Color.Black)
         doubleBlack = ManaCost.MkManaCost [black, black]
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice doubleBlack withPiker) "{B}{B} with a creature to sacrifice"
@@ -1961,8 +1961,8 @@ bloodPetSpec s registry = Spec.describe s "Blood Pet" $ do
   Spec.it s "CR 107.5 a TAPPED Blood Pet is still a mana source" $ do
     bloodPet <- S.printingOf s registry "Blood Pet"
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    let (petId, g1) = S.addCreature bloodPet S.alice (Setup.emptyGame S.bothPlayers)
-        (elfId, g2) = S.addCreature llanowarElves S.alice g1
+    let (petId, g1) = S.addPermanent bloodPet S.alice (Setup.emptyGame S.bothPlayers)
+        (elfId, g2) = S.addPermanent llanowarElves S.alice g1
         tapped = S.tapObject elfId (S.tapObject petId g2)
         sources = Mana.manaSources Cost.manaActivations S.alice tapped
     Spec.assertBool s (elem petId (Mana.manaSources Cost.manaActivations S.alice g2)) "untapped, the Pet is a source"
@@ -1972,8 +1972,8 @@ bloodPetSpec s registry = Spec.describe s "Blood Pet" $ do
   Spec.it s "CR 302.6 a summoning-sick Blood Pet is still a mana source" $ do
     bloodPet <- S.printingOf s registry "Blood Pet"
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    let (petId, g1) = S.addCreature bloodPet S.alice (Setup.emptyGame S.bothPlayers)
-        (elfId, g2) = S.addCreature llanowarElves S.alice g1
+    let (petId, g1) = S.addPermanent bloodPet S.alice (Setup.emptyGame S.bothPlayers)
+        (elfId, g2) = S.addPermanent llanowarElves S.alice g1
         sick = foldr sicken g2 [petId, elfId]
         sources = Mana.manaSources Cost.manaActivations S.alice sick
     Spec.assertBool s (elem petId sources) "CR 302.6 gates a cost with {T} or {Q}, and sacrificing is neither"
@@ -1986,7 +1986,7 @@ bloodPetSpec s registry = Spec.describe s "Blood Pet" $ do
   Spec.it s "CR 605.3a a tapped, sick Blood Pet pays for Typhoid Rats" $ do
     bloodPet <- S.printingOf s registry "Blood Pet"
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let (petId, g1) = S.addCreature bloodPet S.alice (Setup.emptyGame S.bothPlayers)
+    let (petId, g1) = S.addPermanent bloodPet S.alice (Setup.emptyGame S.bothPlayers)
         board = S.tapObject petId (sicken petId g1)
         (withSpell, ratsId) = S.handOne typhoidRats board
         resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer withSpell (S.cast S.alice ratsId)) Stack.resolveTop
@@ -2055,7 +2055,7 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
 -- The Altar and `victims` Pikers, all under alice's control.
 altarBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 altarBoard altar piker victims =
-  foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker)
+  foldr (\p gs -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker)
 
 -- CR 118.3's "fully" over a resource that is neither an object nor life: the
 -- +1/+1 counters on the source itself. Workhorse ({6} Artifact Creature -- Horse
@@ -2136,7 +2136,7 @@ workhorseSpec s registry = Spec.describe s "Workhorse" $ do
 -- entry rewrite has its own case above.
 workhorseBoard :: Printing.Printing -> Natural -> (ObjectId.ObjectId, GameState.GameState)
 workhorseBoard horse counters =
-  let (horseId, gs) = S.addCreature horse S.alice (Setup.emptyGame S.bothPlayers)
+  let (horseId, gs) = S.addPermanent horse S.alice (Setup.emptyGame S.bothPlayers)
    in (horseId, S.addCounter CounterKind.PlusOnePlusOne counters horseId gs)
 
 -- The half #1128 gave up: WHICH mana each of a repeatable source's activations
@@ -2200,7 +2200,7 @@ phyrexianAltarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int 
 phyrexianAltarBoard s registry victims = do
   altar <- S.printingOf s registry "Phyrexian Altar"
   piker <- S.printingOf s registry "Goblin Piker"
-  pure (foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker))
+  pure (foldr (\p gs -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker))
 
 -- Whether alice could pay one mana of each of these colors off this board.
 paysColors :: [Color.Color] -> GameState.GameState -> Bool
@@ -2245,8 +2245,8 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
   Spec.it s "CR 601.2g the mana window opens before CR 601.2h spends the source it needs" $ do
     altar <- S.printingOf s registry "Transmogrant Altar"
     birds <- S.printingOf s registry "Birds of Paradise"
-    let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
-        (birdsId, g2) = S.addCreature birds S.alice g1
+    let (altarId, g1) = S.addPermanent altar S.alice (Setup.emptyGame S.bothPlayers)
+        (birdsId, g2) = S.addPermanent birds S.alice g1
         board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
         after = snd (State.evalState (Engine.runGame (takesAltarOnce altarId birdsId) board Engine.priorityLoop) (0 :: Int))
     Spec.assertEqWith s "CR 601.2g the Birds pays the {B} first, so the Altar's three colorless reach her pool" (poolTypes S.alice after) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
@@ -2270,10 +2270,10 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     star <- S.printingOf s registry "Chromatic Star"
     piker <- S.printingOf s registry "Goblin Piker"
     plains <- S.printingOf s registry "Plains"
-    let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
-        (starId, g2) = S.addCreature star S.alice g1
-        (_, g3) = S.addCreature piker S.alice g2
-        (plainsId, g4) = S.addCreature plains S.alice g3
+    let (altarId, g1) = S.addPermanent altar S.alice (Setup.emptyGame S.bothPlayers)
+        (starId, g2) = S.addPermanent star S.alice g1
+        (_, g3) = S.addPermanent piker S.alice g2
+        (plainsId, g4) = S.addPermanent plains S.alice g3
         (_, g5) = S.addLibraryCard piker S.alice g4
         board = g5 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
         after = snd (State.evalState (Engine.runGame (takesAltarOnce altarId starId) board Engine.priorityLoop) (0 :: Int))
@@ -2289,8 +2289,8 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
   Spec.it s "CR 605.3a the Altar's own window offers the Birds and not the Altar" $ do
     altar <- S.printingOf s registry "Transmogrant Altar"
     birds <- S.printingOf s registry "Birds of Paradise"
-    let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
-        (birdsId, g2) = S.addCreature birds S.alice g1
+    let (altarId, g1) = S.addPermanent altar S.alice (Setup.emptyGame S.bothPlayers)
+        (birdsId, g2) = S.addPermanent birds S.alice g1
         board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
         asked = snd (State.execState (Engine.runGame (recordsSources altarId birdsId) board Engine.priorityLoop) (0 :: Int, []))
     Spec.assertEqWith s "one window, and the Birds is the only source its {B} may come from" asked [[birdsId]]
@@ -2373,11 +2373,11 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
 -- pair of spells in her hand. Returns the Altar and whichever spells were dealt.
 altarSupplyBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState, Maybe ObjectId.ObjectId)
 altarSupplyBoard altar piker swamp spell =
-  let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature piker S.alice g1
+  let (altarId, g1) = S.addPermanent altar S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent piker S.alice g1
       g3 = case swamp of
         Nothing -> g2
-        Just printing -> snd (S.addCreature printing S.alice g2)
+        Just printing -> snd (S.addPermanent printing S.alice g2)
       -- S.handOne REPLACES the hand, so one spell per board and the pair of
       -- boards below differ in that one card alone.
       (g4, held) = case spell of
@@ -2391,10 +2391,10 @@ altarSupplyBoard altar piker swamp spell =
 -- takes itself -- so CR 118.3's joint payability admits both at once.
 altarChainBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
 altarChainBoard altar golem piker swamp =
-  let (_, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature golem S.alice g1
-      (_, g3) = S.addCreature piker S.alice g2
-      (_, g4) = S.addCreature swamp S.alice g3
+  let (_, g1) = S.addPermanent altar S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent golem S.alice g1
+      (_, g3) = S.addPermanent piker S.alice g2
+      (_, g4) = S.addPermanent swamp S.alice g3
    in g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
 
 -- Activates the ALTAR and nothing else, pays its {B} off the Birds, and asks the
@@ -2499,8 +2499,8 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
     ignus <- S.printingOf s registry "Grinning Ignus"
     mountain <- S.printingOf s registry "Mountain"
     splitter <- S.printingOf s registry "Bonesplitter"
-    let (_, alone) = S.addCreature ignus S.alice (Setup.emptyGame S.bothPlayers)
-        withLand = snd (S.addCreature mountain S.alice alone)
+    let (_, alone) = S.addPermanent ignus S.alice (Setup.emptyGame S.bothPlayers)
+        withLand = snd (S.addPermanent mountain S.alice alone)
         holding gs =
           let (board, oid) = S.handOne splitter (gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
            in S.castable S.alice oid board
@@ -2548,7 +2548,7 @@ grinningIgnusSpec s registry = Spec.describe s "Grinning Ignus" $ do
     mountain <- S.printingOf s registry "Mountain"
     nexus <- S.printingOf s registry "Maskwood Nexus"
     let (ignusId, board) = ignusBoard ignus mountain
-        (nexusId, held) = S.addCreature nexus S.alice board
+        (nexusId, held) = S.addPermanent nexus S.alice board
         floated = snd (State.evalState (Engine.runGame (takesIgnusOnce ignusId) held Engine.priorityLoop) (0 :: Int))
         offers gs = filter (isActivationOf nexusId) (Action.legalActions S.alice gs)
     Spec.assertEqWith s "CR 602.2a the Ignus is no supply for an activation either" (length (offers held)) 0
@@ -2566,8 +2566,8 @@ isActivationOf oid action = case action of
 -- Ignus and one Mountain, and nothing else on the board or in her hand.
 ignusBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 ignusBoard ignus mountain =
-  let (ignusId, g1) = S.addCreature ignus S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature mountain S.alice g1
+  let (ignusId, g1) = S.addPermanent ignus S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent mountain S.alice g1
    in (ignusId, g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- CR 118.13a on a MANA ability's own activation cost. A mana ability is an
@@ -2622,7 +2622,7 @@ mysticGateSpec s registry = Spec.describe s "Mystic Gate" $ do
 -- decided which colour went.
 gateBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 gateBoard gate =
-  let (gateId, g1) = S.addCreature gate S.alice (Setup.emptyGame S.bothPlayers)
+  let (gateId, g1) = S.addPermanent gate S.alice (Setup.emptyGame S.bothPlayers)
       unit manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}
    in (gateId, Mana.addMana S.alice [unit whiteType, unit blueType] g1)
 
@@ -2881,11 +2881,11 @@ activationAdjustmentSpec s registry = Spec.describe s "CR 601.2f a mana ability'
 -- ability, or Zirda, whose sentence spares it. Returns the Golem.
 golemBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 golemBoard golem mountain reducer =
-  let (golemId, g1) = S.addCreature golem S.alice (Setup.emptyGame S.bothPlayers)
-      g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
+  let (golemId, g1) = S.addPermanent golem S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = foldr (\_ gs -> snd (S.addPermanent mountain S.alice gs)) g1 [1 :: Int, 2]
       g3 = case reducer of
         Nothing -> g2
-        Just printing -> snd (S.addCreature printing S.alice g2)
+        Just printing -> snd (S.addPermanent printing S.alice g2)
    in (golemId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: three Mountains, one Brothers of
@@ -2893,12 +2893,12 @@ golemBoard golem mountain reducer =
 -- Brothers -- one mana ability and one ability that is not one.
 suppressionFieldBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 suppressionFieldBoard brothers mountain field =
-  let (mountainId, g1) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
-      g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
-      (brothersId, g3) = S.addCreature brothers S.alice g2
+  let (mountainId, g1) = S.addPermanent mountain S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = foldr (\_ gs -> snd (S.addPermanent mountain S.alice gs)) g1 [1 :: Int, 2]
+      (brothersId, g3) = S.addPermanent brothers S.alice g2
       g4 = case field of
         Nothing -> g3
-        Just printing -> snd (S.addCreature printing S.alice g3)
+        Just printing -> snd (S.addPermanent printing S.alice g3)
    in (mountainId, brothersId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: one Brothers of Fire, two
@@ -2906,11 +2906,11 @@ suppressionFieldBoard brothers mountain field =
 -- mana ability, against a board one mana short of its printed cost.
 brothersBoard :: Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 brothersBoard brothers mountain zirda =
-  let (brothersId, g1) = S.addCreature brothers S.alice (Setup.emptyGame S.bothPlayers)
-      g2 = foldr (\_ gs -> snd (S.addCreature mountain S.alice gs)) g1 [1 :: Int, 2]
+  let (brothersId, g1) = S.addPermanent brothers S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = foldr (\_ gs -> snd (S.addPermanent mountain S.alice gs)) g1 [1 :: Int, 2]
       g3 = case zirda of
         Nothing -> g2
-        Just printing -> snd (S.addCreature printing S.alice g2)
+        Just printing -> snd (S.addPermanent printing S.alice g2)
    in (brothersId, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
@@ -2919,12 +2919,12 @@ brothersBoard brothers mountain zirda =
 -- it is not -- and the Drought or not. Returns the Altar.
 altarDroughtBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 altarDroughtBoard altar piker blackSource drought =
-  let (altarId, g1) = S.addCreature altar S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature piker S.alice g1
-      (_, g3) = S.addCreature blackSource S.alice g2
+  let (altarId, g1) = S.addPermanent altar S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent piker S.alice g1
+      (_, g3) = S.addPermanent blackSource S.alice g2
       g4 = case drought of
         Nothing -> g3
-        Just printing -> snd (S.addCreature printing S.alice g3)
+        Just printing -> snd (S.addPermanent printing S.alice g3)
    in (altarId, g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
 
 -- Activates ONE named source, at ONE priority prompt, and answers the payment
@@ -2945,7 +2945,7 @@ takesSourceOnce sourceId p = case p of
 
 -- These printings on the battlefield under alice's control, untapped and settled.
 alicePermanents :: [Printing.Printing] -> GameState.GameState
-alicePermanents = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers)
+alicePermanents = foldr (\p gs -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers)
 
 -- S.identityAnswer, recording the candidates of every Prompt.ChooseManaSource --
 -- the offers CR 601.2g's window made while the cost was still uncovered. A
@@ -3013,7 +3013,7 @@ wildGrowthBoard s registry = do
   let base = S.landsFor forest S.bob 1 (S.landsInPlay forest 1)
   case (Game.zoneMembers Zone.Battlefield S.alice base, Game.zoneMembers Zone.Battlefield S.bob base) of
     ([aliceForest], [bobForest]) ->
-      let (auraId, withAura) = S.addCreature growth S.alice base
+      let (auraId, withAura) = S.addPermanent growth S.alice base
        in -- ToObject and not S.attach's ToCreature: "Enchant land" is a
           -- Pool.Permanents slot narrowed by a Land filter, so a cast would leave
           -- this tag (Pawl.Support.attach says so of Convincing Mirage).

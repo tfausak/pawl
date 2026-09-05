@@ -81,7 +81,7 @@ namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zo
 castBlackRemovalAt :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 castBlackRemovalAt swamp printing foe =
   let base = S.landsInPlay swamp 3
-      (foeId, withFoe) = S.addCreature foe S.bob base
+      (foeId, withFoe) = S.addPermanent foe S.bob base
       (gs, spellId) = S.handOne printing withFoe
       cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -154,7 +154,7 @@ sindbadBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, GameState.GameState)
 sindbadBoard sindbad top filler handLand handSpell =
-  let (sindbadId, onBoard) = S.addCreature sindbad S.alice (Setup.emptyGame S.bothPlayers)
+  let (sindbadId, onBoard) = S.addPermanent sindbad S.alice (Setup.emptyGame S.bothPlayers)
       -- S.addLibraryCard puts each card ON TOP of the last, so `top` goes in
       -- after the filler.
       stocked = snd (S.addLibraryCard top S.alice (stockLibrary filler S.alice 2 onBoard))
@@ -205,7 +205,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     murder <- S.printingOf s registry "Murder"
     let base = S.landsInPlay swamp 3
-        (victim, withFoe) = S.addCreature piker S.bob base
+        (victim, withFoe) = S.addPermanent piker S.bob base
         shielded = S.addRegenShield victim withFoe
         (gs, spellId) = S.handOne murder shielded
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
@@ -216,7 +216,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unsummon <- S.printingOf s registry "Unsummon"
     let base = S.landsInPlay island 1
-        (_, withPiker) = S.addCreature piker S.bob base
+        (_, withPiker) = S.addPermanent piker S.bob base
         (gs, spellId) = S.handOne unsummon withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -228,7 +228,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unsummon <- S.printingOf s registry "Unsummon"
     let base = S.landsInPlay island 1
-        (victim, withFoe) = S.addCreature piker S.bob base
+        (victim, withFoe) = S.addPermanent piker S.bob base
         shielded = S.addRegenShield victim withFoe
         (gs, spellId) = S.handOne unsummon shielded
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
@@ -240,7 +240,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     let base = S.landsInPlay plains 5
-        (_, withPiker) = S.addCreature piker S.bob base
+        (_, withPiker) = S.addPermanent piker S.bob base
         (gs, spellId) = S.handOne angelicEdict withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -253,7 +253,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     let base = S.landsInPlay plains 5
         -- bob controls only Rest in Peace (an enchantment, not a creature), so
         -- it is the single legal CreatureOrEnchantmentTarget.
-        (ripId, withRip) = S.addCreature restInPeace S.bob base
+        (ripId, withRip) = S.addPermanent restInPeace S.bob base
         (gs, spellId) = S.handOne angelicEdict withRip
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -270,7 +270,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     flickerOfFate <- S.printingOf s registry "Flicker of Fate"
-    let (victim, board) = S.addCreature piker S.bob (S.landsInPlay plains 2)
+    let (victim, board) = S.addPermanent piker S.bob (S.landsInPlay plains 2)
         after = castAndSettle flickerOfFate board
     Spec.assertEqWith s "the creature came back onto the battlefield" (S.creaturesInPlay S.bob after) 1
     -- alice cast the spell, so a return that ignored the card's "under its
@@ -370,7 +370,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     visionSkeins <- S.printingOf s registry "Vision Skeins"
     let -- S.landsInPlay builds its own two-seat game, so the {1}{U} goes on
         -- a three-seat board one Island at a time.
-        withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
+        withMana = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
         withLibs = stockLibrary piker S.carol 2 (stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 withMana))
         (gs0, spellId) = S.handOne visionSkeins withLibs
         -- handOne hands alice the turn along with the card, so bob takes the
@@ -393,7 +393,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   Spec.it s "CR 121.1 Master of the Feast's upkeep trigger draws for the opponent, not its controller" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     masterOfTheFeast <- S.printingOf s registry "Master of the Feast"
-    let (_, board) = S.addCreature masterOfTheFeast S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, board) = S.addPermanent masterOfTheFeast S.alice (Setup.emptyGame S.bothPlayers)
         withLibs = stockLibrary piker S.bob 1 (stockLibrary piker S.alice 1 board)
         onStack = settleAtAlicesUpkeep withLibs
         after = snd (Engine.runGamePure S.identityAnswer onStack Stack.resolveTop)
@@ -410,7 +410,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   Spec.it s "CR 806.1 at three seats each opponent draws off Master of the Feast, and only opponents" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     masterOfTheFeast <- S.printingOf s registry "Master of the Feast"
-    let (_, board) = S.addCreature masterOfTheFeast S.alice S.threePlayerGame
+    let (_, board) = S.addPermanent masterOfTheFeast S.alice S.threePlayerGame
         withLibs = stockLibrary piker S.carol 1 (stockLibrary piker S.bob 1 (stockLibrary piker S.alice 1 board))
         after = snd (Engine.runGamePure S.identityAnswer (settleAtAlicesUpkeep withLibs) Stack.resolveTop)
     -- A drawer whose library was empty would draw no card and so record no
@@ -432,7 +432,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     visionSkeins <- S.printingOf s registry "Vision Skeins"
-    let withMana = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
+    let withMana = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
         withLibs = stockLibrary piker S.carol 2 (stockLibrary piker S.bob 2 (stockLibrary piker S.alice 2 withMana))
         (gs0, spellId) = S.handOne visionSkeins withLibs
         gs = S.departs Departure.Type.Conceded S.carol gs0
@@ -705,7 +705,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     miasma <- S.printingOf s registry "Psychic Miasma"
     restInPeace <- S.printingOf s registry "Rest in Peace"
     let base = S.landsInPlay swamp 3
-        (_, withRip) = S.addCreature restInPeace S.alice base
+        (_, withRip) = S.addPermanent restInPeace S.alice base
         withHand = handCards swamp S.bob 1 withRip
         (gs, spellId) = S.handOne miasma withHand
         cast = snd (Engine.runGamePure atBobAnswer gs (S.cast S.alice spellId))
@@ -740,7 +740,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     miasma <- S.printingOf s registry "Psychic Miasma"
     wheel <- S.printingOf s registry "Wheel of Sun and Moon"
     let base = S.landsInPlay swamp 3
-        (wheelId, withWheel) = S.addCreature wheel S.alice base
+        (wheelId, withWheel) = S.addPermanent wheel S.alice base
         enchanting = S.attachTo wheelId (Recipient.ToPlayer S.bob) withWheel
         (_, stocked) = S.addLibraryCard piker S.bob enchanting
         withHand = handCards swamp S.bob 1 stocked
@@ -856,7 +856,7 @@ libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
     griptide <- S.printingOf s registry "Griptide"
     -- S.addLibraryCard puts each card ON TOP, so the LAST seeded is the head.
-    let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay island 4)
+    let (pikerId, g1) = S.addPermanent piker S.bob (S.landsInPlay island 4)
         (deepId, g2) = S.addLibraryCard bolt S.bob g1
         (middleId, g3) = S.addLibraryCard bolt S.bob g2
         (oldTopId, g4) = S.addLibraryCard bolt S.bob g3
@@ -910,7 +910,7 @@ libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bolt <- S.printingOf s registry "Lightning Bolt"
     griptide <- S.printingOf s registry "Griptide"
-    let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay island 4)
+    let (pikerId, g1) = S.addPermanent piker S.bob (S.landsInPlay island 4)
         (_, g2) = S.addLibraryCard bolt S.bob g1
         (gs, spellId) = S.handOne griptide g2
         countingAnswer :: Prompt.Prompt r -> State.State Int r
@@ -936,7 +936,7 @@ libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bolt <- S.printingOf s registry "Lightning Bolt"
     unsummon <- S.printingOf s registry "Unsummon"
-    let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay island 4)
+    let (pikerId, g1) = S.addPermanent piker S.bob (S.landsInPlay island 4)
         (_, g2) = S.addLibraryCard bolt S.bob g1
         (gs, spellId) = S.handOne unsummon g2
         aimAtPiker :: Prompt.Prompt r -> r
@@ -966,11 +966,11 @@ type SpoutsLog = ([(PlayerId.PlayerId, ObjectId.ObjectId)], [(PlayerId.PlayerId,
 -- began").
 spoutsBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId])
 spoutsBoard island spouts mine stolen =
-  let addAll pid ps gs = List.foldl' (\(ids, g) p -> let (oid, g1) = S.addCreature p pid g in (ids <> [oid], g1)) ([], gs) ps
+  let addAll pid ps gs = List.foldl' (\(ids, g) p -> let (oid, g1) = S.addPermanent p pid g in (ids <> [oid], g1)) ([], gs) ps
       (gs0, ours, _) = S.combatBoardOf mine []
       (theirs, gs1) = addAll S.bob stolen gs0
       gs2 = List.foldl' (\g oid -> S.giveControl oid S.alice g) gs1 theirs
-      withLands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) gs2 [1 :: Int .. 5]
+      withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) gs2 [1 :: Int .. 5]
       stocked = List.foldl' (\g pid -> snd (S.addLibraryCard island pid (snd (S.addLibraryCard island pid g)))) withLands [S.alice, S.bob]
       (withCard, spell) = S.handOne spouts stocked
    in ( -- handOne parks its state in a precombat main phase; this board is
@@ -1181,7 +1181,7 @@ perRecipientAmountSpec s registry =
   let castAndResolve spellId gs =
         let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
          in S.runPure S.identityAnswer cast Stack.resolveTop
-      addPikers piker pid n gs = List.foldl' (\board _ -> snd (S.addCreature piker pid board)) gs [1 .. n :: Int]
+      addPikers piker pid n gs = List.foldl' (\board _ -> snd (S.addPermanent piker pid board)) gs [1 .. n :: Int]
       addGraves printing pid n gs = List.foldl' (\board _ -> snd (S.addGraveyardCard printing pid board)) gs [1 .. n :: Int]
       at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
       -- alice controls 3 Pikers, bob 2 and carol 1, on life totals 20, 17 and 13
@@ -1194,7 +1194,7 @@ perRecipientAmountSpec s registry =
         discipline <- S.printingOf s registry "Stronghold Discipline"
         let withLands = S.landsFor swamp S.alice 4 S.threePlayerGame
             withCreatures = addPikers piker S.bob 2 (addPikers piker S.alice 3 withLands)
-            (carolPiker, withCarol) = S.addCreature piker S.carol withCreatures
+            (carolPiker, withCarol) = S.addPermanent piker S.carol withCreatures
             lifed = withCarol {GameState.players = at S.alice 20 (at S.bob 17 (at S.carol 13 (GameState.players withCarol)))}
             (gs, spellId) = S.handOne discipline lifed
         pure (carolPiker, spellId, gs)
@@ -1222,7 +1222,7 @@ perRecipientAmountSpec s registry =
         soil <- S.printingOf s registry "Acidic Soil"
         let withAlice = S.landsFor mountain S.alice 3 S.threePlayerGame
             withBob = S.landsFor mountain S.bob 2 withAlice
-            (carolMountain, withCarol) = S.addCreature mountain S.carol withBob
+            (carolMountain, withCarol) = S.addPermanent mountain S.carol withBob
             lifed = withCarol {GameState.players = at S.alice 20 (at S.bob 17 (at S.carol 13 (GameState.players withCarol)))}
             (gs, spellId) = S.handOne soil lifed
         pure (carolMountain, spellId, gs)
@@ -1303,7 +1303,7 @@ perRecipientAmountSpec s registry =
 -- otherwise advance out of the step the card names.
 mirrorBoard :: Printing.Printing -> Integer -> Integer -> Integer -> (ObjectId.ObjectId, GameState.GameState)
 mirrorBoard mirror aliceLife bobLife carolLife =
-  let (mirrorId, gs1) = S.addCreature mirror S.alice S.threePlayerGame
+  let (mirrorId, gs1) = S.addPermanent mirror S.alice S.threePlayerGame
       at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
    in ( mirrorId,
         gs1
@@ -1325,8 +1325,8 @@ mirrorBoard mirror aliceLife bobLife carolLife =
 -- cannot express.
 soulConduitBoard :: Printing.Printing -> Printing.Printing -> Integer -> Integer -> Integer -> (ObjectId.ObjectId, GameState.GameState)
 soulConduitBoard conduit island aliceLife bobLife carolLife =
-  let withLands = List.foldl' (\gs _ -> snd (S.addCreature island S.alice gs)) S.threePlayerGame [1 .. 6 :: Int]
-      (conduitId, gs1) = S.addCreature conduit S.alice withLands
+  let withLands = List.foldl' (\gs _ -> snd (S.addPermanent island S.alice gs)) S.threePlayerGame [1 .. 6 :: Int]
+      (conduitId, gs1) = S.addPermanent conduit S.alice withLands
       at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
    in ( conduitId,
         gs1
@@ -1551,15 +1551,15 @@ setLifeTotalSpec s registry =
       -- shared by all four cases.
       setBoard lands pridemate mindcrank filler spell aliceLife bobLife carolLife =
         let withLands = List.foldl' (\board (printing, n) -> S.landsFor printing S.alice n board) S.threePlayerGame lands
-            (aliceMate, withAliceMate) = S.addCreature pridemate S.alice withLands
-            (bobMate, withBobMate) = S.addCreature pridemate S.bob withAliceMate
-            (_, withCrank) = S.addCreature mindcrank S.alice withBobMate
+            (aliceMate, withAliceMate) = S.addPermanent pridemate S.alice withLands
+            (bobMate, withBobMate) = S.addPermanent pridemate S.bob withAliceMate
+            (_, withCrank) = S.addPermanent mindcrank S.alice withBobMate
             stocked = List.foldl' (\board pid -> stockLibrary filler pid 30 board) withCrank [S.alice, S.bob, S.carol]
             at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
             lifed = stocked {GameState.players = at S.alice aliceLife (at S.bob bobLife (at S.carol carolLife (GameState.players stocked)))}
             (gs, spellId) = S.handOne spell lifed
          in (aliceMate, bobMate, spellId, gs)
-      addPikers piker pid n gs = List.foldl' (\board _ -> snd (S.addCreature piker pid board)) gs [1 .. n :: Int]
+      addPikers piker pid n gs = List.foldl' (\board _ -> snd (S.addPermanent piker pid board)) gs [1 .. n :: Int]
       -- Biorhythm's board, where what differs between the seats is their CREATURE
       -- COUNT rather than their life total. setBoard leaves alice a Pridemate and
       -- a Mindcrank -- an ARTIFACT, so not one of her creatures -- and bob a
@@ -1757,10 +1757,10 @@ redistributeLifeTotalsSpec s registry =
         piker <- S.printingOf s registry "Goblin Piker"
         sands <- S.printingOf s registry "Reverse the Sands"
         let withLands = S.landsFor plains S.alice 8 S.threePlayerGame
-            (aliceMate, g1) = S.addCreature pridemate S.alice withLands
-            (bobMate, g2) = S.addCreature pridemate S.bob g1
-            (carolMate, g3) = S.addCreature pridemate S.carol g2
-            (_, g4) = S.addCreature mindcrank S.bob g3
+            (aliceMate, g1) = S.addPermanent pridemate S.alice withLands
+            (bobMate, g2) = S.addPermanent pridemate S.bob g1
+            (carolMate, g3) = S.addPermanent pridemate S.carol g2
+            (_, g4) = S.addPermanent mindcrank S.bob g3
             stocked = List.foldl' (\board pid -> stockLibrary piker pid 40 board) g4 [S.alice, S.bob, S.carol]
             at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
             lifed = stocked {GameState.players = at S.alice 27 (at S.bob 4 (at S.carol 13 (GameState.players stocked)))}
@@ -1875,7 +1875,7 @@ redistributeLifeTotalsSpec s registry =
         -- the prompt at all.
         Spec.it s "CR 102.1 every player in the game is offered, beside the total they hold, and a departed seat is not" $ do
           piker <- S.printingOf s registry "Goblin Piker"
-          let (src, g0) = S.addCreature piker S.alice S.threePlayerGame
+          let (src, g0) = S.addPermanent piker S.alice S.threePlayerGame
               at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
               gs = g0 {GameState.players = at S.alice 27 (at S.bob 4 (at S.carol 13 (GameState.players g0)))}
               recording :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, Integer)] r
@@ -1893,7 +1893,7 @@ redistributeLifeTotalsSpec s registry =
         -- assignment however they are answered; two candidates is a real choice.
         Spec.it s "one remaining player leaves only the identity, so no prompt is raised" $ do
           piker <- S.printingOf s registry "Goblin Piker"
-          let (src, gs) = S.addCreature piker S.alice S.threePlayerGame
+          let (src, gs) = S.addPermanent piker S.alice S.threePlayerGame
               countingAnswer :: Prompt.Prompt r -> State.State Int r
               countingAnswer p = case p of
                 Prompt.ChooseRedistribution {} -> do
@@ -1928,9 +1928,9 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     oneWithTheMachine <- S.printingOf s registry "One with the Machine"
     let base = S.landsInPlay island 4
-        (_, withOne) = S.addCreature bonesplitter S.alice base
-        (_, withTwo) = S.addCreature serumPowder S.alice withOne
-        (_, withThree) = S.addCreature mindslaver S.alice withTwo
+        (_, withOne) = S.addPermanent bonesplitter S.alice base
+        (_, withTwo) = S.addPermanent serumPowder S.alice withOne
+        (_, withThree) = S.addPermanent mindslaver S.alice withTwo
         withLib = stockLibrary piker S.alice 10 withThree
         (gs, spellId) = S.handOne oneWithTheMachine withLib
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
@@ -1946,8 +1946,8 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     oneWithTheMachine <- S.printingOf s registry "One with the Machine"
     let base = S.landsInPlay island 4
-        (_, withMine) = S.addCreature bonesplitter S.alice base
-        (_, withTheirs) = S.addCreature mindslaver S.bob withMine
+        (_, withMine) = S.addPermanent bonesplitter S.alice base
+        (_, withTheirs) = S.addPermanent mindslaver S.bob withMine
         withLib = stockLibrary piker S.alice 10 withTheirs
         (gs, spellId) = S.handOne oneWithTheMachine withLib
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
@@ -1964,8 +1964,8 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     oneWithTheMachine <- S.printingOf s registry "One with the Machine"
     let base = S.landsInPlay island 4
-        (_, withArtifact) = S.addCreature bonesplitter S.alice base
-        (_, withWurm) = S.addCreature panglacialWurm S.alice withArtifact
+        (_, withArtifact) = S.addPermanent bonesplitter S.alice base
+        (_, withWurm) = S.addPermanent panglacialWurm S.alice withArtifact
         withLib = stockLibrary piker S.alice 10 withWurm
         (gs, spellId) = S.handOne oneWithTheMachine withLib
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
@@ -2010,7 +2010,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     oneWithTheMachine <- S.printingOf s registry "One with the Machine"
     let base = S.landsInPlay island 4
-        (_, withMyr) = S.addCreature darksteelMyr S.bob base
+        (_, withMyr) = S.addPermanent darksteelMyr S.bob base
         (_, staged) = S.spellOnStack clone S.alice withMyr
         -- CR 614.12a: the copy choice happens inside the Clone's own entry, so
         -- the answerer takes the one legal target -- bob's Myr is the only
@@ -2107,7 +2107,7 @@ cloneOfGargoyle ::
   (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 cloneOfGargoyle turnOver island gargoyle clone piker oneWithTheMachine =
   let base = S.landsInPlay island 4
-      (source, withGargoyle) = S.addCreature gargoyle S.bob base
+      (source, withGargoyle) = S.addPermanent gargoyle S.bob base
       turned = if turnOver then transformEveryCreature withGargoyle else withGargoyle
       (_, staged) = S.spellOnStack clone S.alice turned
       -- CR 614.12a: the copy choice happens inside the Clone's own entry, and
@@ -2170,9 +2170,9 @@ soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     soulsMajesty <- S.printingOf s registry "Soul's Majesty"
     let base = S.landsInPlay forest 5
-        (tusk, withTusk) = S.addCreature thragtusk S.alice base
-        (_, withSpider) = S.addCreature giantSpider S.alice withTusk
-        (_, withWurm) = S.addCreature panglacialWurm S.bob withSpider
+        (tusk, withTusk) = S.addPermanent thragtusk S.alice base
+        (_, withSpider) = S.addPermanent giantSpider S.alice withTusk
+        (_, withWurm) = S.addPermanent panglacialWurm S.bob withSpider
         -- CR 104.3c: twelve is far more than any reading here draws.
         withLib = stockLibrary piker S.alice 12 withWurm
         (gs, spellId) = S.handOne soulsMajesty withLib
@@ -2187,9 +2187,9 @@ soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     soulsMajesty <- S.printingOf s registry "Soul's Majesty"
     let base = S.landsInPlay forest 5
-        (_, withTusk) = S.addCreature thragtusk S.alice base
-        (spider, withSpider) = S.addCreature giantSpider S.alice withTusk
-        (_, withWurm) = S.addCreature panglacialWurm S.bob withSpider
+        (_, withTusk) = S.addPermanent thragtusk S.alice base
+        (spider, withSpider) = S.addPermanent giantSpider S.alice withTusk
+        (_, withWurm) = S.addPermanent panglacialWurm S.bob withSpider
         withLib = stockLibrary piker S.alice 12 withWurm
         (gs, spellId) = S.handOne soulsMajesty withLib
         cast = snd (Engine.runGamePure (targetingCreature spider) gs (S.cast S.alice spellId))

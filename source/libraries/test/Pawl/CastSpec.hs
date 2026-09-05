@@ -102,13 +102,13 @@ sicknessSpec s registry = Spec.describe s "Sickness" $ do
         _ -> pure ()
   Spec.it s "CR 302.6 the untap step settles the active player's permanents" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
         after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
     Spec.assertEqWith s "settled" (sicknessOf oid after) (Just (Sickness.Settled S.alice))
   Spec.it s "CR 302.6 settling does not touch the other player's permanents" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
         after = snd (Engine.runGamePure S.identityAnswer sick (Engine.settleAll S.alice))
     Spec.assertEqWith s "still sick" (sicknessOf oid after) (Just Sickness.Sick)
@@ -142,7 +142,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     let waxWane = Printing.MkPrinting CardSpec.splitCard
         namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
         (green, _) = S.handOne waxWane (S.landsInPlay forest 1)
-        (both, _) = S.handOne waxWane (snd (S.addCreature plains S.alice (S.landsInPlay forest 1)))
+        (both, _) = S.handOne waxWane (snd (S.addPermanent plains S.alice (S.landsInPlay forest 1)))
     -- CR 709.3: "A player chooses which half of a split card they are casting
     -- before putting it onto the stack." Two actions, one card: the choice is
     -- offered, never made.
@@ -265,8 +265,8 @@ stackSpec s registry = Spec.describe s "Stack" $ do
     forest <- S.printingOf s registry "Forest"
     panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let g0 = Setup.emptyGame S.bothPlayers
-        (ewId, g1) = S.addCreature evolvingWilds S.alice g0
-        g2 = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) g1 [1 .. (7 :: Int)]
+        (ewId, g1) = S.addPermanent evolvingWilds S.alice g0
+        g2 = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) g1 [1 .. (7 :: Int)]
         (_, g3) = S.addLibraryCard panglacialWurm S.alice g2
         g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
     case Projection.abilitiesOf ewId g4 of
@@ -286,8 +286,8 @@ stackSpec s registry = Spec.describe s "Stack" $ do
     forest <- S.printingOf s registry "Forest"
     panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
     let g0 = Setup.emptyGame S.bothPlayers
-        (ewId, g1) = S.addCreature evolvingWilds S.alice g0
-        g2 = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) g1 [1 .. (7 :: Int)]
+        (ewId, g1) = S.addPermanent evolvingWilds S.alice g0
+        g2 = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) g1 [1 .. (7 :: Int)]
         (_, g3) = S.addLibraryCard panglacialWurm S.alice g2
         g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
     case Projection.abilitiesOf ewId g4 of
@@ -432,7 +432,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
   Spec.it s "CR 601.2 a mis-coloured mana answer unwinds the whole cast" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, withBirds) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, withBirds) = S.addPermanent birds S.alice (Setup.emptyGame S.bothPlayers)
         (oid, gs0) = S.addHandCard lightningBolt S.alice withBirds
         gs = gs0 {GameState.phase = Phase.PrecombatMain}
         -- Green whenever the colour choice is offered; everything else default.
@@ -453,7 +453,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
   Spec.it s "CR 601.2 the same cast with the right colour succeeds" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, withBirds) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, withBirds) = S.addPermanent birds S.alice (Setup.emptyGame S.bothPlayers)
         (oid, gs0) = S.addHandCard lightningBolt S.alice withBirds
         gs = gs0 {GameState.phase = Phase.PrecombatMain}
         picksRed :: Prompt.Prompt r -> r
@@ -533,7 +533,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     forest <- S.printingOf s registry "Forest"
     mountain <- S.printingOf s registry "Mountain"
     split <- S.printingOf s registry "Synthetic Glacial Half"
-    let (_, withMountain) = S.addCreature mountain S.alice (S.landsInPlay forest 1)
+    let (_, withMountain) = S.addPermanent mountain S.alice (S.landsInPlay forest 1)
         (_, gs) = S.addLibraryCard split S.alice withMountain
     Spec.assertEqWith s "both halves offered, by name" (fmap snd (Cast.castableWhileSearching S.alice gs)) [glacialHalf, volcanicHalf]
   -- The control, one Mountain apart from the pair above: CR 709.3a's "Only the
@@ -561,8 +561,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
     mountain <- S.printingOf s registry "Mountain"
     split <- S.printingOf s registry "Synthetic Glacial Half"
     let g0 = Setup.emptyGame S.bothPlayers
-        (ewId, g1) = S.addCreature evolvingWilds S.alice g0
-        (_, g2) = S.addCreature mountain S.alice (snd (S.addCreature forest S.alice g1))
+        (ewId, g1) = S.addPermanent evolvingWilds S.alice g0
+        (_, g2) = S.addPermanent mountain S.alice (snd (S.addPermanent forest S.alice g1))
         (_, g3) = S.addLibraryCard split S.alice g2
         g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
     case Projection.abilitiesOf ewId g4 of
@@ -740,8 +740,8 @@ magicalHackSpec s registry = Spec.describe s "MagicalHack" $ do
     mountain <- S.printingOf s registry "Mountain"
     island <- S.printingOf s registry "Island"
     magicalHack <- S.printingOf s registry "Magical Hack"
-    let (mountainId, g0) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
-        (islandId, g1) = S.addCreature island S.alice g0
+    let (mountainId, g0) = S.addPermanent mountain S.alice (Setup.emptyGame S.bothPlayers)
+        (islandId, g1) = S.addPermanent island S.alice g0
         (gs, hackId) = handInPlay magicalHack g1
         cast = snd (Engine.runGamePure hackAnswer gs (S.cast S.alice hackId))
         resolved = snd (Engine.runGamePure hackAnswer cast Stack.resolveTop)
@@ -839,7 +839,7 @@ charSpec s registry = Spec.describe s "Char" $ do
     char <- S.printingOf s registry "Char"
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, board) = S.addCreature piker S.bob (S.landsInPlay mountain 3)
+    let (pikerId, board) = S.addPermanent piker S.bob (S.landsInPlay mountain 3)
         (gs0, oid) = S.handOne char board
         after = snd (Engine.runGamePure answerTargetingBob gs0 (do S.cast S.alice oid; Stack.resolveTop))
     -- CR 120.3a: damage dealt to a player makes them lose that much life.
@@ -970,7 +970,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    let (gs0, oid) = S.handOne blaze (snd (S.addCreature thalia S.alice (S.landsInPlay mountain 4)))
+    let (gs0, oid) = S.handOne blaze (snd (S.addPermanent thalia S.alice (S.landsInPlay mountain 4)))
         cast = do S.cast S.alice oid; Stack.resolveTop
         bounds = State.execState (Engine.runGame answerAtBound gs0 cast) []
         after = snd (State.evalState (Engine.runGame answerAtBound gs0 cast) [])
@@ -999,7 +999,7 @@ vitalizingCascadeSpec s registry = Spec.describe s "VitalizingCascade" $ do
     cascade <- S.printingOf s registry "Vitalizing Cascade"
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
-    let board = snd (S.addCreature plains S.alice (snd (S.addCreature plains S.alice (S.landsInPlay forest 3))))
+    let board = snd (S.addPermanent plains S.alice (snd (S.addPermanent plains S.alice (S.landsInPlay forest 3))))
         (gs0, oid) = S.handOne cascade board
         gainedAt x = snd (Engine.runGamePure (answerXOf x) gs0 (do S.cast S.alice oid; Stack.resolveTop))
         atTwo = gainedAt 2
@@ -1076,7 +1076,7 @@ modalCastSpec s registry = Spec.describe s "ModalCast" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (_, gs1) = S.addCreature piker S.alice gs0
+        (_, gs1) = S.addPermanent piker S.alice gs0
     Spec.assertBool s (S.castable S.alice oid gs1) "castable via the damage/haste mode"
   Spec.it s "CR 700.2a Chaos Charm is not castable with no creature on the board at all" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
@@ -1108,8 +1108,8 @@ entwineBoard ::
   Int ->
   (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 entwineBoard land modal piker wallOfStone lands =
-  let (pikerId, gs1) = S.addCreature piker S.bob (S.landsInPlay land lands)
-      (wallId, gs2) = S.addCreature wallOfStone S.bob gs1
+  let (pikerId, gs1) = S.addPermanent piker S.bob (S.landsInPlay land lands)
+      (wallId, gs2) = S.addPermanent wallOfStone S.bob gs1
       (gs, spellId) = S.handOne modal (S.tapObject wallId gs2)
    in (gs, spellId, pikerId, wallId)
 
@@ -1299,7 +1299,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     chaosCharm <- S.printingOf s registry "Chaos Charm"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
-        (_, gs) = S.addCreature piker S.bob gs0
+        (_, gs) = S.addPermanent piker S.bob gs0
     Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor S.alice (S.printingName chaosCharm) spellId gs) gs) Nothing
 
 -- Burst Lightning's one mode is "Burst Lightning deals 2 damage to any target",
@@ -1318,7 +1318,7 @@ kickerBoard ::
   Int ->
   (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 kickerBoard mountain burstLightning hillGiant mountains =
-  let (giantId, gs1) = S.addCreature hillGiant S.bob (S.landsInPlay mountain mountains)
+  let (giantId, gs1) = S.addPermanent hillGiant S.bob (S.landsInPlay mountain mountains)
       (gs, spellId) = S.handOne burstLightning gs1
    in (gs, spellId, giantId)
 
@@ -1361,7 +1361,7 @@ battlemageBoard s registry = do
   battlemage <- S.printingOf s registry "Sunscape Battlemage"
   birdMaiden <- S.printingOf s registry "Bird Maiden"
   let lands = S.landsFor island S.alice 3 (S.landsFor forest S.alice 2 (S.landsInPlay plains 3))
-      (_, withFlier) = S.addCreature birdMaiden S.bob lands
+      (_, withFlier) = S.addPermanent birdMaiden S.bob lands
       (_, withLibrary1) = S.addLibraryCard plains S.alice withFlier
       (_, withLibrary2) = S.addLibraryCard forest S.alice withLibrary1
       (gs, spellId) = S.handOne battlemage withLibrary2
@@ -1552,7 +1552,7 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
-        (creature, withCreature) = S.addCreature piker S.bob base
+        (creature, withCreature) = S.addPermanent piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
         slots = Card.modesTargetSlots (Seq.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
     Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet slots)
@@ -1695,7 +1695,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     firebolt <- S.printingOf s registry "Firebolt"
     piker <- S.printingOf s registry "Goblin Piker"
     let (inGraveyard, gs0) = inGraveyardWith mountain firebolt 5
-        (bystander, gs1) = S.addCreature piker S.alice gs0
+        (bystander, gs1) = S.addPermanent piker S.alice gs0
         cast = S.runPure S.identityAnswer gs1 (S.cast S.alice inGraveyard)
         buried = S.runPure S.identityAnswer cast (Event.changeZone bystander Zone.Graveyard)
     Spec.assertEqWith s "the Piker went to the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice buried)) 1
@@ -1909,7 +1909,7 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
     blaze <- S.printingOf s registry "Blaze"
     lier <- S.printingOf s registry "Lier, Disciple of the Drowned"
     let (inGraveyard, board) = inGraveyardWith mountain blaze 6
-        (_, granted) = S.addCreature lier S.alice board
+        (_, granted) = S.addPermanent lier S.alice board
         after = S.runPure (answerXOf 4) granted (do S.cast S.alice inGraveyard; Stack.resolveTop)
     -- The gameplay assertion, and it ahead of every proxy: Blaze deals the
     -- announced X, so 16 is the announcement having survived into the resolution.
@@ -2044,7 +2044,7 @@ fugitiveDoctorBoard s registry = do
   let (combat, _, _) = S.combatBoardOf [] []
       lands = S.landsFor forest S.alice 3 (S.landsFor mountain S.alice 7 combat)
       (inGraveyard, buried) = S.addGraveyardCard firebolt S.alice lands
-      -- entersWithTrigger rather than addCreature: the Clue this ability's
+      -- entersWithTrigger rather than addPermanent: the Clue this ability's
       -- pay gate spends is the Doctor's OWN CR 701.16a investigate, so the
       -- fixture makes it the way the card does.
       (_, entered) = S.entersWithTrigger doctor S.alice buried
@@ -2188,7 +2188,7 @@ lierBoard s registry withLier = do
   let -- ONE Mountain: see the header. Everything else about the two boards is
       -- identical, so nothing below can turn on mana, timing or seats.
       lands = S.landsInPlay mountain 1
-      seated = if withLier then snd (S.addCreature lier S.alice lands) else lands
+      seated = if withLier then snd (S.addPermanent lier S.alice lands) else lands
       (inGraveyard, buried) = S.addGraveyardCard firebolt S.alice seated
   pure (aliceOnTurn buried, inGraveyard)
 
@@ -2254,7 +2254,7 @@ lierSpec s registry = Spec.describe s "Lier" $ do
     mountain <- S.printingOf s registry "Mountain"
     lier <- S.printingOf s registry "Lier, Disciple of the Drowned"
     let lands = S.landsInPlay mountain 1
-        (_, seated) = S.addCreature lier S.alice lands
+        (_, seated) = S.addPermanent lier S.alice lands
         (inGraveyard, buried) = S.addGraveyardCard bolt S.alice seated
         board = aliceOnTurn buried
         (withoutLier, unhelped) = S.addGraveyardCard bolt S.alice lands
@@ -2325,7 +2325,7 @@ mirrorBoard s registry = do
   -- follows has one land to pay with. Three lands altogether is also what Acidic
   -- Soil's own clause counts when it resolves.
   let lands = S.landsFor island S.alice 2 (S.landsInPlay mountain 1)
-      (_, seated) = S.addCreature lier S.alice lands
+      (_, seated) = S.addPermanent lier S.alice lands
       (subject, withSubject) = S.addGraveyardCard soil S.alice seated
       (original, withOriginal) = S.addGraveyardCard bolt S.bob withSubject
       (inHand, held) = S.addHandCard mirror S.alice withOriginal
@@ -2465,7 +2465,7 @@ harnessBoard s registry = do
   firebolt <- S.printingOf s registry "Firebolt"
   bolt <- S.printingOf s registry "Lightning Bolt"
   harness <- S.printingOf s registry "Harness the Storm"
-  let (_, g1) = S.addCreature harness S.alice (S.landsInPlay mountain 6)
+  let (_, g1) = S.addPermanent harness S.alice (S.landsInPlay mountain 6)
       (buried1, g2) = S.addGraveyardCard firebolt S.alice g1
       (buried2, g3) = S.addGraveyardCard firebolt S.alice g2
       (_, g4) = S.addGraveyardCard bolt S.alice g3
@@ -2836,7 +2836,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
     let (oid, gs) = inHandWith plains sorcery 6
-        board = snd (S.addCreature thalia S.alice gs)
+        board = snd (S.addPermanent thalia S.alice gs)
     Spec.assertBool s (S.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery) Facing.FaceUp) (Action.legalActions S.alice board)) "and offered as a legal action"
   -- Rule 205.4e's SECOND disjunct, "or a legendary planeswalker". Jace
@@ -2847,7 +2847,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
     let (oid, gs) = inHandWith plains sorcery 6
-        board = snd (S.addCreature jace S.alice gs)
+        board = snd (S.addPermanent jace S.alice gs)
     Spec.assertBool s (not (Card.isCreature (S.combinedFace jace))) "not a creature"
     Spec.assertBool s (S.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery) Facing.FaceUp) (Action.legalActions S.alice board)) "and offered as a legal action"
@@ -2864,7 +2864,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     mindslaver <- S.printingOf s registry "Mindslaver"
     sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
     let (oid, gs) = inHandWith plains sorcery 6
-        board = snd (S.addCreature mindslaver S.alice gs)
+        board = snd (S.addPermanent mindslaver S.alice gs)
     Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "and not offered"
   -- "unless THAT PLAYER controls": an opponent's legendary creature is no
@@ -2876,7 +2876,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
     let (oid, gs) = inHandWith plains sorcery 6
-        board = snd (S.addCreature thalia S.bob gs)
+        board = snd (S.addPermanent thalia S.bob gs)
     Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
   -- The scope of the restriction, from the other side: rule 205.4e is about
   -- a legendary INSTANT OR SORCERY, so a legendary creature spell is cast
@@ -2907,8 +2907,8 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
     let (oid, gs) = inHandWith plains sorcery 6
-        (thaliaId, withThalia) = S.addCreature thalia S.alice gs
-        board = snd (S.addCreature piker S.alice withThalia)
+        (thaliaId, withThalia) = S.addPermanent thalia S.alice gs
+        board = snd (S.addPermanent piker S.alice withThalia)
         cast = S.runPure S.identityAnswer board (S.cast S.alice oid)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
         exiled = fmap (`Projection.namesOf` resolved) (Game.zoneMembers Zone.Exile S.alice resolved)
@@ -2937,9 +2937,9 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
 rallyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 rallyBoard piker plains rally =
   let (gs0, _, theirs) = S.combatBoardOf [piker] [piker]
-      (_, gs1) = S.addCreature plains S.bob gs0
+      (_, gs1) = S.addPermanent plains S.bob gs0
       (bobsRally, gs2) = S.addHandCard rally S.bob gs1
-      (_, gs3) = S.addCreature plains S.alice gs2
+      (_, gs3) = S.addPermanent plains S.alice gs2
       (alicesRally, gs4) = S.addHandCard rally S.alice gs3
       tapped = foldr S.tapObject gs4 theirs
    in case theirs of

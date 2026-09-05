@@ -103,7 +103,7 @@ objectFactSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> 
 objectFactSpec s registry = Spec.describe s "ObjectFacts" $ do
   Spec.it s "a Piker's power and toughness are 2 and 1" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 2)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 1)
 
@@ -119,7 +119,7 @@ objectFactSpec s registry = Spec.describe s "ObjectFacts" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
         (spellId, gs1) = S.spellOnStack piker S.alice base
-        (permId, gs2) = S.addCreature piker S.bob gs1
+        (permId, gs2) = S.addPermanent piker S.bob gs1
         tokenCard = Printing.card piker
         (tokId, gs3) = S.addToken tokenCard S.bob gs2
     Spec.assertBool s (Game.isSpell spellId gs3) "a card on the stack is a spell"
@@ -137,7 +137,7 @@ objectFactSpec s registry = Spec.describe s "ObjectFacts" $ do
 
   Spec.it s "controllerOf is the owner while nothing can change control" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "controller" (Projection.controllerOf oid gs) (Just S.bob)
 
   Spec.it s "an unknown id has no facts" $ do
@@ -237,7 +237,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
   Spec.it s "CR 613.7d changeZone stamps the new incarnation with a fresh timestamp" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         before = GameState.nextTimestamp gs
         movedState = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
         movedId = case Game.zoneMembers Zone.Graveyard S.bob movedState of
@@ -362,7 +362,7 @@ actionSpec s registry = Spec.describe s "Action" $ do
 arborBoard :: Printing.Printing -> Maybe Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 arborBoard dryadArbor mTeferi =
   let (gs0, arborId) = S.handOne dryadArbor (Setup.emptyGame S.bothPlayers)
-      gs1 = maybe gs0 (\teferi -> snd (S.addCreature teferi S.alice gs0)) mTeferi
+      gs1 = maybe gs0 (\teferi -> snd (S.addPermanent teferi S.alice gs0)) mTeferi
    in (arborId, gs1 {GameState.phase = Phase.Beginning BeginningStep.Upkeep})
 
 goldfishResult :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Result.Result, GameState.GameState)
@@ -550,7 +550,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let g0 = Setup.emptyGame S.bothPlayers
-        (_mtnId, g1) = S.addCreature mountain S.bob g0
+        (_mtnId, g1) = S.addPermanent mountain S.bob g0
         (_boltId, g2) = handBobBolt lightningBolt g1
         g3 =
           g2
@@ -578,14 +578,14 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let g0 = Setup.emptyGame S.bothPlayers
-        (_msId, g1) = S.addCreature mindslaver S.alice g0
+        (_msId, g1) = S.addPermanent mindslaver S.alice g0
         -- {4} for Mindslaver's activation: four untapped Mountains for alice.
-        (_a1, g2) = S.addCreature mountain S.alice g1
-        (_a2, g3) = S.addCreature mountain S.alice g2
-        (_a3, g4) = S.addCreature mountain S.alice g3
-        (_a4, g5) = S.addCreature mountain S.alice g4
+        (_a1, g2) = S.addPermanent mountain S.alice g1
+        (_a2, g3) = S.addPermanent mountain S.alice g2
+        (_a3, g4) = S.addPermanent mountain S.alice g3
+        (_a4, g5) = S.addPermanent mountain S.alice g4
         -- bob's own resources for his controlled turn: a Mountain and a Bolt.
-        (_bMtn, g6) = S.addCreature mountain S.bob g5
+        (_bMtn, g6) = S.addPermanent mountain S.bob g5
         (_bBolt, g7) = handBobBolt lightningBolt g6
         gStart =
           g7
@@ -646,8 +646,8 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let g0 = Setup.emptyGame S.bothPlayers
-        (_bMtn, g1) = S.addCreature mountain S.bob g0
-        (_aMtn, g2) = S.addCreature mountain S.alice g1
+        (_bMtn, g1) = S.addPermanent mountain S.bob g0
+        (_aMtn, g2) = S.addPermanent mountain S.alice g1
         (_bBolt, g3) = handBobBolt lightningBolt g2
         g4 =
           g3
@@ -673,11 +673,11 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
-        (karnId, g1a) = S.addCreature karn S.bob g0
+        (karnId, g1a) = S.addPermanent karn S.bob g0
         -- CR 606.5: the -14 is only activatable with 14 loyalty to remove, and a
         -- planeswalker a fixture places gets none of CR 306.5b's counters.
         g1 = S.addCounter CounterKind.Loyalty 14 karnId g1a
-        (_aPiker, g2) = S.addCreature piker S.alice g1
+        (_aPiker, g2) = S.addPermanent piker S.alice g1
         -- fill each owner's pool to >= 7 cards so opening hands draw without a
         -- CR 727.3 loss (Karn + 7 mountains = 8 for bob).
         g3 = addManyG mountain 7 S.bob (addManyG mountain 7 S.alice g2)
@@ -734,7 +734,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         bulked = addManyG mountain 24 S.alice inHand
         castServant = snd (Engine.runGamePure S.identityAnswer bulked (S.cast S.alice handId))
         painted = snd (Engine.runGamePure S.identityAnswer castServant Stack.resolveTop)
-        (karnId, withKarn) = S.addCreature karn S.bob painted
+        (karnId, withKarn) = S.addPermanent karn S.bob painted
         withRestart = S.addCounter CounterKind.Loyalty 14 karnId withKarn
         filled = addManyG mountain 7 S.bob withRestart
         gStart =
@@ -771,9 +771,9 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     karn <- S.printingOf s registry "Karn Liberated"
     piker <- S.printingOf s registry "Goblin Piker"
     let g0 = Setup.emptyGame S.threePlayers
-        (karnId, g1) = S.addCreature karn S.bob g0
+        (karnId, g1) = S.addPermanent karn S.bob g0
         g2 = S.addCounter CounterKind.Loyalty 14 karnId g1
-        (pikerId, g3) = S.addCreature piker S.carol g2
+        (pikerId, g3) = S.addPermanent piker S.carol g2
         gStart = g3 {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
     case filter ((==) (Just (-3)) . loyaltyChange) (Face.activatedAbilities (S.combinedFace karn)) of
       [minusThree] -> do
@@ -813,7 +813,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     pacifism <- S.printingOf s registry "Pacifism"
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.threePlayers
-        (karnId, g1a) = S.addCreature karn S.bob g0
+        (karnId, g1a) = S.addPermanent karn S.bob g0
         g1 = S.addCounter CounterKind.Loyalty 6 karnId g1a
         (carolPiker, g2) = S.addHandCard piker S.carol g1
         (_, g3) = S.addHandCard growth S.carol g2
@@ -875,7 +875,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     wolves <- S.printingOf s registry "Russet Wolves"
     mountain <- S.printingOf s registry "Mountain"
     let g0 = addManyG mountain 7 S.carol (addManyG mountain 7 S.bob (addManyG mountain 7 S.alice (Setup.emptyGame S.threePlayers)))
-        (karnId, g1a) = S.addCreature karn S.bob g0
+        (karnId, g1a) = S.addPermanent karn S.bob g0
         g1 = S.addCounter CounterKind.Loyalty 14 karnId g1a
         (pikerId, g2) = S.addExiledCard piker S.carol g1
         (pacifismId, g3) = S.addExiledCard pacifism S.alice g2
@@ -964,7 +964,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let g0 = poolToLibraryG S.alice (addManyG mountain 3 S.alice (Setup.emptyGame S.bothPlayers))
-        (pikerId, g1) = S.addCreature piker S.alice g0
+        (pikerId, g1) = S.addPermanent piker S.alice g0
         sub = Setup.subgameStateFrom S.alice g1
     Spec.assertEqWith s "the battlefield card is outside the subgame" (Map.member pikerId (GameState.outsideObjects sub)) True
     Spec.assertEqWith s "CR 729.2: the library cards moved INTO the subgame, so they are not outside it" (length (GameState.outsideObjects sub)) 1
@@ -1151,7 +1151,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
-        (survivorId, g2) = S.addCreature mountain S.alice g1
+        (survivorId, g2) = S.addPermanent mountain S.alice g1
         (_spellId, g3) = S.addHandCard syntheticSubgame S.alice g2
         gStart =
           g3
@@ -1189,7 +1189,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
         -- a survivor on the main battlefield that must remain after the subgame
-        (survivorId, g2) = S.addCreature mountain S.alice g1
+        (survivorId, g2) = S.addPermanent mountain S.alice g1
         (_spellId, g3) = S.addHandCard syntheticSubgame S.alice g2
         -- give bob a main-game poison counter (CR 729.4b: outside the subgame)
         g4 =
@@ -1653,7 +1653,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
               GameState.combat = (GameState.combat S.threePlayerGame) {Combat.Type.defenders = [S.bob]}
             }
-        (pikerId, board) = S.addCreature piker S.alice seated
+        (pikerId, board) = S.addPermanent piker S.alice seated
         gone = S.departs Departure.Type.Conceded S.alice board
         ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
         ((_, control), askedControl) = State.runState (Engine.runGame declareAttackersAskAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
@@ -1696,7 +1696,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
             { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
               GameState.combat = (GameState.combat (Setup.emptyGame S.bothPlayers)) {Combat.Type.defenders = [S.bob]}
             }
-        (pikerId, board) = S.addCreature piker S.alice seated
+        (pikerId, board) = S.addPermanent piker S.alice seated
         gone = S.departs Departure.Type.Conceded S.alice board
         ((_, after), askedAfter) = State.runState (Engine.runGame declareAttackersAskAnswer gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.DeclareAttackers))) []
     Spec.assertEqWith s "she still controls her Piker -- CR 800.4a never ran at two seats" (Projection.controls S.alice gone) [pikerId]
@@ -1744,8 +1744,8 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- instead.
     swamp <- S.printingOf s registry "Swamp"
     greed <- S.printingOf s registry "Greed"
-    let (_, withSwamp) = S.addCreature swamp S.alice S.threePlayerGame
-        (greedId, withGreed) = S.addCreature greed S.alice withSwamp
+    let (_, withSwamp) = S.addPermanent swamp S.alice S.threePlayerGame
+        (greedId, withGreed) = S.addPermanent greed S.alice withSwamp
         gs =
           withGreed
             { GameState.phase = Phase.PrecombatMain,
@@ -1779,8 +1779,8 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     -- monarch."
     piker <- S.printingOf s registry "Goblin Piker"
     palaceJailer <- S.printingOf s registry "Palace Jailer"
-    let (victim, g1) = S.addCreature piker S.carol S.threePlayerGame
-        (jailer, g2) = S.addCreature palaceJailer S.bob g1
+    let (victim, g1) = S.addPermanent piker S.carol S.threePlayerGame
+        (jailer, g2) = S.addPermanent palaceJailer S.bob g1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
         g3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer g2))] g2
         resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 Engine.settleForPriority) Engine.priorityLoop
@@ -1790,7 +1790,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
         -- total fallback -- unreachable once the size assertion below holds --
         -- so no partial function is needed to find it.
         prisoner = Maybe.fromMaybe victim (Maybe.listToMaybe (Map.keys (GameState.exiledUntilMonarch resolved)))
-        (attacker, g4) = S.addCreature piker S.alice resolved
+        (attacker, g4) = S.addPermanent piker S.alice resolved
         board =
           g4
             { GameState.activePlayer = S.alice,
@@ -1867,7 +1867,7 @@ trustedActionSpec s registry = Spec.describe s "TrustedActions" $ do
   -- does not work either.
   Spec.it s "#219 an activation that was never offered is refused" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+    let (srcId, g0) = S.addPermanent prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         -- Summoning sick, so the ability is genuinely illegal to activate.
         sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) srcId (GameState.objects g0), GameState.priority = Just S.alice}
         ability = theAbility prodigalSorcerer
@@ -1882,7 +1882,7 @@ trustedActionSpec s registry = Spec.describe s "TrustedActions" $ do
   -- refused every activation would pass the test above.
   Spec.it s "#219 the same activation IS honoured once it is legal" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+    let (srcId, g0) = S.addPermanent prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.alice)
         ready = settled {GameState.priority = Just S.alice}
         ability = theAbility prodigalSorcerer
@@ -2017,7 +2017,7 @@ mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b
 -- both halves, since Cast.castableSpells offers a spell only when its cost can be
 -- paid.
 --
--- The seed Forest enters TAPPED (CR 107.5). S.addCreature settles what it
+-- The seed Forest enters TAPPED (CR 107.5). S.addPermanent settles what it
 -- places, and Life and Limb makes a Forest a 1/1 creature, so an untapped one
 -- would offer alice CR 605.3a's mana ability at her first priority and move
 -- GameState.lastChoice. That is a speed measure, not what makes the loop
@@ -2037,13 +2037,13 @@ mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b
 loopBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe (Printing.Printing, Printing.Printing) -> GameState.GameState
 loopBoard flash limb sporemound forest castable =
   let base = Setup.emptyGame S.bothPlayers
-      (_, gs1) = S.addCreature flash S.bob base
-      (_, gs2) = S.addCreature limb S.bob gs1
-      (_, gs3) = S.addCreature sporemound S.alice gs2
+      (_, gs1) = S.addPermanent flash S.bob base
+      (_, gs2) = S.addPermanent limb S.bob gs1
+      (_, gs3) = S.addPermanent sporemound S.alice gs2
       gs4 = case castable of
         Nothing -> gs3
         Just (land, spell) ->
-          let (_, withLand) = S.addCreature land S.alice gs3
+          let (_, withLand) = S.addPermanent land S.alice gs3
            in snd (S.addHandCard spell S.alice withLand)
       (forestId, gs5) = S.entersWithTrigger forest S.alice gs4
       seeded =
@@ -2135,7 +2135,7 @@ lastChoiceSpec s registry = Spec.describe s "lastChoice (CR 104.4b)" $ do
 choicelessBoard :: Printing.Printing -> Bool -> GameState.GameState
 choicelessBoard mountain tapped =
   let base = Setup.emptyGame S.bothPlayers
-      (mountainId, gs1) = S.addCreature mountain S.alice base
+      (mountainId, gs1) = S.addPermanent mountain S.alice base
       gs2 = if tapped then S.tapObject mountainId gs1 else gs1
    in gs2
         { GameState.phase = Phase.PrecombatMain,
@@ -2443,7 +2443,7 @@ subgameRosterAnswer p = case p of
 
 addManyG :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 addManyG mountain n pid gs =
-  List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
+  List.foldl' (\g _ -> snd (S.addPermanent mountain pid g)) gs (replicate n ())
 
 -- Put one printing into a player's library as a fresh object; return its id.
 -- Mirrors S.addHandCard, then relocates hand -> library.
@@ -2490,7 +2490,7 @@ poolToLibraryG pid gs =
 -- without tripping the CR 727.3 short-deck loss.
 ownedCards :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 ownedCards mountain n pid gs =
-  List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs [1 .. n]
+  List.foldl' (\g _ -> snd (S.addPermanent mountain pid g)) gs [1 .. n]
 
 -- alice is active in her precombat main phase (a step that grants priority) with
 -- bob's RestartGame ability already on the stack. Both players pass, the ability
@@ -2630,7 +2630,7 @@ restartReentrySpec s registry = Spec.describe s "restart re-entry (CR 727.4)" $ 
 -- event of the step is CR 514.1's discard.
 cleanupBoard :: Printing.Printing -> Int -> [Printing.Printing] -> GameState.GameState
 cleanupBoard filler n others =
-  let base = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) (Setup.emptyGame S.bothPlayers) others
+  let base = List.foldl' (\g p -> snd (S.addPermanent p S.bob g)) (Setup.emptyGame S.bothPlayers) others
       full = List.foldl' (\g _ -> snd (S.addHandCard filler S.alice g)) base [1 .. n]
    in full
         { GameState.activePlayer = S.alice,
@@ -2721,11 +2721,11 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     piker <- S.printingOf s registry "Goblin Piker"
     giantGrowth <- S.printingOf s registry "Giant Growth"
     curse <- S.printingOf s registry "Curse of Death's Hold"
-    let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
         (gs0, ggId) = S.handOne giantGrowth withPiker
         cast = S.runPure S.identityAnswer gs0 (S.cast S.alice ggId)
         pumped = S.runPure S.identityAnswer cast Stack.resolveTop
-        (curseId, withCurse) = S.addCreature curse S.bob pumped
+        (curseId, withCurse) = S.addPermanent curse S.bob pumped
         atCleanup =
           (S.attachTo curseId (Recipient.ToPlayer S.alice) withCurse)
             { GameState.activePlayer = S.alice,

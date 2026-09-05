@@ -55,9 +55,9 @@ enchanted :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Stri
 enchanted s registry auraName printingName = do
   aura <- S.printingOf s registry auraName
   printing <- S.printingOf s registry printingName
-  let (victim, g1) = S.addCreature printing S.bob (Setup.emptyGame S.bothPlayers)
-      (twin, g2) = S.addCreature printing S.bob g1
-      (auraId, g3) = S.addCreature aura S.alice g2
+  let (victim, g1) = S.addPermanent printing S.bob (Setup.emptyGame S.bothPlayers)
+      (twin, g2) = S.addPermanent printing S.bob g1
+      (auraId, g3) = S.addPermanent aura S.alice g2
   pure (victim, twin, S.attach auraId victim g3)
 
 -- The same two twins with the Aura never placed. The paired control for every
@@ -66,8 +66,8 @@ enchanted s registry auraName printingName = do
 unenchanted :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 unenchanted s registry printingName = do
   printing <- S.printingOf s registry printingName
-  let (victim, g1) = S.addCreature printing S.bob (Setup.emptyGame S.bothPlayers)
-      (twin, g2) = S.addCreature printing S.bob g1
+  let (victim, g1) = S.addPermanent printing S.bob (Setup.emptyGame S.bothPlayers)
+      (twin, g2) = S.addPermanent printing S.bob g1
   pure (victim, twin, g2)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

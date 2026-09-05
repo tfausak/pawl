@@ -171,7 +171,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
     spiderPunk <- S.printingOf s registry "Spider-Punk"
     giantSpider <- S.printingOf s registry "Giant Spider"
     let (gs, held) = riotBoard mountain 3 forest 1 [giantSpider]
-        (_, board) = S.addCreature spiderPunk S.alice gs
+        (_, board) = S.addPermanent spiderPunk S.alice gs
         answer = riotChoosing OptionalDecision.Declines
     case held of
       spiderCard : _ ->
@@ -194,7 +194,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
     rhythm <- S.printingOf s registry "Rhythm of the Wild"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let (gs, held) = riotBoard mountain 2 forest 0 [pikerPrinting]
-        (_, board) = S.addCreature rhythm S.alice gs
+        (_, board) = S.addPermanent rhythm S.alice gs
         answer = riotChoosing OptionalDecision.Declines
     case held of
       pikerCard : _ ->
@@ -239,7 +239,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
     zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
     rhythm <- S.printingOf s registry "Rhythm of the Wild"
     let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
-        (_, board) = S.addCreature rhythm S.alice gs
+        (_, board) = S.addPermanent rhythm S.alice gs
         answer = riotChoosing OptionalDecision.Exercises
     case held of
       goblinCard : _ ->
@@ -266,7 +266,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
     zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
     rhythm <- S.printingOf s registry "Rhythm of the Wild"
     let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
-        (_, board) = S.addCreature rhythm S.alice gs
+        (_, board) = S.addPermanent rhythm S.alice gs
         answer = riotChoosing OptionalDecision.Exercises
     case held of
       goblinCard : _ ->
@@ -320,7 +320,7 @@ unleashSpec s registry = Spec.describe s "Unleash (CR 702.98)" $ do
         -- permanent holding the keyword. Giant Spider rather than a second
         -- Chainwalker, and 2/1 against 2/5, so no reading of the board confuses
         -- the two.
-        (bystander, gs) = S.addCreature spider S.alice gs0
+        (bystander, gs) = S.addPermanent spider S.alice gs0
         answer = unleashChoosing OptionalDecision.Exercises
     case held of
       card : _ ->
@@ -349,7 +349,7 @@ unleashSpec s registry = Spec.describe s "Unleash (CR 702.98)" $ do
     chainwalker <- S.printingOf s registry "Gore-House Chainwalker"
     spider <- S.printingOf s registry "Giant Spider"
     let (gs0, held) = riotBoard mountain 2 forest 0 [chainwalker]
-        (bystander, gs) = S.addCreature spider S.alice gs0
+        (bystander, gs) = S.addPermanent spider S.alice gs0
         answer = unleashChoosing OptionalDecision.Declines
     case held of
       card : _ ->
@@ -376,7 +376,7 @@ unleashSpec s registry = Spec.describe s "Unleash (CR 702.98)" $ do
     chainwalker <- S.printingOf s registry "Gore-House Chainwalker"
     spider <- S.printingOf s registry "Giant Spider"
     let (gs0, held) = riotBoard mountain 2 forest 0 [chainwalker]
-        (bystander, gs) = S.addCreature spider S.alice gs0
+        (bystander, gs) = S.addPermanent spider S.alice gs0
         answer = unleashChoosing OptionalDecision.Declines
     case held of
       card : _ ->
@@ -408,7 +408,7 @@ unleashSpec s registry = Spec.describe s "Unleash (CR 702.98)" $ do
 bloodthirstBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 bloodthirstBoard swamp vampire sentry =
   let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
-      (bobsSentry, withSentry) = S.addCreature sentry S.bob lands
+      (bobsSentry, withSentry) = S.addPermanent sentry S.bob lands
       (held, gs) = S.addHandCard vampire S.alice withSentry
    in (readyForAlice gs, held, bobsSentry)
 
@@ -424,7 +424,7 @@ bloodthirstBoard swamp vampire sentry =
 bloodthirstXBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 bloodthirstXBoard forest woodKin sentry =
   let lands = S.landsFor forest S.alice 7 S.threePlayerGame
-      (bobsSentry, withSentry) = S.addCreature sentry S.bob lands
+      (bobsSentry, withSentry) = S.addPermanent sentry S.bob lands
       (held, gs) = S.addHandCard woodKin S.alice withSentry
    in (readyForAlice gs, held, bobsSentry)
 
@@ -629,7 +629,7 @@ bloodthirstSpec s registry =
           sentry <- S.printingOf s registry "Ogre Sentry"
           kismet <- S.printingOf s registry "Kismet"
           let (gs0, held, _) = bloodthirstXBoard forest woodKin sentry
-              raced = snd (S.addCreature kismet S.bob gs0)
+              raced = snd (S.addPermanent kismet S.bob gs0)
               cast = S.cast S.alice held >> Stack.resolveTop
               after = S.runPure S.aggressiveAnswer raced cast
           Spec.assertBool s (wasAskedToReplace (answersFor S.aggressiveAnswer raced cast)) "a ChooseReplacement was raised"
@@ -720,7 +720,7 @@ skipAnswer wantBrine brine p = case p of
 -- one: CR 502.3 untaps the ACTIVE player's permanents, so a turn whose untap step
 -- happened leaves its player's Piker untapped and a turn whose untap step was
 -- skipped leaves it tapped -- and nothing else in these cases taps or untaps
--- either. Lands go in through S.addCreature too, which puts any printing on the
+-- either. Lands go in through S.addPermanent too, which puts any printing on the
 -- battlefield untapped; only the mana matters here, never the card type.
 --
 -- Libraries are stocked because these cases run seven whole turns, and CR 104.3c
@@ -732,10 +732,10 @@ brineBoard ::
   Printing.Printing ->
   (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 brineBoard island savor brine piker =
-  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature island pid acc)) g [1 .. (n :: Int)]
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addPermanent island pid acc)) g [1 .. (n :: Int)]
       withLands = addLands S.bob 10 (addLands S.alice 3 S.threePlayerGame)
-      (alicePiker, g1) = S.addCreature piker S.alice withLands
-      (carolPiker, g2) = S.addCreature piker S.carol g1
+      (alicePiker, g1) = S.addPermanent piker S.alice withLands
+      (carolPiker, g2) = S.addPermanent piker S.carol g1
       (savorId, g3) = S.addHandCard savor S.alice g2
       (brineId, g4) = S.addHandCard brine S.bob g3
       stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (15 :: Int)]
@@ -1037,7 +1037,7 @@ stuffyDollSpec s registry =
       lives g = (S.lifeOf S.alice g, S.lifeOf S.bob g, S.lifeOf S.carol g)
       chosenOn oid g = Game.lookupObject oid g >>= Object.chosenPlayer
       -- alice casts the Doll off five Mountains on a three-seat board and answers
-      -- CR 614.12a's choice with `who`. The Doll must be CAST: S.addCreature puts
+      -- CR 614.12a's choice with `who`. The Doll must be CAST: S.addPermanent puts
       -- an object straight onto the battlefield without running the entry loop,
       -- so it would choose nobody.
       --
@@ -1064,7 +1064,7 @@ stuffyDollSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           let hit who = case castDoll doll mountain who of
                 (gs, Just dollId, _) ->
-                  let (pikerId, board) = S.addCreature piker S.bob gs
+                  let (pikerId, board) = S.addPermanent piker S.bob gs
                    in Just (board, dollId, dealing [noncombat pikerId dollId 3] board)
                 _ -> Nothing
           case (hit S.bob, hit S.carol) of
@@ -1155,7 +1155,7 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
       -- same printing, same seat, same trigger.
       board withVorinclex printing pid = do
         vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
-        let seated = if withVorinclex then snd (S.addCreature vorinclex S.alice S.threePlayerGame) else S.threePlayerGame
+        let seated = if withVorinclex then snd (S.addPermanent vorinclex S.alice S.threePlayerGame) else S.threePlayerGame
             (oid, entered) = S.entersWithTrigger printing pid seated
         pure (oid, S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority))
       energyIn = S.playerCounterOf PlayerCounterKind.Energy S.alice
@@ -1227,9 +1227,9 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
     vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let bobsBoard withVorinclex =
-          let (_, g1) = S.addCreature forest S.bob (S.landsInPlay forest 1)
-              (piker, g2) = S.addCreature pikerPrinting S.bob g1
-              g3 = if withVorinclex then snd (S.addCreature vorinclex S.alice g2) else g2
+          let (_, g1) = S.addPermanent forest S.bob (S.landsInPlay forest 1)
+              (piker, g2) = S.addPermanent pikerPrinting S.bob g1
+              g3 = if withVorinclex then snd (S.addPermanent vorinclex S.alice g2) else g2
               (spell, g4) = S.addHandCard battlegrowth S.bob g3
            in (piker, S.runPure (raceAnswer piker piker) g4 (S.cast S.bob spell >> Stack.resolveTop))
         (halvedPiker, halved) = bobsBoard True
@@ -1242,7 +1242,7 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
   Spec.it s "CR 614.16 Doubling Season does not reach a player's counters" $ do
     doublingSeason <- S.printingOf s registry "Doubling Season"
     sage <- S.printingOf s registry "Sage of Shaila's Claim"
-    let (_, seated) = S.addCreature doublingSeason S.alice S.threePlayerGame
+    let (_, seated) = S.addPermanent doublingSeason S.alice S.threePlayerGame
         (_, entered) = S.entersWithTrigger sage S.alice seated
         after = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
     Spec.assertEqWith s "three, not six" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
@@ -1260,9 +1260,9 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
     vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
     zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
     let goblinBoard withVorinclex =
-          let (_, g1) = S.addCreature mountain S.bob (S.landsInPlay forest 1)
-              (_, g2) = S.addCreature forest S.bob g1
-              g3 = if withVorinclex then snd (S.addCreature vorinclex S.alice g2) else g2
+          let (_, g1) = S.addPermanent mountain S.bob (S.landsInPlay forest 1)
+              (_, g2) = S.addPermanent forest S.bob g1
+              g3 = if withVorinclex then snd (S.addPermanent vorinclex S.alice g2) else g2
               (held, g4) = S.addHandCard zhurTaa S.bob g3
               after = S.runPure (riotChoosing OptionalDecision.Exercises) g4 (S.cast S.bob held >> Stack.resolveTop)
            in (newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after, after)
@@ -1302,7 +1302,7 @@ damageCountersSpec s registry = Spec.describe s "Counters damage causes (CR 120.
         printings <- Monad.mapM (S.printingOf s registry) blockers
         let (gs0, mine, theirs, _) = S.threePlayerCombat [rats] printings []
             seated = case (seat, watcher) of
-              (Just printing, Just (_, pid)) -> snd (S.addCreature printing pid gs0)
+              (Just printing, Just (_, pid)) -> snd (S.addPermanent printing pid gs0)
               _ -> gs0
         pure $ case mine of
           [rat] -> Just (theirs, S.runCombat (fights rat theirs) seated)
@@ -1439,9 +1439,9 @@ entryCountersSpec s registry = Spec.describe s "The counters a Create says its t
         island <- S.printingOf s registry "Island"
         eyes <- S.printingOf s registry "Eyes of Gitaxias"
         seat <- Monad.mapM (\(name, _) -> S.printingOf s registry name) watcher
-        let bothSeated = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) (S.landsInPlay island 5) [1 .. 5 :: Int]
+        let bothSeated = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) (S.landsInPlay island 5) [1 .. 5 :: Int]
             seated = case (seat, watcher) of
-              (Just printing, Just (_, pid)) -> snd (S.addCreature printing pid bothSeated)
+              (Just printing, Just (_, pid)) -> snd (S.addPermanent printing pid bothSeated)
               _ -> bothSeated
             (held, g1) = S.addHandCard eyes caster seated
             (_, g2) = S.addLibraryCard island caster g1
@@ -1538,8 +1538,8 @@ perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
         doublingSeason <- S.printingOf s registry "Doubling Season"
         vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
         let bare = S.landsFor forest S.alice 2 (S.landsFor swamp S.alice 2 (S.landsInPlay plains 2))
-            (seasonId, withSeason) = S.addCreature doublingSeason S.alice bare
-            (_, withPraetor) = S.addCreature vorinclex S.bob withSeason
+            (seasonId, withSeason) = S.addPermanent doublingSeason S.alice bare
+            (_, withPraetor) = S.addPermanent vorinclex S.bob withSeason
             (_, buried) = S.addGraveyardCard piker S.alice (if scalers then withPraetor else bare)
             (held, ready) = S.addHandCard perennation S.alice buried
         pure (seasonId, held, ready)
@@ -1617,8 +1617,8 @@ toolkitSpec s registry = Spec.describe s "Agent's Toolkit (CR 614.1c)" $ do
         doublingSeason <- S.printingOf s registry "Doubling Season"
         vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
         let bare = S.landsFor forest S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay plains 1))
-            (seasonId, withSeason) = S.addCreature doublingSeason S.alice bare
-            (_, withPraetor) = S.addCreature vorinclex S.bob withSeason
+            (seasonId, withSeason) = S.addPermanent doublingSeason S.alice bare
+            (_, withPraetor) = S.addPermanent vorinclex S.bob withSeason
             (held, ready) = S.addHandCard toolkit S.alice (if scalers then withPraetor else bare)
         pure (seasonId, held, ready)
       castIt seasonFirst (seasonId, held, ready) =
@@ -1695,8 +1695,8 @@ unevenToolkitSpec s registry = Spec.describe s "Synthetic Uneven Toolkit (CR 614
         doublingSeason <- S.printingOf s registry "Doubling Season"
         vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
         let bare = S.landsFor forest S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay plains 1))
-            (seasonId, withSeason) = S.addCreature doublingSeason S.alice bare
-            (_, withPraetor) = S.addCreature vorinclex S.bob withSeason
+            (seasonId, withSeason) = S.addPermanent doublingSeason S.alice bare
+            (_, withPraetor) = S.addPermanent vorinclex S.bob withSeason
             (held, ready) = S.addHandCard toolkit S.alice (if scalers then withPraetor else bare)
         pure (seasonId, held, ready)
       castIt seasonFirst (seasonId, held, ready) =
@@ -1819,7 +1819,7 @@ beaconChain s registry hack = do
   magicalHack <- S.printingOf s registry "Magical Hack"
   piker <- S.printingOf s registry "Goblin Piker"
   let base = S.landsFor mountain S.alice 6 (S.landsInPlay island 1)
-      (beaconId, g1) = S.addCreature beacon S.alice base
+      (beaconId, g1) = S.addPermanent beacon S.alice base
       (hackId, g2) = S.addHandCard magicalHack S.alice g1
       (pikerId, g3) = S.addHandCard piker S.alice g2
       ready =
@@ -1955,8 +1955,8 @@ frontierMastodonSpec s registry = Spec.describe s "Frontier Mastodon (CR 614.12)
         rise <- S.printingOf s registry "Rise of the Dark Realms"
         mastodon <- S.printingOf s registry "Frontier Mastodon"
         ojanen <- S.printingOf s registry "Jedit Ojanen"
-        let lands = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
-            withCat = if buried then snd (S.addGraveyardCard ojanen S.alice lands) else snd (S.addCreature ojanen S.alice lands)
+        let lands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
+            withCat = if buried then snd (S.addGraveyardCard ojanen S.alice lands) else snd (S.addPermanent ojanen S.alice lands)
             (_, withMastodon) = S.addGraveyardCard mastodon S.alice withCat
             (ready, held) = S.handOne rise withMastodon
             after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
@@ -1968,8 +1968,8 @@ frontierMastodonSpec s registry = Spec.describe s "Frontier Mastodon (CR 614.12)
         anthem <- S.printingOf s registry "Glorious Anthem"
         mastodon <- S.printingOf s registry "Frontier Mastodon"
         ojanen <- S.printingOf s registry "Jedit Ojanen"
-        let (_, enchanted) = S.addCreature anthem S.alice (S.landsInPlay forest 3)
-            withOjanen = if withCat then snd (S.addCreature ojanen S.alice enchanted) else enchanted
+        let (_, enchanted) = S.addPermanent anthem S.alice (S.landsInPlay forest 3)
+            withOjanen = if withCat then snd (S.addPermanent ojanen S.alice enchanted) else enchanted
             (ready, held) = S.handOne mastodon withOjanen
             after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
         pure (newestNamed mastodonName after, after)
@@ -2049,7 +2049,7 @@ magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (
         lockdown <- S.printingOf s registry "Synthetic Magnetic Lockdown"
         bauble <- S.printingOf s registry "Conjurer's Bauble"
         let lands = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
-            stocked = List.foldl' (\g _ -> snd (S.addCreature splitter S.alice g)) lands [1 .. owned]
+            stocked = List.foldl' (\g _ -> snd (S.addPermanent splitter S.alice g)) lands [1 .. owned]
             (lockdownId, g1) = S.addHandCard lockdown S.alice stocked
             (baubleId, g2) = S.addHandCard bauble S.alice g1
             ready =
@@ -2127,8 +2127,8 @@ squadCaptainSpec s registry = Spec.describe s "Squad Captain (CR 614.12)" $ do
         captain <- S.printingOf s registry "Squad Captain"
         ojanen <- S.printingOf s registry "Jedit Ojanen"
         piker <- S.printingOf s registry "Goblin Piker"
-        let lands = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
-            place printing g = if buried then snd (S.addGraveyardCard printing S.alice g) else snd (S.addCreature printing S.alice g)
+        let lands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
+            place printing g = if buried then snd (S.addGraveyardCard printing S.alice g) else snd (S.addPermanent printing S.alice g)
             withOthers = place piker (place ojanen lands)
             (_, withCaptain) = S.addGraveyardCard captain S.alice withOthers
             (ready, held) = S.handOne rise withCaptain
@@ -2199,8 +2199,8 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
         ainok <- S.printingOf s registry "Ainok Tracker"
         piker <- S.printingOf s registry "Goblin Piker"
         let (handed, morphCard) = S.handOne ainok (S.landsInPlay mountain 8)
-            seat pid gs = snd (S.addCreature piker pid gs)
-            seated = seat S.bob (seat S.bob (seat S.alice (seat S.alice (snd (S.addCreature ooze S.alice handed)))))
+            seat pid gs = snd (S.addPermanent piker pid gs)
+            seated = seat S.bob (seat S.bob (seat S.alice (seat S.alice (snd (S.addPermanent ooze S.alice handed)))))
             after = S.runPure S.identityAnswer seated (Cast.castSpell S.manaPerformer S.alice morphCard (S.printingName ainok) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
         pure (fmap (\permanent -> (after, permanent)) (enteredOne seated after))
   Spec.it s "CR 122.6 the token enters with one +1/+1 counter per OTHER creature alice controls" $ do

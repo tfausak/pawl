@@ -1899,7 +1899,7 @@ replaySpec s registry =
     -- the DecisionLog byte-identically.
     Spec.it s "Aether Channeler's trigger ChooseModes records and replays a Seq ModeIndex" $ do
       acPrinting <- S.printingOf s registry "Aether Channeler"
-      let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
+      let (acId, gs) = S.addPermanent acPrinting S.alice (Setup.emptyGame S.bothPlayers)
           decider = Decide.deciderFor S.alice gs
       case Face.triggeredAbilities (S.combinedFace acPrinting) of
         [ability] -> do

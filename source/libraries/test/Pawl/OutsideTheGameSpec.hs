@@ -354,7 +354,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
   -- since Living Wish's own casting is not this unit's concern.
   Spec.it s "CR 729.4/729.4a a wish cast in a subgame reaches a main-game creature" $ do
     bear <- S.printingOf s registry "Prodigal Sorcerer"
-    let (bearId, parent) = S.addCreature bear S.alice (Setup.emptyGame S.bothPlayers)
+    let (bearId, parent) = S.addPermanent bear S.alice (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
         after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bearId S.alice))
@@ -366,7 +366,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
   Spec.it s "CR 400.11c/729.4: the pool and the main game are offered together, and the answer picks the pool card" $ do
     bear <- S.printingOf s registry "Prodigal Sorcerer"
     dragon <- S.printingOf s registry "Hoarding Dragon"
-    let (bearId, parent0) = S.addCreature bear S.alice (Setup.emptyGame S.bothPlayers)
+    let (bearId, parent0) = S.addPermanent bear S.alice (Setup.emptyGame S.bothPlayers)
         (dragonId, parent1) = Game.intern dragon parent0
         stock p = p {Player.outsideTheGame = Map.singleton dragonId 1}
         parent = parent1 {GameState.players = Map.adjust stock S.alice (GameState.players parent1)}
@@ -390,7 +390,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
   -- not see it.
   Spec.it s "CR 108.3b a main-game creature owned by another player is not offered" $ do
     bear <- S.printingOf s registry "Prodigal Sorcerer"
-    let (bobsBearId, parent) = S.addCreature bear S.bob (Setup.emptyGame S.bothPlayers)
+    let (bobsBearId, parent) = S.addPermanent bear S.bob (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
         after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame predicate True) bobsBearId S.alice))
@@ -490,9 +490,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     shredder <- S.printingOf s registry "Super Shredder"
     let g0 = Setup.emptyGame S.bothPlayers
-        (firstPiker, g1) = S.addCreature piker S.alice g0
-        (secondPiker, g2) = S.addCreature piker S.alice g1
-        (shredderId, g3) = S.addCreature shredder S.bob g2
+        (firstPiker, g1) = S.addPermanent piker S.alice g0
+        (secondPiker, g2) = S.addPermanent piker S.alice g1
+        (shredderId, g3) = S.addPermanent shredder S.bob g2
         g4 = S.landsFor plains S.alice 2 g3
         g5 = stockLibrary mountain 9 S.bob (stockLibrary forest 7 S.alice (stockLibrary livingWish 2 S.alice g4))
         (_shahrazadId, g6) = S.addHandCard shahrazad S.alice g5
@@ -592,8 +592,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     titaniasSong <- S.printingOf s registry "Titania's Song"
     jadeStatue <- S.printingOf s registry "Jade Statue"
     let g0 = Setup.emptyGame S.bothPlayers
-        (songId, g1) = S.addCreature titaniasSong S.alice g0
-        (statueId, g2) = S.addCreature jadeStatue S.alice g1
+        (songId, g1) = S.addPermanent titaniasSong S.alice g0
+        (statueId, g2) = S.addPermanent jadeStatue S.alice g1
         g3 = S.landsFor plains S.alice 2 g2
         g4 = stockLibrary mountain 9 S.bob (stockLibrary swamp 8 S.alice (stockLibrary deathWish 1 S.alice g3))
         (_shahrazadId, g5) = S.addHandCard shahrazad S.alice g4
@@ -752,7 +752,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
 -- the Ring's, so a case can read what the cost did to it.
 ringBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (GameState.GameState, ObjectId.ObjectId)
 ringBoard plains ring stock outside arm =
-  let (ringId, g1) = S.addCreature ring S.alice (S.landsInPlay plains 5)
+  let (ringId, g1) = S.addPermanent ring S.alice (S.landsInPlay plains 5)
       g2 = stockLibrary stock 2 S.alice g1
       (outsideId, g3) = Game.intern outside g2
       pool p = p {Player.outsideTheGame = Map.singleton outsideId 1}

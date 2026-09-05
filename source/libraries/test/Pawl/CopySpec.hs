@@ -295,8 +295,8 @@ mintedTokens gs = fmap (\oid -> (Projection.namesOf oid gs, S.powerToughnessOf o
 vesuvaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> (ObjectId, GameState.GameState)
 vesuvaBoard mountain mutavault vesuva mMoon =
   let base = S.landsInPlay mountain 2
-      (mutavaultId, g1) = S.addCreature mutavault S.alice base
-      g2 = maybe g1 (\moon -> snd (S.addCreature moon S.alice g1)) mMoon
+      (mutavaultId, g1) = S.addPermanent mutavault S.alice base
+      g2 = maybe g1 (\moon -> snd (S.addPermanent moon S.alice g1)) mMoon
       g3 = snd (S.addHandCard vesuva S.alice g2)
    in ( mutavaultId,
         g3
@@ -373,9 +373,9 @@ sacrificeAbility = Maybe.listToMaybe . drop 1 . Face.activatedAbilities . S.comb
 mirrorlakeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, GameState.GameState)
 mirrorlakeBoard forest island piker mirrorlake =
   let base = S.landsFor island S.alice 3 (S.landsInPlay forest 2)
-      (pikerId, g1) = S.addCreature piker S.alice base
+      (pikerId, g1) = S.addPermanent piker S.alice base
       g2 = S.addCounter CounterKind.PlusOnePlusOne 2 pikerId g1
-      (lakeId, g3) = S.addCreature mirrorlake S.alice g2
+      (lakeId, g3) = S.addPermanent mirrorlake S.alice g2
    in ( lakeId,
         pikerId,
         g3
@@ -397,7 +397,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, board) = S.addCreature piker S.alice gs0
+        (pikerId, board) = S.addPermanent piker S.alice gs0
         (_, staged) = S.spellOnStack clone S.alice board
         resolved = resolveAndSettle copyNewest staged
     case cloneOnBattlefield resolved of
@@ -427,7 +427,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, board) = S.addCreature piker S.alice gs0
+        (_, board) = S.addPermanent piker S.alice gs0
         (_, staged) = S.spellOnStack clone S.alice board
         phantom = ObjectId.MkObjectId 9999
         resolved = resolveAndSettle (copyNamed phantom) staged
@@ -448,8 +448,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     scales <- S.printingOf s registry "Hardened Scales"
     copyEnchantment <- S.printingOf s registry "Copy Enchantment"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, withPiker) = S.addCreature piker S.alice gs0
-        (scalesId, board) = S.addCreature scales S.alice withPiker
+        (_, withPiker) = S.addPermanent piker S.alice gs0
+        (scalesId, board) = S.addPermanent scales S.alice withPiker
         (_, staged) = S.spellOnStack copyEnchantment S.alice board
         resolved = resolveAndSettle (copyNamed scalesId) staged
     case newest (printedOnBattlefield "Copy Enchantment" resolved) of
@@ -467,8 +467,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     scales <- S.printingOf s registry "Hardened Scales"
     copyEnchantment <- S.printingOf s registry "Copy Enchantment"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, withPiker) = S.addCreature piker S.alice gs0
-        (_, board) = S.addCreature scales S.alice withPiker
+        (pikerId, withPiker) = S.addPermanent piker S.alice gs0
+        (_, board) = S.addPermanent scales S.alice withPiker
         (_, staged) = S.spellOnStack copyEnchantment S.alice board
         resolved = resolveAndSettle (copyNamed pikerId) staged
     case newest (printedOnBattlefield "Copy Enchantment" resolved) of
@@ -497,8 +497,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
           let (_, staged) = S.spellOnStack copyEnchantment S.alice board
            in State.execState (Engine.runGame countingAnswer staged (Stack.resolveTop >> Engine.settleForPriority)) 0
         gs0 = Setup.emptyGame S.bothPlayers
-        (_, withPiker) = S.addCreature piker S.alice gs0
-        (_, withScales) = S.addCreature scales S.alice withPiker
+        (_, withPiker) = S.addPermanent piker S.alice gs0
+        (_, withScales) = S.addPermanent scales S.alice withPiker
     Spec.assertEqWith s "a creature but no enchantment: nothing to ask" (asks withPiker) 0
     Spec.assertEqWith s "an enchantment beside it: one real decision" (asks withScales) 1
 
@@ -506,7 +506,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, board0) = S.addCreature piker S.alice gs0
+        (pikerId, board0) = S.addPermanent piker S.alice gs0
         -- Put a +1/+1 counter on the Piker: projected 3/2, base 2/1.
         board = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId board0
         (_, staged) = S.spellOnStack clone S.alice board
@@ -522,7 +522,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, board) = S.addCreature prodigalSorcerer S.alice gs0
+        (_, board) = S.addPermanent prodigalSorcerer S.alice gs0
         (_, staged) = S.spellOnStack clone S.alice board
         resolved = resolveAndSettle copyNewest staged
     case cloneOnBattlefield resolved of
@@ -537,7 +537,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, board) = S.addCreature piker S.alice gs0
+        (_, board) = S.addPermanent piker S.alice gs0
         (_, stagedA) = S.spellOnStack clone S.alice board
         afterA = resolveAndSettle copyNewest stagedA
         (_, stagedB) = S.spellOnStack clone S.alice afterA
@@ -554,7 +554,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, board) = S.addCreature piker S.alice gs0
+        (pikerId, board) = S.addPermanent piker S.alice gs0
         (_, staged) = S.spellOnStack clone S.alice board
         resolved = resolveAndSettle copyNewest staged
         afterKill = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId])
@@ -577,7 +577,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
-        (goyfId, board) = S.addCreature tarmogoyf S.alice withBolt
+        (goyfId, board) = S.addPermanent tarmogoyf S.alice withBolt
         (_, staged) = S.spellOnStack clone S.alice board
         resolved = resolveAndSettle copyNewest staged
         -- A second card type reaches a graveyard AFTER the Clone entered.
@@ -609,7 +609,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     let gs0 = Setup.emptyGame S.bothPlayers
         -- One card type in a graveyard: the Goyf's CDA is 1/2.
         (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
-        (goyfId, board0) = S.addCreature tarmogoyf S.alice withBolt
+        (goyfId, board0) = S.addPermanent tarmogoyf S.alice withBolt
         board = S.addCounter CounterKind.PlusOnePlusOne 1 goyfId board0
         (_, stagedClone) = S.spellOnStack clone S.alice board
         withClone = resolveAndSettle (copyNamed goyfId) stagedClone
@@ -650,7 +650,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     counterpart <- S.printingOf s registry "Cackling Counterpart"
     let (_, withBolt) = S.addGraveyardCard lightningBolt S.alice (S.landsInPlay island 3)
-        (goyfId, board) = S.addCreature tarmogoyf S.bob withBolt
+        (goyfId, board) = S.addPermanent tarmogoyf S.bob withBolt
         (_, staged) = S.spellOnStack gargantuan S.alice board
         withGargantuan = resolveAndSettle (copyNamed goyfId) staged
         resolved = castAndResolve declineCopy counterpart withGargantuan
@@ -684,7 +684,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     duplicate <- S.printingOf s registry "Dack's Duplicate"
-    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         (_, stagedClone) = S.spellOnStack clone S.alice board
         withClone = resolveAndSettle (copyNamed pikerId) stagedClone
         (_, stagedDuplicate) = S.spellOnStack duplicate S.alice withClone
@@ -734,8 +734,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     clone <- S.printingOf s registry "Clone"
     omni <- S.printingOf s registry "Omni-Changeling"
     counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let (_, withLord) = S.addCreature lord S.alice (S.landsInPlay island 3)
-        (pikerId, board) = S.addCreature piker S.bob withLord
+    let (_, withLord) = S.addPermanent lord S.alice (S.landsInPlay island 3)
+        (pikerId, board) = S.addPermanent piker S.bob withLord
         (_, stagedClone) = S.spellOnStack clone S.alice board
         withClone = resolveAndSettle (copyNamed pikerId) stagedClone
         (_, stagedOmni) = S.spellOnStack omni S.alice withClone
@@ -790,7 +790,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     clone <- S.printingOf s registry "Clone"
     metamorph <- S.printingOf s registry "Phyrexian Metamorph"
     bane <- S.printingOf s registry "Bane of Progress"
-    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         (_, stagedClone) = S.spellOnStack clone S.alice board
         withClone = resolveAndSettle (copyNamed pikerId) stagedClone
         (_, stagedMetamorph) = S.spellOnStack metamorph S.alice withClone
@@ -841,7 +841,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     let gs0 = Setup.emptyGame S.bothPlayers
         -- One card type in a graveyard: the Goyf's CDA is 1/2.
         (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
-        (goyfId, board) = S.addCreature tarmogoyf S.alice withBolt
+        (goyfId, board) = S.addPermanent tarmogoyf S.alice withBolt
         (_, stagedGargantuan) = S.spellOnStack gargantuan S.alice board
         withGargantuan = resolveAndSettle (copyNamed goyfId) stagedGargantuan
         (_, stagedMetamorph) = S.spellOnStack metamorph S.alice withGargantuan
@@ -877,7 +877,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let (_, board) = S.addCreature piker S.alice (S.landsInPlay island 3)
+    let (_, board) = S.addPermanent piker S.alice (S.landsInPlay island 3)
         resolved = castAndResolve declineCopy counterpart board
     case tokensOnBattlefield resolved of
       [tokenId] -> do
@@ -896,7 +896,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let (_, board) = S.addCreature piker S.bob (S.landsInPlay island 3)
+    let (_, board) = S.addPermanent piker S.bob (S.landsInPlay island 3)
         (_, staged) = S.spellOnStack clone S.alice board
         -- alice's Clone is now her only creature, so it is the Counterpart's
         -- only legal target ("target creature you control").
@@ -915,7 +915,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let (pikerId, board0) = S.addCreature piker S.alice (S.landsInPlay island 3)
+    let (pikerId, board0) = S.addPermanent piker S.alice (S.landsInPlay island 3)
         board = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId board0
         resolved = castAndResolve declineCopy counterpart board
     Spec.assertEqWith s "the source is boosted to 3/2" (Projection.powerOf pikerId resolved) $ Just 3
@@ -971,7 +971,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "Watchful Radstag mints a token copy of itself when it evolves (CR 702.100b, CR 707.2)" $ do
     radstag <- S.printingOf s registry "Watchful Radstag"
     giant <- S.printingOf s registry "Hill Giant"
-    let (radstagId, board) = S.addCreature radstag S.alice (Setup.emptyGame S.bothPlayers)
+    let (radstagId, board) = S.addPermanent radstag S.alice (Setup.emptyGame S.bothPlayers)
         (_, entered) = S.entersWithTrigger giant S.alice board
         after = resolveAll declineCopy (settle declineCopy entered)
     Spec.assertEqWith s "the Radstag evolved, so it is a 3/3" (S.powerToughnessOf radstagId after) $ Just (3, 3)
@@ -989,7 +989,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "a Radstag killed in response still mints its token copy (CR 608.2h)" $ do
     radstag <- S.printingOf s registry "Watchful Radstag"
     giant <- S.printingOf s registry "Hill Giant"
-    let (radstagId, board) = S.addCreature radstag S.alice (Setup.emptyGame S.bothPlayers)
+    let (radstagId, board) = S.addPermanent radstag S.alice (Setup.emptyGame S.bothPlayers)
         (_, entered) = S.entersWithTrigger giant S.alice board
         -- The evolve ability resolves; the settle that follows puts the
         -- Radstag's own "whenever this creature evolves" on the stack.
@@ -1013,7 +1013,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     rite <- S.printingOf s registry "Rite of Replication"
-    let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
+    let (pikerId, board) = S.addPermanent piker S.alice (S.landsInPlay island 9)
         resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 0) pikerId) rite board
     Spec.assertEqWith s "one token, and it is the Piker" (mintedTokens resolved) [(Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1))]
 
@@ -1021,7 +1021,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     rite <- S.printingOf s registry "Rite of Replication"
-    let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
+    let (pikerId, board) = S.addPermanent piker S.alice (S.landsInPlay island 9)
         resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 1) pikerId) rite board
     Spec.assertEqWith s "five tokens, and every one of them is the Piker" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1)))
 
@@ -1040,7 +1040,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     clone <- S.printingOf s registry "Clone"
     giant <- S.printingOf s registry "Hill Giant"
     rite <- S.printingOf s registry "Rite of Replication"
-    let (cloneId, board0) = S.addCreature clone S.alice (S.landsInPlay island 9)
+    let (cloneId, board0) = S.addPermanent clone S.alice (S.landsInPlay island 9)
         -- A +1/+1 counter is what keeps a Clone that copied NOTHING alive past
         -- CR 704.5f, and so leaves an `EntryR AsCopy` on the battlefield for the
         -- Rite to copy. Counters are not copiable (CR 707.2), so each token is a
@@ -1049,7 +1049,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         -- Added AFTER the Clone, so it is the highest-id creature already on the
         -- battlefield and copyNewest names it -- unless a sibling token, minted
         -- later still, is wrongly offered.
-        (_, board) = S.addCreature giant S.bob board1
+        (_, board) = S.addPermanent giant S.bob board1
         resolved = castAndResolve (rites (KickerDecision.MkKickerDecision 1) cloneId) rite board
     Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Hill Giant")), Just (3, 3)))
     Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))
@@ -1128,8 +1128,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
     growth <- S.printingOf s registry "Giant Growth"
-    let (shifterId, board0) = S.addCreature shapeshifter S.alice (S.landsInPlay forest 1)
-        (pikerId, board) = S.addCreature piker S.alice board0
+    let (shifterId, board0) = S.addPermanent shapeshifter S.alice (S.landsInPlay forest 1)
+        (pikerId, board) = S.addPermanent piker S.alice board0
         grown = castAndResolve (targeting shifterId) growth board
         (giantId, entered0) = S.entersWithTrigger blindSpotGiant S.alice grown
         -- CR 707.2's exclusion, made observable: a +1/+1 counter takes the Giant's
@@ -1191,7 +1191,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
       Just animation -> do
         let (mutavaultId, board) = vesuvaBoard mountain mutavault vesuva Nothing
             without = S.runPure (playsAndCopies mutavaultId) board Engine.priorityLoop
-            with = snd (S.addCreature bloodMoon S.alice without)
+            with = snd (S.addPermanent bloodMoon S.alice without)
             named = CardName.MkCardName . Text.pack
         case newest (printedOnBattlefield "Vesuva" without) of
           Nothing -> Spec.assertFailure s "Vesuva never reached the battlefield"
@@ -1295,10 +1295,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     bloodMoon <- S.printingOf s registry "Blood Moon"
     copyEnchantment <- S.printingOf s registry "Copy Enchantment"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
-    let (plainsId, g0) = S.addCreature plains S.alice (S.landsInPlay plains 6)
-        (mutavaultId, g1) = S.addCreature mutavault S.alice g0
-        (_, moonless) = S.addCreature urborg S.alice g1
-        (moonId, g2) = S.addCreature bloodMoon S.alice moonless
+    let (plainsId, g0) = S.addPermanent plains S.alice (S.landsInPlay plains 6)
+        (mutavaultId, g1) = S.addPermanent mutavault S.alice g0
+        (_, moonless) = S.addPermanent urborg S.alice g1
+        (moonId, g2) = S.addPermanent bloodMoon S.alice moonless
         (_, g3) = S.spellOnStack copyEnchantment S.alice g2
         copied = S.settleSba (S.runPure (copyNamed moonId) g3 Stack.resolveTop)
         (g4, edictId) = S.handOne angelicEdict copied
@@ -1521,9 +1521,9 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     hammer <- S.printingOf s registry "Fall of the Hammer"
     twincast <- S.printingOf s registry "Twincast"
     let lands = S.landsFor island S.alice 2 (S.landsFor mountain S.alice 2 S.threePlayerGame)
-        (giantId, g1) = S.addCreature giant S.alice lands
-        (spiderId, g2) = S.addCreature spider S.alice g1
-        (wallId, g3) = S.addCreature wall S.bob g2
+        (giantId, g1) = S.addPermanent giant S.alice lands
+        (spiderId, g2) = S.addPermanent spider S.alice g1
+        (wallId, g3) = S.addPermanent wall S.bob g2
         (withHammer, hammerId) = S.handOne hammer g3
         (twincastId, board) = handAppend twincast S.alice withHammer
         run dealerId victimId = hammerThenTwincast (retargetHammer dealerId victimId) giantId wallId hammerId twincastId board
@@ -1627,8 +1627,8 @@ wardedCopyBoard forest island guard piker growth twincast =
   let lands = S.landsFor island S.alice 2 (S.landsFor forest S.alice 3 S.threePlayerGame)
       (withGrowth, growthId) = S.handOne growth lands
       (twincastId, withTwincast) = S.addHandCard twincast S.alice withGrowth
-      (guardId, withGuard) = S.addCreature guard S.bob withTwincast
-      (pikerId, gs) = S.addCreature piker S.alice withGuard
+      (guardId, withGuard) = S.addPermanent guard S.bob withTwincast
+      (pikerId, gs) = S.addPermanent piker S.alice withGuard
    in (guardId, pikerId, growthId, twincastId, gs)
 
 -- Resolve until the stack is empty. The two readings of a copy's targets put
@@ -1821,10 +1821,10 @@ stirCopySpec s registry =
 -- down. Returns the Shapeshifter, the Evangel, the Spider and the board.
 becameCopyBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, ObjectId, GameState.GameState)
 becameCopyBoard shapeshifter evangel spider original =
-  let (shifterId, board0) = S.addCreature shapeshifter S.alice (Setup.emptyGame S.bothPlayers)
-      (evangelId, board1) = S.addCreature evangel S.bob board0
-      (spiderId, board2) = S.addCreature spider S.alice board1
-      -- addCreature alone arranges a board and fires nothing; the original is the
+  let (shifterId, board0) = S.addPermanent shapeshifter S.alice (Setup.emptyGame S.bothPlayers)
+      (evangelId, board1) = S.addPermanent evangel S.bob board0
+      (spiderId, board2) = S.addPermanent spider S.alice board1
+      -- addPermanent alone arranges a board and fires nothing; the original is the
       -- one permanent that ENTERS, which is what raises CR 707.4's trigger.
       (originalId, entered) = S.entersWithTrigger original S.alice board2
       copied = resolveAndSettle S.identityAnswer (settle S.identityAnswer entered)
@@ -1953,7 +1953,7 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "CR 707.2 a copy of a Saga enters with CR 714.3a's lore counter" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     copyEnchantment <- S.printingOf s registry "Copy Enchantment"
-    let (benaliaId, board0) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+    let (benaliaId, board0) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
         (_, staged1) = S.spellOnStack copyEnchantment S.alice board0
         withOriginal = resolveAndSettle (copyNamed benaliaId) staged1
         firstId = newest (printedOnBattlefield "Copy Enchantment" withOriginal)
@@ -1994,7 +1994,7 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "CR 707.2 a copy of a planeswalker enters with CR 306.5b's loyalty counters" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     impersonator <- S.printingOf s registry "Clever Impersonator"
-    let (jaceId, bare) = S.addCreature jace S.alice (Setup.emptyGame S.bothPlayers)
+    let (jaceId, bare) = S.addPermanent jace S.alice (Setup.emptyGame S.bothPlayers)
         board0 = S.addCounter CounterKind.Loyalty 3 jaceId bare
         (_, staged1) = S.spellOnStack impersonator S.bob board0
         withOriginal = resolveAndSettle (copyNamed jaceId) staged1
@@ -2024,7 +2024,7 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   Spec.it s "CR 707.2 a copy of a battle enters with CR 310.4b's defense counters" $ do
     invasion <- S.printingOf s registry "Invasion of Dominaria"
     impersonator <- S.printingOf s registry "Clever Impersonator"
-    let (invasionId, bare) = S.addCreature invasion S.alice (Setup.emptyGame S.bothPlayers)
+    let (invasionId, bare) = S.addPermanent invasion S.alice (Setup.emptyGame S.bothPlayers)
         board0 = S.addCounter CounterKind.Defense 5 invasionId bare
         (_, staged1) = S.spellOnStack impersonator S.bob board0
         withOriginal = resolveAndSettle (copyNamed invasionId) staged1
@@ -2061,9 +2061,9 @@ copiedAbilitySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
 lithoformBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, ObjectId, ObjectId, ObjectId, GameState.GameState)
 lithoformBoard mountain engine piker mammoth rollicker bolt =
   let base = S.landsInPlay mountain 7
-      (engineId, gs1) = S.addCreature engine S.alice base
-      (bystander, gs2) = S.addCreature piker S.alice gs1
-      (host, gs3) = S.addCreature mammoth S.alice gs2
+      (engineId, gs1) = S.addPermanent engine S.alice base
+      (bystander, gs2) = S.addPermanent piker S.alice gs1
+      (host, gs3) = S.addPermanent mammoth S.alice gs2
       (gs4, spellId) = S.handOne rollicker gs3
       (boltId, board) = S.addHandCard bolt S.alice gs4
    in (engineId, bystander, host, spellId, boltId, board)
@@ -2281,9 +2281,9 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     engine <- S.printingOf s registry "Lithoform Engine"
     cub <- S.printingOf s registry "Longtusk Cub"
     let base = S.landsInPlay mountain 2
-        (engineId, withEngine) = S.addCreature engine S.alice base
-        (cubA, withA) = S.addCreature cub S.alice withEngine
-        (cubB, withB) = S.addCreature cub S.alice withA
+        (engineId, withEngine) = S.addPermanent engine S.alice base
+        (cubA, withA) = S.addPermanent cub S.alice withEngine
+        (cubB, withB) = S.addPermanent cub S.alice withA
         -- Exactly one activation's worth of energy (CR 107.14), so a copy that
         -- charged its own cost could not have paid it.
         board = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice withB
@@ -2316,8 +2316,8 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     engine <- S.printingOf s registry "Lithoform Engine"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let base = S.landsInPlay mountain 2
-        (engineId, withEngine) = S.addCreature engine S.alice base
-        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice withEngine
+        (engineId, withEngine) = S.addPermanent engine S.alice base
+        (sorcererId, withSorcerer) = S.addPermanent sorcerer S.alice withEngine
         -- CR 302.6: the Sorcerer's {T} is not payable until it has settled.
         board = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
     case (Maybe.listToMaybe (Projection.abilitiesOf sorcererId board), engineAbilityCopyingAbilities engineId board) of
@@ -2352,7 +2352,7 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     engine <- S.printingOf s registry "Lithoform Engine"
     rats <- S.printingOf s registry "Ravenous Rats"
     let withLands = S.landsFor swamp S.alice 4 S.threePlayerGame
-        (engineId, withEngine) = S.addCreature engine S.alice withLands
+        (engineId, withEngine) = S.addPermanent engine S.alice withLands
         -- TWO cards each, so a seat that discarded twice and a seat that
         -- discarded once are different boards.
         stock pid gs = snd (S.addHandCard rats pid (snd (S.addHandCard rats pid gs)))
@@ -2402,11 +2402,11 @@ zadaSpec s registry =
         mongoose <- S.printingOf s registry "Blurred Mongoose"
         growth <- S.printingOf s registry "Giant Growth"
         let lands = S.landsFor forest S.alice 1 S.threePlayerGame
-            (zadaId, g1) = S.addCreature zada S.alice lands
-            (pikerId, g2) = S.addCreature piker S.alice g1
-            (spiderId, g3) = S.addCreature spider S.alice g2
-            (wallId, g4) = S.addCreature wall S.alice g3
-            (mongooseId, g5) = S.addCreature mongoose S.alice g4
+            (zadaId, g1) = S.addPermanent zada S.alice lands
+            (pikerId, g2) = S.addPermanent piker S.alice g1
+            (spiderId, g3) = S.addPermanent spider S.alice g2
+            (wallId, g4) = S.addPermanent wall S.alice g3
+            (mongooseId, g5) = S.addPermanent mongoose S.alice g4
             (withGrowth, growthId) = S.handOne growth g5
         pure (zadaId, pikerId, spiderId, wallId, mongooseId, growthId, withGrowth)
       -- The Growth is aimed at Zada and at nothing else, which is the trigger's
@@ -2551,8 +2551,8 @@ ivySpec s registry =
         spider <- S.printingOf s registry "Giant Spider"
         growth <- S.printingOf s registry "Giant Growth"
         let lands = S.landsFor forest S.bob 1 S.threePlayerGame
-            (ivyId, g1) = S.addCreature ivy S.alice lands
-            (spiderId, g2) = S.addCreature spider S.bob g1
+            (ivyId, g1) = S.addPermanent ivy S.alice lands
+            (spiderId, g2) = S.addPermanent spider S.bob g1
             (growthId, g3) = S.addHandCard growth S.bob g2
         pure (ivyId, spiderId, growthId, g3)
       reprisalBoard = do
@@ -2561,8 +2561,8 @@ ivySpec s registry =
         berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
         reprisal <- S.printingOf s registry "Reprisal"
         let lands = S.landsFor plains S.bob 2 S.threePlayerGame
-            (ivyId, g1) = S.addCreature ivy S.alice lands
-            (berserkersId, g2) = S.addCreature berserkers S.bob g1
+            (ivyId, g1) = S.addPermanent ivy S.alice lands
+            (berserkersId, g2) = S.addPermanent berserkers S.bob g1
             (reprisalId, g3) = S.addHandCard reprisal S.bob g2
         pure (ivyId, berserkersId, reprisalId, g3)
       -- bob aims his spell at his own creature -- the trigger's whole condition,

@@ -130,12 +130,12 @@ solemnitySpec s registry = Spec.describe s "Solemnity" $ do
         prologue <- S.printingOf s registry "Prologue to Phyresis"
         solemnity <- S.printingOf s registry "Solemnity"
         let base = S.landsFor forest S.alice 2 (S.landsFor island S.alice 2 (S.landsFor island S.bob 2 (S.landsInPlay plains 3)))
-            (target, g1) = S.addCreature piker S.alice base
+            (target, g1) = S.addPermanent piker S.alice base
             (heldGrowth, g2) = S.addHandCard battlegrowth S.alice g1
             (heldToolkit, g3) = S.addHandCard toolkit S.alice g2
             (heldPrologue, g4) = S.addHandCard prologue S.bob g3
             g5 = stock plains S.bob g4
-            g6 = if enchanted then snd (S.addCreature solemnity S.alice g5) else g5
+            g6 = if enchanted then snd (S.addPermanent solemnity S.alice g5) else g5
         pure (target, heldGrowth, heldToolkit, heldPrologue, g6)
   -- THE HEADLINE, and the case this unit exists for. CR 101.2: Battlegrowth
   -- "allows or directs" a counter onto the creature and Solemnity says it can't
@@ -217,17 +217,17 @@ meliraSpec s registry = Spec.describe s "Melira, Sylvok Outcast" $ do
                 . S.landsFor mountain S.alice 2
                 . S.landsFor island S.bob 2
                 $ S.landsInPlay swamp 4
-            (mine, g1) = S.addCreature piker S.alice base
-            (theirs, g2) = S.addCreature piker S.bob g1
-            (myElf, g3) = S.addCreature elf S.alice g2
-            (theirElf, g4) = S.addCreature elf S.bob g3
+            (mine, g1) = S.addPermanent piker S.alice base
+            (theirs, g2) = S.addPermanent piker S.bob g1
+            (myElf, g3) = S.addPermanent elf S.alice g2
+            (theirElf, g4) = S.addPermanent elf S.bob g3
             (heldInfection, g5) = S.addHandCard infection S.alice g4
             (heldGrowth, g6) = S.addHandCard battlegrowth S.alice g5
             (heldLightning, g7) = S.addHandCard lightning S.alice g6
             (myPrologue, g8) = S.addHandCard prologue S.alice g7
             (theirPrologue, g9) = S.addHandCard prologue S.bob g8
             g10 = stock plains S.alice (stock plains S.bob g9)
-            g11 = if outcast then snd (S.addCreature melira S.alice g10) else g10
+            g11 = if outcast then snd (S.addPermanent melira S.alice g10) else g10
         pure ((mine, theirs, myElf, theirElf), (heldInfection, heldGrowth, heldLightning, myPrologue, theirPrologue), g11)
   -- THE KIND SCOPING, as a pair of casts on ONE board and ONE creature. A
   -- prohibition that ignored Pawl.Types.CounterRestriction's kind field would
@@ -291,10 +291,10 @@ moveSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
         piker <- S.printingOf s registry "Goblin Piker"
         solemnity <- S.printingOf s registry "Solemnity"
         let base = S.landsFor forest S.alice 2 (S.landsFor mountain S.alice 2 (S.landsInPlay plains 3))
-            (artifact, g1) = S.addCreature toolkit S.alice base
+            (artifact, g1) = S.addPermanent toolkit S.alice base
             g2 = S.addCounter CounterKind.PlusOnePlusOne 1 artifact g1
             (heldPiker, g3) = S.addHandCard piker S.alice g2
-            g4 = if enchanted then snd (S.addCreature solemnity S.alice g3) else g3
+            g4 = if enchanted then snd (S.addPermanent solemnity S.alice g3) else g3
         pure (artifact, heldPiker, g4)
       -- Cast the creature, let it enter, then let the artifact's trigger reach
       -- the stack and resolve. settleForPriority is where CR 704's state-based

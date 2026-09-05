@@ -74,6 +74,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -235,7 +236,12 @@ data ArrangedGame = MkArrangedGame
   deriving (Eq, Show)
 
 -- A script-level object name. Card-name occurrences are 1-based in creation
--- order among the live objects with that name.
+-- order among the live objects with that name, counted across EVERY zone and
+-- not only the battlefield: creation order is what makes the numbering stable,
+-- and a zone-scoped count would renumber the survivors every time something
+-- moved. So a reference can name an object the prompt at hand does not offer
+-- --- a Piker in a graveyard, an already-tapped attacker --- which is a script
+-- error and reported as MkUnofferedObject rather than silently dropped.
 data ObjectRef
   = MkAliasRef ObjectAlias
   | MkNamedRef CardName.CardName Natural
@@ -262,7 +268,12 @@ data Command
 data Scheduled = MkScheduled
   { scheduledMoment :: Moment,
     -- | The object making the prompted decision, when several prompts share one
-    -- moment. The first slice uses this for combat-damage sources.
+    -- moment. The first slice uses this for combat-damage sources. Several
+    -- assignment prompts at one moment arrive in the engine's own order, which a
+    -- script cannot predict, so the qualifier SELECTS an entry rather than
+    -- annotating the head: the moment's first entry naming this source wins, and
+    -- the first unqualified entry answers when none does. A qualifier on a
+    -- prompt with no source of its own is a script error (MkUnexpectedQualifier).
     scheduledQualifier :: Maybe ObjectRef,
     scheduledCommand :: Command
   }
@@ -310,11 +321,25 @@ data HarnessFailure
   | MkUnknownController PlayerId.PlayerId
   | MkDuplicateAlias ObjectAlias
   | MkUnknownCard CardName.CardName
-  | MkUnknownObject ObjectRef
+  | -- | The reference named no live object, with whether the arrangement did
+    -- record an alias by that name -- a stale alias and a typo read alike
+    -- otherwise. Always False for a card-name reference, which has no alias.
+    MkUnknownObject ObjectRef Bool
+  | -- | The reference resolved, but the prompt did not offer that object, so the
+    -- engine would have dropped it after the command was popped and the script
+    -- would have passed while proving nothing. Carries the named thing and the
+    -- offered ones, rendered as a script would name them.
+    MkUnofferedObject Moment Text.Text Text.Text [Text.Text]
+  | -- | An atSource qualifier on a prompt with no source of its own, which
+    -- nothing could ever match.
+    MkUnexpectedQualifier Moment Text.Text ObjectRef
   | MkNestedGamePrompt PromptLocation Text.Text
-  | MkUnscheduledPrompt PromptLocation Text.Text
-  | MkUnexpectedPrompt Moment Command Text.Text
-  | MkUnreachedCommands (Seq.Seq Scheduled)
+  | MkUnscheduledPrompt PromptLocation Text.Text [Text.Text]
+  | MkUnexpectedPrompt Moment Command Text.Text [Text.Text]
+  | -- | Guard 2 from #3050, with the turn and phase the game stopped at: a
+    -- command whose moment never arrived usually means the board never got
+    -- there, not that the command was wrong.
+    MkUnreachedCommands TurnNumber Phase.Phase (Seq.Seq Scheduled)
   deriving (Eq, Ord, Show)
 
 bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
@@ -457,13 +482,31 @@ arrange registry setup = case arrangementFailure setup of
                   (GameState.players base)
                   players
             }
-     in buildPlayers registry players (MkArrangedGame withMoment Map.empty)
+     in fmap (fmap designateArrangedDefenders) (buildPlayers registry players (MkArrangedGame withMoment Map.empty))
+
+-- CR 506.2 / CR 703.4h: an arrangement positioned AFTER the beginning of combat
+-- step is one where the defending players are already settled, so it runs the
+-- same turn-based action that step would have. Without it Combat.defenders stays
+-- empty, declareAttackers finds nobody to attack and skips its prompt, and a
+-- script that meant to attack fails as MkUnreachedCommands.
+--
+-- The engine's own answer to CR 507.1's choice, which is the first candidate in
+-- turn order (Replay.defaultAnswer): a three-seat arrangement that wants the
+-- other opponent defending sets Combat.defenders itself.
+designateArrangedDefenders :: ArrangedGame -> ArrangedGame
+designateArrangedDefenders built = case setupPhaseOf built of
+  Phase.Combat step
+    | step > CombatStep.BeginningOfCombat ->
+        built {builtState = runPure identityAnswer (builtState built) Combat.designateDefenders}
+  _ -> built
+  where
+    setupPhaseOf = GameState.phase . builtState
 
 arrangeOrFail :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Arrangement -> m ArrangedGame
 arrangeOrFail s registry setup = do
   result <- arrange registry setup
   case result of
-    Left failure -> Spec.assertFailure s (show failure)
+    Left failure -> Spec.assertFailure s (renderFailure failure)
     Right built -> pure built
 
 arrangementFailure :: Arrangement -> Maybe HarnessFailure
@@ -506,7 +549,7 @@ buildObjects registry player objects built = case objects of
       Nothing -> pure (Left (MkUnknownCard (objectName object)))
       Just card -> do
         let owner = setupPlayer player
-            (oid, withObject) = addCreature (Printing.MkPrinting card) owner (builtState built)
+            (oid, withObject) = addPermanent (Printing.MkPrinting card) owner (builtState built)
             controller = Maybe.fromMaybe owner (objectController object)
             readiness = case objectReadiness object of
               MkSummoningSick -> Sickness.Sick
@@ -521,6 +564,12 @@ buildObjects registry player objects built = case objects of
                   Object.damage = objectDamage object,
                   Object.sickness = readiness,
                   Object.counters = objectCounters object
+                  -- Object.counterTimestamps is left empty on purpose. CR 613.7c
+                  -- reads a kind's timestamp through
+                  -- Pawl.Engine.Projection with the object's own timestamp as
+                  -- the default, so arranged counters are all as old as the
+                  -- permanent carrying them. A case that needs two kinds stamped
+                  -- apart writes the field itself.
                 }
             state =
               withObject
@@ -696,8 +745,8 @@ playLandAnswer p = case p of
   _ -> identityAnswer p
 
 -- Any printing, on the battlefield under pid's control, untapped and Settled.
-addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-addCreature printing pid gs =
+addPermanent :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addPermanent printing pid gs =
   let (printingId, gsP) = Game.intern printing gs
       (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
@@ -911,9 +960,9 @@ noSource = ObjectId.MkObjectId 999
 boardWithCreatureArtifactLand :: Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
 boardWithCreatureArtifactLand creature artifact land =
   let gs0 = Setup.emptyGame bothPlayers
-      (_, gs1) = addCreature creature alice gs0
-      (_, gs2) = addCreature artifact alice gs1
-      (_, gs3) = addCreature land alice gs2
+      (_, gs1) = addPermanent creature alice gs0
+      (_, gs2) = addPermanent artifact alice gs1
+      (_, gs3) = addPermanent land alice gs2
    in gs3
 
 -- The creature on a `boardWithCreatureArtifactLand` board.
@@ -1174,14 +1223,14 @@ addExiledCard printing pid gs =
 
 -- A creature of a printing on the battlefield under `pid`, WITH the CR 603.6a
 -- enters event crafted alongside it, so Engine.placePendingTriggers finds its
--- SelfEnters trigger pending. addCreature alone puts the permanent there without
+-- SelfEnters trigger pending. addPermanent alone puts the permanent there without
 -- an event, and no trigger fires off a board that was simply arranged.
 --
 -- The from-zone is the stack, which is where a resolved creature spell comes
 -- from (CR 608.3) -- unread by any trigger condition here, but the honest value.
 entersWithTrigger :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 entersWithTrigger printing pid gs0 =
-  let (oid, gs1) = addCreature printing pid gs0
+  let (oid, gs1) = addPermanent printing pid gs0
       entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
    in (oid, withEvents [GameEvent.Moved (Moved.moved entered (Projection.project oid gs1))] gs1)
 
@@ -1246,7 +1295,7 @@ addHandCard printing pid gs =
 -- a Matching (HasCardType Creature) affected set does not touch it). Returns
 -- the updated state.
 withHumility :: Printing.Printing -> GameState.GameState -> GameState.GameState
-withHumility humility gs = snd (addCreature humility bob gs)
+withHumility humility gs = snd (addPermanent humility bob gs)
 
 -- The TargetSlot declared under the "target" slot name, read straight out of a
 -- JSON-loaded printing's spell (Modal.allTargetSlots, keyed by SlotName) -- so a
@@ -1454,7 +1503,7 @@ combatBoardOf :: [Printing.Printing] -> [Printing.Printing] -> (GameState.GameSt
 combatBoardOf mine theirs =
   let addAll pid ps gs =
         List.foldl'
-          (\(ids, g) p -> let (oid, g1) = addCreature p pid g in (ids <> [oid], g1))
+          (\(ids, g) p -> let (oid, g1) = addPermanent p pid g in (ids <> [oid], g1))
           ([], gs)
           ps
       (ours, gs1) = addAll alice mine (Setup.emptyGame bothPlayers)
@@ -1493,7 +1542,7 @@ threePlayerCombat :: [Printing.Printing] -> [Printing.Printing] -> [Printing.Pri
 threePlayerCombat mine theirs others =
   let addAll pid ps gs =
         List.foldl'
-          (\(ids, g) p -> let (oid, g1) = addCreature p pid g in (ids <> [oid], g1))
+          (\(ids, g) p -> let (oid, g1) = addPermanent p pid g in (ids <> [oid], g1))
           ([], gs)
           ps
       (ours, gs1) = addAll alice mine threePlayerGame
@@ -1544,11 +1593,17 @@ runScript scheduled built game =
           let remaining = foldMap snd (Map.toAscList (harnessQueues state))
            in if Seq.null remaining
                 then Right (value, final)
-                else Left (MkUnreachedCommands remaining)
+                else
+                  Left
+                    ( MkUnreachedCommands
+                        (MkTurnNumber (GameState.turnNumber final))
+                        (GameState.phase final)
+                        remaining
+                    )
 
 runScriptOrFail :: (Monad m) => Spec.Spec m n -> Seq.Seq Scheduled -> ArrangedGame -> Game.Type.Game a -> m (a, GameState.GameState)
 runScriptOrFail s scheduled built game = case runScript scheduled built game of
-  Left failure -> Spec.assertFailure s (show failure)
+  Left failure -> Spec.assertFailure s (renderFailure failure)
   Right result -> pure result
 
 answerPrompt :: Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
@@ -1556,66 +1611,77 @@ answerPrompt asked =
   let prompt = Asked.prompt asked
       gs = Asked.game asked
       kind = promptKind prompt
-      location = MkPromptLocation (MkTurnNumber (GameState.turnNumber gs)) (GameState.phase gs)
-      nested pid =
-        if null (Asked.enclosing asked)
-          then Nothing
-          else Just (MkNestedGamePrompt (location pid) kind)
-   in case prompt of
-        Prompt.ChooseAction _ pid _ -> case nested (Just pid) of
-          Just failure -> failHarness failure
-          Nothing -> pure A.Pass
-        Prompt.Concede pid -> case nested (Just pid) of
-          Just failure -> failHarness failure
-          Nothing -> do
+      location = MkPromptLocation (MkTurnNumber (GameState.turnNumber gs)) (GameState.phase gs) (promptPlayer prompt)
+   in -- Hoisted above the command arms: a nested game (CR 726) is out of scope
+      -- for every verb alike, so the check belongs to the prompt and not to each
+      -- arm that answers one.
+      if not (null (Asked.enclosing asked))
+        then failHarness (MkNestedGamePrompt location kind)
+        else case prompt of
+          Prompt.ChooseAction {} -> pure A.Pass
+          Prompt.Concede pid -> do
             let moment = momentOf gs pid
-            next <- peekScheduled moment
-            case fmap scheduledCommand next of
-              Just MkConcede -> do
-                popScheduled moment
-                pure Concession.Concedes
+            found <- peekScheduled moment
+            case found of
+              Just entry
+                | scheduledCommand entry == MkConcede -> case scheduledQualifier entry of
+                    Just ref -> failHarness (MkUnexpectedQualifier moment kind ref)
+                    Nothing -> do
+                      popScheduledAt moment 0
+                      pure Concession.Concedes
               _ -> pure Concession.Continues
-        Prompt.DeclareAttackers _ pid _ -> case nested (Just pid) of
-          Just failure -> failHarness failure
-          Nothing -> do
-            let moment = momentOf gs pid
-            scheduled <- requireScheduled (location (Just pid)) moment kind
-            case scheduledCommand scheduled of
-              MkAttack refs -> do
-                popScheduled moment
-                resolved <- mapM (\ref -> resolveObject ref gs) refs
-                pure (Foldable.toList resolved)
-              command -> failHarness (MkUnexpectedPrompt moment command kind)
-        Prompt.DeclareBlockers _ pid _ _ -> case nested (Just pid) of
-          Just failure -> failHarness failure
-          Nothing -> do
-            let moment = momentOf gs pid
-            scheduled <- requireScheduled (location (Just pid)) moment kind
-            case scheduledCommand scheduled of
-              MkBlock blocks -> do
-                popScheduled moment
-                pairs <- mapM (resolveBlock gs) (Map.toAscList blocks)
-                pure (Map.fromList pairs)
-              command -> failHarness (MkUnexpectedPrompt moment command kind)
-        Prompt.AssignCombatDamage _ pid source _ _ -> case nested (Just pid) of
-          Just failure -> failHarness failure
-          Nothing -> do
-            let moment = momentOf gs pid
-            scheduled <- requireScheduled (location (Just pid)) moment kind
-            qualifierMatches <- case scheduledQualifier scheduled of
-              Nothing -> pure True
-              Just ref -> fmap (== source) (resolveObject ref gs)
-            if not qualifierMatches
-              then failHarness (MkUnexpectedPrompt moment (scheduledCommand scheduled) kind)
-              else case scheduledCommand scheduled of
-                MkAssignDamage assignment -> do
-                  popScheduled moment
-                  pairs <- mapM (resolveDamage gs) (Map.toAscList assignment)
+          Prompt.DeclareAttackers _ pid candidates -> do
+            offers <- describeAll gs candidates
+            onCommand gs location (momentOf gs pid) kind offers (takeUnqualified (momentOf gs pid) kind) $ \command -> case command of
+              MkAttack refs ->
+                Just $ do
+                  resolved <- mapM (resolveOffered gs (momentOf gs pid) kind candidates) refs
+                  pure (Foldable.toList resolved)
+              _ -> Nothing
+          Prompt.DeclareBlockers _ pid blockers attackers -> do
+            let candidates = blockers <> attackers
+                moment = momentOf gs pid
+            offers <- describeAll gs candidates
+            onCommand gs location moment kind offers (takeUnqualified moment kind) $ \command -> case command of
+              MkBlock blocks ->
+                Just $ do
+                  pairs <- mapM (resolveBlock gs moment kind candidates) (Map.toAscList blocks)
                   pure (Map.fromList pairs)
-                command -> failHarness (MkUnexpectedPrompt moment command kind)
-        _ -> case nested (promptPlayer prompt) of
-          Just failure -> failHarness failure
-          Nothing -> failHarness (MkUnscheduledPrompt (location (promptPlayer prompt)) kind)
+              _ -> Nothing
+          Prompt.AssignCombatDamage _ pid source thresholds _ -> do
+            let moment = momentOf gs pid
+                offered = Map.keysSet thresholds
+            offers <- describeAll gs (Maybe.mapMaybe recipientObject (Set.toList offered))
+            onCommand gs location moment kind offers (takeForSource gs moment source) $ \command -> case command of
+              MkAssignDamage assignment ->
+                Just $ do
+                  pairs <- mapM (resolveDamage gs moment kind offered) (Map.toAscList assignment)
+                  pure (Map.fromList pairs)
+              _ -> Nothing
+          _ -> failHarness (MkUnscheduledPrompt location kind [])
+
+-- The require-match-pop sequence every command arm shares: no entry at this
+-- moment is an unscheduled prompt, an entry carrying some other verb is an
+-- unexpected one, and the pop that keeps guard 2 honest happens exactly once,
+-- before the arm resolves anything.
+onCommand ::
+  GameState.GameState ->
+  PromptLocation ->
+  Moment ->
+  Text.Text ->
+  [Text.Text] ->
+  State.StateT HarnessState (Either HarnessFailure) (Maybe (Int, Scheduled)) ->
+  (Command -> Maybe (State.StateT HarnessState (Either HarnessFailure) a)) ->
+  State.StateT HarnessState (Either HarnessFailure) a
+onCommand _ location moment kind offers select match = do
+  found <- select
+  case found of
+    Nothing -> failHarness (MkUnscheduledPrompt location kind offers)
+    Just (index, entry) -> case match (scheduledCommand entry) of
+      Nothing -> failHarness (MkUnexpectedPrompt moment (scheduledCommand entry) kind offers)
+      Just action -> do
+        popScheduledAt moment index
+        action
 
 momentOf :: GameState.GameState -> PlayerId.PlayerId -> Moment
 momentOf gs =
@@ -1623,37 +1689,80 @@ momentOf gs =
     (MkTurnNumber (GameState.turnNumber gs))
     (GameState.phase gs)
 
-peekScheduled :: Moment -> State.StateT HarnessState (Either HarnessFailure) (Maybe Scheduled)
-peekScheduled moment = do
-  queue <- State.gets (Map.lookup moment . harnessQueues)
-  pure $ case queue of
-    Nothing -> Nothing
-    Just entries -> case Seq.viewl entries of
-      Seq.EmptyL -> Nothing
-      entry Seq.:< _ -> Just entry
+queueAt :: Moment -> State.StateT HarnessState (Either HarnessFailure) (Seq.Seq Scheduled)
+queueAt moment = State.gets (Map.findWithDefault Seq.empty moment . harnessQueues)
 
-requireScheduled :: PromptLocation -> Moment -> Text.Text -> State.StateT HarnessState (Either HarnessFailure) Scheduled
-requireScheduled location moment kind = do
+peekScheduled :: Moment -> State.StateT HarnessState (Either HarnessFailure) (Maybe Scheduled)
+peekScheduled moment = fmap (Seq.lookup 0) (queueAt moment)
+
+-- The head entry at `moment`, for a prompt with no source of its own. A
+-- qualifier here names something the prompt could never be matched against, so
+-- it is a script error rather than an entry to skip.
+takeUnqualified :: Moment -> Text.Text -> State.StateT HarnessState (Either HarnessFailure) (Maybe (Int, Scheduled))
+takeUnqualified moment kind = do
   found <- peekScheduled moment
   case found of
-    Nothing -> failHarness (MkUnscheduledPrompt location kind)
-    Just scheduled -> pure scheduled
+    Nothing -> pure Nothing
+    Just entry -> case scheduledQualifier entry of
+      Just ref -> failHarness (MkUnexpectedQualifier moment kind ref)
+      Nothing -> pure (Just (0, entry))
 
-popScheduled :: Moment -> State.StateT HarnessState (Either HarnessFailure) ()
-popScheduled moment =
+-- The first entry at `moment` whose qualifier names `source`, else the first
+-- unqualified entry. Two multi-blocked attackers are prompted in the engine's
+-- own order over Combat.attackers, which a script cannot predict, so a qualified
+-- assignment is found by its source and not by its position in the queue.
+--
+-- Every qualifier at this moment is resolved, not only the matching one: a
+-- dangling alias reports itself as MkUnknownObject here rather than sitting in
+-- the queue until it surfaces as MkUnreachedCommands.
+takeForSource :: GameState.GameState -> Moment -> ObjectId.ObjectId -> State.StateT HarnessState (Either HarnessFailure) (Maybe (Int, Scheduled))
+takeForSource gs moment source = do
+  entries <- queueAt moment
+  qualifiers <-
+    mapM
+      ( \entry -> case scheduledQualifier entry of
+          Nothing -> pure Nothing
+          Just ref -> fmap Just (resolveObject ref gs)
+      )
+      (Foldable.toList entries)
+  let indexed = zip [0 ..] qualifiers
+      qualified = List.find ((== Just source) . snd) indexed
+      unqualified = List.find (Maybe.isNothing . snd) indexed
+      chosen = case qualified of
+        Just found -> Just (fst found)
+        Nothing -> fmap fst unqualified
+  pure $ do
+    index <- chosen
+    entry <- Seq.lookup index entries
+    pure (index, entry)
+
+popScheduledAt :: Moment -> Int -> State.StateT HarnessState (Either HarnessFailure) ()
+popScheduledAt moment index =
   State.modify' $ \state ->
     let queues = case Map.lookup moment (harnessQueues state) of
           Nothing -> harnessQueues state
-          Just entries -> case Seq.viewl entries of
-            Seq.EmptyL -> Map.delete moment (harnessQueues state)
-            _ Seq.:< rest ->
-              if Seq.null rest
-                then Map.delete moment (harnessQueues state)
-                else Map.insert moment rest (harnessQueues state)
+          Just entries ->
+            let rest = Seq.deleteAt index entries
+             in if Seq.null rest
+                  then Map.delete moment (harnessQueues state)
+                  else Map.insert moment rest (harnessQueues state)
      in state {harnessQueues = queues}
 
 failHarness :: HarnessFailure -> State.StateT HarnessState (Either HarnessFailure) a
 failHarness failure = State.StateT (const (Left failure))
+
+-- Every live object whose card answers to `name`, in creation order. The scope
+-- ObjectRef documents: every zone, not the battlefield alone.
+namedObjects :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
+namedObjects name gs =
+  let wanted = Registry.slugFor name
+      matches oid = case Game.cardOf oid gs of
+        Nothing -> False
+        Just card ->
+          any
+            ((== wanted) . Registry.slugFor . Face.name)
+            (NonEmpty.toList (Card.Type.faces card))
+   in filter matches (Map.keys (GameState.objects gs))
 
 resolveObject :: ObjectRef -> GameState.GameState -> State.StateT HarnessState (Either HarnessFailure) ObjectId.ObjectId
 resolveObject ref gs = case ref of
@@ -1662,54 +1771,449 @@ resolveObject ref gs = case ref of
     case found of
       Just oid
         | Map.member oid (GameState.objects gs) -> pure oid
-      _ -> failHarness (MkUnknownObject ref)
-  MkNamedRef name occurrence ->
-    let wanted = Registry.slugFor name
-        matches oid = case Game.cardOf oid gs of
-          Nothing -> False
-          Just card ->
-            any
-              ((== wanted) . Registry.slugFor . Face.name)
-              (NonEmpty.toList (Card.Type.faces card))
-        ids = filter matches (Map.keys (GameState.objects gs))
-     in case occurrence of
-          0 -> failHarness (MkUnknownObject ref)
-          _ -> case List.genericDrop (occurrence - 1) ids of
-            oid : _ -> pure oid
-            [] -> failHarness (MkUnknownObject ref)
+      Just _ -> failHarness (MkUnknownObject ref True)
+      Nothing -> failHarness (MkUnknownObject ref False)
+  MkNamedRef name occurrence -> case occurrence of
+    0 -> failHarness (MkUnknownObject ref False)
+    _ -> case List.genericDrop (occurrence - 1) (namedObjects name gs) of
+      oid : _ -> pure oid
+      [] -> failHarness (MkUnknownObject ref False)
 
-resolveBlock :: GameState.GameState -> (ObjectRef, Set.Set ObjectRef) -> State.StateT HarnessState (Either HarnessFailure) (ObjectId.ObjectId, Set.Set ObjectId.ObjectId)
-resolveBlock gs (blocker, attackers) = do
-  blockerId <- resolveObject blocker gs
-  attackerIds <- mapM (\attacker -> resolveObject attacker gs) (Set.toAscList attackers)
+-- resolveObject, plus the check that the prompt actually offered what it found.
+-- Without it the engine filters the non-candidate out AFTER the command was
+-- popped, and the script passes with nobody attacking.
+resolveOffered :: GameState.GameState -> Moment -> Text.Text -> [ObjectId.ObjectId] -> ObjectRef -> State.StateT HarnessState (Either HarnessFailure) ObjectId.ObjectId
+resolveOffered gs moment kind offered ref = do
+  oid <- resolveObject ref gs
+  if List.elem oid offered
+    then pure oid
+    else do
+      offers <- describeAll gs offered
+      failHarness (MkUnofferedObject moment kind (renderRef ref) offers)
+
+resolveBlock :: GameState.GameState -> Moment -> Text.Text -> [ObjectId.ObjectId] -> (ObjectRef, Set.Set ObjectRef) -> State.StateT HarnessState (Either HarnessFailure) (ObjectId.ObjectId, Set.Set ObjectId.ObjectId)
+resolveBlock gs moment kind offered (blocker, attackers) = do
+  blockerId <- resolveOffered gs moment kind offered blocker
+  attackerIds <- mapM (resolveOffered gs moment kind offered) (Set.toAscList attackers)
   pure (blockerId, Set.fromList attackerIds)
 
-resolveDamage :: GameState.GameState -> (DamageRecipient, Natural) -> State.StateT HarnessState (Either HarnessFailure) (Recipient.Recipient, Natural)
-resolveDamage gs (recipient, amount) = case recipient of
-  MkCreatureRecipient ref -> do
-    oid <- resolveObject ref gs
-    pure (Recipient.ToCreature oid, amount)
-  MkPlayerRecipient pid -> pure (Recipient.ToPlayer pid, amount)
+-- CR 510.1a: the assignment's recipients must be ones the prompt offered a
+-- threshold for, for resolveOffered's reason -- the engine drops an unoffered
+-- recipient after the command was popped.
+resolveDamage :: GameState.GameState -> Moment -> Text.Text -> Set.Set Recipient.Recipient -> (DamageRecipient, Natural) -> State.StateT HarnessState (Either HarnessFailure) (Recipient.Recipient, Natural)
+resolveDamage gs moment kind offered (recipient, amount) = do
+  resolved <- case recipient of
+    MkCreatureRecipient ref -> fmap Recipient.ToCreature (resolveObject ref gs)
+    MkPlayerRecipient pid -> pure (Recipient.ToPlayer pid)
+  if Set.member resolved offered
+    then pure (resolved, amount)
+    else do
+      offers <- describeAll gs (Maybe.mapMaybe recipientObject (Set.toList offered))
+      failHarness (MkUnofferedObject moment kind (renderRecipient recipient) offers)
 
+recipientObject :: Recipient.Recipient -> Maybe ObjectId.ObjectId
+recipientObject recipient = case recipient of
+  Recipient.ToCreature oid -> Just oid
+  Recipient.ToPlaneswalker oid -> Just oid
+  Recipient.ToBattle oid -> Just oid
+  Recipient.ToObject oid -> Just oid
+  Recipient.ToPlayer _ -> Nothing
+  Recipient.ToPile _ -> Nothing
+
+-- How a failure message names one object: the alias the arrangement gave it, or
+-- its card name and 1-based occurrence -- the two ways a script could have
+-- written it.
+describeObject :: GameState.GameState -> Map.Map ObjectAlias ObjectId.ObjectId -> ObjectId.ObjectId -> Text.Text
+describeObject gs aliases oid =
+  case List.find ((== oid) . snd) (Map.toAscList aliases) of
+    Just (MkObjectAlias name, _) -> Text.cons '@' name
+    Nothing -> case Game.cardOf oid gs of
+      Nothing -> Text.pack ("object " <> show (ObjectId.unwrap oid))
+      Just card ->
+        let name = Face.name (NonEmpty.head (Card.Type.faces card))
+            occurrence = Natural.length (takeWhile (/= oid) (namedObjects name gs)) + 1
+         in renderRef (MkNamedRef name occurrence)
+
+describeAll :: GameState.GameState -> [ObjectId.ObjectId] -> State.StateT HarnessState (Either HarnessFailure) [Text.Text]
+describeAll gs oids = do
+  aliases <- State.gets harnessAliases
+  pure (fmap (describeObject gs aliases) oids)
+
+renderRef :: ObjectRef -> Text.Text
+renderRef ref = case ref of
+  MkAliasRef (MkObjectAlias name) -> Text.cons '@' name
+  MkNamedRef (CardName.MkCardName name) occurrence ->
+    name <> Text.pack (" " <> show occurrence)
+
+renderRecipient :: DamageRecipient -> Text.Text
+renderRecipient recipient = case recipient of
+  MkCreatureRecipient ref -> renderRef ref
+  MkPlayerRecipient pid -> renderPlayer pid
+
+-- The fixture seats by the names every spec calls them, so a failure message
+-- reads the way the test that produced it is written.
+renderPlayer :: PlayerId.PlayerId -> Text.Text
+renderPlayer pid =
+  Text.pack $ case PlayerId.unwrap pid of
+    0 -> "alice"
+    1 -> "bob"
+    2 -> "carol"
+    3 -> "dave"
+    n -> "player " <> show n
+
+renderPhase :: Phase.Phase -> Text.Text
+renderPhase phase =
+  Text.pack $ case phase of
+    Phase.Beginning BeginningStep.Untap -> "untap"
+    Phase.Beginning BeginningStep.Upkeep -> "upkeep"
+    Phase.Beginning BeginningStep.DrawStep -> "draw"
+    Phase.PrecombatMain -> "precombat main"
+    Phase.Combat CombatStep.BeginningOfCombat -> "beginning of combat"
+    Phase.Combat CombatStep.DeclareAttackers -> "declare attackers"
+    Phase.Combat CombatStep.DeclareBlockers -> "declare blockers"
+    Phase.Combat CombatStep.CombatDamage -> "combat damage"
+    Phase.Combat CombatStep.EndOfCombat -> "end of combat"
+    Phase.PostcombatMain -> "postcombat main"
+    Phase.Ending EndingStep.EndStep -> "end"
+    Phase.Ending EndingStep.Cleanup -> "cleanup"
+
+renderTurn :: TurnNumber -> Text.Text
+renderTurn turn = Text.pack ("turn " <> show (unwrap turn))
+
+renderMoment :: Moment -> Text.Text
+renderMoment (MkMoment turn phase pid) =
+  Text.intercalate (Text.pack ", ") [renderTurn turn, renderPhase phase, renderPlayer pid]
+
+renderLocation :: PromptLocation -> Text.Text
+renderLocation (MkPromptLocation turn phase pid) =
+  Text.intercalate (Text.pack ", ") ([renderTurn turn, renderPhase phase] <> foldMap (pure . renderPlayer) pid)
+
+renderCommand :: Command -> Text.Text
+renderCommand command = case command of
+  MkAttack refs -> Text.pack "attack " <> renderList (fmap renderRef (Foldable.toList refs))
+  MkBlock blocks ->
+    Text.pack "block "
+      <> renderList
+        [ renderRef blocker <> Text.pack " blocks " <> renderList (fmap renderRef (Set.toAscList attackers))
+        | (blocker, attackers) <- Map.toAscList blocks
+        ]
+  MkAssignDamage assignment ->
+    Text.pack "assign "
+      <> renderList
+        [ renderRecipient recipient <> Text.pack (" " <> show amount)
+        | (recipient, amount) <- Map.toAscList assignment
+        ]
+  MkConcede -> Text.pack "concede"
+
+renderList :: [Text.Text] -> Text.Text
+renderList items = Text.pack "[" <> Text.intercalate (Text.pack ", ") items <> Text.pack "]"
+
+renderScheduled :: Scheduled -> Text.Text
+renderScheduled entry =
+  renderMoment (scheduledMoment entry)
+    <> Text.pack ": "
+    <> foldMap (\ref -> renderRef ref <> Text.pack "'s ") (scheduledQualifier entry)
+    <> renderCommand (scheduledCommand entry)
+
+renderOffers :: [Text.Text] -> Text.Text
+renderOffers offers =
+  if null offers
+    then Text.empty
+    else Text.pack "; it offered " <> renderList offers
+
+-- One human line per failure. Derived Show is kept for assertEq, which wants a
+-- value; this is what a failing case prints, since a nested record of ids tells
+-- a reader nothing about which command went wrong where.
+renderFailure :: HarnessFailure -> String
+renderFailure failure =
+  Text.unpack $ case failure of
+    MkDuplicatePlayer pid -> renderPlayer pid <> Text.pack " was seated twice"
+    MkUnknownActivePlayer pid -> renderPlayer pid <> Text.pack " is active but was not seated"
+    MkUnknownController pid -> renderPlayer pid <> Text.pack " controls an arranged object but was not seated"
+    MkDuplicateAlias (MkObjectAlias name) -> Text.pack "@" <> name <> Text.pack " names two arranged objects"
+    MkUnknownCard (CardName.MkCardName name) -> Text.pack "no card named " <> name
+    MkUnknownObject ref known ->
+      renderRef ref
+        <> Text.pack " names nothing in the game"
+        <> ( if known
+               then Text.pack " (the arrangement did alias it, so it has since left)"
+               else Text.empty
+           )
+    MkUnofferedObject moment kind named offers ->
+      renderMoment moment
+        <> Text.pack ": the "
+        <> kind
+        <> Text.pack " prompt did not offer "
+        <> named
+        <> renderOffers offers
+    MkUnexpectedQualifier moment kind ref ->
+      renderMoment moment
+        <> Text.pack ": the "
+        <> kind
+        <> Text.pack " prompt has no source, so the qualifier "
+        <> renderRef ref
+        <> Text.pack " matches nothing"
+    MkNestedGamePrompt location kind ->
+      renderLocation location <> Text.pack ": " <> kind <> Text.pack " was asked inside a nested game"
+    MkUnscheduledPrompt location kind offers ->
+      renderLocation location
+        <> Text.pack ": nothing is scheduled for the "
+        <> kind
+        <> Text.pack " prompt"
+        <> renderOffers offers
+    MkUnexpectedPrompt moment command kind offers ->
+      renderMoment moment
+        <> Text.pack ": "
+        <> renderCommand command
+        <> Text.pack " does not answer the "
+        <> kind
+        <> Text.pack " prompt"
+        <> renderOffers offers
+    MkUnreachedCommands turn phase entries ->
+      Text.intercalate (Text.pack "; ") (fmap renderScheduled (Foldable.toList entries))
+        <> Text.pack " was never reached; the game stopped at "
+        <> renderTurn turn
+        <> Text.pack ", "
+        <> renderPhase phase
+
+-- The seat a prompt is asked of. Total on purpose: a hand-kept catalog over a
+-- GADT this size drifts silently, and the wildcard that would let it drift is
+-- what -Wincomplete-patterns is here to refuse.
+--
+-- The PlayerId and not the Decider's player: these are the seat a Moment keys
+-- on, and CR 723.6 makes the two differ only while one player controls another.
+-- #3050 is where decider-versus-player keying gets decided.
 promptPlayer :: Prompt.Prompt r -> Maybe PlayerId.PlayerId
 promptPlayer prompt = case prompt of
   Prompt.ChooseAction _ pid _ -> Just pid
   Prompt.Concede pid -> Just pid
+  Prompt.Shuffle {} -> Nothing
+  Prompt.RandomFirstPlayer {} -> Nothing
+  Prompt.RandomObject {} -> Nothing
+  Prompt.RandomOpponent {} -> Nothing
+  Prompt.RollDie {} -> Nothing
+  Prompt.ChooseDieResult _ pid _ _ -> Just pid
+  Prompt.FlipCoin {} -> Nothing
+  Prompt.CallCoin _ pid -> Just pid
+  Prompt.ChooseDiscard _ pid _ _ -> Just pid
+  Prompt.ChooseScry _ pid _ -> Just pid
+  Prompt.ChooseSurveil _ pid _ -> Just pid
+  Prompt.ChooseFateseal _ pid _ _ -> Just pid
+  Prompt.ChooseExplore _ pid _ _ -> Just pid
+  Prompt.ChooseDefender _ pid _ -> Just pid
+  Prompt.ChooseManaSource _ pid _ -> Just pid
+  Prompt.ChooseExtraManaSource _ pid _ -> Just pid
+  Prompt.ReverseManaAbilities _ pid _ -> Just pid
+  Prompt.ChooseManaYield _ pid _ _ -> Just pid
+  Prompt.ChooseManaToSpend _ pid _ -> Just pid
+  Prompt.ChooseProliferate _ pid _ _ -> Just pid
+  Prompt.ChooseRedistribution _ pid _ -> Just pid
+  Prompt.ChooseRingBearer _ pid _ -> Just pid
+  Prompt.ChooseBolster _ pid _ _ -> Just pid
+  Prompt.ChooseAmass _ pid _ _ -> Just pid
+  Prompt.ChooseBlight _ pid _ _ -> Just pid
+  Prompt.ChooseMovedCounter _ pid _ _ _ -> Just pid
+  Prompt.ChooseMovedCounters _ pid _ _ _ -> Just pid
+  Prompt.ChooseMovedCountersAtLeastOne _ pid _ _ _ -> Just pid
+  Prompt.ChooseDistributedMovedCounters _ pid _ _ _ -> Just pid
+  Prompt.ChooseMovedCounterOrNone _ pid _ _ _ -> Just pid
+  Prompt.ChoosePaidEnergy _ pid _ _ -> Just pid
+  Prompt.ChooseReadAheadChapter _ pid _ _ -> Just pid
+  Prompt.ChooseDamageSource _ pid _ _ -> Just pid
+  Prompt.ChooseDelayedTriggerEvent _ pid _ _ -> Just pid
+  Prompt.ChooseCardInGraveyard _ pid _ _ -> Just pid
+  Prompt.ChooseCardInHand _ pid _ _ -> Just pid
+  Prompt.ChooseCardFromAmong _ pid _ _ -> Just pid
+  Prompt.ChooseDungeon _ pid _ -> Just pid
+  Prompt.ChooseCompanion _ pid _ -> Just pid
+  Prompt.ChooseFromOutsideTheGame _ pid _ -> Just pid
+  Prompt.ChooseRoom _ pid _ _ -> Just pid
+  Prompt.ChooseHalf _ pid _ _ -> Just pid
+  Prompt.ChooseLegend _ pid _ -> Just pid
   Prompt.DeclareAttackers _ pid _ -> Just pid
+  Prompt.ChooseAttackTarget _ pid _ _ -> Just pid
+  Prompt.ChooseExert _ pid _ -> Just pid
   Prompt.DeclareBlockers _ pid _ _ -> Just pid
   Prompt.AssignCombatDamage _ pid _ _ _ -> Just pid
   Prompt.ChooseTargets _ pid _ _ -> Just pid
-  _ -> Nothing
+  Prompt.AnnounceTargets _ pid _ _ -> Just pid
+  Prompt.ChooseLandTypeSwap _ pid _ _ _ -> Just pid
+  Prompt.ChooseCreatureTypeSwap _ pid _ _ _ -> Just pid
+  Prompt.ChooseBasicLandType _ pid _ -> Just pid
+  Prompt.ChooseSearchZones _ pid _ -> Just pid
+  Prompt.Search _ pid _ _ -> Just pid
+  Prompt.CastWhileSearching _ pid _ -> Just pid
+  Prompt.ChooseX _ pid _ _ -> Just pid
+  Prompt.ChooseEntwine _ pid _ _ -> Just pid
+  Prompt.ChooseKicker _ pid _ _ _ -> Just pid
+  Prompt.ReturnCommander _ pid _ -> Just pid
+  Prompt.ChooseLibraryEnd _ pid _ -> Just pid
+  Prompt.ArrangeLibraryArrivals _ pid _ _ -> Just pid
+  Prompt.ChooseModes _ pid _ _ _ -> Just pid
+  Prompt.ChooseCopyTarget _ pid _ _ -> Just pid
+  Prompt.ChooseEntryOption _ pid _ _ -> Just pid
+  Prompt.ChooseRiot _ pid _ -> Just pid
+  Prompt.ChooseUnleash _ pid _ -> Just pid
+  Prompt.ChoosePayLifeOnEntry _ pid _ _ -> Just pid
+  Prompt.ChooseRevealOnEntry _ pid _ _ -> Just pid
+  Prompt.ChooseColor _ pid _ -> Just pid
+  Prompt.ChooseManaType _ pid _ _ -> Just pid
+  Prompt.ChooseCardName _ pid _ _ -> Just pid
+  Prompt.ChooseOpponent _ pid _ _ -> Just pid
+  Prompt.ChooseProtector _ pid _ _ -> Just pid
+  Prompt.ChoosePlayer _ pid _ _ -> Just pid
+  Prompt.OrderTriggers _ pid _ -> Just pid
+  Prompt.OrderDamage _ pid _ -> Just pid
+  Prompt.ChooseReplacement _ pid _ -> Just pid
+  Prompt.ChooseBoundToken _ pid _ _ -> Just pid
+  Prompt.ChooseSacrifices _ pid _ _ _ -> Just pid
+  Prompt.ChooseExilesFromGraveyard _ pid _ _ _ -> Just pid
+  Prompt.ChooseAnyNumberToSacrifice _ pid _ _ -> Just pid
+  Prompt.ChooseAnyNumberOfPermanents _ pid _ _ -> Just pid
+  Prompt.ChoosePermanent _ pid _ _ -> Just pid
+  Prompt.ChooseTapsForTotalPower _ pid _ _ _ -> Just pid
+  Prompt.ChooseTaps _ pid _ _ _ -> Just pid
+  Prompt.ChooseReturns _ pid _ _ _ -> Just pid
+  Prompt.ChooseAttachment _ pid _ _ -> Just pid
+  Prompt.ChooseTurnUpAttachment _ pid _ -> Just pid
+  Prompt.ChooseCost _ pid _ _ -> Just pid
+  Prompt.OrderCostComponents _ pid _ _ -> Just pid
+  Prompt.OrderCombatTolls _ pid _ -> Just pid
+  Prompt.OrderComponentCards _ pid _ _ -> Just pid
+  Prompt.OrderForEach _ pid _ _ -> Just pid
+  Prompt.OrderTimestamps _ pid _ -> Just pid
+  Prompt.DeclareMulligan _ pid _ -> Just pid
+  Prompt.Bottom _ pid _ _ -> Just pid
+  Prompt.MulliganAction _ pid _ -> Just pid
+  Prompt.OpeningHandAction _ pid _ -> Just pid
+  Prompt.ChooseOptional _ pid _ _ _ -> Just pid
+  Prompt.ChooseClause _ pid _ _ _ -> Just pid
+  Prompt.OfferedCast _ pid _ _ -> Just pid
+  Prompt.ChooseOfferedCastFace _ pid _ _ -> Just pid
+  Prompt.OfferedMiracleReveal _ pid _ _ -> Just pid
+  Prompt.ChooseToPay _ pid _ _ _ _ -> Just pid
+  Prompt.AnnouncePhyrexianPayment _ pid _ _ _ -> Just pid
+  Prompt.AnnounceHybridPayment _ pid _ _ _ -> Just pid
+  Prompt.AnnounceHybridHalf _ pid _ _ _ -> Just pid
+  Prompt.ChooseReductionHalf _ pid _ _ _ -> Just pid
+  Prompt.ChooseReducedCost _ pid _ _ -> Just pid
 
+-- The prompt's constructor name, for failure messages. Total for promptPlayer's
+-- reason.
 promptKind :: Prompt.Prompt r -> Text.Text
 promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseAction {} -> "ChooseAction"
   Prompt.Concede {} -> "Concede"
+  Prompt.Shuffle {} -> "Shuffle"
+  Prompt.RandomFirstPlayer {} -> "RandomFirstPlayer"
+  Prompt.RandomObject {} -> "RandomObject"
+  Prompt.RandomOpponent {} -> "RandomOpponent"
+  Prompt.RollDie {} -> "RollDie"
+  Prompt.ChooseDieResult {} -> "ChooseDieResult"
+  Prompt.FlipCoin {} -> "FlipCoin"
+  Prompt.CallCoin {} -> "CallCoin"
+  Prompt.ChooseDiscard {} -> "ChooseDiscard"
+  Prompt.ChooseScry {} -> "ChooseScry"
+  Prompt.ChooseSurveil {} -> "ChooseSurveil"
+  Prompt.ChooseFateseal {} -> "ChooseFateseal"
+  Prompt.ChooseExplore {} -> "ChooseExplore"
+  Prompt.ChooseDefender {} -> "ChooseDefender"
+  Prompt.ChooseManaSource {} -> "ChooseManaSource"
+  Prompt.ChooseExtraManaSource {} -> "ChooseExtraManaSource"
+  Prompt.ReverseManaAbilities {} -> "ReverseManaAbilities"
+  Prompt.ChooseManaYield {} -> "ChooseManaYield"
+  Prompt.ChooseManaToSpend {} -> "ChooseManaToSpend"
+  Prompt.ChooseProliferate {} -> "ChooseProliferate"
+  Prompt.ChooseRedistribution {} -> "ChooseRedistribution"
+  Prompt.ChooseRingBearer {} -> "ChooseRingBearer"
+  Prompt.ChooseBolster {} -> "ChooseBolster"
+  Prompt.ChooseAmass {} -> "ChooseAmass"
+  Prompt.ChooseBlight {} -> "ChooseBlight"
+  Prompt.ChooseMovedCounter {} -> "ChooseMovedCounter"
+  Prompt.ChooseMovedCounters {} -> "ChooseMovedCounters"
+  Prompt.ChooseMovedCountersAtLeastOne {} -> "ChooseMovedCountersAtLeastOne"
+  Prompt.ChooseDistributedMovedCounters {} -> "ChooseDistributedMovedCounters"
+  Prompt.ChooseMovedCounterOrNone {} -> "ChooseMovedCounterOrNone"
+  Prompt.ChoosePaidEnergy {} -> "ChoosePaidEnergy"
+  Prompt.ChooseReadAheadChapter {} -> "ChooseReadAheadChapter"
+  Prompt.ChooseDamageSource {} -> "ChooseDamageSource"
+  Prompt.ChooseDelayedTriggerEvent {} -> "ChooseDelayedTriggerEvent"
+  Prompt.ChooseCardInGraveyard {} -> "ChooseCardInGraveyard"
+  Prompt.ChooseCardInHand {} -> "ChooseCardInHand"
+  Prompt.ChooseCardFromAmong {} -> "ChooseCardFromAmong"
+  Prompt.ChooseDungeon {} -> "ChooseDungeon"
+  Prompt.ChooseCompanion {} -> "ChooseCompanion"
+  Prompt.ChooseFromOutsideTheGame {} -> "ChooseFromOutsideTheGame"
+  Prompt.ChooseRoom {} -> "ChooseRoom"
+  Prompt.ChooseHalf {} -> "ChooseHalf"
+  Prompt.ChooseLegend {} -> "ChooseLegend"
   Prompt.DeclareAttackers {} -> "DeclareAttackers"
+  Prompt.ChooseAttackTarget {} -> "ChooseAttackTarget"
+  Prompt.ChooseExert {} -> "ChooseExert"
   Prompt.DeclareBlockers {} -> "DeclareBlockers"
   Prompt.AssignCombatDamage {} -> "AssignCombatDamage"
   Prompt.ChooseTargets {} -> "ChooseTargets"
-  _ -> "unsupported prompt"
+  Prompt.AnnounceTargets {} -> "AnnounceTargets"
+  Prompt.ChooseLandTypeSwap {} -> "ChooseLandTypeSwap"
+  Prompt.ChooseCreatureTypeSwap {} -> "ChooseCreatureTypeSwap"
+  Prompt.ChooseBasicLandType {} -> "ChooseBasicLandType"
+  Prompt.ChooseSearchZones {} -> "ChooseSearchZones"
+  Prompt.Search {} -> "Search"
+  Prompt.CastWhileSearching {} -> "CastWhileSearching"
+  Prompt.ChooseX {} -> "ChooseX"
+  Prompt.ChooseEntwine {} -> "ChooseEntwine"
+  Prompt.ChooseKicker {} -> "ChooseKicker"
+  Prompt.ReturnCommander {} -> "ReturnCommander"
+  Prompt.ChooseLibraryEnd {} -> "ChooseLibraryEnd"
+  Prompt.ArrangeLibraryArrivals {} -> "ArrangeLibraryArrivals"
+  Prompt.ChooseModes {} -> "ChooseModes"
+  Prompt.ChooseCopyTarget {} -> "ChooseCopyTarget"
+  Prompt.ChooseEntryOption {} -> "ChooseEntryOption"
+  Prompt.ChooseRiot {} -> "ChooseRiot"
+  Prompt.ChooseUnleash {} -> "ChooseUnleash"
+  Prompt.ChoosePayLifeOnEntry {} -> "ChoosePayLifeOnEntry"
+  Prompt.ChooseRevealOnEntry {} -> "ChooseRevealOnEntry"
+  Prompt.ChooseColor {} -> "ChooseColor"
+  Prompt.ChooseManaType {} -> "ChooseManaType"
+  Prompt.ChooseCardName {} -> "ChooseCardName"
+  Prompt.ChooseOpponent {} -> "ChooseOpponent"
+  Prompt.ChooseProtector {} -> "ChooseProtector"
+  Prompt.ChoosePlayer {} -> "ChoosePlayer"
+  Prompt.OrderTriggers {} -> "OrderTriggers"
+  Prompt.OrderDamage {} -> "OrderDamage"
+  Prompt.ChooseReplacement {} -> "ChooseReplacement"
+  Prompt.ChooseBoundToken {} -> "ChooseBoundToken"
+  Prompt.ChooseSacrifices {} -> "ChooseSacrifices"
+  Prompt.ChooseExilesFromGraveyard {} -> "ChooseExilesFromGraveyard"
+  Prompt.ChooseAnyNumberToSacrifice {} -> "ChooseAnyNumberToSacrifice"
+  Prompt.ChooseAnyNumberOfPermanents {} -> "ChooseAnyNumberOfPermanents"
+  Prompt.ChoosePermanent {} -> "ChoosePermanent"
+  Prompt.ChooseTapsForTotalPower {} -> "ChooseTapsForTotalPower"
+  Prompt.ChooseTaps {} -> "ChooseTaps"
+  Prompt.ChooseReturns {} -> "ChooseReturns"
+  Prompt.ChooseAttachment {} -> "ChooseAttachment"
+  Prompt.ChooseTurnUpAttachment {} -> "ChooseTurnUpAttachment"
+  Prompt.ChooseCost {} -> "ChooseCost"
+  Prompt.OrderCostComponents {} -> "OrderCostComponents"
+  Prompt.OrderCombatTolls {} -> "OrderCombatTolls"
+  Prompt.OrderComponentCards {} -> "OrderComponentCards"
+  Prompt.OrderForEach {} -> "OrderForEach"
+  Prompt.OrderTimestamps {} -> "OrderTimestamps"
+  Prompt.DeclareMulligan {} -> "DeclareMulligan"
+  Prompt.Bottom {} -> "Bottom"
+  Prompt.MulliganAction {} -> "MulliganAction"
+  Prompt.OpeningHandAction {} -> "OpeningHandAction"
+  Prompt.ChooseOptional {} -> "ChooseOptional"
+  Prompt.ChooseClause {} -> "ChooseClause"
+  Prompt.OfferedCast {} -> "OfferedCast"
+  Prompt.ChooseOfferedCastFace {} -> "ChooseOfferedCastFace"
+  Prompt.OfferedMiracleReveal {} -> "OfferedMiracleReveal"
+  Prompt.ChooseToPay {} -> "ChooseToPay"
+  Prompt.AnnouncePhyrexianPayment {} -> "AnnouncePhyrexianPayment"
+  Prompt.AnnounceHybridPayment {} -> "AnnounceHybridPayment"
+  Prompt.AnnounceHybridHalf {} -> "AnnounceHybridHalf"
+  Prompt.ChooseReductionHalf {} -> "ChooseReductionHalf"
+  Prompt.ChooseReducedCost {} -> "ChooseReducedCost"
 
 -- Run a Game action purely under an answerer and keep only the final state. The
 -- shape every direct-call test needs now that the change-and-emit funnels are
@@ -2016,7 +2520,7 @@ addCounter kind n oid gs =
    in gs1 {GameState.objects = Map.adjust bump oid (GameState.objects gs1)}
 
 -- CR 303.4b: attach `rider` to `host` directly, without casting. A STATE fixture
--- (the shape addCreature and withEffect already have), not a synthetic card --
+-- (the shape addPermanent and withEffect already have), not a synthetic card --
 -- every printing a caller passes is real. Type-agnostic on purpose: CR 400.7's
 -- reset is a property of the field, so the CR 400.7 test does not need an Aura.
 --
@@ -2283,11 +2787,11 @@ isCastOf oid action = case action of
 -- creature). Returns (pre-cast state, post-cast state, Bolt's hand id).
 boltAtBobsPiker :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
 boltAtBobsPiker piker land bolt =
-  let (_, withPiker) = addCreature piker bob (landsInPlay land 1)
+  let (_, withPiker) = addPermanent piker bob (landsInPlay land 1)
       (gs, oid) = handOne bolt withPiker
    in (gs, snd (Engine.runGamePure identityAnswer gs (cast alice oid)), oid)
 
--- The single creature bob controls in a fixture built by (addCreature piker bob).
+-- The single creature bob controls in a fixture built by (addPermanent piker bob).
 pikerOf :: GameState.GameState -> ObjectId.ObjectId
 pikerOf gs = case Game.zoneMembers Zone.Battlefield bob gs of
   oid : _ -> oid

@@ -283,9 +283,9 @@ eliminateTheImpossibleSpec s registry = Spec.describe s "EliminateTheImpossible"
     let (gs0, attackers, _) = S.combatBoardOf [piker] []
         (poiId, gs1) = S.entersWithTrigger poi S.bob gs0
         entered = S.runPure S.identityAnswer gs1 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
-        -- S.addCreature places any permanent; these two are the {1}{U}.
-        (_, gs2) = S.addCreature island S.alice entered
-        (_, gs3) = S.addCreature island S.alice gs2
+        -- S.addPermanent places any permanent; these two are the {1}{U}.
+        (_, gs2) = S.addPermanent island S.alice entered
+        (_, gs3) = S.addPermanent island S.alice gs2
         (spellId, gs4) = S.addHandCard eliminate S.alice gs3
         declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.manaPerformer S.alice)
     case (S.tokensOf declared, attackers) of
@@ -336,9 +336,9 @@ angelicSleuthSpec s registry = Spec.describe s "AngelicSleuth" $ do
   let board = do
         sleuth <- S.printingOf s registry "Angelic Sleuth"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (sleuthId, g1) = S.addCreature sleuth S.alice (Setup.emptyGame S.bothPlayers)
-            (victimId, g2) = S.addCreature piker S.alice g1
-            (opponentId, g3) = S.addCreature piker S.bob g2
+        let (sleuthId, g1) = S.addPermanent sleuth S.alice (Setup.emptyGame S.bothPlayers)
+            (victimId, g2) = S.addPermanent piker S.alice g1
+            (opponentId, g3) = S.addPermanent piker S.bob g2
         pure (sleuthId, victimId, opponentId, g3)
       -- Lethal damage, state-based actions, then gather and resolve whatever
       -- trigger that produced.
@@ -399,7 +399,7 @@ repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
   Spec.it s "CR 701.60b the first activation suspects and the second adds a counter" $ do
     swamp <- S.printingOf s registry "Swamp"
     offender <- S.printingOf s registry "Repeat Offender"
-    let (offenderId, board) = S.addCreature offender S.alice (S.landsInPlay swamp 6)
+    let (offenderId, board) = S.addPermanent offender S.alice (S.landsInPlay swamp 6)
         activate gs = case Activate.abilitiesFor offenderId gs of
           [ability] -> Right (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice offenderId ability >> Stack.resolveTop >> Engine.settleForPriority))
           other -> Left (length other)
@@ -479,10 +479,10 @@ jugglerBoard s registry = do
   brute <- S.printingOf s registry "Boggart Brute"
   wall <- S.printingOf s registry "Wall of Stone"
   juggler <- S.printingOf s registry "Rune-Brand Juggler"
-  let (_, g1) = S.addCreature mountain S.alice (S.landsInPlay swamp 4)
-      (pikerId, g2) = S.addCreature piker S.alice g1
-      (bruteId, g3) = S.addCreature brute S.alice g2
-      (wallId, g4) = S.addCreature wall S.bob g3
+  let (_, g1) = S.addPermanent mountain S.alice (S.landsInPlay swamp 4)
+      (pikerId, g2) = S.addPermanent piker S.alice g1
+      (bruteId, g3) = S.addPermanent brute S.alice g2
+      (wallId, g4) = S.addPermanent wall S.bob g3
       (jugglerId, g5) = S.entersWithTrigger juggler S.alice g4
       gs =
         g5
@@ -745,7 +745,7 @@ wildEvocationSpec s registry =
       -- puts its card at the FRONT of the hand, so the last named is stocked
       -- first.
       board evocation cards =
-        let (_, withEvocation) = S.addCreature evocation S.alice (Setup.emptyGame S.bothPlayers)
+        let (_, withEvocation) = S.addPermanent evocation S.alice (Setup.emptyGame S.bothPlayers)
          in List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) withEvocation (reverse cards)
       -- BOB's upkeep, stamped and recorded: the half TurnScope.EachTurn buys,
       -- since under ControllersTurn the trigger would not fire here at all.
@@ -1005,8 +1005,8 @@ wildEvocationSpec s registry =
           shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
           piker <- S.printingOf s registry "Goblin Piker"
           maiden <- S.printingOf s registry "Bird Maiden"
-          let (_, withWinnower) = S.addCreature winnower S.alice (board evocation [shieldbreaker, piker, maiden])
-              (bonesplitterId, gs) = S.addCreature bonesplitter S.alice withWinnower
+          let (_, withWinnower) = S.addPermanent winnower S.alice (board evocation [shieldbreaker, piker, maiden])
+              (bonesplitterId, gs) = S.addPermanent bonesplitter S.alice withWinnower
               after = runBobsUpkeep (rolling 0) gs
           Spec.assertEqWith s "the Adventure half was cast, and it destroyed the Bonesplitter" (S.onBattlefield bonesplitterId gs, S.onBattlefield bonesplitterId after) (True, False)
           -- BY NAME, and CR 715.4 is why the exiled card answers to the creature's
@@ -1034,7 +1034,7 @@ wildEvocationSpec s registry =
           shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
           piker <- S.printingOf s registry "Goblin Piker"
           maiden <- S.printingOf s registry "Bird Maiden"
-          let (bonesplitterId, gs) = S.addCreature bonesplitter S.alice (board evocation [shieldbreaker, piker, maiden])
+          let (bonesplitterId, gs) = S.addPermanent bonesplitter S.alice (board evocation [shieldbreaker, piker, maiden])
               adventureLeg = runBobsUpkeep (choosingHalf (named "Battle Display")) gs
               creatureLeg = runBobsUpkeep (choosingHalf (named "Embereth Shieldbreaker")) gs
           Spec.assertEqWith s "the Adventure answer destroys the Bonesplitter and the creature answer leaves it" (S.onBattlefield bonesplitterId adventureLeg, S.onBattlefield bonesplitterId creatureLeg) (False, True)

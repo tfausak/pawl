@@ -113,8 +113,8 @@ owningUndercity undercity owners gs =
 board :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId, ObjectId, GameState.GameState)
 board island piker undercity =
   let stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (Setup.emptyGame S.threePlayers) [1 .. (3 :: Int)]
-      (bobs, g1) = S.addCreature piker S.bob stocked
-      (carols, g2) = S.addCreature piker S.carol g1
+      (bobs, g1) = S.addPermanent piker S.bob stocked
+      (carols, g2) = S.addPermanent piker S.carol g1
    in (bobs, carols, owningUndercity undercity [S.alice, S.bob, S.carol] g2)
 
 -- CR 726.2: one creature's combat damage to the player who has the initiative.
@@ -252,7 +252,7 @@ spec s registry = Spec.describe s "Initiative" $ do
     undercity <- S.printingOf s registry "Undercity"
     sneak <- S.printingOf s registry "Aarakocra Sneak"
     let (bobs, _, base) = board island piker undercity
-        (second, withSecond) = S.addCreature piker S.bob base
+        (second, withSecond) = S.addPermanent piker S.bob base
         (_, entering) = S.entersWithTrigger sneak S.alice withSecond
         hers = resolveAll answering entering
         after = resolveAll answering (S.withEvents [combatDamageTo S.alice bobs, combatDamageTo S.alice second] hers)

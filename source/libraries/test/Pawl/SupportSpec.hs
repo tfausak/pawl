@@ -1,3 +1,8 @@
+-- Covers the arrangement builder and keyed script interpreter in Pawl.Support:
+-- what a structurally coherent board construction guarantees and what it does
+-- not, how a command is keyed to a moment and matched to a prompt, and which
+-- script mistakes are reported rather than silently absorbed. The fixtures and
+-- answerers in the rest of Pawl.Support are proved by the specs that use them.
 module Pawl.SupportSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -67,7 +72,7 @@ spec s registry = Spec.describe s "Support" $ do
       Left failure -> Spec.assertFailure s (show failure)
       Right built ->
         case S.runScript (Seq.singleton scheduled) built (pure ()) of
-          Left (S.MkUnreachedCommands commands) ->
+          Left (S.MkUnreachedCommands _ _ commands) ->
             Spec.assertEqWith s "the unreached command" commands (Seq.singleton scheduled)
           Left failure -> Spec.assertFailure s (show failure)
           Right _ -> Spec.assertFailure s "the unreached command was silently ignored"
@@ -114,7 +119,7 @@ spec s registry = Spec.describe s "Support" $ do
               State.modify' (\gs -> gs {GameState.priority = Just S.alice})
               Engine.priorityLoop
         case S.runScript (Seq.singleton scheduled) built priority of
-          Left (S.MkUnreachedCommands commands) ->
+          Left (S.MkUnreachedCommands _ _ commands) ->
             Spec.assertEqWith s "ChooseAction passed and left the combat command alone" commands (Seq.singleton scheduled)
           Left failure -> Spec.assertFailure s (show failure)
           Right _ -> Spec.assertFailure s "the unrelated combat command was consumed"
@@ -149,7 +154,143 @@ spec s registry = Spec.describe s "Support" $ do
       Left failure -> Spec.assertFailure s (show failure)
       Right built ->
         case S.runScript Seq.empty built S.combatGame of
-          Left (S.MkUnscheduledPrompt _ kind) ->
+          Left (S.MkUnscheduledPrompt _ kind _) ->
             Spec.assertEqWith s "the prompt kind" kind (Text.pack "DeclareAttackers")
           Left failure -> Spec.assertFailure s (show failure)
           Right _ -> Spec.assertFailure s "the attackers prompt was silently answered"
+
+  Spec.it s "an arrangement past the beginning of combat can attack" $ do
+    -- CR 506.2 / CR 703.4h: the defending player is settled during the beginning
+    -- of combat step, so a board arranged AFTER it has to arrive with that done.
+    -- Without it Combat.declareAttackers finds no defending player, skips its
+    -- prompt, and the attack command reports itself as never reached.
+    let attacker = S.aliasRef "attacker"
+        setup =
+          S.arrangement
+            ( S.battlefield S.alice [S.ready (S.aliased "attacker" (S.permanent "Goblin Piker"))]
+                NonEmpty.:| [S.battlefield S.bob []]
+            )
+            S.alice
+            (Phase.Combat CombatStep.DeclareAttackers)
+        script = Seq.singleton (S.at 1 (Phase.Combat CombatStep.DeclareAttackers) S.alice (S.attack [attacker]))
+    built <- S.arrangeOrFail s registry setup
+    (_, after) <- S.runScriptOrFail s script built S.combatGame
+    Spec.assertEqWith s "bob took the attacker's two" (S.lifeOf S.bob after) (Just 18)
+
+  Spec.it s "a reference the prompt did not offer is a failure, not a dropped command" $ do
+    -- Both Pikers are alice's, so "Goblin Piker 1" resolves; only the untapped
+    -- one is a legal attacker (CR 508.1a), so the prompt never offers the first.
+    -- The engine would filter it out AFTER the command was popped, leaving a
+    -- green script with nobody attacking.
+    let tapped = (S.ready (S.permanent "Goblin Piker")) {S.objectTapState = TapState.Tapped}
+        setup =
+          S.arrangement
+            ( S.battlefield S.alice [tapped, S.ready (S.permanent "Goblin Piker")]
+                NonEmpty.:| [S.battlefield S.bob []]
+            )
+            S.alice
+            (Phase.Combat CombatStep.DeclareAttackers)
+        script =
+          Seq.singleton
+            ( S.at
+                1
+                (Phase.Combat CombatStep.DeclareAttackers)
+                S.alice
+                (S.attack [S.namedRef "Goblin Piker" 1])
+            )
+    built <- S.arrangeOrFail s registry setup
+    case S.runScript script built S.combatGame of
+      Left (S.MkUnofferedObject _ kind named offers) -> do
+        Spec.assertEqWith s "the unoffered reference" named (Text.pack "Goblin Piker 1")
+        Spec.assertEqWith s "the prompt it came from" kind (Text.pack "DeclareAttackers")
+        Spec.assertEqWith s "what it did offer" offers [Text.pack "Goblin Piker 2"]
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "the unoffered attacker was silently dropped"
+
+  Spec.it s "a qualified assignment is matched by its source, not by its position" $ do
+    -- Two double-blocked attackers are prompted in the engine's order over
+    -- Combat.attackers, which the script does not know. The assignments are
+    -- listed in the opposite order on purpose: matching by position answers the
+    -- first prompt with the second attacker's map.
+    let permanent name = S.ready (S.aliased name (S.permanent "Goblin Piker"))
+        setup =
+          S.arrangement
+            ( S.battlefield S.alice [permanent "left", permanent "right"]
+                NonEmpty.:| [ S.battlefield
+                                S.bob
+                                [ permanent "left first",
+                                  permanent "left second",
+                                  permanent "right first",
+                                  permanent "right second"
+                                ]
+                            ]
+            )
+            S.alice
+            (Phase.Combat CombatStep.BeginningOfCombat)
+        left = S.aliasRef "left"
+        right = S.aliasRef "right"
+        script =
+          Seq.fromList
+            [ S.at 1 (Phase.Combat CombatStep.DeclareAttackers) S.alice (S.attack [left, right]),
+              S.at
+                1
+                (Phase.Combat CombatStep.DeclareBlockers)
+                S.bob
+                ( S.block
+                    [ (S.aliasRef "left first", left),
+                      (S.aliasRef "left second", left),
+                      (S.aliasRef "right first", right),
+                      (S.aliasRef "right second", right)
+                    ]
+                ),
+              S.atSource
+                1
+                (Phase.Combat CombatStep.CombatDamage)
+                S.alice
+                right
+                ( S.assignDamage
+                    [ (S.MkCreatureRecipient (S.aliasRef "right first"), 1),
+                      (S.MkCreatureRecipient (S.aliasRef "right second"), 1)
+                    ]
+                ),
+              S.atSource
+                1
+                (Phase.Combat CombatStep.CombatDamage)
+                S.alice
+                left
+                ( S.assignDamage
+                    [ (S.MkCreatureRecipient (S.aliasRef "left first"), 1),
+                      (S.MkCreatureRecipient (S.aliasRef "left second"), 1)
+                    ]
+                )
+            ]
+    built <- S.arrangeOrFail s registry setup
+    (_, fought) <- S.runScriptOrFail s script built S.combatGame
+    -- Each Piker is a 2/1, so one point is lethal: every blocker dies.
+    Spec.assertEqWith s "all four blockers were assigned lethal damage" (S.creaturesInPlay S.bob (S.settleSba fought)) 0
+
+  Spec.it s "a qualifier on a prompt with no source is a script error" $ do
+    let attacker = S.aliasRef "attacker"
+        setup =
+          S.arrangement
+            ( S.battlefield S.alice [S.ready (S.aliased "attacker" (S.permanent "Goblin Piker"))]
+                NonEmpty.:| [S.battlefield S.bob []]
+            )
+            S.alice
+            (Phase.Combat CombatStep.DeclareAttackers)
+        script =
+          Seq.singleton
+            ( S.atSource
+                1
+                (Phase.Combat CombatStep.DeclareAttackers)
+                S.alice
+                attacker
+                (S.attack [attacker])
+            )
+    built <- S.arrangeOrFail s registry setup
+    case S.runScript script built S.combatGame of
+      Left (S.MkUnexpectedQualifier _ kind ref) -> do
+        Spec.assertEqWith s "the prompt that has no source" kind (Text.pack "DeclareAttackers")
+        Spec.assertEqWith s "the qualifier it carried" ref attacker
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "the dangling qualifier was ignored"

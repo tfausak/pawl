@@ -109,7 +109,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     swamp <- S.printingOf s registry "Swamp"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
-        (piker, g1) = S.addCreature pikerPrinting S.alice base
+        (piker, g1) = S.addPermanent pikerPrinting S.alice base
         land = case Set.toList (GameState.battlefield base) of
           oid : _ -> Just oid
           [] -> Nothing
@@ -131,18 +131,18 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 614.1a a redirect that no longer matches its own pattern cannot re-fire" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g1) = S.addCreature restInPeace S.alice g0
-        (piker, g2) = S.addCreature pikerPrinting S.bob g1
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g1) = S.addPermanent restInPeace S.alice g0
+        (piker, g2) = S.addPermanent pikerPrinting S.bob g1
         after = S.runPure S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
     Spec.assertEqWith s "not in a graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
     Spec.assertEqWith s "exactly one object in exile" (Set.size (GameState.exile after)) 1
   Spec.it s "CR 616.1 value-equal candidates elide the prompt (nothing to choose)" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g1) = S.addCreature restInPeace S.alice g0
-        (piker, g2) = S.addCreature pikerPrinting S.bob g1
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g1) = S.addPermanent restInPeace S.alice g0
+        (piker, g2) = S.addPermanent pikerPrinting S.bob g1
         asked = answersFor S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
     Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
   -- The other side of Replacement.readsApplier, and the reason it exists rather
@@ -155,9 +155,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 616.1 value-equal candidates under DIFFERENT controllers still elide" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g1) = S.addCreature restInPeace S.bob g0
-        (piker, g2) = S.addCreature pikerPrinting S.bob g1
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g1) = S.addPermanent restInPeace S.bob g0
+        (piker, g2) = S.addPermanent pikerPrinting S.bob g1
         after = S.runPure S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
         asked = answersFor S.identityAnswer g2 (Event.changeZone piker Zone.Graveyard)
     Spec.assertEqWith s "the Piker was exiled, not buried" (Set.size (GameState.exile after)) 1
@@ -179,9 +179,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     opalescence <- S.printingOf s registry "Opalescence"
     restInPeace <- S.printingOf s registry "Rest in Peace"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
-        (rip, g1) = S.addCreature restInPeace S.alice g0
-        (piker, g2) = S.addCreature pikerPrinting S.bob g1
+    let (_, g0) = S.addPermanent opalescence S.alice (Setup.emptyGame S.bothPlayers)
+        (rip, g1) = S.addPermanent restInPeace S.alice g0
+        (piker, g2) = S.addPermanent pikerPrinting S.bob g1
         board = S.addCounter CounterKind.MinusOneMinusOne 1 piker (S.addCounter CounterKind.MinusOneMinusOne 2 rip g2)
         after = S.settleSba board
     Spec.assertBool s (rip < piker) "setup: Rest in Peace is buried before the Piker"
@@ -205,9 +205,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     opalescence <- S.printingOf s registry "Opalescence"
     restInPeace <- S.printingOf s registry "Rest in Peace"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
-        (rip, g1) = S.addCreature restInPeace S.alice g0
-        (piker, g2) = S.addCreature pikerPrinting S.bob g1
+    let (_, g0) = S.addPermanent opalescence S.alice (Setup.emptyGame S.bothPlayers)
+        (rip, g1) = S.addPermanent restInPeace S.alice g0
+        (piker, g2) = S.addPermanent pikerPrinting S.bob g1
         board = S.markDamage piker 1 (S.addCounter CounterKind.MinusOneMinusOne 2 rip g2)
         after = S.settleSba board
     Spec.assertEqWith s "setup: Opalescence's 2/2 is a 0/0, so CR 704.5f buries it" (S.powerToughnessOf rip board) (Just (0, 0))
@@ -246,9 +246,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     coating <- S.printingOf s registry "Liquimetal Coating"
     animator <- S.printingOf s registry "Skilled Animator"
     let base = S.landsInPlay island 3 -- {2}{U} for the Animator
-        (creature, g1) = S.addCreature pikerPrinting S.alice base
-        (aura, g2) = S.addCreature unholyStrength S.alice g1
-        (coatingId, g3) = S.addCreature coating S.alice (S.attach aura creature g2)
+        (creature, g1) = S.addPermanent pikerPrinting S.alice base
+        (aura, g2) = S.addPermanent unholyStrength S.alice g1
+        (coatingId, g3) = S.addPermanent coating S.alice (S.attach aura creature g2)
         ready = g3 {GameState.priority = Just S.alice}
         activated = S.runPure (aimObject aura) ready (Activate.activateAbility S.alice coatingId (theAbility coating))
         coated = S.runPure (aimObject aura) activated Stack.resolveTop
@@ -274,8 +274,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 614.1a a move whose destination the pattern misses is untouched" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-        (piker, g1) = S.addCreature pikerPrinting S.bob g0
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+        (piker, g1) = S.addPermanent pikerPrinting S.bob g0
         -- Rest in Peace watches graveyard-bound moves only; a bounce to hand
         -- is not one, so the loop finds no candidate and the move stands.
         after = S.runPure S.identityAnswer g1 (Event.changeZone piker Zone.Hand)
@@ -286,8 +286,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     fog <- S.printingOf s registry "Fog"
     let base = S.landsInPlay forest 1
-        (victimA, g1) = S.addCreature pikerPrinting S.bob base
-        (victimB, g2) = S.addCreature pikerPrinting S.bob g1
+        (victimA, g1) = S.addPermanent pikerPrinting S.bob base
+        (victimB, g2) = S.addPermanent pikerPrinting S.bob g1
         (g3, fogId) = S.handOne fog g2
         resolved = S.runPure S.identityAnswer g3 (S.cast S.alice fogId >> Stack.resolveTop)
         -- Hand-built rather than driven through real combat: reaching a real
@@ -306,7 +306,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     swamp <- S.printingOf s registry "Swamp"
     drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
     let base = S.landsInPlay swamp 1
-        (skel, g1) = S.addCreature drudgeSkeletons S.alice base
+        (skel, g1) = S.addPermanent drudgeSkeletons S.alice base
         -- Activate {B}: regenerate this creature, and resolve it.
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice skel (theAbility drudgeSkeletons) >> Stack.resolveTop)
         -- CR 701.19a's "remove it from combat" half needs the creature
@@ -329,7 +329,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 701.19c a shield does not save a creature from a destruction that forbids regeneration" $ do
     swamp <- S.printingOf s registry "Swamp"
     drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
-    let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
+    let (skel, g1) = S.addPermanent drudgeSkeletons S.alice (S.landsInPlay swamp 1)
         shielded = S.addRegenShield skel g1
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.CantBeRegenerated [skel])
     Spec.assertBool s (not (Set.member skel (GameState.battlefield after))) "it died anyway"
@@ -343,7 +343,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 701.19a the same shield DOES save it from an ordinary destruction" $ do
     swamp <- S.printingOf s registry "Swamp"
     drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
-    let (skel, g1) = S.addCreature drudgeSkeletons S.alice (S.landsInPlay swamp 1)
+    let (skel, g1) = S.addPermanent drudgeSkeletons S.alice (S.landsInPlay swamp 1)
         shielded = S.addRegenShield skel g1
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [skel])
     Spec.assertBool s (Set.member skel (GameState.battlefield after)) "it survived"
@@ -356,8 +356,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     swamp <- S.printingOf s registry "Swamp"
     uthdenTroll <- S.printingOf s registry "Uthden Troll"
     terror <- S.printingOf s registry "Terror"
-    let base = foldl (\gs p -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
-        (troll, g1) = S.addCreature uthdenTroll S.alice base
+    let base = foldl (\gs p -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
+        (troll, g1) = S.addPermanent uthdenTroll S.alice base
         -- {R}: Regenerate this creature -- the shield is really activated.
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
         (withTerror, spell) = S.handOne terror armed
@@ -372,7 +372,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     mountain <- S.printingOf s registry "Mountain"
     uthdenTroll <- S.printingOf s registry "Uthden Troll"
     let base = S.landsInPlay mountain 1
-        (troll, g1) = S.addCreature uthdenTroll S.alice base
+        (troll, g1) = S.addPermanent uthdenTroll S.alice base
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
         -- 2 damage is lethal to a 2/2.
         hurt = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent troll (Recipient.ToCreature troll) 2 False False False 0 Nothing DamageKind.Combat])
@@ -383,8 +383,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     drudgeSkeletons <- S.printingOf s registry "Drudge Skeletons"
     let base = S.landsInPlay swamp 1
-        (_, g1) = S.addCreature restInPeace S.bob base
-        (skel, g2) = S.addCreature drudgeSkeletons S.alice g1
+        (_, g1) = S.addPermanent restInPeace S.bob base
+        (skel, g2) = S.addPermanent drudgeSkeletons S.alice g1
         shielded = S.addRegenShield skel g2
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [skel])
     Spec.assertBool s (Set.member skel (GameState.battlefield after)) "still on the battlefield"
@@ -393,7 +393,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 614.7 an event that never happens does not consume a shield" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let base = Setup.emptyGame S.bothPlayers
-        (myr, g1) = S.addCreature darksteelMyr S.alice base
+        (myr, g1) = S.addPermanent darksteelMyr S.alice base
         shielded = S.addRegenShield myr g1
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [myr])
     Spec.assertBool s (Set.member myr (GameState.battlefield after)) "the indestructible creature survives"
@@ -488,8 +488,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     instillInfection <- S.printingOf s registry "Instill Infection"
     let base = S.landsInPlay swamp 4
-        (scales, g1) = S.addCreature hardenedScales S.alice base
-        (piker, g2) = S.addCreature pikerPrinting S.alice g1
+        (scales, g1) = S.addPermanent hardenedScales S.alice base
+        (piker, g2) = S.addPermanent pikerPrinting S.alice g1
         (g3, spellId) = S.handOne instillInfection g2
         after = castAndResolve (raceAnswer scales piker) g3 spellId
     Spec.assertEqWith s "one -1/-1 counter, unscaled" (countersOn CounterKind.MinusOneMinusOne piker after) 1
@@ -589,7 +589,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
         outcome buried =
-          let (_, withPiker) = S.addCreature pikerPrinting S.alice (S.landsInPlay swamp 9)
+          let (_, withPiker) = S.addPermanent pikerPrinting S.alice (S.landsInPlay swamp 9)
               graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) withPiker buried
               (gs, spellId) = S.handOne rise graves
               after = S.settleSba (castAndResolve sacrificesAll gs spellId)
@@ -879,7 +879,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     let base = S.landsInPlay island 4
-        (_, withPiker) = S.addCreature pikerPrinting S.alice base
+        (_, withPiker) = S.addPermanent pikerPrinting S.alice base
         (gs, cloneId) = S.handOne clone withPiker
         -- S.identityAnswer declines ChooseCopyTarget (Clone's own "may").
         resolved = S.runPure S.identityAnswer gs (S.cast S.alice cloneId >> Stack.resolveTop >> Engine.settleForPriority)
@@ -890,7 +890,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     clonePrinting <- S.printingOf s registry "Clone"
     let base = S.landsInPlay island 4
-        (piker, withPiker) = S.addCreature pikerPrinting S.alice base
+        (piker, withPiker) = S.addPermanent pikerPrinting S.alice base
         (gs, cloneId) = S.handOne clonePrinting withPiker
         -- No settle: the choice must already be made when resolveTop returns.
         resolved = S.runPure (copyOf piker) gs (S.cast S.alice cloneId >> Stack.resolveTop)
@@ -1057,9 +1057,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     -- whose source alice controls. Bob's card is exiled on the way to his
     -- graveyard; alice's own reaches hers untouched.
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (src, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
-        (mine, g2) = S.addCreature pikerPrinting S.alice g1
-        (theirs, g3) = S.addCreature pikerPrinting S.bob g2
+    let (src, g1) = S.addPermanent pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        (mine, g2) = S.addPermanent pikerPrinting S.alice g1
+        (theirs, g3) = S.addPermanent pikerPrinting S.bob g2
         g4 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g3))) g3
         after = S.runPure S.identityAnswer g4 (Event.changeZone mine Zone.Graveyard >> Event.changeZone theirs Zone.Graveyard)
     Spec.assertEqWith s "alice's own card reaches her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
@@ -1071,8 +1071,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     -- controller-based test would, which is the case this pins.
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let slot = SlotName.MkSlotName (Text.pack "target")
-        (src, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
-        (oid, g2) = S.addCreature pikerPrinting S.alice g1
+        (src, g1) = S.addPermanent pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
+        (oid, g2) = S.addPermanent pikerPrinting S.alice g1
         g3 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g2))) g2
         stolen =
           S.runPure S.identityAnswer g3 $
@@ -1083,7 +1083,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
   Spec.it s "CR 208.2b a single-option ChoiceOf is not a choice and must not prompt" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (piker, g1) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
+    let (piker, g1) = S.addPermanent pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
         (ts, g2) = Game.freshTimestamp g1
         onlyOption = EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}
         active =
@@ -1109,7 +1109,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     doublingSeason <- S.printingOf s registry "Doubling Season"
     dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let base = S.landsInPlay mountain 2
-        (_, g1) = S.addCreature doublingSeason S.alice base
+        (_, g1) = S.addPermanent doublingSeason S.alice base
         (g2, spellId) = S.handOne dragonFodder g1
         after = castAndResolve S.identityAnswer g2 spellId
     Spec.assertEqWith s "twice that many" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 4
@@ -1118,8 +1118,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     doublingSeason <- S.printingOf s registry "Doubling Season"
     dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let base = S.landsInPlay mountain 2
-        (_, g1) = S.addCreature doublingSeason S.alice base
-        (_, g2) = S.addCreature doublingSeason S.alice g1
+        (_, g1) = S.addPermanent doublingSeason S.alice base
+        (_, g2) = S.addPermanent doublingSeason S.alice g1
         (g3, spellId) = S.handOne dragonFodder g2
         after = castAndResolve S.identityAnswer g3 spellId
     Spec.assertEqWith s "2 -> 4 -> 8" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 8
@@ -1164,8 +1164,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     doublingSeason <- S.printingOf s registry "Doubling Season"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     immolation <- S.printingOf s registry "Soul Immolation"
-    let (_, g1) = S.addCreature doublingSeason S.alice (S.landsInPlay mountain 5)
-        (wall, g2) = S.addCreature wallOfStone S.alice g1
+    let (_, g1) = S.addPermanent doublingSeason S.alice (S.landsInPlay mountain 5)
+        (wall, g2) = S.addPermanent wallOfStone S.alice g1
         (g3, spellId) = S.handOne immolation g2
         after = castAndResolve (blightAnswer wall) g3 spellId
     Spec.assertEqWith s "X counters, not 2X" (countersOn CounterKind.MinusOneMinusOne wall after) 3
@@ -1182,8 +1182,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     immolation <- S.printingOf s registry "Soul Immolation"
-    let (_, g1) = S.addCreature vorinclex S.alice (S.landsInPlay mountain 5)
-        (wall, g2) = S.addCreature wallOfStone S.alice g1
+    let (_, g1) = S.addPermanent vorinclex S.alice (S.landsInPlay mountain 5)
+        (wall, g2) = S.addPermanent wallOfStone S.alice g1
         (g3, spellId) = S.handOne immolation g2
         after = castAndResolve (blightAnswer wall) g3 spellId
     Spec.assertEqWith s "twice that many" (countersOn CounterKind.MinusOneMinusOne wall after) 6
@@ -1199,8 +1199,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     doublingSeason <- S.printingOf s registry "Doubling Season"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     mischief <- S.printingOf s registry "Boggart Mischief"
-    let (_, g1) = S.addCreature doublingSeason S.alice (S.landsInPlay swamp 3)
-        (wall, g2) = S.addCreature wallOfStone S.alice g1
+    let (_, g1) = S.addPermanent doublingSeason S.alice (S.landsInPlay swamp 3)
+        (wall, g2) = S.addPermanent wallOfStone S.alice g1
         (g3, spellId) = S.handOne mischief g2
         -- CR 603.3: the enters trigger is put on the stack by the next CR 117.5
         -- scan, not by the resolution that fired it, so the spell's resolution is
@@ -1219,14 +1219,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     swamp <- S.printingOf s registry "Swamp"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
-        (piker, g1) = S.addCreature pikerPrinting S.alice base
+        (piker, g1) = S.addPermanent pikerPrinting S.alice base
         (settled, _) = S.runPureWith S.identityAnswer g1 (Event.resolveDestruction Nothing DestructionCause.ByEffect Regenerability.Regenerable piker)
     Spec.assertEqWith s "the object it was asked about" settled (Just piker)
   Spec.it s "CR 701.19a a regenerated destruction settles on nothing" $ do
     swamp <- S.printingOf s registry "Swamp"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
-        (piker, g1) = S.addCreature pikerPrinting S.alice base
+        (piker, g1) = S.addPermanent pikerPrinting S.alice base
         (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Event.resolveDestruction Nothing DestructionCause.ByEffect Regenerability.Regenerable piker)
     Spec.assertEqWith s "consumed by the shield" settled Nothing
   galvanicBlastSpec s registry
@@ -1465,7 +1465,7 @@ warLeechSpec s registry = Spec.describe s "Monstrous War-Leech" $ do
 -- distinct names.
 metalcraftBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId)
 metalcraftBoard mountain myr galvanicBlast artifacts others =
-  let addAll ps gs = List.foldl' (\g p -> snd (S.addCreature p S.alice g)) gs ps
+  let addAll ps gs = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) gs ps
       gs1 = addAll (replicate artifacts myr <> others) (S.landsInPlay mountain 1)
       (gs2, spellId) = S.handOne galvanicBlast gs1
    in (gs2, spellId)
@@ -1534,7 +1534,7 @@ galvanicBlastSpec s registry =
       -- alice has two; bob has three. CR 109.5's "you" is the spell's
       -- controller, so hers is the count that matters and metalcraft is off.
       let (gs0, spellId) = metalcraftBoard mountain myr galvanicBlast 2 []
-          gs = List.foldl' (\g _ -> snd (S.addCreature myr S.bob g)) gs0 [1 :: Int, 2, 3]
+          gs = List.foldl' (\g _ -> snd (S.addPermanent myr S.bob g)) gs0 [1 :: Int, 2, 3]
           after = castAndResolve atBob gs spellId
       Spec.assertEqWith s "bob takes 2, not 4" (S.lifeOf S.bob after) (Just 18)
     -- CR 616.1a, and the reason the SelfReplacement bucket exists: "if any of
@@ -1597,9 +1597,9 @@ galvanicBlastSpec s registry =
     Spec.it s "CR 614.15 a source-scoped rewrite takes its own source's damage and no one else's" $ do
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
       let base = Setup.emptyGame S.bothPlayers
-          (mine, g1) = S.addCreature pikerPrinting S.alice base
-          (theirs, g2) = S.addCreature pikerPrinting S.bob g1
-          (victim, g3) = S.addCreature pikerPrinting S.bob g2
+          (mine, g1) = S.addPermanent pikerPrinting S.alice base
+          (theirs, g2) = S.addPermanent pikerPrinting S.bob g1
+          (victim, g3) = S.addPermanent pikerPrinting S.bob g2
           (ts, g4) = Game.freshTimestamp g3
           armed = S.addReplacement (blastShape mine ts) g4
           hit src = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Noncombat])
@@ -1639,7 +1639,7 @@ galvanicBlastSpec s registry =
 surgeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId])
 surgeBoard mountain splitter surge firebolt artifacts =
   let base = S.landsFor mountain S.alice 5 (Setup.emptyGame S.bothPlayers)
-      addArtifact (ids, g) _ = let (oid, g') = S.addCreature splitter S.alice g in (ids <> [oid], g')
+      addArtifact (ids, g) _ = let (oid, g') = S.addPermanent splitter S.alice g in (ids <> [oid], g')
       (splitters, g1) = List.foldl' addArtifact ([], base) [1 .. artifacts]
       (surgeId, g2) = S.addHandCard surge S.alice g1
       addBolt (ids, g) _ = let (oid, g') = S.addHandCard firebolt S.alice g in (ids <> [oid], g')
@@ -1692,7 +1692,7 @@ voltaicSurgeSpec s registry =
         [first_, second] -> do
           let armed = castAndResolve atBob gs surgeId
               printed = castAndResolve atBob armed first_
-              grown = snd (S.addCreature splitter S.alice printed)
+              grown = snd (S.addPermanent splitter S.alice printed)
               after = castAndResolve atBob grown second
           Spec.assertEqWith s "the first Firebolt lands at its printed 2" (S.lifeOf S.bob printed) (Just 18)
           Spec.assertEqWith s "the third artifact turns the clause on, so the second is doubled" (S.lifeOf S.bob after) (Just 14)
@@ -1716,9 +1716,9 @@ controlledNamed wanted pid gs =
 -- the Piker.
 specimenBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId)
 specimenBoard island pikerPrinting gatherSpecimens bobsHand =
-  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature island pid acc)) g [1 .. n :: Int]
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addPermanent island pid acc)) g [1 .. n :: Int]
       base = addLands S.bob 10 (addLands S.alice 6 (Setup.emptyGame S.bothPlayers))
-      (piker, g1) = S.addCreature pikerPrinting S.alice base
+      (piker, g1) = S.addPermanent pikerPrinting S.alice base
       (gatherId, g2) = S.addHandCard gatherSpecimens S.alice g1
       addOne (ids, g) p = let (oid, g3) = S.addHandCard p S.bob g in (ids <> [oid], g3)
       (bobs, g4) = List.foldl' addOne ([], g2) bobsHand
@@ -1740,7 +1740,7 @@ specimenBoard island pikerPrinting gatherSpecimens bobsHand =
 -- id, bob's, and carol's card.
 threeSeatSpecimenBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 threeSeatSpecimenBoard island gatherSpecimens creature =
-  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature island pid acc)) g [1 .. n :: Int]
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addPermanent island pid acc)) g [1 .. n :: Int]
       base = addLands S.carol 2 (addLands S.bob 6 (addLands S.alice 6 (Setup.emptyGame S.threePlayers)))
       (aliceGather, g1) = S.addHandCard gatherSpecimens S.alice base
       (bobGather, g2) = S.addHandCard gatherSpecimens S.bob g1
@@ -2080,10 +2080,10 @@ gatherSpecimensSpec s registry =
 -- state, the Piker and the held card.
 kismetBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 kismetBoard land pikerPrinting kismet spell =
-  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature land pid acc)) g [1 .. n :: Int]
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addPermanent land pid acc)) g [1 .. n :: Int]
       base = addLands S.alice 6 (Setup.emptyGame S.bothPlayers)
-      (pikerId, g1) = S.addCreature pikerPrinting S.alice base
-      (_, g2) = S.addCreature kismet S.bob g1
+      (pikerId, g1) = S.addPermanent pikerPrinting S.alice base
+      (_, g2) = S.addPermanent kismet S.bob g1
       (spellId, g3) = S.addHandCard spell S.alice g2
    in ( g3
           { GameState.phase = Phase.PrecombatMain,
@@ -2203,7 +2203,7 @@ blastShape src ts =
 shimatsuBoard :: Printing.Printing -> Int -> Printing.Printing -> Int -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
 shimatsuBoard mountain n pikerPrinting extra shimatsu =
   let base = S.landsInPlay mountain n
-      addOne (ids, g) _ = let (oid, g1) = S.addCreature pikerPrinting S.alice g in (ids <> [oid], g1)
+      addOne (ids, g) _ = let (oid, g1) = S.addPermanent pikerPrinting S.alice g in (ids <> [oid], g1)
       (pikers, withPikers) = List.foldl' addOne ([], base) (replicate extra ())
       (gs, held) = S.handOne shimatsu withPikers
    in ( gs
@@ -2389,12 +2389,12 @@ woodElementalBoard ::
   (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId, ObjectId.ObjectId)
 woodElementalBoard island forest bayou mountain woodElemental rite =
   let base = S.landsInPlay island 9
-      (firstForest, board1) = S.addCreature forest S.alice base
-      (secondForest, board2) = S.addCreature forest S.alice board1
-      (bayouId, board3) = S.addCreature bayou S.alice board2
-      (tappedForest, board4) = S.addCreature forest S.alice board3
-      (mountainId, board5) = S.addCreature mountain S.alice board4
-      (elementalId, board6) = S.addCreature woodElemental S.alice board5
+      (firstForest, board1) = S.addPermanent forest S.alice base
+      (secondForest, board2) = S.addPermanent forest S.alice board1
+      (bayouId, board3) = S.addPermanent bayou S.alice board2
+      (tappedForest, board4) = S.addPermanent forest S.alice board3
+      (mountainId, board5) = S.addPermanent mountain S.alice board4
+      (elementalId, board6) = S.addPermanent woodElemental S.alice board5
       (held, board7) = S.addHandCard rite S.alice (S.addCounter CounterKind.PlusOnePlusOne 1 elementalId (S.tapObject tappedForest board6))
    in ( board7
           { GameState.phase = Phase.PrecombatMain,
@@ -2520,10 +2520,10 @@ entryBudgetSpec s registry =
 riotBoard :: Printing.Printing -> Int -> Printing.Printing -> Int -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
 riotBoard mountain mountains forest forests hand =
   let base = S.landsInPlay mountain mountains
-      -- S.addCreature puts one permanent of a printing onto the battlefield,
+      -- S.addPermanent puts one permanent of a printing onto the battlefield,
       -- settled; nothing in it is creature-specific, which is what lets a second
       -- land printing join a board S.landsInPlay built from one.
-      addLand g _ = snd (S.addCreature forest S.alice g)
+      addLand g _ = snd (S.addPermanent forest S.alice g)
       withForests = List.foldl' addLand base (replicate forests ())
       addOne (ids, g) p = let (oid, g1) = S.addHandCard p S.alice g in (ids <> [oid], g1)
       (held, gs) = List.foldl' addOne ([], withForests) hand

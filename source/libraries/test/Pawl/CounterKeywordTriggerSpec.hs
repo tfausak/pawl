@@ -292,9 +292,9 @@ arborColossusSpec s registry =
         maidenPrinting <- S.printingOf s registry "Bird Maiden"
         pikerPrinting <- S.printingOf s registry "Goblin Piker"
         base <- extra (S.landsInPlay forest 12)
-        let (colossus, g1) = S.addCreature colossusPrinting S.alice base
-            (maiden, g2) = S.addCreature maidenPrinting S.bob g1
-            (piker, g3) = S.addCreature pikerPrinting S.bob g2
+        let (colossus, g1) = S.addPermanent colossusPrinting S.alice base
+            (maiden, g2) = S.addPermanent maidenPrinting S.bob g1
+            (piker, g3) = S.addPermanent pikerPrinting S.bob g2
         pure (colossus, maiden, piker, g3)
    in Spec.describe s "Arbor Colossus" $ do
         -- The proving test. CR 701.37a's counters and designation, and then rule
@@ -320,7 +320,7 @@ arborColossusSpec s registry =
           case monstrosity colossus maiden gs of
             Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
             Right once -> do
-              let (second, withSecond) = S.addCreature maidenPrinting S.bob once
+              let (second, withSecond) = S.addPermanent maidenPrinting S.bob once
               case monstrosity colossus second withSecond of
                 Left n -> Spec.assertFailure s ("expected the monstrous Colossus to stay activatable, got " <> show n)
                 Right twice -> do
@@ -354,7 +354,7 @@ arborColossusSpec s registry =
         Spec.it s "CR 701.37b a creature becoming monstrous is not a creature becoming renowned" $ do
           wardensPrinting <- S.printingOf s registry "Valeron Wardens"
           piker <- S.printingOf s registry "Goblin Piker"
-          (colossus, maiden, _, gs) <- board (pure . snd . S.addLibraryCard piker S.alice . snd . S.addCreature wardensPrinting S.alice)
+          (colossus, maiden, _, gs) <- board (pure . snd . S.addLibraryCard piker S.alice . snd . S.addPermanent wardensPrinting S.alice)
           case monstrosity colossus maiden gs of
             Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
             Right after -> do
@@ -386,7 +386,7 @@ vanishingSpec s registry =
       after pid gs = snd (upkeepOf pid gs)
       times = S.counterOf CounterKind.Time
       -- The wurm CAST rather than placed, because rule 702.63a's first ability is
-      -- a replacement on the entry -- S.addCreature builds the object directly and
+      -- a replacement on the entry -- S.addPermanent builds the object directly and
       -- so reaches no CR 616.1 loop, which is what the counterless case below
       -- turns on.
       castWurm = do
@@ -438,7 +438,7 @@ vanishingSpec s registry =
               Spec.assertBool s (S.onBattlefield wurm resolved) "and the wurm is untouched"
         -- CR 603.4's intervening "if": rule 702.63a's second ability does not
         -- trigger AT ALL on an upkeep where the permanent has no time counter, so
-        -- nothing reaches the stack. S.addCreature is what reaches this board --
+        -- nothing reaches the stack. S.addPermanent is what reaches this board --
         -- it places the wurm without running rule 702.63a's entry replacement, the
         -- position a card that lost its counters some other way would be in.
         --
@@ -447,7 +447,7 @@ vanishingSpec s registry =
         -- counter came off.
         Spec.it s "CR 603.4 a wurm with no time counters neither triggers nor is sacrificed" $ do
           wurm <- S.printingOf s registry "Waning Wurm"
-          let (oid, gs) = S.addCreature wurm S.alice (Setup.emptyGame S.bothPlayers)
+          let (oid, gs) = S.addPermanent wurm S.alice (Setup.emptyGame S.bothPlayers)
               (settled, resolved) = upkeepOf S.alice gs
           Spec.assertEqWith s "it really has none" (times oid gs) 0
           Spec.assertEqWith s "nothing on the stack" (GameState.stack settled) []
@@ -501,7 +501,7 @@ numberlessVanishingSpec s registry =
          in snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop)
       times = S.counterOf CounterKind.Time
       -- CAST rather than placed, for vanishingSpec's reason: the card's own entry
-      -- replacement is what puts the counters on, and S.addCreature reaches no CR
+      -- replacement is what puts the counters on, and S.addPermanent reaches no CR
       -- 616.1 loop. `swamps` pays the generic half of {2}{U} on the control board,
       -- where two Islands are one mana short.
       castTidewalker islands swamps = do
@@ -600,7 +600,7 @@ fadingSpec s registry =
       after pid gs = snd (upkeepOf pid gs)
       fades = S.counterOf CounterKind.Fade
       -- CAST rather than placed, for vanishingSpec's reason: rule 702.32a's first
-      -- ability is a replacement on the entry, and S.addCreature reaches no CR
+      -- ability is a replacement on the entry, and S.addPermanent reaches no CR
       -- 616.1 loop.
       castRidgeback = do
         forest <- S.printingOf s registry "Forest"
@@ -655,12 +655,12 @@ fadingSpec s registry =
         -- Rule 702.32a states NO intervening "if", which is the other half of the
         -- difference from rule 702.63a: the ability triggers on an upkeep where
         -- the pile is already empty, and that firing IS the sacrifice.
-        -- S.addCreature is what reaches this board -- it places the Ridgeback
+        -- S.addPermanent is what reaches this board -- it places the Ridgeback
         -- without running the entry replacement, the position a card that lost its
         -- counters some other way would be in.
         Spec.it s "CR 702.32a a Ridgeback with no fade counters triggers and is sacrificed at once" $ do
           ridgeback <- S.printingOf s registry "Skyshroud Ridgeback"
-          let (oid, gs) = S.addCreature ridgeback S.alice (Setup.emptyGame S.bothPlayers)
+          let (oid, gs) = S.addPermanent ridgeback S.alice (Setup.emptyGame S.bothPlayers)
               (settled, resolved) = upkeepOf S.alice gs
           Spec.assertEqWith s "it really has none" (fades oid gs) 0
           Spec.assertEqWith s "and the ability still reached the stack" (length (GameState.stack settled)) 1
@@ -744,7 +744,7 @@ cumulativeUpkeepSpec s registry =
       boardOf = do
         forest <- S.printingOf s registry "Forest"
         unicorn <- S.printingOf s registry "Revered Unicorn"
-        let (oid, placed) = S.addCreature unicorn S.alice (S.landsFor forest S.alice 5 (Setup.emptyGame S.bothPlayers))
+        let (oid, placed) = S.addPermanent unicorn S.alice (S.landsFor forest S.alice 5 (Setup.emptyGame S.bothPlayers))
         pure (oid, S.addCounter CounterKind.Age 2 oid placed)
    in Spec.describe s "Cumulative upkeep" $ do
         -- The proving test. Every assertion is board state a player could see --
@@ -869,9 +869,9 @@ modularSpec s registry =
         hybrid <- S.printingOf s registry "Arcbound Hybrid"
         other <- S.printingOf s registry companion
         let lands = S.landsInPlay swamp 3
-            (hybridId, g1) = S.addCreature hybrid S.alice lands
+            (hybridId, g1) = S.addPermanent hybrid S.alice lands
             g2 = S.addCounter CounterKind.PlusOnePlusOne 3 hybridId g1
-            (otherId, g3) = S.addCreature other S.alice g2
+            (otherId, g3) = S.addPermanent other S.alice g2
             -- The companion carries a counter of its own, so a payload that
             -- overwrote rather than added would be visible, and so that a 0/0
             -- Worker survives CR 704.5f.
@@ -889,7 +889,7 @@ modularSpec s registry =
             settled = S.runPure answer destroyed Engine.settleForPriority
          in (settled, S.runPure answer settled Stack.resolveTop)
       -- A printing CAST rather than placed, because rule 702.43a's first ability
-      -- is a replacement on the ENTRY -- S.addCreature reaches no CR 616.1 loop.
+      -- is a replacement on the ENTRY -- S.addPermanent reaches no CR 616.1 loop.
       castOne name lands = do
         swamp <- S.printingOf s registry "Swamp"
         printing <- S.printingOf s registry name
@@ -1173,7 +1173,7 @@ aragornSpec s registry =
           case mine of
             [maulers, aurelia, piker] -> do
               let first = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (plan [maulers, aurelia]) gs
-                  (hero, staged) = S.addCreature aragorn S.alice first
+                  (hero, staged) = S.addPermanent aragorn S.alice first
                   loaded = S.addCounter CounterKind.PlusOnePlusOne 3 piker staged
                   second = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (plan [maulers, piker]) loaded
                   after = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (plan [maulers, piker]) second

@@ -216,7 +216,7 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
   Spec.it s "an artifact with no counters on it moves nothing and asks nothing" $ do
     let withPraetor gs = do
           vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
-          pure (snd (S.addCreature vorinclex S.bob gs))
+          pure (snd (S.addPermanent vorinclex S.bob gs))
     built <- board "Goblin Piker" withPraetor
     case play Lowest built of
       (asked, Just toolkit, after) -> do
@@ -286,7 +286,7 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
     let animated gs = do
           march <- S.printingOf s registry "March of the Machines"
           season <- S.printingOf s registry "Doubling Season"
-          pure (snd (S.addCreature season S.alice (snd (S.addCreature march S.alice gs))))
+          pure (snd (S.addPermanent season S.alice (snd (S.addPermanent march S.alice gs))))
     built <- board "Goblin Piker" animated
     case playAlone Lowest built of
       (asked, Just toolkit, after) -> do
@@ -393,7 +393,7 @@ namedKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of a named
         piker <- S.printingOf s registry "Goblin Piker"
         bolt <- S.printingOf s registry "Lightning Bolt"
         let lands = S.landsFor mountain S.alice 1 (S.landsFor forest S.alice 2 (S.landsInPlay plains 3))
-            (target, g1) = S.addCreature piker S.alice lands
+            (target, g1) = S.addPermanent piker S.alice lands
             (heldCache, g2) = S.addHandCard cache S.alice g1
             (heldBolt, g3) = S.addHandCard bolt S.alice g2
             (_, g4) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice g3))
@@ -461,7 +461,7 @@ namedKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of a named
   Spec.it s "the dies trigger reads the counter on the creature that died" $ do
     let secondPiker gs = do
           piker <- S.printingOf s registry "Goblin Piker"
-          pure (snd (S.addCreature piker S.alice gs))
+          pure (snd (S.addPermanent piker S.alice gs))
     (bare, heldCache, heldBolt, ready) <- board secondPiker
     case enter bare heldCache ready of
       Just (cache, asked0, staged) ->
@@ -533,10 +533,10 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
         piker <- S.printingOf s registry "Goblin Piker"
         extras <- mapM (\(name, pid) -> fmap (\p -> (p, pid)) (S.printingOf s registry name)) extra
         let lands = S.landsFor mountain S.alice 1 (S.landsInPlay forest 4)
-            (pantherId, g1) = S.addCreature panther S.alice lands
-            (pikerId, g2) = S.addCreature piker S.alice g1
+            (pantherId, g1) = S.addPermanent panther S.alice lands
+            (pikerId, g2) = S.addPermanent piker S.alice g1
             (_, g3) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice g2))
-            seated = foldl (\gs (p, pid) -> snd (S.addCreature p pid gs)) g3 extras
+            seated = foldl (\gs (p, pid) -> snd (S.addPermanent p pid gs)) g3 extras
             ready = seated {GameState.priority = Just S.alice}
         pure $ do
           landId <- newestNamed mountainName ready
@@ -671,9 +671,9 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
         fateTransfer <- S.printingOf s registry "Fate Transfer"
         seats <- mapM (\(name, pid) -> fmap (\p -> (p, pid)) (S.printingOf s registry name)) extras
         let lands = S.landsFor swamp S.alice 1 (S.landsInPlay island 2)
-            (giverId, g1) = S.addCreature wall S.bob lands
-            (takerId, g2) = S.addCreature wall S.alice g1
-            seated = foldl (\gs (p, pid) -> snd (S.addCreature p pid gs)) g2 seats
+            (giverId, g1) = S.addPermanent wall S.bob lands
+            (takerId, g2) = S.addPermanent wall S.alice g1
+            seated = foldl (\gs (p, pid) -> snd (S.addPermanent p pid gs)) g2 seats
             (staged, spellId) = S.handOne fateTransfer seated
         pure (giverId, takerId, spellId, counters giverId staged)
       -- Cast and resolve, the whole spell.
@@ -792,9 +792,9 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
         plains <- S.printingOf s registry "Plains"
         defense <- S.printingOf s registry "Resourceful Defense"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (defenseId, g1) = S.addCreature defense S.alice (S.landsInPlay plains 5)
-            (giverId, g2) = S.addCreature piker S.alice g1
-            (takerId, g3) = S.addCreature piker S.alice g2
+        let (defenseId, g1) = S.addPermanent defense S.alice (S.landsInPlay plains 5)
+            (giverId, g2) = S.addPermanent piker S.alice g1
+            (takerId, g3) = S.addPermanent piker S.alice g2
             ready = (counters giverId g3) {GameState.priority = Just S.alice}
         pure (defenseId, giverId, takerId, ready)
       -- The ability, activated once and resolved, answering the counter question
@@ -949,10 +949,10 @@ namedAnyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of c
         wall <- S.printingOf s registry "Wall of Stone"
         bandar <- S.printingOf s registry "Scrounging Bandar"
         seats <- mapM (S.printingOf s registry) extras
-        let (bandarId, g1) = S.addCreature bandar S.alice (S.landsInPlay forest 1)
-            (takerId, g2) = S.addCreature wall S.alice g1
-            (_, g3) = S.addCreature wall S.bob g2
-            seated = foldl (\gs p -> snd (S.addCreature p S.alice gs)) g3 seats
+        let (bandarId, g1) = S.addPermanent bandar S.alice (S.landsInPlay forest 1)
+            (takerId, g2) = S.addPermanent wall S.alice g1
+            (_, g3) = S.addPermanent wall S.bob g2
+            seated = foldl (\gs p -> snd (S.addPermanent p S.alice gs)) g3 seats
         pure (bandarId, takerId, counters bandarId seated)
       -- alice's upkeep begins, the printed trigger goes on the stack and resolves
       -- -- Pawl.CounterspellSpec's bitterblossomChain, with the prompt count
@@ -1082,9 +1082,9 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
         island <- S.printingOf s registry "Island"
         goldberry <- S.printingOf s registry "Goldberry, River-Daughter"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (goldberryId, g1) = S.addCreature goldberry S.alice (S.landsInPlay island 2)
-            (giverId, g2) = S.addCreature piker S.alice g1
-            (_, g3) = S.addCreature piker S.bob g2
+        let (goldberryId, g1) = S.addPermanent goldberry S.alice (S.landsInPlay island 2)
+            (giverId, g2) = S.addPermanent piker S.alice g1
+            (_, g3) = S.addPermanent piker S.bob g2
             stocked =
               S.addCounter CounterKind.Finality 2 giverId
                 . S.addCounter CounterKind.Shield 4 giverId
@@ -1220,13 +1220,13 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
         piker <- S.printingOf s registry "Goblin Piker"
         cannibal <- S.printingOf s registry "Spike Cannibal"
         seats <- mapM (S.printingOf s registry) extras
-        let (aliceWall, g1) = S.addCreature wall S.alice S.threePlayerGame
-            (bobWall, g2) = S.addCreature wall S.bob g1
-            (bobPiker, g3) = S.addCreature piker S.bob g2
-            (aliceIsland, g4) = S.addCreature island S.alice g3
-            seated = foldl (\gs p -> snd (S.addCreature p S.alice gs)) g4 seats
+        let (aliceWall, g1) = S.addPermanent wall S.alice S.threePlayerGame
+            (bobWall, g2) = S.addPermanent wall S.bob g1
+            (bobPiker, g3) = S.addPermanent piker S.bob g2
+            (aliceIsland, g4) = S.addPermanent island S.alice g3
+            seated = foldl (\gs p -> snd (S.addPermanent p S.alice gs)) g4 seats
             (cannibalId, g5) = S.entersWithTrigger cannibal S.alice (stock aliceWall bobWall bobPiker aliceIsland seated)
-            -- The card's own entry rider, supplied by hand: S.addCreature places
+            -- The card's own entry rider, supplied by hand: S.addPermanent places
             -- a permanent without running CR 614.1c's replacement, and a 0/0
             -- Spike Cannibal would be buried by CR 704.5f before its own trigger
             -- resolved. Pawl.ReplacementSpec is where an entry rider is proven.
@@ -1373,12 +1373,12 @@ upToOneSpec s registry = Spec.describe s "CR 122.5 moving up to one counter off 
         piker <- S.printingOf s registry "Goblin Piker"
         takesies <- S.printingOf s registry "Takesies"
         seats <- mapM (S.printingOf s registry) extras
-        let (destination, g1) = S.addCreature wall S.alice (S.landsFor island S.alice 3 S.threePlayerGame)
-            (alicePiker, g2) = S.addCreature piker S.alice g1
-            (bobWall, g3) = S.addCreature wall S.bob g2
-            (carolPiker, g4) = S.addCreature piker S.carol g3
-            (carolWall, g5) = S.addCreature wall S.carol g4
-            seated = foldl (\gs pr -> snd (S.addCreature pr S.alice gs)) g5 seats
+        let (destination, g1) = S.addPermanent wall S.alice (S.landsFor island S.alice 3 S.threePlayerGame)
+            (alicePiker, g2) = S.addPermanent piker S.alice g1
+            (bobWall, g3) = S.addPermanent wall S.bob g2
+            (carolPiker, g4) = S.addPermanent piker S.carol g3
+            (carolWall, g5) = S.addPermanent wall S.carol g4
+            seated = foldl (\gs pr -> snd (S.addPermanent pr S.alice gs)) g5 seats
             (held, g6) = S.addHandCard takesies S.alice seated
             stocked =
               S.addCounter CounterKind.Shield 9 destination
@@ -1507,9 +1507,9 @@ atLeastOneSpec s registry = Spec.describe s "CR 122.5 moving one or more counter
         island <- S.printingOf s registry "Island"
         goldberry <- S.printingOf s registry "Goldberry, River-Daughter"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (goldberryId, g1) = S.addCreature goldberry S.alice (S.landsInPlay island 2)
-            (takerId, g2) = S.addCreature piker S.alice g1
-            (_, g3) = S.addCreature piker S.bob g2
+        let (goldberryId, g1) = S.addPermanent goldberry S.alice (S.landsInPlay island 2)
+            (takerId, g2) = S.addPermanent piker S.alice g1
+            (_, g3) = S.addPermanent piker S.bob g2
             -- Stocked so the printed draw has a card to take and CR 104.3c cannot
             -- end the game before an assertion runs.
             stockedLibrary = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) g3 [1 :: Int .. 3]
@@ -1631,10 +1631,10 @@ groupDestinationSpec s registry = Spec.describe s "CR 122.5 moving counters onto
         wall <- S.printingOf s registry "Wall of Stone"
         piker <- S.printingOf s registry "Goblin Piker"
         ancient <- S.printingOf s registry "Forgotten Ancient"
-        let (ancientId, g1) = S.addCreature ancient S.alice (S.landsInPlay forest 1)
-            (aliceWall, g2) = S.addCreature wall S.alice g1
-            (alicePiker, g3) = S.addCreature piker S.alice g2
-            (bobWall, g4) = S.addCreature wall S.bob g3
+        let (ancientId, g1) = S.addPermanent ancient S.alice (S.landsInPlay forest 1)
+            (aliceWall, g2) = S.addPermanent wall S.alice g1
+            (alicePiker, g3) = S.addPermanent piker S.alice g2
+            (bobWall, g4) = S.addPermanent wall S.bob g3
         pure (ancientId, aliceWall, alicePiker, bobWall, counters ancientId g4)
       -- alice's upkeep begins, the printed trigger goes on the stack and resolves
       -- -- namedAnyNumberSpec's `begin`, with the prompt count and the offered

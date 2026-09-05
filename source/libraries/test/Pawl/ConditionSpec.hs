@@ -72,7 +72,7 @@ boardOf :: Printing.Printing -> Integer -> (Count.ViewOf, GameState.GameState)
 boardOf swamp n =
   let gs0 = Setup.emptyGame S.bothPlayers
       step (ids, g) _ =
-        let (oid, g') = S.addCreature swamp S.alice g
+        let (oid, g') = S.addPermanent swamp S.alice g
          in (ids <> [oid], g')
       (oids, gs) = foldl step ([], gs0) [1 .. n]
       table = fmap (\oid -> (oid, Set.empty, Set.singleton Subtype.Swamp, Just S.alice)) oids
@@ -104,7 +104,7 @@ monarchSpec s registry =
       -- Alice's upkeep with Queen Marchesa already out, on `seats`, after
       -- `crown` has settled the monarchy.
       upkeepWith marchesa seats crown =
-        let (_, gs0) = S.addCreature marchesa S.alice (Setup.emptyGame seats)
+        let (_, gs0) = S.addPermanent marchesa S.alice (Setup.emptyGame seats)
          in resolveAll (settle (beginUpkeep (crown gs0)))
       noToken after = Spec.assertEqWith s "no token was created" (S.tokensOf after) []
       oneAssassin after = case S.tokensOf after of
@@ -140,7 +140,7 @@ monarchSpec s registry =
         -- fixture write.
         Spec.it s "CR 725.1 her enters trigger crowns her controller, so no token follows" $ do
           marchesa <- S.printingOf s registry "Queen Marchesa"
-          let (oid, gs0) = S.addCreature marchesa S.alice (Setup.emptyGame S.threePlayers)
+          let (oid, gs0) = S.addPermanent marchesa S.alice (Setup.emptyGame S.threePlayers)
               entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
               crowned = resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project oid gs0))] gs0))
           Spec.assertEqWith s "alice is the monarch" (GameState.monarch crowned) (Just S.alice)
@@ -161,7 +161,7 @@ monarchSpec s registry =
 -- games apart.
 --
 -- A Goblin Piker stands beside Thrasta throughout as the within-board control: it
--- is on the battlefield without having entered (S.addCreature files no zone
+-- is on the battlefield without having entered (S.addPermanent files no zone
 -- change), so it is a legal target in BOTH games. Without it the negative could
 -- pass because the offer was empty -- a Doom Blade that reached nothing at all.
 --
@@ -176,7 +176,7 @@ enteredThisTurnSpec s registry = Spec.describe s "EnteredThisTurn" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (pikerId, staged) = S.addCreature piker S.alice (S.landsInPlay forest 12)
+    let (pikerId, staged) = S.addPermanent piker S.alice (S.landsInPlay forest 12)
         (start, spellId) = S.handOne thrasta staged
         cast = snd (Engine.runGamePure S.identityAnswer start (S.cast S.alice spellId))
         arrived = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -335,7 +335,7 @@ interveningRecheckSpec s registry =
       -- and the cast below are paid with, so the three boards differ only in where
       -- the Skeleton starts and whether it is killed.
       board knight swamp =
-        let (knightId, withKnight) = S.addCreature knight S.alice (S.landsInPlay swamp 2)
+        let (knightId, withKnight) = S.addPermanent knight S.alice (S.landsInPlay swamp 2)
          in ( knightId,
               withKnight
                 { GameState.phase = Phase.PrecombatMain,
@@ -552,7 +552,7 @@ lastKnownTokenSpec s registry =
           kirin <- S.printingOf s registry "Sunpearl Kirin"
           swamp <- S.printingOf s registry "Swamp"
           piker <- S.printingOf s registry "Goblin Piker"
-          run kirin swamp (S.addCreature piker S.alice) $ \victimId onStack after -> do
+          run kirin swamp (S.addPermanent piker S.alice) $ \victimId onStack after -> do
             Spec.assertEqWith s "alice's library is untouched" (librarySize after) 1
             Spec.assertEqWith s "though the card really did leave the battlefield" (Set.member victimId (GameState.battlefield after)) False
             Spec.assertEqWith s "with the Kirin's trigger on the stack before it resolved" (length (GameState.stack onStack)) 1
@@ -644,9 +644,9 @@ damageDealtToItSpec s registry =
   let run sorcerer zubera giant mountain bolt pingsZubera k =
         case Face.activatedAbilities (S.combinedFace sorcerer) of
           ping : _ ->
-            let (sorcererId, gs1) = S.addCreature sorcerer S.alice (S.landsInPlay mountain 1)
-                (zuberaId, gs2) = S.addCreature zubera S.bob gs1
-                (giantId, gs3) = S.addCreature giant S.bob gs2
+            let (sorcererId, gs1) = S.addPermanent sorcerer S.alice (S.landsInPlay mountain 1)
+                (zuberaId, gs2) = S.addPermanent zubera S.bob gs1
+                (giantId, gs3) = S.addPermanent giant S.bob gs2
                 (staged, boltId) = S.handOne bolt gs3
                 ready = staged {GameState.priority = Just S.alice}
                 pingedAt = if pingsZubera then zuberaId else giantId
