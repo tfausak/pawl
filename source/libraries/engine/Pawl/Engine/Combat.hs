@@ -561,16 +561,21 @@ attackCeilingGiven limit alone barred candidates gs =
       -- the creature has no free announcement at all, which is a creature the cost
       -- clause keeps out of every declaration.
       --
-      -- The RESULT is observed -- Pawl.CombatEffectSpec's PublicEnemy Jace board
-      -- turns on `best` being the defending player rather than their
-      -- planeswalker -- but the maximization inside is a fence no board can
-      -- reach. Every instance AttackRequirement.instances mints either weights
-      -- every target alike (a requirement naming no object, goad's first) or
-      -- weights only the defending player (the stored carrier, a printed
-      -- RequiredDefender, goad's second), and Combat.attackTargets puts that
-      -- target first -- so the first freely announceable target is always an
-      -- argmax. Not implemented, therefore untested: any weighting under which
-      -- this fold and "take the first announceable target" differ (#2369).
+      -- The MAXIMIZATION is proved, not just the result: CR 802.2's several
+      -- defending players make declarableTargets a concatenation in APNAP order,
+      -- so a requirement naming the SECOND defending player weights a target the
+      -- first announceable one is not. Pawl.CombatCostSpec's MostLifeRequirement
+      -- group is that board -- Galactus under "attacks an opponent with the most
+      -- life among your opponents", with the leader seated after the other
+      -- opponent -- and replacing this fold with the first announceable target
+      -- reddens it. Pawl.CombatEffectSpec's PublicEnemy Jace board is the
+      -- narrower fact that `best` is read at all.
+      --
+      -- The TIE-BREAK is still a fence rather than a proof: relaxing `>` to `>=`
+      -- keeps the whole Combat subtree green, since two targets of equal weight
+      -- make both declarations legal and the choice between them is only ever
+      -- read out of forcedAttackDeclaration, which attemptAttackDeclaration
+      -- reaches only for an interpreter that repeats a rejected declaration.
       bestFor oid = case fmap (\target -> (target, Map.findWithDefault 0 (oid, target) required)) (announceable oid) of
         [] -> Nothing
         first : rest -> Just (List.foldl' (\best pair -> if snd pair > snd best then pair else best) first rest)
