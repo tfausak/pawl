@@ -57,7 +57,7 @@ data EntryRewrite effect
     -- Object.chosenNames.
     --
     -- The Filter is carried and passed to the prompt so the answerer can obey it;
-    -- the engine does not check the answer against it (#663).
+    -- Pawl.Interpreter.policingCardNames is what judges the answer.
     ChooseCardNames (Filter.Filter Keyword.Keyword)
   | -- | CR 614.1c with CR 201.4a / Runed Halo: this object's CONTROLLER alone
     -- chooses one card name matching the Filter, written to Object.chosenNames.

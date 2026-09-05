@@ -512,8 +512,9 @@ data Effect card ability
     Proliferate
   | -- | CR 201.4 via CR 608.2c: the resolving controller chooses a card name,
     -- written to Object.chosenNames on the resolving object (Ancient Vendetta).
-    -- The Filter is CR 201.4a's restriction, passed to the prompt unchecked
-    -- (#663).
+    -- The Filter is CR 201.4a's restriction, carried to the prompt for the
+    -- answerer to obey; Pawl.Interpreter.policingCardNames is what judges the
+    -- answer, the engine being unable to resolve a name at all.
     --
     -- Not implemented: a chooser other than CR 109.5's "you" -- Petra Sphinx's
     -- "target player chooses a card name" (#2233).

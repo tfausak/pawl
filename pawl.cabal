@@ -1086,6 +1086,20 @@ library extra
     Pawl.Extra.Word8
     Pawl.Extra.Word8Spec
 
+-- The far side of the engine's interpreter seam: what an answerer needs that the
+-- rules engine deliberately cannot supply itself.
+library interpreter
+  import: library
+  build-depends:
+    pawl:engine,
+    pawl:registry,
+    pawl:types,
+
+  hs-source-dirs: source/libraries/interpreter
+  -- cabal-gild: discover source/libraries/interpreter
+  exposed-modules:
+    Pawl.Interpreter
+
 -- RFC 8259 compliant JSON types, encoders, and decoders. Similar to aeson, but
 -- much simpler.
 library json
@@ -1247,6 +1261,7 @@ library test
     pawl:engine,
     pawl:exceptions,
     pawl:extra,
+    pawl:interpreter,
     pawl:json,
     pawl:json-codec,
     pawl:json-pointer,

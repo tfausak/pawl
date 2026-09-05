@@ -3990,13 +3990,15 @@ data Framing
     -- filter" to that lint, and a stored Effect.Replace's row would otherwise
     -- appear on one side of the comparison and not the other.
     ReplacementRowFramed
-  | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's, the one
-    -- card-authored position whose candidates are never objects in the game:
-    -- Pawl.Engine.Event.eligible matches it against a printed FACE
-    -- (Pawl.Engine.Projection.View.viewOfCard). Marked not because its evaluator
-    -- FILLS a field the others leave empty but because its candidate view leaves
-    -- one empty that every other position fills -- `identity` -- so
-    -- Filter.IsBound is a silent False there and nowhere else.
+  | -- | CR 400.11c's wish filter -- Effect.FromOutsideTheGame's -- and CR 201.4a's
+    -- naming restriction, Effect.ChooseCardName's: the two card-authored
+    -- positions whose candidates are never objects in the game. The first is
+    -- matched by Pawl.Engine.Event.eligible and the second by
+    -- Pawl.Interpreter.legalCardName, both against a printed FACE
+    -- (Pawl.Engine.Projection.View.viewOfCard). Marked not because their
+    -- evaluators FILL a field the others leave empty but because that candidate
+    -- view leaves one empty which every other position fills -- `identity` -- so
+    -- Filter.IsBound is a silent False in these two and nowhere else.
     OutsideTheGameFramed
   | -- | A KEYWORD's own Filter -- CR 702.29e's typecycling predicate, CR 702.11d's
     -- "hexproof from", a cost-carrying keyword's CostComponent.Sacrifice, and CR
@@ -4266,10 +4268,13 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ _ f _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
-  -- CR 201.4a's restriction, UNFRAMED: it is handed to Prompt.ChooseCardName for
-  -- an answerer to obey rather than matched against a candidate at all, so none of
-  -- the framings' evaluators is the one that reads it.
-  Effect.ChooseCardName restriction -> unframed [restriction]
+  -- CR 201.4a's restriction, and the WISH's frame: what judges it is
+  -- Pawl.Interpreter.legalCardName, on the far side of
+  -- Pawl.Engine.Engine.runGameAsked, and it matches a printed FACE
+  -- (Pawl.Engine.Projection.View.viewOfCard) exactly as CR 400.11c's filter does.
+  -- No candidate here is an object in the game either, the named card being one
+  -- the reference has rather than one on the board.
+  Effect.ChooseCardName restriction -> outsideTheGameFramed [restriction]
   -- THE one wish-framed position. CR 400.11c's filter is matched against a
   -- PRINTED FACE (Pawl.Engine.Projection.View.viewOfCard) rather than against an
   -- object any of the other framings' evaluators project, which is what makes

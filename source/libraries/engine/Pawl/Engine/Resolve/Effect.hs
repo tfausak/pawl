@@ -5303,9 +5303,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- where two or more make it a choice" shortcut the sibling prompts take cannot
   -- apply here.
   --
-  -- The answer is NOT filtered against the restriction, the posture the entry
-  -- twin already takes: pawl holds no Oracle card reference, so there is nothing
-  -- to check it against (#663).
+  -- The answer is not filtered HERE, the posture the entry twin already takes:
+  -- the engine holds no Oracle card reference, so it cannot resolve a name.
+  -- Pawl.Interpreter.policingCardNames judges it on the far side of
+  -- Pawl.Engine.Engine.runGameAsked, where the registry is, and covers this arm
+  -- and the entry twin alike by covering the one Prompt they share.
   --
   -- Set.insert rather than a fresh singleton: CR 201.4g's interchangeable names
   -- aside, nothing in rule 201.4 says a second choice unmakes the first, and a
