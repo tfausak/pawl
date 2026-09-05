@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -35,6 +36,8 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -47,6 +50,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -644,6 +649,13 @@ randomRevealSpec s registry =
           h : _ -> h
           [] -> NonEmpty.head offered
         _ -> S.aggressiveAnswer p
+      -- rolling, with every target aimed at bob: both cards below name an
+      -- opponent, and a two-seat board would otherwise let the answerer take
+      -- alice and leave the reveal reading her own empty hand.
+      aiming :: Int -> Prompt.Prompt r -> r
+      aiming i p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+        _ -> rolling i p
       -- Who showed what, by name. The SEAT is asserted alongside the name in
       -- every leg: rule 701.20a's shower is the player carrying out the
       -- instruction, which here is bob and not the trigger's controller alice,
@@ -711,10 +723,71 @@ randomRevealSpec s registry =
           maiden <- S.printingOf s registry "Bird Maiden"
           let base = List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) (Setup.emptyGame S.bothPlayers) [piker, wraith, maiden]
               gs = base {GameState.lastChoice = Timestamp.MkTimestamp 0}
-              effect = Effect.Reveal (Reveal.MkReveal (ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.Opponent)) Nothing)
+              effect = Effect.Reveal (Reveal.MkReveal (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.Opponent) (Filter.Type.And []) (Quantity.Type.Literal 1))) Nothing)
               after = S.runPure (rolling 1) gs (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty effect)
           Spec.assertEqWith s "the roll was honoured here too" (revealed after) [(S.bob, ["Bog Wraith"])]
           Spec.assertEqWith s "and nobody was recorded as having been offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
+        -- Fall (the right half of Rise // Fall, {B}{R} Sorcery) is the card:
+        -- "Target player reveals two cards at random from their hand, then
+        -- discards each nonland card revealed this way."
+        --
+        -- Bob's hand is stocked so that the zone order is Forest, Bog Wraith,
+        -- Goblin Piker -- the land FIRST, which is what makes the roll below
+        -- discriminating. `rolling 2` takes the Piker out of the three offered,
+        -- and then the SECOND ask offers two, where the same index clamps to the
+        -- Wraith. Three broken readings fail here and each fails differently:
+        -- a count of one leaves the Wraith in hand; a pick that does not drop
+        -- what it already named offers three again and answers the Piker twice,
+        -- so the Wraith survives too; and an engine revealing the head of the
+        -- offer names the Forest, which the discard clause then passes over.
+        Spec.it s "CR 701.20a two cards at random are two DISTINCT cards, and CR 701.9a both nonlands go to the graveyard" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          forest <- S.printingOf s registry "Forest"
+          fall <- S.printingOf s registry "Fall"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          let stocked = List.foldl' (\g pr -> snd (S.addHandCard pr S.bob g)) (S.landsFor mountain S.alice 1 (S.landsInPlay swamp 1)) [piker, wraith, forest]
+              (gs, oid) = S.handOne fall stocked
+              cast = snd (Engine.runGamePure (aiming 2) gs (Cast.castSpell S.manaPerformer S.alice oid (CardName.MkCardName (Text.pack "Fall")) Facing.FaceUp))
+              after = snd (Engine.runGamePure (aiming 2) cast Stack.resolveTop)
+          Spec.assertEqWith s "bob's hand starts as the Forest, the Wraith and the Piker" (namesIn Zone.Hand S.bob gs) (fmap (Just . CardName.MkCardName . Text.pack) ["Forest", "Bog Wraith", "Goblin Piker"])
+          Spec.assertEqWith s "CR 701.9a both nonland cards revealed this way are in bob's graveyard" (List.sort (namesIn Zone.Graveyard S.bob after)) (fmap (Just . CardName.MkCardName . Text.pack) ["Bog Wraith", "Goblin Piker"])
+          Spec.assertEqWith s "and the Forest randomness did not name is all that is left in his hand" (namesIn Zone.Hand S.bob after) [Just (CardName.MkCardName (Text.pack "Forest"))]
+          Spec.assertEqWith s "CR 701.20a bob showed them one at a time, in the order randomness named them" (revealed after) [(S.bob, ["Goblin Piker"]), (S.bob, ["Bog Wraith"])]
+        -- Lumbering Lightshield is the card: {1}{W} Creature -- Illusion 1/4,
+        -- "When Lumbering Lightshield enters, target opponent reveals a nonland
+        -- card at random from their hand." Its printed second sentence -- "It
+        -- perpetually gains 'This spell costs {1} more to cast.'" -- is not
+        -- transcribed, which leaves pawl's card strictly weaker than printed
+        -- (gap #3291).
+        --
+        -- The same hand as the Fall case, and the same reason for its order: with
+        -- the filter the candidates are the Wraith and the Piker, so `rolling 1`
+        -- names the Piker. Without it the Forest heads a three-card offer and the
+        -- same index names the Wraith instead -- so a dropped filter and an engine
+        -- taking the head of the offer both fail here, and they fail with
+        -- different names.
+        Spec.it s "CR 701.20a a narrowed random reveal draws only from the cards the filter admits" $ do
+          shield <- S.printingOf s registry "Lumbering Lightshield"
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          let stocked = List.foldl' (\g pr -> snd (S.addHandCard pr S.bob g)) (Setup.emptyGame S.bothPlayers) [piker, wraith, forest]
+              after = S.runPure (aiming 1) (snd (S.entersWithTrigger shield S.alice stocked)) (Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "bob showed the Piker, which only the filtered offer reaches" (revealed after) [(S.bob, ["Goblin Piker"])]
+          Spec.assertEqWith s "CR 701.20b: revealing moved nothing" (S.handSize S.bob after) 3
+        -- CR 101.3 and CR 609.3 from the other side: a hand the filter admits
+        -- nothing out of is a hand with no candidates at all, so the reveal is
+        -- skipped rather than falling back to a land. The control for the case
+        -- above, and the leg a filter dropped in the OTHER direction fails.
+        Spec.it s "CR 609.3 a hand holding only lands has nothing the filter admits, so nothing is revealed" $ do
+          shield <- S.printingOf s registry "Lumbering Lightshield"
+          forest <- S.printingOf s registry "Forest"
+          let stocked = List.foldl' (\g pr -> snd (S.addHandCard pr S.bob g)) (Setup.emptyGame S.bothPlayers) [forest, forest]
+              after = S.runPure (aiming 1) (snd (S.entersWithTrigger shield S.alice stocked)) (Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "two lands in hand and nothing shown" (revealed after) []
+          Spec.assertEqWith s "and both are still there" (S.handSize S.bob after) 2
 
 -- Wild Evocation is the card: {5}{R} Enchantment, "At the beginning of each
 -- player's upkeep, that player reveals a card at random from their hand. If it's

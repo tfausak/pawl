@@ -706,6 +706,7 @@ library codec
     Pawl.Codec.PutCountersSpec
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
+    Pawl.Codec.RandomCardInHand
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientKind
     Pawl.Codec.RecipientKindSpec
@@ -1765,6 +1766,7 @@ library types
     Pawl.Types.PutCounters
     Pawl.Types.PutCountersFrom
     Pawl.Types.Quantity
+    Pawl.Types.RandomCardInHand
     Pawl.Types.Recipient
     Pawl.Types.RecipientKind
     Pawl.Types.RedirectDamage

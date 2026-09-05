@@ -8,7 +8,7 @@ import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
@@ -100,14 +100,13 @@ data ObjectRef
     -- matches -- the printed "all land cards revealed this way", the arm above's
     -- plural and a read rather than a question.
     EachCardFromAmong EachCardFromAmong.EachCardFromAmong
-  | -- | CR 701.9b / Merfolk Spy: a card randomness names out of the hand the
-    -- PlayerRef names, asked of the interpreter through Prompt.RandomObject and
-    -- filtered back against the candidates.
+  | -- | CR 701.20a / 701.9b / Merfolk Spy, Fall: the cards randomness names out of
+    -- the hands the PlayerRef names, asked of the interpreter through
+    -- Prompt.RandomObject and filtered back against the candidates.
     --
-    -- Not implemented: a filter beside the PlayerRef (gap #1742), more than one
-    -- card per seat (gap #3060), and the MoveToZone gather, which elides this arm
-    -- so that only Reveal carries it out (#1733).
-    RandomCardInHand PlayerRef.PlayerRef
+    -- Not implemented: the MoveToZone gather, which elides this arm so that only
+    -- Reveal carries it out (#1733).
+    RandomCardInHand RandomCardInHand.RandomCardInHand
   | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
     -- battlefield matching the Filter, offered rather than swept, the empty answer
     -- legal.
