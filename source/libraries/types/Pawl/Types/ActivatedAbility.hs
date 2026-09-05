@@ -105,6 +105,35 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- from its text, and CR 613.1f removes abilities rather than one instance of
     -- one, so a name is a REFERENCE the card's own author writes and pawl's card
     -- lint checks, never a key the engine assumes unique.
-    name :: Maybe AbilityName.AbilityName
+    name :: Maybe AbilityName.AbilityName,
+    -- | CR 702: the keyword whose rules this ability is under, or Nothing for an
+    -- ability the card simply prints -- which is nearly all of them.
+    --
+    -- Rule 702 states whole activated abilities a permanent or a card in a hand
+    -- has for holding a keyword: CR 702.6a's equip, CR 702.29a's cycling, CR
+    -- 702.67a's fortify, CR 702.77a's reinforce, CR 702.87a's level up, CR
+    -- 702.107a's outlast, CR 702.122a's crew and CR 702.184a's station. This is
+    -- the stamp Pawl.Engine.Keyword's minters put on each one, and
+    -- Pawl.Engine.Keyword.familyGranting reads nothing else --
+    -- Pawl.Types.ReduceActivationCost.grantedBy is what asks, so that Bureau
+    -- Headmaster's "equip abilities you activate" reaches rule 702.6a's ability
+    -- and not a printed twin of it. Pawl.ActivateSpec's "CR 118.7 a printed twin
+    -- of rule 702.6a's ability is not an equip ability" is what proves it.
+    --
+    -- ORIGIN, not shape. The classification used to be re-minting plus value
+    -- equality, which cannot tell rule 702.6a's ability from a card that printed
+    -- the same words. The objection to a field was that it would put an
+    -- engine-only fact on the wire where a card could author a lie; the answer is
+    -- a lint rather than an absent key, since Pawl.Codec.GameState reaches this
+    -- type through Pawl.Codec.Object and an ability on the stack has to
+    -- round-trip its stamp. Pawl.CardSpec's "CR 702 no card claims a keyword
+    -- minted an ability it printed" is that lint, over every ability a face
+    -- prints and every ability a layer-6 grant carries.
+    --
+    -- THE WHOLE KEYWORD rather than a Pawl.Types.KeywordFamily, because CR
+    -- 702.184a's station is nullary and that type deliberately has no arm for a
+    -- nullary keyword. familyOf answers Nothing for station, which is the same
+    -- answer as before and now for a stated reason rather than by accident.
+    keyword :: Maybe Keyword.Keyword
   }
   deriving (Eq, Ord, Show)

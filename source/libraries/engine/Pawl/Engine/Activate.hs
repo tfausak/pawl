@@ -159,35 +159,6 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   Just Zone.Command -> zoneAbilitiesOf Zone.Command oid gs
   _ -> []
 
--- CR 702 / CR 601.2f: WHICH RULE minted this ability of `oid`, as the family
--- designator Pawl.Types.ReduceActivationCost.grantedBy compares -- Fluctuator's
--- "cycling abilities you activate" against the ability actually being activated.
--- Nothing for an ability the card itself prints.
---
--- The zone split is abilitiesForGiven's above, and for its reason: the hand arm
--- reads PRINTED keywords because rules 702.29a and 702.77a state the hand, and
--- the battlefield arm reads POST-LAYER ones because CR 613.1f can take a keyword
--- away. Kept in step with that function by hand -- an arm here that named a
--- different keyword source than the arm that MINTED the ability would classify it
--- as printed, which reads as "no reduction" rather than as an error.
---
--- Nothing for every other zone, the command zone included, where
--- abilitiesForGiven does offer abilities: no rule-702 keyword mints an activated
--- ability outside a hand or the battlefield, so a command-zone offer is always a
--- printed one and always classifies as printed here.
-familyGrantingGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe KeywordFamily.KeywordFamily
-familyGrantingGiven pcs oid gs ability = case fmap Object.zone (Game.lookupObject oid gs) of
-  Just Zone.Battlefield -> Keyword.familyGranting (Projection.keywordsGiven pcs oid gs) ability
-  Just Zone.Hand -> case Game.faceOf oid gs of
-    Nothing -> Nothing
-    Just face -> Keyword.familyGranting (Map.fromSet (const 1) (Face.keywords face)) ability
-  _ -> Nothing
-
--- familyGrantingGiven off this object's own board -- `activatable`'s pairing, and
--- activateAbility's, neither of which is inside an enumeration.
-familyGranting :: ObjectId -> GameState -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe KeywordFamily.KeywordFamily
-familyGranting = familyGrantingGiven Map.empty
-
 -- CR 113.6j + CR 113.6m + CR 702.178b: the AUTHORED abilities a card outside the
 -- battlefield offers from the zone it is in. Three zones ask it today -- the
 -- graveyard, the hand for Faerie Macabre's "Discard this card: Exile up to
@@ -688,7 +659,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         && ActivationRestriction.restrictionsOk pid srcId (ActivatedAbility.restrictions ability) gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
-        && payableCostGiven aimable sources pcs (familyGrantingGiven pcs srcId gs ability) pid srcId gs (ActivatedAbility.cost ability)
+        && payableCostGiven aimable sources pcs (Keyword.familyGranting ability) pid srcId gs (ActivatedAbility.cost ability)
 
 -- CR 602.2a: an ability activated from a hidden zone reveals the card that has
 -- it (CR 701.20a). Note what the rule does NOT say: there is no qualifier about
@@ -810,9 +781,9 @@ activateAbility pid srcId ability = do
       -- "cycling abilities"), so every totalling below is asked with this
       -- ability's provenance -- the two gates and the payment alike, or a
       -- reduction the gate withheld could still be applied when the cost is
-      -- paid. Read off `gs`, the pre-stack board, because the ability's source is
-      -- still in the zone whose keywords minted it.
-      family = familyGranting srcId gs ability
+      -- paid. Read off the ability's own stamp, so the answer does not depend on
+      -- the zone its source is in when this is asked.
+      family = Keyword.familyGranting ability
   State.put onStack
   -- Sorted on the way in, for the reason Cast.castProposed gives: printed order
   -- (CR 608.2c), with a repeated mode's instances adjacent (CR 700.2d).

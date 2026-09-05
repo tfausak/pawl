@@ -1941,7 +1941,8 @@ oneEffectActivated mana effect =
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      ActivatedAbility.keyword = Nothing
     }
 
 -- One CR 700.2 mode for the fixtures below: the effects it runs and the target
@@ -1966,7 +1967,8 @@ modalActivated modes =
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
-      ActivatedAbility.name = Nothing
+      ActivatedAbility.name = Nothing,
+      ActivatedAbility.keyword = Nothing
     }
 
 -- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
@@ -5217,6 +5219,27 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
     Spec.assertBool s (any (declaresVariable . ActivatedAbility.cost . snd) abilities) "and one of them declares an X"
     Spec.assertEqWith s "X read iff X declared" (fmap fst (filter offends abilities)) []
+  -- CR 702: Pawl.Types.ActivatedAbility.keyword is the stamp
+  -- Pawl.Engine.Keyword.mintedBy puts on an ability rule 702 states, and the wire
+  -- carries the key only so an ability already on the stack round-trips through
+  -- Pawl.Codec.GameState. A card that wrote it would be claiming a provenance
+  -- nothing minted, and Bureau Headmaster's "equip abilities you activate" would
+  -- reach an ability the card printed.
+  --
+  -- BOTH places a face holds an activated ability, grantedActivatedAbilities'
+  -- reason: a layer-6 grant carries text printed on the granter.
+  Spec.it s "CR 702 no card claims a keyword minted an ability it printed" $ do
+    ps <- S.allPrintings s
+    let claimed f = filter (Maybe.isJust . ActivatedAbility.keyword) (Face.activatedAbilities f <> grantedActivatedAbilities f)
+        offenders = filter (anyFace (not . null . claimed) . Printing.card) ps
+    Spec.assertEqWith s "no printing writes the key" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The sweep is green on a corpus that simply has no activated abilities, so
+    -- the pool is asserted non-empty and a face that DOES claim one is caught.
+    Spec.assertBool s (any (anyFace (not . null . Face.activatedAbilities) . Printing.card) ps) "the pool has printed activated abilities"
+    Spec.assertBool
+      s
+      (not (null (claimed ((vanillaFace "Liar" instantLine) {Face.activatedAbilities = [(oneEffectActivated (costOf []) (youDraw 1)) {ActivatedAbility.keyword = Just Keyword.Flying}]}))))
+      "and a face claiming one is caught"
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
     -- Every FACE of every token, since CR 707.8a's double-faced token names two.

@@ -486,7 +486,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
-              ActivatedAbility.name = Nothing
+              ActivatedAbility.name = Nothing,
+              ActivatedAbility.keyword = Nothing
             }
      in Spec.assertBool s (ManaAbility.isManaAbility ab) "mana ability"
 
@@ -502,7 +503,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
-              ActivatedAbility.name = Nothing
+              ActivatedAbility.name = Nothing,
+              ActivatedAbility.keyword = Nothing
             }
      in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "targets -> not mana"
 
@@ -518,7 +520,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
-              ActivatedAbility.name = Nothing
+              ActivatedAbility.name = Nothing,
+              ActivatedAbility.keyword = Nothing
             }
      in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "no mana produced -> not mana"
 
@@ -3076,4 +3079,4 @@ atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.a
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing

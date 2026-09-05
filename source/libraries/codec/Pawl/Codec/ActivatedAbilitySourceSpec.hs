@@ -31,6 +31,7 @@ ability =
     Activator.Controller
     Nothing
     Nothing
+    Nothing
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivatedAbilitySource" $ do
