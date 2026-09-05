@@ -986,6 +986,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     paintersServant <- S.printingOf s registry "Painter's Servant"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     silence <- S.printingOf s registry "Synthetic Prismatic Silence"
+    stifle <- S.printingOf s registry "Stifle"
     let base = S.landsInPlay mountain 2
         (inHand, psId) = S.handOne paintersServant base
         cast = snd (Engine.runGamePure choosingRed inHand (S.cast S.alice psId))
@@ -999,11 +1000,18 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
             answer = aimingAt (Recipient.ToCreature victimId)
             pinged = snd (Engine.runGamePure answer withVictim (Activate.activateAbility S.alice sorcererId ping))
         Spec.assertEqWith s "Painter's Servant really did name red: the blue Sorcerer is red too" (Projection.colorsOf sorcererId pinged) $ Set.fromList [Color.Blue, Color.Red]
-        case (filter (`Game.isAbility` pinged) (GameState.stack pinged), modeTargetSlot silence soleMode) of
-          ([abilityId], Just slot) -> do
+        case (filter (`Game.isAbility` pinged) (GameState.stack pinged), modeTargetSlot silence soleMode, modeTargetSlot stifle soleMode) of
+          ([abilityId], Just filtered, Just unfiltered) -> do
+            -- The pair, differing in exactly one thing: Stifle's slot is the
+            -- same Pool.Abilities with no filter on it, so a vacuous negative --
+            -- the pool offering nothing at all -- fails here instead.
             Spec.assertBool
               s
-              (not (Set.member (Recipient.ToObject abilityId) (Target.legalRecipients Nothing S.noSource slot pinged)))
-              "the ability on the stack is no legal 'target red activated or triggered ability'"
+              (Set.member (Recipient.ToObject abilityId) (Target.legalRecipients Nothing S.noSource unfiltered pinged))
+              "Stifle's unfiltered slot does offer the ability"
+            Spec.assertBool
+              s
+              (not (Set.member (Recipient.ToObject abilityId) (Target.legalRecipients Nothing S.noSource filtered pinged)))
+              "and the ability on the stack is no legal 'target red activated or triggered ability'"
             Spec.assertEqWith s "because CR 113.1c leaves it colourless" (Projection.colorsOf abilityId pinged) Set.empty
-          _ -> Spec.assertFailure s "expected exactly one ability on the stack and one target slot"
+          _ -> Spec.assertFailure s "expected exactly one ability on the stack and one target slot per card"
