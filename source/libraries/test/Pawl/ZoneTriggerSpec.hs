@@ -2318,8 +2318,11 @@ representativeEvents cond =
         -- CR 603.3b's own event, and the only one this condition admits. The
         -- pair does NOT actually match here -- `departed` projects as no Saga on
         -- the empty board Event.matchesTrigger is asked about -- which is fine
-        -- for what this pins: eventBindings contributes nothing for this
-        -- condition under any event, so the floor is empty either way.
+        -- for what this pins: eventBindings reads CR 113.7's source and CR
+        -- 603.3a's controller straight off the record, and the record carries
+        -- both whatever the projection says. The source is TriggerSource.OfObject
+        -- deliberately, that being the only shape matchesTrigger accepts; a
+        -- Sourceless one would pin the empty floor and say nothing.
         TriggerCondition.SagaFinalChapterTriggers _ ->
           one
             ( GameEvent.AbilityTriggered

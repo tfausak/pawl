@@ -231,10 +231,11 @@ mayPlayers = SlotName.MkSlotName (Text.pack "thoseWhoMay")
 -- Stamped by Pawl.Engine.Event.Binding.eventBindings alongside `triggerPlayer`, and not
 -- a target -- same CR 608.2b posture as that slot, including the "no card's
 -- targetSlots may name it" sweep and the eventBindingSlots check on reads. A
--- condition that binds it only SOMETIMES is rejected by that same lint: CR
--- 400.7e withholds this slot when the destination is hidden (CR 400.2), so the
--- wider leaves-the-battlefield condition binds it for a death and not for a
--- bounce, and no card may read it under that condition yet (#505).
+-- condition that binds it only SOMETIMES is accepted by that same lint through
+-- Event.eventBindingSlotsSometimes: CR 400.7e withholds this slot when the
+-- destination is hidden (CR 400.2), so the wider leaves-the-battlefield
+-- condition binds it for a death and not for a bounce, and the rule's own answer
+-- there is that the ability finds nothing.
 --
 -- ONE object usually, SEVERAL for a melded permanent leaving the battlefield:
 -- CR 712.21c makes an effect that finds what it became find both cards. The

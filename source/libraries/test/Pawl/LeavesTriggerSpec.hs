@@ -830,6 +830,104 @@ becameSlotSpec s registry =
                  in Spec.assertEqWith s ("the slots bound for " <> show cond) (Event.eventBindingSlots cond) (foldr Set.intersection (NonEmpty.head stamped) (NonEmpty.tail stamped))
             )
             everyTriggerCondition
+        -- The CEILING, pinned the same way: Event.eventBindingSlotsSometimes is
+        -- the floor's complement -- the slots bound for some of a condition's
+        -- events and not all -- and it is what the card lint unions in so that
+        -- CR 400.7e's hidden-destination case is accepted rather than rejected.
+        -- Unlike the floor it carries a WILDCARD, so nothing in the types stops a
+        -- new condition from binding a slot conditionally and going unnamed
+        -- there; the UNION over the same events is what does. Every other reader
+        -- wants the floor, which is why the two are separate functions rather
+        -- than one three-valued answer.
+        Spec.it s "CR 603.2 eventBindingSlots and eventBindingSlotsSometimes together name every key eventBindings stamps" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          let bearerBecame = Just (ObjectId.MkObjectId 3)
+              (pikerId, placed) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+              bounced = S.runPure S.identityAnswer placed (Event.changeZone pikerId Zone.Hand)
+              empty = Setup.emptyGame S.bothPlayers
+              pinState = case Map.lookup pikerId (GameState.lastKnown bounced) of
+                Just lk -> empty {GameState.lastKnown = Map.singleton representativeDeparted lk}
+                Nothing -> empty
+          mapM_
+            ( \cond ->
+                let stamped = fmap (Map.keysSet . Event.eventBindings pinState bearerBecame S.alice cond) (representativeEvents cond)
+                 in Spec.assertEqWith
+                      s
+                      ("the slots ever bound for " <> show cond)
+                      (Set.union (Event.eventBindingSlots cond) (Event.eventBindingSlotsSometimes cond))
+                      (foldr Set.union (NonEmpty.head stamped) (NonEmpty.tail stamped))
+            )
+            everyTriggerCondition
+
+-- CR 400.7e's proviso ON A BOARD, which is what makes the slot readable by a
+-- card at all; see #505. Synthetic Persistent Roaches, {1}{B}{B} Creature -- Insect
+-- 2/2, "When this creature leaves the battlefield, return it to its owner's
+-- hand." -- Endless Cockroaches's payload under CR 603.6c's wider condition,
+-- where becameSlotSpec above has it under CR 700.4's narrower one.
+--
+-- SYNTHETIC because no printing has the shape. Scryfall, 2026-09-04:
+-- o:/when(ever)? (this|~)[^.]*leaves the battlefield/ include:extras and
+-- o:/leaves the battlefield, (exile|return|shuffle|put) it/ include:extras
+-- return nothing that reads the object it BECAME -- Broodguard Elite, Hei Bai
+-- Spirit of Balance and Selfless Police Captain all read "its counters", which
+-- is CR 608.2h about the departed permanent. Nothing in the CR forbids the
+-- printing; CR 400.7e states exactly what it would do.
+--
+-- WHY THIS IS THE PAIR. Event.eventBindingSlots answers per CONDITION with no
+-- event in hand, so it can only promise the FLOOR, and this condition's floor is
+-- empty: CR 400.7e binds `became` "if that zone is a public zone" and CR 400.2
+-- makes a library hidden. Event.eventBindingSlotsSometimes is the half the card
+-- lint unions in, and these two cases are why it is sound to: the payload acts
+-- on the card for a public destination and does nothing for a hidden one, which
+-- is the whole of what the rule says rather than the silent no-op the lint
+-- exists to catch.
+--
+-- The two boards differ in ONE thing, the destination -- CR 400.2's own axis --
+-- and a LIBRARY is the hidden zone that can discriminate. A bounce cannot: the
+-- payload returns the card to its owner's hand, so a board where the card is
+-- already in hand reads the same whether the slot was bound or not.
+persistentRoachesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+persistentRoachesSpec s registry =
+  let -- alice: the Roaches in play, enough basics for the spell, and the spell
+      -- in hand. S.identityAnswer targets the least Recipient and the Roaches is
+      -- the only creature on the board, so it is the target either way.
+      roachBoard land n spell = do
+        landP <- S.printingOf s registry land
+        spellP <- S.printingOf s registry spell
+        roaches <- S.printingOf s registry "Synthetic Persistent Roaches"
+        let (roachId, withRoaches) = S.addCreature roaches S.alice (S.landsInPlay landP n)
+        pure (roachId, S.handOne spellP withRoaches)
+      -- Cast, resolve the spell, settle -- the CR 117.5 settle whose trigger scan
+      -- sees the departure -- then resolve the trigger.
+      castIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+            resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+      roachName = CardName.MkCardName $ Text.pack "Synthetic Persistent Roaches"
+   in Spec.describe s "CR 400.7e a leaves-the-battlefield payload naming the card it became" $ do
+        -- The PUBLIC half. The discriminating assertion is the hand: an unbound
+        -- slot leaves Pawl.Engine.Resolve's MoveToZone with nothing to act on,
+        -- and the card stays in the graveyard the state-based action put it in.
+        Spec.it s "CR 400.2 killed by Lightning Bolt, the Roaches returns itself from the graveyard" $ do
+          (_, board) <- roachBoard "Mountain" 1 "Lightning Bolt"
+          let (settled, after) = castIt board
+          Spec.assertBool s (Set.member roachName (namesIn Zone.Hand S.alice after)) "the card is in hand once the trigger resolves"
+          Spec.assertBool s (not (Set.member roachName (namesIn Zone.Graveyard S.alice after))) "and no longer in the graveyard"
+          Spec.assertEqWith s "only the spent Bolt is left there" (namesIn Zone.Graveyard S.alice after) (Set.singleton (CardName.MkCardName $ Text.pack "Lightning Bolt"))
+          Spec.assertEqWith s "the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
+        -- The HIDDEN half, and the case the lint's floor was protecting: CR
+        -- 400.7e withholds `became` for a library, so the same payload finds
+        -- nothing and the card stays where Griptide put it. That is the rule's
+        -- own answer, which is what makes the sometimes-bound slot admissible.
+        Spec.it s "CR 400.2 put on top of the library by Griptide, the same trigger moves nothing" $ do
+          (_, board) <- roachBoard "Island" 4 "Griptide"
+          let (settled, after) = castIt board
+          Spec.assertBool s (not (Set.member roachName (namesIn Zone.Hand S.alice after))) "the card did NOT reach alice's hand"
+          Spec.assertBool s (Set.member roachName (namesIn Zone.Library S.alice after)) "it is still in her library"
+          Spec.assertEqWith s "and the trigger really did reach the stack" (length (GameState.stack settled)) 1
 
 -- CR 400.7e's slot under a BYSTANDER's dies trigger, the last of the four
 -- conditions that bind it (SelfDies in becameSlotSpec above,
@@ -3414,6 +3512,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   kishlaSkimmerSpec s registry
   warpedDevotionSpec s registry
   becameSlotSpec s registry
+  persistentRoachesSpec s registry
   promiseOfTomorrowSpec s registry
   cleopatraSpec s registry
   promiseOfTomorrowReturnSpec s registry

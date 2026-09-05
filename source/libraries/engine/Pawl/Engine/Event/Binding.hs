@@ -13,6 +13,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -41,6 +42,7 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
@@ -687,6 +689,27 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- question #977 still holds open.
   (TriggerCondition.PermanentSacrificed {}, GameEvent.PermanentSacrificed ev) ->
     Binding.setTriggerPlayer (PermanentWasSacrificed.player ev) Map.empty
+  -- CR 603.3b's "that Saga" and "that player": GameEvent.AbilityTriggered names
+  -- the object the chapter ability hangs on (CR 113.7) and the player who
+  -- controls it (CR 603.3a), and the watcher is neither of them.
+  -- data/cards/synthetic-chronicle-warden.json reads both, and its Opponent
+  -- relation is what makes the seat something CR 109.5's "you" is not.
+  --
+  -- The Saga under CR 400.7e's slot rather than one of its own, which is
+  -- PermanentTurnedFaceUp's case above and settled there: one permanent, one id,
+  -- two unrelated objects, and Pawl.Engine.Resolve never learns which condition
+  -- placed the ability whose slot it is reading, so a second slot would have to
+  -- be kept apart by every reader for a distinction no rule draws.
+  --
+  -- Both unconditional given a match, which is what eventBindingSlots'
+  -- per-condition promise needs: matchesTrigger's arm rejects
+  -- TriggerSource.Sourceless outright -- CR 725.2's and CR 702.179d's abilities
+  -- hang on no Saga -- so every record it accepts carries an ObjectId, and every
+  -- record carries a controller.
+  (TriggerCondition.SagaFinalChapterTriggers _, GameEvent.AbilityTriggered record) ->
+    case AbilityTriggered.source record of
+      TriggerSource.Sourceless -> Map.empty
+      TriggerSource.OfObject saga -> Binding.setBecame saga (Binding.setTriggerPlayer (AbilityTriggered.controller record) Map.empty)
   -- CR 120.3's "that much", read by the damage's RECIPIENT: Coalhauler Swine's
   -- "whenever this creature is dealt damage, it deals that much damage to each
   -- player". The same reserved slot CR 615.13's prevention and CR 119.9's life
@@ -1090,12 +1113,16 @@ eventBindingSlots cond = case cond of
   -- one either: Scryfall o:"one or more other creatures you control die",
   -- 2026-08-24, matches Vengeful Townsfolk and Vraan, Executioner Thane, whose
   -- payloads act on the bearer and on the players. A printing whose payload said
-  -- "it" would refute this, and the lint would reject it (#505).
+  -- "it" would refute this, and the lint would reject it -- and rightly, since
+  -- one slot naming one of several buried cards is no partial binding but a
+  -- wrong one, which is why this is no member of eventBindingSlotsSometimes.
   TriggerCondition.PermanentsDie _ -> Set.empty
   -- The same slot and rule as SelfDies, but bound only for a PUBLIC destination
   -- (CR 400.7e's proviso over CR 400.2's hidden zones), so the guaranteed floor is
-  -- empty. A card whose leaves-the-battlefield payload names `became` is therefore
-  -- rejected by the lint (#505).
+  -- empty. A card whose leaves-the-battlefield payload names `became` is still
+  -- accepted: the slot is claimed by eventBindingSlotsSometimes below, which the
+  -- card lint unions in, and the rule's own answer for a hidden destination is
+  -- that the ability finds nothing.
   TriggerCondition.SelfLeavesTheBattlefield -> Set.empty
   -- CR 400.7e's `became` is withheld for the arm above's reason and for a second
   -- one: this condition's other event (CR 603.6c's leaving-the-game form)
@@ -1161,7 +1188,8 @@ eventBindingSlots cond = case cond of
   -- and a different number for each, so neither reserved slot could name one.
   -- Synthetic Communal Vigil, the card that landed the constructor, draws a card
   -- and reads no part of the event; a printing whose payload said "that player"
-  -- would refute this, and the lint would reject it (#505).
+  -- would refute this, and the lint would reject it -- PermanentsDie's case
+  -- above, and no member of eventBindingSlotsSometimes for its reason.
   TriggerCondition.PlayersGainLife _ -> Set.empty
   -- The loss condition's amount, guaranteed for the same reason:
   -- GameEvent.LifeLost carries a Natural unconditionally. Exquisite Blood's "you
@@ -1190,7 +1218,8 @@ eventBindingSlots cond = case cond of
   -- permanents, and one slot cannot name them all. Cloaked Cadet, the only
   -- printing of this written form (Scryfall o:"counters are put on one or more",
   -- 2026-08-25), draws a card and names none of them; a printing whose payload
-  -- said "it" would refute this, and the lint would reject it (#505).
+  -- said "it" would refute this, and the lint would reject it -- PermanentsDie's
+  -- case above, and no member of eventBindingSlotsSometimes for its reason.
   TriggerCondition.PermanentsGetCounters {} -> Set.empty
   -- CR 400.7e's slot in its widest reading, and NOT the arm above's answer: this
   -- condition names one permanent, so the slot is honest. Auntie Ool,
@@ -1248,8 +1277,8 @@ eventBindingSlots cond = case cond of
   --
   -- ALWAYS bound and never sometimes, which is what Binding.became's own contract
   -- demands: GameEvent.TurnedFaceUp carries one ObjectId unconditionally, so
-  -- unlike CR 400.7e's hidden-destination case (#505) there is no shape of this
-  -- event that withholds it.
+  -- unlike CR 400.7e's hidden-destination case (eventBindingSlotsSometimes)
+  -- there is no shape of this event that withholds it.
   TriggerCondition.PermanentTurnedFaceUp _ -> Set.singleton Binding.became
   -- A deliberate empty: Valeron Wardens draws a card and names no "it", so there
   -- is no subject to claim a slot for. The arm above is the worked example of what
@@ -1288,7 +1317,8 @@ eventBindingSlots cond = case cond of
   -- payload moving nothing is correct rather than the silent no-op this lint
   -- exists to catch. That is what separates this arm from
   -- SelfLeavesTheBattlefield's floor, where a BOUNCE is an ordinary printed
-  -- destination and the slot's absence is an ordinary printed case (#505).
+  -- destination and the slot's absence is an ordinary printed case that
+  -- eventBindingSlotsSometimes hands to the lint instead.
   --
   -- Not implemented: the EQUIPMENT bearer, which CR 704.5n leaves standing, so
   -- CR 400.7f mints no incarnation for it and this floor over-claims. Its
@@ -1354,12 +1384,18 @@ eventBindingSlots cond = case cond of
   -- reads the bearer and never this slot, and a slot promised but unread is
   -- harmless where the reverse is the failure this lint exists to catch.
   TriggerCondition.ControllerBecomesTarget {} -> Set.singleton Binding.targetingObject
-  -- CR 603.3b's second class binds NOTHING, a deliberate empty rather than a
-  -- default: GameEvent.AbilityTriggered names the Saga and the player who
-  -- controls the chapter ability, and Historian's Boon's "create a 4/4 white
-  -- Angel" reads neither. A card printing "that Saga" or "that player" is what
-  -- would earn a slot (#1029).
-  TriggerCondition.SagaFinalChapterTriggers _ -> Set.empty
+  -- CR 603.3b's second class names two things and binds both: CR 113.7's Saga,
+  -- which the chapter ability hangs on, under CR 400.7e's slot for the reason
+  -- eventBindings' arm gives, and CR 603.3a's controller of that chapter ability
+  -- under the reserved player slot. Synthetic Chronicle Warden reads both;
+  -- Historian's Boon, the printed bearer, reads neither and is unaffected by the
+  -- slots being available.
+  --
+  -- Both guaranteed given a match: matchesTrigger's arm rejects
+  -- TriggerSource.Sourceless, so the record it accepts always carries an
+  -- ObjectId, and every record carries a controller. Claimed for the CONDITION
+  -- rather than for the printing, which is what a per-condition set means.
+  TriggerCondition.SagaFinalChapterTriggers _ -> Set.fromList [Binding.became, Binding.triggerPlayer]
   -- CR 725.1's newly crowned player -- Garland, Royal Kidnapper watches an
   -- OPPONENT take the crown, so the seat is one nothing else on the ability
   -- names. Under the You relation it is also CR 109.5's "you", a second name for
@@ -1378,3 +1414,44 @@ eventBindingSlots cond = case cond of
   -- resolution that made it comes from CR 603.7c's captured environment instead,
   -- which Pawl.Engine.Resolve stamps into the entry as it is armed.
   TriggerCondition.Reflexive -> Set.empty
+
+-- The slots eventBindings stamps for SOME of a condition's events and not for
+-- all of them -- what the classification above deliberately leaves out, since a
+-- floor may promise only what every admitted event supplies.
+--
+-- ONE customer, the card lint, which unions this with the floor. A slot bound
+-- for some events is a slot a card may legitimately name, because CR 400.7e is
+-- itself the rule that withholds it ("if that zone is a public zone"): the
+-- payload finding nothing for the other destination is what the rule
+-- PRESCRIBES, not the silent no-op the lint exists to catch. Every other reader
+-- wants the floor, a slot bound sometimes being no guarantee at all.
+--
+-- Two arms and no more, which is a fact about eventBindings above rather than a
+-- convenience: CR 400.7e's public-zone proviso is the only guard there that a
+-- MATCH does not already settle, and it stands on exactly these two conditions
+-- (CR 603.6c admits every destination for both). AttachedCreatureDies is the
+-- near miss -- its `became` rides on CR 400.7f's arrival rather than on the
+-- event -- and the floor claims it outright, for the reasons that arm gives.
+--
+-- A WILDCARD here where eventBindingSlots forbids one, the asymmetry being which
+-- way each default fails. Defaulting a new condition to "binds nothing" there
+-- would silently un-lint a slot it does bind; defaulting to "nothing extra" here
+-- only makes the lint STRICTER, and a card rejected at the corpus sweep fails
+-- loudly. Pinned even so, by Pawl.LeavesTriggerSpec's "CR 603.2 eventBindingSlots
+-- and eventBindingSlotsSometimes together name every key eventBindings stamps",
+-- which unions where the floor's pin intersects.
+eventBindingSlotsSometimes :: TriggerCondition -> Set.Set SlotName.SlotName
+eventBindingSlotsSometimes cond = case cond of
+  -- CR 400.7e's proviso, read against CR 400.2's split: a death binds `became`
+  -- and a bounce does not, and CR 603.6c admits both, so the floor is empty
+  -- while a card naming the slot is correct for every destination -- it acts on
+  -- the card for a public one and does nothing for a hidden one, which is the
+  -- whole of what the rule says. data/cards/synthetic-persistent-roaches.json is
+  -- the reader.
+  TriggerCondition.SelfLeavesTheBattlefield -> Set.singleton Binding.became
+  -- The bystander reading of that same arm, withheld by the same guard for the
+  -- same rule. Its floor holds CR 603.10a's departed permanent instead, so
+  -- unlike the arm above this condition is not silent about the departure --
+  -- nothing in data/cards/ names the arrival under it.
+  TriggerCondition.PermanentLeavesTheBattlefield _ -> Set.singleton Binding.became
+  _ -> Set.empty
