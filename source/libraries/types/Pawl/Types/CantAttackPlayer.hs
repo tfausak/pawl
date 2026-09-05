@@ -46,10 +46,10 @@ data CantAttackPlayer = MkCantAttackPlayer
     -- meaning and joined to the grant by the same dataflow lint in
     -- Pawl.AbilitySlotLintSpec.
     --
-    -- Nothing for the overwhelming majority, which grant no such permission and
-    -- so have nothing to be referred to by. Volrath's Curse's one sentence
-    -- declares BOTH halves of "can't attack or block" under one name, which is
-    -- what makes one payment cover both.
+    -- Nothing for every printing, this arm included: CR 116.2d's producers that
+    -- aim at an object state CantAttack and CantBlock instead. The field is here
+    -- because whether a restriction can be NAMED is independent of its shape,
+    -- which is why the "unless" gate beside it is on every arm too.
     name :: Maybe AbilityName.AbilityName
   }
   deriving (Eq, Ord, Show)

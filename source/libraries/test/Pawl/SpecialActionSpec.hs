@@ -1323,7 +1323,7 @@ curseCombat curse kami piker =
    in (curseId, kamiId, victimId, S.attach curseId kamiId gs3)
 
 -- CR 116.2d on the OBJECT axis: an ability aimed at a permanent rather than at a
--- player. Volrath's Curse (STH 43) is the producer -- "enchanted creature can't
+-- player. Volrath's Curse (TMP 101) is the producer -- "enchanted creature can't
 -- attack or block, and its activated abilities can't be activated. That
 -- creature's controller may sacrifice a permanent of their choice for that
 -- player to ignore this effect until end of turn" -- and its one sentence
