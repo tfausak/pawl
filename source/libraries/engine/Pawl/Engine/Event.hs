@@ -3338,7 +3338,11 @@ unlockHalves actor oid halves = do
         State.modify' $ \g ->
           let open o = o {Object.unlockedHalves = opened}
            in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
-        let fully = fullyUnlockedAfter opened (Game.cardOf oid gs)
+        -- CR 709.5b: the halves the permanent HAS, which for one that copied a
+        -- Room are the copied Room's (Game.halvesOf) and not the card printed
+        -- underneath it. Off the object's own card this answers False for every
+        -- copy, since no copier's printed card has a shared type line.
+        let fully = fullyUnlockedAfter opened (Game.halvesOf oid gs)
         Monad.forM_ (Set.toAscList given) $ \half ->
           State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid actor half (fully && Set.lookupMax given == Just half))))
 

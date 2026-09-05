@@ -4,6 +4,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.CardSpec as CardSpec
 import qualified Pawl.Codec.FaceSpec as FaceSpec
 import qualified Pawl.Codec.ProjectedCharacteristics as PC
 import qualified Pawl.JsonCodec.Common as Common
@@ -68,7 +69,11 @@ testCharacteristics =
       -- wrong field would not round trip to the same JSON.
       PC.textChangedKeywords = Map.singleton Keyword.Trample 1,
       PC.assignsCombatDamageWithToughness = True,
-      PC.grantsStationToughness = True
+      PC.grantsStationToughness = True,
+      -- Synthetic like the rest of this value: a Mountain has no halves, and
+      -- what the case is about is that the field carries a whole card through
+      -- the wire (CR 709.5).
+      PC.halves = Just CardSpec.mountainCard
     }
 
 testCharacteristicsJson :: String
@@ -86,7 +91,8 @@ testCharacteristicsJson =
     <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}],"
     <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}],"
     <> "\"assignsCombatDamageWithToughness\":true,"
-    <> "\"grantsStationToughness\":true}"
+    <> "\"grantsStationToughness\":true,"
+    <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]}}"
 
 -- | Every field but the two required ones at its default.
 minimalCharacteristics :: PC.ProjectedCharacteristics
@@ -114,7 +120,8 @@ minimalCharacteristics =
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,
-      PC.grantsStationToughness = False
+      PC.grantsStationToughness = False,
+      PC.halves = Nothing
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
