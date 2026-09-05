@@ -2409,9 +2409,23 @@ filterReads f = case f of
   -- abilitiesFromCharacteristics runs through Condition.holds and which a
   -- Quantity can take anywhere (#2633).
   Filter.Type.HasNonManaActivatedAbility -> Set.singleton Keywords
-  -- CR 602.1 reads the same abilities one exclusion out, so it reads the same
-  -- layer.
-  Filter.Type.HasActivatedAbility -> Set.singleton Keywords
+  -- CR 602.1 reads the same abilities the neighbour above does, and CR 613.1f's
+  -- layer 6 with them -- but also CR 305.6's intrinsic "{T}: Add [mana symbol]",
+  -- which Projection.View.viewOfCharacteristics adds as a disjunct off the
+  -- projected card types and subtypes. Those are layer 4 (CR 613.1d), so a
+  -- subtype write moves this atom's answer: Blood Moon's SetLandSubtype gives a
+  -- nonbasic the Mountain ability it did not have, and CR 613.8a's dependency on
+  -- an Affected.Matching HasActivatedAbility effect is only seen if the read is
+  -- declared here.
+  --
+  -- A REGRESSION FENCE rather than a proved behaviour: no card in data/cards/
+  -- writes this atom into an Affected or a Count position -- Zirda, the
+  -- Dawnwaker's companion condition is the pool's only writer and runs through
+  -- viewOfCard, which movableAspects never reaches -- so no board can tell the
+  -- widened row from the narrow one. The neighbour above needs no widening for
+  -- the same reason its own field does not: CR 605.1a makes the intrinsic
+  -- ability a mana ability.
+  Filter.Type.HasActivatedAbility -> Set.fromList [Keywords, Types, Subtypes]
   -- CR 400.1 / 109.3: a zone is not a characteristic, so no Modification writes
   -- one and no layer's ordering turns on this atom.
   Filter.Type.IsInZone _ -> Set.empty

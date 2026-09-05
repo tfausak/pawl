@@ -70,6 +70,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
@@ -696,23 +697,25 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
 -- this object's own unlocked designations instead (copiableCharacteristics
 -- above).
 --
--- THE accessor all six of those readers share -- the record above,
--- staticAbilitiesOf below, Pawl.Engine.Projection's copiableReplacementsOf,
--- anyCopiableKeyword and copiableMintsType, and Pawl.Engine.PlayerEffect's
--- playerAbilitiesOf -- so that no two of them can answer differently about one
--- object. Four of the six are disjuncts of ONE predicate
--- (Pawl.Engine.Projection.replacementsAffecting's baseHas), which is what makes a
--- per-reader fork a bug waiting rather than a style question: that predicate's
+-- THE accessor all seven of those readers share -- the record above,
+-- staticAbilitiesOf and specialActionsOf below, Pawl.Engine.Projection's
+-- copiableReplacementsOf, anyCopiableKeyword and copiableMintsType, and
+-- Pawl.Engine.PlayerEffect's playerAbilitiesOf -- so that no two of them can
+-- answer differently about one object. Four of the seven are disjuncts of ONE
+-- predicate (Pawl.Engine.Projection.replacementsAffecting's baseHas), which is
+-- what makes a per-reader fork a bug waiting rather than a style question: that
+-- predicate's
 -- False SKIPS the projection, so a reader left behind hides a copy's ability
 -- rather than reporting it.
 --
--- Two of those six have a producer over a copied door -- copiableReplacementsOf
+-- Two of those seven have a producer over a copied door -- copiableReplacementsOf
 -- (Torture Pit, proved by Pawl.RoomSpec's "CR 707.2a a copy of a Room gathers the
 -- replacement effect behind the door IT unlocked") and playerAbilitiesOf
--- (Steaming Sauna). anyCopiableKeyword and copiableMintsType have none and are
--- REGRESSION FENCES: no printed Room half prints a keyword, and none is a Saga, a
--- planeswalker or a battle (Scryfall `t:room`, 2026-09-05), so nothing can redden
--- if they are left behind again.
+-- (Steaming Sauna). anyCopiableKeyword, copiableMintsType and specialActionsOf
+-- have none and are REGRESSION FENCES: no printed Room half prints a keyword,
+-- none is a Saga, a planeswalker or a battle, and none grants a CR 116.2
+-- permission (Scryfall `t:room`, 2026-09-05), so nothing can redden if they are
+-- left behind again.
 copiableSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 copiableSnapshotOf oid gs
   | derivesFromCopiedHalves oid gs = Nothing
@@ -773,6 +776,27 @@ staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
   -- halves subtracted by THIS object's designations (CR 709.5).
   Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywords face)) (Game.faceOf oid gs)
 
+-- CR 116.2: the special actions this object's copiable rules text grants -- its
+-- copy snapshot's when it has one, its printed face's otherwise.
+-- staticAbilitiesOf above in every respect, and split from it for the same two
+-- structural reasons; the one caller is Pawl.Engine.Ignore.ignoreGrants.
+--
+-- CR 707.2a is what puts the snapshot first: the permission is derived from the
+-- copied object's rules text, so a permanent that became a copy of Leonin
+-- Arbiter offers the {2} its own printed face never mentions, beside the
+-- prohibition Pawl.Engine.PlayerEffect.playerAbilitiesOf already reads off that
+-- same snapshot. Pawl.SpecialActionSpec's "CR 707.2a a copy of the Arbiter
+-- carries the offer with the ban" proves it.
+--
+-- CR 116.2e's discard is not asked of this: that permission is read of a card in
+-- HAND (Pawl.Engine.Action.discardableCards, off Pawl.Engine.Card.combined), a
+-- zone in which nothing in data/cards/ can make an object a copy.
+specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
+specialActionsOf oid gs = case copiableSnapshotOf oid gs of
+  Just snapshot -> PC.specialActions snapshot
+  -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
+  Nothing -> foldMap Face.specialActions (Game.faceOf oid gs)
+
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
 -- has a printed power and toughness box (CR 208.1) for the star to sit in.
@@ -813,6 +837,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.subtypes = Set.empty,
         PC.staticAbilities = [],
         PC.playerAbilities = [],
+        -- CR 116.2: no card behind the object, so no printed permission either.
+        PC.specialActions = [],
         PC.activatedAbilities = [],
         PC.replacementEffects = [],
         PC.triggeredAbilities = [],
@@ -891,6 +917,10 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- instead of on the copier's printed face (CR 707.2a).
             PC.staticAbilities = Face.staticAbilities face,
             PC.playerAbilities = Face.playerAbilities face,
+            -- CR 116.2, in the seed for the same reason and read by
+            -- specialActionsOf below: CR 707.2a copies the abilities a face's
+            -- rules text derives, and CR 116.2d's permission is one of them.
+            PC.specialActions = Face.specialActions face,
             PC.activatedAbilities = Face.activatedAbilities face,
             PC.replacementEffects = Face.replacementEffects face,
             PC.triggeredAbilities = Face.triggeredAbilities face,
