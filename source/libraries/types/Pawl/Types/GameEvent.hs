@@ -427,6 +427,13 @@ data GameEvent
     -- transitioned. The id alone, no card in `data/cards/` distinguishing what
     -- caused the tap.
     BecameTapped ObjectId.ObjectId
+  | -- | CR 701.26b: this permanent BECAME UNTAPPED. Appended by
+    -- Pawl.Engine.Event.untap and by CR 502.3's batch in
+    -- Pawl.Engine.Engine.untapAll, the two roads that untap, and only for a
+    -- permanent that was tapped -- that rule's second sentence. CR 603.2e is the
+    -- other exclusion: a permanent that ENTERS untapped never transitioned. The
+    -- id alone, BecameTapped's mirror.
+    BecameUntapped ObjectId.ObjectId
   | -- | CR 106.12a: this permanent WAS TAPPED FOR MANA -- a mana ability of it
     -- whose activation cost includes {T} resolved and produced mana. Appended by
     -- Pawl.Engine.Cost.tapForManaWith alone, the funnel every mana activation
