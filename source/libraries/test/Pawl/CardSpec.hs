@@ -631,114 +631,16 @@ objectRefPlayerRefPositions =
 plantedPlayer :: String -> PlayerRef.PlayerRef
 plantedPlayer = PlayerRef.InSlot . SlotName.MkSlotName . Text.pack
 
--- Every Count reachable from a Quantity: a leaf Count directly, or one nested
--- through Plus's two children (CR 208.2 composition -- a printed 1+*) or
--- Negate's one.
+-- Every Count reachable from a Quantity, Pawl.Engine.QuantitySlot's enumeration:
+-- a leaf Count, plus the ones the composing arms nest. ONE enumeration, because
+-- Resolve.Slots.quantitySlots reads the same Counts for the slots their FILTERS
+-- name and the two must not disagree about where a Count sits.
 quantityCounts :: Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
-quantityCounts quantity = case quantity of
-  Quantity.Type.Literal _ -> []
-  Quantity.Type.ManaValue -> []
-  Quantity.Type.Power -> []
-  Quantity.Type.Toughness -> []
-  -- A slot read, not a fold over game state: the value was bound by an earlier
-  -- effect of the same resolution and there is no Count inside it.
-  Quantity.Type.InSlot _ -> []
-  Quantity.Type.Star -> []
-  Quantity.Type.Plus (Plus.MkPlus a b) -> quantityCounts a <> quantityCounts b
-  -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it
-  -- halves may be one -- Malignus halves a fold over players.
-  Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityCounts inner
-  -- Not a leaf: a minus sign hides nothing, so the lints reach through it --
-  -- Toxic Deluge's -X, and any negated count a card comes to print.
-  Quantity.Type.Negate a -> quantityCounts a
-  Quantity.Type.Count count -> count : countCounts count
-  -- A fold over a MANA POOL (CR 106.4), not over a zone: it holds no
-  -- Pawl.Types.Count and no Pawl.Types.Filter, so the lints below -- which are
-  -- about the Filters a card authors -- have nothing to sweep here. See
-  -- Pawl.Types.ManaCount.
-  Quantity.Type.ManaCount _ -> []
-  -- CR 119.1's scalar attached to a PLAYER: it holds neither a Pawl.Types.Count
-  -- nor a Pawl.Types.Filter, so these lints have nothing to sweep here either.
-  Quantity.Type.LifeTotal _ -> []
-  Quantity.Type.Speed _ -> []
-  -- CR 725.1's game-wide player designation, read as a 0/1: a PlayerRef and
-  -- nothing else, so no Count and no Filter here either.
-  Quantity.Type.IsMonarch _ -> []
-  -- CR 103.1's, read the same way and holding the same nothing.
-  Quantity.Type.IsStartingPlayer _ -> []
-  Quantity.Type.IsActivePlayer _ -> []
-  Quantity.Type.HasDesignation _ -> []
-  Quantity.Type.ClassLevel -> []
-  Quantity.Type.WasKicked -> []
-  -- No Count under CR 702.33d's per-cost tally: it reads a Cost off the spell's
-  -- own announcement. That Cost is checked against the face's kicker keywords by
-  -- timesKickedWithOffends, off the ENCODING, because none of this module's three
-  -- Quantity traversals can carry a Cost.
-  Quantity.Type.TimesKickedWith {} -> []
-  Quantity.Type.TagWasSpent {} -> []
-  Quantity.Type.WasToken -> []
-  Quantity.Type.WasBlocking -> []
-  Quantity.Type.DamageDealtToThisTurn -> []
-  -- CR 122.1's per-player counter tally, another such scalar.
-  Quantity.Type.PlayerCounters {} -> []
-  -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
-  -- against: a CounterKind with no Count beside it. The KIND may carry a Filter
-  -- of its own (CR 122.1b), which quantityKindFilters below is what digs out.
-  Quantity.Type.ObjectCounters _ -> []
-  -- The kind-agnostic reading of that same tally: not even a CounterKind beside it.
-  Quantity.Type.ObjectCountersOfAnyKind -> []
-  -- CR 508.3b's combat record, read as a tally of players: a PlayerRef and
-  -- nothing else, so no Count and no Filter here either.
-  Quantity.Type.OpponentsAttacked _ -> []
-  -- CR 701.9a's tally of logged discards: a PlayerRef and nothing else, so no
-  -- Count and no Filter here either.
-  Quantity.Type.CardsDiscardedThisTurn _ -> []
-  Quantity.Type.LifeGainedThisTurn _ -> []
-  -- CR 120.1's tally of logged damage: a PlayerRef and nothing else, so no Count
-  -- and no Filter here either.
-  Quantity.Type.PlayersDealtDamageThisTurn _ -> []
-  -- The same log read as a TOTAL rather than a tally: a PlayerRef and nothing
-  -- else here either.
-  Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
-  -- CR 601.2i's tally of casts, read off the handoff snapshot: a PlayerRef and
-  -- nothing else, so no Count and no Filter here either.
-  Quantity.Type.SpellsCastLastTurn _ -> []
-  -- CR 309.7's tally of completed dungeons, read off the player: a PlayerRef and
-  -- nothing else, so no Count and no Filter here either.
-  Quantity.Type.DungeonsCompleted _ -> []
-  Quantity.Type.CompletedDungeon {} -> []
-  -- CR 400.7's logged entry, read against the object the quantity is aimed at: no
-  -- reference at all, so no Count and no Filter here either.
-  Quantity.Type.EnteredThisTurn -> []
-  -- CR 400.7's logged origin zone and CR 601.2a's logged cast: player references
-  -- and nothing else -- an InZone for the first, a CastFrom holding a second
-  -- reference beside one for the second -- so no Count and no Filter here either.
-  -- The shared-zone pairing either InZone could state is rejected at the decoder
-  -- by Pawl.Codec.InZone.undividedShared; cardOffendsSharedZoneScope below
-  -- restates it only over a Count's scope, so these two are covered once rather
-  -- than twice (see #161).
-  Quantity.Type.EnteredFrom _ -> []
-  Quantity.Type.WasCastFrom _ -> []
-  -- CR 509.1h's declaration, read against the object the quantity is evaluated
-  -- against: a nullary leaf, so no Count and no Filter here either.
-  Quantity.Type.BlockersBeyondFirst -> []
-  -- CR 702.184c's engine-only substitution, Power's shape: no Count and no
-  -- Filter here either.
-  Quantity.Type.StationMeasure -> []
-  -- Not a leaf: aiming the evaluation at another object does not stop the payload
-  -- from being a Count, so the Filter lints must reach through it.
-  Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> quantityCounts inner
-
--- Every Count nested inside another Count's AGGREGATION: only Greatest carries
--- a per-member Quantity, and that Quantity may itself be a Count. Without this
--- descent the shared-zone lint below would sweep past a misauthored inner
--- scope.
-countCounts :: Count.Type.Count Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
-countCounts = concatMap quantityCounts . countQuantities
+quantityCounts = QuantitySlot.nestedCounts
 
 -- The Quantities a Count's AGGREGATION carries: only Greatest has one. Named so
--- countCounts above and quantityKindFilters below descend through the same field
--- rather than each spelling the aggregation out.
+-- quantityKindFilters below and Pawl.Engine.QuantitySlot's own Count descent
+-- reach the same field rather than each spelling the aggregation out.
 countQuantities :: Count.Type.Count Quantity.Type.Quantity -> [Quantity.Type.Quantity]
 countQuantities count = case Count.Type.aggregation count of
   Aggregation.Members -> []
@@ -2991,7 +2893,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.Negate a -> quantityKindFilters a
   -- The Count's own Filter is countFilters' half above; what this half adds is
   -- the CounterKind a Greatest's per-member Quantity may hide, which is
-  -- countCounts' descent.
+  -- QuantitySlot.nestedCounts' descent.
   Quantity.Type.Count count -> concatMap quantityKindFilters (countQuantities count)
   Quantity.Type.ManaCount _ -> []
   Quantity.Type.LifeTotal _ -> []

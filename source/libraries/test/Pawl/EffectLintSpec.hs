@@ -1645,10 +1645,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         -- that funnel, is filterSlotsReadSingly's; Filter.IsBound reads the whole
         -- set, so it is no risk and no fence for the others either.
         --
-        -- Not implemented: a PlayerRef NESTED IN a quantity -- Quantity's own
-        -- ControllerOfBound arm -- which QuantitySlot.slots answers empty for,
-        -- so the quantity leg cannot report it and nothing else looks there
-        -- (#1079).
+        -- A PlayerRef NESTED IN a quantity -- Quantity's own ControllerOfBound
+        -- arm -- is covered by the same leg: QuantitySlot.slots answers empty
+        -- for it, but quantitySlots folds nestedRefs, so it arrives at
+        -- Resolve.playerRefSlots' own arity like any other reference.
         --
         -- The condition of a DELAYED ability is a singular reader too, and it is
         -- fenced on both axes: triggerConditionSlots and filterSlotsReadSingly

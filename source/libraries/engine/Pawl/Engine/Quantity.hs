@@ -898,9 +898,9 @@ objectSlots quantity = case quantity of
   -- own; the other two aggregations carry no number to ask.
   Quantity.Count c -> QuantitySlot.foldCount objectSlots c
   -- Every remaining arm names no slot at all, QuantitySlot.slots saying the same
-  -- of each:
-  -- the references they carry are PlayerRefs, which name a target slot neither
-  -- walk reports and Resolve.slotsOf cannot recover from here (#1079).
+  -- of each: the references they carry are PlayerRefs, which name a target slot
+  -- neither walk reports. QuantitySlot.nestedRefs is the walk that does, and
+  -- Resolve.Slots.quantitySlots folds it, so the read is not lost.
   Quantity.ManaCount _ -> Set.empty
   Quantity.LifeTotal _ -> Set.empty
   Quantity.Speed _ -> Set.empty
@@ -968,8 +968,7 @@ playerRefIsSlotless ref = case ref of
   -- hands the evaluation, never off a binding.
   PlayerRef.Candidate -> True
   -- InSlot's answer, and for its reason: the slot is a TARGET slot, which
-  -- Resolve.slotsOf is the half that reports -- and cannot see one buried in a
-  -- quantity (#1079).
+  -- Resolve.Slots.quantitySlots reports by folding nestedRefs.
   PlayerRef.ControllerOfBound _ -> False
   -- InSlot's answer again: the player attacked is named by a slot.
   PlayerRef.Attacking _ -> False
