@@ -3492,6 +3492,8 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.CanAttachToSubject -> []
   Filter.Type.IsToken -> []
   Filter.Type.IsActivatedAbility -> []
+  Filter.Type.IsAbility -> []
+  Filter.Type.IsEmblem -> []
   -- DESCENT, for RepresentedByCard's reason below.
   Filter.Type.FromSource f -> filterSlotsReadSingly f
   Filter.Type.IsTapped -> []

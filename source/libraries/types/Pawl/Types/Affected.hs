@@ -48,11 +48,11 @@ data Affected
     -- printed characteristics. Pawl.ProjectionSpec's Maskwood Nexus pair is what
     -- proves the second.
     --
-    -- Not implemented, the symmetric OVER-reach, recorded here because the card's
-    -- JSON cannot carry a comment: Painter's own filter is And [], which matches
-    -- EVERY object, while the card scopes to three kinds of thing. So this also
-    -- reaches an ability on the stack (CR 113.1c) and an emblem in the command
-    -- zone (CR 114.5). Neither is observable today (#1551, #3061).
+    -- The set is every OBJECT, so what a card scoped to fewer kinds of thing
+    -- says is said by its Filter instead: Painter's "all cards that aren't on
+    -- the battlefield, spells, and permanents" writes CR 109.1's remaining two
+    -- kinds out with Not (Or [IsAbility, IsEmblem]), and Pawl.ColorSpec's Koth
+    -- and Synthetic Prismatic Silence cases prove each exclusion.
     MatchingAnywhere (Filter.Filter Keyword.Keyword)
   | -- | Matching with the battlefield gate INVERTED: any object matching the
     -- Filter that is not on the battlefield. Teferi, Mage of Zhalfir's "creature

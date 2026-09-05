@@ -1015,6 +1015,23 @@ isActivatedAbility oid gs = case lookupObject oid gs of
       Source.OfEmblem _ -> False
       Source.OfSpellCopy _ -> False
 
+-- CR 114.5: is this object an emblem -- "neither a card nor a permanent"? Asks
+-- the object's KIND off Object.source, isToken's posture, and never its zone:
+-- CR 114.2 puts an emblem in the command zone and nothing moves it, so a zone
+-- conjunct would be a second reading of the same fact. False for an unknown id.
+isEmblem :: ObjectId -> GameState -> Bool
+isEmblem oid gs = case lookupObject oid gs of
+  Nothing -> False
+  Just obj -> case Object.source obj of
+    Source.OfEmblem _ -> True
+    Source.OfCard _ -> False
+    Source.OfMeld _ -> False
+    Source.OfToken _ -> False
+    Source.OfAbility _ -> False
+    Source.OfTrigger _ -> False
+    Source.OfSpellCopy _ -> False
+    Source.OfInherentTrigger _ -> False
+
 -- CR 113.7: the object an ability on the stack came from -- the one whose
 -- ability was activated or triggered. Nothing for anything that is not an
 -- ability on the stack, and for CR 725.2's inherent trigger, which has no

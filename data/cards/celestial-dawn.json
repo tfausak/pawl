@@ -197,6 +197,12 @@
                   "value": {
                     "type": "You"
                   }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsAbility"
+                  }
                 }
               ]
             }
@@ -231,6 +237,20 @@
                   "type": "OwnedBy",
                   "value": {
                     "type": "You"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "Or",
+                    "value": [
+                      {
+                        "type": "IsAbility"
+                      },
+                      {
+                        "type": "IsEmblem"
+                      }
+                    ]
                   }
                 }
               ]
