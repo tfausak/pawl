@@ -16,6 +16,7 @@ import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CastFrom as CastFrom
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
@@ -633,7 +634,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     let entered = any (\zc -> ZoneChange.from zc == InZone.zone inZone) (entriesOf oid)
     pure (if elem owner pids && entered then 1 else 0)
   -- CR 601.2a / 400.3 read as a 0/1: was the object this evaluation is aimed at
-  -- cast by the named player out of that player's copy of the named zone?
+  -- cast, by a player the payload's `caster` names, out of a copy of the zone its
+  -- `from` names?
   --
   -- Two hops rather than one, because CR 400.7 puts a whole object between the
   -- cast and the entry: the spell the card became is ZoneChange.departed of the
@@ -641,48 +643,41 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- id (Pawl.Types.SpellWasCast.zone). Nothing else records it -- the permanent
   -- has no memory of the spell's origin.
   --
-  -- ONE reference answering THREE questions the rules distinguish: whose copy of
-  -- the zone, who cast the spell, and who owns the card. The owner half is
-  -- EnteredFrom's, for CR 400.3's reason, and is read the same way for CR 603.4's;
-  -- the caster half is CR 601.2a's.
+  -- THREE questions the rules distinguish, answered off TWO references: whose
+  -- copy of the zone, who owns the card, and who cast the spell. The first two
+  -- are one question by CR 400.3, which puts a card only in its OWNER's library,
+  -- hand or graveyard, and CR 400.1's shared zones can only take
+  -- PlayerRef.EachPlayer (Pawl.Codec.InZone.undividedShared) where both conjuncts
+  -- go vacuous; that pair is `from`, read exactly as EnteredFrom reads its own.
+  -- CR 601.2a's caster is `caster`, and it really does come apart from the other
+  -- two: Tinybones, the Pickpocket casts a nonland permanent card out of the
+  -- graveyard of the player it damaged, so Breathless Knight's "you cast it from
+  -- A graveyard" is Relative You over EachPlayer's graveyards and its two halves
+  -- disagree on that board. Fblthp, the Lost's agentless "was cast from your
+  -- library" constrains them the other way round.
   --
-  -- What makes the one reference exact is the POOL rather than anything about
-  -- Magic. CR 400.3 puts a card only in its OWNER's library, hand or graveyard, so
-  -- the zone's owner and the card's owner are always one seat; CR 400.1's shared
-  -- zones can only take PlayerRef.EachPlayer (Pawl.Codec.InZone.undividedShared),
-  -- where all three conjuncts are vacuous. Every card that READS this reference
-  -- reads a graveyard or exile, and every CR 601.3 permission over a graveyard in
-  -- data/cards/ names PlayerRef.Relative You, so wherever a spell those cards can
-  -- see is cast, the caster is the owner too. Breathless Knight's "you cast it
-  -- from A graveyard" is therefore PlayerRef.Relative You here -- an EachPlayer
-  -- reference would read "anyone cast it", which is weaker -- and Fblthp, the
-  -- Lost's agentless "was cast from your library" is that same seat named from the
-  -- other side.
-  --
-  -- Not implemented: the caster and the zone's owner really can differ now, so the
-  -- conjuncts are a regression fence rather than a proved trio -- mutating either
-  -- away leaves the suite green. TWO roads reach it. Sen Triplets grants a cast
-  -- out of an opponent's HAND (Pawl.Types.CastFromZone), and no card in
-  -- data/cards/ reads a hand here; and CR 608.2g's offered cast asks no zone at
-  -- all (Cast.castableWhenOffered), so an effect naming a card in an opponent's
-  -- graveyard would cast it from there. The reference splits in three the day
-  -- either gets a reader (#2689). Jetsam (Flotsam // Jetsam) is the printing on
-  -- the second road; Havengul Lich would reach the first through the CR 601.3
-  -- permission road, which still refuses at the one-object permission (#2795).
+  -- All three conjuncts are PROVED there rather than fenced, which is what one
+  -- reference could not do: Pawl.ConditionSpec's ForeignGraveyardCast reads one
+  -- such cast with three cards at once, and each conjunct is the only thing
+  -- answering for one of them -- the Knight's counter for the zone, the Vessel's
+  -- absent Demon for the owner, and bob's Prized Amalgam arming nothing for the
+  -- caster.
   --
   -- An object that reached the battlefield any OTHER way answers 0 rather than
   -- Nothing, `spells` coming up empty: a permanent put there by an effect was not
   -- cast at all, which is an answered question and the disjunct's other half
   -- (EnteredFrom) is what covers it.
-  Quantity.WasCastFrom inZone -> do
+  Quantity.WasCastFrom castFrom -> do
     oid <- mOid
+    let inZone = CastFrom.from castFrom
     pids <- playersOf (InZone.player inZone)
+    casters <- playersOf (CastFrom.caster castFrom)
     owner <- Filter.owner =<< viewOf oid
     let spells = [ZoneChange.departed zc | zc <- entriesOf oid, ZoneChange.from zc == Zone.Stack]
         castFromZone cast =
           elem (SpellWasCast.spell cast) spells
             && SpellWasCast.zone cast == Just (InZone.zone inZone)
-            && elem (SpellWasCast.player cast) pids
+            && elem (SpellWasCast.player cast) casters
         wasCast = any (maybe False castFromZone . Game.castOf . LoggedEvent.event) (GameState.events gs)
     pure (if elem owner pids && wasCast then 1 else 0)
   -- CR 509.1h's declaration, counted beyond the first: how many creatures are

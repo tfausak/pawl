@@ -181,7 +181,26 @@ costsFor pid name oid gs = fmap CandidateCost.cost (candidateCostsFor pid name o
 -- which is the zone half of rule 702.103a; CR 702.127a's aftermath asks about the
 -- ZONE instead and needs no tag of its own.
 candidateCostsFor :: PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
-candidateCostsFor pid name oid gs = case Game.lookupObject oid gs of
+candidateCostsFor = candidateCostsGiven False
+
+-- | candidateCostsFor, told whether CR 601.3's permission comes from the EFFECT
+-- rather than from the board.
+--
+-- One arm reads that rule, and so one arm needs telling: a card in a GRAVEYARD
+-- is offered the printed cost and its alternatives only where some permission
+-- lets this player cast it from there, since without one there is no cast to
+-- price. CR 608.2g's offer is such a permission -- the effect naming the object
+-- IS it, which is why Pawl.Engine.Cast.castableWhenOffered asks no zone -- and
+-- it is not written anywhere on the board for
+-- Pawl.Engine.PlayerEffect.mayCastFrom to find. Without this the offer priced
+-- the card at nothing at all and no cast was made, which is what kept anything
+-- from being cast out of a graveyard on that road (#2795).
+--
+-- A permission states no cost, so what it adds is exactly what a board-written
+-- permission adds: the printed cost first, then each alternative (CR 118.9a),
+-- untagged.
+candidateCostsGiven :: Bool -> PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
+candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]
   Just obj -> case Object.source obj of
@@ -302,7 +321,7 @@ candidateCostsFor pid name oid gs = case Game.lookupObject oid gs of
                       -- UNTAGGED: an effect's permission states no cost, so
                       -- neither rule 702.34a's clause nor rule 702.133a's is
                       -- satisfied by paying it.
-                      <> (if PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then fmap untagged (printed : alternatives) else [])
+                      <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then fmap untagged (printed : alternatives) else [])
               -- CR 702.170d: a PLOTTED card is cast "without paying its mana
               -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
               -- rule 702.170d being the only thing permitting this cast. The zone's

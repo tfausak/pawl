@@ -839,7 +839,7 @@ offerCast resolving caster slot optionality offer = do
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
-            candidates = maybe (Cost.candidateCostsFor caster name oid proposed) (pure . Cost.untagged) applied
+            candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) (pure . Cost.untagged) applied
          in if Cast.castableWhenOffered caster oid name candidates proposed
               then
                 -- CR 118.8c, read off the same candidates the cast will be
@@ -870,7 +870,7 @@ offerCast resolving caster slot optionality offer = do
   case chosen of
     Nothing -> pure ()
     Just (oid, name, applied, excused) -> do
-      let cast = Cast.castSpellWith performManaAbility applied caster oid name Facing.FaceUp
+      let cast = Cast.castSpellWith performManaAbility True applied caster oid name Facing.FaceUp
           -- The SAME prompt on both paths: CR 118.8c creates no new decision.
           mayCast = do
             let decider = Decide.deciderFor caster gs

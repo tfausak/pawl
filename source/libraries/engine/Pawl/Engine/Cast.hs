@@ -1492,7 +1492,7 @@ castWhileSearching perform pid = do
 -- object is put onto the stack, so it cannot be a prompt inside the
 -- announcement.
 castSpell :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpell perform = castSpellWith perform Nothing
+castSpell perform = castSpellWith perform False Nothing
 
 -- castSpell with CR 118.9's other source of an alternative cost: one "applied to
 -- it from another effect" rather than listed in the spell's own text. Just c
@@ -1508,8 +1508,8 @@ castSpell perform = castSpellWith perform Nothing
 -- Nothing about the offer is re-checked here: `castSpellWith` casts, and whether
 -- the cast may be offered at all is `castableWhenOffered`'s question, asked by
 -- the caller that made the offer.
-castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpellWith perform applied pid oid name facing = do
+castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpellWith perform offered applied pid oid name facing = do
   before <- State.get
   -- The state the GATE measured, which is `before` with CR 709.3's half and CR
   -- 708.4's facing stamped on. Read from rather than written to the game: the
@@ -1569,7 +1569,7 @@ castSpellWith perform applied pid oid name facing = do
               (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
-                  (maybe (Cost.candidateCostsFor pid name oid proposed) (pure . Cost.untagged) applied)
+                  (maybe (Cost.candidateCostsGiven offered pid name oid proposed) (pure . Cost.untagged) applied)
               )
           -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move
