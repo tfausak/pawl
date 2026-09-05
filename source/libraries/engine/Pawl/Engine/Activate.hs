@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
@@ -649,6 +650,18 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- same conjunct for CR 605.3a's windows, exactly as sickness below and the
         -- printed rider two lines down are asked in both places.
         && not (Detain.detained srcId gs)
+        -- CR 101.2 over CR 602.2's permission: a printed static ability aimed at
+        -- this permanent saying its activated abilities can't be activated
+        -- (Arrest). Beside detain because it is the same clause from card data
+        -- rather than from the rulebook, and it owes the second gate for detain's
+        -- reason: Cost.manaActivations carries it for CR 605.3a's windows.
+        --
+        -- Asked as NonManaAbility, which the mana conjunct above has already
+        -- settled for everything reaching here (CR 605.3b). That is what makes
+        -- Realmbreaker's Grasp's "unless they're mana abilities" an exemption
+        -- rather than a second reading: its row names this kind, so the mana
+        -- window's question -- ManaAbility -- never matches it.
+        && not (ActivationProhibition.prohibited AbilityKind.NonManaAbility srcId gs)
         -- CR 602.5's player-axis prohibition (Sen Triplets), beside detain for
         -- its reason: rule 701.35a stamps one object and this names a player, and
         -- neither carves a mana ability out -- so Cost.manaActivationsGiven

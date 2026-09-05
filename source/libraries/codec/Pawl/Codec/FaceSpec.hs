@@ -11,8 +11,10 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
@@ -150,6 +152,7 @@ baseFace =
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
+      Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
@@ -205,6 +208,7 @@ minimalFace =
       Face.untapRestrictions = [],
       Face.attachRestrictions = [],
       Face.counterRestrictions = [],
+      Face.activationProhibitions = [],
       Face.entryRestrictions = [],
       Face.attackCosts = [],
       Face.blockCosts = [],
@@ -259,6 +263,7 @@ populatedFace =
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
       Face.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)],
       Face.counterRestrictions = [CounterRestriction.MkCounterRestriction Affected.Attached (Just CounterKind.MinusOneMinusOne)],
+      Face.activationProhibitions = [ActivationProhibition.MkActivationProhibition Affected.Attached (Just AbilityKind.NonManaAbility)],
       Face.entryRestrictions = [EntryRestriction.MkEntryRestriction Affected.Attached (Set.singleton Zone.Graveyard)],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
       Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
@@ -299,6 +304,7 @@ populatedFaceJson =
     <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attachRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"attachers\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}],"
     <> "\"counterRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"kind\":{\"type\":\"MinusOneMinusOne\"}}],"
+    <> "\"activationProhibitions\":[{\"affected\":{\"type\":\"Attached\"},\"kind\":{\"type\":\"NonManaAbility\"}}],"
     <> "\"entryRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"origins\":[{\"type\":\"Graveyard\"}]}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"scope\":{\"type\":\"Controller\"}}],"
     <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}],"
@@ -373,6 +379,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "counterRestrictions (CR 122.6/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.counterRestrictions <$> decodeFace v) (Right [])
+    Spec.it s "activationProhibitions (CR 602.2/101.2) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.activationProhibitions <$> decodeFace v) (Right [])
     Spec.it s "entryRestrictions (CR 400.4a/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.entryRestrictions <$> decodeFace v) (Right [])
@@ -509,6 +518,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction Affected.Attached (Just CounterKind.MinusOneMinusOne)]}
         (init baseFaceJson <> ",\"counterRestrictions\":[{\"affected\":{\"type\":\"Attached\"},\"kind\":{\"type\":\"MinusOneMinusOne\"}}]}")
+    Spec.it s "activationProhibitions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.activationProhibitions = [ActivationProhibition.MkActivationProhibition Affected.Attached (Just AbilityKind.NonManaAbility)]}
+        (init baseFaceJson <> ",\"activationProhibitions\":[{\"affected\":{\"type\":\"Attached\"},\"kind\":{\"type\":\"NonManaAbility\"}}]}")
     Spec.it s "entryRestrictions" $
       Common.assertJsonCodec
         s

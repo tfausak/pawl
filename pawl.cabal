@@ -91,6 +91,8 @@ library codec
     Pawl.Codec.ActivatedAbilitySource
     Pawl.Codec.ActivatedAbilitySourceSpec
     Pawl.Codec.ActivatedAbilitySpec
+    Pawl.Codec.ActivationProhibition
+    Pawl.Codec.ActivationProhibitionSpec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
     Pawl.Codec.Activator
@@ -933,6 +935,7 @@ library engine
   exposed-modules:
     Pawl.Engine.Action
     Pawl.Engine.Activate
+    Pawl.Engine.ActivationProhibition
     Pawl.Engine.ActivationRestriction
     Pawl.Engine.Amass
     Pawl.Engine.Attach
@@ -1266,6 +1269,7 @@ library test
   exposed-modules:
     Pawl.AbilitySlotLintSpec
     Pawl.ActivateSpec
+    Pawl.ActivationProhibitionSpec
     Pawl.AdventureSpec
     Pawl.AttackKeywordTriggerSpec
     Pawl.AuraSpec
@@ -1394,6 +1398,7 @@ library types
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivatedAbilitySource
+    Pawl.Types.ActivationProhibition
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
     Pawl.Types.Activator

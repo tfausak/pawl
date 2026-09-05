@@ -4,6 +4,7 @@ import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
 import qualified Pawl.AbilitySlotLintSpec
 import qualified Pawl.ActivateSpec
+import qualified Pawl.ActivationProhibitionSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AttackKeywordTriggerSpec
 import qualified Pawl.AuraSpec
@@ -24,6 +25,7 @@ import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
+import qualified Pawl.Codec.ActivationProhibitionSpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.ActivatorSpec
 import qualified Pawl.Codec.ActiveAttackProhibitionSpec
@@ -623,6 +625,7 @@ testTree registry =
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = do
   Pawl.ActivateSpec.spec s registry
+  Pawl.ActivationProhibitionSpec.spec s registry
   Pawl.AdventureSpec.spec s registry
   Pawl.AuraSpec.spec s registry
   Pawl.BattleSpec.spec s registry
@@ -642,6 +645,7 @@ spec s registry = do
   Pawl.Codec.AbilityTriggeredSpec.spec s
   Pawl.Codec.ActivatedAbilitySourceSpec.spec s
   Pawl.Codec.ActivatedAbilitySpec.spec s
+  Pawl.Codec.ActivationProhibitionSpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
   Pawl.Codec.ActivatorSpec.spec s
   Pawl.Codec.ActiveAttackProhibitionSpec.spec s
