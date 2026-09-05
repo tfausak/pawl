@@ -1362,7 +1362,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- may carry is a separate question and is not tagged with it.
         alternatively = base {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing sacrificeCost]}
         -- CR 602.2b, paid as the ability is activated -- after CR 601.2c too.
-        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost [] (spellOf []) [] Activator.Controller Nothing Nothing]}
+        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost [] (spellOf []) [] Activator.Controller Nothing Nothing Nothing]}
         -- CR 116.2d: a special action uses no stack (CR 116.1), so no
         -- announcement could answer in any engine.
         ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn (AbilityName.MkAbilityName (Text.pack "the prohibition")) sacrificeCost]}

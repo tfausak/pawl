@@ -110,7 +110,7 @@ chooseNoModes p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -334,7 +334,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
-              ActivatedAbility.name = Nothing
+              ActivatedAbility.name = Nothing,
+              ActivatedAbility.keyword = Nothing
             }
     Spec.assertBool s (not (Activate.activatable S.alice srcId costlyAbility gs1)) "one Mountain cannot pay {2}"
 
@@ -924,6 +925,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
             Activator.Controller
             Nothing
             Nothing
+            Nothing
         after = S.runPure chooseNoModes gs (Activate.activateAbility S.alice oid twoModes)
     Spec.assertEqWith s "the activation was rejected: nothing on the stack" (GameState.stack after) []
     Spec.assertEqWith s "so no reveal survives it either" (S.revealsOf after) []
@@ -958,7 +960,8 @@ aimAtOffered oid p = case p of
 -- Fluctuator above is the same shape one keyword over; what this group adds is
 -- the keyword itself, since an Equipment produces a byte-identical
 -- ActivatedAbility whether the equip is printed or minted, and nothing else in
--- the pool asks which.
+-- the pool asks which. Synthetic Duplicitous Warblade's case below is that collision built
+-- on purpose.
 --
 -- alice's board: a Bonesplitter (equip {1}), a Goblin Piker to equip, a Withered
 -- Wretch ("{1}: Exile target card from a graveyard"), a Goblin Piker in bob's
@@ -1017,7 +1020,7 @@ equipSpec s registry = Spec.describe s "Equip" $ do
 
   -- CR 118.7 narrowed to one rule-702 family, which is what
   -- Pawl.Types.ReduceActivationCost's `grantedBy` names and what
-  -- Pawl.Engine.Keyword.familyGranting answers by re-minting. The whole card:
+  -- Pawl.Engine.Keyword.familyGranting reads off the minter's stamp. The whole card:
   -- with no mana source in the game, {1} minus {1} is {0} and the Equipment
   -- moves.
   Spec.it s "CR 118.7 whole card: Bureau Headmaster equips a Bonesplitter off no mana at all" $ do
@@ -1069,6 +1072,40 @@ equipSpec s registry = Spec.describe s "Equip" $ do
     Spec.assertEqWith s "the Wretch's printed {1} is not reduced away" (length (activationsOf wretchId (Action.legalActions S.alice gs))) 0
     Spec.assertEqWith s "while the equip on the same board is offered" (length (activationsOf splitterId (Action.legalActions S.alice gs))) 1
     Spec.assertBool s (not (null (Projection.abilitiesOf wretchId gs))) "and the Wretch has an ability to withhold"
+
+  -- CR 702.6a's ability against a card that PRINTS the same words, which is the
+  -- one pair value equality cannot tell apart. Synthetic Duplicitous Warblade
+  -- ({2} Artifact -- Equipment, "Equipped creature gets +1/+0", equip {1}, and
+  -- "{1}: Attach this permanent to target creature you control. Activate only as
+  -- a sorcery" printed underneath) is that pair on one permanent, so the board
+  -- differs in the ORIGIN of two abilities and in nothing else.
+  --
+  -- SYNTHETIC because no printing pairs a keyword with a twin of what that
+  -- keyword mints. Scryfall o:"Attach this permanent to target creature you
+  -- control", 2026-09-05, no hit -- an Equipment's reminder text writes "Attach
+  -- to", so a real twin would be the one card matching rule 702.6a's own words.
+  -- Nothing in rule 702.6 forbids one.
+  --
+  -- The Headmaster board again, and for its reason: with no mana at all, "was
+  -- this classified as an equip ability" is offered against not offered. Rule
+  -- 702.6a's ability is reduced to {0} and offered; the printed twin's {1} is
+  -- not payable and is not. The second assertion is what keeps the first from
+  -- being vacuous -- the two abilities really are equal but for the stamp
+  -- Pawl.Engine.Keyword.mintedBy puts on the minted one, so a classification by
+  -- SHAPE reduces both and offers two.
+  Spec.it s "CR 118.7 a printed twin of rule 702.6a's ability is not an equip ability" $ do
+    (_, _, _, gs) <- equipBoard s registry True
+    warblade <- S.printingOf s registry "Synthetic Duplicitous Warblade"
+    let (twinId, board) = S.addCreature warblade S.alice gs
+        abilities = Projection.abilitiesOf twinId board
+        unstamp ability = ability {ActivatedAbility.keyword = Nothing}
+    Spec.assertEqWith s "only rule 702.6a's own ability is reduced to {0} and offered" (length (activationsOf twinId (Action.legalActions S.alice board))) 1
+    Spec.assertEqWith
+      s
+      "and the printed twin is equal to it but for the stamp, so shape cannot tell them apart"
+      (fmap unstamp (filter (Maybe.isJust . ActivatedAbility.keyword) abilities))
+      (filter (Maybe.isNothing . ActivatedAbility.keyword) abilities)
+    Spec.assertEqWith s "both abilities are there to be offered" (length abilities) 2
 
   -- The control for the case above, one Swamp apart: everything the Wretch's
   -- refusal could otherwise be about -- its target slot, its timing, its being
@@ -1966,7 +2003,7 @@ tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"
 shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
   Just ab -> ab
-  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing
+  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
 
 -- alice controls Tovolar showing his BACK face -- "{X}{R}{G}: Target Wolf or
 -- Werewolf you control gets +X/+0 and gains trample until end of turn" -- a

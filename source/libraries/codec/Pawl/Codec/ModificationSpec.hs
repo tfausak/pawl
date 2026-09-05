@@ -276,6 +276,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
                   Activator.Controller
                   Nothing
                   Nothing
+                  Nothing
               )
           )
       )

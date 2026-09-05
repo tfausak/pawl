@@ -17,7 +17,9 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
@@ -52,11 +54,12 @@ toJson = Codec.encode codec
 fromJson :: Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility Text.Text Text.Text)
 fromJson = Codec.decode codec
 
--- One constructor, so three cases: rule 702.6a's equip ability as
+-- One constructor, so four cases: rule 702.6a's equip ability as
 -- Pawl.Engine.Keyword mints it, carrying CR 602.5d's SorcerySpeed clause, CR
 -- 602.2's default of no clause at all,
--- whose key is elided, and Kongming's Contraptions' TWO clauses, which is what
--- the key being an array is for.
+-- whose key is elided, Kongming's Contraptions' TWO clauses, which is what
+-- the key being an array is for, and the same equip ability carrying the stamp
+-- its minter put on it.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
   Spec.it s "MkActivatedAbility, rule 702.6a's equip ability" $
@@ -80,6 +83,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           Activator.Controller
           Nothing
           Nothing
+          Nothing
       )
       " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{\"clauses\":[{\"effects\":[{\"type\":\"Attach\",\"value\":\"target\"}]}],\"targetSlots\":{\"target\":{\"pool\":{\"type\":\"Creatures\"},\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}}}}]},\"restrictions\":[{\"type\":\"SorcerySpeed\"}]} "
   -- CR 602.5's conjunction, in the JSON: two clauses in printed order, which is
@@ -99,8 +103,29 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           Activator.Controller
           Nothing
           Nothing
+          Nothing
       )
       " {\"cost\":{\"mana\":null,\"components\":[{\"type\":\"TapThis\"}]},\"modal\":{\"modes\":[{}]},\"restrictions\":[{\"type\":\"DuringPhase\",\"value\":{\"window\":{\"type\":\"Step\",\"value\":{\"type\":\"Combat\",\"value\":{\"type\":\"DeclareAttackers\"}}},\"scope\":{\"type\":\"EachTurn\"}}},{\"type\":\"AttackedThisStep\"}]} "
+  -- CR 702.6a: the stamp Pawl.Engine.Keyword.mintedBy writes, which is the one
+  -- key no card in data/cards/ carries -- an ability already on the stack has to
+  -- round-trip it, since Pawl.Codec.GameState reaches this codec through
+  -- Pawl.Codec.Object.
+  Spec.it s "the keyword an ability was minted from round-trips" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( ActivatedAbility.MkActivatedAbility
+          (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
+          []
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
+          [ActivationRestriction.SorcerySpeed]
+          Activator.Controller
+          Nothing
+          Nothing
+          (Just (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []) Nothing)))
+      )
+      " {\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{}]},\"restrictions\":[{\"type\":\"SorcerySpeed\"}],\"keyword\":{\"type\":\"Equip\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"quality\":null}}} "
   -- CR 602.2: no rider is the default for nearly every ability, so the key stays
   -- out of the JSON.
   Spec.it s "an unrestricted ability omits the restrictions key, and an absent key decodes to none" $
@@ -114,6 +139,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           []
           Activator.Controller
+          Nothing
           Nothing
           Nothing
       )
