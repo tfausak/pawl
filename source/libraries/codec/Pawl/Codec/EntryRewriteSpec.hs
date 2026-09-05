@@ -133,6 +133,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       (EntryRewrite.WithCounters (WithCounters.one CounterKind.Loyalty (Quantity.Literal 3)))
       " {\"type\":\"WithCounters\",\"value\":[{\"kind\":{\"type\":\"Loyalty\"},\"count\":{\"type\":\"Literal\",\"value\":3}}]} "
+  -- CR 614.1c: the keyword half of Faerie Squadron's clause, whose counter half
+  -- is the arm above. A set, since "with first strike and trample" (Cetavolver)
+  -- is one clause naming two.
+  Spec.it s "WithKeywords (Faerie Squadron)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.WithKeywords (Set.singleton Keyword.Flying))
+      " {\"type\":\"WithKeywords\",\"value\":[{\"type\":\"Flying\"}]} "
   -- CR 702.136a: riot's rewrite, payload-free because rule 702.136a fixes both
   -- halves. Minted from a keyword rather than written by a card, and round-tripped
   -- anyway, because every arm of this type is.

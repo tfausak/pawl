@@ -131,6 +131,8 @@ import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryFlip as EntryFlip
+import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -3725,6 +3727,11 @@ copyExceptionFilters exception = case exception of
   CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
   CopyException.AddCardTypes _ -> []
 
+-- CR 208.2b's entry option. The P/T pair narrows nothing; the keywords reach a
+-- Filter apiece, copyExceptionFilters' road one rule over.
+entryOptionFilters :: EntryOption.EntryOption -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+entryOptionFilters option = concatMap keywordFilters (Set.toList (EntryOption.keywords option))
+
 -- The Filters an EntryRewrite carries, on five different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
 -- Chamber's "other than a basic land card name"), a predicate over a CARD in the
@@ -3750,10 +3757,15 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- landwalk is one that holds a Filter. The CR 614.1d `tapped` flag beside them
   -- holds none (Vesuva).
   EntryRewrite.AsCopy (AsCopy.MkAsCopy f exceptions _) -> unframed [f] <> concatMap copyExceptionFilters exceptions
-  -- Not implemented: descending into each option's keywords, whose landwalk
-  -- Filter this walk does not reach (#3232).
-  EntryRewrite.ChoiceOf _ -> []
-  EntryRewrite.ChoiceByCoinFlip _ -> []
+  -- CR 208.2b's options grant KEYWORDS, and a keyword may carry a Filter of its
+  -- own (CR 702.14c's landwalk) -- the axis the AsCopy arm above reaches through
+  -- CR 707.9a, on the payload beside it. Vacuous over `data/cards/` while Primal
+  -- Plasma's and Molten Sentry's options grant flying, defender and haste, none of
+  -- which carries one; Pawl.FilterPositionLintSpec's "CR 702 a keyword's own
+  -- filter is framed by the keyword and not by whatever quotes it" plants one and
+  -- is what proves the descent.
+  EntryRewrite.ChoiceOf options -> concatMap entryOptionFilters options
+  EntryRewrite.ChoiceByCoinFlip f -> entryOptionFilters (EntryFlip.heads f) <> entryOptionFilters (EntryFlip.tails f)
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.ChoosePlayer -> []
@@ -3766,6 +3778,9 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- every KIND, the map's keys being CR 122.1b's, any of which may be a whole
   -- Keyword carrying a Filter; see #2728.
   EntryRewrite.WithCounters w -> withCountersFilters w
+  -- CR 614.1c's granted keywords, the option arms' payload without the choice
+  -- around it, and reached the same way.
+  EntryRewrite.WithKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []

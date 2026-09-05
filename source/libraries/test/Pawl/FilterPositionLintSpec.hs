@@ -67,6 +67,9 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryFlip as EntryFlip
+import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
@@ -1424,6 +1427,18 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton slot targetSlot)))
             (ModeSelection.ChooseExactly 1)
         counting kind f = spellOf (TargetSlot.withAmount (Quantity.Type.ObjectCounters kind) (TargetSlot.required Pool.Creatures f))
+        -- CR 614.1c's own row, carrying the entry rewrite under test. Filter.IsSource
+        -- is what every "[this permanent] enters ..." clause matches on.
+        entering rewrite =
+          [ PrintedReplacement.MkPrintedReplacement
+              Nothing
+              (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource rewrite))
+              Set.empty
+              Nothing
+          ]
+        -- CR 208.2b's option, distinct P/T so nothing here is a numeric
+        -- coincidence, and the keyword is the only thing carrying a Filter.
+        optionWith = EntryOption.MkEntryOption 2 5
     -- Ordered FIRST, and CR 115.10a's half of the claim: the atom whose offence
     -- is the mirror of the others' is rejected at all three sites a keyword's
     -- Filter is reached from. A site that lost the tag reddens under its own
@@ -1431,7 +1446,15 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let sited =
           [ ("CR 702.11d's printed keyword", isBoundCounts (base {Face.keywords = Set.singleton (keywordOf boundAtom)})),
             ("CR 613's granted keyword", isBoundCounts (base {Face.staticAbilities = granting (keywordOf boundAtom)})),
-            ("CR 122.1b's keyword counter", isBoundCounts (base {Face.counterRestrictions = prohibiting (kindOf boundAtom)}))
+            ("CR 122.1b's keyword counter", isBoundCounts (base {Face.counterRestrictions = prohibiting (kindOf boundAtom)})),
+            -- CR 208.2b's as-enters options and CR 614.1c's outright grant, the
+            -- three positions #3232 named: each carries a Set of whole Keywords,
+            -- so each reaches a Filter the same way CR 707.9a's exception does.
+            -- ONE option of the flip's two carries the atom, so the count is 1
+            -- here as it is at every other site.
+            ("CR 208.2b's as-enters option", isBoundCounts (base {Face.replacementEffects = entering (EntryRewrite.ChoiceOf [optionWith (Set.singleton (keywordOf boundAtom))])})),
+            ("CR 705.2's flipped option", isBoundCounts (base {Face.replacementEffects = entering (EntryRewrite.ChoiceByCoinFlip EntryFlip.MkEntryFlip {EntryFlip.heads = optionWith (Set.singleton (keywordOf boundAtom)), EntryFlip.tails = optionWith Set.empty})})),
+            ("CR 614.1c's granted keyword", isBoundCounts (base {Face.replacementEffects = entering (EntryRewrite.WithKeywords (Set.singleton (keywordOf boundAtom)))}))
           ]
     Spec.assertEqWith s "IsBound under a keyword is an offence at every site that reaches one" sited (fmap (fmap (const (1, 0))) sited)
     -- The pair that differs in exactly ONE thing: the same prohibition, the same

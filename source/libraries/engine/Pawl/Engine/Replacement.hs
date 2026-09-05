@@ -874,6 +874,12 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.ChooseCardNames _ -> True
   EntryRewrite.ChooseCardName _ -> True
   EntryRewrite.WithCounters {} -> True
+  -- CR 614.1c states no condition of its own: "it enters with flying" is
+  -- unconditional, and Faerie Squadron's "if this creature was kicked" is the
+  -- CARD's clause, which rides CR 604.2 on Pawl.Types.PrintedReplacement and has
+  -- already been asked before this row was collected -- RunEffects' answer below,
+  -- and for its reason.
+  EntryRewrite.WithKeywords _ -> True
   EntryRewrite.UnderSourceControl -> True
   EntryRewrite.SacrificeAnyNumber {} -> True
   -- CR 702.155b states no condition of its own -- a Saga with read ahead always
@@ -1461,6 +1467,9 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChooseCardNames _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChooseCardName _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters {})) -> ReplacementBucket.Other
+  -- CR 616.1e for the arm above's reason, one payload over: what the permanent
+  -- enters WITH is neither whose it is, what it copies nor which face is up.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithKeywords _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> ReplacementBucket.Other
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
@@ -1592,6 +1601,10 @@ readsApplier re = case re of
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's loyalty included).
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters {})) -> False
+  -- CR 614.1c's "enters with" one payload over: the keywords are the effect's own
+  -- field, and the CR 611.2 grant they become names the ENTERING object as both
+  -- its source and its affected set, so nothing here is read off the applier.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithKeywords _)) -> False
   -- CR 614.1c again, and NO despite performing a sacrifice: the sacrificing
   -- player is the ENTERING object's controller, read live off the board at CR
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride

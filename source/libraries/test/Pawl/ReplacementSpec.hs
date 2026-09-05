@@ -1241,6 +1241,111 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   undergrowthScavengerSpec s registry
   entryBudgetSpec s registry
   warLeechSpec s registry
+  faerieSquadronSpec s registry
+
+-- Faerie Squadron {U} Creature -- Faerie 1/1, whole text: "Kicker {3}{U} (You may
+-- pay an additional {3}{U} as you cast this spell.) / If this creature was
+-- kicked, it enters with two +1/+1 counters on it and with flying." (oracle
+-- checked on Scryfall)
+--
+-- The card whose second clause EntryRewrite.WithKeywords exists for (#2323): CR
+-- 614.1c's "enters with" naming a keyword rather than a counter. It writes the
+-- one sentence as two rows -- the counters and the keyword -- each on CR 604.2's
+-- "if this creature was kicked", which is why both reach CR 616.1e together and
+-- the entry loop asks for an order.
+--
+-- THE BOARD: nine Islands, the Squadron in hand and a Rite of Replication beside
+-- it. Nine is the two casts added up -- {U} plus the kicker {3}{U} is five, and
+-- the Rite unkicked is four -- so the kicked and unkicked cases below differ in
+-- the kicker answer and in nothing else.
+squadronBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+squadronBoard island squadron rite =
+  let (gs1, squadronId) = S.handOne squadron (S.landsInPlay island 9)
+      (riteId, gs2) = S.addHandCard rite S.alice gs1
+   in (gs2, squadronId, riteId)
+
+-- The battlefield's Faerie Squadrons, by name: CR 400.7 gives the permanent a new
+-- id, so the one the cast was handed names nothing here.
+squadronsOut :: GameState.GameState -> [ObjectId.ObjectId]
+squadronsOut gs = [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName (CardName.MkCardName (Text.pack "Faerie Squadron")) o gs]
+
+-- Cast the Squadron with this kicker answer and settle. `kicks` answers CR
+-- 702.33a and defers the rest, so CR 616.1's order between the two entry rows is
+-- the canonical one -- which the rule makes immaterial, both rows applying either
+-- way (CR 616.1f).
+castSquadron :: KickerDecision.KickerDecision -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castSquadron decision gs squadronId =
+  let cast = snd (Engine.runGamePure (kicks decision) gs (S.cast S.alice squadronId))
+   in snd (Engine.runGamePure (kicks decision) cast (Stack.resolveTop >> Engine.settleForPriority))
+
+-- Rite of Replication unkicked, aimed at `victim` -- PINNED to that id rather
+-- than searched for, so a mutation cannot be repaired by an answerer that finds
+-- another legal target.
+riteAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+riteAt victim p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
+  _ -> S.identityAnswer p
+
+faerieSquadronSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+faerieSquadronSpec s registry = Spec.describe s "Faerie Squadron" $ do
+  -- CR 702.33d's designation survives the resolution (CR 400.7d), CR 604.2's
+  -- clause reads it off the entering permanent, and CR 614.1c's two rewrites place
+  -- the counters and grant the keyword.
+  Spec.it s "CR 614.1c kicked, the Squadron enters with flying and with two +1/+1 counters" $ do
+    island <- S.printingOf s registry "Island"
+    squadron <- S.printingOf s registry "Faerie Squadron"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (board, squadronId, _) = squadronBoard island squadron rite
+        settled = castSquadron (KickerDecision.MkKickerDecision 1) board squadronId
+    case squadronsOut settled of
+      [permId] -> do
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying permId settled) "CR 614.1c it has flying"
+        Spec.assertEqWith s "and the counter half of the same sentence placed two +1/+1 counters" (S.powerToughnessOf permId settled) (Just (3, 3))
+      other -> Spec.assertFailure s ("expected one Squadron, got " <> show (length other))
+  -- The same board and the same answerer but for the one answer. The Squadron
+  -- enters HERE TOO, so what the two cases tell apart is whether the rewrite ran
+  -- and not whether the permanent arrived.
+  Spec.it s "CR 604.2 unkicked, neither rewrite applies: no flying and a 1/1" $ do
+    island <- S.printingOf s registry "Island"
+    squadron <- S.printingOf s registry "Faerie Squadron"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (board, squadronId, _) = squadronBoard island squadron rite
+        settled = castSquadron (KickerDecision.MkKickerDecision 0) board squadronId
+    case squadronsOut settled of
+      [permId] -> do
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying permId settled)) "CR 604.2 the unkicked Squadron does not have flying"
+        Spec.assertEqWith s "and it is the printed 1/1" (S.powerToughnessOf permId settled) (Just (1, 1))
+      other -> Spec.assertFailure s ("expected one Squadron, got " <> show (length other))
+  -- WHERE THE GRANT LIVES, which the two cases above cannot see: CR 707.2 copies
+  -- an "as . . . enters" ability's values only where it SETS POWER AND TOUGHNESS,
+  -- and "with flying" sets neither, so the keyword is not a copiable value. A
+  -- token copy of the kicked Squadron is a printed 1/1 with no flying -- and an
+  -- implementation writing the keyword into the copiable snapshot the way
+  -- Pawl.Engine.Replacement.applyEntryOption does for CR 208.2b's options would
+  -- hand the token flying instead.
+  --
+  -- The counters are the control beside it: CR 707.2's last sentence keeps them
+  -- off the copy too, so a token that arrived at 3/3 would say the whole snapshot
+  -- was written rather than only the keyword.
+  Spec.it s "CR 707.2 a token copy of the kicked Squadron has neither the flying nor the counters" $ do
+    island <- S.printingOf s registry "Island"
+    squadron <- S.printingOf s registry "Faerie Squadron"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (board, squadronId, riteId) = squadronBoard island squadron rite
+        entered = castSquadron (KickerDecision.MkKickerDecision 1) board squadronId
+    case squadronsOut entered of
+      [origId] -> do
+        let cast = snd (Engine.runGamePure (riteAt origId) entered (S.cast S.alice riteId))
+            after = snd (Engine.runGamePure (riteAt origId) cast (Stack.resolveTop >> Engine.settleForPriority))
+        case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield entered)) of
+          [tokenId] -> do
+            Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying tokenId after)) "CR 707.2 the token copy does not have flying"
+            Spec.assertEqWith s "it is a Faerie Squadron all the same" (Projection.namesOf tokenId after) (Set.singleton (CardName.MkCardName (Text.pack "Faerie Squadron")))
+            Spec.assertEqWith s "at its printed 1/1, the counters not being copied either" (S.powerToughnessOf tokenId after) (Just (1, 1))
+            Spec.assertBool s (Projection.hasKeyword Keyword.Flying origId after) "and the original still has the flying it entered with"
+          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+      other -> Spec.assertFailure s ("expected one Squadron, got " <> show (length other))
 
 -- Monstrous War-Leech {3}{B} Creature -- Leech Horror \*/*, whole text: "Kicker
 -- {U}. As this creature enters, if it was kicked, mill four cards. Monstrous

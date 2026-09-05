@@ -1070,6 +1070,11 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   EntryRewrite.ChooseCardNames f -> EntryRewrite.ChooseCardNames (Filter.rewrite pairs f)
   EntryRewrite.ChooseCardName f -> EntryRewrite.ChooseCardName (Filter.rewrite pairs f)
   EntryRewrite.WithCounters w -> EntryRewrite.WithCounters (rewriteWithCounters pairs w)
+  -- CR 702.14a's word once more, this time in a keyword the entry clause grants
+  -- outright. Latent for ChoiceByCoinFlip's reason: Faerie Squadron grants flying,
+  -- which carries no word, and an entry clause granting islandwalk would be what
+  -- proves it.
+  EntryRewrite.WithKeywords ks -> EntryRewrite.WithKeywords (Set.map (Filter.rewriteKeyword pairs) ks)
   EntryRewrite.UnderSourceControl -> rewrite
   EntryRewrite.SacrificeAnyNumber s ->
     EntryRewrite.SacrificeAnyNumber
