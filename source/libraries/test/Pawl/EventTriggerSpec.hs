@@ -46,6 +46,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.Zone as Zone
@@ -1938,6 +1939,122 @@ oreskosSunGuideSpec s registry =
           Spec.assertEqWith s "untapping the Guide gains alice 2" (S.lifeOf S.alice (resolveOne (untapOne guideId))) (Just 22)
           Spec.assertEqWith s "untapping the Piker instead gains nothing" (S.lifeOf S.alice (resolveOne (untapOne pikerId))) (Just 20)
 
+-- CR 701.68d's blight as a TRIGGER EVENT, which nothing could watch: the whole
+-- printed pool blights, and not one card triggers on a player doing it
+-- (Scryfall oracle:blight, every "whenever" clause read, 2026-09-05). So the
+-- watcher is made up -- Synthetic Blight Chronicler {1}{B} 1/3 Creature --
+-- Human Cleric (data/cards/synthetic-blight-chronicler.json): "Whenever a
+-- player blights, you draw a card and you lose 1 life." One trigger condition over one event,
+-- and both effects are ones the engine already had, so the only new thing these
+-- cases can be passing on is the condition and the event behind it.
+--
+-- The blighter is Sinister Gnarlbark, {2}{B} 0/4 Creature -- Treefolk Warlock
+-- (data/cards/sinister-gnarlbark.json): "At the beginning of your end step,
+-- draw a card and blight 1." (Name, cost, type line, P/T and oracle text
+-- checked against Scryfall.) Its own draw is what tells rule 101.3's ignored
+-- PART from an aborted instruction on the no-creature board below.
+--
+-- WHY A COUNTER TRIGGER CANNOT STAND IN, which is the whole of rule 701.68d's
+-- last clause: the Solemnity case blights with every counter kept off the
+-- board, so no GameEvent.CountersPut is written and the Chronicler fires all
+-- the same.
+blightChroniclerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blightChroniclerSpec s registry =
+  let placeTriggers gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveOne gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject oid gs)
+   in Spec.describe s "Synthetic Blight Chronicler" $ do
+        -- The card on its plainest board: alice's Gnarlbark blights her own
+        -- Gnarlbark, and bob's Chronicler -- a seat away from the blight --
+        -- draws and drains him for it.
+        Spec.it s "CR 701.68d a blight triggers a watcher on another seat" $ do
+          (gnarlbarkId, board) <- blightChroniclerBoard s registry False False
+          let blighted = resolveOne board
+              placed = placeTriggers blighted
+              after = resolveOne placed
+          Spec.assertEqWith s "bob loses 1 to his Chronicler" (S.lifeOf S.bob after) (Just 19)
+          Spec.assertEqWith s "and draws the card beside it" (S.handSize S.bob after) 1
+          Spec.assertEqWith s "the Gnarlbark took rule 701.68a's counter" (minusCountersOn gnarlbarkId blighted) (Just 1)
+          Spec.assertEqWith s "one trigger reached the stack, and only one" (length (GameState.stack placed)) 1
+        -- Rule 701.68d's "regardless of what events actually occurred", one
+        -- permanent apart from the case above: Solemnity, {2}{W} Enchantment
+        -- (data/cards/solemnity.json), "If a counter would be put on an
+        -- artifact, creature, enchantment, or land, it isn't." The blight puts
+        -- nothing, so a condition reading GameEvent.CountersPut would see no
+        -- event at all -- and the Chronicler still fires.
+        Spec.it s "CR 701.68d Solemnity keeps every counter off and the Chronicler still triggers" $ do
+          (gnarlbarkId, board) <- blightChroniclerBoard s registry True False
+          let blighted = resolveOne board
+              placed = placeTriggers blighted
+              after = resolveOne placed
+          Spec.assertEqWith s "bob loses 1 all the same" (S.lifeOf S.bob after) (Just 19)
+          Spec.assertEqWith s "though no counter was put on the Gnarlbark" (minusCountersOn gnarlbarkId blighted) (Just 0)
+          Spec.assertEqWith s "and alice's own draw still happened" (S.handSize S.alice blighted) 1
+        -- Rule 701.68b's board, and the negative of the first case one
+        -- permanent apart: the Gnarlbark dies to state-based actions with its
+        -- own trigger already on the stack (CR 603.3b), so alice controls no
+        -- creature, rule 701.68a's process never runs, and no blight happened
+        -- to trigger on. The draw beside it still does, which is what tells CR
+        -- 101.3's ignored part from an aborted instruction.
+        Spec.it s "CR 701.68b a controller with no creature blights nothing, and nothing triggers" $ do
+          (gnarlbarkId, board) <- blightChroniclerBoard s registry False False
+          let dead = S.settleSba (S.markDamage gnarlbarkId 4 board)
+              blighted = resolveOne dead
+              placed = placeTriggers blighted
+              after = resolveOne placed
+          Spec.assertEqWith s "bob's life is untouched" (S.lifeOf S.bob after) (Just 20)
+          Spec.assertEqWith s "and he drew nothing" (S.handSize S.bob after) 0
+          Spec.assertBool s (not (S.onBattlefield gnarlbarkId blighted)) "the Gnarlbark left before its trigger resolved"
+          Spec.assertEqWith s "alice drew all the same" (S.handSize S.alice blighted) 1
+          Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack placed)) 0
+        -- CR 102.1's bare "a player", which PlayerRelation.AnyPlayer is and
+        -- neither You nor Opponent is: a second Chronicler under ALICE, the
+        -- blighting seat, fires beside bob's. An Opponent reading would leave
+        -- her at 20 and a You reading would leave him there, so the one board
+        -- separates all three.
+        Spec.it s "CR 701.68d AnyPlayer reaches the blighting player's own seat too" $ do
+          (_, board) <- blightChroniclerBoard s registry False True
+          let blighted = resolveOne board
+              placed = placeTriggers blighted
+              after = resolveOne (resolveOne placed)
+          Spec.assertEqWith s "alice loses 1 to her own Chronicler" (S.lifeOf S.alice after) (Just 19)
+          Spec.assertEqWith s "and bob loses 1 to his" (S.lifeOf S.bob after) (Just 19)
+          Spec.assertEqWith s "both triggers reached the stack" (length (GameState.stack placed)) 2
+
+-- Sinister Gnarlbark on alice's battlefield and a Synthetic Blight Chronicler
+-- on bob's, with the libraries stocked past every draw these cases take (CR
+-- 104.3c), alice's end step begun
+-- and the Gnarlbark's trigger settled onto the stack (CR 603.3b). Returns the
+-- Gnarlbark and that state.
+--
+-- Two flags, each adding ONE permanent, so every pair of boards below differs in
+-- exactly one thing: Solemnity on bob's battlefield, and a second Chronicler on
+-- alice's.
+blightChroniclerBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  Bool ->
+  m (ObjectId.ObjectId, GameState.GameState)
+blightChroniclerBoard s registry withSolemnity withOwnWatcher = do
+  swamp <- S.printingOf s registry "Swamp"
+  gnarlbark <- S.printingOf s registry "Sinister Gnarlbark"
+  chronicler <- S.printingOf s registry "Synthetic Blight Chronicler"
+  solemnity <- S.printingOf s registry "Solemnity"
+  let (gnarlbarkId, g1) = S.addCreature gnarlbark S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature chronicler S.bob g1
+      g3 = if withSolemnity then snd (S.addCreature solemnity S.bob g2) else g2
+      g4 = if withOwnWatcher then snd (S.addCreature chronicler S.alice g3) else g3
+      g5 = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 :: Int .. 3]
+      g6 = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.bob g)) g5 [1 :: Int .. 3]
+      endStep = Phase.Ending EndingStep.EndStep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice))
+          (g6 {GameState.phase = endStep, GameState.activePlayer = S.alice})
+  pure (gnarlbarkId, S.runPure S.identityAnswer begun Engine.settleForPriority)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   discardTriggerSpec s registry
@@ -1957,3 +2074,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   kambalSpec s registry
   brinebornCutthroatSpec s registry
   oreskosSunGuideSpec s registry
+  blightChroniclerSpec s registry

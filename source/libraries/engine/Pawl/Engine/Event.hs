@@ -554,6 +554,7 @@ damageOf event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
@@ -610,6 +611,7 @@ revealOf event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed, WITH the
@@ -6285,6 +6287,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  -- A fifth keyword action, and the same answer: CR 701.68a is something a
+  -- player DOES, so it takes CR 603.3b's first pass too.
+  TriggerCondition.PlayerBlights _ -> False
   -- CR 706.1's roll is something a resolving effect INSTRUCTS a player to do,
   -- never an ability triggering, so it takes CR 603.3b's first pass as well.
   TriggerCondition.PlayerRollsDice _ -> False
@@ -6452,6 +6457,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
+  -- CR 701.68 names no turn either.
+  TriggerCondition.PlayerBlights _ -> False
   -- CR 706.1 names no turn either.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False

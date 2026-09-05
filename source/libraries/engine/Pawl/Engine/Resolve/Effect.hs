@@ -5971,9 +5971,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- state-based actions until a player would get priority, and no replacement in
   -- data/cards reads a counter tally across permanents.
   --
+  -- CR 701.68d's GameEvent.Blighted is written per blighter inside
+  -- Pawl.Engine.Blight.blight, one per seat that actually blighted -- the
+  -- bracket groups them, which changes nothing here, PlayerBlights not being a
+  -- CR 603.2c batch condition (Pawl.Engine.Event.Trigger.batchScoped).
+  --
   -- Not implemented: nothing records which creature was blighted, so CR 701.68c's
-  -- "blighted creature" has nothing to read (#1492); CR 701.68d's trigger on a
-  -- player blighting has no condition to match either (#3065).
+  -- "blighted creature" has nothing to read (#1492).
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs

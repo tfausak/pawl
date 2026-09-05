@@ -2363,6 +2363,10 @@ representativeEvents cond =
         TriggerCondition.PlayerScries _ -> one (GameEvent.Scried S.bob)
         -- CR 701.54d's own event, the PlayerScries arm's shape and reasoning.
         TriggerCondition.RingTemptsPlayer _ -> one (GameEvent.RingTempted S.bob)
+        -- CR 701.68d's own event, the arm above's shape and reasoning. A
+        -- DISTINCT event once more: an arm matching a temptation here would
+        -- claim the floor for the wrong keyword action.
+        TriggerCondition.PlayerBlights _ -> one (GameEvent.Blighted S.bob)
         -- CR 309.7's own event, and the only one this condition admits. bob
         -- rather than the perspective player, on the PlayerScries arm's reasoning.
         TriggerCondition.PlayerCompletesDungeon _ -> one (GameEvent.DungeonCompleted S.bob)
@@ -2562,7 +2566,13 @@ everyTriggerCondition =
     TriggerCondition.Reflexive,
     TriggerCondition.RingTemptsPlayer PlayerRelation.You,
     TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent,
-    TriggerCondition.PermanentBecomesBlockedBy (Filter.Type.And [])
+    TriggerCondition.PermanentBecomesBlockedBy (Filter.Type.And []),
+    -- ALL THREE relations, the PlayerAttacksWith rows' reasoning: Blight
+    -- Chronicler prints AnyPlayer, and the other two are readings a card could
+    -- take of the same condition.
+    TriggerCondition.PlayerBlights PlayerRelation.You,
+    TriggerCondition.PlayerBlights PlayerRelation.Opponent,
+    TriggerCondition.PlayerBlights PlayerRelation.AnyPlayer
   ]
 
 -- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN

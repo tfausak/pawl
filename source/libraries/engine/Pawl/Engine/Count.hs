@@ -720,6 +720,7 @@ snapshotView gs shape event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   -- CR 712.21e's second half: every arrival AFTER the leading one, which is what
   -- makes a melded permanent two cards where the Moved arm above makes it one
   -- object. Read under the card shape alone -- answering it under MovedBetween

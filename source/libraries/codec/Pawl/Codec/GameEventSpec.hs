@@ -551,3 +551,11 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.RingTempted (PlayerId.MkPlayerId 7))
       " {\"type\":\"RingTempted\",\"value\":7} "
+  -- CR 701.68d. One player id, the arm above's payload: rule 701.68d names the
+  -- blighting player, and the -1/-1 counters are their own log entry.
+  Spec.it s "Blighted" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Blighted (PlayerId.MkPlayerId 4))
+      " {\"type\":\"Blighted\",\"value\":4} "
