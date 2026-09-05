@@ -49,6 +49,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
@@ -171,6 +172,45 @@ arbiterBoard forest arbiter growth =
    in ( arbiterId,
         growthId,
         gs3
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- arbiterBoard with the Arbiter's text moved onto a COPY of it: alice's Unstable
+-- Shapeshifter becomes a copy of the Leonin Arbiter as that Arbiter enters (CR
+-- 707.4), and the printed Arbiter then leaves the battlefield.
+--
+-- The departure is what makes the board discriminating, the reason
+-- Pawl.CopySpec's becameCopyBoard gives: while the printed Arbiter is still
+-- there it grants CR 116.2d's permission itself, and a reader that consulted the
+-- copier's own printed face cannot be told apart from one that consulted the
+-- copied text. CR 707.2b is what makes the board after the departure legal.
+-- CR 604.2 takes the printed Arbiter's prohibition with it, so the ban that
+-- remains is the copy's alone.
+--
+-- Nine Forests, one Forest left in the library and a Rampant Growth in hand,
+-- exactly as arbiterBoard has them. Returns the Shapeshifter and the Growth.
+copiedArbiterBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+copiedArbiterBoard forest shapeshifter arbiter growth =
+  let (shifterId, gs1) = S.addCreature shapeshifter S.alice (S.landsInPlay forest 9)
+      (_, gs2) = S.addLibraryCard forest S.alice gs1
+      (growthId, gs3) = S.addHandCard growth S.alice gs2
+      -- addCreature above arranges a board and fires nothing; the Arbiter is the
+      -- one permanent that ENTERS, which is what raises CR 707.4's trigger.
+      (arbiterId, entered) = S.entersWithTrigger arbiter S.alice gs3
+      stacked = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)
+      copied = snd (Engine.runGamePure S.identityAnswer stacked (Stack.resolveTop >> Engine.settleForPriority))
+      gone = S.runPure S.identityAnswer copied (Event.changeZone arbiterId Zone.Graveyard)
+   in ( shifterId,
+        growthId,
+        gone
           { GameState.activePlayer = S.alice,
             GameState.phase = Phase.PrecombatMain,
             GameState.priority = Just S.alice
@@ -1088,6 +1128,38 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     Spec.assertEqWith s "the search was offered this time" asked ["search", "shuffle"]
     Spec.assertBool s (not (PlayerEffect.prohibitsSearching S.alice S.alice S.alice afterIgnore)) "alice paid, so she is not prohibited"
     Spec.assertBool s (PlayerEffect.prohibitsSearching S.bob S.bob S.bob afterIgnore) "bob did not, so he still is"
+  -- CR 707.2 / 707.2a: the permission is derived from the copied object's rules
+  -- text, so it is copied along with the prohibition it accompanies. What this
+  -- proves is that Pawl.Engine.Ignore.ignoreGrants and
+  -- Pawl.Engine.PlayerEffect.playerAbilitiesOf answer off the SAME copiable read
+  -- (Projection.specialActionsOf and Projection.copiableSnapshotOf under it):
+  -- a fork between them leaves the copy enforcing a ban nobody may pay to ignore.
+  --
+  -- The payment leg is FIRST: an implementation that offered the action without
+  -- wiring it to the copy's ban passes an offer-only assertion.
+  Spec.it s "CR 707.2a a copy of the Arbiter carries the offer with the ban" $ do
+    forest <- S.printingOf s registry "Forest"
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    arbiter <- S.printingOf s registry "Leonin Arbiter"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (shifterId, growthId, gs) = copiedArbiterBoard forest shapeshifter arbiter growth
+        afterIgnore = snd (State.evalState (Engine.runGame (takeOnce (Action.Type.Ignore shifterId searchBan)) gs Engine.priorityLoop) False)
+        (paid, askedAfterPaying) = growAndResolve growthId afterIgnore
+        (unpaid, askedWithout) = growAndResolve growthId gs
+    Spec.assertEqWith s "CR 116.2d paying the copy's {2} lets the search happen: the Forest left the library" (S.countByName (S.printingName forest) S.alice paid) 0
+    Spec.assertEqWith s "and is the tenth on the battlefield" (S.countOnBattlefieldByName (S.printingName forest) S.alice paid) 10
+    Spec.assertEqWith s "the search was offered this time" askedAfterPaying ["search", "shuffle"]
+    -- The paired control, differing in exactly the payment: the copy's ban is
+    -- real, so the same board without it searches nothing. BEFORE the offer
+    -- below, which is a proxy -- CR 116.2d's WHO conjunct withdraws the offer
+    -- when the ban goes, so the offer would absorb a mutation aimed at the ban.
+    Spec.assertEqWith s "CR 707.2a the unpaid copy still bans the search" askedWithout ["shuffle"]
+    Spec.assertEqWith s "so that Forest is still in the library" (S.countByName (S.printingName forest) S.alice unpaid) 1
+    Spec.assertBool s (List.elem (Action.Type.Ignore shifterId searchBan) (Action.legalActions S.alice gs)) "and the offer is the copy's own"
+    -- The fixture's own preconditions, after the behaviour so neither can absorb
+    -- a mutation aimed at it.
+    Spec.assertEqWith s "the Shapeshifter is the Arbiter by name (CR 707.2)" (Projection.namesOf shifterId gs) (Set.singleton (S.printingName arbiter))
+    Spec.assertEqWith s "and no printed Arbiter is left on the battlefield to answer for it" (S.countOnBattlefieldByName (S.printingName arbiter) S.alice gs) 0
   -- CR 514.2: "until end of turn" ends at cleanup, which is the one caller of
   -- Expiry.dropAtCleanup. Asserted by casting the SAME spell on the swept state
   -- and watching it stop searching again.

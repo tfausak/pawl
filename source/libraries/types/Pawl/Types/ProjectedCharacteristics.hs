@@ -18,6 +18,7 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -169,6 +170,14 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- staticAbilities' reason above, copiable for the same one, and read by
     -- Pawl.Engine.Projection.playerAbilitiesOf.
     playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
+    -- | CR 116.2: the special actions this object's rules text grants -- the
+    -- axis Pawl.Types.Face.specialActions carries. Copiable because CR 707.2
+    -- names rules text among the copiable values and CR 707.2a copies the
+    -- abilities derived from it, so a copy of Leonin Arbiter offers the {2} its
+    -- own printed face never mentions. Seeded and touched by no layer, exactly
+    -- as playerAbilities above is, and read by
+    -- Pawl.Engine.Projection.View.specialActionsOf.
+    specialActions :: [SpecialAction.SpecialAction],
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer
     -- system. Seeded from the card and added to by CR 613.1f's grant (Presence of
     -- Gond); emptied by LoseAllAbilities (Humility) and by CR 305.7's strip at
