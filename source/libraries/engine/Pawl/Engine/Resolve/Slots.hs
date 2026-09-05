@@ -934,8 +934,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- of this same resolution bound, CR 608.2c following the list in written order.
   --
   -- A SHAPE CORRECTION, not a tested behaviour: every modifier in data/cards/ is
-  -- a Count naming no slot (Diviner's Portent), so leaving this Map.empty leaves
-  -- the suite green. A card whose roll added "the number of cards you drew this
+  -- a Count naming no slot (Diviner's Portent) and every count is a Literal
+  -- (Valiant Endeavor), so leaving this Map.empty leaves the suite green. A card whose roll added "the number of cards you drew this
   -- way" would refute that. The same holds of the two arms below.
   Effect.RollDie rollDie -> quantitySlots (RollDie.count rollDie) <> maybe Map.empty quantitySlots (RollDie.modifier rollDie)
   -- And a DEFINITION too, on top of the slots the coin count reads.
