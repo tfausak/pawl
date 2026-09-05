@@ -259,6 +259,32 @@ spec s registry = Spec.describe s "Face-down exile" $ do
       -- this green.
       Spec.assertEqWith s "and nothing in a hand is face down in exile" (concealedIn Zone.Hand S.alice after) []
       Spec.assertEqWith s "the delayed ability was spent" (length (GameState.delayedTriggers after)) 0
+    -- CR 406.3a: a card exiled face down has NO characteristics, so a CR 113.6c
+    -- ability that functions from exile does not function from under one.
+    -- Grist, the Hunger Tide is a 1/1 Insect creature card in every zone but the
+    -- battlefield, which Pawl.ProjectionSpec's HiddenZoneStatics group reads off
+    -- a face-up exiled Grist; here the same card reaches the same zone by
+    -- Ignorant Bliss instead, and the pair differs in exactly one thing -- CR
+    -- 406.3's face-down flag.
+    Spec.it s "CR 406.3a a Grist card exiled FACE DOWN has no characteristics to function from" $ do
+      bliss <- S.printingOf s registry "Ignorant Bliss"
+      mountain <- S.printingOf s registry "Mountain"
+      grist <- S.printingOf s registry "Grist, the Hunger Tide"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (g1, blissId) = S.handOne bliss (S.landsInPlay mountain 2)
+          (_, g2) = S.addHandCard grist S.alice g1
+          (_, g3) = S.addLibraryCard piker S.alice g2
+          hidden = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (S.cast S.alice blissId)) Engine.priorityLoop
+          (faceUpGrist, shown) = S.addExiledCard grist S.alice (Setup.emptyGame S.bothPlayers)
+      case faceDownExiled hidden of
+        [downGrist] -> do
+          Spec.assertEqWith
+            s
+            "no 1/1 under the face-down flag, where the same card exiled face up is one"
+            (S.powerToughnessOf downGrist hidden, S.powerToughnessOf faceUpGrist shown)
+            (Nothing, Just (1, 1))
+          Spec.assertEqWith s "and it is the Grist that Ignorant Bliss hid" (namesOf [downGrist] hidden) (Set.singleton (S.printingName grist))
+        _ -> Spec.assertFailure s "the casting should hide exactly the Grist"
 
 -- CR 702.143a's foretold card is the pool's one grant of CR 406.3's permission to
 -- look at a card exiled face down, and CR 406.4 is what turns a permission to
