@@ -2381,6 +2381,12 @@ filterReads f = case f of
   -- 113.3's two kinds are told apart by Pawl.Types.Source, which no Modification
   -- writes.
   Filter.Type.IsActivatedAbility -> Set.empty
+  -- Reads nothing, for the atom above's reason: CR 113.1c's question is answered
+  -- off Pawl.Types.Source too.
+  Filter.Type.IsAbility -> Set.empty
+  -- Reads nothing, and CR 114.3 is stronger than the atoms above it: an emblem
+  -- has no characteristics for a layer to write in the first place.
+  Filter.Type.IsEmblem -> Set.empty
   -- Reads nothing of the CANDIDATE: CR 113.7's nest is about its source, whose
   -- characteristics come through `peers` -- filterReadsPeers descends.
   Filter.Type.FromSource _ -> Set.empty
@@ -2552,6 +2558,8 @@ filterReadsPeers f = case f of
   Filter.Type.IsHostOfSource -> False
   Filter.Type.IsToken -> False
   Filter.Type.IsActivatedAbility -> False
+  Filter.Type.IsAbility -> False
+  Filter.Type.IsEmblem -> False
   Filter.Type.IsTapped -> False
   Filter.Type.IsFaceDown -> False
   Filter.Type.IsExiledFaceDown -> False

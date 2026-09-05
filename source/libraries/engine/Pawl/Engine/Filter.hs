@@ -390,6 +390,22 @@ data View = MkView
     -- permanent, a spell, a player, a printed face, an event snapshot. Each
     -- builder says so at its own site.
     activatedAbility :: Bool,
+    -- CR 113.1c: is this candidate an ability on the stack AT ALL, of either of
+    -- CR 113.3's kinds? The field above widened, filled from the same record
+    -- (Pawl.Engine.Game.isAbility) and never from a projection, for the same
+    -- reason: which kind of object an object is is no characteristic (CR 109.3).
+    --
+    -- False for every candidate that is not an ability on the stack, each
+    -- builder saying so at its own site.
+    ability :: Bool,
+    -- CR 114.5: is this candidate an emblem? Read from Object.source
+    -- (Pawl.Engine.Game.isEmblem) as the two fields above are, and CR 114.3
+    -- makes it more than immutable -- an emblem has no characteristics but its
+    -- abilities, so no CR 613 layer has anything here to write.
+    --
+    -- False for every candidate that is not an emblem. Each builder says so at
+    -- its own site.
+    emblem :: Bool,
     -- CR 113.7: the view of the object this ability came from, for
     -- Filter.FromSource's nest to be matched against. Filled only by
     -- Pawl.Engine.Projection.View.viewOfCharacteristics, through CR 113.7a's last
@@ -708,6 +724,11 @@ playerView pid =
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,
       activatedAbility = False,
+      -- CR 113.1c again, one kind wider: a player is not an object at all (CR
+      -- 109.1), so it is no ability on the stack either.
+      ability = False,
+      -- CR 114.5 / 109.1: a player is not an object, and so not an emblem.
+      emblem = False,
       -- CR 113.7 asks about an ability on the stack, and CR 109.1 makes a player
       -- none.
       abilitySource = Nothing,
@@ -1515,6 +1536,12 @@ matches context view predicate = case predicate of
   -- CR 113.3b against rule 113.3c, read the way IsToken above is: a live read of
   -- what the object IS (Object.source), which no layer rewrites.
   Filter.IsActivatedAbility -> activatedAbility view
+  -- CR 113.1c, the atom above widened to both of CR 113.3's kinds, and read the
+  -- same way: a live read of what the object IS (Object.source).
+  Filter.IsAbility -> ability view
+  -- CR 114.5, read off Object.source for the two atoms above's reason: what an
+  -- object is represented by is no characteristic, so no layer rewrites it.
+  Filter.IsEmblem -> emblem view
   -- CR 113.7: the nest is matched against the SOURCE's view and the same
   -- context, AttachedTo's arm's posture. False where the candidate is no
   -- ability on the stack, since rule 113.7 has nothing to read there.
@@ -1712,6 +1739,8 @@ rewrite pairs predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
+  Filter.IsAbility -> predicate
+  Filter.IsEmblem -> predicate
   -- Descended into, HasAttached's reason: the nest describes the SOURCE.
   Filter.FromSource f -> Filter.FromSource (rewrite pairs f)
   Filter.IsTapped -> predicate
@@ -2159,6 +2188,8 @@ bakeBound players predicate = case predicate of
   Filter.CanAttachToSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
+  Filter.IsAbility -> predicate
+  Filter.IsEmblem -> predicate
   -- Descended into, HasAttached's reason: the SOURCE's description is baked
   -- exactly as the same atom at the top level would be, and boundSlots descends
   -- to match.
@@ -2285,6 +2316,8 @@ manaValueThresholds predicate = case predicate of
   Filter.CanAttachToSubject -> []
   Filter.IsToken -> []
   Filter.IsActivatedAbility -> []
+  Filter.IsAbility -> []
+  Filter.IsEmblem -> []
   Filter.FromSource f -> manaValueThresholds f
   Filter.IsTapped -> []
   Filter.IsFaceDown -> []
@@ -2414,6 +2447,8 @@ statesAQuality predicate = case predicate of
   Filter.CanAttachToSubject -> True
   Filter.IsToken -> True
   Filter.IsActivatedAbility -> True
+  Filter.IsAbility -> True
+  Filter.IsEmblem -> True
   -- True whatever the nest says, RepresentedByCard's reason one arm down.
   Filter.FromSource _ -> True
   Filter.IsTapped -> True

@@ -32,8 +32,18 @@
           "affected": {
             "type": "MatchingAnywhere",
             "value": {
-              "type": "And",
-              "value": []
+              "type": "Not",
+              "value": {
+                "type": "Or",
+                "value": [
+                  {
+                    "type": "IsAbility"
+                  },
+                  {
+                    "type": "IsEmblem"
+                  }
+                ]
+              }
             }
           },
           "modifications": [

@@ -191,6 +191,12 @@ viewOfCard face =
           -- CR 113.3b: an ability on the stack is never a printed face, so this
           -- builder's candidate cannot be one.
           Filter.activatedAbility = False,
+          -- CR 113.1c, the line above widened to CR 113.3's other kind: a printed
+          -- face is no ability on the stack either.
+          Filter.ability = False,
+          -- CR 114.5: an emblem is not a card (CR 114.3 leaves it no printed
+          -- face), so this builder's candidate cannot be one.
+          Filter.emblem = False,
           -- CR 113.7, for the line above's reason: no ability, so no source.
           Filter.abilitySource = Nothing,
           Filter.tapped = False,
@@ -545,6 +551,12 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- for an id naming nothing, and for every object that is not an ability on
       -- the stack.
       Filter.activatedAbility = Game.isActivatedAbility oid gs,
+      -- CR 113.1c, the line above widened to take CR 113.3c's triggered kind as
+      -- well, and read off Object.source in the same way.
+      Filter.ability = Game.isAbility oid gs,
+      -- CR 114.5, read off Object.source for the two lines above's reason. False
+      -- for an id naming nothing, and for every object that is not an emblem.
+      Filter.emblem = Game.isEmblem oid gs,
       -- CR 113.7: the source's view, through `peers` at this caller's depth while
       -- it exists (attachedViews' reason) and through CR 113.7a's last known
       -- information once it has left -- Green Slime countering the ability of an

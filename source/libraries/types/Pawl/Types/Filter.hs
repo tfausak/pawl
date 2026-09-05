@@ -318,6 +318,15 @@ data Filter keyword
     -- 113.3c's triggered one -- Squelch's "target activated ability".
     -- Uncharacteristic and immutable for IsToken's reason.
     IsActivatedAbility
+  | -- | CR 113.1c: the candidate is an ability on the stack, of either of CR
+    -- 113.3's two kinds -- IsActivatedAbility above widened to take the triggered
+    -- one as well. Uncharacteristic and immutable for IsToken's reason.
+    IsAbility
+  | -- | CR 114.5: the candidate is an emblem -- "neither a card nor a permanent".
+    -- Uncharacteristic and immutable for IsToken's reason, and more strongly: CR
+    -- 114.3 gives an emblem no characteristics at all but its abilities, so there
+    -- is nothing here for a CR 613 layer to have written.
+    IsEmblem
   | -- | CR 113.7 / 113.7a: the candidate is an ability on the stack whose SOURCE,
     -- read with last known information, matches the nested filter (Green Slime).
     FromSource (Filter keyword)
