@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
@@ -62,7 +63,6 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
@@ -431,12 +431,8 @@ applying pid gs =
       -- load-bearing now that a stored row names its source: an activated
       -- ability of a permanent stores rows under that permanent's own id, which
       -- a shared filter would suppress on a rule the ability is not subject to.
-      notIgnored (_, source, name, _, _, _) = not (any (ignores source name) (GameState.ignoredAbilities gs))
+      notIgnored (_, source, name, _, _, _) = not (any (\s -> IgnoredAbility.ignoredBy pid s name gs) source)
       applyingScope (_, _, _, controller, scope, _) = applies pid controller gs scope
-      ignores source name ignored =
-        IgnoredAbility.player ignored == pid
-          && Just (IgnoredAbility.source ignored) == source
-          && Just (IgnoredAbility.ability ignored) == name
       effectOf (_, source, _, _, _, effect) = (source, effect)
       stampOf (timestamp, _, _, _, _, _) = timestamp
    in fmap effectOf (List.sortOn stampOf (filter applyingScope (filter notIgnored printed <> stored)))

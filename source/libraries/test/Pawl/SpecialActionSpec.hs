@@ -1,7 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers CR 116.2e and CR 116.2d end to end: Pawl.Types.SpecialAction and the
+-- Covers CR 116.2e and CR 116.2d end to end, on BOTH axes an ability can be
+-- aimed on -- a player (Leonin Arbiter, Damping Engine) and an object (Volrath's
+-- Curse): Pawl.Types.SpecialAction and the
 -- Pawl.Types.Face.specialActions field that carries both, Pawl.Engine.Action's
 -- discardableCards and Pawl.Engine.Ignore's ignorable with the actions they
 -- offer, and Pawl.Engine.Engine's arms for them. CR 116.3 -- "if a player takes
@@ -48,6 +50,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -120,6 +123,11 @@ searchBan = AbilityName.MkAbilityName (Text.pack "search ban")
 -- CR 116.2d disagree observably.
 creatureBan :: AbilityName.AbilityName
 creatureBan = AbilityName.MkAbilityName (Text.pack "creature ban")
+
+-- Volrath's Curse names its one sentence, whose three rows -- two combat
+-- restrictions and an activation prohibition -- all carry it.
+thisEffect :: AbilityName.AbilityName
+thisEffect = AbilityName.MkAbilityName (Text.pack "this effect")
 
 isPlay :: Action.Type.Action -> Bool
 isPlay action = case action of
@@ -931,6 +939,7 @@ spec s registry = do
   dampingEngine s registry
   dividedEdicts s registry
   leoninArbiter s registry
+  volrathsCurse s registry
   plotting s registry
   makePlotted s registry
   foretelling s registry
@@ -1240,3 +1249,132 @@ circlingVultures s registry = Spec.describe s "CR 116.2e Circling Vultures" $ do
       "bob passes, alice acts, alice is asked again, and only then is bob asked"
       asked
       [S.bob, S.alice, S.alice, S.bob]
+
+-- Is this the offer to activate an ability of THAT permanent? `playing`'s shape
+-- one action over, and written out for its reason: the operation alone would
+-- answer Yes for every other permanent on the board.
+activating :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+activating wanted action = case action of
+  Action.Type.Activate oid _ -> oid == wanted
+  Action.Type.Play _ _ -> False
+  Action.Type.Pass -> False
+  Action.Type.Cast {} -> False
+  Action.Type.TurnFaceUp {} -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
+  Action.Type.PutCompanionIntoHand -> False
+  Action.Type.Ignore _ _ -> False
+  Action.Type.EndEffect _ -> False
+  Action.Type.ActivateManaAbility _ -> False
+
+-- Volrath's Curse under BOB's control, on a Teardrop Kami ALICE controls, on a
+-- THREE-seat board: at two seats "the enchanted creature's controller" and "the
+-- Aura's controller's opponent" are one player and the readings cannot be told
+-- apart.
+--
+-- Every seat controls a permanent it could sacrifice, so a seat left out of the
+-- offer is left out by CR 116.2d's WHO rather than by an unpayable cost -- bob
+-- controls a Piker beside the Aura, and carol one of her own.
+--
+-- bob's Piker rides out so a case can move the Curse onto it, which is the pair
+-- for the whole group: one board, one thing different, the offer at the other
+-- seat.
+curseSeats ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+curseSeats curse kami piker =
+  let (kamiId, gs1) = S.addCreature kami S.alice S.threePlayerGame
+      (_, gs2) = S.addCreature piker S.alice gs1
+      (curseId, gs3) = S.addCreature curse S.bob gs2
+      (bobPikerId, gs4) = S.addCreature piker S.bob gs3
+      (_, gs5) = S.addCreature piker S.carol gs4
+   in ( curseId,
+        kamiId,
+        bobPikerId,
+        (S.attach curseId kamiId gs5)
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The same Aura and the same seats on a COMBAT board, which is what makes CR
+-- 508.1c's and CR 509.1b's halves of the sentence askable: alice is active with
+-- the enchanted Kami and one other creature, bob defends with one.
+--
+-- alice's OTHER creature is the sacrifice victim, and `sacrificing` pins it
+-- there. Paying by sacrificing the Kami itself would end the restriction through
+-- CR 604.2 -- the creature it names having left the battlefield -- rather than
+-- through CR 116.2d, and every assertion would pass for the wrong reason.
+curseCombat ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+curseCombat curse kami piker =
+  let (gs, _, _) = S.combatBoardOf [] [piker]
+      (kamiId, gs1) = S.addCreature kami S.alice gs
+      (victimId, gs2) = S.addCreature piker S.alice gs1
+      (curseId, gs3) = S.addCreature curse S.bob gs2
+   in (curseId, kamiId, victimId, S.attach curseId kamiId gs3)
+
+-- CR 116.2d on the OBJECT axis: an ability aimed at a permanent rather than at a
+-- player. Volrath's Curse (STH 43) is the producer -- "enchanted creature can't
+-- attack or block, and its activated abilities can't be activated. That
+-- creature's controller may sacrifice a permanent of their choice for that
+-- player to ignore this effect until end of turn" -- and its one sentence
+-- declares three rows across two carriers, all three named "this effect".
+--
+-- What the axis changes is WHO. The ability names no player, so CR 116.2d's
+-- offer follows the permanent the ability restricts, and the Aura's controller
+-- is offered nothing -- the reading a player-axis derivation cannot state, since
+-- there is no PlayerScope to read a seat off.
+volrathsCurse :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+volrathsCurse s registry = Spec.describe s "CR 116.2d Volrath's Curse" $ do
+  -- The OFFER half. The last two assertions are the pair: the same board with
+  -- the Curse moved onto a creature bob controls, which differs in exactly the
+  -- thing the rule reads.
+  Spec.it s "CR 116.2d the offer goes to the enchanted creature's controller, not to the Aura's" $ do
+    curse <- S.printingOf s registry "Volrath's Curse"
+    kami <- S.printingOf s registry "Teardrop Kami"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (curseId, kamiId, bobPikerId, gs) = curseSeats curse kami piker
+        moved = S.attach curseId bobPikerId gs
+        asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
+    Spec.assertBool s (List.elem (Action.Type.Ignore curseId thisEffect) (asked S.alice gs)) "alice controls the enchanted creature, so the deal is hers to take"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore curseId thisEffect) (asked S.bob gs)) "and not the Aura's controller's, though the Piker beside it would pay his sacrifice"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore curseId thisEffect) (asked S.carol gs)) "nor carol's, an opponent of his whom the ability restricts nothing of"
+    Spec.assertBool s (List.elem (Action.Type.Ignore curseId thisEffect) (asked S.bob moved)) "the pair: with the Curse on bob's own creature the offer is his"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore curseId thisEffect) (asked S.alice moved)) "and no longer alice's, so the seat follows the enchanted creature and not the Aura"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore kamiId thisEffect) (asked S.alice gs)) "and it is the AURA that grants it: the enchanted creature offers nothing"
+  -- The SUPPRESSION half, and the three assertions this unit exists to prove
+  -- come first: after the payment the creature can attack, can block, and its
+  -- activated ability can be activated. All three are read at gameplay level --
+  -- Pawl.Engine.Combat's declaration questions and the action list a player with
+  -- priority is offered -- and all three come off ONE payment, which is what
+  -- makes "this effect" the sentence rather than one of its rows.
+  --
+  -- The Kami's ability costs no mana -- its whole cost is sacrificing itself --
+  -- and it is not a mana ability, so neither an empty mana pool nor
+  -- Pawl.Engine.Activate.activatable's blanket False for a mana ability can be
+  -- why an activation is missing.
+  Spec.it s "CR 116.2d after the enchanted creature's controller pays, it can attack and block and its ability can be activated" $ do
+    curse <- S.printingOf s registry "Volrath's Curse"
+    kami <- S.printingOf s registry "Teardrop Kami"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (curseId, kamiId, victimId, cursed) = curseCombat curse kami piker
+        afterIgnore = S.runPure (sacrificing victimId) cursed (Ignore.ignore S.alice curseId thisEffect)
+        swept = Expiry.dropAtCleanup afterIgnore
+        asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
+    Spec.assertBool s (Combat.canAttack S.alice kamiId afterIgnore) "CR 508.1c: alice paid, so the enchanted creature may attack"
+    Spec.assertBool s (Combat.canBlock S.alice kamiId afterIgnore) "CR 509.1b: and block, off that same one payment"
+    Spec.assertBool s (any (activating kamiId) (asked S.alice afterIgnore)) "CR 602.2: and its activated ability may be activated, the third row that one name declares"
+    Spec.assertBool s (not (Combat.canAttack S.alice kamiId cursed)) "the pair, on the same board before the payment: it cannot attack"
+    Spec.assertBool s (not (Combat.canBlock S.alice kamiId cursed)) "nor block"
+    Spec.assertBool s (not (any (activating kamiId) (asked S.alice cursed))) "and its ability cannot be activated"
+    Spec.assertBool s (not (Combat.canAttack S.alice kamiId swept)) "CR 514.2: the ignore ends at cleanup, so the restriction is back next turn"
+    Spec.assertEqWith s "the sacrifice was paid: alice's other creature is gone" (S.countOnBattlefieldByName (S.printingName piker) S.alice afterIgnore) 0

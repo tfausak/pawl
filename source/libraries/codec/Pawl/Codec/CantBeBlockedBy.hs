@@ -2,6 +2,7 @@
 
 module Pawl.Codec.CantBeBlockedBy where
 
+import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Filter as Filter
@@ -12,19 +13,23 @@ import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 
 -- | The bare object the enclosing tag already carried, now with a record behind
--- it to name. The wire format is unchanged.
+-- it to name.
 --
 -- "blockers" and not a second "affected": the two creature-naming keys are not
 -- interchangeable, and naming them is what stops a card file barring the
 -- attackers from themselves.
+--
+-- "name" defaults to Nothing, Pawl.Codec.AffectedUnless's reason.
 codec :: Codec.Codec CantBeBlockedBy.CantBeBlockedBy
 codec = Fields.object $ do
   affected <- Fields.required "affected" Affected.codec CantBeBlockedBy.affected
   blockers <- Fields.required "blockers" (Filter.codec Keyword.codec) CantBeBlockedBy.blockers
   unless <- Fields.defaulted "unless" Nothing (Common.maybe Condition.codec) CantBeBlockedBy.unless
+  name <- Fields.defaulted "name" Nothing (Common.maybe AbilityName.codec) CantBeBlockedBy.name
   pure
     CantBeBlockedBy.MkCantBeBlockedBy
       { CantBeBlockedBy.affected = affected,
         CantBeBlockedBy.blockers = blockers,
-        CantBeBlockedBy.unless = unless
+        CantBeBlockedBy.unless = unless,
+        CantBeBlockedBy.name = name
       }

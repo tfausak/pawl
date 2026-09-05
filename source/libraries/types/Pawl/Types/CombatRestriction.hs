@@ -138,14 +138,15 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- apart; a conditional Aura would.
 data CombatRestriction
   = -- | CR 508.1c: these creatures can't attack, unless the gate holds. Pacifism
-    -- (ungated) and Blind-Spot Giant (gated) are the pool's printed attacking
-    -- restrictions that are not CR 702.3b's defender keyword, which stays a
+    -- and the Aura family beside it -- Arrest, Realmbreaker's Grasp, Volrath's
+    -- Curse -- print it ungated and Blind-Spot Giant gated; none of them is CR
+    -- 702.3b's defender keyword, which stays a
     -- Keyword because rule 702 is part of the rulebook and a keyword's meaning
     -- is the closed half's to know.
     CantAttack AffectedUnless.AffectedUnless
-  | -- | CR 509.1b: these creatures can't block, unless the gate holds.
-    -- Pacifism's second half and Blind-Spot Giant's are the pool's only printed
-    -- blocking restrictions, and CR 702.98a's unleash is the one rule 702 mints
+  | -- | CR 509.1b: these creatures can't block, unless the gate holds. The
+    -- second half of Pacifism's line and of the Aura family's beside it, and
+    -- Blind-Spot Giant's gated one; CR 702.98a's unleash is the one rule 702 mints
     -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor); every other one today
     -- restricts being blocked rather than blocking, as an evasion keyword on the
     -- ATTACKER or as the arm below.

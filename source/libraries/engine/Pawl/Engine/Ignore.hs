@@ -1,18 +1,22 @@
 -- CR 116.2d: the special action that lets a player pay to ignore the effect of a
--- permanent's static ability for a duration. Leonin Arbiter's "any player may
--- pay {2} for that player to ignore this effect until end of turn" is one
--- producer; Damping Engine, whose sentence narrows both the effect's scope and
--- therefore the offer, is the other in the pool.
+-- permanent's static ability for a duration. Three producers are in the pool,
+-- across both axes an ability can be aimed on: Leonin Arbiter's "any player may
+-- pay {2} for that player to ignore this effect until end of turn" and Damping
+-- Engine, whose sentence narrows both the effect's scope and therefore the
+-- offer, aim at PLAYERS; Volrath's Curse aims at the enchanted creature.
 --
 -- The offer side and the payment side, exactly as Pawl.Engine.Room is for CR
--- 116.2m: what the ignore then SUPPRESSES is Pawl.Engine.PlayerEffect.applying's
--- question, which this module never asks. It asks that module only WHO the
--- ability is affecting, which is the rule's own gate on the offer -- a typed
--- question, so no PlayerEffect or PlayerScope constructor is visible here.
+-- 116.2m: what the ignore then SUPPRESSES is each carrier's own question, asked
+-- through Pawl.Engine.IgnoredAbility, and this module asks none of them. It asks
+-- only WHO the ability is affecting, which is the rule's own gate on the offer --
+-- a typed question, so no PlayerEffect, PlayerScope, CombatRestriction or
+-- ActivationProhibition constructor is visible here.
 module Pawl.Engine.Ignore where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Set as Set
+import qualified Pawl.Engine.ActivationProhibition as ActivationProhibition
+import qualified Pawl.Engine.CombatRestriction as CombatRestriction
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection.View as Projection
@@ -71,6 +75,14 @@ ignoreCostOf oid name gs = case [c | (n, c) <- ignoreGrants oid gs, n == name] o
 --     ignore, however much the rest of the permanent is doing to them. Asked as
 --     Pawl.Engine.PlayerEffect.affectedBy, which is the typed question -- this
 --     module sees no PlayerEffect and no PlayerScope constructor.
+--
+--     An ability aimed at an OBJECT names no player at all, so the seat is
+--     derived from what it restricts: Volrath's Curse and Lost in Thought both
+--     say "that creature's controller", so a player controlling any permanent
+--     the named ability restricts is offered the action (`affectedThrough`). A
+--     DISJUNCTION rather than a second question, because one ability is on one
+--     axis or the other and no printing states both -- and neither carrier is
+--     cased on here either.
 --   * the cost is payable. An action the player cannot take is not offered,
 --     which is Pawl.Engine.Action.legalActions' posture throughout.
 --
@@ -88,7 +100,21 @@ ignoreCostOf oid name gs = case [c | (n, c) <- ignoreGrants oid gs, n == name] o
 canIgnore :: PlayerId -> ObjectId -> AbilityName.AbilityName -> GameState -> Bool
 canIgnore pid oid name gs = case ignoreCostOf oid name gs of
   Nothing -> False
-  Just cost -> PlayerEffect.affectedBy pid oid name gs && Cost.canPay pid oid cost gs
+  Just cost -> (PlayerEffect.affectedBy pid oid name gs || affectedThrough pid oid name gs) && Cost.canPay pid oid cost gs
+
+-- CR 116.2d's WHO for an ability aimed at an OBJECT: does this player CONTROL a
+-- permanent the named ability restricts? That is "that creature's controller",
+-- read live rather than off the Aura -- the enchanted creature's controller is
+-- offered the action, and the Aura's controller is not.
+--
+-- Both object-axis carriers, since Volrath's Curse's one sentence states its
+-- combat restrictions and its activation prohibition under the same name; each
+-- answers a list of ids and neither hands over a constructor.
+affectedThrough :: PlayerId -> ObjectId -> AbilityName.AbilityName -> GameState -> Bool
+affectedThrough pid oid name gs =
+  any
+    (\subject -> Projection.controllerOf subject gs == Just pid)
+    (CombatRestriction.namedSubjects oid name gs <> ActivationProhibition.namedSubjects oid name gs)
 
 -- Every (permanent, ability name) this player may pay to ignore right now, in
 -- battlefield order -- what Action.Ignore is built from, the shape

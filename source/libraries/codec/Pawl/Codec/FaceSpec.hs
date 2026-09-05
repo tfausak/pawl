@@ -258,12 +258,12 @@ populatedFace =
       Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached)],
       Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing],
-      Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing)],
+      Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing)],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
       Face.attachRestrictions = [AttachRestriction.MkAttachRestriction Affected.Attached (Filter.HasSubtype Subtype.Aura)],
       Face.counterRestrictions = [CounterRestriction.MkCounterRestriction Affected.Attached (Just CounterKind.MinusOneMinusOne)],
-      Face.activationProhibitions = [ActivationProhibition.MkActivationProhibition Affected.Attached (Just AbilityKind.NonManaAbility)],
+      Face.activationProhibitions = [ActivationProhibition.MkActivationProhibition Affected.Attached (Just AbilityKind.NonManaAbility) Nothing],
       Face.entryRestrictions = [EntryRestriction.MkEntryRestriction Affected.Attached (Set.singleton Zone.Graveyard)],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller],
       Face.blockCosts = [BlockCost.MkBlockCost Affected.Attached (PerCreature.Fixed (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))],
@@ -488,7 +488,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing)]}
+        baseFace {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing)]}
         (init baseFaceJson <> ",\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}]}")
     Spec.it s "sacrificeRestrictions" $
       Common.assertJsonCodec
@@ -523,7 +523,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.activationProhibitions = [ActivationProhibition.MkActivationProhibition Affected.Attached (Just AbilityKind.NonManaAbility)]}
+        baseFace {Face.activationProhibitions = [ActivationProhibition.MkActivationProhibition Affected.Attached (Just AbilityKind.NonManaAbility) Nothing]}
         (init baseFaceJson <> ",\"activationProhibitions\":[{\"affected\":{\"type\":\"Attached\"},\"kind\":{\"type\":\"NonManaAbility\"}}]}")
     Spec.it s "entryRestrictions" $
       Common.assertJsonCodec
