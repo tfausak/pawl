@@ -230,9 +230,9 @@ untapAll pid = do
   -- The GameEvent.BecameUntapped records ride inside CR 502.3's own
   -- simultaneity: one Event.simultaneously bracket, so a card watching an untap
   -- sees the whole step as ONE event (CR 608.2f) rather than as one event per
-  -- permanent. Only the survivors are recorded, which is what keeps CR 603.2e's
-  -- "doesn't retrigger if it persists" true of a permanent that was already
-  -- upright.
+  -- permanent. Only the SURVIVORS are recorded, so rule 701.26b's guard gates the
+  -- event as well as the write -- which is what CR 603.2e's "don't ... retrigger
+  -- if it persists" asks of a permanent that was already upright.
   survivors <- Monad.filterM Event.proposeUntap untapping
   Event.simultaneously $ do
     State.modify' $ \live ->

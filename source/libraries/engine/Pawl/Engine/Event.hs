@@ -460,7 +460,7 @@ tap oid = do
 -- through -- Pawl.Engine.Cost.payComponent's UntapThis for CR 107.6's untap
 -- symbol, Pawl.Engine.Resolve's Effect.Untap opcode, and CR 502.3's turn-based
 -- action in Pawl.Engine.Engine.untapAll, which calls `proposeUntap` directly so
--- that its own write stays simultaneous.
+-- that its own write -- and its own event -- stay simultaneous.
 --
 -- GameEvent.BecameUntapped is recorded only where `proposeUntap` said the
 -- permanent will untap, so rule 701.26b's second sentence and CR 614's
