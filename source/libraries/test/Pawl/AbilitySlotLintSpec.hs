@@ -187,7 +187,11 @@ modalCountsOffend modal =
 --     here.
 --   * Event.eventBindingSlots is the condition-SPECIFIC half -- CR 400.7e's
 --     `became`, CR 702.70a's `thatPlayer` -- and is the whole point of this
---     lint.
+--     lint. Event.eventBindingSlotsSometimes beside it, the slots that condition
+--     binds for some of its events and not all: CR 400.7e binds `became` for a
+--     public destination and withholds it for a hidden one, and a payload that
+--     finds nothing there is doing what the rule says rather than the silent
+--     no-op this lint catches.
 --   * Resolve.definedSlots covers a slot the ability's own effects MINT rather
 --     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's winner.
 --     The same exemption every carrier takes.
@@ -203,7 +207,8 @@ triggeredAbilityOffends ability =
   modalSlotsOffend
     ( Set.unions
         [ Set.fromList [Binding.triggerSource, Binding.you],
-          Event.eventBindingSlots (TriggeredAbility.condition ability)
+          Event.eventBindingSlots (TriggeredAbility.condition ability),
+          Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)
         ]
     )
     (TriggeredAbility.modal ability)
@@ -485,7 +490,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
     let cardBound card = Set.insert Binding.triggerSource (Set.union (armingTargetSlots card) (Resolve.definedSlots (cardResolutionEffects card)))
         abilityOffends card ability =
           modalSlotsOffend
-            (Set.union (cardBound card) (Event.eventBindingSlots (TriggeredAbility.condition ability)))
+            (Set.unions [cardBound card, Event.eventBindingSlots (TriggeredAbility.condition ability), Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)])
             (TriggeredAbility.modal ability)
         -- The CONDITION's own slot, which modalSlotsOffend never sees: it walks
         -- the ability's modes, and CR 603.7's slot-named condition sits beside

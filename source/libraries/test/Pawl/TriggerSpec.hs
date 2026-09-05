@@ -2660,6 +2660,63 @@ secondPlacementPassSpec s registry =
             other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
           Spec.assertBool s (not (S.onBattlefield sagaId resolved)) "and the Saga's story is told, so CR 704.5s sacrifices it"
 
+-- CR 603.3b's second class read for what the EVENT names, which the pool's one
+-- printed bearer never asks; see #1029. Synthetic Chronicle Warden, {2}{W}
+-- Enchantment, "Whenever the final chapter ability of a Saga an opponent
+-- controls triggers, return that Saga to its owner's hand. That player loses 2
+-- life." Historian's Boon above creates an Angel and reads nothing off the
+-- event, so the two slots GameEvent.AbilityTriggered carries -- CR 113.7's Saga
+-- and CR 603.3a's controller of the chapter ability -- had no reader.
+--
+-- SYNTHETIC because no printing has the shape. Of the three cards naming a
+-- Saga's final chapter ability, Historian's Boon watches it TRIGGER and names
+-- neither; Narci, Fable Singer and Tom Bombadil name "that Saga" but watch it
+-- RESOLVE, which is a condition pawl has no arm for and separate work.
+--
+-- BOB's Saga and ALICE's Warden, which is what makes both slots discriminating.
+-- The condition's Opponent relation is read of the chapter ability's controller
+-- (CR 603.3a), so `thatPlayer` is bob while CR 109.5's "you" is alice: a payload
+-- that had quietly read "you" would take alice's life instead, and both totals
+-- are asserted. The Saga likewise belongs to a seat that is not the Warden's.
+--
+-- The ORDER is CR 603.3b's own and not a choice: bob's chapter III goes on the
+-- stack in the first pass and alice's Warden trigger in the second, so the
+-- Warden is on top and resolves first -- which is why the Saga is still on the
+-- battlefield for it to return. secondPlacementPassSpec above proves that
+-- ordering directly.
+chronicleWardenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+chronicleWardenSpec s registry =
+  let benaliaName = CardName.MkCardName (Text.pack "History of Benalia")
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+   in Spec.describe s "CR 603.3b a watcher that names the Saga and its controller" $ do
+        Spec.it s "CR 113.7 the Warden returns the opponent's Saga and takes THAT player's life" $ do
+          benalia <- S.printingOf s registry "History of Benalia"
+          warden <- S.printingOf s registry "Synthetic Chronicle Warden"
+          let (sagaId, base) = S.addCreature benalia S.bob (Setup.emptyGame S.bothPlayers)
+              (_, withWarden) = S.addCreature warden S.alice base
+              withCounters = S.addCounter CounterKind.Lore 2 sagaId withWarden
+              ready =
+                withCounters
+                  { GameState.phase = Phase.PrecombatMain,
+                    GameState.activePlayer = S.bob,
+                    GameState.priority = Just S.bob
+                  }
+              advanced = S.runPure S.identityAnswer ready (Engine.runTurnBasedActions Phase.PrecombatMain)
+              resolved = S.runPure S.identityAnswer advanced Engine.priorityLoop
+          -- CR 400.7e's slot, read at gameplay level: the Saga card is in BOB's
+          -- hand. A payload reading CR 113.7a's source instead would name the
+          -- Warden and move that.
+          Spec.assertBool s (Set.member benaliaName (namesIn Zone.Hand S.bob resolved)) "the Saga is in bob's hand"
+          Spec.assertBool s (not (S.onBattlefield sagaId resolved)) "and off the battlefield"
+          -- The reserved player slot beside it, and the pair that separates the
+          -- two readings: CR 603.3a's controller is bob, CR 109.5's "you" alice.
+          Spec.assertEqWith s "bob lost the 2 life" (S.lifeOf S.bob resolved) (Just 18)
+          Spec.assertEqWith s "and alice lost none" (S.lifeOf S.alice resolved) (Just 20)
+          -- The proxy, after both: the turn-based action really did put the third
+          -- lore counter on, so chapter III really was the final chapter.
+          Spec.assertEqWith s "the turn-based action put the third lore counter on" (S.counterOf CounterKind.Lore sagaId advanced) 3
+
 -- The chapter numbers of `oid`'s own chapter abilities currently on the stack (CR
 -- 714.2, CR 704.5s).
 chaptersOnStackFrom :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
@@ -2776,6 +2833,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   towershellSkipSpec s registry
   orderingSpec s registry
   secondPlacementPassSpec s registry
+  chronicleWardenSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
   enchantedHostTriggerSpec s registry
