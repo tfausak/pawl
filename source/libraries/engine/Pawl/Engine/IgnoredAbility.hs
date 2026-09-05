@@ -46,7 +46,13 @@ ignoredBy pid source name gs =
 --
 -- A subject whose controller cannot be found suppresses nothing, which is the
 -- honest answer: an object off the battlefield has no seat to have paid.
+--
+-- The EMPTY-LIST guard comes first, and it is what keeps this affordable: every
+-- caller asks per (row, restricted object), and every board on which nobody has
+-- taken the action would otherwise pay a control projection per pair.
 ignoredForSubject :: ObjectId -> ObjectId -> Maybe AbilityName.AbilityName -> GameState -> Bool
-ignoredForSubject subject source name gs = case Projection.controllerOf subject gs of
-  Nothing -> False
-  Just pid -> ignoredBy pid source name gs
+ignoredForSubject subject source name gs
+  | null (GameState.ignoredAbilities gs) = False
+  | otherwise = case Projection.controllerOf subject gs of
+      Nothing -> False
+      Just pid -> ignoredBy pid source name gs
