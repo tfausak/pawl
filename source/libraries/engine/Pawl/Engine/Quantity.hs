@@ -240,6 +240,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- OBJECT and the object this quantity is aimed at need not be the ability's
   -- source. Nothing when the context names no source at all.
   --
+  -- Not implemented: rule 607.2a scopes the link to the exiling ABILITY, and
+  -- GameState.exiledWith keys it by the source object, so an object with two
+  -- exiling abilities would hand this arm the union of both piles (#1535).
+  --
   -- Terminating: the payload is a strictly smaller subterm.
   Quantity.AgainstCardsExiledWith inner ->
     case Filter.source context of
@@ -734,8 +738,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       mOid
   -- CR 702.184c: Power's arm, with the substitution asked first. `perspective`
   -- is CR 109.5's "you" of the ability being resolved -- its controller (CR
-  -- 113.8), unmoved by AgainstSlot's re-aim, which only ever repoints
-  -- `mOid`/`mView`, and unmoved by whoever controls the stationing permanent
+  -- 113.8), unmoved by the re-aiming arms (AgainstSlot,
+  -- AgainstCardsExiledWith), which only ever repoint `mOid`/`mView`, and unmoved by whoever controls the stationing permanent
   -- NOW: Tapestry Warden's ruling gates on the station ability's controller
   -- controlling the Warden as it resolves. grantsStationToughnessFor walks the
   -- battlefield through the same `viewOf` every other arm reads, so a snapshot

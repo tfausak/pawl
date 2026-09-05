@@ -26,7 +26,8 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Arms that name no object (Power, ObjectCounters, HasDesignation, ...) read
 -- the object the evaluation is aimed at, most of them through the injected
 -- view, which is what lets CR 608.2h last known information answer for an
--- object that is gone; AgainstSlot is how a card aims them elsewhere.
+-- object that is gone; AgainstSlot and AgainstCardsExiledWith are how a card
+-- aims them elsewhere.
 data Quantity
   = Literal Integer
   | -- | CR 202.3: the mana value of the object this quantity is evaluated against.

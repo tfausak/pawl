@@ -21,7 +21,9 @@
 -- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
 -- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b),
 -- and CR 107.1a's rounding -- both directions in one modification (Aspect of
--- Wolf), and a CDA halving a maximum folded over the PLAYERS (Malignus).
+-- Wolf), and a CDA halving a maximum folded over the PLAYERS (Malignus), and CR
+-- 607.2a's linked exile pile read from a static ability, where there is no
+-- resolution slot to aim at (Phyrexian Ingester).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -2052,7 +2054,7 @@ ingesterAnswer decision victim p = case p of
   Prompt.ChooseOptional {} -> decision
   _ -> S.identityAnswer p
 
--- The trigger placed on the stack (CR 603.3, where its target is chosen) and then
+-- The trigger placed on the stack (CR 603.3d, where its target is chosen) and then
 -- resolved, under one answerer.
 ingesterPlay :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, GameState.GameState)
 ingesterPlay decision victim board =
