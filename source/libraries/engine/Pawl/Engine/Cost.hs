@@ -3193,13 +3193,19 @@ tapForManaWith perform inFlight oid = do
 -- NOT moved -- it belongs to the CR 117.5 scan, and moving it would swallow the
 -- ordinary triggers this same event owes that scan.
 --
--- CR 603.4's intervening "if" is applied, Event.reactionTriggers doing it; CR
--- 603.3b's ordering prompt is not, and needs no arm: these never share a stack
--- to be ordered on, and each is applied as its own activation finishes.
+-- CR 603.4's intervening "if" is applied, Event.reactionTriggers doing it.
 --
--- Not implemented: CR 603.3b's "triggers only once each turn" rider, which
--- Engine.withinTurnLimit spends over the log for a trigger that reaches the
--- stack. No triggered mana ability prints one (#1572).
+-- Not implemented: an ordering choice where ONE tap fires several triggered mana
+-- abilities -- two Wild Growths enchanting one Forest. `fired` is gathered from
+-- the single event above and applied in gather order, engine-chosen. CR 605.4a
+-- keeps them off the stack, so CR 603.3b's process does not literally run, but it
+-- is the rule that gives their controller the order, and no prompt is raised.
+-- Sound only while every such ability's effect is order-independent, which every
+-- AddMana into a pool is (#1572).
+--
+-- Not implemented: the printed "triggers only once each turn" rider
+-- (Pawl.Types.TriggerLimit), which Engine.withinTurnLimit spends over the log for
+-- a trigger that reaches the stack. No triggered mana ability prints one (#1572).
 applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game ()
 applyManaTriggers perform oid = do
   State.modify' (Event.recordEvent (GameEvent.TappedForMana oid))

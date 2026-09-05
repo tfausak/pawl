@@ -2086,6 +2086,7 @@ reservedSlots =
       Binding.sacrificedCount,
       Binding.sacrificedPermanent,
       Binding.tappedPermanent,
+      Binding.manaSource,
       Binding.castSpell,
       Binding.thisAbility,
       Binding.targetingObject,
@@ -5464,6 +5465,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 fmap (\t -> t {TriggeredAbility.modal = overModal (rebind slot) (TriggeredAbility.modal t)}) (Face.triggeredAbilities card)
             }
         offender = withBind Binding.eventAmount (S.combinedFace baneOfProgress)
+        manaOffender = withBind Binding.manaSource (S.combinedFace baneOfProgress)
     Spec.assertEqWith
       s
       "CR 615.13 thatMuch bound by a Destroy is caught, and the declaration sweep misses it"
@@ -5474,6 +5476,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and the real card binds no reserved slot"
       (reservedBindings (S.combinedFace baneOfProgress))
       Set.empty
+    -- CR 106.12a's `thatManaSource`, asserted for the same reason reservedSlots
+    -- is Pawl.Engine.Binding's whole list rather than a subset: a name missing
+    -- from it is in NEITHER sweep, and nothing else in the tree would say so.
+    Spec.assertEqWith
+      s
+      "CR 106.12a thatManaSource bound by a Destroy is caught"
+      (reservedBindings manaOffender)
+      (Set.singleton Binding.manaSource)
   -- Both sweeps above range over a face's MINTED cards as well as the face
   -- itself, and this is what proves that half. CR 111.3 makes the abilities a
   -- token's creator defines "functionally equivalent to the characteristic
