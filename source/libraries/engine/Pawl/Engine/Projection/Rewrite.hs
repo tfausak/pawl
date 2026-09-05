@@ -1293,6 +1293,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.AttachedCreatureMentors -> condition
   TriggerCondition.AttachedCreatureDies -> condition
   TriggerCondition.AttachedCreatureBecomesTapped -> condition
+  TriggerCondition.SelfBecomesUntapped -> condition
   TriggerCondition.AttachedPermanentTappedForMana -> condition
   TriggerCondition.SelfTrains -> condition
   TriggerCondition.PermanentSacrificed payload -> TriggerCondition.PermanentSacrificed payload {PermanentSacrificed.filter = Filter.rewrite pairs (PermanentSacrificed.filter payload)}

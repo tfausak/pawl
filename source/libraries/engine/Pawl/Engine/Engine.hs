@@ -226,15 +226,24 @@ untapAll pid = do
   -- Event.untap is not called per permanent for exactly that reason: it writes as
   -- it goes, which is right for CR 701.26b's one-at-a-time roads (an Effect.Untap,
   -- an untap symbol) and wrong for this one.
+  --
+  -- The GameEvent.BecameUntapped records ride inside CR 502.3's own
+  -- simultaneity: one Event.simultaneously bracket, so a card watching an untap
+  -- sees the whole step as ONE event (CR 608.2f) rather than as one event per
+  -- permanent. Only the survivors are recorded, which is what keeps CR 603.2e's
+  -- "doesn't retrigger if it persists" true of a permanent that was already
+  -- upright.
   survivors <- Monad.filterM Event.proposeUntap untapping
-  State.modify' $ \live ->
-    let untapped = foldr (Map.adjust clear) (foldr Event.writeUntappedIn (GameState.objects live) survivors) expiring
-     in live
-          { GameState.objects =
-              if any (Set.member pid . Object.exertedBy) untapped
-                then Map.map unexert untapped
-                else untapped
-          }
+  Event.simultaneously $ do
+    State.modify' $ \live ->
+      let untapped = foldr (Map.adjust clear) (foldr Event.writeUntappedIn (GameState.objects live) survivors) expiring
+       in live
+            { GameState.objects =
+                if any (Set.member pid . Object.exertedBy) untapped
+                  then Map.map unexert untapped
+                  else untapped
+            }
+    Monad.forM_ survivors (State.modify' . Event.recordEvent . GameEvent.BecameUntapped)
 
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick, and the untap step is where that becomes true.
@@ -725,6 +734,7 @@ abilityTriggeredOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing

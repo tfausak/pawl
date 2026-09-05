@@ -462,13 +462,16 @@ tap oid = do
 -- action in Pawl.Engine.Engine.untapAll, which calls `proposeUntap` directly so
 -- that its own write stays simultaneous.
 --
--- Not implemented: no GameEvent is recorded here, so nothing can watch a
--- permanent become untapped (#2236). The funnel this comment sits on is what
--- that issue's remaining half hangs off.
+-- GameEvent.BecameUntapped is recorded only where `proposeUntap` said the
+-- permanent will untap, so rule 701.26b's second sentence and CR 614's
+-- replacements both gate the event as well as the write. CR 603.2e's other
+-- exclusion is discharged the same way `tap` above discharges it: a permanent
+-- that ENTERS untapped never comes through here at all.
 untap :: ObjectId -> Game ()
 untap oid = do
   survives <- proposeUntap oid
-  Monad.when survives (State.modify' (\gs -> gs {GameState.objects = writeUntappedIn oid (GameState.objects gs)}))
+  Monad.when survives . State.modify' $ \gs ->
+    recordEvent (GameEvent.BecameUntapped oid) gs {GameState.objects = writeUntappedIn oid (GameState.objects gs)}
 
 -- `untap`'s replacement half, split out so CR 502.3's simultaneous untap can run
 -- it over a whole set before writing any of them.
@@ -547,6 +550,7 @@ damageOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
@@ -602,6 +606,7 @@ revealOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
@@ -6413,6 +6418,8 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 701.26a's tap is a first-pass event as well, and not an ability
   -- triggering.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- CR 701.26b's untap is a first-pass event as well.
+  TriggerCondition.SelfBecomesUntapped -> False
   -- CR 106.12a is a first-pass event as well, and not an ability triggering.
   TriggerCondition.AttachedPermanentTappedForMana -> False
   TriggerCondition.PermanentSacrificed {} -> False
@@ -6518,6 +6525,9 @@ controllerTurnScoped cond = case cond of
   -- and Betrayal's whole point is that the Aura's controller is not the tapping
   -- creature's.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- Nor CR 701.26b: CR 502.3's untap step is the active player's, but an
+  -- Effect.Untap and CR 107.6's untap symbol reach any turn.
+  TriggerCondition.SelfBecomesUntapped -> False
   -- Nor does CR 106.12a: an enchanted land can be tapped for mana on anyone's
   -- turn, and Wild Growth's whole point is that the mana is its controller's.
   TriggerCondition.AttachedPermanentTappedForMana -> False

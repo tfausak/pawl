@@ -167,6 +167,7 @@ movedOf event = case event of
   GameEvent.BecameAttacked _ -> Nothing
   GameEvent.AttackersDeclared _ -> Nothing
   GameEvent.BecameTapped _ -> Nothing
+  GameEvent.BecameUntapped _ -> Nothing
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
@@ -255,6 +256,9 @@ looksBack condition = case condition of
   -- battlefield, so the ordinary CR 603.10 reading -- the board as it is now --
   -- is the right one.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- Nor is becoming untapped: CR 701.26b leaves the permanent standing on
+  -- the battlefield too, so the same live read is the right one.
+  TriggerCondition.SelfBecomesUntapped -> False
   -- Not on CR 603.10a's list either, the arm above's reason: the permanent
   -- tapped for mana is standing on the battlefield when the ability is
   -- gathered.
@@ -460,6 +464,10 @@ batchScoped condition = case condition of
   -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
   -- occurrence; no printing of that event says "one or more".
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- The untap direction the same way, CR 502.3's simultaneous batch
+  -- included: the condition is about the BEARER, so a batch that untaps a
+  -- whole board still holds one occurrence of it.
+  TriggerCondition.SelfBecomesUntapped -> False
   -- CR 106.12a names one resolution of one mana ability, so one occurrence;
   -- no printing of it says "one or more".
   TriggerCondition.AttachedPermanentTappedForMana -> False
@@ -828,6 +836,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
@@ -1069,6 +1078,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
@@ -1277,6 +1287,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
@@ -1411,6 +1422,7 @@ eventTriggers events gs =
         GameEvent.BecameAttacked _ -> Map.empty
         GameEvent.AttackersDeclared _ -> Map.empty
         GameEvent.BecameTapped _ -> Map.empty
+        GameEvent.BecameUntapped _ -> Map.empty
         GameEvent.TappedForMana _ -> Map.empty
         GameEvent.CoinFlipped {} -> Map.empty
         GameEvent.RingTempted _ -> Map.empty
@@ -1593,6 +1605,9 @@ enchantedObjectLeaves condition = case condition of
   -- attachment link, but for an event that leaves the enchanted permanent right
   -- where it was, so CR 113.6m's Aura clause has nothing to exempt.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- Not an attachment condition at all -- it reads the bearer -- so the
+  -- Aura clause is not in question.
+  TriggerCondition.SelfBecomesUntapped -> False
   -- False for the arm above's reason: the enchanted permanent stays exactly
   -- where it was, so CR 113.6m's Aura clause has nothing to exempt.
   TriggerCondition.AttachedPermanentTappedForMana -> False
@@ -1808,6 +1823,9 @@ zonesTriggeredFrom cond = case cond of
   -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
   -- is for a condition that cannot trigger from there at all.
   TriggerCondition.AttachedCreatureBecomesTapped -> battlefield
+  -- CR 110.5 makes tapped a permanent's status, so only a permanent can
+  -- become untapped and only the battlefield can hold one.
+  TriggerCondition.SelfBecomesUntapped -> battlefield
   -- The same default and the same reason, one event over.
   TriggerCondition.AttachedPermanentTappedForMana -> battlefield
   -- The same default from the training creature's own side: rule 702.149a's ability
@@ -2214,6 +2232,9 @@ stateTriggers gs
               -- False: CR 603.2e says a "becomes" condition does not retrigger
               -- while the state persists, and a state trigger would do nothing but.
               TriggerCondition.AttachedCreatureBecomesTapped -> False
+              -- CR 701.26b's untap is an EVENT for the identical reason,
+              -- read off the bearer instead of its host.
+              TriggerCondition.SelfBecomesUntapped -> False
               -- CR 106.12a is an EVENT too, and more plainly than the arm
               -- above: a mana ability having resolved is nothing a later
               -- board read can recover.

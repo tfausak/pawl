@@ -477,6 +477,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedCreatureBecomesTapped
       " {\"type\":\"AttachedCreatureBecomesTapped\"} "
+  -- CR 701.26b's untap read off the BEARER. Nullary for the arm above's reason,
+  -- and the TAG is the whole difference between the two directions of one status.
+  Spec.it s "SelfBecomesUntapped" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfBecomesUntapped
+      " {\"type\":\"SelfBecomesUntapped\"} "
   -- CR 106.12a's tap for mana read off the same attachment link. Nullary for the
   -- arm above's reason, and the TAG is again the whole difference: the two watch
   -- one link for a plain tap and for a tap that produced mana.

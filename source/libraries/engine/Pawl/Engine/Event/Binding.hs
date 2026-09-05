@@ -660,6 +660,9 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- answers the Aura's "you" from Binding.triggerSource. There is no second
   -- object for the payload to name.
   (TriggerCondition.AttachedCreatureBecomesTapped, _) -> Map.empty
+  -- Nothing either, and for a plainer reason: the permanent that became
+  -- untapped IS the bearer, whom Binding.triggerSource already names.
+  (TriggerCondition.SelfBecomesUntapped, _) -> Map.empty
   -- CR 106.12a's permanent, bound because the attachment link is NOT enough
   -- here where it is enough above: Wild Growth's "its controller" is the
   -- enchanted land's controller, and PlayerRef.ControllerOfBound is how a card
@@ -1345,6 +1348,9 @@ eventBindingSlots cond = case cond of
   -- is no arrival for a payload to find. The tapped permanent is still the one
   -- Object.attachedTo names.
   TriggerCondition.AttachedCreatureBecomesTapped -> Set.empty
+  -- Empty for the arm above's reason once more: nothing moved, and the
+  -- permanent that untapped is the bearer.
+  TriggerCondition.SelfBecomesUntapped -> Set.empty
   -- The permanent tapped for mana, which the arm above stamps for every
   -- match: Wild Growth reads it through PlayerRef.ControllerOfBound.
   TriggerCondition.AttachedPermanentTappedForMana -> Set.singleton Binding.manaSource
