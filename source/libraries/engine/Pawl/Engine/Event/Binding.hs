@@ -17,9 +17,11 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameTarget as BecameTarget
+import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -598,6 +600,22 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- and so gets no second name.
   (TriggerCondition.SelfBlocksCreature _, GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker})) ->
     Binding.setBlockedCreature attacker Map.empty
+  -- CR 701.3a's "that creature" read from the ATTACHMENT: the host the bearer
+  -- went onto, which Enormous Energy Blade taps. The SelfBecomesAttachedBy arm
+  -- below binds nothing off the same event, and the two together are the pair --
+  -- whichever end is not the bearer is the one that earns a name.
+  --
+  -- Guaranteed given a match rather than conditional, which is what
+  -- eventBindingSlots' per-condition promise needs: matchesTrigger has already
+  -- declined every event whose host is a player, so Recipient.objectOf answers
+  -- Just here. Map.empty when it does not, which the promise reads as the floor.
+  (TriggerCondition.SelfBecomesAttachedTo _, GameEvent.BecameAttached (BecameAttached.MkBecameAttached {BecameAttached.host = host})) ->
+    maybe Map.empty (`Binding.setAttachedHost` Map.empty) (Recipient.objectOf host)
+  -- CR 701.3d's "that permanent": the host the bearer came OFF, which Grafted
+  -- Wargear sacrifices. The arm above's mirror off the other event, guaranteed
+  -- for the same reason.
+  (TriggerCondition.SelfBecomesUnattachedFrom _, GameEvent.BecameUnattached (BecameUnattached.MkBecameUnattached {BecameUnattached.host = host})) ->
+    maybe Map.empty (`Binding.setUnattachedHost` Map.empty) (Recipient.objectOf host)
   -- CR 702.134c's "that creature": the creature that was mentored, the event's
   -- second id -- Aegis of the Legion's shield counter goes on it. The MENTOR gets no
   -- slot: matchesTrigger has just proved it is the bearer's host, and no printed
@@ -901,9 +919,17 @@ eventBindingSlots cond = case cond of
   -- one of them -- CR 113.7a's source slot already names the host. The other,
   -- the attachment, has no printed reader: Bramble Elemental says "create two
   -- 1\/1 green Saproling creature tokens" and names no "it". Enormous Energy
-  -- Blade's "tap that creature" is the printing that earns a slot, and it reads
-  -- the event from the other end (gap #1837).
+  -- Blade's "tap that creature" reads the event from the other end, under
+  -- SelfBecomesAttachedTo below.
   TriggerCondition.SelfBecomesAttachedBy _ -> Set.empty
+  -- The other end of the same event, and the one that DOES earn a slot: here the
+  -- bearer is the attachment, so CR 113.7a's source slot names it and the host is
+  -- a second object. Guaranteed given a match -- matchesTrigger declines a player
+  -- host outright.
+  TriggerCondition.SelfBecomesAttachedTo _ -> Set.singleton Binding.attachedHost
+  -- CR 701.3d's mirror, on its own slot for Pawl.Engine.Binding.unattachedHost's
+  -- reason.
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> Set.singleton Binding.unattachedHost
   -- CR 603.6a's two written forms differ only in which object the bearer is.
   -- SelfEnters matches on `object == bearer`, so CR 113.7a's source slot already
   -- names the entrant and `became` would be a second name for one object.

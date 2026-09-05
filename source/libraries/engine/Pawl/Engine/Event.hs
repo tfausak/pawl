@@ -65,6 +65,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameTarget as BecameTarget
+import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
@@ -537,6 +538,7 @@ damageOf event = case event of
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
   GameEvent.BecameAttached {} -> Nothing
+  GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -594,6 +596,7 @@ revealOf event = case event of
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
   GameEvent.BecameAttached {} -> Nothing
+  GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -4903,6 +4906,19 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- through Moved.arrivals and binds CR 400.7e's `became` slot as a
               -- group, so a trigger's payload acts on each card. Empty for every
               -- move but this one.
+              --
+              -- CR 701.3d's "this includes if that Aura, Equipment, or
+              -- Fortification leaves the battlefield": an attached permanent that
+              -- is leaving becomes unattached from whatever it was on. Read off
+              -- `obj`, the PRE-MOVE object, since CR 400.7 has already taken the
+              -- live one away. Ahead of the Moved event, which is the order the
+              -- rule's own sentence takes -- the unattachment is part of the
+              -- leaving rather than a consequence of it.
+              --
+              -- The BATTLEFIELD conjunct is the rule's own scope; an object in any
+              -- other zone carries no attachment for CR 701.3a to have made.
+              Monad.when (fromZone == Zone.Battlefield) $
+                Monad.forM_ (Object.attachedTo obj) (unattach oid)
               State.modify'
                 . recordEvent
                 . GameEvent.Moved
@@ -5456,14 +5472,15 @@ becameTarget source kind controller chosen =
             BecameTarget.controller = controller
           }
 
--- CR 701.3b and CR 701.3c: store the attachment, restamp, and record it.
+-- CR 701.3b and CR 701.3c: store the attachment, restamp, and record it -- and
+-- rule 701.3d's unattachment from the old host, when there was one.
 --
 -- CR 303.4j for an Aura -- "the Aura doesn't move" -- and CR 701.3b's first
 -- sentence for the rest. A FAILURE MODE, not a fizzle: the only thing that does
 -- not happen is the move, and in particular the subject stays attached to its old
--- host rather than becoming unattached, so CR 704.5m has nothing to bury. Nothing
--- is recorded on that branch either, which is CR 701.3b in as many words -- the
--- permanent did not become attached.
+-- host rather than becoming unattached, so CR 704.5m has nothing to bury. Neither
+-- event is recorded on that branch, which is CR 701.3b in as many words -- the
+-- permanent did not become attached, and so it did not become unattached either.
 --
 -- CR 701.3b's SECOND sentence is checked here rather than left to the caller:
 -- attaching a permanent to the object or player it is already attached to "does
@@ -5491,6 +5508,20 @@ attach subject destination = do
       let (ts, gs1) = Game.freshTimestamp gs
           move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
       State.put gs1 {GameState.objects = Map.adjust move subject (GameState.objects gs1)}
+      -- CR 701.3d's first route, and the one this funnel is the sole producer of:
+      -- moving an already-attached permanent onto a DIFFERENT host makes it cease
+      -- to be attached to the old one. Ahead of the attachment event, which is the
+      -- order rule 701.3a's own words take -- "take it from where it currently is
+      -- and put it onto that object" -- and read off `gs`, the board before the
+      -- move, since the write above has already overwritten the field.
+      --
+      -- After the State.put and not before it: that put is built from `gs`, so an
+      -- event recorded ahead of it would be thrown away with the rest of the
+      -- pre-move state.
+      --
+      -- The equality guard above is what keeps a re-attach to the SAME host from
+      -- reaching here: CR 701.3b makes that "do nothing", so neither event fires.
+      Monad.forM_ (Game.lookupObject subject gs >>= Object.attachedTo) (unattach subject)
       State.modify'
         . recordEvent
         $ GameEvent.BecameAttached
@@ -5498,6 +5529,30 @@ attach subject destination = do
             { BecameAttached.attachment = subject,
               BecameAttached.host = attachment
             }
+
+-- CR 701.3d: record that `subject` BECAME UNATTACHED from `host`. The funnel every
+-- route rule 701.3d lists goes through, so a condition watching for one sees them
+-- all: `attach` above for a move to another host, Pawl.Engine.Sba's CR 704.5n and
+-- CR 702.103f folds for a detach that leaves the permanent on the battlefield, and
+-- this module's zone-change funnel for the attachment leaving the battlefield --
+-- which is also how the HOST leaving its zone and CR 800.4a's departing player are
+-- reached, an Aura following its host into the graveyard under CR 704.5m and an
+-- Equipment detaching under CR 704.5n's dead-host reading.
+--
+-- Records only; the WRITE to Object.attachedTo stays at each site, because the
+-- three do different things with it -- one overwrites it, one clears it, one lets
+-- CR 400.7 take the whole object away.
+--
+-- Not called by Pawl.Engine.Phasing, which is CR 702.26j.
+unattach :: ObjectId -> Recipient.Recipient -> Game ()
+unattach subject host =
+  State.modify'
+    . recordEvent
+    $ GameEvent.BecameUnattached
+      BecameUnattached.MkBecameUnattached
+        { BecameUnattached.attachment = subject,
+          BecameUnattached.host = host
+        }
 
 -- CR 611.1 / 613.11: does a rules-modifying continuous effect stop this spell or
 -- ability from being countered (Spider-Punk, Prowling Serpopard)? The victim's
@@ -6302,6 +6357,11 @@ reactsToAbilityTriggering cond = case cond of
   -- or by a permanent entering the battlefield -- never an ability triggering, so
   -- CR 603.3b's first pass again.
   TriggerCondition.SelfBecomesAttachedBy _ -> False
+  TriggerCondition.SelfBecomesAttachedTo _ -> False
+  -- And CR 701.3d's unattaching is not an ability triggering either: every route
+  -- rule 701.3d lists is a state-based action, a zone change or a resolving
+  -- effect's move.
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> False
   -- CR 603.12's trigger event is the action the resolving ability instructed --
   -- a payment, for every printing in the pool -- and never another ability
   -- triggering, so a reflexive takes CR 603.3b's first pass.
@@ -6470,6 +6530,10 @@ controllerTurnScoped cond = case cond of
   -- CR 701.3a names no turn: an Aura can be cast, and an Equipment equipped, on
   -- any turn its controller has priority for.
   TriggerCondition.SelfBecomesAttachedBy _ -> False
+  TriggerCondition.SelfBecomesAttachedTo _ -> False
+  -- CR 701.3d names no turn either: an Equipment comes off on whatever turn the
+  -- move, the zone change or the state-based action happens.
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> False
   -- One of the two arms carrying a TurnScope, and the one the lint below this
   -- was written for (CR 603.3a, CR 109.5).
   TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.ControllersTurn) -> True

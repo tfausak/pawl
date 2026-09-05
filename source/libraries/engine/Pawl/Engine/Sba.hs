@@ -830,9 +830,11 @@ performStateBasedActions = Event.simultaneously $ do
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.
   --
-  -- Not implemented: CR 701.3d's becoming UNATTACHED, which this write is one
-  -- producer of. The attaching half is GameEvent.BecameAttached; there is no
-  -- event and no trigger condition for the other direction (#1838).
+  -- CR 701.3d's becoming unattached, recorded before the write clears the field
+  -- the host is read off. `gs` and not the live board: this pass may already have
+  -- buried the host, and the Recipient wanted is the one the permanent was
+  -- attached to when the pass began.
+  Monad.forM_ detaching (\oid -> Monad.forM_ (Game.lookupObject oid gs >>= Object.attachedTo) (Event.unattach oid))
   State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing}))) (GameState.objects g) detaching})
   -- CR 702.103f: the two halves of "it becomes unattached and ceases to be
   -- bestowed", in one write for the reason the detach above is one -- neither is
@@ -843,6 +845,10 @@ performStateBasedActions = Event.simultaneously $ do
   --
   -- ONE WAY: no rule makes an object bestowed again, and CR 702.103a's choice is
   -- available only while casting.
+  --
+  -- Rule 702.103f says "becomes unattached" in as many words, so it is a CR
+  -- 701.3d event like the detach above and is recorded the same way.
+  Monad.forM_ unbestowing (\oid -> Monad.forM_ (Game.lookupObject oid gs >>= Object.attachedTo) (Event.unattach oid))
   State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing, Object.bestowed = False}))) (GameState.objects g) unbestowing})
   -- CR 704.5g/h: destruction through the funnel, Regenerable -- the point rather
   -- than a default, since CR 701.19a's shield exists to replace exactly this

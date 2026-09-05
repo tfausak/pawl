@@ -14,6 +14,7 @@ import qualified Pawl.Codec.BecameAttacked as BecameAttacked
 import qualified Pawl.Codec.BecameBlocking as BecameBlocking
 import qualified Pawl.Codec.BecameDesignated as BecameDesignated
 import qualified Pawl.Codec.BecameTarget as BecameTarget
+import qualified Pawl.Codec.BecameUnattached as BecameUnattached
 import qualified Pawl.Codec.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Codec.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Codec.CoinFlipped as CoinFlipped
@@ -86,6 +87,7 @@ codec =
       Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered (\x -> case x of GameEvent.VentureMarkerEntered y -> Just y; _ -> Nothing),
       Arm.payload "BecameTarget" BecameTarget.codec GameEvent.BecameTarget (\x -> case x of GameEvent.BecameTarget y -> Just y; _ -> Nothing),
       Arm.payload "BecameAttached" BecameAttached.codec GameEvent.BecameAttached (\x -> case x of GameEvent.BecameAttached y -> Just y; _ -> Nothing),
+      Arm.payload "BecameUnattached" BecameUnattached.codec GameEvent.BecameUnattached (\x -> case x of GameEvent.BecameUnattached y -> Just y; _ -> Nothing),
       Arm.payload "LeftTheGame" ObjectId.codec GameEvent.LeftTheGame (\x -> case x of GameEvent.LeftTheGame y -> Just y; _ -> Nothing),
       Arm.payload "Scried" PlayerId.codec GameEvent.Scried (\x -> case x of GameEvent.Scried y -> Just y; _ -> Nothing),
       -- CR 309.7's completion, with only the completing player on the wire: the
