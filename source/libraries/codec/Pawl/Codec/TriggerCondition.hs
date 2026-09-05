@@ -137,7 +137,9 @@ codec =
       Arm.payload "RingTemptsPlayer" PlayerRelation.codec TriggerCondition.RingTemptsPlayer (\x -> case x of TriggerCondition.RingTemptsPlayer y -> Just y; _ -> Nothing),
       -- CR 509.3d from the attacking side's bystander, SelfBecomesBlockedBy's
       -- shape above with the Filter over the attacker instead.
-      Arm.payload "PermanentBecomesBlockedBy" filterCodec TriggerCondition.PermanentBecomesBlockedBy (\x -> case x of TriggerCondition.PermanentBecomesBlockedBy y -> Just y; _ -> Nothing)
+      Arm.payload "PermanentBecomesBlockedBy" filterCodec TriggerCondition.PermanentBecomesBlockedBy (\x -> case x of TriggerCondition.PermanentBecomesBlockedBy y -> Just y; _ -> Nothing),
+      -- CR 701.68d's "whenever a player blights", RingTemptsPlayer's shape above.
+      Arm.payload "PlayerBlights" PlayerRelation.codec TriggerCondition.PlayerBlights (\x -> case x of TriggerCondition.PlayerBlights y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec

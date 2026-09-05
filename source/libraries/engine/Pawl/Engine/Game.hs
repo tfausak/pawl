@@ -1240,6 +1240,7 @@ castOf event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The discarding player an event describes, if it is a discard (CR 701.9a).
@@ -1310,6 +1311,7 @@ discardOf event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The permanent an event describes ENTERING THE BATTLEFIELD, if it is one. CR
@@ -1386,6 +1388,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The RECIPIENT an event describes damage being dealt to, if it describes one --
@@ -1475,6 +1478,7 @@ damageDealt event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The PLAYER an event describes being dealt damage, if it describes one. CR
@@ -1616,6 +1620,7 @@ lifeGainOf event = case event of
   GameEvent.TappedForMana _ -> Nothing
   GameEvent.CoinFlipped {} -> Nothing
   GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- CR 119.3 / 608.2i: how much life this player has gained this turn. The log fold

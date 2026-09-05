@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -110,4 +111,14 @@ blight cause resolving n = do
       -- cause is an effect, CR 614.16's (Doubling Season).
       Monad.when (n > 0) . Monad.void $
         Event.putCounters cause blighted CounterKind.MinusOneMinusOne n
+      -- CR 701.68d: the blight itself, "regardless of what events actually
+      -- occurred" -- after rule 701.68a's process and outside the `when` above,
+      -- so an N of zero and a blight whose counters a replacement kept off write
+      -- it just the same. Pawl.EventTriggerSpec's "CR 701.68d Solemnity keeps
+      -- every counter off and the Chronicler still triggers" proves that.
+      --
+      -- HERE and not at a caller, because this is the one place all three
+      -- provenances meet (the module haddock above): a blight paid as a cost and
+      -- one an effect instructs are both a player blighting.
+      State.modify' (Event.recordEvent (GameEvent.Blighted pid))
       pure True
