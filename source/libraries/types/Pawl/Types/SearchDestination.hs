@@ -35,8 +35,13 @@ data SearchDestination
     -- reveal, so the two are not the same act and this arm is not RevealThenHand
     -- pointed at another zone.
     Exile
-  | -- | Auratouched Mage's "put that Aura card onto the battlefield attached to
-    -- it", where "it" is the searching ability's own source.
+  | -- | Auratouched Mage's "If this creature is still on the battlefield, put
+    -- that Aura card onto the battlefield attached to it. Otherwise, reveal the
+    -- Aura card and put it into your hand."
+    --
+    -- WHICH object "it" is comes from Pawl.Types.Search.subject, shared with the
+    -- filter's Pawl.Types.Filter.CanAttachToSubject so the card's one "it" cannot
+    -- come apart between the two sentences that name it.
     --
     -- CR 303.4's entry-attached move rather than a plain battlefield entry
     -- followed by CR 701.3's attach: the card enters ALREADY attached, and
@@ -46,14 +51,23 @@ data SearchDestination
     -- card the fixed host can't legally hold; CR 303.4i then leaves it in the
     -- library, which is what Pawl.Engine.Resolve.Effect.putFound does.
     --
-    -- The WHOLE of the card's two sentences, not just the first: "If this
-    -- creature is still on the battlefield, put that Aura card onto the
-    -- battlefield attached to it. Otherwise, reveal the Aura card and put it into
-    -- your hand." One arm rather than two, because a search has one destination
-    -- and the card prints one instruction -- which of its branches runs is a fact
-    -- about the board at resolution (CR 608.2h), not a second thing a card could
-    -- ask for. Pawl.AuraSpec's pair of Auratouched Mage cases, alike but for
-    -- whether the Mage was killed in response to its own trigger, is what proves
-    -- both branches.
-    BattlefieldAttachedToSource
+    -- The WHOLE of the card's two sentences, not just the first. One arm rather
+    -- than two, because a search has one destination and the card prints one
+    -- instruction -- which of its branches runs is a fact about the board at
+    -- resolution (CR 608.2h), not a second thing a card could ask for.
+    -- Pawl.AuraSpec's pair of Auratouched Mage cases, alike but for whether the
+    -- Mage was killed in response to its own trigger, is what proves both
+    -- branches.
+    BattlefieldAttachedOrHand
+  | -- | Sovereigns of Lost Alara's "put it onto the battlefield attached to that
+    -- creature", the arm above's first sentence with no "otherwise" printed
+    -- beside it.
+    --
+    -- A separate arm and not BattlefieldAttachedOrHand with a flag: this card
+    -- prints one sentence where that one prints two, and CR 608.2h is what
+    -- decides what happens when the host has gone -- the effect does as much as
+    -- it can, which for a card that never names a second destination is nothing,
+    -- leaving the Aura in the library. Putting it into a hand instead would be
+    -- this engine printing a sentence the card does not.
+    BattlefieldAttached
   deriving (Bounded, Enum, Eq, Ord, Show)

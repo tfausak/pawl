@@ -34,6 +34,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
@@ -61,6 +62,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
@@ -2374,6 +2376,15 @@ mageAnswer other p = case p of
   Prompt.ChooseAttachment {} -> pure other
   _ -> pure (S.identityAnswer p)
 
+-- mageAnswer with CR 506.5's declaration and CR 603.5's "you may" added: the lone
+-- attacker is named rather than left to S.aggressiveAnswer, since which creature
+-- attacks is what the case is about, and the optional clause is exercised.
+sovereignsAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+sovereignsAnswer attacker other p = case p of
+  Prompt.DeclareAttackers _ _ ids -> pure (filter (== attacker) ids)
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  _ -> mageAnswer other p
+
 -- CR 701.3a asked from the CANDIDATE's side -- "an Aura card that could enchant
 -- it", where the host is fixed for the whole evaluation and the Aura varies per
 -- candidate. Filter.CanHostSubject is the same rule with the two roles swapped,
@@ -2505,6 +2516,75 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
     -- first.
     Spec.assertEqWith s "the search offered exactly the Aura that could have enchanted the Mage" (named searches) [[strengthName]]
     Spec.assertEqWith s "and the rejected Aura never reached alice's hand" (filter (== consecrateName) (handNames S.alice after)) []
+
+  -- THE PROVING CASE for #2028: the object CR 701.3a's question is about is the
+  -- one the resolution BOUND, not the searching ability's source. Sovereigns of
+  -- Lost Alara's trigger says "an Aura card that could enchant THAT CREATURE" of
+  -- CR 506.5's lone attacker, and puts what it finds onto the battlefield
+  -- attached to that same creature.
+  --
+  -- The board tells the two readings apart in both directions, and each Aura is
+  -- legal for exactly one of the two objects:
+  --
+  --   * Entangling Vines enchants a TAPPED creature (CR 702.5a), which the
+  --     attacker is (CR 508.1f) and the untapped Sovereigns is not;
+  --   * Banewasp Affliction is a black Aura and enchants any creature, which the
+  --     Sovereigns is and the attacker -- Apostle of Purifying Light, protection
+  --     from black -- is not (CR 702.16c).
+  --
+  -- So an engine asking rule 701.3a about the SOURCE finds Banewasp Affliction
+  -- and attaches it to nothing, and one asking about the bound creature finds
+  -- Entangling Vines. Banewasp Affliction is stocked LAST, so it sits at the head
+  -- of the library the search reads and is what the wrong reading hands back.
+  Spec.it s "CR 701.3a whole card: Sovereigns of Lost Alara finds the Aura that could enchant the creature its trigger bound" $ do
+    sovereigns <- S.printingOf s registry "Sovereigns of Lost Alara"
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    vines <- S.printingOf s registry "Entangling Vines"
+    banewasp <- S.printingOf s registry "Banewasp Affliction"
+    let (base0, ours, _) = S.combatBoardOf [sovereigns, apostle] []
+        (_, base1) = S.addLibraryCard vines S.alice base0
+        (banewaspId, gs) = S.addLibraryCard banewasp S.alice base1
+        vinesName = S.nameOf (Printing.card vines)
+        banewaspName = S.nameOf (Printing.card banewasp)
+        -- Read off `gs`, the PRE-run board, for the Auratouched Mage case's
+        -- reason: a candidate a library search offers has not moved, so its id
+        -- still names it.
+        named = fmap (Maybe.mapMaybe (fmap Face.name . flip Game.faceOf gs))
+    case ours of
+      [sovereignsId, apostleId] -> do
+        let ((_, after), searches) = State.runState (Engine.runGame (sovereignsAnswer apostleId sovereignsId) gs Engine.runStep) []
+        -- THE gameplay-level assertion, and FIRST: the Aura that could enchant
+        -- the ATTACKING creature is the one on the battlefield, and it is on THAT
+        -- creature. Both halves of the sentence in one read, so neither the
+        -- filter's host nor the destination's can be right while the other is
+        -- wrong -- an engine reading either off the source produces Nothing here,
+        -- rule 303.4i leaving its find in the library.
+        Spec.assertEqWith
+          s
+          "CR 701.3a / 303.4: Entangling Vines entered attached to the attacking creature"
+          (fmap (\auraId -> Game.lookupObject auraId after >>= Object.attachedTo) (battlefieldNamed vinesName after))
+          (Just (Just (Recipient.ToCreature apostleId)))
+        -- The OFFER, which is where the rejected Aura is visible: the search never
+        -- showed the one only the SOURCE could have hosted.
+        Spec.assertEqWith s "the search offered exactly the Aura that could enchant the attacker" (named searches) [[vinesName]]
+        -- CR 701.23b: a search stating a quality may find fewer, so the rejected
+        -- Aura stayed where it was rather than being found and refused at the
+        -- move -- and it is not in the hand either, which is the half
+        -- S.countByName cannot see.
+        Spec.assertEqWith s "and the Aura it rejected is still in the library" (S.countByName banewaspName S.alice after) 1
+        Spec.assertEqWith s "and it is not in alice's hand" (filter (== banewaspName) (handNames S.alice after)) []
+        -- The preconditions the assertions above rest on. Without the first pair
+        -- the two Auras would not tell the two objects apart, and without the
+        -- second the trigger would not have fired at all.
+        Spec.assertEqWith s "the attacker was tapped by CR 508.1f, which is what Entangling Vines' enchant ability reads" (fmap Object.tapped (Game.lookupObject apostleId after)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and the Sovereigns stayed untapped, so that Aura could not have gone on it" (fmap Object.tapped (Game.lookupObject sovereignsId after)) (Just TapState.Untapped)
+        Spec.assertBool s (Map.keys (Combat.Type.attackers (GameState.combat after)) == [apostleId]) "the attacker really was attacking alone (CR 506.5)"
+        -- And the rejected Aura is one the SOURCE could have hosted, which is what
+        -- makes its absence from the offer a fact about WHICH object rule 701.3a
+        -- asked about rather than about the Aura being unplayable anywhere.
+        Spec.assertBool s (Attach.attachableWithLastKnown banewaspId sovereignsId gs) "Banewasp Affliction could have enchanted the Sovereigns"
+        Spec.assertBool s (not (Attach.attachableWithLastKnown banewaspId apostleId gs)) "but not the attacker, which has protection from black (CR 702.16c)"
+      _ -> Spec.assertFailure s "fixture should give alice the Sovereigns and the Apostle"
 
 -- CR 613.1f / 702.5a: an enchant ability that arrives from an EFFECT rather than
 -- from a printing (Modification.GainEnchant), which is what a "becomes an Aura

@@ -2087,7 +2087,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ManaUnit.rider = rider
                       }
               State.modify' (Mana.addMana pid (replicate howMany unit))
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -2112,7 +2112,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 701.3a: one candidate's VIEW carries the field no projection can fill --
     -- whether the CANDIDATE could legally be attached to the object this
     -- instruction fixes (Auratouched Mage's "an Aura card that could enchant
-    -- it"), which for a search is the searching ability's own SOURCE. Answered by
+    -- it"). WHICH object that is comes from Search.subject: the searching
+    -- ability's own SOURCE where the card says "it" of itself (CR 113.7), and
+    -- otherwise the one object a slot this resolution has bound names --
+    -- Sovereigns of Lost Alara's "that creature", CR 506.5's lone attacker, which
+    -- its trigger stamped under Binding.attackingCreature. Answered by
     -- Attach.attachableWithLastKnown, whose live half is the same function the
     -- move goes through, so the offer and the move cannot disagree -- and whose
     -- other half is CR 608.2h: a source killed while its own trigger was on the
@@ -2120,6 +2124,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- card that could have enchanted it, and putFound's own CR 608.2h branch is
     -- where that card then goes. Lazy, so a filter that never names
     -- Filter.CanAttachToSubject pays nothing for it.
+    --
+    -- A slot naming no object, or more than one, leaves rule 701.3a's question
+    -- with nothing to be about, and the atom is False for every candidate -- a
+    -- search that finds nothing rather than one that finds anything. The same
+    -- reading putFound takes for where the card then goes, so the offer and the
+    -- move agree there too.
     --
     -- No recursion to bound: this is called from a resolution rather than from
     -- inside a CR 613 fold, so the projections that question reaches start fresh.
@@ -2133,9 +2143,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
     -- filter" is what keeps the atom to this position, the one that answers.
     let searchContext g = (effectContext g controller source legal (slotBindings resolving g)) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) g}
+        subjectOf g = maybe (Just source) (\slot -> Filter.slotOneObject slot (searchContext g)) subject
         viewOfCandidate g oid =
           (Projection.viewOfObject oid g)
-            { Filter.canAttachToSubject = Attach.attachableWithLastKnown oid source g
+            { Filter.canAttachToSubject = Maybe.maybe False (\host -> Attach.attachableWithLastKnown oid host g) (subjectOf g)
             }
         matches1 g oid = Filter.matches (searchContext g) (viewOfCandidate g oid) filter_
         -- CR 400.2: the library and the hand are the hidden zones. CR 701.23b,
@@ -2298,7 +2309,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 701.23e says the same of the reveal. The searcher is the
             -- revealer (CR 701.20a), and the cards go in the order the searcher
             -- named them.
-            Monad.mapM_ (putFound searcher source destination) found
+            -- Read HERE rather than when the arm was entered, the reason the
+            -- context above is a function of the board: CR 608.2c carries the
+            -- clauses out in order, so the slot an earlier clause bound is read
+            -- as it stands now.
+            host <- State.gets subjectOf
+            Monad.mapM_ (putFound searcher host destination) found
             -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
             -- The library shuffled is the one that was READ, so this seat is the
             -- owner -- and only where a LIBRARY is among the zones the searcher
@@ -6737,8 +6753,8 @@ changeLifeByDelta pid delta =
 -- CR 701.23: do to a found card what the search said -- a move for every
 -- destination and, for one of them, a CR 701.20a reveal first, through the CR
 -- 400.7 funnel either way.
-putFound :: PlayerId -> ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
-putFound searcher source destination cardId = case destination of
+putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
+putFound searcher subject destination cardId = case destination of
   -- Nature's Lore's "put that card onto the battlefield": the plain move, with
   -- no rider naming how it enters, so CR 110.5b's defaults stand and the card
   -- arrives untapped. That is why this is Event.changeZone rather than putTapped
@@ -6756,7 +6772,12 @@ putFound searcher source destination cardId = case destination of
   -- it (CR 701.23e). Which card this instruction exiled is CR 607.2a's link,
   -- filed by recordExiledWith off the effect that ran rather than here.
   SearchDestination.Exile -> Event.changeZone cardId Zone.Exile
-  -- Auratouched Mage's "put that Aura card onto the battlefield attached to it".
+  -- Auratouched Mage's "put that Aura card onto the battlefield attached to it",
+  -- and Sovereigns of Lost Alara's "put it onto the battlefield attached to that
+  -- creature". WHICH object "it" is, is Search.subject, resolved by the arm that
+  -- ran the search -- the same value its filter asked CR 701.3a about, so the
+  -- offer and the move cannot name different hosts.
+  --
   -- The seed is the RECIPIENT Attach.attachmentFor produced rather than a
   -- hand-built ToObject, for the reason Event.changeZoneAttaching's CR 303.4f arm
   -- gives: Sba.stillLegalEnchant compares the (pool, tag) pair, so a mismatched
@@ -6774,29 +6795,30 @@ putFound searcher source destination cardId = case destination of
   -- Nothing is CR 303.4i's "the Aura remains in its current zone" -- unreachable
   -- from a filter naming Filter.CanAttachToSubject, since that atom is this same
   -- function, and the honest answer for a card whose filter does not.
+  SearchDestination.BattlefieldAttached -> case subject of
+    Nothing -> pure ()
+    Just host -> attachFound searcher host cardId
+  -- The arm above with the card's second sentence added: "If this creature is
+  -- still on the battlefield ... Otherwise, reveal the Aura card and put it into
+  -- your hand."
   --
-  -- The OUTER branch is the card's own "If this creature is still on the
-  -- battlefield ... Otherwise", asked of the SOURCE's liveness rather than of
-  -- attachmentFor's Nothing. The two are different questions and the rules give
-  -- them opposite answers: an Aura a LIVE host cannot legally hold stays in the
-  -- library (CR 303.4i), while an Aura whose host has gone is revealed and put
-  -- into its owner's hand (CR 608.2h; CR 113.7a is what keeps the ability
-  -- resolving at all with its source gone). Branching on Nothing alone would
-  -- send the first of those to the hand.
+  -- The OUTER branch is that printed "If ... Otherwise", asked of the SUBJECT's
+  -- liveness rather than of attachmentFor's Nothing. The two are different
+  -- questions and the rules give them opposite answers: an Aura a LIVE host
+  -- cannot legally hold stays in the library (CR 303.4i), while an Aura whose
+  -- host has gone is revealed and put into its owner's hand (CR 608.2h; CR 113.7a
+  -- is what keeps the ability resolving at all with its source gone). Branching
+  -- on Nothing alone would send the first of those to the hand.
   --
   -- The ORDER of those two questions is a REGRESSION FENCE rather than a proven
   -- behaviour: rule 303.4i's Nothing is unreachable for the one card that reaches
   -- this arm, whose filter names Filter.CanAttachToSubject, so both readings
   -- produce the same board and swapping them reddens nothing. A card whose search
   -- filter did NOT ask rule 701.3a would be its observer.
-  SearchDestination.BattlefieldAttachedToSource -> do
+  SearchDestination.BattlefieldAttachedOrHand -> do
     gs <- State.get
-    if Set.member source (GameState.battlefield gs)
-      then case Attach.attachmentFor cardId (Recipient.ToObject source) gs of
-        Nothing -> pure ()
-        Just seed ->
-          Monad.void
-            (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried)
+    if maybe False (\host -> Set.member host (GameState.battlefield gs)) subject
+      then Monad.mapM_ (\host -> attachFound searcher host cardId) subject
       else do
         -- CR 701.20b makes the order matter, for RevealThenHand's reason above:
         -- swapped, CR 400.7 has already ceased `cardId` and the reveal shows
@@ -6804,6 +6826,18 @@ putFound searcher source destination cardId = case destination of
         -- is why it is written here rather than in the searching rule.
         Event.reveal RevealCause.Ordinary searcher cardId
         Event.changeZone cardId Zone.Hand
+
+-- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
+-- sentence they have in common is written once. Nothing from attachmentFor is CR
+-- 303.4i's "the Aura remains in its current zone".
+attachFound :: PlayerId -> ObjectId -> ObjectId -> Game ()
+attachFound searcher host cardId = do
+  gs <- State.get
+  case Attach.attachmentFor cardId (Recipient.ToObject host) gs of
+    Nothing -> pure ()
+    Just seed ->
+      Monad.void
+        (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried)
 
 -- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

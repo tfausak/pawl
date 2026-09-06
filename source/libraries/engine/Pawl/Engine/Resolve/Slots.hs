@@ -617,7 +617,7 @@ effectPlayerRefs effect = case effect of
   Effect.ModifyTarget {} -> []
   Effect.ChangeText {} -> []
   Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
-  Effect.Search (Search.MkSearch searcher owner _ _ _ _ _) -> [searcher, owner]
+  Effect.Search (Search.MkSearch searcher owner _ _ _ _ _ _) -> [searcher, owner]
   Effect.ExileAllGraveyards -> []
   Effect.RestartGame {} -> []
   Effect.ControlPlayerNextTurn {} -> []
@@ -770,8 +770,13 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- matches it in the resolution's own context -- Bifurcate's "with the same
   -- name as target nontoken creature" is the whole of what its target slot is
   -- for, so without this the D4 dataflow lint would call that slot unread.
-  Effect.Search (Search.MkSearch _ _ _ quantity filter_ _ _) ->
-    joinTwo (joinSlots (fmap quantitySlots (Maybe.maybeToList quantity))) (filterSlotsOf filter_)
+  Effect.Search (Search.MkSearch _ _ _ quantity filter_ _ _ subject) ->
+    joinTwo
+      (joinTwo (joinSlots (fmap quantitySlots (Maybe.maybeToList quantity))) (filterSlotsOf filter_))
+      -- CR 701.3a's fixed host, read at arity ONE: a slot naming several objects
+      -- names no one host for "an Aura card that could enchant that creature" to
+      -- be about, which is what Pawl.Engine.Filter.slotOneObject already reports.
+      (maybe Map.empty oneSlot subject)
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   -- CR 201.4's name is not an object, so the choice binds no slot and the
@@ -1226,7 +1231,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- slotsOf reports them through Filter.boundSlots, the one walk that enumerates
   -- what a Filter reads, and no Filter atom carries a Quantity for
   -- Quantity.slotsAreExhaustive to be about.
-  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> all Quantity.slotsAreExhaustive quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> all Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.ChooseCardName _ -> True
@@ -1429,7 +1434,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
-      Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> any Quantity.readsX quantity
+      Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       -- No Quantity: rule 201.4 chooses one name and states no count.

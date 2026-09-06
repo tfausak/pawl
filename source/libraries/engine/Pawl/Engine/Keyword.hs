@@ -484,7 +484,10 @@ cycling cost searchFor =
               -- CR 702.29e prints no "up to", and its quality-stating filter puts
               -- the search under CR 701.23b anyway, so this value is unobservable.
               Search.upTo = False,
-              Search.destination = SearchDestination.RevealThenHand
+              Search.destination = SearchDestination.RevealThenHand,
+              -- CR 702.29e's destination attaches nothing and its filter asks no
+              -- CR 701.3a question, so no object is fixed for one to be about.
+              Search.subject = Nothing
             }
 
 -- CR 702.77a's whole ability. Cycling's one clause over, and the first hand
