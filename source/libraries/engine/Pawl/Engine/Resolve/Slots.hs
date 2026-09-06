@@ -534,7 +534,9 @@ effectObjectRefs effect = case effect of
   Effect.Conjure {} -> []
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> [ref]
   -- Both sides: CR 707.2's copiable values come off one and go onto the other.
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> [original, subject]
+  -- The exceptions beside them read no slot: CR 707.9a's "this ability" is the
+  -- resolving object's own, and neither of CR 707.9b's arms names an object.
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> [original, subject]
   -- BOTH refs: CR 707.10d's candidates are named by a ref of their own, and a
   -- slot it reads is as much a read of this effect's as the copied object's.
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> ref : copyTargetsRefs targets

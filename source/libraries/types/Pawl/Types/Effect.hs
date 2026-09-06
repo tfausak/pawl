@@ -269,9 +269,11 @@ data Effect card ability
     -- another object (Unstable Shapeshifter), by writing CR 707.2's copiable
     -- values themselves.
     --
-    -- Not implemented: the CR 707.9a exception every printed producer carries
-    -- ("except it has this ability"), so pawl's Shapeshifter loses its own
-    -- trigger as it copies and cannot copy again (#1292); and a stated duration
+    -- The payload carries CR 707.9's exceptions, so the Shapeshifter keeps the
+    -- trigger that copied and can copy again.
+    --
+    -- Not implemented: a stated duration ("until your next turn", Crystalline
+    -- Resonance), which needs a layer-1 continuous effect beside the stamp
     -- (#1753).
     BecomeCopy BecomeCopy.BecomeCopy
   | -- | CR 707.10: put a copy of a spell or of an activated or triggered ability

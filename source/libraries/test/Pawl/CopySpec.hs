@@ -15,7 +15,10 @@
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
 -- count buys, kicked Rite of Replication; and CR 122.6's entry rider on it,
 -- Littjara Mirrorlake) and its BecomeCopy arm (CR 707.4's
--- change of a permanent already on the battlefield, Unstable Shapeshifter).
+-- change of a permanent already on the battlefield, and CR 707.9a's "except it
+-- has this ability" riding it -- Unstable Shapeshifter, which copies twice
+-- because of it, and whose token copy copies again because CR 707.9a put the
+-- ability in the copiable values).
 -- Gameplay-level: Clone enters via the zone-change funnel, the Counterpart is
 -- cast and resolved, the Radstag evolves and the Shapeshifter's trigger resolves,
 -- and their projected characteristics are asserted.
@@ -1150,11 +1153,102 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "and so is the other creature already there" (S.powerToughnessOf pikerId after) $ Just (2, 1)
     Spec.assertEqWith s "after: the copiable 4/3 -- not the counter-boosted 5/4 -- plus the SAME Giant Growth" (S.powerToughnessOf shifterId after) $ Just (7, 6)
     Spec.assertEqWith s "and it is the Giant by name (CR 707.2)" (Projection.namesOf shifterId after) . Set.singleton . CardName.MkCardName $ Text.pack "Blind-Spot Giant"
-    -- Not implemented: CR 707.9a's "except it has this ability" (#1292). pawl's
-    -- Shapeshifter takes the Giant's abilities and only those, so it loses the
-    -- trigger that copied and can never copy again -- STRICTER than printed, and
-    -- this is where that is observable.
-    Spec.assertEqWith s "it has the Giant's abilities and only those" (length (Projection.triggeredAbilitiesOf shifterId after)) 0
+    -- CR 707.9a: the Giant's abilities plus the one the exception kept, which is
+    -- the printed sentence's second half. The two cases below spend it.
+    Spec.assertEqWith s "it has the Giant's abilities plus the one it kept (CR 707.9a)" (length (Projection.triggeredAbilitiesOf shifterId after)) 1
+
+  -- THE PROVING TEST for CR 707.9a's second shape, the exception that names an
+  -- ability rather than quoting one: Unstable Shapeshifter {3}{U} Creature --
+  -- Shapeshifter 0/1, "Whenever another creature enters, this creature becomes a
+  -- copy of that creature, except it has this ability."
+  --
+  -- Read at GAMEPLAY level over TWO entries. The first copy is what every board
+  -- above already shows; the SECOND is the one only the exception can produce,
+  -- since a Shapeshifter that took the Hill Giant's abilities and only those has
+  -- nothing left to trigger. So 4/3 at the end is "the kept ability fired on the
+  -- copy" and 3/3 is "it did not".
+  --
+  -- A Clone copying the Piker is the control, and it is the copy made WITHOUT the
+  -- exception: it entered before the Shapeshifter was placed, so nothing it did
+  -- is what stopped it copying again -- it simply never had the ability. It stays
+  -- a 2/1 through both entries.
+  --
+  -- Three distinct printed pairs, so no reading is reached by a coincidence: the
+  -- Piker's 2/1, the Hill Giant's 3/3, the Blind-Spot Giant's 4/3.
+  Spec.it s "Unstable Shapeshifter keeps the ability that copied and copies again (CR 707.9a)" $ do
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    clone <- S.printingOf s registry "Clone"
+    let (pikerId, board0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (_, stagedClone) = S.spellOnStack clone S.alice board0
+        withClone = resolveAndSettle (copyNamed pikerId) stagedClone
+        -- The Shapeshifter arrives AFTER the Clone, so the Clone's own entry is
+        -- not what it copies and the two copies below are made by one rule each.
+        (shifterId, withShifter) = S.addPermanent shapeshifter S.alice withClone
+        (_, firstEntry) = S.entersWithTrigger hillGiant S.alice withShifter
+        afterFirst = resolveAndSettle (targeting shifterId) (settle (targeting shifterId) firstEntry)
+        (_, secondEntry) = S.entersWithTrigger blindSpotGiant S.alice afterFirst
+        afterSecond = resolveAndSettle (targeting shifterId) (settle (targeting shifterId) secondEntry)
+    case cloneOnBattlefield withClone of
+      Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
+      Just cloneId -> do
+        -- THE GAMEPLAY ASSERTION, ahead of every diagnostic: the second creature
+        -- to enter is what the Shapeshifter is now a copy of, which only the
+        -- ability the exception kept can have done.
+        Spec.assertEqWith s "the Shapeshifter copied a second creature (CR 707.9a)" (S.powerToughnessOf shifterId afterSecond) $ Just (4, 3)
+        Spec.assertEqWith s "and it is the second creature by name (CR 707.2)" (Projection.namesOf shifterId afterSecond) . Set.singleton . CardName.MkCardName $ Text.pack "Blind-Spot Giant"
+        -- The control, on the same board: the copy made without the exception
+        -- never gains the ability, so neither entry moves it.
+        Spec.assertEqWith s "the copy without the exception is still the Piker's 2/1" (S.powerToughnessOf cloneId afterSecond) $ Just (2, 1)
+        Spec.assertEqWith s "and it has no triggered ability to have copied with" (length (Projection.triggeredAbilitiesOf cloneId afterSecond)) 0
+        Spec.assertEqWith s "and the Piker it copied is untouched" (S.powerToughnessOf pikerId afterSecond) $ Just (2, 1)
+        -- Diagnostics, after the behaviour: the first copy really happened, and
+        -- the kept ability is on the copy rather than on the printed card.
+        Spec.assertEqWith s "the first copy was the Hill Giant's 3/3" (S.powerToughnessOf shifterId afterFirst) $ Just (3, 3)
+        Spec.assertEqWith s "with the Hill Giant's abilities plus the kept one" (length (Projection.triggeredAbilitiesOf shifterId afterFirst)) 1
+
+  -- THE PROVING TEST for CR 707.2 over the kept ability: it is part of the COPY'S
+  -- copiable values (CR 707.9a's second sentence), so a token copy of the
+  -- Shapeshifter-as-copy has it too -- where a CR 613 layer-6 grant would be left
+  -- behind by rule 707.2's exclusion of "other effects".
+  --
+  -- Cackling Counterpart {1}{U} Instant is the token maker, aimed at the
+  -- Shapeshifter and at nothing else. Its token entering is itself a creature
+  -- entering, so the Shapeshifter's own trigger fires and is left on the stack;
+  -- the settle below drains both that and the pair the Blind-Spot Giant raises.
+  --
+  -- THE TOKEN is what the case reads, not the Shapeshifter: the Shapeshifter is
+  -- 4/3 at the end for the case above's reason, while the token can only be 4/3
+  -- if the ability travelled with the copiable values.
+  Spec.it s "a token copy of the Shapeshifter carries the ability it kept (CR 707.2)" $ do
+    island <- S.printingOf s registry "Island"
+    shapeshifter <- S.printingOf s registry "Unstable Shapeshifter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let (pikerId, board0) = S.addPermanent piker S.alice (S.landsInPlay island 3)
+        (shifterId, withShifter) = S.addPermanent shapeshifter S.alice board0
+        (_, firstEntry) = S.entersWithTrigger hillGiant S.alice withShifter
+        afterFirst = resolveAndSettle (targeting shifterId) (settle (targeting shifterId) firstEntry)
+        minted = castAndResolve (targeting shifterId) counterpart afterFirst
+    case tokensOnBattlefield minted of
+      [tokenId] -> do
+        let (_, secondEntry) = S.entersWithTrigger blindSpotGiant S.alice minted
+            drained = List.foldl' (\g _ -> resolveAndSettle (targeting shifterId) g) (settle (targeting shifterId) secondEntry) [1 .. 3 :: Int]
+        -- THE GAMEPLAY ASSERTION: the TOKEN copied the creature that entered, so
+        -- the ability reached it through the copiable values.
+        Spec.assertEqWith s "the token copy copied the Blind-Spot Giant itself (CR 707.2)" (S.powerToughnessOf tokenId drained) $ Just (4, 3)
+        -- The control on the same board: the Piker never had the ability and is
+        -- the printed 2/1 still.
+        Spec.assertEqWith s "the Piker beside it is untouched" (S.powerToughnessOf pikerId drained) $ Just (2, 1)
+        -- Diagnostics, after the behaviour: the token really was a copy of the
+        -- Shapeshifter-as-Hill-Giant, ability and all, before the second entry.
+        Spec.assertEqWith s "the token entered as the Hill Giant's 3/3" (S.powerToughnessOf tokenId minted) $ Just (3, 3)
+        Spec.assertEqWith s "carrying one triggered ability (CR 707.9a)" (length (Projection.triggeredAbilitiesOf tokenId minted)) 1
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
   -- THE PROVING TEST for CR 305.7's THIRD clause: a land whose subtype is set to a
   -- basic type "loses all abilities generated from its rules text, its old land

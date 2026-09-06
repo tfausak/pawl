@@ -1718,7 +1718,10 @@ apply batch candidate event =
                   -- (CR 707.9b) rather than an effect layered over them. Only on
                   -- this branch: a declined copy is no copying process, so its
                   -- exceptions do not happen either.
-                  let stamped = Replacement.applyCopyExceptions (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
+                  -- Nothing for "this ability": the copy effect here is a
+                  -- replacement effect, and no printed one points at itself --
+                  -- applyCopyExceptions records the query.
+                  let stamped = Replacement.applyCopyExceptions Nothing (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
                       stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 -- CR 614.1d, inside the same sentence: Vesuva enters TAPPED as a

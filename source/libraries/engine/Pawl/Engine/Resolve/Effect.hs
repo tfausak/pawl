@@ -1825,6 +1825,20 @@ chooseNewTargetsFor controller copyId = do
 -- environment is read back, and where CR 601.2b's announced X lives. Not
 -- `source`: for an ability the two differ (CR 113.7a), and that permanent can be
 -- gone before a later effect of the same list runs.
+-- CR 707.9a's "this ability", read off the RESOLVING object: rule 603.3 puts a
+-- triggered ability on the stack carrying itself (Pawl.Types.TriggeredAbilitySource),
+-- so the words point at a value already in hand.
+--
+-- A CLASSIFICATION of the resolving object under CR 113.3 and never a question
+-- about which ability it is, so the closed half stays closed. Nothing for every
+-- other arm: a spell, an emblem and CR 725.2's sourceless trigger have no ability
+-- to point at, and an ACTIVATED ability has one this cannot return -- CR 707.9a
+-- reaches it too, and it would go in another list (#3325).
+thisTriggeredAbility :: ObjectId -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+thisTriggeredAbility resolving gs = case fmap Object.source (Game.lookupObject resolving gs) of
+  Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.ability triggered)
+  _ -> Nothing
+
 applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts dealer excess) -> do
@@ -4242,7 +4256,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- simultaneously and none may copy a sibling.
                 Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
       _ -> pure ()
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef) ->
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in
       -- whatever zone it already sits -- CR 707.4's "while remaining on the
@@ -4258,12 +4272,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- re-apply over the new base -- CR 707.4's "doesn't change any noncopy
       -- effects presently affecting the permanent".
       --
-      -- Not implemented: CR 707.9a's "except it has this ability", which every
-      -- printed producer carries (#1292); pawl's copy is stricter, losing the
-      -- ability that made it. Nor a stated duration (#1753).
+      -- CR 707.9's exceptions are folded into the snapshot on the way in, exactly
+      -- as the CR 707.5 entry road folds AsCopy's (Event's EntryR arm), so the
+      -- excepted ability is part of the copy's own copiable values (CR 707.9a)
+      -- rather than an effect layered over them.
+      --
+      -- "This ability" is the RESOLVING object's own -- thisTriggeredAbility, off
+      -- Pawl.Types.Source, so the ability is read where CR 603.3 already carries
+      -- it rather than being looked back up on a source that may have left (CR
+      -- 113.7a). Not implemented: a stated duration (#1753).
       case objectRefObjects legal resolving controller source gs originalRef of
         [original] ->
-          let snapshot = Event.copiedSnapshotWithLastKnown original gs
+          let snapshot = Replacement.applyCopyExceptions (thisTriggeredAbility resolving gs) exceptions (Event.copiedSnapshotWithLastKnown original gs)
               write o = o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
