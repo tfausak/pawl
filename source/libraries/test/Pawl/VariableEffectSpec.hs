@@ -1903,9 +1903,9 @@ harnessedBoard s registry = do
 --
 -- WHY THIS CARD of the five printings (Scryfall o:"one or more {E}",
 -- 2026-08-31): Aether Refinery and Pia Nalaar, Chief Mechanic read the amount
--- into an X/X token's power, CR 111.3's defined characteristic value, which no
--- card in data/cards/ reaches -- Miming Slime's X is a board tally rather than a
--- binding (gap #2813). Territorial Aetherkite's rider is CR 603.12's "when you do" rather
+-- into an X/X token's power instead, CR 111.3's defined characteristic value --
+-- a different position for the same binding, which Pia's own group in
+-- Pawl.CounterKeywordTriggerSpec is what proves. Territorial Aetherkite's rider is CR 603.12's "when you do" rather
 -- than CR 118.12's, and Rampaging Aetherhood's energy GAIN is a quantity of its
 -- own.
 localizedDestructionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

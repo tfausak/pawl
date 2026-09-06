@@ -2343,14 +2343,20 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- data carries of having been written in rule 111.9's form.
 --
 -- EXEMPT TOO: a NONLEGENDARY token the instruction names -- Flock of Rabid
--- Sheep's "create a 2\/2 green Sheep creature token named Rabid Sheep". The same
--- half of rule 111.4 as the legendary case, but nothing in the card data marks
--- it, so this is a hand-kept list rather than a predicate. CR 111.10's predefined
--- tokens (111.10d's Walker, 111.10j-r's Roles) and the copy tokens of CR 111.4's
--- own Spitting Image example (named Doomed Dissenter, "not Human Token or Doomed
--- Dissenter Token") will each want a line here too.
+-- Sheep's "create a 2\/2 green Sheep creature token named Rabid Sheep", and Pia
+-- Nalaar, Chief Mechanic's "create an X\/X colorless Vehicle artifact token named
+-- Nalaar Aetherjet". The same half of rule 111.4 as the legendary case, but
+-- nothing in the card data marks it, so this is a hand-kept list rather than a
+-- predicate. CR 111.10's predefined tokens (111.10d's Walker, 111.10j-r's Roles)
+-- and the copy tokens of CR 111.4's own Spitting Image example (named Doomed
+-- Dissenter, "not Human Token or Doomed Dissenter Token") will each want a line
+-- here too.
 namedTokens :: Set.Set CardName.CardName
-namedTokens = Set.singleton (CardName.MkCardName (Text.pack "Rabid Sheep"))
+namedTokens =
+  Set.fromList
+    [ CardName.MkCardName (Text.pack "Nalaar Aetherjet"),
+      CardName.MkCardName (Text.pack "Rabid Sheep")
+    ]
 
 tokenNameOffends :: Face.Face Card.Type.Card -> Bool
 tokenNameOffends token
