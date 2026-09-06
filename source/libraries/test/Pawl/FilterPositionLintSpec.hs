@@ -492,7 +492,8 @@ hasChosenNameCounts card =
 -- all but one of a resolution's positions go through -- the search filter, the
 -- mill tally and an ObjectRef's own Filter among them -- and
 -- Pawl.Engine.Replacement.candidateContext, where rule 702.16e's minted shield is
--- the only filter written. Filter.contextFor, Filter.contextComparingPower and
+-- the only filter written. Filter.contextFor, Filter.contextWithSlots,
+-- Filter.contextComparingPower and
 -- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
 -- a target slot, an affected set, a static ability's condition or a cost
 -- criterion is a silent False rather than a rejected card. This is where that is
@@ -508,7 +509,7 @@ hasChosenNameCounts card =
 -- three.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside those two positions, or the traversal and the codec
+-- traversal found the atom outside those three positions, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence. Unlike its three siblings' the second disjunct is PROVED here rather

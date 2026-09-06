@@ -405,7 +405,9 @@ armsReflexive source effect gs = case effect of
 -- caller. Three callers ask, and for the same reason: the seats a resolution cost
 -- is offered to (CR 118.12a), the seats CR 111.2 has creating tokens, and the
 -- seats CR 201.4 has naming a card. Mana Leak's reference names one and Rishadan
--- Cutpurse's names every opponent; the order is only observable for the second.
+-- Cutpurse's names every opponent; the order is observable only where the
+-- reference names more than one seat, which no printing in the pool does at the
+-- naming caller (Petra Sphinx's is a target slot).
 apnapPlayersOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> [PlayerId]
 apnapPlayersOf ref legal controller gs =
   let named = playerRefPlayers legal controller gs ref
