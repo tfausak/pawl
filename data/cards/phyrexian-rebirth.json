@@ -1,0 +1,110 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Phyrexian Rebirth",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Destroy",
+                    "value": {
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        }
+                      },
+                      "regenerability": {
+                        "type": "Regenerable"
+                      },
+                      "slot": "destroyed"
+                    }
+                  },
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "name": "Phyrexian Horror Token",
+                            "power": {
+                              "type": "InSlot",
+                              "value": "destroyed"
+                            },
+                            "toughness": {
+                              "type": "InSlot",
+                              "value": "destroyed"
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Horror"
+                                },
+                                {
+                                  "type": "Phyrexian"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Artifact"
+                                },
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

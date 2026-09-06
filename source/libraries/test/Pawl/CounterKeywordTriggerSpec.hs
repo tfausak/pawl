@@ -15,6 +15,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import Pawl.CrewSpec (crewWith)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
@@ -42,6 +43,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -1074,12 +1076,12 @@ tovolarSpec s registry =
 -- Pia Nalaar, Chief Mechanic {G}{U}{R} Legendary Creature -- Human Artificer 2/4
 -- is the card (data/cards/pia-nalaar-chief-mechanic.json): "Whenever one or more
 -- artifact creatures you control deal combat damage to a player, you get {E}{E}."
--- Name, cost, type line and Oracle text checked against Scryfall 2026-09-01.
--- Not implemented: her second ability, "at the beginning of your end step, you
--- may pay one or more {E}. If you do, create an X/X colorless Vehicle artifact
--- token named Nalaar Aetherjet with flying and crew 2, where X is the amount of
--- {E} paid this way" -- a token whose power is a bound amount (#2813). Omitting
--- an optional ability leaves the card STRICTER than printed.
+-- Name, cost, type line and Oracle text checked against Scryfall 2026-09-06.
+-- Her second ability -- "at the beginning of your end step, you may pay one or
+-- more {E}. If you do, create an X/X colorless Vehicle artifact token named
+-- Nalaar Aetherjet with flying and crew 2, where X is the amount of {E} paid
+-- this way" -- is the last group below, and is a token whose printed box reads
+-- an amount an earlier effect of the same resolution bound (CR 111.3).
 --
 -- The discrimination is the energy count with two artifact creatures connecting:
 -- {E}{E} is the batch reading, {E}{E}{E}{E} is the per-damager one Tovolar's
@@ -1127,6 +1129,66 @@ piaNalaarSpec s registry =
           after <- board ["Pia Nalaar, Chief Mechanic"]
           Spec.assertEqWith s "alice got no energy" (energy after) 0
           Spec.assertEqWith s "though Pia connected, for two" (S.lifeOf S.bob after) (Just 18)
+        -- Her SECOND ability, which is CR 111.3's defined characteristic value
+        -- read off a binding: the token's printed box is a Quantity.InSlot
+        -- naming the amount Effect.PayAnyEnergy bound one clause earlier.
+        --
+        -- The board separates every other reading of "the amount of {E} paid
+        -- this way": alice banks five (two off the combat trigger and three
+        -- placed) and pays THREE, so 5 is what she had, 2 is what she has left,
+        -- 2/4 is Pia's own box, and only 3 is what she paid.
+        --
+        -- CREWED before the box is read, because CR 208.3 gives a noncreature
+        -- permanent no power or toughness however its printed box reads -- so an
+        -- uncrewed Vehicle answers Nothing under every value of X and could not
+        -- tell them apart. The Hill Giant is the crewer, placed untapped after
+        -- the combat that tapped everything else alice controls.
+        Spec.it s "CR 111.3 the Aetherjet's X/X is the energy PAID, not the energy held" $ do
+          after <- board ["Pia Nalaar, Chief Mechanic", "Palladium Myr", "Spined Thopter"]
+          giant <- S.printingOf s registry "Hill Giant"
+          let resolved = payAtEndStep 3 (S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice after)
+              (_, withCrewer) = S.addPermanent giant S.alice resolved
+          case aetherjetIds resolved of
+            [jet] -> do
+              let crewed = crewWith S.identityAnswer jet (withCrewer {GameState.priority = Just S.alice})
+              Spec.assertEqWith s "crewed, a 3/3: three {E} were paid of the five she held" (S.powerToughnessOf jet crewed) (Just (3, 3))
+              Spec.assertEqWith s "CR 208.3 and uncrewed it had none, whatever its box said" (S.powerToughnessOf jet resolved) Nothing
+            other -> Spec.assertFailure s ("expected exactly one Aetherjet, got " <> show (length other))
+          Spec.assertEqWith s "and the three really left her pool" (energy resolved) 2
+        -- The discriminating twin, differing in the ANSWER alone: paying nothing
+        -- is how the printed "may" is declined (CR 107.14), so CR 118.12's "if
+        -- you do" gate fails and no token is created at all.
+        Spec.it s "CR 107.14 paying no energy declines the ability, so no Aetherjet is created" $ do
+          after <- board ["Pia Nalaar, Chief Mechanic", "Palladium Myr", "Spined Thopter"]
+          let resolved = payAtEndStep 0 (S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice after)
+          Spec.assertEqWith s "no Aetherjet" (aetherjetIds resolved) []
+          Spec.assertEqWith s "and every {E} she held is still hers" (energy resolved) 5
+
+-- Pia's end-step trigger, driven to its answer: alice's end step begins, the
+-- trigger is put on the stack, and it resolves with `n` paid to
+-- Prompt.ChoosePaidEnergy. The amount is PINNED rather than left to
+-- S.identityAnswer, which answers the same way on both boards below and so
+-- could not tell paying three from declining.
+payAtEndStep :: Natural -> GameState.GameState -> GameState.GameState
+payAtEndStep n gs =
+  let endStep = Phase.Ending EndingStep.EndStep
+      begun = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      settled = snd (Engine.runGamePure (paying n) begun Engine.settleForPriority)
+   in S.settleSba (snd (Engine.runGamePure (paying n) settled Stack.resolveTop))
+
+paying :: Natural -> Prompt.Prompt r -> r
+paying n p = case p of
+  Prompt.ChoosePaidEnergy {} -> n
+  _ -> S.identityAnswer p
+
+-- The tokens named for Pia's Vehicle. By NAME rather than by S.tokensOf alone,
+-- so a token minted by anything else could not be mistaken for hers.
+aetherjetIds :: GameState.GameState -> [ObjectId.ObjectId]
+aetherjetIds gs =
+  [ oid
+  | oid <- S.tokensOf gs,
+    fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Nalaar Aetherjet"))
+  ]
 
 -- What the filtered condition is FOR: a payload that aims at the creature that
 -- dealt the damage (Pawl.Engine.Binding.combatDamager) rather than at the bearer
