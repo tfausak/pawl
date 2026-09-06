@@ -78,8 +78,8 @@ stationAbility oid gs = case Projection.abilitiesOf oid gs of
 -- Three seats, for the reason the module header gives.
 board :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 board frigate crew =
-  let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-      add (ids, g) p = let (oid, g1) = S.addCreature p S.alice g in (ids <> [oid], g1)
+  let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+      add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
       (crewIds, gs1) = foldl add ([], gs0) crew
    in ( frigateId,
         crewIds,
@@ -173,8 +173,8 @@ stationAbilitySpec s registry = Spec.describe s "StationAbility" $ do
   Spec.it s "CR 702.184a a creature an opponent controls cannot be tapped to station" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (_, gs1) = S.addCreature blindSpot S.carol gs0
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addPermanent blindSpot S.carol gs0
         gs = gs1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         (mineId, _, mine) = board frigate [blindSpot]
     Spec.assertBool s (not (stationable frigateId gs)) "carol's Giant is not alice's to tap"
@@ -213,7 +213,7 @@ striationSpec s registry = Spec.describe s "Striation" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     hillGiant <- S.printingOf s registry "Hill Giant"
     let (handGs, cardId) = S.handOne frigate (Setup.emptyGame S.bothPlayers)
-        (giantId, gs) = S.addCreature hillGiant S.alice handGs
+        (giantId, gs) = S.addPermanent hillGiant S.alice handGs
     Spec.assertEqWith s "no power or toughness in a hand" (sizeOf cardId gs) (Nothing, Nothing)
     -- The positive control: the SAME read point answers for an ordinary creature
     -- on the SAME board, so a Nothing above is rule 721.2c and not a broken
@@ -226,9 +226,9 @@ striationSpec s registry = Spec.describe s "Striation" $ do
   Spec.it s "CR 721.2a the 2+ striation pumps other creatures you control and nobody else's" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     hillGiant <- S.printingOf s registry "Hill Giant"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (mineId, gs1) = S.addCreature hillGiant S.alice gs0
-        (bobsId, gs2) = S.addCreature hillGiant S.bob gs1
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (mineId, gs1) = S.addPermanent hillGiant S.alice gs0
+        (bobsId, gs2) = S.addPermanent hillGiant S.bob gs1
         gs = gs2 {GameState.priority = Just S.alice}
         below = withCharge 1 frigateId gs
         above = withCharge 2 frigateId gs
@@ -273,9 +273,9 @@ tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     warden <- S.printingOf s registry "Tapestry Warden"
     wall <- S.printingOf s registry "Wall of Stone"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (_, gs1) = S.addCreature warden S.alice gs0
-        (wallId, gs2) = S.addCreature wall S.alice gs1
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addPermanent warden S.alice gs0
+        (wallId, gs2) = S.addPermanent wall S.alice gs1
         gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         pinned :: Prompt.Prompt r -> r
         pinned p = case p of
@@ -289,8 +289,8 @@ tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
   Spec.it s "CR 702.184c without Tapestry Warden the same tap loads none, power 0" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     wall <- S.printingOf s registry "Wall of Stone"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (wallId, gs1) = S.addCreature wall S.alice gs0
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (wallId, gs1) = S.addPermanent wall S.alice gs0
         gs = gs1 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         pinned :: Prompt.Prompt r -> r
         pinned p = case p of
@@ -305,9 +305,9 @@ tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     warden <- S.printingOf s registry "Tapestry Warden"
     wall <- S.printingOf s registry "Wall of Stone"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (_, gs1) = S.addCreature warden S.bob gs0
-        (wallId, gs2) = S.addCreature wall S.alice gs1
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addPermanent warden S.bob gs0
+        (wallId, gs2) = S.addPermanent wall S.alice gs1
         gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         pinned :: Prompt.Prompt r -> r
         pinned p = case p of
@@ -322,9 +322,9 @@ tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     warden <- S.printingOf s registry "Tapestry Warden"
     wall <- S.printingOf s registry "Wall of Stone"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (wardenId, gs1) = S.addCreature warden S.alice gs0
-        (wallId, gs2) = S.addCreature wall S.alice gs1
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (wardenId, gs1) = S.addPermanent warden S.alice gs0
+        (wallId, gs2) = S.addPermanent wall S.alice gs1
         gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         pinned :: Prompt.Prompt r -> r
         pinned p = case p of
@@ -344,9 +344,9 @@ tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     warden <- S.printingOf s registry "Tapestry Warden"
     wall <- S.printingOf s registry "Wall of Stone"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (_, gs1) = S.addCreature warden S.alice gs0
-        (wallId, gs2) = S.addCreature wall S.alice gs1
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addPermanent warden S.alice gs0
+        (wallId, gs2) = S.addPermanent wall S.alice gs1
         gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         pinned :: Prompt.Prompt r -> r
         pinned p = case p of
@@ -371,9 +371,9 @@ tapestryWardenSpec s registry = Spec.describe s "TapestryWarden" $ do
     frigate <- S.printingOf s registry "Lumen-Class Frigate"
     warden <- S.printingOf s registry "Tapestry Warden"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (frigateId, gs0) = S.addCreature frigate S.alice S.threePlayerGame
-        (_, gs1) = S.addCreature warden S.alice gs0
-        (giantId, gs2) = S.addCreature blindSpot S.alice gs1
+    let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
+        (_, gs1) = S.addPermanent warden S.alice gs0
+        (giantId, gs2) = S.addPermanent blindSpot S.alice gs1
         gs = gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         pinned :: Prompt.Prompt r -> r
         pinned p = case p of

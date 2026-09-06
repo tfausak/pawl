@@ -205,7 +205,7 @@ ceaseFireBoard ::
 ceaseFireBoard plains ceaseFire mountain piker lightningBolt =
   let gs0 = Setup.emptyGame S.threePlayers
       repeatedly f n gs = List.foldl' (\g _ -> f g) gs [1 .. n :: Int]
-      addLands printing pid = repeatedly (snd . S.addCreature printing pid)
+      addLands printing pid = repeatedly (snd . S.addPermanent printing pid)
       stockLibrary pid = repeatedly (snd . S.addLibraryCard plains pid) (2 :: Int)
       gs1 = addLands plains S.alice (3 :: Int) gs0
       gs2 = addLands mountain S.alice (2 :: Int) gs1
@@ -354,9 +354,9 @@ ceaseFireSpec s registry =
 blossomingCalmBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 blossomingCalmBoard plains calm mountain bolt =
   let gs0 = Setup.emptyGame S.threePlayers
-      (_, gs1) = S.addCreature plains S.alice gs0
+      (_, gs1) = S.addPermanent plains S.alice gs0
       (calmId, gs2) = S.addHandCard calm S.alice gs1
-      (_, gs3) = S.addCreature mountain S.bob gs2
+      (_, gs3) = S.addPermanent mountain S.bob gs2
       (boltId, gs4) = S.addHandCard bolt S.bob gs3
    in ( calmId,
         boltId,
@@ -517,17 +517,17 @@ blossomingCalmSpec s registry =
 conditionalSilenceBoard :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 conditionalSilenceBoard withSwamp island swamp hush mountain piker =
   let gs0 = Setup.emptyGame S.threePlayers
-      (_, gs1) = S.addCreature island S.alice gs0
+      (_, gs1) = S.addPermanent island S.alice gs0
       (swampId, gs2) =
         if withSwamp
-          then S.addCreature swamp S.alice gs1
+          then S.addPermanent swamp S.alice gs1
           else (S.noSource, gs1)
       (hushId, gs3) = S.addHandCard hush S.alice gs2
-      (_, gs4) = S.addCreature mountain S.bob gs3
-      (_, gs5) = S.addCreature mountain S.bob gs4
+      (_, gs4) = S.addPermanent mountain S.bob gs3
+      (_, gs5) = S.addPermanent mountain S.bob gs4
       (bobsPiker, gs6) = S.addHandCard piker S.bob gs5
-      (_, gs7) = S.addCreature mountain S.carol gs6
-      (_, gs8) = S.addCreature mountain S.carol gs7
+      (_, gs7) = S.addPermanent mountain S.carol gs6
+      (_, gs8) = S.addPermanent mountain S.carol gs7
       (carolsPiker, gs9) = S.addHandCard piker S.carol gs8
    in ( hushId,
         swampId,
@@ -684,15 +684,15 @@ hackedSilenceBoard ::
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 hackedSilenceBoard island hush magicalHack mountain piker =
   let gs0 = Setup.emptyGame S.threePlayers
-      (firstIsland, gs1) = S.addCreature island S.alice gs0
-      (secondIsland, gs2) = S.addCreature island S.alice gs1
+      (firstIsland, gs1) = S.addPermanent island S.alice gs0
+      (secondIsland, gs2) = S.addPermanent island S.alice gs1
       (hushId, gs3) = S.addHandCard hush S.alice gs2
       (hackId, gs4) = S.addHandCard magicalHack S.alice gs3
-      (_, gs5) = S.addCreature mountain S.bob gs4
-      (_, gs6) = S.addCreature mountain S.bob gs5
+      (_, gs5) = S.addPermanent mountain S.bob gs4
+      (_, gs6) = S.addPermanent mountain S.bob gs5
       (bobsPiker, gs7) = S.addHandCard piker S.bob gs6
-      (_, gs8) = S.addCreature mountain S.carol gs7
-      (_, gs9) = S.addCreature mountain S.carol gs8
+      (_, gs8) = S.addPermanent mountain S.carol gs7
+      (_, gs9) = S.addPermanent mountain S.carol gs8
       (carolsPiker, gs10) = S.addHandCard piker S.carol gs9
    in ( hushId,
         hackId,
@@ -839,10 +839,10 @@ lilianaBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 lilianaBoard island swamp liliana evolution zombie evangel =
-  let (_, g1) = S.addCreature island S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature swamp S.alice g1
-      (_, g3) = S.addCreature swamp S.alice g2
-      (lilianaId, g4) = S.addCreature liliana S.alice g3
+  let (_, g1) = S.addPermanent island S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent swamp S.alice g1
+      (_, g3) = S.addPermanent swamp S.alice g2
+      (lilianaId, g4) = S.addPermanent liliana S.alice g3
       (evolutionId, g5) = S.addHandCard evolution S.alice g4
       (zombieId, g6) = S.addGraveyardCard zombie S.alice g5
       (evangelId, g7) = S.addGraveyardCard evangel S.alice g6
@@ -885,7 +885,7 @@ activateLoyalty answer n lilianaId gs = case projectedAbility n lilianaId gs of
 -- +1's mill leaves cards behind and CR 104.3c decides nothing.
 lilianaMillBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 lilianaMillBoard swamp liliana stock =
-  let (lilianaId, g1) = S.addCreature liliana S.alice (S.landsInPlay swamp 3)
+  let (lilianaId, g1) = S.addPermanent liliana S.alice (S.landsInPlay swamp 3)
       g2 = List.foldl' (\g _ -> snd (S.addLibraryCard stock S.alice g)) g1 [1 :: Int .. 5]
    in ( lilianaId,
         (S.addCounter CounterKind.Loyalty 4 lilianaId g2)
@@ -977,12 +977,12 @@ lilianaSpec s registry =
           zombie <- S.printingOf s registry "Whipstitched Zombie"
           evangel <- S.printingOf s registry "Cabal Evangel"
           berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
-          let (_, g1) = S.addCreature island S.alice (S.landsInPlay swamp 2)
-              (lilianaId, g2) = S.addCreature liliana S.alice g1
-              (_, g3) = S.addCreature zombie S.alice g2
-              (_, g4) = S.addCreature zombie S.alice g3
-              (_, g5) = S.addCreature evangel S.alice g4
-              (victim, g6) = S.addCreature berserkers S.bob g5
+          let (_, g1) = S.addPermanent island S.alice (S.landsInPlay swamp 2)
+              (lilianaId, g2) = S.addPermanent liliana S.alice g1
+              (_, g3) = S.addPermanent zombie S.alice g2
+              (_, g4) = S.addPermanent zombie S.alice g3
+              (_, g5) = S.addPermanent evangel S.alice g4
+              (victim, g6) = S.addPermanent berserkers S.bob g5
               (evolutionId, g7) = S.addHandCard evolution S.alice g6
               ready =
                 (S.addCounter CounterKind.Loyalty 4 lilianaId g7)
@@ -1068,7 +1068,7 @@ matchesObjectSpec s registry =
 -- Chamber in hand, in her own precombat main phase with an empty stack.
 nullChamberBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 nullChamberBoard plains mountain nullChamber =
-  let addMountain board _ = snd (S.addCreature mountain S.alice board)
+  let addMountain board _ = snd (S.addPermanent mountain S.alice board)
       lands = List.foldl' addMountain (S.landsInPlay plains 8) [1 .. 4 :: Int]
       (gs, oid) = S.handOne nullChamber lands
    in (oid, gs)
@@ -1078,7 +1078,7 @@ nullChamberBoard plains mountain nullChamber =
 -- pay the Chamber's {3}{W}; nothing else is in play.
 threeSeatBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 threeSeatBoard plains nullChamber =
-  let addLand seat _ = snd (S.addCreature plains S.alice seat)
+  let addLand seat _ = snd (S.addPermanent plains S.alice seat)
       lands = List.foldl' addLand (Setup.emptyGame S.threePlayers) [1 .. 4 :: Int]
       (oid, seated) = S.addHandCard nullChamber S.alice lands
    in ( oid,
@@ -1188,7 +1188,7 @@ noSuchCard = CardName.MkCardName (Text.pack "No Such Card")
 
 -- Cast the Chamber and let it resolve, answering both name choices.
 --
--- CAST rather than S.addCreature, because the choice happens only on the entry
+-- CAST rather than S.addPermanent, because the choice happens only on the entry
 -- path (Event.runEntry): a Chamber placed straight onto the battlefield
 -- has an empty chosenNames and prohibits nothing.
 castChamber :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
@@ -1394,7 +1394,7 @@ nullChamberSpec s registry =
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       ashBarrens <- S.printingOf s registry "Ash Barrens"
       let (oid, alices) = nullChamberBoard plains mountain nullChamber
-          (_, bobHasMana) = S.addCreature mountain S.bob alices
+          (_, bobHasMana) = S.addPermanent mountain S.bob alices
           (bobsBolt, bobHasBolt) = S.addHandCard lightningBolt S.bob bobHasMana
           (bobsBarrens, before) = S.addHandCard ashBarrens S.bob bobHasBolt
           -- alice names the spell, bob names the land: each prohibition is then
@@ -1573,7 +1573,7 @@ nullChamberSpec s registry =
 -- CR 109.5's You scope with the two players actually pulled apart.
 landDropBoard :: Printing.Printing -> [Printing.Printing] -> PlayerId.PlayerId -> GameState.GameState
 landDropBoard mountain grantors active =
-  let put g printing = snd (S.addCreature printing S.alice g)
+  let put g printing = snd (S.addPermanent printing S.alice g)
       withGrantors = List.foldl' put (Setup.emptyGame S.bothPlayers) grantors
       add g _ = snd (S.addHandCard mountain active g)
       withHand = List.foldl' add withGrantors [1 .. 5 :: Int]
@@ -1614,7 +1614,7 @@ flashBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (
 flashBoard mountain hand extra =
   let (base, oid) = S.pikerInHand mountain hand 9 Phase.PrecombatMain
       withLand = snd (S.addHandCard mountain S.alice base)
-      put (ids, g) printing = let (i, g1) = S.addCreature printing S.alice g in (ids <> [i], g1)
+      put (ids, g) printing = let (i, g1) = S.addPermanent printing S.alice g in (ids <> [i], g1)
       (extraIds, withExtra) = List.foldl' put ([], withLand) extra
    in ( oid,
         extraIds,
@@ -1639,9 +1639,9 @@ flashOnOwnTurn mountain hand extra =
 orreryScopeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
 orreryScopeBoard mountain piker orrery owner =
   let base = S.landsInPlay mountain 9
-      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. 9 :: Int]
+      withBobsLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.bob g)) base [1 .. 9 :: Int]
       (bobsPiker, withBobsPiker) = S.addHandCard piker S.bob withBobsLands
-      withOrrery = snd (S.addCreature orrery owner withBobsPiker)
+      withOrrery = snd (S.addPermanent orrery owner withBobsPiker)
    in ( bobsPiker,
         withOrrery
           { GameState.phase = Phase.PrecombatMain,
@@ -1658,9 +1658,9 @@ orreryScopeBoard mountain piker orrery owner =
 equipBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
 equipBoard mountain piker bonesplitter extra active =
   let base = S.landsInPlay mountain 9
-      withPiker = snd (S.addCreature piker S.alice base)
-      (equipment, withEquipment) = S.addCreature bonesplitter S.alice withPiker
-      withExtra = List.foldl' (\g printing -> snd (S.addCreature printing S.alice g)) withEquipment extra
+      withPiker = snd (S.addPermanent piker S.alice base)
+      (equipment, withEquipment) = S.addPermanent bonesplitter S.alice withPiker
+      withExtra = List.foldl' (\g printing -> snd (S.addPermanent printing S.alice g)) withEquipment extra
    in ( equipment,
         withExtra
           { GameState.phase = Phase.PrecombatMain,
@@ -1760,7 +1760,7 @@ runedHaloCombat ::
   (GameState.GameState, GameState.GameState)
 runedHaloCombat plains halo curse piker name defender =
   let (haloId, _, base) = runedHaloBoard plains halo curse
-      (_, withPiker) = S.addCreature piker S.bob (castHalo name base haloId)
+      (_, withPiker) = S.addPermanent piker S.bob (castHalo name base haloId)
       before =
         withPiker
           { GameState.activePlayer = S.bob,
@@ -1773,7 +1773,7 @@ runedHaloCombat plains halo curse piker name defender =
 
 -- Cast the Halo and let it resolve, naming `name`.
 --
--- CAST rather than S.addCreature, castChamber's reason: the choice happens only
+-- CAST rather than S.addPermanent, castChamber's reason: the choice happens only
 -- on the entry path (Event.runEntry), so a Halo placed straight onto the
 -- battlefield has an empty chosenNames and protects from nothing.
 castHalo :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
@@ -1852,7 +1852,7 @@ runedHaloSpec s registry =
       curse <- S.printingOf s registry "Curse of Vitality"
       piker <- S.printingOf s registry "Goblin Piker"
       let (haloId, _, board) = runedHaloBoard plains halo curse
-          (aura, withAura) = S.addCreature curse S.bob board
+          (aura, withAura) = S.addPermanent curse S.bob board
           cursed = S.attachTo aura (Recipient.ToPlayer S.alice) withAura
           named = S.settleSba (castHalo (S.printingName curse) cursed haloId)
           other = S.settleSba (castHalo (S.printingName piker) cursed haloId)

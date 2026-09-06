@@ -125,7 +125,7 @@ doorSpec s registry =
     -- be tapped to pay a cost" (CR 107.5 says the same for the {T} symbol).
     Spec.it s "CR 107.5 TapThis is payable only while the permanent is untapped" $ do
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-      let (oid, gs) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+      let (oid, gs) = S.addPermanent prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
           tapped = S.tapObject oid gs
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid CostComponent.TapThis gs) "untapped pays"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice oid CostComponent.TapThis tapped)) "tapped does not"
@@ -133,7 +133,7 @@ doorSpec s registry =
     -- or something that's a permanent they don't control."
     Spec.it s "CR 701.21a SacrificeThis needs a permanent this player controls" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      let (onField, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice onField CostComponent.SacrificeThis gs1) "a controlled permanent pays"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice inHand CostComponent.SacrificeThis gs1)) "a card in hand does not"
@@ -146,7 +146,7 @@ doorSpec s registry =
     -- whose source this player does not control.
     Spec.it s "CR 406.2 ExileThis needs a permanent this player controls" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      let (onField, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice onField CostComponent.ExileThis gs1) "a controlled permanent pays"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice inHand CostComponent.ExileThis gs1)) "a card in hand does not"
@@ -162,7 +162,7 @@ doorSpec s registry =
     -- want of a permanent.
     Spec.it s "CR 701.68b Blight is payable only by a player who controls a creature" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.Blight 1) gs) "a creature its payer controls pays"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.bob oid (CostComponent.Blight 1) gs)) "an opponent's creature does not"
       -- CR 122.6 puts any number of counters on any creature, so no N outruns a
@@ -178,7 +178,7 @@ doorSpec s registry =
     -- otherwise cover for each other, and either alone would look correct.
     Spec.it s "CR 702.29a DiscardThis needs the card in this player's hand" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      let (onField, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice inHand (CostComponent.DiscardThis DiscardCause.Ordinary) gs1) "a card in hand pays"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice onField (CostComponent.DiscardThis DiscardCause.Ordinary) gs1)) "a permanent does not"
@@ -215,7 +215,7 @@ doorSpec s registry =
       thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       let base = S.landsInPlay mountain 5
-          (_, gs) = S.addCreature thalia S.alice base
+          (_, gs) = S.addPermanent thalia S.alice base
           (bolt, withBolt) = S.addHandCard lightningBolt S.alice gs
       Spec.assertEqWith
         s
@@ -244,8 +244,8 @@ doorSpec s registry =
       mindslaver <- S.printingOf s registry "Mindslaver"
       thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       let base = S.landsInPlay mountain 4
-          (slaver, gs1) = S.addCreature mindslaver S.alice base
-          (_, gs2) = S.addCreature thalia S.alice gs1
+          (slaver, gs1) = S.addPermanent mindslaver S.alice base
+          (_, gs2) = S.addPermanent thalia S.alice gs1
       Spec.assertBool
         s
         (Activate.activatable S.alice slaver (theAbility mindslaver) gs2)
@@ -274,7 +274,7 @@ doorSpec s registry =
     -- direction).
     Spec.it s "CR 118.6 PayEnergy is unpayable below the count and payable at or above" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      let (oid, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           two = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice gs0
           one = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice gs0
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice oid (CostComponent.PayEnergy 2) two) "two energy pays PayEnergy 2"
@@ -282,7 +282,7 @@ doorSpec s registry =
     -- CR 107.14: paying energy removes exactly that many counters.
     Spec.it s "CR 107.14 paying PayEnergy removes that many energy counters" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      let (oid, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
           after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent PaymentMoment.OutsideResolution Map.empty S.alice oid (CostComponent.PayEnergy 2)))
       Spec.assertEqWith s "one energy left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
@@ -293,7 +293,7 @@ doorSpec s registry =
     -- out, since on that card the payer is the controller either way.
     Spec.it s "CR 118.12 PutPlusOneCountersOnThis needs the permanent on the battlefield, whoever controls it" $ do
       piker <- S.printingOf s registry "Goblin Piker"
-      let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      let (onField, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           (inHand, gs1) = S.addHandCard piker S.alice gs0
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "a permanent on the battlefield pays"
       Spec.assertBool s (Cost.canPayComponent Map.empty S.bob onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "and pays for a player who does not control it"
@@ -310,7 +310,7 @@ doorSpec s registry =
 greedBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Integer -> (ObjectId.ObjectId, GameState.GameState)
 greedBoard swamp greed piker life =
   let base = S.landsInPlay swamp 1
-      (greedId, gs1) = S.addCreature greed S.alice base
+      (greedId, gs1) = S.addPermanent greed S.alice base
       (_, gs2) = S.addLibraryCard piker S.alice gs1
       (_, gs3) = S.addLibraryCard piker S.alice gs2
       (_, gs4) = S.addLibraryCard piker S.alice gs3
@@ -433,7 +433,7 @@ wasAskedToChooseCost responses =
 villageRitesBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 villageRitesBoard swamp piker villageRites n =
   let base = S.landsInPlay swamp 1
-      addPiker (ids, gs) _ = let (oid, gs') = S.addCreature piker S.alice gs in (ids <> [oid], gs')
+      addPiker (ids, gs) _ = let (oid, gs') = S.addPermanent piker S.alice gs in (ids <> [oid], gs')
       (pikers, withPikers) = List.foldl' addPiker ([], base) [1 .. n]
       (rites, gs1) = S.addHandCard villageRites S.alice withPikers
       (_, gs2) = S.addLibraryCard piker S.alice gs1
@@ -502,7 +502,7 @@ villageRitesSpec s registry =
       villageRites <- S.printingOf s registry "Village Rites"
       khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (rites, _, gs0) = villageRitesBoard swamp piker villageRites 1
-          (ghoul, gs1) = S.addCreature khabalGhoul S.alice gs0
+          (ghoul, gs1) = S.addPermanent khabalGhoul S.alice gs0
           cast = S.runPure S.identityAnswer gs1 (S.cast S.alice rites)
           endStep = Phase.Ending EndingStep.EndStep
           beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
@@ -554,7 +554,7 @@ altarsReapBoard ::
   (ObjectId.ObjectId, GameState.GameState)
 altarsReapBoard swamp creature altarsReap lands =
   let base = S.landsInPlay swamp lands
-      (_, withCreature) = S.addCreature creature S.alice base
+      (_, withCreature) = S.addPermanent creature S.alice base
       (reap, gs1) = S.addHandCard altarsReap S.alice withCreature
       stock gs _ = snd (S.addLibraryCard swamp S.alice gs)
       gs2 = List.foldl' stock gs1 [1 .. (3 :: Int)]
@@ -667,7 +667,7 @@ altarsReapSpec s registry =
 --
 -- alice controls one Swamp, a Hill Giant and `pikers` Goblin Pikers, and the
 -- Rite or the Altar is placed by `place` -- S.addHandCard for the instant,
--- S.addCreature for the artifact, which puts any printing onto the battlefield
+-- S.addPermanent for the artifact, which puts any printing onto the battlefield
 -- (Greed above takes the same road) -- with priority in her own precombat main
 -- phase. The Giant is the creature every case targets, so the Pikers are the
 -- only permanents the cost may take -- and the graveyard's NAMES say which kind
@@ -682,8 +682,8 @@ spitefulBoard ::
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 spitefulBoard place swamp giant piker spiteful pikers =
   let base = S.landsInPlay swamp 1
-      (giantId, withGiant) = S.addCreature giant S.alice base
-      addPiker g _ = snd (S.addCreature piker S.alice g)
+      (giantId, withGiant) = S.addPermanent giant S.alice base
+      addPiker g _ = snd (S.addPermanent piker S.alice g)
       withPikers = List.foldl' addPiker withGiant [1 .. pikers]
       (spitefulId, gs) = place spiteful S.alice withPikers
    in ( giantId,
@@ -756,7 +756,7 @@ spitefulSpec s registry =
       giant <- S.printingOf s registry "Hill Giant"
       piker <- S.printingOf s registry "Goblin Piker"
       altar <- S.printingOf s registry "Synthetic Spiteful Altar"
-      let (giantId, altarId, gs) = spitefulBoard S.addCreature swamp giant piker altar 2
+      let (giantId, altarId, gs) = spitefulBoard S.addPermanent swamp giant piker altar 2
           activated = S.runPure (spitefulAnswer giantId) gs (Activate.activateAbility S.alice altarId (theAbility altar))
       Spec.assertBool s (S.onBattlefield giantId activated) "the Giant the Altar targets was not what paid for it"
       Spec.assertEqWith s "a Piker paid" (namesIn Zone.Graveyard activated) [CardName.MkCardName (Text.pack "Goblin Piker")]
@@ -789,8 +789,8 @@ spitefulSpec s registry =
       giant <- S.printingOf s registry "Hill Giant"
       piker <- S.printingOf s registry "Goblin Piker"
       altar <- S.printingOf s registry "Synthetic Spiteful Altar"
-      let (_, aloneId, alone) = spitefulBoard S.addCreature swamp giant piker altar 0
-          (_, pairedId, paired) = spitefulBoard S.addCreature swamp giant piker altar 1
+      let (_, aloneId, alone) = spitefulBoard S.addPermanent swamp giant piker altar 0
+          (_, pairedId, paired) = spitefulBoard S.addPermanent swamp giant piker altar 1
       Spec.assertBool s (not (any (isActivateOf aloneId) (Action.legalActions S.alice alone))) "with the target the only creature no announcement pays, so the activation is not offered"
       Spec.assertBool s (any (isActivateOf pairedId) (Action.legalActions S.alice paired)) "and one more creature makes some announcement pay, so it is"
 
@@ -988,7 +988,7 @@ frailExhumationSpec s registry =
       urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
       nightmare <- S.printingOf s registry "Nightmare"
       exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
-      let onBoard board = snd (S.addCreature urborg S.alice (S.landsFor mountain S.alice 2 (S.landsFor swamp S.alice 1 board)))
+      let onBoard board = snd (S.addPermanent urborg S.alice (S.landsFor mountain S.alice 2 (S.landsFor swamp S.alice 1 board)))
           (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard []
           cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
       Spec.assertBool s (not (S.castable S.alice spell gs)) "not castable"
@@ -1019,7 +1019,7 @@ frailExhumationSpec s registry =
       nightmare <- S.printingOf s registry "Nightmare"
       piker <- S.printingOf s registry "Goblin Piker"
       exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
-      let onBoard board = snd (S.addCreature urborg S.alice (S.landsFor mountain S.alice 2 (S.landsFor swamp S.alice 1 board)))
+      let onBoard board = snd (S.addPermanent urborg S.alice (S.landsFor mountain S.alice 2 (S.landsFor swamp S.alice 1 board)))
           (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard [piker]
           cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
       Spec.assertBool s (S.castable S.alice spell gs) "castable"
@@ -1036,7 +1036,7 @@ frailExhumationSpec s registry =
       nightmare <- S.printingOf s registry "Nightmare"
       exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
       let lands = S.landsFor bayou S.alice 3 . S.landsFor mountain S.alice 1 . S.landsFor swamp S.alice 1
-          onBoard board = snd (S.addCreature bloodMoon S.alice (lands board))
+          onBoard board = snd (S.addPermanent bloodMoon S.alice (lands board))
           (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard []
           cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
       Spec.assertBool s (S.castable S.alice spell gs) "castable"
@@ -1300,13 +1300,13 @@ asmorFoodBoard ::
 asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight foods others =
   let addEach printing n gs0 =
         List.foldl'
-          (\(oids, g) _ -> let (oid, g') = S.addCreature printing S.alice g in (oids <> [oid], g'))
+          (\(oids, g) _ -> let (oid, g') = S.addPermanent printing S.alice g in (oids <> [oid], g'))
           ([], gs0)
           (replicate n ())
-      (asmor, gs1) = S.addCreature asmorPrinting S.alice (Setup.emptyGame S.bothPlayers)
+      (asmor, gs1) = S.addPermanent asmorPrinting S.alice (Setup.emptyGame S.bothPlayers)
       (eggs, gs2) = addEach goldenEgg foods gs1
       (_, gs3) = addEach sphere others gs2
-      (victim, gs4) = S.addCreature childOfNight S.bob gs3
+      (victim, gs4) = S.addPermanent childOfNight S.bob gs3
    in ( asmor,
         eggs,
         victim,
@@ -1432,10 +1432,10 @@ crossCheckSpec s registry =
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       bloodMoon <- S.printingOf s registry "Blood Moon"
       let base = S.landsInPlay mountain 1
-          (wilds, gs1) = S.addCreature evolvingWilds S.alice base
+          (wilds, gs1) = S.addPermanent evolvingWilds S.alice base
           (fireblast, gs2) = S.addHandCard fireblastPrinting S.alice gs1
           withoutMoon = crossCheckWithPriority gs2
-          (_, gs3) = S.addCreature bloodMoon S.alice gs2
+          (_, gs3) = S.addPermanent bloodMoon S.alice gs2
           withMoon = crossCheckWithPriority gs3
           cast = S.runPure S.identityAnswer withMoon (S.cast S.alice fireblast)
       Spec.assertBool
@@ -1456,11 +1456,11 @@ crossCheckSpec s registry =
       fireblastPrinting <- S.printingOf s registry "Fireblast"
       let tapAll gs = List.foldl' (flip S.tapObject) gs (Set.toList (GameState.battlefield gs))
           twoTapped = tapAll (S.landsInPlay mountain 2)
-          (_, taxedTwo) = S.addCreature thalia S.alice twoTapped
+          (_, taxedTwo) = S.addPermanent thalia S.alice twoTapped
           (fireblastTwo, gsTwo) = S.addHandCard fireblastPrinting S.alice taxedTwo
           -- The same board plus one UNTAPPED Mountain, which can pay the {1}.
-          (_, threeMountains) = S.addCreature mountain S.alice twoTapped
-          (_, taxedThree) = S.addCreature thalia S.alice threeMountains
+          (_, threeMountains) = S.addPermanent mountain S.alice twoTapped
+          (_, taxedThree) = S.addPermanent thalia S.alice threeMountains
           (fireblastThree, gsThree) = S.addHandCard fireblastPrinting S.alice taxedThree
           alternativeOf oid gs = case Cost.costsFor S.alice (S.printingName fireblastPrinting) oid gs of
             _ : alt : _ -> Just (Cost.Type.mana (Cost.total S.alice oid alt gs))
@@ -1493,7 +1493,7 @@ longtuskCubSpec s registry =
       Spec.assertEqWith s "one activated ability" (length (Face.activatedAbilities (S.combinedFace longtuskCub))) 1
     Spec.it s "CR 118.6 the pay-energy ability is payable at two energy, not at one, and grows the Cub" $ do
       longtuskCub <- S.printingOf s registry "Longtusk Cub"
-      let (cubId, base) = S.addCreature longtuskCub S.alice (Setup.emptyGame S.bothPlayers)
+      let (cubId, base) = S.addPermanent longtuskCub S.alice (Setup.emptyGame S.bothPlayers)
           ability = theAbility longtuskCub
           withTwo = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice base
           withOne = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice base
@@ -1530,8 +1530,8 @@ longtuskCubSpec s registry =
 -- letting an answerer search for whatever land is still legal (#105).
 jaradBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 jaradBoard jarad bayou extras =
-  let add gs printing = snd (S.addCreature printing S.alice gs)
-      (bayouId, withBayou) = S.addCreature bayou S.alice (Setup.emptyGame S.bothPlayers)
+  let add gs printing = snd (S.addPermanent printing S.alice gs)
+      (bayouId, withBayou) = S.addPermanent bayou S.alice (Setup.emptyGame S.bothPlayers)
       withExtras = List.foldl' add withBayou extras
       (jaradId, withJarad) = S.addGraveyardCard jarad S.alice withExtras
    in ( bayouId,
@@ -1695,9 +1695,9 @@ jaradSpec s registry =
 jaradDrainBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 jaradDrainBoard jarad swamp forest victim extras =
   let lands = S.landsFor forest S.alice 2 (S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers))
-      (jaradId, withJarad) = S.addCreature jarad S.alice lands
-      (preyId, withPrey) = S.addCreature victim S.alice withJarad
-   in (jaradId, preyId, foldl (\g printing -> snd (S.addCreature printing S.alice g)) withPrey extras)
+      (jaradId, withJarad) = S.addPermanent jarad S.alice lands
+      (preyId, withPrey) = S.addPermanent victim S.alice withJarad
+   in (jaradId, preyId, foldl (\g printing -> snd (S.addPermanent printing S.alice g)) withPrey extras)
 
 -- CR 602.2b pays an activation cost at CR 601.2h, so by the time Jarad's drain
 -- resolves the creature it sacrificed is a card in a graveyard and CR 608.2h's
@@ -1774,7 +1774,7 @@ answerHatredAtBound p = case p of
 hatredBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Integer -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 hatredBoard swamp piker hatred life =
   let base = S.landsInPlay swamp 5
-      (pikerId, withPiker) = S.addCreature piker S.alice base
+      (pikerId, withPiker) = S.addPermanent piker S.alice base
       (gs, hatredId) = S.handOne hatred withPiker
    in ( pikerId,
         hatredId,
@@ -1964,7 +1964,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
 omniscienceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Bool -> (ObjectId.ObjectId, GameState.GameState)
 omniscienceBoard mountain omniscience card n granted =
   let base = S.landsInPlay mountain n
-      withGrant = if granted then snd (S.addCreature omniscience S.alice base) else base
+      withGrant = if granted then snd (S.addPermanent omniscience S.alice base) else base
       (spell, gs) = S.addHandCard card S.alice withGrant
    in ( spell,
         gs
@@ -2036,7 +2036,7 @@ omniscienceSpec s registry =
       omniscience <- S.printingOf s registry "Omniscience"
       bolt <- S.printingOf s registry "Lightning Bolt"
       let (hers, base) = omniscienceBoard mountain omniscience bolt 0 False
-          gs = snd (S.addCreature omniscience S.bob base)
+          gs = snd (S.addPermanent omniscience S.bob base)
           manaOf pid oid = fmap Cost.Type.mana (Cost.costsFor pid (S.printingName bolt) oid gs)
           red = ManaSymbol.OfType (ManaType.Colored Color.Red)
       Spec.assertEqWith s "alice is offered the printed {R} alone" (manaOf S.alice hers) [Just (ManaCost.MkManaCost [red])]
@@ -2274,7 +2274,7 @@ thrastaSpec s registry =
 sentryBoard :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
 sentryBoard plains safeholdSentry tapped =
   let base = S.landsInPlay plains 3
-      (sentry, gs1) = S.addCreature safeholdSentry S.alice base
+      (sentry, gs1) = S.addPermanent safeholdSentry S.alice base
       turnTapped o = if tapped then o {Object.tapped = TapState.Tapped} else o
    in ( sentry,
         gs1
@@ -2500,9 +2500,9 @@ magmaticInsightSpec s registry =
 -- this ability on every board and no case may route through it.
 springleafBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 springleafBoard drum first second =
-  let (drumId, gs0) = S.addCreature drum S.alice (Setup.emptyGame S.bothPlayers)
-      (firstId, gs1) = S.addCreature first S.alice gs0
-      (secondId, gs2) = S.addCreature second S.alice gs1
+  let (drumId, gs0) = S.addPermanent drum S.alice (Setup.emptyGame S.bothPlayers)
+      (firstId, gs1) = S.addPermanent first S.alice gs0
+      (secondId, gs2) = S.addPermanent second S.alice gs1
    in (drumId, firstId, secondId, gs2 {GameState.priority = Just S.alice})
 
 -- Answer Prompt.ChooseTaps with one named permanent, FILTERED against the
@@ -2627,8 +2627,8 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
 -- Activate.activatable (CR 605.3b is what bars that for the Drum).
 morcantBoard :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 morcantBoard morcant elves =
-  let (morcantId, gs0) = S.addCreature morcant S.alice (Setup.emptyGame S.bothPlayers)
-      add (ids, g) p = let (oid, g1) = S.addCreature p S.alice g in (ids <> [oid], g1)
+  let (morcantId, gs0) = S.addPermanent morcant S.alice (Setup.emptyGame S.bothPlayers)
+      add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
       (elfIds, gs1) = foldl add ([], gs0) elves
    in ( morcantId,
         elfIds,
@@ -2710,7 +2710,7 @@ slingBoard sling griffin hillGiant forest =
       (griffinId, giantId) = case ours of
         [a, b] -> (a, b)
         _ -> (S.noSource, S.noSource)
-      (slingId, withSling) = S.addCreature sling S.alice combat
+      (slingId, withSling) = S.addPermanent sling S.alice combat
       withLands = S.landsFor forest S.alice 3 withSling
    in (slingId, griffinId, giantId, S.runPure (attackingWith griffinId) withLands (Combat.declareAttackers S.manaPerformer S.alice))
 
@@ -2786,8 +2786,8 @@ unerringSlingSpec s registry = Spec.describe s "Unerring Sling" $ do
 -- drop every land alice controls and still afford the mana half.
 melokuBoard :: Printing.Printing -> Printing.Printing -> [(Printing.Printing, PlayerId.PlayerId)] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 melokuBoard meloku elves lands =
-  let (melokuId, gs0) = S.addCreature meloku S.alice (Setup.emptyGame S.bothPlayers)
-      (_, gs1) = S.addCreature elves S.alice gs0
+  let (melokuId, gs0) = S.addPermanent meloku S.alice (Setup.emptyGame S.bothPlayers)
+      (_, gs1) = S.addPermanent elves S.alice gs0
       add (ids, gs) (land, pid) = let (oid, gsN) = addLand land pid gs in (ids <> [oid], gsN)
       (landIds, gs2) = List.foldl' add ([], gs1) lands
    in ( melokuId,
@@ -2921,8 +2921,8 @@ melokuSpec s registry = Spec.describe s "Meloku the Clouded Mirror" $ do
 -- besides what is buried.
 everbarkBoard :: Printing.Printing -> Printing.Printing -> Bool -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
 everbarkBoard shaman nexus withNexus buried =
-  let (shamanId, gs0) = S.addCreature shaman S.alice (Setup.emptyGame S.bothPlayers)
-      gs1 = if withNexus then snd (S.addCreature nexus S.alice gs0) else gs0
+  let (shamanId, gs0) = S.addPermanent shaman S.alice (Setup.emptyGame S.bothPlayers)
+      gs1 = if withNexus then snd (S.addPermanent nexus S.alice gs0) else gs0
       gs2 = List.foldl' (\gs printing -> snd (S.addGraveyardCard printing S.alice gs)) gs1 buried
    in ( shamanId,
         gs2
@@ -2989,7 +2989,7 @@ everbarkShamanSpec s registry =
 raptorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> [Printing.Printing] -> Maybe (ObjectId.ObjectId, GameState.GameState)
 raptorBoard mountain raptor nexus withNexus held =
   let (gs0, card) = S.handOne raptor (S.landsInPlay mountain 3)
-      gs1 = if withNexus then snd (S.addCreature nexus S.alice gs0) else gs0
+      gs1 = if withNexus then snd (S.addPermanent nexus S.alice gs0) else gs0
       gs2 = List.foldl' (\gs printing -> snd (S.addHandCard printing S.alice gs)) gs1 held
       before = Set.toList (GameState.battlefield gs2)
       after =
@@ -3076,7 +3076,7 @@ putridRaptorSpec s registry =
 -- source keeps the fixture honest for the cast case below.
 trollBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 trollBoard troll forest =
-  let (trollId, gs) = S.addCreature troll S.alice (S.landsInPlay forest 2)
+  let (trollId, gs) = S.addPermanent troll S.alice (S.landsInPlay forest 2)
    in ( trollId,
         (S.addCounter CounterKind.PlusOnePlusOne 1 trollId gs)
           { GameState.phase = Phase.PrecombatMain,
@@ -3226,7 +3226,7 @@ millikinSpec s registry =
 -- phase. Nothing else is on the board, so a refusal below is the library's.
 millikinBoard :: Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 millikinBoard millikin cards =
-  let (millikinId, g1) = S.addCreature millikin S.alice (Setup.emptyGame S.bothPlayers)
+  let (millikinId, g1) = S.addPermanent millikin S.alice (Setup.emptyGame S.bothPlayers)
       stocked = foldr (\p gs -> snd (S.addLibraryCard p S.alice gs)) g1 (replicate cards millikin)
    in ( millikinId,
         stocked
@@ -3268,9 +3268,9 @@ brittleEffigyBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 brittleEffigyBoard effigy plains giant piker =
-  let (effigyId, g1) = S.addCreature effigy S.alice (Setup.emptyGame S.bothPlayers)
-      (giantId, g2) = S.addCreature giant S.bob g1
-      (pikerId, g3) = S.addCreature piker S.bob g2
+  let (effigyId, g1) = S.addPermanent effigy S.alice (Setup.emptyGame S.bothPlayers)
+      (giantId, g2) = S.addPermanent giant S.bob g1
+      (pikerId, g3) = S.addPermanent piker S.bob g2
       withLands = S.landsFor plains S.alice 4 g3
    in ( effigyId,
         giantId,
@@ -3406,9 +3406,9 @@ recordingOrdersTargeting victim p = case p of
 -- creature, so the grant is visible on a permanent the cost never touches.
 hanweirBattlementsBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 hanweirBattlementsBoard battlements mountain piker =
-  let (battlementsId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
-      (mountainId, g2) = S.addCreature mountain S.alice g1
-      (pikerId, g3) = S.addCreature piker S.bob g2
+  let (battlementsId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
+      (mountainId, g2) = S.addPermanent mountain S.alice g1
+      (pikerId, g3) = S.addPermanent piker S.bob g2
    in ( battlementsId,
         mountainId,
         pikerId,
@@ -3512,9 +3512,9 @@ altarBoard ::
   Int ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 altarBoard subject altar land piker n =
-  let (subjectId, g1) = S.addCreature subject S.alice (Setup.emptyGame S.bothPlayers)
-      (altarId, g2) = S.addCreature altar S.alice g1
-      (pikerId, g3) = S.addCreature piker S.bob g2
+  let (subjectId, g1) = S.addPermanent subject S.alice (Setup.emptyGame S.bothPlayers)
+      (altarId, g2) = S.addPermanent altar S.alice g1
+      (pikerId, g3) = S.addPermanent piker S.bob g2
       withLands = S.landsFor land S.alice n g3
    in ( subjectId,
         altarId,
@@ -3671,8 +3671,8 @@ poolSize pid gs = case Game.poolOf pid gs of
 -- manaLeakHand, and the same reason).
 reversalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 reversalBoard island ancientTomb manaLeak piker =
-  let (tombId, withTomb) = S.addCreature ancientTomb S.bob (S.landsInPlay island 2)
-      (_, withBob) = S.addCreature island S.bob withTomb
+  let (tombId, withTomb) = S.addPermanent ancientTomb S.bob (S.landsInPlay island 2)
+      (_, withBob) = S.addPermanent island S.bob withTomb
       (_, onStack) = S.spellOnStack piker S.bob withBob
       (gs, leakId) = S.handOne manaLeak onStack
    in (tombId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
@@ -3774,8 +3774,8 @@ libraryOrder pid gs = Foldable.toList (Map.findWithDefault mempty pid (GameState
 shufflingReversalBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 shufflingReversalBoard island shufflingTomb manaLeak piker bottomCard topCard =
   let stocked = snd (S.addLibraryCard topCard S.bob (snd (S.addLibraryCard bottomCard S.bob (S.landsInPlay island 2))))
-      (tombId, withTomb) = S.addCreature shufflingTomb S.bob stocked
-      (_, withBob) = S.addCreature island S.bob withTomb
+      (tombId, withTomb) = S.addPermanent shufflingTomb S.bob stocked
+      (_, withBob) = S.addPermanent island S.bob withTomb
       (_, onStack) = S.spellOnStack piker S.bob withBob
       (gs, leakId) = S.handOne manaLeak onStack
    in (tombId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
@@ -3840,8 +3840,8 @@ shufflingReversalSpec s registry = Spec.describe s "Reversal keeps a shuffle" $ 
 rigBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 rigBoard shufflingTomb rig bottomCard topCard handFiller =
   let stocked = snd (S.addLibraryCard topCard S.alice (snd (S.addLibraryCard bottomCard S.alice (Setup.emptyGame S.bothPlayers))))
-      (tombId, withTomb) = S.addCreature shufflingTomb S.alice stocked
-      (rigId, withRig) = S.addCreature rig S.alice withTomb
+      (tombId, withTomb) = S.addPermanent shufflingTomb S.alice stocked
+      (rigId, withRig) = S.addPermanent rig S.alice withTomb
       (_, withHand1) = S.addHandCard handFiller S.alice withRig
       (_, withHand2) = S.addHandCard handFiller S.alice withHand1
    in (tombId, rigId, withHand2 {GameState.priority = Just S.alice})

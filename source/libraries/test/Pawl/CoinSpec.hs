@@ -131,9 +131,9 @@ coinBoard s registry = do
   piker <- S.printingOf s registry "Goblin Piker"
   maiden <- S.printingOf s registry "Bird Maiden"
   mountain <- S.printingOf s registry "Mountain"
-  let (_, gs1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-      (_, gs2) = S.addCreature piker S.bob gs1
-      (_, gs3) = S.addCreature maiden S.bob gs2
+  let (_, gs1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+      (_, gs2) = S.addPermanent piker S.bob gs1
+      (_, gs3) = S.addPermanent maiden S.bob gs2
       (_, gs4) = S.addLibraryCard mountain S.alice gs3
       (_, gs5) = S.addLibraryCard mountain S.alice gs4
       (_, gs6) = S.addLibraryCard mountain S.bob gs5
@@ -254,10 +254,10 @@ statedBoard s registry withEdgar skies = do
   maiden <- S.printingOf s registry "Bird Maiden"
   mountain <- S.printingOf s registry "Mountain"
   edgar <- S.printingOf s registry "Edgar, King of Figaro"
-  let (_, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature piker S.bob g1
-      (_, g3) = S.addCreature maiden S.bob g2
-      (_, g4) = S.addCreature (if withEdgar then edgar else maiden) S.alice g3
+  let (_, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent piker S.bob g1
+      (_, g3) = S.addPermanent maiden S.bob g2
+      (_, g4) = S.addPermanent (if withEdgar then edgar else maiden) S.alice g3
       -- Three cards apiece so a lost flip's draw never decks a seat (CR 104.3c)
       -- and replaces a hand size with a loss.
       stocked = repeatedly (snd . S.addLibraryCard mountain S.alice) 3 (repeatedly (snd . S.addLibraryCard mountain S.bob) 3 g4)
@@ -314,8 +314,8 @@ sentryBoard s registry withEdgar = do
   sentry <- S.printingOf s registry "Molten Sentry"
   maiden <- S.printingOf s registry "Bird Maiden"
   edgar <- S.printingOf s registry "Edgar, King of Figaro"
-  let (_, g1) = S.addCreature scoundrel S.alice (S.landsInPlay mountain 6)
-      (_, g2) = S.addCreature (if withEdgar then edgar else maiden) S.alice g1
+  let (_, g1) = S.addPermanent scoundrel S.alice (S.landsInPlay mountain 6)
+      (_, g2) = S.addPermanent (if withEdgar then edgar else maiden) S.alice g1
       (spellId, g3) = S.addHandCard sentry S.alice g2
    in pure
         ( spellId,
@@ -436,7 +436,7 @@ flockBoard s registry helper = do
     Nothing -> pure lands
     Just name -> do
       creature <- S.printingOf s registry name
-      pure (snd (S.addCreature creature S.alice lands))
+      pure (snd (S.addPermanent creature S.alice lands))
   let (gs, oid) = S.handOne flock planted
   pure (oid, gs)
 

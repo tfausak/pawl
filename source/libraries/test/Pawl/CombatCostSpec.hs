@@ -241,7 +241,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     jace <- S.printingOf s registry "Jace Beleren"
     let (gs, mine, jaceId) = jaceBoard jace [piker]
-        withPrison = snd (S.addCreature prison S.bob gs)
+        withPrison = snd (S.addPermanent prison S.bob gs)
         (forests, board) = addForests forest 2 withPrison
         atJace = S.runPure attackThePlaneswalker board (Combat.declareAttackers S.manaPerformer S.alice)
         atBob = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
@@ -269,7 +269,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     jace <- S.printingOf s registry "Jace Beleren"
     let (gs, _, jaceId) = jaceBoard jace [piker]
-        withSphere = snd (S.addCreature sphere S.bob gs)
+        withSphere = snd (S.addPermanent sphere S.bob gs)
         (forests, board) = addForests forest 1 withSphere
         atJace = S.runPure attackThePlaneswalker board (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith
@@ -294,7 +294,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     let (one, mine1, f1) = imprisoning sphere forest S.bob [piker] 1
         after1 = S.runPure S.aggressiveAnswer one (Combat.declareAttackers S.manaPerformer S.alice)
         (two0, mine2, f2) = imprisoning sphere forest S.bob [piker] 2
-        two = snd (S.addCreature megrim S.bob two0)
+        two = snd (S.addPermanent megrim S.bob two0)
         after2 = S.runPure S.aggressiveAnswer two (Combat.declareAttackers S.manaPerformer S.alice)
     Spec.assertEqWith s "X = 1: the Piker was declared" (S.attackerDeclarationsOf after1) mine1
     Spec.assertBool s (allTapped f1 after1) "X = 1: the one Forest paid"
@@ -313,7 +313,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     prison <- S.printingOf s registry "Ghostly Prison"
     piker <- S.printingOf s registry "Goblin Piker"
     let (cursed, mine, _) = cursing curse S.alice [piker] []
-        taxed = snd (S.addCreature prison S.bob cursed)
+        taxed = snd (S.addPermanent prison S.bob cursed)
     Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] cursed)) "without the Prison, declining is illegal"
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] taxed) "CR 508.1d: with the Prison, declining is legal"
     case mine of
@@ -335,8 +335,8 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     let (withJace, _, _) = jaceBoard jace [piker]
         (plain, _, _) = S.combatBoardOf [piker] []
-        taxedWithJace = snd (S.addCreature prison S.bob (cursingBoard curse S.alice withJace))
-        taxedPlain = snd (S.addCreature prison S.bob (cursingBoard curse S.alice plain))
+        taxedWithJace = snd (S.addPermanent prison S.bob (cursingBoard curse S.alice withJace))
+        taxedPlain = snd (S.addPermanent prison S.bob (cursingBoard curse S.alice plain))
     Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] taxedWithJace)) "the free attack on Jace keeps the requirement"
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] taxedPlain) "with no planeswalker every attack costs, so declining is legal"
   Spec.it s "CR 508.1d whole cards: the Curse forces the attack, and the Prison unforces it" $ do
@@ -351,7 +351,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (cursed, _, _) = cursing curse S.alice [piker] []
         (forests, forced) = addForests forest 2 cursed
-        taxed = snd (S.addCreature prison S.bob forced)
+        taxed = snd (S.addPermanent prison S.bob forced)
         declining :: Prompt.Prompt r -> r
         declining p = case p of
           Prompt.DeclareAttackers {} -> []
@@ -380,7 +380,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     let (gs, mine, jaceId) = jaceBoard jace [piker]
     case mine of
       [attacker] -> do
-        let (aura, withAura) = S.addCreature rays S.bob gs
+        let (aura, withAura) = S.addPermanent rays S.bob gs
             (forests, board) = addForests forest 3 (S.attach aura attacker withAura)
             atJace = S.runPure attackThePlaneswalker board (Combat.declareAttackers S.manaPerformer S.alice)
             atBob = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
@@ -455,7 +455,7 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     warrior <- S.printingOf s registry "Hollow Warrior"
     arbor <- S.printingOf s registry "Dryad Arbor"
     let (gs, mine, _) = S.combatBoardOf [dragon, warrior] []
-        (tree, board) = S.addCreature arbor S.alice gs
+        (tree, board) = S.addPermanent arbor S.alice gs
         -- Declares the two taxed creatures and leaves the Arbor home; the Arbor
         -- is a legal attacker too, and one that attacked would be tapped and so
         -- out of the Warrior's reach.
@@ -505,7 +505,7 @@ retryBlockAnswer keep p = case p of
 -- 508.1j's is the active one, so a cost to block is paid out of bob's lands.
 addForestsFor :: PlayerId.PlayerId -> Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
 addForestsFor who forest n gs =
-  let add (ids, g) _ = let (oid, g1) = S.addCreature forest who g in (ids <> [oid], g1)
+  let add (ids, g) _ = let (oid, g1) = S.addPermanent forest who g in (ids <> [oid], g1)
    in List.foldl' add ([], gs) [1 .. n]
 
 -- An Oppressive Rays under ALICE's control attached to `victim`, which is bob's
@@ -514,7 +514,7 @@ addForestsFor who forest n gs =
 -- pays" resolves to bob however the Aura got there.
 raying :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 raying rays victim gs =
-  let (aura, withAura) = S.addCreature rays S.alice gs
+  let (aura, withAura) = S.addPermanent rays S.alice gs
    in S.attach aura victim withAura
 
 -- Who is blocking `attacker`, as CR 509.1g's record states it.
@@ -999,7 +999,7 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     let (board, mine, _) = S.combatBoardOf [piker] []
-        (forests, base) = addForests forest 2 (snd (S.addCreature windbornMuse S.bob board))
+        (forests, base) = addForests forest 2 (snd (S.addPermanent windbornMuse S.bob board))
         with extras = withPermanents S.bob extras base
         declared b = S.runPure S.aggressiveAnswer b (Combat.declareAttackers S.manaPerformer S.alice)
         paid b = allTapped forests (declared b)
@@ -1069,7 +1069,7 @@ curtainBoard ::
   (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId)
 curtainBoard plains piker curtain mine =
   let (gs0, ours, yours) = S.combatBoardOf mine [piker]
-      paid = snd (S.addCreature plains S.bob (snd (S.addCreature plains S.bob gs0)))
+      paid = snd (S.addPermanent plains S.bob (snd (S.addPermanent plains S.bob gs0)))
       (curtainId, withCard) = S.addHandCard curtain S.bob paid
       stocked = snd (S.addLibraryCard plains S.bob withCard)
    in (stocked, ours, yours, curtainId)
@@ -1204,7 +1204,7 @@ foliageBoard ::
   (GameState.GameState, [ObjectId.ObjectId], ObjectId.ObjectId)
 foliageBoard forest thopter prey foliage =
   let (gs0, ours, _) = S.combatBoardOf [thopter, prey] []
-      lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 [1 :: Int, 2, 3]
+      lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 [1 :: Int, 2, 3]
       (foliageId, withCard) = S.addHandCard foliage S.bob lands
       stocked = snd (S.addLibraryCard forest S.bob withCard)
    in (stocked, ours, foliageId)
@@ -1221,7 +1221,7 @@ soloFoliageBoard ::
   (GameState.GameState, [ObjectId.ObjectId])
 soloFoliageBoard forest attacker foliage =
   let (gs0, ours, _) = S.combatBoardOf [attacker] []
-      lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 [1 :: Int, 2, 3]
+      lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 [1 :: Int, 2, 3]
       (_, withCard) = S.addHandCard foliage S.bob lands
       stocked = snd (S.addLibraryCard forest S.bob withCard)
    in (stocked, ours)
@@ -1249,7 +1249,7 @@ planeswalkerFoliageBoard ::
   Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 planeswalkerFoliageBoard forest jace attacker foliage =
   let (gs0, mine, theirs) = S.combatBoardOf [attacker] [jace]
-      lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 [1 :: Int, 2, 3]
+      lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 [1 :: Int, 2, 3]
       (_, withCard) = S.addHandCard foliage S.bob lands
       stocked = snd (S.addLibraryCard forest S.bob withCard)
    in case (mine, theirs) of
@@ -1770,7 +1770,7 @@ castingWindowSpec s registry = Spec.describe s "CastingWindow" $ do
     mountain <- S.printingOf s registry "Mountain"
     bolt <- S.printingOf s registry "Lightning Bolt"
     let (gs0, _, _, curtainId) = curtainBoard plains piker curtain [prey]
-        (boltId, gs) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob gs0))
+        (boltId, gs) = S.addHandCard bolt S.bob (snd (S.addPermanent mountain S.bob gs0))
         -- The declare blockers step reached but not yet run: attackers are
         -- declared, CR 509.1's turn-based action is not.
         beforeDeclaration = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
@@ -2061,7 +2061,7 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
               GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]}
             }
         enchanting host =
-          let (aura, withAura) = S.addCreature enemy S.alice defending
+          let (aura, withAura) = S.addPermanent enemy S.alice defending
            in S.attach aura host withAura
     case (mine, theirs, hers) of
       ([attacker], [bobs], [carols]) -> do
@@ -2091,7 +2091,7 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
     case (mine, theirs) of
       ([attacker], [jaceId, host]) -> do
         let loyal = S.addCounter CounterKind.Loyalty 3 jaceId base
-            (aura, withAura) = S.addCreature enemy S.alice loyal
+            (aura, withAura) = S.addPermanent enemy S.alice loyal
             narrowed = S.attach aura host withAura
             control = cursingBoard curse S.alice loyal
         Spec.assertBool
@@ -2123,7 +2123,7 @@ publicEnemySpec s registry = Spec.describe s "PublicEnemy" $ do
     case (mine, theirs) of
       ([attacker], [jaceId, host]) -> do
         let loyal = S.addCounter CounterKind.Loyalty 3 jaceId base
-            (aura, withAura) = S.addCreature enemy S.alice loyal
+            (aura, withAura) = S.addPermanent enemy S.alice loyal
             narrowed = S.attach aura host withAura
             control = cursingBoard curse S.alice loyal
             announced gs = Map.lookup attacker (Combat.Type.attackers (GameState.combat (S.runPure (announcing jaceId) gs (Combat.declareAttackers S.manaPerformer S.alice))))

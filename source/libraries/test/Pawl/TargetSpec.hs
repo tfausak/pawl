@@ -177,8 +177,8 @@ activatedAbilityCosting component p =
 restrictionBoard :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 restrictionBoard restricted piker pid =
   let gs0 = Setup.emptyGame S.bothPlayers
-      (restrictedId, gs1) = S.addCreature restricted pid gs0
-      (pikerId, gs2) = S.addCreature piker pid gs1
+      (restrictedId, gs1) = S.addPermanent restricted pid gs0
+      (pikerId, gs2) = S.addPermanent piker pid gs1
    in (restrictedId, pikerId, gs2)
 
 -- Aims every target slot at one chosen card, tagged the way
@@ -446,7 +446,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     ivoryMask <- S.printingOf s registry "Ivory Mask"
     bolt <- S.printingOf s registry "Lightning Bolt"
     let bare = Setup.emptyGame S.bothPlayers
-        (_, masked) = S.addCreature ivoryMask S.bob bare
+        (_, masked) = S.addPermanent ivoryMask S.bob bare
     case S.spellTargetSlot bolt of
       Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
       Just theSlot -> do
@@ -472,7 +472,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   Spec.it s "CR 702.11c Leyline of Sanctity stops an opponent, but not its own controller" $ do
     leyline <- S.printingOf s registry "Leyline of Sanctity"
     bolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, warded) = S.addCreature leyline S.bob (Setup.emptyGame S.bothPlayers)
+    let (_, warded) = S.addPermanent leyline S.bob (Setup.emptyGame S.bothPlayers)
     case S.spellTargetSlot bolt of
       Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
       Just theSlot -> do
@@ -502,7 +502,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           _ -> S.identityAnswer p
         castAt guard =
           let base = S.landsInPlay mountain 1
-              withGuard = maybe base (\g -> snd (S.addCreature g S.bob base)) guard
+              withGuard = maybe base (\g -> snd (S.addPermanent g S.bob base)) guard
               (ready, boltId) = S.handOne bolt withGuard
               board = ready {GameState.priority = Just S.alice}
            in S.runPure prefersBob board (S.cast S.alice boltId >> Stack.resolveTop)
@@ -531,8 +531,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
     mountain <- S.printingOf s registry "Mountain"
     let base = S.landsInPlay mountain 1
-        (_, oneMask) = S.addCreature ivoryMask S.bob base
-        (_, bothMasked) = S.addCreature ivoryMask S.alice oneMask
+        (_, oneMask) = S.addPermanent ivoryMask S.bob base
+        (_, bothMasked) = S.addPermanent ivoryMask S.alice oneMask
         castableIn board =
           let (ready, boltId) = S.handOne bolt board
            in S.castable S.alice boltId (ready {GameState.priority = Just S.alice})
@@ -596,8 +596,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
     let base = S.landsInPlay plains 4 -- {2}{W}{W}
-        (_, b1) = S.addCreature mongoose S.bob base
-        (_, b2) = S.addCreature piker S.bob b1
+        (_, b1) = S.addPermanent mongoose S.bob base
+        (_, b2) = S.addPermanent piker S.bob b1
         (gs, dojId) = S.handOne dayOfJudgment b2
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dojId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -670,7 +670,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- (a slot that excludes its source says so with Not IsSource).
   Spec.it s "CR 115.5 does not stop Prodigal Sorcerer's ability targeting its own source" $ do
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (sorcererId, gs) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
+    let (sorcererId, gs) = S.addPermanent sorcerer S.alice (Setup.emptyGame S.bothPlayers)
     case Maybe.mapMaybe (soleTargetSlot . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
       [theSlot] ->
         Spec.assertBool
@@ -694,7 +694,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let base = S.landsInPlay swamp 2
-        (pikerId, board) = S.addCreature piker S.bob base
+        (pikerId, board) = S.addPermanent piker S.bob base
         (gs, dbId) = S.handOne doomBlade board
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))
         resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
@@ -719,8 +719,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     setessanTraining <- S.printingOf s registry "Setessan Training"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice gs0
-        (auraId, g2) = S.addCreature setessanTraining S.alice g1
+        (pikerId, g1) = S.addPermanent piker S.alice gs0
+        (auraId, g2) = S.addPermanent setessanTraining S.alice g1
         attached = S.attach auraId pikerId g2
         shrouded = S.withEffect pikerId (Modification.GainKeyword Keyword.Shroud) attached
     Spec.assertBool s (Set.member auraId (GameState.battlefield (S.settleSba attached))) "the Aura stays put with no shroud around"
@@ -785,7 +785,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     bogle <- S.printingOf s registry "Slippery Bogle"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let base = S.landsInPlay swamp 2 -- {1}{B}
-        (_, board) = S.addCreature bogle S.alice base
+        (_, board) = S.addPermanent bogle S.alice base
         (gs, dbId) = S.handOne doomBlade board
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -808,8 +808,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
     let base = S.landsInPlay plains 4 -- {2}{W}{W}
-        (_, b1) = S.addCreature bogle S.bob base
-        (_, b2) = S.addCreature piker S.bob b1
+        (_, b1) = S.addPermanent bogle S.bob base
+        (_, b2) = S.addPermanent piker S.bob b1
         (gs, dojId) = S.handOne dayOfJudgment b2
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dojId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -877,7 +877,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
-    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         withHexproof quality = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof quality)) board
     case (S.spellTargetSlot doomBlade, S.spellTargetSlot angelicEdict) of
       (Just blackSlot, Just whiteSlot) -> do
@@ -919,7 +919,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   Spec.it s "CR 702.11d hexproof from black does not stop its own controller's black spell" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         guarded = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor Color.Black)))) board
     case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
@@ -947,7 +947,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     humility <- S.printingOf s registry "Humility"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         guarded = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor Color.Black)))) board
         humbled = S.withHumility humility guarded
     case S.spellTargetSlot doomBlade of
@@ -976,7 +976,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
-    let (pikerId, board) = S.addCreature piker S.bob (S.landsInPlay swamp 2) -- {1}{B}
+    let (pikerId, board) = S.addPermanent piker S.bob (S.landsInPlay swamp 2) -- {1}{B}
         (base, dbId) = S.handOne doomBlade board
         guarded quality = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor quality)))) base
         resolve gs = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))) Stack.resolveTop)
@@ -1017,7 +1017,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     case (S.spellTargetSlot doomBlade, S.spellTargetSlot angelicEdict) of
       (Just blackSlot, Just whiteSlot) -> do
-        let (knightId, board) = S.addCreature knight S.bob (Setup.emptyGame S.bothPlayers)
+        let (knightId, board) = S.addPermanent knight S.bob (Setup.emptyGame S.bothPlayers)
             -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents,
             -- so the same Knight is tagged differently in the two sets (CR 115).
             reaches printing theSlot tag caster =
@@ -1072,9 +1072,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     giantGrowth <- S.printingOf s registry "Giant Growth"
     case S.spellTargetSlot giantGrowth of
       Just slot -> do
-        let (bobKnight, board0) = S.addCreature knight S.bob (Setup.emptyGame S.bothPlayers)
-            (aliceKnight, dawnless) = S.addCreature knight S.alice board0
-            dawned = snd (S.addCreature dawn S.alice dawnless)
+        let (bobKnight, board0) = S.addPermanent knight S.bob (Setup.emptyGame S.bothPlayers)
+            (aliceKnight, dawnless) = S.addPermanent knight S.alice board0
+            dawned = snd (S.addPermanent dawn S.alice dawnless)
             reachesFrom (spellId, onStack) caster victim =
               Set.member (Recipient.ToCreature victim) (Target.legalRecipients (Just caster) spellId slot onStack)
             reaches board caster = reachesFrom (S.spellOnStack giantGrowth caster board) caster
@@ -1141,7 +1141,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     case (S.spellTargetSlot doomBlade, S.spellTargetSlot angelicEdict) of
       (Just blackSlot, Just whiteSlot) -> do
-        let (apostleId, board) = S.addCreature apostle S.bob (Setup.emptyGame S.bothPlayers)
+        let (apostleId, board) = S.addPermanent apostle S.bob (Setup.emptyGame S.bothPlayers)
             -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents,
             -- so the same Apostle is tagged differently in the two sets (CR 115).
             reaches printing theSlot tag caster =
@@ -1177,7 +1177,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     apostle <- S.printingOf s registry "Apostle of Purifying Light"
     doomBlade <- S.printingOf s registry "Doom Blade"
     humility <- S.printingOf s registry "Humility"
-    let (_, board) = S.addCreature apostle S.bob (S.landsInPlay swamp 2) -- {1}{B}
+    let (_, board) = S.addPermanent apostle S.bob (S.landsInPlay swamp 2) -- {1}{B}
         (base, dbId) = S.handOne doomBlade board
         humbled = S.withHumility humility base
         resolve gs = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))) Stack.resolveTop)
@@ -1210,8 +1210,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     murder <- S.printingOf s registry "Murder"
     case S.spellTargetSlot murder of
       Just slot -> do
-        let (nemesisId, board0) = S.addCreature nemesis S.bob S.threePlayerGame
-            (giantId, board) = S.addCreature giant S.bob board0
+        let (nemesisId, board0) = S.addPermanent nemesis S.bob S.threePlayerGame
+            (giantId, board) = S.addPermanent giant S.bob board0
             chose who = board {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just who}) nemesisId (GameState.objects board)}
             reaches gs victim =
               let (spellId, onStack) = S.spellOnStack murder S.alice gs
@@ -1248,8 +1248,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     case (S.spellTargetSlot murder, S.spellTargetSlot angelicEdict) of
       (Just blackSlot, Just whiteSlot) -> do
-        let (progenitusId, board0) = S.addCreature progenitus S.bob (Setup.emptyGame S.bothPlayers)
-            (giantId, board) = S.addCreature giant S.bob board0
+        let (progenitusId, board0) = S.addPermanent progenitus S.bob (Setup.emptyGame S.bothPlayers)
+            (giantId, board) = S.addPermanent giant S.bob board0
             -- Murder's pool is Creatures and Angelic Edict's is Permanents, so
             -- the same creature is tagged differently in the two sets (CR 115).
             reaches printing theSlot tag victim =
@@ -1289,7 +1289,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let castAt controller =
-          let (pikerId, board) = S.addCreature piker controller (S.landsInPlay swamp 2)
+          let (pikerId, board) = S.addPermanent piker controller (S.landsInPlay swamp 2)
               (gs, dbId) = S.handOne doomBlade board
            in (pikerId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId)))
         resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
@@ -1324,7 +1324,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     case Face.activatedAbilities (S.combinedFace sorcerer) of
       [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
       ability : _ -> do
-        let (srcId, withSorcerer) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
+        let (srcId, withSorcerer) = S.addPermanent sorcerer S.alice (Setup.emptyGame S.bothPlayers)
             -- CR 302.6: the Sorcerer has to have settled before its {T} is legal.
             settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
             (spellId, onStack) = S.spellOnStack piker S.alice settled
@@ -1360,11 +1360,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     case soleActivatedAbility sorcerer of
       Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
       Just ping -> do
-        let (srcId, withSorcerer) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
+        let (srcId, withSorcerer) = S.addPermanent sorcerer S.alice (Setup.emptyGame S.bothPlayers)
             -- CR 302.6: the Sorcerer has to have settled before its {T} is legal.
             settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-            (_, withFlash) = S.addCreature aetherFlash S.alice settled
-            withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) withFlash [1 .. (2 :: Int)]
+            (_, withFlash) = S.addPermanent aetherFlash S.alice settled
+            withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withFlash [1 .. (2 :: Int)]
             (pikerId, withPiker) = S.addHandCard piker S.alice withLands
             cast = S.runPure S.identityAnswer withPiker (S.cast S.alice pikerId)
             -- CR 603.3 puts Aether Flash's trigger on the stack once the Piker
@@ -1418,13 +1418,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     adric <- S.printingOf s registry "Adric, Mathematical Genius"
     case (soleActivatedAbility sorcerer, activatedAbilityCosting CostComponent.SacrificeThis adric) of
       (Just ping, Just ultimateSacrifice) -> do
-        let (srcId, withSorcerer) = S.addCreature sorcerer S.bob (Setup.emptyGame S.bothPlayers)
+        let (srcId, withSorcerer) = S.addPermanent sorcerer S.bob (Setup.emptyGame S.bothPlayers)
             -- CR 302.6: the Sorcerer must have settled before its {T} is legal.
             -- Adric needs no such thing -- its cost carries no {T}.
             settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.bob)
-            (adricId, withAdric) = S.addCreature adric S.alice settled
-            (_, withIsland) = S.addCreature island S.alice withAdric
-            (_, withIslands) = S.addCreature island S.alice withIsland
+            (adricId, withAdric) = S.addPermanent adric S.alice settled
+            (_, withIsland) = S.addPermanent island S.alice withAdric
+            (_, withIslands) = S.addPermanent island S.alice withIsland
             atAlice :: Prompt.Prompt r -> r
             atAlice p = case p of
               Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
@@ -1484,7 +1484,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bolt <- S.printingOf s registry "Lightning Bolt"
     raiseDead <- S.printingOf s registry "Raise Dead"
-    let (inPlayId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (inPlayId, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         (mineId, g2) = S.addGraveyardCard piker S.alice g1
         (myBoltId, g3) = S.addGraveyardCard bolt S.alice g2
         (theirsId, gs) = S.addGraveyardCard piker S.bob g3
@@ -1569,7 +1569,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
     wretch <- S.printingOf s registry "Withered Wretch"
     raiseDead <- S.printingOf s registry "Raise Dead"
-    let (inPlayId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (inPlayId, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         (mineId, g2) = S.addGraveyardCard piker S.alice g1
         (myBoltId, g3) = S.addGraveyardCard bolt S.alice g2
         (theirsId, gs) = S.addGraveyardCard piker S.bob g3
@@ -1606,7 +1606,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     wretch <- S.printingOf s registry "Withered Wretch"
-    let (wretchId, g1) = S.addCreature wretch S.alice (S.landsInPlay swamp 1)
+    let (wretchId, g1) = S.addPermanent wretch S.alice (S.landsInPlay swamp 1)
         (mineId, g2) = S.addGraveyardCard piker S.alice g1
         (theirsId, g3) = S.addGraveyardCard piker S.bob g2
         board = g3 {GameState.priority = Just S.alice}
@@ -1636,7 +1636,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     wretch <- S.printingOf s registry "Withered Wretch"
-    let (wretchId, g1) = S.addCreature wretch S.alice (S.landsInPlay swamp 1)
+    let (wretchId, g1) = S.addPermanent wretch S.alice (S.landsInPlay swamp 1)
         (theirsId, g2) = S.addGraveyardCard piker S.bob g1
         board = g2 {GameState.priority = Just S.alice}
     case Face.activatedAbilities (S.combinedFace wretch) of
@@ -1681,7 +1681,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
     riftsweeper <- S.printingOf s registry "Riftsweeper"
     wretch <- S.printingOf s registry "Withered Wretch"
-    let (inPlayId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (inPlayId, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         (buriedId, g2) = S.addGraveyardCard piker S.alice g1
         (hersId, g3) = S.addExiledCard piker S.alice g2
         (hisId, gs) = S.addExiledCard bolt S.bob g3
@@ -1847,7 +1847,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bolt <- S.printingOf s registry "Lightning Bolt"
     dwell <- S.printingOf s registry "Dwell on the Past"
-    let (_, g1) = S.addCreature forest S.alice S.threePlayerGame
+    let (_, g1) = S.addPermanent forest S.alice S.threePlayerGame
         (hisId, g2) = S.addGraveyardCard piker S.bob g1
         (hisOtherId, g3) = S.addGraveyardCard bolt S.bob g2
         (hersId, g4) = S.addGraveyardCard bolt S.carol g3
@@ -2038,7 +2038,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     case soleActivatedAbility engine of
       Nothing -> Spec.assertFailure s "Synthetic Reclamation Engine should declare exactly one activated ability"
       Just ability -> do
-        let (engineId, g1) = S.addCreature engine S.alice S.threePlayerGame
+        let (engineId, g1) = S.addPermanent engine S.alice S.threePlayerGame
             (hisId, g2) = S.addGraveyardCard piker S.bob g1
             (hersId, board) = S.addGraveyardCard bolt S.carol g2
             activated = S.runPure (aimingReclamation S.carol hisId hersId) board (Activate.activateAbility S.alice engineId ability)
@@ -2086,9 +2086,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     wall <- S.printingOf s registry "Wall of Stone"
     rats <- S.printingOf s registry "Typhoid Rats"
     hammer <- S.printingOf s registry "Fall of the Hammer"
-    let (dealerId, g1) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
-        (wallId, g2) = S.addCreature wall S.alice g1
-        (ratsId, g3) = S.addCreature rats S.bob g2
+    let (dealerId, g1) = S.addPermanent piker S.alice (S.landsInPlay mountain 2)
+        (wallId, g2) = S.addPermanent wall S.alice g1
+        (ratsId, g3) = S.addPermanent rats S.bob g2
         (board, hammerId) = S.handOne hammer g3
         run victimId =
           let cast = S.runPure (aimingHammer dealerId victimId) board (S.cast S.alice hammerId)
@@ -2138,9 +2138,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     rats <- S.printingOf s registry "Typhoid Rats"
     hammer <- S.printingOf s registry "Fall of the Hammer"
-    let (dealerId, g1) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
+    let (dealerId, g1) = S.addPermanent piker S.alice (S.landsInPlay mountain 2)
         (alone, hammerId) = S.handOne hammer g1
-        (_, together) = S.addCreature rats S.bob alone
+        (_, together) = S.addPermanent rats S.bob alone
         slots = Modal.allTargetSlots (Face.spell (S.combinedFace hammer))
         offered = Target.legalSets (Just S.alice) False Map.empty S.noSource slots alone
         slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
@@ -2185,8 +2185,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
               ManaUnit.rider = Nothing
             }
         funded = (Setup.emptyGame S.bothPlayers) {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana (replicate 5 white)), GameState.priority = Just S.alice}
-        (defenseId, alone) = S.addCreature defense S.alice funded
-        (_, together) = S.addCreature piker S.alice alone
+        (defenseId, alone) = S.addPermanent defense S.alice funded
+        (_, together) = S.addPermanent piker S.alice alone
         activates gs = any (\action -> case action of A.Activate oid _ -> oid == defenseId; _ -> False) (Action.legalActions S.alice gs)
     Spec.assertBool s (not (activates alone)) "with the Defense alone on the battlefield, its ability is not offered at all"
     Spec.assertBool s (activates together) "and with a Piker beside it, the same ability off the same floating five is offered"
@@ -2221,9 +2221,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     wall <- S.printingOf s registry "Wall of Stone"
     refrain <- S.printingOf s registry "Synthetic Hammer Refrain"
-    let (firstDealerId, g1) = S.addCreature piker S.alice (S.landsInPlay mountain 2)
-        (secondDealerId, g2) = S.addCreature piker S.alice g1
-        (wallId, g3) = S.addCreature wall S.bob g2
+    let (firstDealerId, g1) = S.addPermanent piker S.alice (S.landsInPlay mountain 2)
+        (secondDealerId, g2) = S.addPermanent piker S.alice g1
+        (wallId, g3) = S.addPermanent wall S.bob g2
         (board, refrainId) = S.handOne refrain g3
         run victimTwo =
           let cast = S.runPure (aimingRefrain firstDealerId wallId secondDealerId victimTwo) board (S.cast S.alice refrainId)
@@ -2291,12 +2291,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     rats <- S.printingOf s registry "Typhoid Rats"
     refrain <- S.printingOf s registry "Synthetic Measured Refrain"
-    let (gaugeA, g1) = S.addCreature piker S.alice (S.landsInPlay swamp 3)
-        (gaugeB, g2) = S.addCreature piker S.alice g1
-        (gaugeC, g3) = S.addCreature piker S.alice g2
-        (victimId, g4) = S.addCreature piker S.bob g3
-        (dearId, g5) = S.addCreature piker S.bob g4
-        (cheapId, g6) = S.addCreature rats S.bob g5
+    let (gaugeA, g1) = S.addPermanent piker S.alice (S.landsInPlay swamp 3)
+        (gaugeB, g2) = S.addPermanent piker S.alice g1
+        (gaugeC, g3) = S.addPermanent piker S.alice g2
+        (victimId, g4) = S.addPermanent piker S.bob g3
+        (dearId, g5) = S.addPermanent piker S.bob g4
+        (cheapId, g6) = S.addPermanent rats S.bob g5
         (board, refrainId) = S.handOne refrain g6
         run victimTwo =
           let cast = S.runPure (aimingMeasured [gaugeA, gaugeB] victimId gaugeC victimTwo) board (S.cast S.alice refrainId)
@@ -2359,15 +2359,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     refrain <- S.printingOf s registry "Synthetic Measured Refrain"
     let (_, l1) = S.addLibraryCard swamp S.alice (S.landsInPlay swamp 3)
         (_, l2) = S.addLibraryCard swamp S.alice l1
-        (gaugeA, g1) = S.addCreature wall S.alice l2
-        (gaugeB, g2) = S.addCreature wall S.alice g1
-        (_, common) = S.addCreature wall S.alice g2
+        (gaugeA, g1) = S.addPermanent wall S.alice l2
+        (gaugeB, g2) = S.addPermanent wall S.alice g1
+        (_, common) = S.addPermanent wall S.alice g2
         run victim board0 =
           let (board, spellId) = S.handOne refrain board0
               cast = S.runPure (aimingGauged [gaugeA, gaugeB] victim) board (S.cast S.alice spellId)
            in S.runPure (aimingGauged [gaugeA, gaugeB] victim) cast Stack.resolveTop
-        (dearId, dearBoard) = S.addCreature wall S.bob common
-        (cheapId, cheapBoard) = S.addCreature piker S.bob common
+        (dearId, dearBoard) = S.addPermanent wall S.bob common
+        (cheapId, cheapBoard) = S.addPermanent piker S.bob common
         atDear = run dearId dearBoard
         atCheap = run cheapId cheapBoard
         onBattlefield gs oid = elem oid (Game.zoneMembers Zone.Battlefield S.bob gs)
@@ -2407,9 +2407,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     wall <- S.printingOf s registry "Wall of Stone"
     bioshift <- S.printingOf s registry "Bioshift"
     let lands = S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (Setup.emptyGame S.bothPlayers))
-        (giverId, g1) = S.addCreature wall S.alice lands
-        (mineId, g2) = S.addCreature wall S.alice g1
-        (theirsId, g3) = S.addCreature wall S.bob g2
+        (giverId, g1) = S.addPermanent wall S.alice lands
+        (mineId, g2) = S.addPermanent wall S.alice g1
+        (theirsId, g3) = S.addPermanent wall S.bob g2
         (board, spellId) = S.handOne bioshift (S.addCounter CounterKind.PlusOnePlusOne 3 giverId g3)
         run takerId =
           let cast = S.runPure (aimingBioshift giverId takerId) board (S.cast S.alice spellId)
@@ -2460,10 +2460,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     stalker <- S.printingOf s registry "Branchblight Stalker"
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (otherRaptorId, gs1) = S.addCreature raptor S.alice gs0
-        (stalkerId, gs2) = S.addCreature stalker S.alice gs1
-        (pikerId, gs3) = S.addCreature piker S.alice gs2
-        (hisStalkerId, gs4) = S.addCreature stalker S.bob gs3
+        (otherRaptorId, gs1) = S.addPermanent raptor S.alice gs0
+        (stalkerId, gs2) = S.addPermanent stalker S.alice gs1
+        (pikerId, gs3) = S.addPermanent piker S.alice gs2
+        (hisStalkerId, gs4) = S.addPermanent stalker S.bob gs3
         (enteringId, board) = S.entersWithTrigger raptor S.alice gs4
     case triggerTargetSlot raptor of
       Nothing -> Spec.assertFailure s "Flensing Raptor's trigger should declare one target slot"
@@ -2506,7 +2506,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     dwell <- S.printingOf s registry "Dwell on the Past"
     -- S.addLibraryCard puts each card ON TOP, so the second of each pair heads
     -- the library and the first sits under it.
-    let (_, g1) = S.addCreature forest S.alice S.threePlayerGame
+    let (_, g1) = S.addPermanent forest S.alice S.threePlayerGame
         (hisId, g2) = S.addGraveyardCard piker S.bob g1
         (hisOtherId, g3) = S.addGraveyardCard bolt S.bob g2
         (hersId, g4) = S.addGraveyardCard piker S.carol g3
@@ -2577,10 +2577,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     doomBlade <- S.printingOf s registry "Doom Blade"
     let -- {5}{G}{G} for the Regent, and {1}{B} twice for bob.
         (gs1, regentCardId) = S.handOne regent (S.landsInPlay forest 7)
-        (alicePikerId, gs2) = S.addCreature piker S.alice gs1
-        (bobPikerId, gs3) = S.addCreature piker S.bob gs2
-        (_, gs4) = S.addCreature swamp S.bob gs3
-        (_, gs5) = S.addCreature swamp S.bob gs4
+        (alicePikerId, gs2) = S.addPermanent piker S.alice gs1
+        (bobPikerId, gs3) = S.addPermanent piker S.bob gs2
+        (_, gs4) = S.addPermanent swamp S.bob gs3
+        (_, gs5) = S.addPermanent swamp S.bob gs4
         (bobsBlade, gs6) = S.addHandCard doomBlade S.bob gs5
         (_, gs7) = S.addHandCard doomBlade S.bob gs6
         -- CR 104.3c: neither player may deck during the three runs below.
@@ -2748,13 +2748,13 @@ razorfinBoard s registry = do
   pure $ case soleActivatedAbility abolisher of
     Nothing -> Nothing
     Just ability ->
-      let (_, g1) = S.addCreature abolisher S.alice (Setup.emptyGame S.bothPlayers)
+      let (_, g1) = S.addPermanent abolisher S.alice (Setup.emptyGame S.bothPlayers)
           -- CR 302.6: the Abolisher's cost carries {T}, so it must have settled.
           settled = S.runPure S.identityAnswer g1 (Engine.settleAll S.alice)
-          (_, g2) = S.addCreature island S.alice settled
-          (_, g3) = S.addCreature island S.alice g2
-          (giantId, g4) = S.addCreature giant S.bob g3
-          (pikerId, g5) = S.addCreature piker S.bob g4
+          (_, g2) = S.addPermanent island S.alice settled
+          (_, g3) = S.addPermanent island S.alice g2
+          (giantId, g4) = S.addPermanent giant S.bob g3
+          (pikerId, g5) = S.addPermanent piker S.bob g4
           board = (S.addCounter CounterKind.Stun 1 giantId g5) {GameState.priority = Just S.alice}
        in Just (board, ability, giantId, pikerId)
 
@@ -2889,7 +2889,7 @@ celestineSpec s registry = Spec.describe s "ManaValueAtMostAmount (CR 202.3)" $ 
         -- No life gained, so the printed Quantity this slot replaces would admit
         -- nothing: every offer below is the seeded amount talking.
         let (pikerId, wolvesId, _, noGain) = celestineGraveyard piker wolves bolt 0
-            (sourceId, board) = S.addCreature piker S.alice noGain
+            (sourceId, board) = S.addPermanent piker S.alice noGain
             name = SlotName.MkSlotName (Text.pack "target")
             slotted = theSlot {TargetSlot.amount = Just (Quantity.Type.InSlot Binding.eventAmount)}
             offer seed = Map.findWithDefault Set.empty name (Target.legalSets (Just S.alice) False seed sourceId (Map.singleton name slotted) board)
@@ -3213,7 +3213,7 @@ itzquinthSpec s registry = Spec.describe s "Announcing a trigger's targets (CR 6
     mountain <- S.printingOf s registry "Mountain"
     wall <- S.printingOf s registry "Wall of Stone"
     itzquinth <- S.printingOf s registry "Itzquinth, Firstborn of Gishath"
-    let (wallId, withWall) = S.addCreature wall S.bob (S.landsInPlay mountain 2)
+    let (wallId, withWall) = S.addPermanent wall S.bob (S.landsInPlay mountain 2)
         (dinoId, together) = S.entersWithTrigger itzquinth S.alice withWall
         (aloneId, alone) = S.entersWithTrigger itzquinth S.alice (S.landsInPlay mountain 2)
         -- The CR 603.6a enters trigger onto the stack, then its resolution (where
@@ -3260,7 +3260,7 @@ itzquinthSpec s registry = Spec.describe s "Announcing a trigger's targets (CR 6
     mountain <- S.printingOf s registry "Mountain"
     wall <- S.printingOf s registry "Wall of Stone"
     itzquinth <- S.printingOf s registry "Itzquinth, Firstborn of Gishath"
-    let (wallId, withWall) = S.addCreature wall S.bob (S.landsInPlay mountain 2)
+    let (wallId, withWall) = S.addPermanent wall S.bob (S.landsInPlay mountain 2)
         (dinoId, together) = S.entersWithTrigger itzquinth S.alice withWall
         placed = S.runPure S.identityAnswer together Engine.settleForPriority
         ((_, ceased), asks) = State.runState (Engine.runGame (answeringItzquinthAfresh dinoId) placed (Stack.resolveTop >> Engine.settleForPriority)) 0

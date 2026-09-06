@@ -273,13 +273,13 @@ warrenBoard s registry petrified = do
   warren <- S.printingOf s registry "Synthetic Fossil Warren"
   let base = S.addPlayerCounter PlayerCounterKind.Rad 2 S.alice (Setup.emptyGame S.bothPlayers)
       stocked = libraryTopped [piker, piker, mountain] S.alice base
-  pure (if petrified then snd (S.addCreature warren S.alice stocked) else stocked)
+  pure (if petrified then snd (S.addPermanent warren S.alice stocked) else stocked)
 
 -- alice with The Master settled on the battlefield, one rad counter, and one
 -- creature card sitting in her graveyard from the start.
 radBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 radBoard master bystander =
-  let (masterId, board) = S.addCreature master S.alice (Setup.emptyGame S.bothPlayers)
+  let (masterId, board) = S.addPermanent master S.alice (Setup.emptyGame S.bothPlayers)
       (bystanderId, withBystander) = S.addGraveyardCard bystander S.alice board
    in (masterId, bystanderId, S.addPlayerCounter PlayerCounterKind.Rad 1 S.alice withBystander)
 
@@ -325,7 +325,7 @@ fourColorLands s registry = traverse (S.printingOf s registry) ["Swamp", "Forest
 
 -- alice's side of the board: one untapped land of each printing.
 boardOf :: [Printing.Printing] -> GameState.GameState
-boardOf = foldr (\land gs -> snd (S.addCreature land S.alice gs)) (Setup.emptyGame S.bothPlayers)
+boardOf = foldr (\land gs -> snd (S.addPermanent land S.alice gs)) (Setup.emptyGame S.bothPlayers)
 
 -- The given printings in pid's library, FIRST ONE ON TOP -- S.addLibraryCard
 -- puts each new card at the front, so the list is laid down back to front.

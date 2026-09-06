@@ -75,8 +75,8 @@ crewAbility oid gs = case Projection.abilitiesOf oid gs of
 -- precombat main phase. Three seats, for the reason the module header gives.
 board :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 board dreadnought crewers =
-  let (vehicleId, gs0) = S.addCreature dreadnought S.alice S.threePlayerGame
-      add (ids, g) p = let (oid, g1) = S.addCreature p S.alice g in (ids <> [oid], g1)
+  let (vehicleId, gs0) = S.addPermanent dreadnought S.alice S.threePlayerGame
+      add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
       (crewIds, gs1) = foldl add ([], gs0) crewers
    in (vehicleId, crewIds, gs1 {GameState.priority = Just S.alice})
 
@@ -180,9 +180,9 @@ crewCostSpec s registry = Spec.describe s "CrewCost" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (vehicleId, gs0) = S.addCreature dreadnought S.alice S.threePlayerGame
-        (_, gs1) = S.addCreature blindSpot S.bob gs0
-        (_, gs2) = S.addCreature hillGiant S.carol gs1
+    let (vehicleId, gs0) = S.addPermanent dreadnought S.alice S.threePlayerGame
+        (_, gs1) = S.addPermanent blindSpot S.bob gs0
+        (_, gs2) = S.addPermanent hillGiant S.carol gs1
         gs = gs2 {GameState.priority = Just S.alice}
     Spec.assertBool s (not (crewable vehicleId gs)) "bob's 4 and carol's 3 are not alice's to tap"
   -- CR 702.122a's "other". Once crewed, the Vehicle is an untapped 7/11 creature

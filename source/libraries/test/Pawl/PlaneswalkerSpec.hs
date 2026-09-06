@@ -176,7 +176,7 @@ burnAtJace ::
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 burnAtJace island mountain jace burn =
   let (jaceId, board) = jaceOnBattlefield island jace
-      (_, withMountain) = S.addCreature mountain S.alice board
+      (_, withMountain) = S.addPermanent mountain S.alice board
       (burnId, gs) = S.addHandCard burn S.alice withMountain
    in (jaceId, burnId, gs)
 
@@ -194,7 +194,7 @@ strikeAtJace ::
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 strikeAtJace island mountain jace strike piker =
   let (jaceId, strikeId, gs) = burnAtJace island mountain jace strike
-   in (jaceId, strikeId, List.foldl' (\g p -> snd (S.addCreature p S.alice g)) gs [piker, piker])
+   in (jaceId, strikeId, List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) gs [piker, piker])
 
 -- How many cards of a given name are in alice's graveyard.
 graveyardCount :: String -> GameState.GameState -> Int
@@ -424,7 +424,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     island <- S.printingOf s registry "Island"
     jace <- S.printingOf s registry "Jace Beleren"
     doublingSeason <- S.printingOf s registry "Doubling Season"
-    let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
+    let (gs, handId) = S.handOne jace (snd (S.addPermanent doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
         after = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
     Spec.assertEqWith s "three doubled to six" (S.counterOf CounterKind.Loyalty (theJace after) after) 6
 
@@ -436,7 +436,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     island <- S.printingOf s registry "Island"
     jace <- S.printingOf s registry "Jace Beleren"
     doublingSeason <- S.printingOf s registry "Doubling Season"
-    let (gs, handId) = S.handOne jace (snd (S.addCreature doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
+    let (gs, handId) = S.handOne jace (snd (S.addPermanent doublingSeason S.alice (stockLibraries island (S.landsInPlay island 3))))
         board = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
         jaceId = theJace board
         after = useAbility plusTwo jace jaceId board
@@ -458,7 +458,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     island <- S.printingOf s registry "Island"
     jace <- S.printingOf s registry "Jace Beleren"
     vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
-    let (gs, handId) = S.handOne jace (snd (S.addCreature vorinclex S.alice (stockLibraries island (S.landsInPlay island 3))))
+    let (gs, handId) = S.handOne jace (snd (S.addPermanent vorinclex S.alice (stockLibraries island (S.landsInPlay island 3))))
         board = S.runPure S.identityAnswer gs (do S.cast S.alice handId; Stack.resolveTop)
         jaceId = theJace board
         after = useAbility plusTwo jace jaceId board
@@ -679,7 +679,7 @@ combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
     carth <- S.printingOf s registry "Carth the Lion"
     let (jaceId, board) = jaceOnBattlefield island jace
         atNine = S.addCounter CounterKind.Loyalty 6 jaceId board
-        withCarth = snd (S.addCreature carth S.alice atNine)
+        withCarth = snd (S.addPermanent carth S.alice atNine)
     Spec.assertEqWith s "3 printed plus 6 is 9" (S.counterOf CounterKind.Loyalty jaceId withCarth) 9
     Spec.assertBool s (not (null (activation jaceId minusTen jace))) "the -10 is a real ability"
     Spec.assertBool
@@ -716,7 +716,7 @@ combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
     carth <- S.printingOf s registry "Carth the Lion"
     let (jaceId, board) = jaceOnBattlefield island jace
         atNine = S.addCounter CounterKind.Loyalty 6 jaceId board
-        withCarth = snd (S.addCreature carth S.alice atNine)
+        withCarth = snd (S.addPermanent carth S.alice atNine)
         after = useAbility minusTen jace jaceId withCarth
     Spec.assertEqWith s "nine counters spent, not ten and not nine less one added back" (S.counterOf CounterKind.Loyalty jaceId after) 0
     Spec.assertBool s (Set.member jaceId (GameState.battlefield after)) "CR 120.5: still there before the state-based action"
@@ -731,7 +731,7 @@ combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     carth <- S.printingOf s registry "Carth the Lion"
     let (jaceId, board) = jaceOnBattlefield island jace
-        withCarth = snd (S.addCreature carth S.alice board)
+        withCarth = snd (S.addPermanent carth S.alice board)
         after = useAbility plusTwo jace jaceId withCarth
         without = useAbility plusTwo jace jaceId board
     Spec.assertEqWith s "3 + 3 with Carth" (S.counterOf CounterKind.Loyalty jaceId after) 6
@@ -748,7 +748,7 @@ combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     carth <- S.printingOf s registry "Carth the Lion"
     let (jaceId, board) = jaceOnBattlefield island jace
-        withCarth = snd (S.addCreature carth S.alice board)
+        withCarth = snd (S.addPermanent carth S.alice board)
         after = useAbility minusOne jace jaceId withCarth
     Spec.assertEqWith s "still 3, neither 2 nor 4" (S.counterOf CounterKind.Loyalty jaceId after) 3
     Spec.assertEqWith s "and the ability did resolve: exactly one player drew" (S.handSize S.alice after + S.handSize S.bob after) 1
@@ -900,7 +900,7 @@ minusFive = 1
 -- before reading what the cost took off; the -2 boards keep the printed number.
 gristWith :: Natural -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 gristWith loyalty grist gs =
-  let (oid, placed) = S.addCreature grist S.alice gs
+  let (oid, placed) = S.addPermanent grist S.alice gs
    in (oid, S.addCounter CounterKind.Loyalty loyalty oid placed)
 
 -- Activate alice's `i`th loyalty ability and resolve it, with an answerer of the
@@ -961,11 +961,11 @@ gristMinusTwoBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 gristMinusTwoBoard grist piker jace ogre mountain =
-  let (pikerId, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-      (jaceId, withJace) = S.addCreature jace S.bob withPiker
+  let (pikerId, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+      (jaceId, withJace) = S.addPermanent jace S.bob withPiker
       loyal = S.addCounter CounterKind.Loyalty 3 jaceId withJace
-      (_, withOgre) = S.addCreature ogre S.bob loyal
-      (mountainId, withMountain) = S.addCreature mountain S.bob withOgre
+      (_, withOgre) = S.addPermanent ogre S.bob loyal
+      (mountainId, withMountain) = S.addPermanent mountain S.bob withOgre
       (gristId, board) = gristWith 3 grist withMountain
    in (gristId, pikerId, jaceId, mountainId, board)
 
@@ -1100,7 +1100,7 @@ ashiokMinusTwo = 1
 ashiokBoard :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
 ashiokBoard ashiok stock =
   let stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) S.threePlayerGame stock
-      (oid, placed) = S.addCreature ashiok S.alice stocked
+      (oid, placed) = S.addPermanent ashiok S.alice stocked
    in (oid, S.addCounter CounterKind.Loyalty 5 oid placed)
 
 -- The +1's one ask, pinned by INDEX into the offered group rather than by a
@@ -1244,7 +1244,7 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let (ashiokId, board) = ashiokBoard ashiok [swamp]
-        (pikerId, withPiker) = S.addCreature piker S.alice board
+        (pikerId, withPiker) = S.addPermanent piker S.alice board
         minted = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId withPiker
         exiled = S.runPure S.identityAnswer minted (Event.changeZone pikerId Zone.Exile)
         after = throughBeginningOfCombat exiled
@@ -1259,7 +1259,7 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let (ashiokId, board) = ashiokBoard ashiok [swamp]
-        (pikerId, withPiker) = S.addCreature piker S.alice board
+        (pikerId, withPiker) = S.addPermanent piker S.alice board
         minted = useLoyaltyAbility S.identityAnswer ashiokMinusTwo ashiok ashiokId withPiker
         victim = Maybe.listToMaybe (S.tokensOf minted)
         exiled = S.runPure S.identityAnswer minted (mapM_ (`Event.changeZone` Zone.Exile) victim)

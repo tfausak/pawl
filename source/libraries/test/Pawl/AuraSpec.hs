@@ -117,8 +117,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.alice base
-        (equip, gs) = S.addCreature bonesplitter S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.alice base
+        (equip, gs) = S.addPermanent bonesplitter S.alice withCreature
         slot = SlotName.MkSlotName (Text.pack "target")
         run =
           Resolve.applyEffect
@@ -140,8 +140,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.alice base
-        (equip, gs) = S.addCreature bonesplitter S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.alice base
+        (equip, gs) = S.addPermanent bonesplitter S.alice withCreature
         attached = S.attach equip creature gs
     Spec.assertEqWith s "unequipped, the Piker is 2/1" (Projection.powerOf creature gs) (Just 2)
     Spec.assertEqWith s "equipped, it is 4/1" (Projection.powerOf creature attached) (Just 4)
@@ -153,9 +153,9 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (first, g1) = S.addCreature piker S.alice base
-        (second, g2) = S.addCreature warMammoth S.alice g1
-        (equip, g3) = S.addCreature bonesplitter S.alice g2
+        (first, g1) = S.addPermanent piker S.alice base
+        (second, g2) = S.addPermanent warMammoth S.alice g1
+        (equip, g3) = S.addPermanent bonesplitter S.alice g2
         gs = S.attach equip first g3
         slot = SlotName.MkSlotName (Text.pack "target")
         run =
@@ -180,7 +180,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base0 = S.landsInPlay mountain 2 -- {1} to cast, {1} to equip
-        (creature, base1) = S.addCreature piker S.alice base0
+        (creature, base1) = S.addPermanent piker S.alice base0
         (withSpell, spellId) = S.handOne bonesplitter base1
         cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -222,9 +222,9 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     evangel <- S.printingOf s registry "Cabal Evangel"
     blade <- S.printingOf s registry "Dúnedain Blade"
-    let (goblin, base1) = S.addCreature piker S.alice (S.landsInPlay mountain 3)
-        (human, base2) = S.addCreature evangel S.alice base1
-        (bladeId, base3) = S.addCreature blade S.alice base2
+    let (goblin, base1) = S.addPermanent piker S.alice (S.landsInPlay mountain 3)
+        (human, base2) = S.addPermanent evangel S.alice base1
+        (bladeId, base3) = S.addPermanent blade S.alice base2
         board = base3 {GameState.priority = Just S.alice}
         abilityCosting n =
           List.find
@@ -253,9 +253,9 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (first, g1) = S.addCreature piker S.alice base
-        (second, g2) = S.addCreature warMammoth S.alice g1
-        (equip, g3) = S.addCreature bonesplitter S.alice g2
+        (first, g1) = S.addPermanent piker S.alice base
+        (second, g2) = S.addPermanent warMammoth S.alice g1
+        (equip, g3) = S.addPermanent bonesplitter S.alice g2
         gs = S.attach equip first g3
         slot = SlotName.MkSlotName (Text.pack "target")
         attachTo t g =
@@ -280,8 +280,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.alice base
-        (equip, g2) = S.addCreature bonesplitter S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.alice base
+        (equip, g2) = S.addPermanent bonesplitter S.alice withCreature
         attached = S.attach equip creature g2
         gone = S.runPure S.identityAnswer attached (Event.changeZone creature Zone.Graveyard)
         after = S.settleSba gone
@@ -294,8 +294,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (land, withLand) = S.addCreature mountain S.alice base
-        (equip, g2) = S.addCreature bonesplitter S.alice withLand
+        (land, withLand) = S.addPermanent mountain S.alice base
+        (equip, g2) = S.addPermanent bonesplitter S.alice withLand
         attached = S.attach equip land g2
         after = S.settleSba attached
     Spec.assertBool s (Set.member equip (GameState.battlefield after)) "the Equipment survives"
@@ -317,9 +317,9 @@ fortifyBoard s registry = do
   tower <- S.printingOf s registry "Tower of the Magistrate"
   garrison <- S.printingOf s registry "Darksteel Garrison"
   let base = S.landsInPlay forest 4
-      (arborId, g1) = S.addCreature dryadArbor S.alice base
-      (towerId, g2) = S.addCreature tower S.alice g1
-      (garrisonId, g3) = S.addCreature garrison S.alice g2
+      (arborId, g1) = S.addPermanent dryadArbor S.alice base
+      (towerId, g2) = S.addPermanent tower S.alice g1
+      (garrisonId, g3) = S.addPermanent garrison S.alice g2
   pure
     ( arborId,
       towerId,
@@ -449,8 +449,8 @@ fortificationSpec s registry = Spec.describe s "Fortification" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     garrison <- S.printingOf s registry "Darksteel Garrison"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.alice base
-        (garrisonId, g2) = S.addCreature garrison S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.alice base
+        (garrisonId, g2) = S.addPermanent garrison S.alice withCreature
         attached = S.attachTo garrisonId (Recipient.ToObject creature) g2
         after = S.settleSba attached
     Spec.assertEqWith s "the Fortification is unattached" (fmap Object.attachedTo (Game.lookupObject garrisonId after)) (Just Nothing)
@@ -493,8 +493,8 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     animator <- S.printingOf s registry "Skilled Animator"
     let base = S.landsInPlay island 3 -- {2}{U}
-        (creature, g1) = S.addCreature piker S.alice base
-        (equip, g2) = S.addCreature bonesplitter S.alice g1
+        (creature, g1) = S.addPermanent piker S.alice base
+        (equip, g2) = S.addPermanent bonesplitter S.alice g1
         attached = S.attach equip creature g2
         (withSpell, spellId) = S.handOne animator attached
         cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
@@ -524,8 +524,8 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.alice base
-        (land, g2) = S.addCreature mountain S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.alice base
+        (land, g2) = S.addPermanent mountain S.alice withCreature
         attached = S.attach land creature g2
         after = S.settleSba attached
     Spec.assertBool s (Set.member land (GameState.battlefield after)) "the land survives"
@@ -553,10 +553,10 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
     coating <- S.printingOf s registry "Liquimetal Coating"
     animator <- S.printingOf s registry "Skilled Animator"
     let base = S.landsInPlay island 3 -- {2}{U} for the Animator
-        (creature, g1) = S.addCreature piker S.alice base
-        (aura, g2) = S.addCreature unholyStrength S.alice g1
+        (creature, g1) = S.addPermanent piker S.alice base
+        (aura, g2) = S.addPermanent unholyStrength S.alice g1
         attached = S.attach aura creature g2
-        (coatingId, g3) = S.addCreature coating S.alice attached
+        (coatingId, g3) = S.addPermanent coating S.alice attached
         ability = case Face.activatedAbilities (S.combinedFace coating) of
           ab : _ -> Just ab
           [] -> Nothing
@@ -609,8 +609,8 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     curse <- S.printingOf s registry "Curse of Death's Hold"
     let base = S.landsInPlay swamp 5
-        (his, withHis) = S.addCreature piker S.bob base
-        (hers, withBoth) = S.addCreature piker S.alice withHis
+        (his, withHis) = S.addPermanent piker S.bob base
+        (hers, withBoth) = S.addPermanent piker S.alice withHis
         (gs, spellId) = S.handOne curse withBoth
         answer = aimRecipient (Recipient.ToPlayer S.bob)
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
@@ -636,10 +636,10 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
     curse <- S.printingOf s registry "Curse of Death's Hold"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.bob base
-        (aura, withAura) = S.addCreature curse S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.bob base
+        (aura, withAura) = S.addPermanent curse S.alice withCreature
         cursed = S.attachTo aura (Recipient.ToPlayer S.bob) withAura
-        (steal, withSteal) = S.addCreature controlMagic S.alice cursed
+        (steal, withSteal) = S.addPermanent controlMagic S.alice cursed
         stolen = S.attach steal creature withSteal
     Spec.assertEqWith s "bob controls it and it is shrunk" (S.powerToughnessOf creature cursed) (Just (1, 0))
     Spec.assertEqWith s "alice controls it now, so the Curse does not reach it" (S.powerToughnessOf creature stolen) (Just (2, 1))
@@ -650,7 +650,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- again.
   Spec.it s "CR 704.5m / 303.4c: a Curse attached to a player who has left the game is put into its owner's graveyard" $ do
     curse <- S.printingOf s registry "Curse of Death's Hold"
-    let (aura, withAura) = S.addCreature curse S.alice S.threePlayerGame
+    let (aura, withAura) = S.addPermanent curse S.alice S.threePlayerGame
         attached = S.attachTo aura (Recipient.ToPlayer S.carol) withAura
         before = S.settleSba attached
         departed = S.departs Departure.Type.Conceded S.carol before
@@ -670,10 +670,10 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
     curse <- S.printingOf s registry "Curse of Death's Hold"
     crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.alice base
-        (onCreature, g2) = S.addCreature unholyStrength S.alice g1
-        (onPlayer, g3) = S.addCreature curse S.alice g2
-        (crownId, g4) = S.addCreature crown S.alice g3
+        (creature, g1) = S.addPermanent piker S.alice base
+        (onCreature, g2) = S.addPermanent unholyStrength S.alice g1
+        (onPlayer, g3) = S.addPermanent curse S.alice g2
+        (crownId, g4) = S.addPermanent crown S.alice g3
         gs = S.attachTo onPlayer (Recipient.ToPlayer S.bob) (S.attach onCreature creature g4)
     case activatedTargetSlot crown of
       Nothing -> Spec.assertFailure s "the fixture wanted Crown of the Ages' one printed target slot"
@@ -717,9 +717,9 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     twofold <- S.printingOf s registry "Synthetic Twofold Enchant"
     let base0 = S.landsInPlay plains 2
-        (mineTapped, base1) = S.addCreature piker S.alice base0
-        (mineUntapped, base2) = S.addCreature piker S.alice base1
-        (theirsTapped, base3) = S.addCreature piker S.bob base2
+        (mineTapped, base1) = S.addPermanent piker S.alice base0
+        (mineUntapped, base2) = S.addPermanent piker S.alice base1
+        (theirsTapped, base3) = S.addPermanent piker S.bob base2
         base4 = S.tapObject theirsTapped (S.tapObject mineTapped base3)
         (gs, spellId) = S.handOne twofold base4
         offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) spellId theSlot gs) (Card.enchantTargetSlot (S.combinedFace twofold))
@@ -741,7 +741,7 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     twofold <- S.printingOf s registry "Synthetic Twofold Enchant"
     let base0 = S.landsInPlay plains 2
-        (creature, base1) = S.addCreature piker S.alice base0
+        (creature, base1) = S.addPermanent piker S.alice base0
         base2 = S.tapObject creature base1
         (gs, spellId) = S.handOne twofold base2
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice spellId))
@@ -770,12 +770,12 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
     -- {1}{W} for alice's Aura, {2}{U}{U} for bob's: S.landsInPlay seats alice's
     -- lands only, so bob's Islands go in one at a time.
     let base0 = S.landsInPlay plains 2
-        (creature, base1) = S.addCreature piker S.alice base0
+        (creature, base1) = S.addPermanent piker S.alice base0
         base2 = S.tapObject creature base1
-        (_, base3) = S.addCreature island S.bob base2
-        (_, base4) = S.addCreature island S.bob base3
-        (_, base5) = S.addCreature island S.bob base4
-        (_, base6) = S.addCreature island S.bob base5
+        (_, base3) = S.addPermanent island S.bob base2
+        (_, base4) = S.addPermanent island S.bob base3
+        (_, base5) = S.addPermanent island S.bob base4
+        (_, base6) = S.addPermanent island S.bob base5
         (gs, spellId) = S.handOne twofold base6
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice spellId))
         enchanted = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -812,7 +812,7 @@ replenishSpec s registry =
       board plains replenish creatures buried =
         let withLands = S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers)
             step add (acc, g) printing = let (oid, g') = add printing S.alice g in (acc <> [oid], g')
-            (creatureIds, withCreatures) = List.foldl' (step S.addCreature) ([], withLands) creatures
+            (creatureIds, withCreatures) = List.foldl' (step S.addPermanent) ([], withLands) creatures
             (buriedIds, withBuried) = List.foldl' (step S.addGraveyardCard) ([], withCreatures) buried
             (ready, spell) = S.handOne replenish withBuried
          in (spell, creatureIds, buriedIds, ready)
@@ -999,10 +999,10 @@ replenishSpec s registry =
           unholy <- S.printingOf s registry "Unholy Strength"
           piker <- S.printingOf s registry "Goblin Piker"
           mammoth <- S.printingOf s registry "War Mammoth"
-          let (host, base0) = S.addCreature piker S.alice (S.landsInPlay plains 2)
+          let (host, base0) = S.addPermanent piker S.alice (S.landsInPlay plains 2)
               -- TWO creatures, so Attach.chooseHost's one-candidate elision cannot
               -- make "nobody was asked" pass for the wrong reason.
-              (host2, base1) = S.addCreature mammoth S.alice base0
+              (host2, base1) = S.addPermanent mammoth S.alice base0
               -- A second library card keeps CR 104.3c off the board; Unholy Strength
               -- goes on top of it, so the manifest reaches the Aura.
               (_, base2) = S.addLibraryCard piker S.alice base1
@@ -1076,7 +1076,7 @@ chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
     -- The Islands pay {1}{U}; the Mountain is the host, and is added last so it
     -- is never the head of a mana-source candidate list.
     let base0 = S.landsInPlay island 4
-        (landId, base1) = S.addCreature mountain S.alice base0
+        (landId, base1) = S.addPermanent mountain S.alice base0
         (withAura, auraSpell) = S.handOne convincingMirage base1
         run pick =
           let cast = snd (Engine.runGamePure (mirageOn landId pick) withAura (S.cast S.alice auraSpell))
@@ -1190,14 +1190,14 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     crown <- S.printingOf s registry "Crown of the Ages"
     -- {B} for the Aura, {2} to cast the Crown, {4} to activate it.
     let base0 = S.landsInPlay swamp 7
-        (first, base1) = S.addCreature piker S.alice base0
+        (first, base1) = S.addPermanent piker S.alice base0
         -- A THIRD creature, and deliberately the one with the lower object id
         -- of the two destinations: "another creature" offers both, so the
         -- Prompt.ChooseAttachment answer below is a real choice rather than a
         -- forced single candidate, and answering with the Mammoth is not the
         -- head of the candidate list.
-        (decoy, base1b) = S.addCreature piker S.alice base1
-        (second, base2) = S.addCreature warMammoth S.alice base1b
+        (decoy, base1b) = S.addPermanent piker S.alice base1
+        (second, base2) = S.addPermanent warMammoth S.alice base1b
         (withAura, auraSpell) = S.handOne unholyStrength base2
         castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) withAura (S.cast S.alice auraSpell))
         enchanted = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature first)) castAura Stack.resolveTop)
@@ -1249,10 +1249,10 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.alice base
-        (land, g2) = S.addCreature mountain S.alice g1
-        (aura, g3) = S.addCreature unholyStrength S.alice g2
-        (crownObj, g4) = S.addCreature crown S.alice g3
+        (creature, g1) = S.addPermanent piker S.alice base
+        (land, g2) = S.addPermanent mountain S.alice g1
+        (aura, g3) = S.addPermanent unholyStrength S.alice g2
+        (crownObj, g4) = S.addPermanent crown S.alice g3
         onCreature = S.attach aura creature g4
         onLand = S.attach aura land g4
         offered gs = fmap (\theSlot -> Target.legalRecipients (Just S.alice) crownObj theSlot gs) (activatedTargetSlot crown)
@@ -1271,10 +1271,10 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
-        (first, g1) = S.addCreature piker S.alice base
-        (second, g2) = S.addCreature warMammoth S.alice g1
-        (aura, g3) = S.addCreature unholyStrength S.alice g2
-        (crownObj, g4) = S.addCreature crown S.alice g3
+        (first, g1) = S.addPermanent piker S.alice base
+        (second, g2) = S.addPermanent warMammoth S.alice g1
+        (aura, g3) = S.addPermanent unholyStrength S.alice g2
+        (crownObj, g4) = S.addPermanent crown S.alice g3
         gs = S.attach aura first g4
         slot = SlotName.MkSlotName (Text.pack "target")
         after =
@@ -1299,9 +1299,9 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
-        (first, g1) = S.addCreature piker S.alice base
-        (aura, g2) = S.addCreature unholyStrength S.alice g1
-        (crownObj, g3) = S.addCreature crown S.alice g2
+        (first, g1) = S.addPermanent piker S.alice base
+        (aura, g2) = S.addPermanent unholyStrength S.alice g1
+        (crownObj, g3) = S.addPermanent crown S.alice g2
         gs = S.attach aura first g3
         slot = SlotName.MkSlotName (Text.pack "target")
         after =
@@ -1337,10 +1337,10 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     crown <- S.printingOf s registry "Crown of the Ages"
     let base = Setup.emptyGame S.bothPlayers
-        (first, g1) = S.addCreature piker S.alice base
-        (land, g2) = S.addCreature mountain S.alice g1
-        (aura, g3) = S.addCreature unholyStrength S.alice g2
-        (crownObj, g4) = S.addCreature crown S.alice g3
+        (first, g1) = S.addPermanent piker S.alice base
+        (land, g2) = S.addPermanent mountain S.alice g1
+        (aura, g3) = S.addPermanent unholyStrength S.alice g2
+        (crownObj, g4) = S.addPermanent crown S.alice g3
         gs = S.attach aura first g4
         slot = SlotName.MkSlotName (Text.pack "target")
         after =
@@ -1389,9 +1389,9 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
     crown <- S.printingOf s registry "Crown of the Ages"
     -- {1}{G} for the Aura, {2} to cast the Crown, {4} to activate it.
     let base0 = S.landsInPlay forest 8
-        (host, base1) = S.addCreature piker S.alice base0
-        (mine, base2) = S.addCreature warMammoth S.alice base1
-        (theirs, base3) = S.addCreature piker S.bob base2
+        (host, base1) = S.addPermanent piker S.alice base0
+        (mine, base2) = S.addPermanent warMammoth S.alice base1
+        (theirs, base3) = S.addPermanent piker S.bob base2
         (withAura, auraSpell) = S.handOne setessanTraining base3
         castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature host)) withAura (S.cast S.alice auraSpell))
         enchanted = snd (Engine.runGamePure S.identityAnswer castAura Stack.resolveTop)
@@ -1465,11 +1465,11 @@ arbitrationSpec s registry =
       -- no numeric coincidence can hide a wrong host.
       board maiden piker mammoth unholy diffusion =
         let base = Setup.emptyGame S.bothPlayers
-            (host, g1) = S.addCreature maiden S.alice base
-            (firstHost, g2) = S.addCreature piker S.alice g1
-            (secondHost, g3) = S.addCreature mammoth S.alice g2
-            (aura, g4) = S.addCreature unholy S.bob g3
-            (artifact, g5) = S.addCreature diffusion S.alice g4
+            (host, g1) = S.addPermanent maiden S.alice base
+            (firstHost, g2) = S.addPermanent piker S.alice g1
+            (secondHost, g3) = S.addPermanent mammoth S.alice g2
+            (aura, g4) = S.addPermanent unholy S.bob g3
+            (artifact, g5) = S.addPermanent diffusion S.alice g4
          in (host, firstHost, secondHost, aura, artifact, (S.attach aura host g5) {GameState.priority = Just S.alice})
       -- Targets the Aura, then routes the destination choice by WHO is asked.
       byChooser :: ObjectId.ObjectId -> Int -> Int -> Prompt.Prompt r -> r
@@ -1556,12 +1556,12 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     auraGraft <- S.printingOf s registry "Aura Graft"
     -- {1}{U} for the Graft.
     let base0 = S.landsInPlay island 2
-        (host, base1) = S.addCreature piker S.alice base0
-        (prize, base2) = S.addCreature warMammoth S.bob base1
+        (host, base1) = S.addPermanent piker S.alice base0
+        (prize, base2) = S.addPermanent warMammoth S.bob base1
         -- A second candidate, so the destination is a real Prompt.ChooseAttachment
         -- choice rather than the single-candidate elision.
-        (decoy, base3) = S.addCreature piker S.bob base2
-        (aura, base4) = S.addCreature controlMagic S.bob base3
+        (decoy, base3) = S.addPermanent piker S.bob base2
+        (aura, base4) = S.addPermanent controlMagic S.bob base3
         stolen = S.attach aura host base4
         (gs, graft) = S.handOne auraGraft stolen
         cast = snd (Engine.runGamePure (moveAura aura prize) gs (S.cast S.alice graft))
@@ -1613,13 +1613,13 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     crown <- S.printingOf s registry "Crown of the Ages"
     auraGraft <- S.printingOf s registry "Aura Graft"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.alice base
-        (land, g2) = S.addCreature mountain S.alice g1
-        (onCreature, g3) = S.addCreature unholyStrength S.alice g2
-        (onLand, g4) = S.addCreature unholyStrength S.alice g3
-        (loose, g5) = S.addCreature unholyStrength S.alice g4
-        (onPlayer, g6) = S.addCreature curse S.alice g5
-        (crownId, g7) = S.addCreature crown S.alice g6
+        (creature, g1) = S.addPermanent piker S.alice base
+        (land, g2) = S.addPermanent mountain S.alice g1
+        (onCreature, g3) = S.addPermanent unholyStrength S.alice g2
+        (onLand, g4) = S.addPermanent unholyStrength S.alice g3
+        (loose, g5) = S.addPermanent unholyStrength S.alice g4
+        (onPlayer, g6) = S.addPermanent curse S.alice g5
+        (crownId, g7) = S.addPermanent crown S.alice g6
         (gs, graft) = S.handOne auraGraft g7
         attached =
           S.attachTo onPlayer (Recipient.ToPlayer S.bob) $
@@ -1650,8 +1650,8 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     auraGraft <- S.printingOf s registry "Aura Graft"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.alice base
-        (aura, g2) = S.addCreature unholyStrength S.alice g1
+        (creature, g1) = S.addPermanent piker S.alice base
+        (aura, g2) = S.addPermanent unholyStrength S.alice g1
         (gs, graft) = S.handOne auraGraft (S.attach aura creature g2)
         bounced = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Hand)
         offers g = fmap (Set.member (Recipient.ToObject aura) . (\theSlot -> Target.legalRecipients (Just S.alice) graft theSlot g)) (S.spellTargetSlot auraGraft)
@@ -1684,10 +1684,10 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     -- Gatherer, 2007-07-15: "You can target an Aura you already control just to
     -- move that Aura to a new permanent."
     let base0 = S.landsInPlay island 2
-        (host, base1) = S.addCreature piker S.alice base0
-        (land, base2) = S.addCreature mountain S.alice base1
-        (elsewhere, base3) = S.addCreature warMammoth S.alice base2
-        (aura, base4) = S.addCreature unholyStrength S.alice base3
+        (host, base1) = S.addPermanent piker S.alice base0
+        (land, base2) = S.addPermanent mountain S.alice base1
+        (elsewhere, base3) = S.addPermanent warMammoth S.alice base2
+        (aura, base4) = S.addPermanent unholyStrength S.alice base3
         onPiker = S.attach aura host base4
         (gs, graft) = S.handOne auraGraft onPiker
         cast = snd (Engine.runGamePure (moveAura aura land) gs (S.cast S.alice graft))
@@ -1712,10 +1712,10 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     setessanTraining <- S.printingOf s registry "Setessan Training"
     auraGraft <- S.printingOf s registry "Aura Graft"
     let base0 = S.landsInPlay island 2
-        (host, base1) = S.addCreature piker S.bob base0
-        (his, base2) = S.addCreature warMammoth S.bob base1
-        (hers, base3) = S.addCreature piker S.alice base2
-        (aura, base4) = S.addCreature setessanTraining S.bob base3
+        (host, base1) = S.addPermanent piker S.bob base0
+        (his, base2) = S.addPermanent warMammoth S.bob base1
+        (hers, base3) = S.addPermanent piker S.alice base2
+        (aura, base4) = S.addPermanent setessanTraining S.bob base3
         onHis = S.attach aura host base4
         (gs, graft) = S.handOne auraGraft onHis
         cast = snd (Engine.runGamePure (moveAura aura his) gs (S.cast S.alice graft))
@@ -1738,9 +1738,9 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
     controlMagic <- S.printingOf s registry "Control Magic"
     auraGraft <- S.printingOf s registry "Aura Graft"
     let base0 = S.landsInPlay island 2
-        (host, base1) = S.addCreature piker S.alice base0
-        (_, base2) = S.addCreature mountain S.alice base1
-        (aura, base3) = S.addCreature controlMagic S.bob base2
+        (host, base1) = S.addPermanent piker S.alice base0
+        (_, base2) = S.addPermanent mountain S.alice base1
+        (aura, base3) = S.addPermanent controlMagic S.bob base2
         stolen = S.attach aura host base3
         (gs, graft) = S.handOne auraGraft stolen
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject aura)) gs (S.cast S.alice graft))
@@ -1780,15 +1780,15 @@ miracleWorkerSpec s registry = Spec.describe s "MiracleWorker" $ do
     crown <- S.printingOf s registry "Crown of the Ages"
     worker <- S.printingOf s registry "Miracle Worker"
     let base = Setup.emptyGame S.bothPlayers
-        (mine, g1) = S.addCreature piker S.alice base
-        (theirs, g2) = S.addCreature piker S.bob g1
-        (myLand, g3) = S.addCreature mountain S.alice g2
-        (onMine, g4) = S.addCreature unholyStrength S.alice g3
-        (onTheirs, g5) = S.addCreature unholyStrength S.alice g4
-        (onLand, g6) = S.addCreature unholyStrength S.alice g5
-        (loose, g7) = S.addCreature unholyStrength S.alice g6
-        (workerId, g8) = S.addCreature worker S.alice g7
-        (crownId, g9) = S.addCreature crown S.alice g8
+        (mine, g1) = S.addPermanent piker S.alice base
+        (theirs, g2) = S.addPermanent piker S.bob g1
+        (myLand, g3) = S.addPermanent mountain S.alice g2
+        (onMine, g4) = S.addPermanent unholyStrength S.alice g3
+        (onTheirs, g5) = S.addPermanent unholyStrength S.alice g4
+        (onLand, g6) = S.addPermanent unholyStrength S.alice g5
+        (loose, g7) = S.addPermanent unholyStrength S.alice g6
+        (workerId, g8) = S.addPermanent worker S.alice g7
+        (crownId, g9) = S.addPermanent crown S.alice g8
         board =
           S.attach onLand myLand $
             S.attach onTheirs theirs (S.attach onMine mine g9)
@@ -1819,11 +1819,11 @@ miracleWorkerSpec s registry = Spec.describe s "MiracleWorker" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     worker <- S.printingOf s registry "Miracle Worker"
     let base = Setup.emptyGame S.bothPlayers
-        (mine, g1) = S.addCreature piker S.alice base
-        (theirs, g2) = S.addCreature piker S.bob g1
-        (onMine, g3) = S.addCreature unholyStrength S.alice g2
-        (onTheirs, g4) = S.addCreature unholyStrength S.alice g3
-        (workerId, g5) = S.addCreature worker S.alice g4
+        (mine, g1) = S.addPermanent piker S.alice base
+        (theirs, g2) = S.addPermanent piker S.bob g1
+        (onMine, g3) = S.addPermanent unholyStrength S.alice g2
+        (onTheirs, g4) = S.addPermanent unholyStrength S.alice g3
+        (workerId, g5) = S.addPermanent worker S.alice g4
         board = (S.attach onTheirs theirs (S.attach onMine mine g5)) {GameState.priority = Just S.alice}
     case Face.activatedAbilities (S.combinedFace worker) of
       [] -> Spec.assertFailure s "Miracle Worker should print one activated ability"
@@ -1843,7 +1843,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
-        (creature, withCreature) = S.addCreature piker S.bob base
+        (creature, withCreature) = S.addPermanent piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -1859,7 +1859,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
-        (creature, withCreature) = S.addCreature piker S.bob base
+        (creature, withCreature) = S.addPermanent piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         -- The target leaves in response, so no legal target remains at resolution.
@@ -1877,8 +1877,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = S.landsInPlay swamp 1
-        (creature, withCreature) = S.addCreature piker S.bob base
-        (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.bob base
+        (aura, withAura) = S.addPermanent unholyStrength S.alice withCreature
         attached = S.attach aura creature withAura
         -- Goblin Piker is 2/1; Unholy Strength makes it 4/2, so 2 damage is not
         -- lethal and 3 is (CR 704.5g reads TOTAL marked damage against projected
@@ -1898,7 +1898,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   Spec.it s "CR 704.5m: an unattached Aura on the battlefield goes to the graveyard" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = Setup.emptyGame S.bothPlayers
-        (aura, gs) = S.addCreature unholyStrength S.alice base
+        (aura, gs) = S.addPermanent unholyStrength S.alice base
         after = S.settleSba gs
     Spec.assertBool s (not (Set.member aura (GameState.battlefield after))) "never attached, so it falls off immediately"
   -- CR 303.4c through CR 704.5m, with the illegality coming from a layer-4 card
@@ -1926,9 +1926,9 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         landId = case Game.zoneMembers Zone.Battlefield S.alice base of
           i : _ -> i
           [] -> ObjectId.MkObjectId 999
-        (creature, withCreature) = S.addCreature piker S.alice base
-        (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
-        (songId, withSong) = S.addCreature song S.alice (S.attach aura creature withAura)
+        (creature, withCreature) = S.addPermanent piker S.alice base
+        (aura, withAura) = S.addPermanent unholyStrength S.alice withCreature
+        (songId, withSong) = S.addPermanent song S.alice (S.attach aura creature withAura)
         -- ToObject rather than S.attach's ToCreature: "enchant permanent" is a
         -- Pool.Permanents slot, so those are the recipients casting would have
         -- left, and CR 704.5m's re-check compares against exactly those.
@@ -1956,8 +1956,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     setessanTraining <- S.printingOf s registry "Setessan Training"
     let base0 = S.landsInPlay forest 2
-        (mine, base1) = S.addCreature piker S.alice base0
-        (theirs, base2) = S.addCreature piker S.bob base1
+        (mine, base1) = S.addPermanent piker S.alice base0
+        (theirs, base2) = S.addPermanent piker S.bob base1
         -- Something to draw, so the trigger is observable rather than an
         -- attempted draw from an empty library (CR 704.5b).
         (_, base3) = S.addLibraryCard forest S.alice base2
@@ -2002,14 +2002,14 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     controlMagic <- S.printingOf s registry "Control Magic"
     -- {1}{G} for alice's Aura, {2}{U}{U} for bob's. S.landsInPlay seats
     -- alice's lands and nothing else, so bob's go in one at a time through
-    -- S.addCreature -- which puts a printing onto the battlefield whatever its
+    -- S.addPermanent -- which puts a printing onto the battlefield whatever its
     -- card types are, despite the name.
     let base0 = S.landsInPlay forest 2
-        (creature, base1) = S.addCreature piker S.alice base0
-        (_, base2) = S.addCreature island S.bob base1
-        (_, base3) = S.addCreature island S.bob base2
-        (_, base4) = S.addCreature island S.bob base3
-        (_, base5) = S.addCreature island S.bob base4
+        (creature, base1) = S.addPermanent piker S.alice base0
+        (_, base2) = S.addPermanent island S.bob base1
+        (_, base3) = S.addPermanent island S.bob base2
+        (_, base4) = S.addPermanent island S.bob base3
+        (_, base5) = S.addPermanent island S.bob base4
         (gs, auraSpell) = S.handOne setessanTraining base5
         castAura = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice auraSpell))
         enchanted = snd (Engine.runGamePure S.identityAnswer castAura Stack.resolveTop)
@@ -2039,8 +2039,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.bob base
-        (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.bob base
+        (aura, withAura) = S.addPermanent controlMagic S.alice withCreature
         attached = S.attach aura creature withAura
     Spec.assertEqWith s "unattached, bob still controls it" (Projection.controllerOf creature withAura) (Just S.bob)
     Spec.assertEqWith s "attached, alice controls it" (Projection.controllerOf creature attached) (Just S.alice)
@@ -2054,8 +2054,8 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.bob base
-        (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+        (creature, withCreature) = S.addPermanent piker S.bob base
+        (aura, withAura) = S.addPermanent controlMagic S.alice withCreature
         attached = S.attach aura creature withAura
         gone = S.runPure S.identityAnswer attached (Event.changeZone aura Zone.Graveyard)
     Spec.assertEqWith s "alice controlled it" (Projection.controllerOf creature attached) (Just S.alice)
@@ -2066,7 +2066,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = S.landsInPlay island 4
-        (creature, withCreature) = S.addCreature piker S.bob base
+        (creature, withCreature) = S.addPermanent piker S.bob base
         (gs, spellId) = S.handOne controlMagic withCreature
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -2084,9 +2084,9 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, withCreature) = S.addCreature piker S.bob base
+        (creature, withCreature) = S.addPermanent piker S.bob base
         settledForBob = S.runPure S.identityAnswer withCreature (Engine.settleAll S.bob)
-        (aura, withAura) = S.addCreature controlMagic S.alice settledForBob
+        (aura, withAura) = S.addPermanent controlMagic S.alice settledForBob
         stolen = S.attach aura creature withAura
         settled = S.runPure S.identityAnswer stolen (Engine.settleAll S.alice)
     Spec.assertEqWith s "alice controls it" (Projection.controllerOf creature stolen) (Just S.alice)
@@ -2140,9 +2140,9 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     brawler <- S.printingOf s registry "Goblin Brawler"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base0 = S.landsInPlay island 1
-        (pikerId, base1) = S.addCreature piker S.alice base0
-        (brawlerId, base2) = S.addCreature brawler S.alice base1
-        (splitterId, base3) = S.addCreature bonesplitter S.alice base2
+        (pikerId, base1) = S.addPermanent piker S.alice base0
+        (brawlerId, base2) = S.addPermanent brawler S.alice base1
+        (splitterId, base3) = S.addPermanent bonesplitter S.alice base2
         ready = base3 {GameState.priority = Just S.alice}
         -- From the PROJECTION, not the face: Bonesplitter declares CR 702.6a's
         -- keyword and prints no activated ability of its own.
@@ -2181,8 +2181,8 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     song <- S.printingOf s registry "Song of the Dryads"
     consecrate <- S.printingOf s registry "Consecrate Land"
     let base0 = S.landsInPlay plains 1
-        (landId, base1) = S.addCreature mountain S.alice base0
-        (songId, base2) = S.addCreature song S.alice base1
+        (landId, base1) = S.addPermanent mountain S.alice base0
+        (songId, base2) = S.addPermanent song S.alice base1
         occupied = S.attachTo songId (Recipient.ToObject landId) base2
         (gs, spell) = S.handOne consecrate occupied
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToObject landId)) gs (S.cast S.alice spell))
@@ -2214,11 +2214,11 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     consecrate <- S.printingOf s registry "Consecrate Land"
     graft <- S.printingOf s registry "Aura Graft"
     let base0 = S.landsInPlay island 2
-        (protectedLand, base1) = S.addCreature mountain S.alice base0
-        (hostLand, base2) = S.addCreature mountain S.alice base1
-        (consecrateId, base3) = S.addCreature consecrate S.alice base2
+        (protectedLand, base1) = S.addPermanent mountain S.alice base0
+        (hostLand, base2) = S.addPermanent mountain S.alice base1
+        (consecrateId, base3) = S.addPermanent consecrate S.alice base2
         guarded = S.attachTo consecrateId (Recipient.ToObject protectedLand) base3
-        (songId, base4) = S.addCreature song S.alice guarded
+        (songId, base4) = S.addPermanent song S.alice guarded
         board = S.attachTo songId (Recipient.ToObject hostLand) base4
         (gs, spell) = S.handOne graft board
         cast = snd (Engine.runGamePure (moveAura songId protectedLand) gs (S.cast S.alice spell))
@@ -2249,10 +2249,10 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     strength <- S.printingOf s registry "Unholy Strength"
     graft <- S.printingOf s registry "Aura Graft"
     let base0 = S.landsInPlay island 2
-        (host, base1) = S.addCreature piker S.alice base0
-        (protected, base2) = S.addCreature apostle S.alice base1
-        (willing, base3) = S.addCreature mammoth S.alice base2
-        (auraId, base4) = S.addCreature strength S.alice base3
+        (host, base1) = S.addPermanent piker S.alice base0
+        (protected, base2) = S.addPermanent apostle S.alice base1
+        (willing, base3) = S.addPermanent mammoth S.alice base2
+        (auraId, base4) = S.addPermanent strength S.alice base3
         board = S.attach auraId host base4
         (gs, spell) = S.handOne graft board
         cast = snd (Engine.runGamePure (moveAura auraId protected) gs (S.cast S.alice spell))
@@ -2284,8 +2284,8 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
   Spec.it s "CR 702.16k whole cards: a Nemesis that chose alice buries her Aura, and one that chose carol keeps it" $ do
     nemesis <- S.printingOf s registry "True-Name Nemesis"
     pacifism <- S.printingOf s registry "Pacifism"
-    let (nemesisId, base1) = S.addCreature nemesis S.bob S.threePlayerGame
-        (auraId, base2) = S.addCreature pacifism S.alice base1
+    let (nemesisId, base1) = S.addPermanent nemesis S.bob S.threePlayerGame
+        (auraId, base2) = S.addPermanent pacifism S.alice base1
         wearing = S.attach auraId nemesisId base2
         chose who = S.settleSba (wearing {GameState.objects = Map.adjust (\o -> o {Object.chosenPlayer = Just who}) nemesisId (GameState.objects wearing)})
         choseAlice = chose S.alice
@@ -2314,10 +2314,10 @@ attachRestrictionSpec s registry = Spec.describe s "AttachRestriction" $ do
     strength <- S.printingOf s registry "Unholy Strength"
     finery <- S.printingOf s registry "Groom's Finery"
     let base0 = S.landsInPlay island 1
-        (shifter, base1) = S.addCreature shapeshifter S.alice base0
-        (auraId, base2) = S.addCreature strength S.alice base1
+        (shifter, base1) = S.addPermanent shapeshifter S.alice base0
+        (auraId, base2) = S.addPermanent strength S.alice base1
         wearing0 = S.attach auraId shifter base2
-        (equipId, base3) = S.addCreature finery S.alice wearing0
+        (equipId, base3) = S.addPermanent finery S.alice wearing0
         wearing = S.attach equipId shifter base3
         (_, entered) = S.entersWithTrigger apostle S.alice wearing
         onStack = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)
@@ -2396,7 +2396,7 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
     consecrate <- S.printingOf s registry "Consecrate Land"
     piker <- S.printingOf s registry "Goblin Piker"
     let base0 = S.landsInPlay plains 6
-        (pikerId, base1) = S.addCreature piker S.alice base0
+        (pikerId, base1) = S.addPermanent piker S.alice base0
         (_, base2) = S.addLibraryCard piker S.alice base1
         (_, base3) = S.addLibraryCard strength S.alice base2
         (_, base4) = S.addLibraryCard consecrate S.alice base3
@@ -2464,7 +2464,7 @@ couldEnchantSpec s registry = Spec.describe s "CouldEnchant" $ do
     consecrate <- S.printingOf s registry "Consecrate Land"
     piker <- S.printingOf s registry "Goblin Piker"
     let base0 = S.landsInPlay plains 6
-        (pikerId, base1) = S.addCreature piker S.alice base0
+        (pikerId, base1) = S.addPermanent piker S.alice base0
         (_, base2) = S.addLibraryCard piker S.alice base1
         (_, base3) = S.addLibraryCard strength S.alice base2
         (_, base4) = S.addLibraryCard consecrate S.alice base3
@@ -2701,8 +2701,8 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let base = S.landsInPlay mountain 4
-        (bystander, gs1) = S.addCreature piker S.alice base
-        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (bystander, gs1) = S.addPermanent piker S.alice base
+        (host, gs2) = S.addPermanent mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
         bestowed = S.runPure (bestowing host) board (S.cast S.alice spellId)
         printed = S.runPure (payingPrinted host) board (S.cast S.alice spellId)
@@ -2758,8 +2758,8 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let base = S.landsInPlay mountain 4
-        (bystander, gs1) = S.addCreature piker S.alice base
-        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (bystander, gs1) = S.addPermanent piker S.alice base
+        (host, gs2) = S.addPermanent mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
         resolveWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
         resolveWith answer = S.settleSba (S.runPure answer (S.runPure answer board (S.cast S.alice spellId)) Stack.resolveTop)
@@ -2803,8 +2803,8 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let base = S.landsInPlay mountain 4
-        (_, gs1) = S.addCreature piker S.alice base
-        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (_, gs1) = S.addPermanent piker S.alice base
+        (host, gs2) = S.addPermanent mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
         attached = S.settleSba (S.runPure (bestowing host) (S.runPure (bestowing host) board (S.cast S.alice spellId)) Stack.resolveTop)
         -- The enchanted War Mammoth is a 4/4, so four damage is lethal (CR 704.5g).
@@ -2854,8 +2854,8 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let base = S.landsInPlay mountain 4
-        (_, gs1) = S.addCreature piker S.alice base
-        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (_, gs1) = S.addPermanent piker S.alice base
+        (host, gs2) = S.addPermanent mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
         onStack = S.runPure (bestowing host) board (S.cast S.alice spellId)
         -- War Mammoth is a 3/3 and the spell has NOT resolved, so nothing has
@@ -2901,10 +2901,10 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     let base = S.landsInPlay mountain 4
-        (_, gs1) = S.addCreature piker S.alice base
-        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (_, gs1) = S.addPermanent piker S.alice base
+        (host, gs2) = S.addPermanent mammoth S.alice gs1
         (board, spellId) = S.handOne rollicker gs2
-        taxing = snd (S.addCreature thalia S.alice board)
+        taxing = snd (S.addPermanent thalia S.alice board)
         castWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
         castWith answer gs = S.runPure answer gs (S.cast S.alice spellId)
         bestowedTaxed = castWith (bestowing host) taxing
@@ -2940,11 +2940,11 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     storm <- S.printingOf s registry "Aether Storm"
     let base = S.landsInPlay mountain 4
-        (_, gs1) = S.addCreature piker S.alice base
-        (host, gs2) = S.addCreature mammoth S.alice gs1
+        (_, gs1) = S.addPermanent piker S.alice base
+        (host, gs2) = S.addPermanent mammoth S.alice gs1
         (open, spellId) = S.handOne rollicker gs2
         (plainCreature, board) = S.addHandCard piker S.alice open
-        stormed = snd (S.addCreature storm S.alice board)
+        stormed = snd (S.addPermanent storm S.alice board)
         castThere gs = S.runPure (payingPrinted host) gs (S.cast S.alice spellId)
     -- THE gameplay-level pair, first: one answerer, two boards. Under Aether
     -- Storm the printed candidate is gone, so the announcement settles on the
@@ -2978,7 +2978,7 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     rollicker <- S.printingOf s registry "Nyxborn Rollicker"
     let (bare, spellId) = S.handOne rollicker (S.landsInPlay mountain 4)
-        (host, hosted) = S.addCreature mammoth S.alice bare
+        (host, hosted) = S.addPermanent mammoth S.alice bare
         castThere gs = S.runPure (bestowing host) gs (S.cast S.alice spellId)
     -- THE gameplay-level pair, first. With nothing to enchant there is no
     -- {1}{R} candidate to name, so CR 601.2b settles on the printed {R} and a
@@ -3094,7 +3094,7 @@ licidSpec s registry = Spec.describe s "Licid" $ do
     island <- S.printingOf s registry "Island"
     licid <- S.printingOf s registry "Gliding Licid"
     let base = S.landsInPlay island 3
-        (lic, placed) = S.addCreature licid S.alice base
+        (lic, placed) = S.addPermanent licid S.alice base
         ready = placed {GameState.priority = Just S.alice}
         withRemoval name = S.withEffectAt lic (Timestamp.MkTimestamp 500) (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack name))) ready
         matching = withRemoval "animate"
@@ -3161,7 +3161,7 @@ licidSpec s registry = Spec.describe s "Licid" $ do
     case licidBoard island piker licid of
       Nothing -> Spec.assertFailure s "Gliding Licid should print one activated ability"
       Just (lic, _, after) -> do
-        let (aura, withAura) = S.addCreature confiscate S.bob after
+        let (aura, withAura) = S.addPermanent confiscate S.bob after
             stolen = S.settleSba (S.attachTo aura (Recipient.ToObject lic) withAura)
         -- THE pair, gameplay level and first: the offer stayed with alice and
         -- never reached bob, whose control of the Licid the leg below confirms.
@@ -3190,8 +3190,8 @@ licidBoard ::
   Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 licidBoard island piker licid =
   let base0 = S.landsFor island S.bob 3 (S.landsInPlay island 3)
-      (host, base1) = S.addCreature piker S.alice base0
-      (lic, base2) = S.addCreature licid S.alice base1
+      (host, base1) = S.addPermanent piker S.alice base0
+      (lic, base2) = S.addPermanent licid S.alice base1
       ready = base2 {GameState.priority = Just S.alice}
    in case Face.activatedAbilities (S.combinedFace licid) of
         [] -> Nothing
@@ -3242,7 +3242,7 @@ aspectChain s registry hack = do
   aspect <- S.printingOf s registry "Aspect of Wolf"
   magicalHack <- S.printingOf s registry "Magical Hack"
   let base = S.landsFor island S.alice 7 (S.landsInPlay forest 3)
-      (creature, g1) = S.addCreature piker S.alice base
+      (creature, g1) = S.addPermanent piker S.alice base
       (auraId, g2) = S.addHandCard aspect S.alice g1
       (hackId, g3) = S.addHandCard magicalHack S.alice g2
       onStack = S.runPure (targetingOnly creature) g3 (S.cast S.alice auraId)
@@ -3309,8 +3309,8 @@ sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let board creature =
           let base0 = S.landsInPlay plains 1
-              (_, base1) = S.addCreature aid S.alice base0
-              (creatureId, base2) = S.addCreature creature S.alice base1
+              (_, base1) = S.addPermanent aid S.alice base0
+              (creatureId, base2) = S.addPermanent creature S.alice base1
               (splitterId, ready) = S.addHandCard bonesplitter S.alice base2
            in (creatureId, splitterId, ready)
         -- The answerer is spelled out at each call rather than let-bound: it is
@@ -3357,9 +3357,9 @@ sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
     mammoth <- S.printingOf s registry "War Mammoth"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base0 = S.landsInPlay plains 1
-        (_, base1) = S.addCreature aid S.alice base0
-        (pikerId, base2) = S.addCreature piker S.alice base1
-        (mammothId, base3) = S.addCreature mammoth S.alice base2
+        (_, base1) = S.addPermanent aid S.alice base0
+        (pikerId, base2) = S.addPermanent piker S.alice base1
+        (mammothId, base3) = S.addPermanent mammoth S.alice base2
         (splitterId, ready) = S.addHandCard bonesplitter S.alice base3
         countingAnswer :: Prompt.Prompt r -> State.State Int r
         countingAnswer p = case p of
@@ -3396,8 +3396,8 @@ sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base0 = S.landsInPlay plains 1
-        (_, base1) = S.addCreature aid S.alice base0
-        (pikerId, base2) = S.addCreature piker S.alice base1
+        (_, base1) = S.addPermanent aid S.alice base0
+        (pikerId, base2) = S.addPermanent piker S.alice base1
         (splitterId, ready) = S.addHandCard bonesplitter S.alice base2
         -- targetingOnly is attachingTo without the ChooseOptional arm, so the
         -- target is still the Piker and S.identityAnswer declines the "may".
@@ -3430,8 +3430,8 @@ sigardasAidSpec s registry = Spec.describe s "AttachBound" $ do
     bulwark <- S.printingOf s registry "Synthetic Grave Bulwark"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base0 = S.landsInPlay plains 1
-        (_, base1) = S.addCreature aid S.alice base0
-        (pikerId, base2) = S.addCreature piker S.alice base1
+        (_, base1) = S.addPermanent aid S.alice base0
+        (pikerId, base2) = S.addPermanent piker S.alice base1
         (_, base3) = S.addGraveyardCard bulwark S.alice base2
         (splitterId, ready) = S.addHandCard bonesplitter S.alice base3
         cast = S.runPure (attachingTo pikerId) ready (S.cast S.alice splitterId)

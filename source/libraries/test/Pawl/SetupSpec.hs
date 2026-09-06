@@ -294,7 +294,7 @@ greenBlackSetupSpec s registry = Spec.describe s "GreenBlackSetup" $ do
 -- pool of owned cards). replicate n () avoids a list comprehension (CLAUDE.md).
 addMany :: Printing.Printing -> Int -> PlayerId -> GameState.GameState -> GameState.GameState
 addMany mountain n pid gs =
-  List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
+  List.foldl' (\g _ -> snd (S.addPermanent mountain pid g)) gs (replicate n ())
 
 -- CR 400.7's per-incarnation state, all of it at once and every field set to
 -- something Object.newIncarnation would erase, so a path that forgets to erase
@@ -479,8 +479,8 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- bob's graveyard card is proven to return by his count staying 8.
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
-        (_aId, g1) = S.addCreature mountain S.alice g0
-        (bId, g2) = S.addCreature mountain S.bob g1
+        (_aId, g1) = S.addPermanent mountain S.alice g0
+        (bId, g2) = S.addPermanent mountain S.bob g1
         g3 = addMany mountain 7 S.alice (addMany mountain 7 S.bob g2)
         -- move bob's card to his graveyard, to prove zone-independence.
         g4 = snd (Engine.runGamePure S.identityAnswer g3 (Event.changeZone bId Zone.Graveyard))
@@ -607,8 +607,8 @@ townshipName = CardName.MkCardName (Text.pack "Hanweir, the Writhing Township")
 -- Pawl.Support, which rebuilds every spec in the tree.
 meldedBoard :: GameState.GameState -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (Maybe ObjectId.ObjectId, GameState.GameState)
 meldedBoard base battlements garrison mountain =
-  let (battlementsId, g1) = S.addCreature battlements S.alice base
-      (_, g2) = S.addCreature garrison S.alice g1
+  let (battlementsId, g1) = S.addPermanent battlements S.alice base
+      (_, g2) = S.addPermanent garrison S.alice g1
       board =
         (S.landsFor mountain S.alice 5 g2)
           { GameState.phase = Phase.PrecombatMain,
@@ -829,8 +829,8 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 729.4a: a card the subgame brought in leaves the main game when the subgame ends" $ do
     elf <- S.printingOf s registry "Arbor Elf"
     let g0 = Setup.emptyGame S.bothPlayers
-        (elfId, g1) = S.addCreature elf S.alice g0
-        (bystanderId, parent) = S.addCreature elf S.bob g1
+        (elfId, g1) = S.addPermanent elf S.alice g0
+        (bystanderId, parent) = S.addPermanent elf S.bob g1
         sub0 = Setup.subgameStateFrom S.alice parent
         (broughtInId, crossedSub) = Event.bringInFrom S.alice elfId sub0
         after = Setup.applyCrossings crossedSub parent
@@ -864,7 +864,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   -- has anything to find.
   Spec.it s "CR 729.4a a phased-in permanent a subgame takes triggers its leaves-the-battlefield ability" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
-    let (tusk, g1) = S.addCreature thragtusk S.alice S.threePlayerGame
+    let (tusk, g1) = S.addPermanent thragtusk S.alice S.threePlayerGame
         parent = S.giveControl tusk S.carol g1
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, crossedSub) = Event.bringInFrom S.alice tusk sub0
@@ -894,7 +894,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   -- printing in the pool has both phasing and a leaves-the-battlefield ability.
   Spec.it s "CR 702.26b a phased-out permanent a subgame takes leaves the main game and triggers nothing" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
-    let (tusk, g1) = S.addCreature thragtusk S.alice S.threePlayerGame
+    let (tusk, g1) = S.addPermanent thragtusk S.alice S.threePlayerGame
         parent = Phasing.phaseOut (PhasedOut.Directly S.carol) tusk (S.giveControl tusk S.carol g1)
         sub0 = Setup.subgameStateFrom S.alice parent
         (broughtInId, crossedSub) = Event.bringInFrom S.alice tusk sub0
@@ -924,8 +924,8 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 702.26b a phased-out Titania's Song a subgame takes hands nothing over" $ do
     titaniasSong <- S.printingOf s registry "Titania's Song"
     jadeStatue <- S.printingOf s registry "Jade Statue"
-    let (songId, g1) = S.addCreature titaniasSong S.alice (Setup.emptyGame S.bothPlayers)
-        (statueId, phasedIn) = S.addCreature jadeStatue S.alice g1
+    let (songId, g1) = S.addPermanent titaniasSong S.alice (Setup.emptyGame S.bothPlayers)
+        (statueId, phasedIn) = S.addPermanent jadeStatue S.alice g1
         phasedOut = Phasing.phaseOut (PhasedOut.Directly S.alice) songId phasedIn
         crossFrom parent = Setup.applyCrossings (snd (Event.bringInFrom S.alice songId (Setup.subgameStateFrom S.alice parent))) parent
         afterIn = crossFrom phasedIn
@@ -949,8 +949,8 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     let g0 = Setup.emptyGame S.bothPlayers
         -- Minted in the opposite order to the one they cross in, so every
         -- assertion below reads the CROSSING order and not the id order.
-        (lateCrosser, g1) = S.addCreature elf S.alice g0
-        (earlyCrosser, parent) = S.addCreature elf S.alice g1
+        (lateCrosser, g1) = S.addPermanent elf S.alice g0
+        (earlyCrosser, parent) = S.addPermanent elf S.alice g1
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, crossed1) = Event.bringInFrom S.alice earlyCrosser sub0
         (_, crossedSub) = Event.bringInFrom S.alice lateCrosser crossed1
@@ -983,8 +983,8 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     elf <- S.printingOf s registry "Arbor Elf"
     anthem <- S.printingOf s registry "Glorious Anthem"
     let g0 = Setup.emptyGame S.bothPlayers
-        (anthemId, g1) = S.addCreature anthem S.alice g0
-        (elfId, parent) = S.addCreature elf S.alice g1
+        (anthemId, g1) = S.addPermanent anthem S.alice g0
+        (elfId, parent) = S.addPermanent elf S.alice g1
         sub0 = Setup.subgameStateFrom S.alice parent
         (_, crossed1) = Event.bringInFrom S.alice anthemId sub0
         (_, crossedSub) = Event.bringInFrom S.alice elfId crossed1
@@ -1004,7 +1004,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 729.6: a crossing from further out is passed outward one level, not applied here" $ do
     elf <- S.printingOf s registry "Arbor Elf"
     let g0 = Setup.emptyGame S.bothPlayers
-        (elfId, g1) = S.addCreature elf S.alice g0
+        (elfId, g1) = S.addPermanent elf S.alice g0
         (printingId, g2) = Game.intern elf g1
         -- An id belonging to no object of g2's: this game is itself a subgame,
         -- and that card sits in the game holding it.
@@ -1078,7 +1078,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
   Spec.it s "CR 729.4a/800.4a a main-game card a departed player wished in is in neither game after" $ do
     elf <- S.printingOf s registry "Arbor Elf"
     let g0 = Setup.emptyGame S.threePlayers
-        (bobsId, parent) = S.addCreature elf S.bob g0
+        (bobsId, parent) = S.addPermanent elf S.bob g0
         sub0 = Setup.subgameStateFrom S.alice parent
         (minted, crossedSub) = Event.bringInFrom S.bob bobsId sub0
         departedSub = S.departs Departure.Type.Lost S.bob crossedSub

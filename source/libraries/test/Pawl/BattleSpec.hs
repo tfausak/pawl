@@ -916,8 +916,8 @@ conscriptedSiege s registry = do
   mountain <- S.printingOf s registry "Mountain"
   plains <- S.printingOf s registry "Plains"
   conscripts <- S.printingOf s registry "Zealous Conscripts"
-  let lands = List.foldl' (\g _ -> snd (S.addCreature mountain S.carol g)) entered [1 :: Int .. 5]
-      (decoy, withDecoy) = S.addCreature plains S.alice lands
+  let lands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.carol g)) entered [1 :: Int .. 5]
+      (decoy, withDecoy) = S.addPermanent plains S.alice lands
       (spell, handed) = S.addHandCard conscripts S.carol withDecoy
   pure
     ( handed
@@ -1309,7 +1309,7 @@ twoBolts ::
 twoBolts s registry gs = do
   mountain <- S.printingOf s registry "Mountain"
   bolt <- S.printingOf s registry "Lightning Bolt"
-  let landed = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) gs [1 :: Int, 2]
+  let landed = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) gs [1 :: Int, 2]
       (one, g1) = S.addHandCard bolt S.alice landed
       (two, g2) = S.addHandCard bolt S.alice g1
   pure (g2, [one, two])
@@ -1327,7 +1327,7 @@ siegeUnderFire s registry spells = do
   (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
   mountain <- S.printingOf s registry "Mountain"
   printings <- Monad.mapM (S.printingOf s registry) spells
-  let withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) entered printings
+  let withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) entered printings
       (ids, ready) =
         List.foldl'
           (\(acc, g) p -> let (oid, g2) = S.addHandCard p S.alice g in (acc <> [oid], g2))
@@ -1397,7 +1397,7 @@ battleCombat s registry protector defender mine theirs hers = do
   (entered, battle) <- castInvasionThreeSeated s registry (protectTo protector)
   let addAll pid ps g =
         List.foldl'
-          (\(ids, g1) p -> let (oid, g2) = S.addCreature p pid g1 in (ids <> [oid], g2))
+          (\(ids, g1) p -> let (oid, g2) = S.addPermanent p pid g1 in (ids <> [oid], g2))
           ([], g)
           ps
       (ours, gs1) = addAll S.alice mine entered
@@ -1461,7 +1461,7 @@ castInvasionThreeSeated ::
 castInvasionThreeSeated s registry answer = do
   plains <- S.printingOf s registry "Plains"
   invasion <- S.printingOf s registry "Invasion of Dominaria"
-  let lands = List.foldl' (\g _ -> snd (S.addCreature plains S.alice g)) S.threePlayerGame [1 :: Int .. 3]
+  let lands = List.foldl' (\g _ -> snd (S.addPermanent plains S.alice g)) S.threePlayerGame [1 :: Int .. 3]
       stocked = snd (S.addLibraryCard plains S.alice lands)
       (spellId, handed) = S.addHandCard invasion S.alice stocked
       ready =

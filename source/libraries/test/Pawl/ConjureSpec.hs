@@ -97,7 +97,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   Spec.it s "conjure puts a castable card named Ornithopter into the conjuring player's hand" $ do
     island <- S.printingOf s registry "Island"
     thopterist <- S.printingOf s registry "Emporium Thopterist"
-    let (_, board) = S.addCreature thopterist S.alice (S.landsInPlay island 1)
+    let (_, board) = S.addPermanent thopterist S.alice (S.landsInPlay island 1)
         conjured = upkeepOf board
         inHand = namedIn ornithopter Zone.Hand conjured
         -- CR 302.1: a creature card is cast from a hand during a main phase with
@@ -129,7 +129,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   Spec.it s "a second upkeep conjures a second Ornithopter" $ do
     island <- S.printingOf s registry "Island"
     thopterist <- S.printingOf s registry "Emporium Thopterist"
-    let (_, board) = S.addCreature thopterist S.alice (S.landsInPlay island 1)
+    let (_, board) = S.addPermanent thopterist S.alice (S.landsInPlay island 1)
         twice = upkeepOf (upkeepOf board)
     Spec.assertEqWith
       s
@@ -256,7 +256,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- not merely an object with the right name.
   --
   -- Kismet is BOB's, so it reaches the conjured Mentor and nothing alice's
-  -- fixture placed; addCreature arranges a board rather than entering anything.
+  -- fixture placed; addPermanent arranges a board rather than entering anything.
   Spec.it s "conjure onto the battlefield enters as a permanent, seen by an enters trigger and an entry replacement" $ do
     islandPrinting <- S.printingOf s registry "Island"
     lam <- S.printingOf s registry "Lam, Storm Crane Elder"
@@ -264,9 +264,9 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     kismet <- S.printingOf s registry "Kismet"
     twice <- S.printingOf s registry "Think Twice"
     let board0 = S.landsInPlay islandPrinting 2
-        (_, board1) = S.addCreature lam S.alice board0
-        (_, board2) = S.addCreature warden S.alice board1
-        (_, board3) = S.addCreature kismet S.bob board2
+        (_, board1) = S.addPermanent lam S.alice board0
+        (_, board2) = S.addPermanent warden S.alice board1
+        (_, board3) = S.addPermanent kismet S.bob board2
         (spell, board4) = S.addHandCard twice S.alice board3
         -- Think Twice draws, and CR 104.3c would lose alice the game out from
         -- under the assertions on an empty library.

@@ -849,8 +849,8 @@ saviorOfOllenbockSpec s registry =
           giant <- S.printingOf s registry "Hill Giant"
           forest <- S.printingOf s registry "Forest"
           battlegrowth <- S.printingOf s registry "Battlegrowth"
-          let (saviorId, withSavior) = S.addCreature savior S.alice (S.landsInPlay forest 1)
-              (giantId, withGiant) = S.addCreature giant S.bob withSavior
+          let (saviorId, withSavior) = S.addPermanent savior S.alice (S.landsInPlay forest 1)
+              (giantId, withGiant) = S.addPermanent giant S.bob withSavior
               (handed, spellId) = S.handOne battlegrowth withGiant
               cast = snd (Engine.runGamePure (aimingAt (Recipient.ToCreature saviorId) []) handed (S.cast S.alice spellId))
               resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -1366,7 +1366,7 @@ evolveSpec s registry =
       -- A Raptor under alice, then one creature entering under `pid` with CR
       -- 603.6a's event, so the scan has something to match.
       board raptor printing pid =
-        let (raptorId, gs1) = S.addCreature raptor S.alice (Setup.emptyGame S.bothPlayers)
+        let (raptorId, gs1) = S.addPermanent raptor S.alice (Setup.emptyGame S.bothPlayers)
             (enteringId, gs2) = S.entersWithTrigger printing pid gs1
          in (raptorId, enteringId, gs2)
       evolvesAgainst raptor printing = do
@@ -1505,17 +1505,17 @@ krasisSpec s registry =
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       plusOnes = S.counterOf CounterKind.PlusOnePlusOne
       seeded printing pid gs =
-        let (oid, g1) = S.addCreature printing pid gs
+        let (oid, g1) = S.addPermanent printing pid gs
          in (oid, S.addCounter CounterKind.PlusOnePlusOne 1 oid g1)
       boardOn base = do
         krasisPrinting <- S.printingOf s registry "Renegade Krasis"
         pikerPrinting <- S.printingOf s registry "Goblin Piker"
         birdsPrinting <- S.printingOf s registry "Birds of Paradise"
         giantPrinting <- S.printingOf s registry "Hill Giant"
-        let (krasis, g1) = S.addCreature krasisPrinting S.alice base
+        let (krasis, g1) = S.addPermanent krasisPrinting S.alice base
             (mine, g2) = seeded pikerPrinting S.alice g1
             (giant, g3) = seeded giantPrinting S.alice g2
-            (birds, g4) = S.addCreature birdsPrinting S.alice g3
+            (birds, g4) = S.addPermanent birdsPrinting S.alice g3
             (theirs, g5) = seeded pikerPrinting S.bob g4
         pure (krasis, mine, giant, birds, theirs, g5)
       board = boardOn (Setup.emptyGame S.bothPlayers)
@@ -1539,7 +1539,7 @@ krasisSpec s registry =
           raptorPrinting <- S.printingOf s registry "Cloudfin Raptor"
           pikerPrinting <- S.printingOf s registry "Goblin Piker"
           (krasis, mine, _, _, _, gs) <- board
-          let (raptor, withRaptor) = S.addCreature raptorPrinting S.alice gs
+          let (raptor, withRaptor) = S.addPermanent raptorPrinting S.alice gs
               (_, entered) = S.entersWithTrigger pikerPrinting S.alice withRaptor
               after = resolveAll (settle entered)
           Spec.assertEqWith s "the Raptor did evolve" (plusOnes raptor after) 1

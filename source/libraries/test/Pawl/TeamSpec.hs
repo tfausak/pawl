@@ -68,7 +68,7 @@ spec s registry = Spec.describe s "Teams" $ do
   -- positive proves the same creature, on the same board, may attack an opponent.
   Spec.it s "CR 102.3 a creature cannot attack its controller's teammate" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (mine, staged) = S.addCreature piker S.alice (twoTeams S.fourPlayerGame)
+    let (mine, staged) = S.addPermanent piker S.alice (twoTeams S.fourPlayerGame)
         board =
           staged
             { GameState.activePlayer = S.alice,
@@ -172,7 +172,7 @@ spec s registry = Spec.describe s "Teams" $ do
   Spec.it s "CR 702.11c hexproof from opponents does not stop a teammate" $ do
     leyline <- S.printingOf s registry "Leyline of Sanctity"
     bolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, warded) = S.addCreature leyline S.bob (twoTeams S.fourPlayerGame)
+    let (_, warded) = S.addPermanent leyline S.bob (twoTeams S.fourPlayerGame)
     case S.spellTargetSlot bolt of
       Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
       Just theSlot -> do
@@ -193,7 +193,7 @@ spec s registry = Spec.describe s "Teams" $ do
   Spec.it s "CR 102.3 a teammate's card is not put into an opponent's graveyard" $ do
     leyline <- S.printingOf s registry "Leyline of the Void"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature leyline S.alice (twoTeams S.fourPlayerGame)
+    let (_, g0) = S.addPermanent leyline S.alice (twoTeams S.fourPlayerGame)
         (teammates, g1) = S.addLibraryCard piker S.bob g0
         (opponents, g2) = S.addLibraryCard piker S.carol g1
         after = S.runPure S.identityAnswer g2 (Event.changeZone teammates Zone.Graveyard)

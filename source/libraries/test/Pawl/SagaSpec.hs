@@ -95,7 +95,7 @@ entrySpec s registry = Spec.describe s "Entry" $ do
     weaving <- S.printingOf s registry "Synthetic Chronicle Weaving"
     highGround <- S.printingOf s registry "High Ground"
     let (gs, spellId) = S.handOne highGround (S.landsInPlay plains 1)
-        (_, granted) = S.addCreature weaving S.alice gs
+        (_, granted) = S.addPermanent weaving S.alice gs
         enter board = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.alice spellId)) Stack.resolveTop
         after = enter granted
     case sagaOf after of
@@ -140,8 +140,8 @@ chapterSpec s registry = Spec.describe s "Chapters" $ do
   Spec.it s "CR 714.2d the final chapter number is the greatest chapter, and 0 with none" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     plains <- S.printingOf s registry "Plains"
-    let (oid, gs) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
-        (landId, withLand) = S.addCreature plains S.bob gs
+    let (oid, gs) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
+        (landId, withLand) = S.addPermanent plains S.bob gs
         pcs = Projection.projectAll withLand
     case Map.lookup oid pcs of
       Nothing -> Spec.assertFailure s "the Saga has no projection"
@@ -169,7 +169,7 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
   -- reaching would leave all of them green.
   Spec.it s "CR 505.4 the turn machinery itself runs the action as the step begins" $ do
     benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
         withCounter = S.addCounter CounterKind.Lore 1 oid base
         gs = precombatMainOf S.alice withCounter
         after = S.runPure S.identityAnswer gs Engine.runStep
@@ -177,14 +177,14 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
     Spec.assertEqWith s "and the step really was the precombat main phase" (GameState.phase gs) Phase.PrecombatMain
   Spec.it s "CR 714.3c the active player puts a lore counter on each Saga they control" $ do
     benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
         withCounter = S.addCounter CounterKind.Lore 1 oid base
         gs = precombatMainOf S.alice withCounter
         after = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
     Spec.assertEqWith s "a second lore counter" (S.counterOf CounterKind.Lore oid after) 2
   Spec.it s "CR 714.3c and it fires the chapter that counter crossed, not the ones below it" $ do
     benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
         withCounter = S.addCounter CounterKind.Lore 1 oid base
         gs = precombatMainOf S.alice withCounter
         advanced = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
@@ -205,7 +205,7 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     doublingSeason <- S.printingOf s registry "Doubling Season"
     plains <- S.printingOf s registry "Plains"
-    let (_, withSeason) = S.addCreature doublingSeason S.alice (S.landsInPlay plains 3)
+    let (_, withSeason) = S.addPermanent doublingSeason S.alice (S.landsInPlay plains 3)
         (gs, spellId) = S.handOne benalia withSeason
         cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
         entered = S.runPure S.identityAnswer cast Stack.resolveTop
@@ -226,8 +226,8 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
   Spec.it s "CR 714.3c Vorinclex DOES double the turn-based lore counter" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
-    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
-        (_, withPraetor) = S.addCreature vorinclex S.alice base
+    let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
+        (_, withPraetor) = S.addPermanent vorinclex S.alice base
         gs = precombatMainOf S.alice withPraetor
         after = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
         bare = S.runPure S.identityAnswer (precombatMainOf S.alice base) (Engine.runTurnBasedActions Phase.PrecombatMain)
@@ -235,7 +235,7 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
     Spec.assertEqWith s "and one without the praetor" (S.counterOf CounterKind.Lore oid bare) 1
   Spec.it s "CR 714.3c a Saga its controller does not control the turn of stays put" $ do
     benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addCreature benalia S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent benalia S.bob (Setup.emptyGame S.bothPlayers)
         withCounter = S.addCounter CounterKind.Lore 1 oid base
         -- ALICE's precombat main phase. CR 505.4 names the active player, and
         -- bob's Saga is not theirs to advance.
@@ -248,7 +248,7 @@ sacrificeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n
 sacrificeSpec s registry = Spec.describe s "The final chapter" $ do
   Spec.it s "CR 704.5s a Saga at its final chapter number is sacrificed by its controller" $ do
     benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
         -- Three counters and NO unscanned placement event, so CR 704.5s's third
         -- conjunct is satisfied: nothing of this Saga's has triggered.
         gs = S.addCounter CounterKind.Lore 3 oid base
@@ -257,7 +257,7 @@ sacrificeSpec s registry = Spec.describe s "The final chapter" $ do
     Spec.assertEqWith s "and is in its owner's graveyard, a sacrifice being a move to it (CR 701.21a)" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
   Spec.it s "CR 704.5s but NOT while a chapter ability of its own is still on the stack" $ do
     benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
         withCounters = S.addCounter CounterKind.Lore 2 oid base
         gs = precombatMainOf S.alice withCounters
         -- The turn-based action takes it to three, which fires chapter III. The
@@ -281,10 +281,10 @@ sacrificeSpec s registry = Spec.describe s "The final chapter" $ do
   Spec.it s "CR 714 the Saga runs II then III, pumps its own Knight, and is sacrificed" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (sagaId, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+    let (sagaId, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
         -- Goblin Piker is the CONTROL: a 2/1 alice controls that is no Knight,
         -- so chapter III's "Knights you control" must leave it alone.
-        (pikerId, withPiker) = S.addCreature piker S.alice base
+        (pikerId, withPiker) = S.addPermanent piker S.alice base
         withCounter = S.addCounter CounterKind.Lore 1 sagaId withPiker
         advance g = S.runPure S.identityAnswer (precombatMainOf S.alice g) (Engine.runTurnBasedActions Phase.PrecombatMain)
         resolveAll g = S.runPure S.identityAnswer g Engine.priorityLoop
@@ -372,7 +372,7 @@ readAheadSpec s registry = Spec.describe s "Read ahead" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     loveSong <- S.printingOf s registry "Love Song of Night and Day"
-    let (pikerId, board) = S.addCreature piker S.alice (stocked plains)
+    let (pikerId, board) = S.addPermanent piker S.alice (stocked plains)
         (gs, spellId) = S.handOne loveSong board
         cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
         resolved = S.runPure (answeringChapter 3) cast Stack.resolveTop

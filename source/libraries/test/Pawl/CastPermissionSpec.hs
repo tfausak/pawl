@@ -174,7 +174,7 @@ extraLandDropsSpec s registry =
     Spec.it s "CR 604.2 destroying Exploration mid-turn drops the allowance back to one" $ do
       mountain <- S.printingOf s registry "Mountain"
       exploration <- S.printingOf s registry "Exploration"
-      let (explorationId, board) = S.addCreature exploration S.alice (Setup.emptyGame S.bothPlayers)
+      let (explorationId, board) = S.addPermanent exploration S.alice (Setup.emptyGame S.bothPlayers)
           add g _ = snd (S.addHandCard mountain S.alice g)
           withHand = List.foldl' add board [1 .. 5 :: Int]
           ready = withHand {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
@@ -424,11 +424,11 @@ counteringBoard ::
   [(PlayerId.PlayerId, Printing.Printing)] ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 counteringBoard island cancel stifle sorcerer victim permanents =
-  let withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) (Setup.emptyGame S.bothPlayers) [1 .. (3 :: Int)]
-      (srcId, withSorcerer) = S.addCreature sorcerer S.alice withLands
+  let withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) (Setup.emptyGame S.bothPlayers) [1 .. (3 :: Int)]
+      (srcId, withSorcerer) = S.addPermanent sorcerer S.alice withLands
       -- CR 302.6: settled, so the Sorcerer's {T} may be activated at all.
       settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-      addPermanent (ids, g) (who, p) = let (oid, g') = S.addCreature p who g in (oid : ids, g')
+      addPermanent (ids, g) (who, p) = let (oid, g') = S.addPermanent p who g in (oid : ids, g')
       (permanentIds, withPermanents) = List.foldl' addPermanent ([], settled) permanents
       (victimId, onStack) = S.spellOnStack victim S.alice withPermanents
       (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
@@ -669,7 +669,7 @@ crucibleBoard swamp mountain sorcerer crucible present =
       (herMountain, g5) = S.addHandCard mountain S.alice g4
       (hisMountain, g6) = S.addHandCard mountain S.bob g5
       (_, g7) = S.addHandCard mountain S.carol g6
-      g8 = if present then snd (S.addCreature crucible S.alice g7) else g7
+      g8 = if present then snd (S.addPermanent crucible S.alice g7) else g7
    in ( hers,
         his,
         theirs,
@@ -824,7 +824,7 @@ hordeBoard forest horde elves rampant top present =
       (_, g6) = S.addLibraryCard forest S.carol g5
       (theirTop, g7) = S.addLibraryCard elves S.carol g6
       (herHand, g8) = S.addHandCard rampant S.alice g7
-      g9 = if present then snd (S.addCreature horde S.alice g8) else g8
+      g9 = if present then snd (S.addPermanent horde S.alice g8) else g8
    in ( herTop,
         herDeep,
         hisTop,
@@ -915,7 +915,7 @@ garruksHordeSpec s registry =
         Spec.it s "CR 601.3 a prohibition still closes the zone the permission opened" $ do
           cage <- S.printingOf s registry "Grafdigger's Cage"
           (herTop, _, _, _, herHand, gs) <- board "Llanowar Elves" True
-          let caged = snd (S.addCreature cage S.bob gs)
+          let caged = snd (S.addPermanent cage S.bob gs)
           Spec.assertBool s (not (any (S.isCastOf herTop) (Action.legalActions S.alice caged))) "the top card is not offered with the Cage out"
           Spec.assertBool s (not (S.castable S.alice herTop caged)) "nor castable"
           Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Library herTop caged) "so the refusal is the prohibition, not the permission"
@@ -943,7 +943,7 @@ garruksHordeSpec s registry =
 --
 -- All four of the card's printed clauses are in its file now, and only this one
 -- is read here: nothing on this board prevents damage, no other Spider enters,
--- and S.addCreature inserts Spider-Punk into the battlefield directly rather
+-- and S.addPermanent inserts Spider-Punk into the battlefield directly rather
 -- than raising an entry event, so CR 702.136a's riot has no CR 614.1c
 -- replacement to be. CR 615.12's clause is proved in Pawl.ReplacementSpec's
 -- "Spider-Punk (CR 615.12)" group instead, where a Mending Hands shield gives it
@@ -1192,9 +1192,9 @@ jaredBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 jaredBoard jared jailer piker =
-  let (jaredId, gs1) = S.addCreature jared S.alice (Setup.emptyGame S.bothPlayers)
-      (jailerId, gs2) = S.addCreature jailer S.alice gs1
-      (pikerId, gs3) = S.addCreature piker S.alice gs2
+  let (jaredId, gs1) = S.addPermanent jared S.alice (Setup.emptyGame S.bothPlayers)
+      (jailerId, gs2) = S.addPermanent jailer S.alice gs1
+      (pikerId, gs3) = S.addPermanent piker S.alice gs2
    in (jaredId, jailerId, pikerId, gs3)
 
 -- One permanent's CR 603.6a entry, gathered and resolved. The permanent is already
@@ -1310,12 +1310,12 @@ voidWinnowerBoard ::
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 voidWinnowerBoard mountain piker bolt disaster extra =
   let base = S.landsInPlay mountain 9
-      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. 9 :: Int]
+      withBobsLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.bob g)) base [1 .. 9 :: Int]
       (alicesPiker, gs1) = S.addHandCard piker S.alice withBobsLands
       (bobsPiker, gs2) = S.addHandCard piker S.bob gs1
       (bobsBolt, gs3) = S.addHandCard bolt S.bob gs2
       (bobsDisaster, gs4) = S.addHandCard disaster S.bob gs3
-      put g printing = snd (S.addCreature printing S.alice g)
+      put g printing = snd (S.addPermanent printing S.alice g)
    in ( alicesPiker,
         bobsPiker,
         bobsBolt,
@@ -1332,10 +1332,10 @@ voidWinnowerBoard mountain piker bolt disaster extra =
 omniscientBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
 omniscientBoard mountain disaster omniscience lands extra =
   let base = S.landsInPlay mountain 9
-      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. lands]
-      withGrant = snd (S.addCreature omniscience S.bob withBobsLands)
+      withBobsLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.bob g)) base [1 .. lands]
+      withGrant = snd (S.addPermanent omniscience S.bob withBobsLands)
       (bobsDisaster, gs) = S.addHandCard disaster S.bob withGrant
-      put g printing = snd (S.addCreature printing S.alice g)
+      put g printing = snd (S.addPermanent printing S.alice g)
    in (bobsDisaster, (List.foldl' put gs extra) {GameState.phase = Phase.PrecombatMain})
 
 -- Whatever that player may do, asked in their own precombat main phase with an
@@ -1461,9 +1461,9 @@ voidWinnowerSpec s registry =
 -- board: it is exactly the printed cost and one short of half the taxed one.
 oppressiveRaysBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 oppressiveRaysBoard rays brothers mountain n =
-  let (taxed, g1) = S.addCreature brothers S.alice (S.landsInPlay mountain n)
-      (untaxed, g2) = S.addCreature brothers S.alice g1
-      (aura, g3) = S.addCreature rays S.alice g2
+  let (taxed, g1) = S.addPermanent brothers S.alice (S.landsInPlay mountain n)
+      (untaxed, g2) = S.addPermanent brothers S.alice g1
+      (aura, g3) = S.addPermanent rays S.alice g2
    in (taxed, untaxed, (S.attach aura taxed g3) {GameState.priority = Just S.alice})
 
 oppressiveRaysSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

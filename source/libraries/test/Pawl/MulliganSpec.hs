@@ -69,7 +69,7 @@ brawling gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.bra
 libraryGame :: Printing.Printing -> Int -> GameState.GameState
 libraryGame mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany pid g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
+      addMany pid g = List.foldl' (\h _ -> snd (S.addPermanent mountain pid h)) g (replicate n ())
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob (addMany S.alice g0)))
 
 libSize :: PlayerId -> GameState.GameState -> Int
@@ -102,7 +102,7 @@ run answer gs = snd (Engine.runGamePure answer gs (Mulligan.openingHands S.perfo
 libraryGame3 :: Printing.Printing -> Int -> GameState.GameState
 libraryGame3 mountain n =
   let g0 = Setup.emptyGame S.threePlayers
-      addMany pid g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
+      addMany pid g = List.foldl' (\h _ -> snd (S.addPermanent mountain pid h)) g (replicate n ())
    in poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany S.carol (addMany S.bob (addMany S.alice g0)))))
 
 -- run, for three seats. CR 103.5: the declaration order is the turn order, so
@@ -164,8 +164,8 @@ distinctPrintings s registry =
 orderedLibraryGame :: Printing.Printing -> [Printing.Printing] -> GameState.GameState
 orderedLibraryGame mountain printings =
   let g0 = Setup.emptyGame S.bothPlayers
-      addOrdered pid g = List.foldl' (\h p -> snd (S.addCreature p pid h)) g printings
-      addUniform pid g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g printings
+      addOrdered pid g = List.foldl' (\h p -> snd (S.addPermanent p pid h)) g printings
+      addUniform pid g = List.foldl' (\h _ -> snd (S.addPermanent mountain pid h)) g printings
    in poolToLibrary S.bob (poolToLibrary S.alice (addUniform S.bob (addOrdered S.alice g0)))
 
 -- Alice mulligans exactly twice then keeps; bob keeps at once. On each Bottom
@@ -187,7 +187,7 @@ bottomReversedAnswer p = case p of
 powderGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 powderGame powder mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany powder S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
@@ -226,7 +226,7 @@ useActionAt i p = case p of
 twofoldGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 twofoldGame twofold mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany twofold S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
@@ -236,7 +236,7 @@ twofoldGame twofold mountain n =
 egretGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 egretGame egret mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany egret S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
@@ -246,7 +246,7 @@ egretGame egret mountain n =
 chancellorGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 chancellorGame chancellor mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany chancellor S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
@@ -318,7 +318,7 @@ revealedNames gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
 powderUnder :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 powderUnder powder mountain above =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice 20 (addMany powder S.alice 1 (addMany mountain S.alice above g0))
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob 20 withAlice))
 
@@ -329,7 +329,7 @@ powderUnder powder mountain above =
 chainGame :: Printing.Printing -> Printing.Printing -> GameState.GameState
 chainGame powder mountain =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice =
         addMany mountain S.alice 20 (addMany powder S.alice 1 (addMany mountain S.alice 6 (addMany powder S.alice 1 g0)))
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob 20 withAlice))
@@ -339,7 +339,7 @@ chainGame powder mountain =
 shortPowderGame :: Printing.Printing -> Printing.Printing -> GameState.GameState
 shortPowderGame powder mountain =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice 6 (addMany powder S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob 20 withAlice))
 
@@ -403,7 +403,7 @@ recordOffers p = case p of
 leylineGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 leylineGame leyline mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany leyline S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
@@ -411,7 +411,7 @@ leylineGame leyline mountain n =
 leylineBothGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 leylineBothGame leyline mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany leyline S.alice 1 g0)
       withBoth = addMany mountain S.bob n (addMany leyline S.bob 1 withAlice)
    in poolToLibrary S.bob (poolToLibrary S.alice withBoth)
@@ -421,7 +421,7 @@ leylineBothGame leyline mountain n =
 twoLeylineGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 twoLeylineGame leyline mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany leyline S.alice 2 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
@@ -433,7 +433,7 @@ twoLeylineGame leyline mountain n =
 gemstoneBothGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 gemstoneBothGame caverns mountain n =
   let g0 = Setup.emptyGame S.bothPlayers
-      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany caverns S.alice 1 g0)
       withBoth = addMany mountain S.bob n (addMany caverns S.bob 1 withAlice)
    in poolToLibrary S.bob (poolToLibrary S.alice withBoth)
@@ -840,7 +840,7 @@ spec s registry =
       -- the initial draw -- "regardless of any mulligans" (CR 727.3 / 729.3).
       mountain <- S.printingOf s registry "Mountain"
       let g0 = Setup.emptyGame S.bothPlayers
-          addMany pid n g = List.foldl' (\h _ -> snd (S.addCreature mountain pid h)) g (replicate n ())
+          addMany pid n g = List.foldl' (\h _ -> snd (S.addPermanent mountain pid h)) g (replicate n ())
           gs0 = poolToLibrary S.bob (poolToLibrary S.alice (addMany S.bob 5 (addMany S.alice 20 g0)))
           after = run (mulliganUpTo 1) gs0
       Spec.assertBool s (Set.member S.bob (GameState.drewFromEmpty after)) "bob drew from an empty library"

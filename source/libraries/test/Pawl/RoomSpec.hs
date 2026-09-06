@@ -145,10 +145,10 @@ setUp s registry = do
   mountain <- S.printingOf s registry "Mountain"
   island <- S.printingOf s registry "Island"
   wall <- S.printingOf s registry "Wall of Stone"
-  let addAll printing pid n gs = List.foldl' (\g _ -> snd (S.addCreature printing pid g)) gs [1 .. n :: Int]
+  let addAll printing pid n gs = List.foldl' (\g _ -> snd (S.addPermanent printing pid g)) gs [1 .. n :: Int]
       handAll printing n gs = List.foldl' (\g _ -> snd (S.addHandCard printing S.alice g)) gs [1 .. n :: Int]
       lands = addAll island S.alice 6 (addAll mountain S.alice 4 (Setup.emptyGame S.threePlayers))
-      (wallId, withWall) = S.addCreature wall S.bob lands
+      (wallId, withWall) = S.addPermanent wall S.bob lands
       (_, deck) = S.addLibraryCard mountain S.alice withWall
       (roomId, filled) = S.addHandCard room S.alice (handAll mountain 3 deck)
   pure
@@ -321,12 +321,12 @@ foreignRoom s registry doors = do
   room <- S.printingOf s registry "Roaring Furnace"
   leech <- S.printingOf s registry "Balemurk Leech"
   key <- S.printingOf s registry "Synthetic Skeleton Key"
-  let (permId, withRoom) = S.addCreature room S.bob gs
+  let (permId, withRoom) = S.addPermanent room S.bob gs
       opened o = o {Object.unlockedHalves = doors}
       shown = withRoom {GameState.objects = Map.adjust opened permId (GameState.objects withRoom)}
-      (_, withAlices) = S.addCreature leech S.alice shown
-      (_, withBobs) = S.addCreature leech S.bob withAlices
-      (keyId, board) = S.addCreature key S.alice withBobs
+      (_, withAlices) = S.addPermanent leech S.alice shown
+      (_, withBobs) = S.addPermanent leech S.bob withAlices
+      (keyId, board) = S.addPermanent key S.alice withBobs
   pure (permId, keyId, key, board)
 
 -- Activate the Key at the Room and resolve everything. The TARGET is answered by
@@ -515,12 +515,12 @@ spec s registry = Spec.describe s "Room" $ do
     (roomId, wallId, gs) <- setUp s registry
     keys <- S.printingOf s registry "Keys to the House"
     island <- S.printingOf s registry "Island"
-    let (keysId, withKeys) = S.addCreature keys S.alice gs
+    let (keysId, withKeys) = S.addPermanent keys S.alice gs
         -- Eight spare Islands. The board pays for the cast, CR 709.5e's unlock,
         -- the {3} here and then Steaming Sauna's {3}{U}{U} unlock cost a second
         -- time, which is what the last assertion reads -- an unlock the board
         -- could not afford is not offered whatever the designation says.
-        funded = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withKeys [1 .. 8 :: Int]
+        funded = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withKeys [1 .. 8 :: Int]
         after = castDoor furnaceName roomId funded
     case roomPermanent after of
       [permId] -> do
@@ -587,8 +587,8 @@ spec s registry = Spec.describe s "Room" $ do
     (roomId, wallId, gs) <- setUp s registry
     keys <- S.printingOf s registry "Keys to the House"
     island <- S.printingOf s registry "Island"
-    let (keysId, withKeys) = S.addCreature keys S.alice gs
-        funded = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withKeys [1 .. 4 :: Int]
+    let (keysId, withKeys) = S.addPermanent keys S.alice gs
+        funded = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withKeys [1 .. 4 :: Int]
         after = castDoor saunaName roomId funded
     Spec.assertEqWith s "the control: the blue door alone deals no damage" (S.damageOf wallId after) (Just 0)
     case roomPermanent after of
@@ -669,7 +669,7 @@ spec s registry = Spec.describe s "Room" $ do
   Spec.it s "CR 709.5i fully unlocking a Room fires once, and only on the second door" $ do
     (roomId, wallId, gs) <- setUp s registry
     leech <- S.printingOf s registry "Balemurk Leech"
-    let (_, board) = S.addCreature leech S.alice gs
+    let (_, board) = S.addPermanent leech S.alice gs
         after = castDoor furnaceName roomId board
     -- CR 603.6a through the FIRST arm: a Room is an Enchantment (CR 709.5a
     -- leaves the shared type line alone), and alice controls it.
@@ -925,7 +925,7 @@ spec s registry = Spec.describe s "Room" $ do
     -- the copy's other door costs. An unlock the board cannot afford is not
     -- offered whatever the designations say, so the last assertion below is
     -- about the designation only if the mana is there for both readings.
-    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addCreature printing S.alice g)) g0 [1 .. n :: Int]
+    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addPermanent printing S.alice g)) g0 [1 .. n :: Int]
         funded = addAll mountain 4 (addAll island 8 gs)
         after = castDoor furnaceName roomId funded
     case roomPermanent after of
@@ -968,8 +968,8 @@ spec s registry = Spec.describe s "Room" $ do
     leech <- S.printingOf s registry "Balemurk Leech"
     island <- S.printingOf s registry "Island"
     mountain <- S.printingOf s registry "Mountain"
-    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addCreature printing S.alice g)) g0 [1 .. n :: Int]
-        (_, withLeech) = S.addCreature leech S.alice gs
+    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addPermanent printing S.alice g)) g0 [1 .. n :: Int]
+        (_, withLeech) = S.addPermanent leech S.alice gs
         funded = addAll mountain 4 (addAll island 8 withLeech)
         after = castDoor furnaceName roomId funded
     case roomPermanent after of
@@ -1015,7 +1015,7 @@ spec s registry = Spec.describe s "Room" $ do
     copyEnchantment <- S.printingOf s registry "Copy Enchantment"
     bolt <- S.printingOf s registry "Lightning Bolt"
     mountain <- S.printingOf s registry "Mountain"
-    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addCreature printing S.alice g)) g0 [1 .. n :: Int]
+    let addAll printing n g0 = List.foldl' (\g _ -> snd (S.addPermanent printing S.alice g)) g0 [1 .. n :: Int]
         (roomId, withRoom) = S.addHandCard corridor S.alice (addAll mountain 12 (Setup.emptyGame S.threePlayers))
         (boltId, withBolt) = S.addHandCard bolt S.alice withRoom
         board =

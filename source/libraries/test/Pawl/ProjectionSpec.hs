@@ -118,7 +118,7 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 giantGrowthOnPiker :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 giantGrowthOnPiker forest piker giantGrowth =
   let base = S.landsInPlay forest 1
-      (pikerId, withPiker) = S.addCreature piker S.alice base
+      (pikerId, withPiker) = S.addPermanent piker S.alice base
       (gs, ggId) = S.handOne giantGrowth withPiker
       cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ggId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -137,7 +137,7 @@ answerX4 p = case p of
 untamedMightOnPiker :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 untamedMightOnPiker forest piker untamedMight =
   let base = S.landsInPlay forest 5
-      (pikerId, withPiker) = S.addCreature piker S.alice base
+      (pikerId, withPiker) = S.addPermanent piker S.alice base
       (gs, umId) = S.handOne untamedMight withPiker
       cast = snd (Engine.runGamePure answerX4 gs (S.cast S.alice umId))
       resolved = snd (Engine.runGamePure answerX4 cast Stack.resolveTop)
@@ -237,7 +237,7 @@ matronCandidates s registry withNexus = do
       (_, base1) = S.addLibraryCard mountain S.alice base0
       (_, base2) = S.addLibraryCard giant S.alice base1
       (pikerId, base3) = S.addLibraryCard piker S.alice base2
-      base4 = if withNexus then snd (S.addCreature nexus S.alice base3) else base3
+      base4 = if withNexus then snd (S.addPermanent nexus S.alice base3) else base3
       (gs, spellId) = S.handOne matron base4
       (_, (searches, _)) =
         State.runState
@@ -280,14 +280,14 @@ borrowedShapeBoard s registry granted = do
   changeling <- S.printingOf s registry "Woodland Changeling"
   turnToFrog <- S.printingOf s registry "Turn to Frog"
   aura <- S.printingOf s registry "Synthetic Borrowed Shape"
-  let (changelingId, g1) = S.addCreature changeling S.alice (S.landsInPlay island 4)
-      (pikerId, g2) = S.addCreature piker S.alice g1
+  let (changelingId, g1) = S.addPermanent changeling S.alice (S.landsInPlay island 4)
+      (pikerId, g2) = S.addPermanent piker S.alice g1
       frogged = castAtCreature pikerId turnToFrog (castAtCreature changelingId turnToFrog g2)
       gs =
         if not granted
           then frogged
           else
-            let (auraId, g3) = S.addCreature aura S.alice frogged
+            let (auraId, g3) = S.addPermanent aura S.alice frogged
              in S.attach auraId pikerId g3
   pure (pikerId, changelingId, gs)
 
@@ -324,12 +324,12 @@ wasteLoop lunar tidal lunarFirst =
   let base = Setup.emptyGame S.bothPlayers
    in if lunarFirst
         then
-          let (l, g1) = S.addCreature lunar S.alice base
-              (t, g2) = S.addCreature tidal S.alice g1
+          let (l, g1) = S.addPermanent lunar S.alice base
+              (t, g2) = S.addPermanent tidal S.alice g1
            in (l, t, g2)
         else
-          let (t, g1) = S.addCreature tidal S.alice base
-              (l, g2) = S.addCreature lunar S.alice g1
+          let (t, g1) = S.addPermanent tidal S.alice base
+              (l, g2) = S.addPermanent lunar S.alice g1
            in (l, t, g2)
 
 -- Two Synthetic Echoing Mimics and a Goblin Piker, all Alice's, with the
@@ -340,9 +340,9 @@ wasteLoop lunar tidal lunarFirst =
 -- automorphism of the board and could only restate this case.
 mimicLoop :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 mimicLoop piker mimic =
-  let (older, g1) = S.addCreature mimic S.alice (Setup.emptyGame S.bothPlayers)
-      (younger, g2) = S.addCreature mimic S.alice g1
-      (_, g3) = S.addCreature piker S.alice g2
+  let (older, g1) = S.addPermanent mimic S.alice (Setup.emptyGame S.bothPlayers)
+      (younger, g2) = S.addPermanent mimic S.alice g1
+      (_, g3) = S.addPermanent piker S.alice g2
    in (older, younger, snd (Engine.runGamePure S.identityAnswer g3 Engine.settleForPriority))
 
 -- Blood Moon, Urborg, and a Forest on the battlefield. `urborgFirst` controls
@@ -351,16 +351,16 @@ mimicLoop piker mimic =
 bloodMoonUrborg :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 bloodMoonUrborg forest urborg bloodMoon urborgFirst =
   let base = Setup.emptyGame S.bothPlayers
-      (forestId, g1) = S.addCreature forest S.alice base
+      (forestId, g1) = S.addPermanent forest S.alice base
       place g =
         if urborgFirst
           then
-            let (u, g') = S.addCreature urborg S.alice g
-                (_, g'') = S.addCreature bloodMoon S.alice g'
+            let (u, g') = S.addPermanent urborg S.alice g
+                (_, g'') = S.addPermanent bloodMoon S.alice g'
              in (u, g'')
           else
-            let (_, g') = S.addCreature bloodMoon S.alice g
-                (u, g'') = S.addCreature urborg S.alice g'
+            let (_, g') = S.addPermanent bloodMoon S.alice g
+                (u, g'') = S.addPermanent urborg S.alice g'
              in (u, g'')
       (urborgId, gs) = place g1
    in (forestId, urborgId, gs)
@@ -377,18 +377,18 @@ bloodMoonUrborg forest urborg bloodMoon urborgFirst =
 ashayaBloodMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
   let base = Setup.emptyGame S.bothPlayers
-      (forestId, g1) = S.addCreature forest S.alice base
-      (pikerId, g2) = S.addCreature piker S.alice g1
+      (forestId, g1) = S.addPermanent forest S.alice base
+      (pikerId, g2) = S.addPermanent piker S.alice g1
       (tokenId, g3) = S.addToken (Printing.card piker) S.alice g2
       place g =
         if ashayaFirst
           then
-            let (a, g') = S.addCreature ashaya S.alice g
-                (_, g'') = S.addCreature bloodMoon S.alice g'
+            let (a, g') = S.addPermanent ashaya S.alice g
+                (_, g'') = S.addPermanent bloodMoon S.alice g'
              in (a, g'')
           else
-            let (_, g') = S.addCreature bloodMoon S.alice g
-                (a, g'') = S.addCreature ashaya S.alice g'
+            let (_, g') = S.addPermanent bloodMoon S.alice g
+                (a, g'') = S.addPermanent ashaya S.alice g'
              in (a, g'')
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
@@ -422,15 +422,15 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
 -- phrased on a second permanent's types.
 rootedWardings :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 rootedWardings forest piker pacifism wardings ashaya wardingsFirst =
-  let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
-      (pikerId, g2) = S.addCreature piker S.alice g1
-      (pacifismId, g3) = S.addCreature pacifism S.alice g2
+  let (_, g1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addPermanent piker S.alice g1
+      (pacifismId, g3) = S.addPermanent pacifism S.alice g2
       attached = S.attach pacifismId pikerId g3
       place g =
         if wardingsFirst
-          then snd (S.addCreature ashaya S.alice (snd (S.addCreature wardings S.alice g)))
-          else snd (S.addCreature wardings S.alice (snd (S.addCreature ashaya S.alice g)))
-   in (pacifismId, place attached, snd (S.addCreature wardings S.alice attached))
+          then snd (S.addPermanent ashaya S.alice (snd (S.addPermanent wardings S.alice g)))
+          else snd (S.addPermanent wardings S.alice (snd (S.addPermanent ashaya S.alice g)))
+   in (pacifismId, place attached, snd (S.addPermanent wardings S.alice attached))
 
 -- A basic Forest, a Merfolk Seer, a Lord of Atlantis and Ashaya, all alice's,
 -- built twice: once as-is and once with a Blood Moon added last. Returns the
@@ -441,11 +441,11 @@ rootedWardings forest piker pacifism wardings ashaya wardingsFirst =
 -- since the Lord's own ability excludes its source ("other Merfolk").
 animatedLord :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 animatedLord forest seer lord ashaya bloodMoon =
-  let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
-      (seerId, g2) = S.addCreature seer S.alice g1
-      (_, g3) = S.addCreature lord S.alice g2
-      (_, without) = S.addCreature ashaya S.alice g3
-   in (seerId, without, snd (S.addCreature bloodMoon S.alice without))
+  let (_, g1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+      (seerId, g2) = S.addPermanent seer S.alice g1
+      (_, g3) = S.addPermanent lord S.alice g2
+      (_, without) = S.addPermanent ashaya S.alice g3
+   in (seerId, without, snd (S.addPermanent bloodMoon S.alice without))
 
 -- Life and Limb, Blood Moon, a Bayou and a Shroofus Sproutsire, all under alice.
 -- `limbFirst` controls the timestamp order (fresh timestamps ascend with
@@ -490,10 +490,10 @@ chorusBadMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> 
 chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
   let place g =
         if chorusFirst
-          then snd (S.addCreature badMoon S.alice (snd (S.addCreature chorus S.alice g)))
-          else snd (S.addCreature chorus S.alice (snd (S.addCreature badMoon S.alice g)))
-      (wraithId, g2) = S.addCreature bogWraith S.alice (place (Setup.emptyGame S.bothPlayers))
-      (childId, gs) = S.addCreature childOfNight S.alice g2
+          then snd (S.addPermanent badMoon S.alice (snd (S.addPermanent chorus S.alice g)))
+          else snd (S.addPermanent chorus S.alice (snd (S.addPermanent badMoon S.alice g)))
+      (wraithId, g2) = S.addPermanent bogWraith S.alice (place (Setup.emptyGame S.bothPlayers))
+      (childId, gs) = S.addPermanent childOfNight S.alice g2
    in (wraithId, childId, gs)
 
 -- Synthetic Artificers' Ascent, two Goblin Pikers and a Presence of Gond on the
@@ -538,19 +538,19 @@ chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
 -- -- Oracle text verified against Scryfall, 2026-08-29.
 ascentGond :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 ascentGond ascent gond piker ascentFirst =
-  let (pikerId, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-      (bareId, g2) = S.addCreature piker S.alice g1
+  let (pikerId, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+      (bareId, g2) = S.addPermanent piker S.alice g1
       place g =
         if ascentFirst
           then
-            let (_, g') = S.addCreature ascent S.alice g
-                (gondId, g'') = S.addCreature gond S.alice g'
+            let (_, g') = S.addPermanent ascent S.alice g
+                (gondId, g'') = S.addPermanent gond S.alice g'
              in S.attach gondId pikerId g''
           else
-            let (gondId, g') = S.addCreature gond S.alice g
-                (_, g'') = S.addCreature ascent S.alice g'
+            let (gondId, g') = S.addPermanent gond S.alice g
+                (_, g'') = S.addPermanent ascent S.alice g'
              in S.attach gondId pikerId g''
-   in (pikerId, bareId, place g2, snd (S.addCreature ascent S.alice g2))
+   in (pikerId, bareId, place g2, snd (S.addPermanent ascent S.alice g2))
 
 -- The printings the graveyard-dependency group below shares: Synthetic Charnel
 -- Measure, Grist, the Hunger Tide and a Hill Giant.
@@ -587,22 +587,22 @@ gristCharnel charnel grist giant measureFirst =
   let empty = Setup.emptyGame S.bothPlayers
       (gristId, placed) =
         if measureFirst
-          then S.addGraveyardCard grist S.alice (snd (S.addCreature charnel S.alice empty))
+          then S.addGraveyardCard grist S.alice (snd (S.addPermanent charnel S.alice empty))
           else
             let (g, afterGrist) = S.addGraveyardCard grist S.alice empty
-             in (g, snd (S.addCreature charnel S.alice afterGrist))
-      (giantId, gs) = S.addCreature giant S.alice placed
+             in (g, snd (S.addPermanent charnel S.alice afterGrist))
+      (giantId, gs) = S.addPermanent giant S.alice placed
    in (gristId, giantId, gs)
 
 limbBloodMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 limbBloodMoon bayou shroofus limb bloodMoon limbFirst =
   let base = Setup.emptyGame S.bothPlayers
-      (bayouId, g1) = S.addCreature bayou S.alice base
-      (shroofusId, g2) = S.addCreature shroofus S.alice g1
+      (bayouId, g1) = S.addPermanent bayou S.alice base
+      (shroofusId, g2) = S.addPermanent shroofus S.alice g1
       place g =
         if limbFirst
-          then snd (S.addCreature bloodMoon S.alice (snd (S.addCreature limb S.alice g)))
-          else snd (S.addCreature limb S.alice (snd (S.addCreature bloodMoon S.alice g)))
+          then snd (S.addPermanent bloodMoon S.alice (snd (S.addPermanent limb S.alice g)))
+          else snd (S.addPermanent limb S.alice (snd (S.addPermanent bloodMoon S.alice g)))
    in (bayouId, shroofusId, place g2)
 
 -- alice has four Forests, an Abomination of Llanowar on the battlefield, two
@@ -622,7 +622,7 @@ abominationAcrossNexus forest abomination nexus stocked =
   let base = S.landsInPlay forest 4
       (_, g1) = S.addGraveyardCard stocked S.alice base
       (_, g2) = S.addGraveyardCard stocked S.alice g1
-      (abominationId, g3) = S.addCreature abomination S.alice g2
+      (abominationId, g3) = S.addPermanent abomination S.alice g2
       (g4, nexusId) = S.handOne nexus g3
       cast = snd (Engine.runGamePure S.identityAnswer g4 (S.cast S.alice nexusId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -663,10 +663,10 @@ elspethEmblemBoard s registry ultimate = do
   elspeth <- S.printingOf s registry "Elspeth, Sun's Champion"
   piker <- S.printingOf s registry "Goblin Piker"
   giant <- S.printingOf s registry "Hill Giant"
-  let (elspethId, g1) = S.addCreature elspeth S.alice S.threePlayerGame
-      (mine, g2) = S.addCreature piker S.alice g1
-      (theirs, g3) = S.addCreature giant S.bob g2
-      (carols, g4) = S.addCreature piker S.carol g3
+  let (elspethId, g1) = S.addPermanent elspeth S.alice S.threePlayerGame
+      (mine, g2) = S.addPermanent piker S.alice g1
+      (theirs, g3) = S.addPermanent giant S.bob g2
+      (carols, g4) = S.addPermanent piker S.carol g3
       armed = S.addCounter CounterKind.Loyalty 7 elspethId g4
       -- The third loyalty ability, in printed order: +1, -3, -7.
       used = case (ultimate, drop 2 (Face.activatedAbilities (S.combinedFace elspeth))) of
@@ -690,7 +690,7 @@ elspethEmblemBoard s registry ultimate = do
 -- an activated ability is not a static one.
 forgedBoard :: Printing.Printing -> GameState.GameState -> GameState.GameState
 forgedBoard forge gs =
-  let (forgeId, placed) = S.addCreature forge S.alice gs
+  let (forgeId, placed) = S.addPermanent forge S.alice gs
    in case Face.activatedAbilities (S.combinedFace forge) of
         ability : _ -> S.runPure S.identityAnswer placed (do Activate.activateAbility S.alice forgeId ability; Stack.resolveTop)
         [] -> placed
@@ -732,7 +732,7 @@ dealTo src victim amount gs =
 -- gives a loyalty ability -- Setup.emptyGame leaves the board in the untap step.
 serraEmblemBoard :: Bool -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 serraEmblemBoard ultimate serra gs =
-  let (serraId, placed) = S.addCreature serra S.alice gs {GameState.phase = Phase.PrecombatMain}
+  let (serraId, placed) = S.addPermanent serra S.alice gs {GameState.phase = Phase.PrecombatMain}
       armed = S.addCounter CounterKind.Loyalty 6 serraId placed
    in ( serraId,
         S.settleSba
@@ -794,7 +794,7 @@ toweredBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> ObjectId.Ob
 toweredBoard s registry victim gs = do
   plains <- S.printingOf s registry "Plains"
   tower <- S.printingOf s registry "Tower of the Magistrate"
-  let (towerId, placed) = S.addCreature tower S.alice (S.landsFor plains S.alice 2 gs)
+  let (towerId, placed) = S.addPermanent tower S.alice (S.landsFor plains S.alice 2 gs)
   case Projection.abilitiesOf towerId placed of
     [_, protect] -> pure (S.runPure (preferTarget [Recipient.ToCreature victim]) placed (do Activate.activateAbility S.alice towerId protect; Stack.resolveTop))
     abilities -> Spec.assertFailure s ("expected exactly two Tower abilities, got " <> show (length abilities))
@@ -841,7 +841,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "no effects: the projection is the base printing (Piker is 2/1)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 2)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 1)
     Spec.assertBool s (Map.null (Projection.keywordsOf oid gs)) "no keywords"
@@ -849,7 +849,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.3 layer 7c +3/+3 raises a Piker to 5/4" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs0
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 5)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 4)
@@ -857,7 +857,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613 layer 6 GainKeyword adds deathtouch" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.GainKeyword Keyword.Deathtouch) gs0
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch oid gs) "has deathtouch"
 
@@ -873,8 +873,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     kirdApe <- S.printingOf s registry "Kird Ape"
     forest <- S.printingOf s registry "Forest"
     skyTether <- S.printingOf s registry "Sky Tether"
-    let (apeId, withApe) = S.addCreature kirdApe S.alice (S.landsInPlay forest 1)
-        (aura, withAura) = S.addCreature skyTether S.alice withApe
+    let (apeId, withApe) = S.addPermanent kirdApe S.alice (S.landsInPlay forest 1)
+        (aura, withAura) = S.addPermanent skyTether S.alice withApe
         board = S.attach aura apeId withAura
     Spec.assertEqWith s "the Ape keeps its own +1/+2" (S.powerToughnessOf apeId board) (Just (2, 3))
     Spec.assertBool s (Projection.hasKeyword Keyword.Defender apeId board) "while the Aura is attached and applying"
@@ -892,8 +892,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     skyTether <- S.printingOf s registry "Sky Tether"
-    let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay mountain 1)
-        (aura, withAura) = S.addCreature skyTether S.alice withPiker
+    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsInPlay mountain 1)
+        (aura, withAura) = S.addPermanent skyTether S.alice withPiker
         board = S.attach aura pikerId withAura
         auraStamp = maybe 0 (Timestamp.unwrap . Object.timestamp) (Game.lookupObject aura board)
         grantAt n = S.withEffectAt pikerId (Timestamp.MkTimestamp n) (Modification.GainKeyword Keyword.Flying) board
@@ -913,8 +913,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     stalker <- S.printingOf s registry "Branchblight Stalker"
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature stalker S.bob (S.landsInPlay mountain 1)
-        (plain, gs1) = S.addCreature piker S.bob gs0
+    let (oid, gs0) = S.addPermanent stalker S.bob (S.landsInPlay mountain 1)
+        (plain, gs1) = S.addPermanent piker S.bob gs0
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.GainKeyword (Keyword.Toxic 1)) gs1
     Spec.assertEqWith s "printed toxic 2 alone" (Projection.totalToxic oid gs1) 2
     Spec.assertEqWith s "toxic 2 plus a granted toxic 1" (Projection.totalToxic oid gs) 3
@@ -932,7 +932,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 702.164b two toxic abilities with the SAME N both count" $ do
     stalker <- S.printingOf s registry "Branchblight Stalker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature stalker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent stalker S.bob (S.landsInPlay mountain 1)
         grant ts = S.withEffectAt oid (Timestamp.MkTimestamp ts)
         gs =
           grant 101 (Modification.GainKeyword (Keyword.Toxic 1))
@@ -949,7 +949,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613 layer 7b SetBasePowerToughness makes a Piker 1/1" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) gs0
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 1)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 1)
@@ -957,7 +957,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613 sublayer order: 7b then 7c, a set-1/1 Piker with +3/+3 is 4/4" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         -- Deliberately give 7c the EARLIER timestamp to prove layer beats
         -- timestamp: 7b still applies first.
         gs1 = S.withEffectAt oid (Timestamp.MkTimestamp 50) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs0
@@ -968,7 +968,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.7 within layer 6, timestamp order: later grant survives an earlier lose-all" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         gs1 = S.withEffectAt oid (Timestamp.MkTimestamp 10) Modification.LoseAllAbilities gs0
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 20) (Modification.GainKeyword Keyword.Deathtouch) gs1
     Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch oid gs) "grant wins"
@@ -976,7 +976,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.7 within layer 6, timestamp order: earlier grant is erased by a later lose-all" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         gs1 = S.withEffectAt oid (Timestamp.MkTimestamp 10) (Modification.GainKeyword Keyword.Deathtouch) gs0
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 20) Modification.LoseAllAbilities gs1
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch oid gs)) "lose-all wins"
@@ -1038,7 +1038,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- modification that cannot be frozen is not stored at all").
   Spec.it s "CR 608.2h freezeQuantities locks an answerable quantity and refuses an unanswerable one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         freeze :: Projection.Modification -> Maybe Projection.Modification
         -- One object twice: the SPELL case, where CR 601.2b's announcer and CR
         -- 113.7a's source are the same id. Pawl.ActivateSpec is where they part.
@@ -1088,7 +1088,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     mountain <- S.printingOf s registry "Mountain"
     humility <- S.printingOf s registry "Humility"
-    let (flyerId, gs0) = S.addCreature birdMaiden S.bob (S.landsInPlay mountain 1)
+    let (flyerId, gs0) = S.addPermanent birdMaiden S.bob (S.landsInPlay mountain 1)
         gs = S.withHumility humility gs0
     Spec.assertEqWith s "power 1" (Projection.powerOf flyerId gs) (Just 1)
     Spec.assertEqWith s "toughness 1" (Projection.toughnessOf flyerId gs) (Just 1)
@@ -1097,13 +1097,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613 layer 6: Humility strips a creature's activated abilities" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     humility <- S.printingOf s registry "Humility"
-    let (sorcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+    let (sorcId, g0) = S.addPermanent prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         gs = S.withHumility humility g0
     Spec.assertEqWith s "no abilities under Humility" (Projection.abilitiesOf sorcId gs) []
 
   Spec.it s "without Humility the ability is present" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (sorcId, gs) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+    let (sorcId, gs) = S.addPermanent prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "one ability" (length (Projection.abilitiesOf sorcId gs)) 1
 
   -- The same layer-6 removal from the OTHER kind of ability, and the card whose
@@ -1115,8 +1115,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.6 Titania's Song strips the artifact its own layer-4 part animates" $ do
     liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
     titaniasSong <- S.printingOf s registry "Titania's Song"
-    let (coatingId, g0) = S.addCreature liquimetalCoating S.alice (Setup.emptyGame S.bothPlayers)
-        gs = snd (S.addCreature titaniasSong S.bob g0)
+    let (coatingId, g0) = S.addPermanent liquimetalCoating S.alice (Setup.emptyGame S.bothPlayers)
+        gs = snd (S.addPermanent titaniasSong S.bob g0)
     Spec.assertEqWith s "control: the Coating's {T} ability is there to begin with" (length (Projection.abilitiesOf coatingId g0)) 1
     Spec.assertEqWith s "CR 613.1f: and gone under the Song" (Projection.abilitiesOf coatingId gs) []
     Spec.assertEqWith s "CR 613.4b: base power is its mana value" (Projection.powerOf coatingId gs) (Just 2)
@@ -1143,9 +1143,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     titaniasSong <- S.printingOf s registry "Titania's Song"
     badMoon <- S.printingOf s registry "Bad Moon"
     bogWraith <- S.printingOf s registry "Bog Wraith"
-    let (moonId, g0) = S.addCreature badMoon S.alice (Setup.emptyGame S.bothPlayers)
-        (wraithId, g1) = S.addCreature bogWraith S.alice g0
-        (coatingId, g2) = S.addCreature liquimetalCoating S.alice g1
+    let (moonId, g0) = S.addPermanent badMoon S.alice (Setup.emptyGame S.bothPlayers)
+        (wraithId, g1) = S.addPermanent bogWraith S.alice g0
+        (coatingId, g2) = S.addPermanent liquimetalCoating S.alice g1
         ability = case Face.activatedAbilities (S.combinedFace liquimetalCoating) of
           ab : _ -> Just ab
           [] -> Nothing
@@ -1155,11 +1155,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         let ready = g2 {GameState.priority = Just S.alice}
             activated = snd (Engine.runGamePure (aimAtObject moonId) ready (Activate.activateAbility S.alice coatingId coat))
             coated = snd (Engine.runGamePure (aimAtObject moonId) activated Stack.resolveTop)
-            sung = snd (S.addCreature titaniasSong S.bob coated)
+            sung = snd (S.addPermanent titaniasSong S.bob coated)
             -- The control: the same three permanents plus the Song, with the
             -- Coating's ability never activated. Without it the whole test would
             -- pass for the wrong reason if the activation silently no-opped.
-            unsung = snd (S.addCreature titaniasSong S.bob g2)
+            unsung = snd (S.addPermanent titaniasSong S.bob g2)
         Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf moonId coated)) "the Coating made Bad Moon an artifact"
         -- Assertion 1: the animation half of the Song reached it.
         Spec.assertBool s (Projection.isCreatureOf moonId sung) "CR 613.1d: the Song animates it at layer 4"
@@ -1179,7 +1179,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     mountain <- S.printingOf s registry "Mountain"
     humility <- S.printingOf s registry "Humility"
-    let (mammothId, gs0) = S.addCreature warMammoth S.bob (S.landsInPlay mountain 1)
+    let (mammothId, gs0) = S.addPermanent warMammoth S.bob (S.landsInPlay mountain 1)
         damaged = S.markDamage mammothId 2 gs0
         underHumility = S.withHumility humility damaged
         afterSba = S.settleSba underHumility
@@ -1192,7 +1192,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     humility <- S.printingOf s registry "Humility"
     giantGrowth <- S.printingOf s registry "Giant Growth"
     let base = S.landsInPlay forest 1
-        (pikerId, withPiker) = S.addCreature piker S.alice base
+        (pikerId, withPiker) = S.addPermanent piker S.alice base
         withHum = S.withHumility humility withPiker
         (gs, ggId) = S.handOne giantGrowth withHum
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ggId))
@@ -1209,7 +1209,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     serpentsGift <- S.printingOf s registry "Serpent's Gift"
     let base = S.landsInPlay forest 3
-        (mammothId, withMammoth) = S.addCreature warMammoth S.alice base
+        (mammothId, withMammoth) = S.addPermanent warMammoth S.alice base
         (gs, sgId) = S.handOne serpentsGift withMammoth
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice sgId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -1225,7 +1225,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     mountain <- S.printingOf s registry "Mountain"
     humility <- S.printingOf s registry "Humility"
-    let (mammothId, gs0) = S.addCreature warMammoth S.bob (S.landsInPlay mountain 1)
+    let (mammothId, gs0) = S.addPermanent warMammoth S.bob (S.landsInPlay mountain 1)
         withHum = S.withHumility humility gs0
         Timestamp.MkTimestamp h = humilityTimestamp humility withHum
         olderGrant = S.withEffectAt mammothId (Timestamp.MkTimestamp (h - 1)) (Modification.GainKeyword Keyword.Deathtouch) withHum
@@ -1236,7 +1236,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "projected type line: a Piker is a Creature - Goblin Warrior" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
     Spec.assertBool s (Projection.isCreatureOf oid gs) "is a creature"
     Spec.assertEqWith s "card types" (Projection.cardTypesOf oid gs) (Set.singleton CardType.Creature)
     Spec.assertEqWith s "subtypes" (Projection.subtypesOf oid gs) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
@@ -1293,7 +1293,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- discarding is visible, and the assertion is on the map for that reason.
   Spec.it s "CR 612.1 a swap that collides two landwalk keys keeps both abilities" $ do
     stalkerHag <- S.printingOf s registry "Stalker Hag"
-    let (hagId, gs0) = S.addCreature stalkerHag S.alice (Setup.emptyGame S.bothPlayers)
+    let (hagId, gs0) = S.addPermanent stalkerHag S.alice (Setup.emptyGame S.bothPlayers)
         gs = S.withEffectAt hagId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Forest Subtype.Type.Swamp)) gs0
         walk t = Keyword.Landwalk (Filter.Type.HasSubtype t)
     Spec.assertEqWith
@@ -1324,9 +1324,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     swamp <- S.printingOf s registry "Swamp"
     island <- S.printingOf s registry "Island"
     let base = Setup.emptyGame S.bothPlayers
-        (bellId, g1) = S.addCreature kormusBell S.alice base
-        (swampId, g2) = S.addCreature swamp S.alice g1
-        (islandId, plain) = S.addCreature island S.alice g2
+        (bellId, g1) = S.addPermanent kormusBell S.alice base
+        (swampId, g2) = S.addPermanent swamp S.alice g1
+        (islandId, plain) = S.addPermanent island S.alice g2
         -- The swap is on the BELL, which is where the words are printed.
         hacked = S.withEffectAt bellId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island)) plain
     -- Unhacked, the Bell animates the Swamp and nothing else.
@@ -1359,7 +1359,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 612.1 hacking Tidal Warrior swaps the land type inside its activated ability" $ do
     tidalWarrior <- S.printingOf s registry "Tidal Warrior"
     let base = Setup.emptyGame S.bothPlayers
-        (warriorId, plain) = S.addCreature tidalWarrior S.alice base
+        (warriorId, plain) = S.addPermanent tidalWarrior S.alice base
         hacked = S.withEffectAt warriorId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Island Subtype.Type.Swamp)) plain
         setsTo gs = case Projection.abilitiesOf warriorId gs of
           ability : _ -> concatMap (Maybe.mapMaybe landTypeSet . Foldable.toList . Mode.allEffects) (Modal.modes (ActivatedAbility.modal ability))
@@ -1388,7 +1388,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 612.1 hacking Barbarian Outcast swaps the land type inside its triggered ability" $ do
     barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
     let base = Setup.emptyGame S.bothPlayers
-        (outcastId, plain) = S.addCreature barbarianOutcast S.alice base
+        (outcastId, plain) = S.addPermanent barbarianOutcast S.alice base
         hacked = S.withEffectAt outcastId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island)) plain
         asksAbout gs = case Projection.triggeredAbilitiesOf outcastId gs of
           ability : _ -> case TriggeredAbility.condition ability of
@@ -1451,8 +1451,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     island <- S.printingOf s registry "Island"
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bogWraith <- S.printingOf s registry "Bog Wraith"
-    let (_, withAshaya) = S.addCreature ashaya S.alice (S.landsInPlay island 3)
-        (wraithId, plain) = S.addCreature bogWraith S.alice withAshaya
+    let (_, withAshaya) = S.addPermanent ashaya S.alice (S.landsInPlay island 3)
+        (wraithId, plain) = S.addPermanent bogWraith S.alice withAshaya
         swapped from to = S.withEffectAt wraithId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to)) plain
     Spec.assertEqWith
       s
@@ -1531,9 +1531,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     forest <- S.printingOf s registry "Forest"
     let base = Setup.emptyGame S.bothPlayers
-        (_, g1) = S.addCreature kormusBell S.alice base
-        (forestId, withBell) = S.addCreature forest S.alice g1
-        (_, withUrborg) = S.addCreature urborg S.alice withBell
+        (_, g1) = S.addPermanent kormusBell S.alice base
+        (forestId, withBell) = S.addPermanent forest S.alice g1
+        (_, withUrborg) = S.addPermanent urborg S.alice withBell
     -- Without Urborg the Forest is no Swamp, so the Bell leaves it alone.
     Spec.assertBool s (not (Projection.isCreatureOf forestId withBell)) "the Forest is not animated on its own"
     -- With Urborg it is a Swamp (layer 4, written) and therefore animated (layer
@@ -1576,8 +1576,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
           _ -> (ObjectId.MkObjectId 998, ObjectId.MkObjectId 999)
         -- Two ordinary permanents standing in for two Aura sources; all this
         -- arm reads off a source is Object.chosenSubtype.
-        (srcA, g1) = S.addCreature piker S.alice gs0
-        (srcB, g2) = S.addCreature piker S.alice g1
+        (srcA, g1) = S.addPermanent piker S.alice gs0
+        (srcB, g2) = S.addPermanent piker S.alice g1
         withChoices = S.withChosenSubtype Subtype.Type.Swamp srcB (S.withChosenSubtype Subtype.Type.Island srcA g2)
         gs =
           S.withEffectFromAt srcB landB (Timestamp.MkTimestamp 101) Modification.SetLandSubtypeToChosen $
@@ -1600,7 +1600,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     island <- S.printingOf s registry "Island"
     bogWraith <- S.printingOf s registry "Bog Wraith"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+    let (wraithId, board) = S.addPermanent bogWraith S.alice (S.landsInPlay island 3)
         after = castAtCreature wraithId turnToFrog board
     Spec.assertEqWith s "before: Creature -- Wraith" (Projection.subtypesOf wraithId board) (Set.singleton Subtype.Type.Wraith)
     -- CR 205.1b's last sentence: an effect making an object a "[creature type]
@@ -1628,8 +1628,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bogWraith <- S.printingOf s registry "Bog Wraith"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (_, withAshaya) = S.addCreature ashaya S.alice (S.landsInPlay island 3)
-        (wraithId, board) = S.addCreature bogWraith S.alice withAshaya
+    let (_, withAshaya) = S.addPermanent ashaya S.alice (S.landsInPlay island 3)
+        (wraithId, board) = S.addPermanent bogWraith S.alice withAshaya
         after = castAtCreature wraithId turnToFrog board
     Spec.assertEqWith
       s
@@ -1654,7 +1654,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     island <- S.printingOf s registry "Island"
     bogWraith <- S.printingOf s registry "Bog Wraith"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+    let (wraithId, board) = S.addPermanent bogWraith S.alice (S.landsInPlay island 3)
         after = castAtCreature wraithId turnToFrog board
     Spec.assertEqWith s "before: black" (Projection.colorsOf wraithId board) (Set.singleton Color.Black)
     Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)) wraithId board) "before: swampwalk"
@@ -1667,7 +1667,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     island <- S.printingOf s registry "Island"
     bogWraith <- S.printingOf s registry "Bog Wraith"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
+    let (wraithId, board) = S.addPermanent bogWraith S.alice (S.landsInPlay island 3)
         after = castAtCreature wraithId turnToFrog board
         afterCleanup = snd (Engine.runGamePure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
     Spec.assertEqWith s "all four effects dropped" (GameState.continuousEffects afterCleanup) []
@@ -1688,7 +1688,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 202.3 SetBasePowerToughness ManaValue sets a Piker to its mana value ({1}{R} = 2)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness Quantity.ManaValue Quantity.ManaValue)) gs0
     Spec.assertEqWith s "power = mana value" (Projection.powerOf oid gs) (Just 2)
     Spec.assertEqWith s "toughness = mana value" (Projection.toughnessOf oid gs) (Just 2)
@@ -1778,13 +1778,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     nightmare <- S.printingOf s registry "Nightmare"
     mimic <- S.printingOf s registry "Synthetic Echoing Mimic"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (mimicId, g1) = S.addCreature mimic S.alice gs0
-        (_, g2) = S.addCreature piker S.alice g1
-        (_, g3) = S.addCreature swamp S.alice g2
-        (_, g4) = S.addCreature swamp S.alice g3
-        (_, g5) = S.addCreature swamp S.alice g4
-        (_, g6) = S.addCreature swamp S.alice g5
-        (nightmareId, gs) = S.addCreature nightmare S.alice g6
+        (mimicId, g1) = S.addPermanent mimic S.alice gs0
+        (_, g2) = S.addPermanent piker S.alice g1
+        (_, g3) = S.addPermanent swamp S.alice g2
+        (_, g4) = S.addPermanent swamp S.alice g3
+        (_, g5) = S.addPermanent swamp S.alice g4
+        (_, g6) = S.addPermanent swamp S.alice g5
+        (nightmareId, gs) = S.addPermanent nightmare S.alice g6
         settled = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
     Spec.assertBool s (Set.member mimicId (GameState.battlefield settled)) "CR 704.5f does not bury the Mimic"
     Spec.assertEqWith s "the Mimic's power is the Nightmare's DEFINED 4, not the Piker's printed 2" (Projection.powerOf mimicId settled) (Just 4)
@@ -1827,8 +1827,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         forestId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
           i : _ -> i
           [] -> ObjectId.MkObjectId 999
-        (urborgId, g1) = S.addCreature urborg S.alice gs0
-        (mirageId, g2) = S.addCreature convincingMirage S.alice g1
+        (urborgId, g1) = S.addPermanent urborg S.alice gs0
+        (mirageId, g2) = S.addPermanent convincingMirage S.alice g1
         gs = S.withChosenSubtype Subtype.Type.Island mirageId (S.attach mirageId urborgId g2)
     Spec.assertEqWith s "before: Urborg makes the Forest a Swamp too" (Projection.subtypesOf forestId g2) (Set.fromList [Subtype.Type.Forest, Subtype.Type.Swamp])
     Spec.assertEqWith s "Urborg itself is only an Island now" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Island)
@@ -1863,9 +1863,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forest <- S.printingOf s registry "Forest"
     dawn <- S.printingOf s registry "Celestial Dawn"
     let base = Setup.emptyGame S.bothPlayers
-        (aliceLand, g1) = S.addCreature forest S.alice base
-        (bobLand, g2) = S.addCreature forest S.bob g1
-        gs = snd (S.addCreature dawn S.alice g2)
+        (aliceLand, g1) = S.addPermanent forest S.alice base
+        (bobLand, g2) = S.addPermanent forest S.bob g1
+        gs = snd (S.addPermanent dawn S.alice g2)
     Spec.assertEqWith s "alice's Forest is a Plains" (Projection.subtypesOf aliceLand gs) (Set.singleton Subtype.Type.Plains)
     Spec.assertEqWith s "bob's Forest is untouched" (Projection.subtypesOf bobLand gs) (Set.singleton Subtype.Type.Forest)
     Spec.assertEqWith s "and asking who controls one answers rather than diverging" (Projection.controllerOf bobLand gs) (Just S.bob)
@@ -1884,11 +1884,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     livingPlane <- S.printingOf s registry "Living Plane"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (bobLand, g1) = S.addCreature forest S.bob base
-        (aliceLand, g2) = S.addCreature forest S.alice g1
-        (_, g3) = S.addCreature livingPlane S.bob g2
-        (_, g4) = S.addCreature dawn S.alice g3
-        (aura, unattached) = S.addCreature controlMagic S.alice g4
+        (bobLand, g1) = S.addPermanent forest S.bob base
+        (aliceLand, g2) = S.addPermanent forest S.alice g1
+        (_, g3) = S.addPermanent livingPlane S.bob g2
+        (_, g4) = S.addPermanent dawn S.alice g3
+        (aura, unattached) = S.addPermanent controlMagic S.alice g4
         gs = S.attach aura bobLand unattached
     Spec.assertBool s (Projection.isCreatureOf bobLand unattached) "Living Plane animates the land, so the Aura may enchant it"
     Spec.assertEqWith s "Celestial Dawn is live: alice's own Forest is a Plains" (Projection.subtypesOf aliceLand unattached) (Set.singleton Subtype.Type.Plains)
@@ -1911,7 +1911,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (alicePiker, g1) = S.addGraveyardCard piker S.alice base
         (bobPiker, g2) = S.addGraveyardCard piker S.bob g1
         (aliceForest, dawnless) = S.addGraveyardCard forest S.alice g2
-        gs = snd (S.addCreature dawn S.alice dawnless)
+        gs = snd (S.addPermanent dawn S.alice dawnless)
     Spec.assertEqWith s "alice's Goblin Piker card in her graveyard is white" (Projection.colorsOf alicePiker gs) (Set.singleton Color.White)
     Spec.assertEqWith s "bob's stays red, the clause naming the cards you own" (Projection.colorsOf bobPiker gs) (Set.singleton Color.Red)
     Spec.assertEqWith s "her Forest card, being a land, stays colorless" (Projection.colorsOf aliceForest gs) Set.empty
@@ -1934,9 +1934,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let base = Setup.emptyGame S.bothPlayers
-        (sorcererId, g1) = S.addCreature sorcerer S.alice base
-        (_, g2) = S.addCreature dawn S.alice g1
-        (victimId, g3) = S.addCreature sorcerer S.bob g2
+        (sorcererId, g1) = S.addPermanent sorcerer S.alice base
+        (_, g2) = S.addPermanent dawn S.alice g1
+        (victimId, g3) = S.addPermanent sorcerer S.bob g2
     case Face.activatedAbilities (S.combinedFace sorcerer) of
       [] -> Spec.assertFailure s "Prodigal Sorcerer prints one activated ability"
       ping : _ -> do
@@ -2006,8 +2006,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     song <- S.printingOf s registry "Song of the Dryads"
     let base = S.landsInPlay forest 1
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (songId, g2) = S.addCreature song S.alice g1
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        (songId, g2) = S.addPermanent song S.alice g1
         gs = S.attach songId pikerId g2
     Spec.assertEqWith s "before: a Creature and nothing else" (Projection.cardTypesOf pikerId g2) (Set.singleton CardType.Creature)
     Spec.assertEqWith s "before: a Goblin Warrior" (Projection.subtypesOf pikerId g2) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
@@ -2034,9 +2034,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     marshSong <- S.printingOf s registry "Synthetic Marsh Song"
     let base = Setup.emptyGame S.bothPlayers
-        (forestId, g1) = S.addCreature forest S.alice base
-        (pikerId, g2) = S.addCreature piker S.alice g1
-        (songId, g3) = S.addCreature marshSong S.alice g2
+        (forestId, g1) = S.addPermanent forest S.alice base
+        (pikerId, g2) = S.addPermanent piker S.alice g1
+        (songId, g3) = S.addPermanent marshSong S.alice g2
         onPiker = S.attach songId pikerId g3
         onForest = S.attach songId forestId g3
         black = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Black)]
@@ -2067,9 +2067,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     song <- S.printingOf s registry "Song of the Dryads"
     let base = Setup.emptyGame S.bothPlayers
-        (_, g1) = S.addCreature mountain S.alice base
-        (pikerId, g2) = S.addCreature piker S.alice g1
-        (songId, unattached) = S.addCreature song S.alice g2
+        (_, g1) = S.addPermanent mountain S.alice base
+        (pikerId, g2) = S.addPermanent piker S.alice g1
+        (songId, unattached) = S.addPermanent song S.alice g2
         attached = S.attach songId pikerId unattached
         green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice green unattached)) "before: nothing alice controls makes green"
@@ -2091,8 +2091,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     seer <- S.printingOf s registry "Merfolk Seer"
     lord <- S.printingOf s registry "Lord of Atlantis"
     let base = Setup.emptyGame S.bothPlayers
-        (seerId, g1) = S.addCreature seer S.alice base
-        (lordId, g2) = S.addCreature lord S.alice g1
+        (seerId, g1) = S.addPermanent seer S.alice base
+        (lordId, g2) = S.addPermanent lord S.alice g1
         nonland = S.withEffectAt lordId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Type.Mountain) g2
         land = S.withEffectAt lordId (Timestamp.MkTimestamp 5) (Modification.AddCardType CardType.Land) nonland
         red = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]
@@ -2115,7 +2115,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay forest 1
-        (pikerId, board) = S.addCreature piker S.alice base
+        (pikerId, board) = S.addPermanent piker S.alice base
         withBoth addAt setAt =
           S.withEffectAt pikerId (Timestamp.MkTimestamp setAt) (Modification.SetCardType CardType.Land) $
             S.withEffectAt pikerId (Timestamp.MkTimestamp addAt) (Modification.AddCardType CardType.Artifact) board
@@ -2251,9 +2251,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     chorus <- S.printingOf s registry "Synthetic Ferocious Chorus"
     bogWraith <- S.printingOf s registry "Bog Wraith"
     childOfNight <- S.printingOf s registry "Child of Night"
-    let (_, g1) = S.addCreature chorus S.alice (Setup.emptyGame S.bothPlayers)
-        (wraithId, g2) = S.addCreature bogWraith S.alice g1
-        (childId, gs) = S.addCreature childOfNight S.alice g2
+    let (_, g1) = S.addPermanent chorus S.alice (Setup.emptyGame S.bothPlayers)
+        (wraithId, g2) = S.addPermanent bogWraith S.alice g1
+        (childId, gs) = S.addPermanent childOfNight S.alice g2
     Spec.assertEqWith s "the Wraith is its printed 3/3" (Projection.powerOf wraithId gs) (Just 3)
     Spec.assertEqWith s "the Wraith is its printed 3/3" (Projection.toughnessOf wraithId gs) (Just 3)
     Spec.assertEqWith s "the Child is its printed 2/1" (Projection.powerOf childId gs) (Just 2)
@@ -2340,7 +2340,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     (charnel, grist, giant) <- charnelPrintings s registry
     forest <- S.printingOf s registry "Forest"
     let (_, g1) = S.addGraveyardCard grist S.alice (S.landsInPlay forest 3)
-        (giantId, g2) = S.addCreature giant S.alice g1
+        (giantId, g2) = S.addPermanent giant S.alice g1
         (gs, charnelId) = S.handOne charnel g2
         resolved = S.runPure S.identityAnswer gs (S.cast S.alice charnelId >> Stack.resolveTop)
     Spec.assertEqWith s "the enchantment resolved" (GameState.stack resolved) []
@@ -2358,14 +2358,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.4b control: an ordinary graveyard creature card is read at its printed power" $ do
     (charnel, _, giant) <- charnelPrintings s registry
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addGraveyardCard piker S.alice (snd (S.addCreature charnel S.alice (Setup.emptyGame S.bothPlayers)))
-        (giantId, gs) = S.addCreature giant S.alice g1
+    let (_, g1) = S.addGraveyardCard piker S.alice (snd (S.addPermanent charnel S.alice (Setup.emptyGame S.bothPlayers)))
+        (giantId, gs) = S.addPermanent giant S.alice g1
     Spec.assertEqWith s "the Piker's printed 2" (Projection.powerOf giantId gs) (Just 2)
     Spec.assertEqWith s "the Piker's printed 2" (Projection.toughnessOf giantId gs) (Just 2)
 
   Spec.it s "CR 613.4b control: an empty graveyard leaves the count unevaluable and the base alone" $ do
     (charnel, _, giant) <- charnelPrintings s registry
-    let (giantId, gs) = S.addCreature giant S.alice (snd (S.addCreature charnel S.alice (Setup.emptyGame S.bothPlayers)))
+    let (giantId, gs) = S.addPermanent giant S.alice (snd (S.addPermanent charnel S.alice (Setup.emptyGame S.bothPlayers)))
     Spec.assertEqWith s "the Giant is its printed 3/3" (Projection.powerOf giantId gs) (Just 3)
     Spec.assertEqWith s "the Giant is its printed 3/3" (Projection.toughnessOf giantId gs) (Just 3)
 
@@ -2377,8 +2377,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forest <- S.printingOf s registry "Forest"
     limb <- S.printingOf s registry "Life and Limb"
     let base = Setup.emptyGame S.bothPlayers
-        (forestId, g1) = S.addCreature forest S.alice base
-        (_, gs) = S.addCreature limb S.alice g1
+        (forestId, g1) = S.addPermanent forest S.alice base
+        (_, gs) = S.addPermanent limb S.alice g1
     Spec.assertBool s (Set.member Subtype.Type.Saproling (Projection.subtypesOf forestId gs)) "the Forest is a Saproling"
     Spec.assertBool s (Set.member Subtype.Type.Forest (Projection.subtypesOf forestId gs)) "and still a Forest (CR 205.1b: the add keeps the rest)"
     Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
@@ -2407,9 +2407,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     shroofus <- S.printingOf s registry "Shroofus Sproutsire"
     limb <- S.printingOf s registry "Life and Limb"
     let base = Setup.emptyGame S.bothPlayers
-        (_, g1) = S.addCreature mountain S.alice base
-        (shroofusId, without) = S.addCreature shroofus S.alice g1
-        (_, with) = S.addCreature limb S.alice without
+        (_, g1) = S.addPermanent mountain S.alice base
+        (shroofusId, without) = S.addPermanent shroofus S.alice g1
+        (_, with) = S.addPermanent limb S.alice without
         green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         red = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice green without)) "before: nothing alice controls makes green"
@@ -2434,8 +2434,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     ygra <- S.printingOf s registry "Ygra, Eater of All"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (ygraId, g1) = S.addCreature ygra S.alice base
-        (pikerId, gs) = S.addCreature piker S.alice g1
+        (ygraId, g1) = S.addPermanent ygra S.alice base
+        (pikerId, gs) = S.addPermanent piker S.alice g1
     Spec.assertBool s (Set.member Subtype.Type.Food (Projection.subtypesOf pikerId gs)) "the Piker is a Food"
     -- CR 205.1b's "in addition": the add must not replace what the Piker had. An
     -- arm that SET the subtypes passes the assertion above and fails this one.
@@ -2467,8 +2467,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     ygra <- S.printingOf s registry "Ygra, Eater of All"
     piker <- S.printingOf s registry "Goblin Piker"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (ygraId, g1) = S.addCreature ygra S.alice (S.landsInPlay mountain 1)
-        (pikerId, board) = S.addCreature piker S.alice g1
+    let (ygraId, g1) = S.addPermanent ygra S.alice (S.landsInPlay mountain 1)
+        (pikerId, board) = S.addPermanent piker S.alice g1
         (withBolt, spellId) = S.handOne lightningBolt board
         cast = S.runPure (aimAtCreature pikerId) withBolt (S.cast S.alice spellId)
         damaged = S.runPure (aimAtCreature pikerId) cast Stack.resolveTop
@@ -2489,7 +2489,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- changeling and nothing else) is the card.
   Spec.it s "CR 702.73a a changeling is every creature type, and no other family's" $ do
     changeling <- S.printingOf s registry "Woodland Changeling"
-    let (oid, gs) = S.addCreature changeling S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent changeling S.alice (Setup.emptyGame S.bothPlayers)
         subtypes = Projection.subtypesOf oid gs
     Spec.assertBool s (Set.member Subtype.Type.Shapeshifter subtypes) "still its printed Shapeshifter"
     Spec.assertBool s (Set.member Subtype.Type.Merfolk subtypes) "a Merfolk"
@@ -2508,9 +2508,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     changeling <- S.printingOf s registry "Woodland Changeling"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (_, withLord) = S.addCreature lord S.alice base
-        (changelingId, withChangeling) = S.addCreature changeling S.alice withLord
-        (pikerId, gs) = S.addCreature piker S.alice withChangeling
+        (_, withLord) = S.addPermanent lord S.alice base
+        (changelingId, withChangeling) = S.addPermanent changeling S.alice withLord
+        (pikerId, gs) = S.addPermanent piker S.alice withChangeling
     Spec.assertEqWith s "the 2/2 changeling is a Merfolk, so 3/3" (Projection.powerOf changelingId gs) (Just 3)
     Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)) changelingId gs) "and has islandwalk"
     -- The control: the Piker is a Goblin Warrior and no changeling, so the same
@@ -2525,7 +2525,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     island <- S.printingOf s registry "Island"
     changeling <- S.printingOf s registry "Woodland Changeling"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
-    let (oid, board) = S.addCreature changeling S.alice (S.landsInPlay island 3)
+    let (oid, board) = S.addPermanent changeling S.alice (S.landsInPlay island 3)
         after = castAtCreature oid turnToFrog board
     Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf oid board)) "before: a Merfolk among the rest"
     Spec.assertEqWith s "after: Creature -- Frog alone" (Projection.subtypesOf oid after) (Set.singleton Subtype.Type.Frog)
@@ -2562,8 +2562,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     lord <- S.printingOf s registry "Lord of Atlantis"
     piker <- S.printingOf s registry "Goblin Piker"
     wings <- S.printingOf s registry "Wings of Velis Vel"
-    let (_, withLord) = S.addCreature lord S.alice (S.landsInPlay island 3)
-        (pikerId, board) = S.addCreature piker S.alice withLord
+    let (_, withLord) = S.addPermanent lord S.alice (S.landsInPlay island 3)
+        (pikerId, board) = S.addPermanent piker S.alice withLord
         after = castAtCreature pikerId wings board
         subtypes = Projection.subtypesOf pikerId after
     Spec.assertEqWith s "base 4/4, and the lord sees a Merfolk" (Projection.powerOf pikerId after) (Just 5)
@@ -2625,8 +2625,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     lord <- S.printingOf s registry "Lord of Atlantis"
     piker <- S.printingOf s registry "Goblin Piker"
     blessing <- S.printingOf s registry "Synthetic Protean Blessing"
-    let (_, withLord) = S.addCreature lord S.alice (S.landsInPlay island 2)
-        (pikerId, before) = S.addCreature piker S.alice withLord
+    let (_, withLord) = S.addPermanent lord S.alice (S.landsInPlay island 2)
+        (pikerId, before) = S.addPermanent piker S.alice withLord
         after = castAtCreature pikerId blessing before
     Spec.assertEqWith s "the lord leaves the Goblin alone before the spell resolves" (Projection.powerOf pikerId before) (Just 2)
     Spec.assertEqWith s "and pumps it once the granted changeling has made it a Merfolk" (Projection.powerOf pikerId after) (Just 3)
@@ -2669,9 +2669,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     island <- S.printingOf s registry "Island"
     conversion <- S.printingOf s registry "Conversion"
     let base = Setup.emptyGame S.bothPlayers
-        (mountainId, g1) = S.addCreature mountain S.alice base
-        (islandId, g2) = S.addCreature island S.alice g1
-        (_, gs) = S.addCreature conversion S.alice g2
+        (mountainId, g1) = S.addPermanent mountain S.alice base
+        (islandId, g2) = S.addPermanent island S.alice g1
+        (_, gs) = S.addPermanent conversion S.alice g2
     Spec.assertBool s (Set.member Subtype.Type.Plains (Projection.subtypesOf mountainId gs)) "the Mountain is a Plains"
     Spec.assertBool s (not (Set.member Subtype.Type.Mountain (Projection.subtypesOf mountainId gs))) "and no longer a Mountain (CR 305.7's set)"
     Spec.assertBool s (Set.member Subtype.Type.Island (Projection.subtypesOf islandId gs)) "the Island is untouched"
@@ -2681,9 +2681,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     island <- S.printingOf s registry "Island"
     conversion <- S.printingOf s registry "Conversion"
     let base = Setup.emptyGame S.bothPlayers
-        (mountainId, g1) = S.addCreature mountain S.alice base
-        (islandId, g2) = S.addCreature island S.alice g1
-        (conversionId, g3) = S.addCreature conversion S.alice g2
+        (mountainId, g1) = S.addPermanent mountain S.alice base
+        (islandId, g2) = S.addPermanent island S.alice g1
+        (conversionId, g3) = S.addPermanent conversion S.alice g2
         -- A Magical Hack on Conversion: "All Mountains are Plains" becomes "All
         -- Islands are Plains". The swap reaches the AFFECTED set, not a
         -- modification, which is the read-point this card exists to exercise.
@@ -2720,9 +2720,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     estuary <- S.printingOf s registry "Synthetic Volcanic Estuary"
     conversion <- S.printingOf s registry "Conversion"
     let base = Setup.emptyGame S.bothPlayers
-        (forestId, g1) = S.addCreature forest S.alice base
-        (_, g2) = S.addCreature estuary S.alice g1
-        (conversionId, printed) = S.addCreature conversion S.alice g2
+        (forestId, g1) = S.addPermanent forest S.alice base
+        (_, g2) = S.addPermanent estuary S.alice g1
+        (conversionId, printed) = S.addPermanent conversion S.alice g2
         -- The same Magical Hack as the case above, on the same card: "All
         -- Mountains are Plains" becomes "All Islands are Plains". The Estuary's
         -- printed type line still says Mountain, so the rewritten clause no longer
@@ -2760,10 +2760,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     let base = Setup.emptyGame S.bothPlayers
-        (_, g1) = S.addCreature forest S.alice base
-        (_, g2) = S.addCreature piker S.alice g1
+        (_, g1) = S.addPermanent forest S.alice base
+        (_, g2) = S.addPermanent piker S.alice g1
         (_, g3) = S.addToken (Printing.card piker) S.alice g2
-        (ashayaId, gs) = S.addCreature ashaya S.alice g3
+        (ashayaId, gs) = S.addPermanent ashaya S.alice g3
     Spec.assertEqWith s "Forest + animated Piker + Ashaya" (Projection.powerOf ashayaId gs) (Just 3)
     Spec.assertEqWith s "toughness the same" (Projection.toughnessOf ashayaId gs) (Just 3)
 
@@ -2851,11 +2851,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (corpsejackId, g1) = S.addCreature corpsejackMenace S.alice base
-        (_, g2) = S.addCreature piker S.alice g1
-        (_, g3) = S.addCreature ashaya S.alice g2
+        (corpsejackId, g1) = S.addPermanent corpsejackMenace S.alice base
+        (_, g2) = S.addPermanent piker S.alice g1
+        (_, g3) = S.addPermanent ashaya S.alice g2
     Spec.assertEqWith s "it has one before Blood Moon" (length (Projection.replacementsOf Zone.Battlefield corpsejackId g3)) 1
-    let (_, gs) = S.addCreature bloodMoon S.alice g3
+    let (_, gs) = S.addPermanent bloodMoon S.alice g3
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf corpsejackId gs)) "the Menace is a Mountain now"
     Spec.assertEqWith s "and its rules text is gone" (fmap snd (Projection.replacementsOf Zone.Battlefield corpsejackId gs)) []
 
@@ -2863,8 +2863,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (nonbasicId, g1) = S.addCreature urborg S.alice base
-        (bloodMoonId, g2) = S.addCreature bloodMoon S.alice g1
+        (nonbasicId, g1) = S.addPermanent urborg S.alice base
+        (bloodMoonId, g2) = S.addPermanent bloodMoon S.alice g1
         gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 500) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) g2
     Spec.assertEqWith s "nonbasic land is now Island" (Projection.subtypesOf nonbasicId gs) (Set.singleton Subtype.Type.Island)
 
@@ -2872,8 +2872,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (nonbasicId, g1) = S.addCreature urborg S.alice base
-        (bloodMoonId, g2) = S.addCreature bloodMoon S.alice g1
+        (nonbasicId, g1) = S.addPermanent urborg S.alice base
+        (bloodMoonId, g2) = S.addPermanent bloodMoon S.alice g1
         -- Timestamp 1 is older than Blood Moon's own object timestamp; the
         -- outcome must not change.
         gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) g2
@@ -2883,10 +2883,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     humility <- S.printingOf s registry "Humility"
     opalescence <- S.printingOf s registry "Opalescence"
     let base = Setup.emptyGame S.bothPlayers
-        (humilityId, g1) = S.addCreature humility S.alice base
+        (humilityId, g1) = S.addPermanent humility S.alice base
         -- Opalescence AFTER Humility, so Opalescence's 7b (mana value 4) wins
         -- the timestamp race: Humility is a 4/4 creature.
-        (_, g2) = S.addCreature opalescence S.alice g1
+        (_, g2) = S.addPermanent opalescence S.alice g1
     Spec.assertBool s (Projection.isCreatureOf humilityId g2) "Humility is a creature"
     Spec.assertEqWith s "base P/T = its mana value" (Projection.toughnessOf humilityId g2) (Just 4)
     let damaged = S.markDamage humilityId 4 g2
@@ -2903,10 +2903,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     humility <- S.printingOf s registry "Humility"
     opalescence <- S.printingOf s registry "Opalescence"
     let base = Setup.emptyGame S.bothPlayers
-        (opalescenceId, g1) = S.addCreature opalescence S.alice base
+        (opalescenceId, g1) = S.addPermanent opalescence S.alice base
         -- A second enchantment, so the effect is demonstrably live: it
         -- animates Humility in the same state where it skips itself.
-        (humilityId, gs) = S.addCreature humility S.alice g1
+        (humilityId, gs) = S.addPermanent humility S.alice g1
     Spec.assertBool s (Projection.isCreatureOf humilityId gs) "the other enchantment IS animated"
     Spec.assertBool s (not (Projection.isCreatureOf opalescenceId gs)) "Opalescence is not"
 
@@ -2926,8 +2926,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     march <- S.printingOf s registry "March of the Machines"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (equip, g1) = S.addCreature bonesplitter S.alice base
-        (_, gs) = S.addCreature march S.alice g1
+        (equip, g1) = S.addPermanent bonesplitter S.alice base
+        (_, gs) = S.addPermanent march S.alice g1
     Spec.assertBool s (Projection.isCreatureOf equip gs) "Bonesplitter is a creature (layer 4)"
     Spec.assertEqWith s "power equal to its mana value, {1} (layer 7b)" (Projection.powerOf equip gs) (Just 1)
     Spec.assertEqWith s "and toughness the same" (Projection.toughnessOf equip gs) (Just 1)
@@ -2940,8 +2940,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     march <- S.printingOf s registry "March of the Machines"
     myr <- S.printingOf s registry "Darksteel Myr"
     let base = Setup.emptyGame S.bothPlayers
-        (myrId, g1) = S.addCreature myr S.alice base
-        (_, gs) = S.addCreature march S.alice g1
+        (myrId, g1) = S.addPermanent myr S.alice base
+        (_, gs) = S.addPermanent march S.alice g1
     Spec.assertEqWith s "still its printed 0 power, not its {3} mana value" (Projection.powerOf myrId gs) (Just 0)
     Spec.assertEqWith s "and its printed 1 toughness" (Projection.toughnessOf myrId gs) (Just 1)
 
@@ -2954,8 +2954,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     livingPlane <- S.printingOf s registry "Living Plane"
     forest <- S.printingOf s registry "Forest"
     let base = Setup.emptyGame S.bothPlayers
-        (land, g1) = S.addCreature forest S.alice base
-        (self, gs) = S.addCreature livingPlane S.alice g1
+        (land, g1) = S.addPermanent forest S.alice base
+        (self, gs) = S.addPermanent livingPlane S.alice g1
     Spec.assertBool s (Projection.isCreatureOf land gs) "the Forest is a creature (layer 4)"
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf land gs)) "and still a land"
     Spec.assertEqWith s "power 1 (layer 7b)" (Projection.powerOf land gs) (Just 1)
@@ -2974,8 +2974,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     march <- S.printingOf s registry "March of the Machines"
     let base = S.landsInPlay island 4 -- {3}{U}
-        (creature, g1) = S.addCreature piker S.alice base
-        (equip, g2) = S.addCreature bonesplitter S.alice g1
+        (creature, g1) = S.addPermanent piker S.alice base
+        (equip, g2) = S.addPermanent bonesplitter S.alice g1
         attached = S.attach equip creature g2
         (withSpell, spellId) = S.handOne march attached
         cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
@@ -2992,9 +2992,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     humility <- S.printingOf s registry "Humility"
     opalescence <- S.printingOf s registry "Opalescence"
     let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (_, g2) = S.addCreature humility S.alice g1
-        (_, gs) = S.addCreature opalescence S.alice g2
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        (_, g2) = S.addPermanent humility S.alice g1
+        (_, gs) = S.addPermanent opalescence S.alice g2
     Spec.assertEqWith s "power 1" (Projection.powerOf pikerId gs) (Just 1)
     Spec.assertEqWith s "toughness 1" (Projection.toughnessOf pikerId gs) (Just 1)
     Spec.assertBool s (Map.null (Projection.keywordsOf pikerId gs)) "no abilities"
@@ -3003,16 +3003,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     humility <- S.printingOf s registry "Humility"
     opalescence <- S.printingOf s registry "Opalescence"
     let base = Setup.emptyGame S.bothPlayers
-        (humilityId, g1) = S.addCreature humility S.alice base
-        (_, gs) = S.addCreature opalescence S.alice g1
+        (humilityId, g1) = S.addPermanent humility S.alice base
+        (_, gs) = S.addPermanent opalescence S.alice g1
     Spec.assertEqWith s "Opalescence's mana-value 7b wins" (Projection.powerOf humilityId gs) (Just 4)
 
   Spec.it s "CR 613.7 Humility + Opalescence: Humility is 1/1 when Humility is newer" $ do
     humility <- S.printingOf s registry "Humility"
     opalescence <- S.printingOf s registry "Opalescence"
     let base = Setup.emptyGame S.bothPlayers
-        (_, g1) = S.addCreature opalescence S.alice base
-        (humilityId, gs) = S.addCreature humility S.alice g1
+        (_, g1) = S.addPermanent opalescence S.alice base
+        (humilityId, gs) = S.addPermanent humility S.alice g1
     Spec.assertEqWith s "Humility's 1/1 7b wins" (Projection.powerOf humilityId gs) (Just 1)
 
   -- Opalescence's own text says "each other NON-AURA enchantment". Card text, not
@@ -3022,9 +3022,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     restInPeace <- S.printingOf s registry "Rest in Peace"
     let base = Setup.emptyGame S.bothPlayers
-        (_, withOpal) = S.addCreature opalescence S.alice base
-        (auraId, withAura) = S.addCreature unholyStrength S.alice withOpal
-        (ripId, gs) = S.addCreature restInPeace S.alice withAura
+        (_, withOpal) = S.addPermanent opalescence S.alice base
+        (auraId, withAura) = S.addPermanent unholyStrength S.alice withOpal
+        (ripId, gs) = S.addPermanent restInPeace S.alice withAura
     Spec.assertBool s (not (Projection.isCreatureOf auraId gs)) "the Aura stays a non-creature"
     Spec.assertBool s (Projection.isCreatureOf ripId gs) "a non-Aura enchantment IS animated"
 
@@ -3048,8 +3048,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     controlMagic <- S.printingOf s registry "Control Magic"
     humility <- S.printingOf s registry "Humility"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.bob base
-        (aura, g2) = S.addCreature controlMagic S.alice g1
+        (creature, g1) = S.addPermanent piker S.bob base
+        (aura, g2) = S.addPermanent controlMagic S.alice g1
         stolen = S.attach aura creature g2
         gs = S.withHumility humility stolen
     Spec.assertEqWith s "before Humility, alice controls it" (Projection.controllerOf creature stolen) (Just S.alice)
@@ -3068,9 +3068,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     controlMagic <- S.printingOf s registry "Control Magic"
     humility <- S.printingOf s registry "Humility"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.bob base
+        (creature, g1) = S.addPermanent piker S.bob base
         underHumility = S.withHumility humility g1
-        (aura, withAura) = S.addCreature controlMagic S.alice underHumility
+        (aura, withAura) = S.addPermanent controlMagic S.alice underHumility
         gs = S.attach aura creature withAura
     Spec.assertEqWith s "bob's until the Aura attaches" (Projection.controllerOf creature underHumility) (Just S.bob)
     Spec.assertEqWith s "alice's once it does" (Projection.controllerOf creature gs) (Just S.alice)
@@ -3081,7 +3081,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     humility <- S.printingOf s registry "Humility"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.bob base
+        (creature, g1) = S.addPermanent piker S.bob base
         gs = S.withHumility humility g1
     Spec.assertEqWith s "still bob's" (Projection.controllerOf creature gs) (Just S.bob)
     Spec.assertEqWith s "though Humility is live: 1/1" (Projection.powerOf creature gs) (Just 1)
@@ -3101,8 +3101,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
-        (creature, g1) = S.addCreature piker S.bob base
-        (aura, g2) = S.addCreature controlMagic S.alice g1
+        (creature, g1) = S.addPermanent piker S.bob base
+        (aura, g2) = S.addPermanent controlMagic S.alice g1
         stolen = S.attach aura creature g2
         gs = S.withEffectAt aura (Timestamp.MkTimestamp 500) Modification.LoseAllAbilities stolen
     Spec.assertEqWith s "the Aura still holds the creature" (Projection.controllerOf creature gs) (Just S.alice)
@@ -3125,11 +3125,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     humility <- S.printingOf s registry "Humility"
     opalescence <- S.printingOf s registry "Opalescence"
     let base = Setup.emptyGame S.bothPlayers
-        (skelId, g1) = S.addCreature skeletons S.bob base
-        (badMoonId, g2) = S.addCreature badMoon S.alice g1
-        (_, unstripped) = S.addCreature opalescence S.alice g2
-        (_, g3) = S.addCreature humility S.alice g2
-        (_, gs) = S.addCreature opalescence S.alice g3
+        (skelId, g1) = S.addPermanent skeletons S.bob base
+        (badMoonId, g2) = S.addPermanent badMoon S.alice g1
+        (_, unstripped) = S.addPermanent opalescence S.alice g2
+        (_, g3) = S.addPermanent humility S.alice g2
+        (_, gs) = S.addPermanent opalescence S.alice g3
     Spec.assertEqWith s "animated but unstripped, Bad Moon pumps: 2/2" (Projection.powerOf skelId unstripped) (Just 2)
     Spec.assertBool s (Projection.isCreatureOf badMoonId gs) "Bad Moon is a creature, so Humility's set holds it"
     Spec.assertEqWith s "Humility's 1/1, not 2/2" (Projection.powerOf skelId gs) (Just 1)
@@ -3147,8 +3147,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     humility <- S.printingOf s registry "Humility"
     let base = Setup.emptyGame S.bothPlayers
-        (skelId, g1) = S.addCreature skeletons S.bob base
-        (badMoonId, g2) = S.addCreature badMoon S.alice g1
+        (skelId, g1) = S.addPermanent skeletons S.bob base
+        (badMoonId, g2) = S.addPermanent badMoon S.alice g1
         gs = S.withHumility humility g2
     Spec.assertBool s (not (Projection.isCreatureOf badMoonId gs)) "no animator, so Bad Moon is no creature"
     Spec.assertEqWith s "1/1 from Humility's 7b, then +1/+1 from Bad Moon's 7c" (Projection.powerOf skelId gs) (Just 2)
@@ -3172,10 +3172,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     opalescence <- S.printingOf s registry "Opalescence"
     march <- S.printingOf s registry "March of the Machines"
     let base = Setup.emptyGame S.bothPlayers
-        (slaverId, g1) = S.addCreature mindslaver S.alice base
-        (_, g2) = S.addCreature humility S.alice g1
-        (_, g3) = S.addCreature opalescence S.alice g2
-        (marchId, gs) = S.addCreature march S.alice g3
+        (slaverId, g1) = S.addPermanent mindslaver S.alice base
+        (_, g2) = S.addPermanent humility S.alice g1
+        (_, g3) = S.addPermanent opalescence S.alice g2
+        (marchId, gs) = S.addPermanent march S.alice g3
     Spec.assertBool s (Projection.isCreatureOf marchId gs) "Opalescence animated March, so Humility's set holds it"
     Spec.assertBool s (Projection.isCreatureOf slaverId gs) "March's layer-4 part still animates the artifact"
     Spec.assertEqWith s "and its layer-7b part still sets the mana value, 6" (Projection.powerOf slaverId gs) (Just 6)
@@ -3192,7 +3192,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     humility <- S.printingOf s registry "Humility"
     let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.bob base
+        (pikerId, g1) = S.addPermanent piker S.bob base
         g2 = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId g1
         gs = S.withHumility humility g2
     Spec.assertEqWith s "power 1 + 1" (Projection.powerOf pikerId gs) (Just 2)
@@ -3211,7 +3211,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.8b within layer 4, a dependency overrides timestamp order" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (pikerId, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasCardType CardType.Land)) (Timestamp.MkTimestamp 10) (Modification.AddLandSubtype Subtype.Type.Swamp) gs0
         gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.AddCardType CardType.Land) gsA
     Spec.assertBool s (Set.member Subtype.Type.Swamp (Projection.subtypesOf pikerId gs)) "the newer land-maker applied first, so the Swamp lands"
@@ -3234,7 +3234,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.7 within layer 4, no dependency leaves timestamp order alone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (pikerId, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
+    let (pikerId, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
         animated = S.withEffectAt pikerId (Timestamp.MkTimestamp 5) (Modification.AddCardType CardType.Land) gs0
         gsA = S.withEffectAt pikerId (Timestamp.MkTimestamp 10) (Modification.SetLandSubtype Subtype.Type.Swamp) animated
         gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.SetLandSubtype Subtype.Type.Forest) gsA
@@ -3296,8 +3296,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
           i : _ -> i
           [] -> ObjectId.MkObjectId 999
-        (_, g1) = S.addCreature march S.alice gs0
-        (coatingId, g2) = S.addCreature coating S.alice g1
+        (_, g1) = S.addPermanent march S.alice gs0
+        (coatingId, g2) = S.addPermanent coating S.alice g1
         ability = case Face.activatedAbilities (S.combinedFace coating) of
           ab : _ -> Just ab
           [] -> Nothing
@@ -3329,7 +3329,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- on A and there is no loop.
   Spec.it s "CR 613.8b within layer 6, a keyword grant reorders a keyword-reading effect" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, gs0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (pikerId, gs0) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         gsA = withDynamicEffect (Affected.Matching (Filter.Type.HasKeyword Keyword.Flying)) (Timestamp.MkTimestamp 10) (Modification.GainKeyword Keyword.Deathtouch) gs0
         gs = S.withEffectAt pikerId (Timestamp.MkTimestamp 20) (Modification.GainKeyword Keyword.Flying) gsA
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "the grant itself landed"
@@ -3357,7 +3357,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 613.8b Humility reorders an effect whose set reads a keyword" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     humility <- S.printingOf s registry "Humility"
-    let (flierId, gs0) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+    let (flierId, gs0) = S.addPermanent birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
         withHum = S.withHumility humility gs0
         Timestamp.MkTimestamp h = humilityTimestamp humility withHum
         groundling = Affected.Matching (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.HasKeyword Keyword.Flying)])
@@ -3369,7 +3369,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   Spec.it s "CR 614: Rest in Peace projects its graveyard->exile replacement" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
-    let (rip, gs) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+    let (rip, gs) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "one redirect replacement"
@@ -3378,14 +3378,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   Spec.it s "a vanilla creature projects no replacements" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
-    let (piker, gs) = S.addCreature pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
+    let (piker, gs) = S.addPermanent pikerPrinting S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "none" (fmap snd (Projection.replacementsOf Zone.Battlefield piker gs)) []
 
   Spec.it s "CR 122.1a a +1/+1 counter adds +1/+1 (layer 7c)" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay forest 0
-        (oid, gs0) = S.addCreature piker S.bob base
+        (oid, gs0) = S.addPermanent piker S.bob base
         gs = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
     Spec.assertEqWith s "power 2 + 1" (Projection.powerOf oid gs) (Just 3)
     Spec.assertEqWith s "toughness 1 + 1" (Projection.toughnessOf oid gs) (Just 2)
@@ -3394,7 +3394,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay forest 0
-        (oid, gs0) = S.addCreature piker S.bob base
+        (oid, gs0) = S.addPermanent piker S.bob base
         gs = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs0
     Spec.assertEqWith s "power 2 - 1" (Projection.powerOf oid gs) (Just 1)
     Spec.assertEqWith s "toughness 1 - 1" (Projection.toughnessOf oid gs) (Just 0)
@@ -3403,7 +3403,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay forest 0
-        (oid, gs0) = S.addCreature piker S.bob base
+        (oid, gs0) = S.addPermanent piker S.bob base
         gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
         gs = S.withEffectAt oid (Timestamp.MkTimestamp 9) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs1
     Spec.assertEqWith s "power 2 + 1 + 3" (Projection.powerOf oid gs) (Just 6)
@@ -3411,7 +3411,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   Spec.it s "CR 108.4 a SetController effect overrides owner; last timestamp wins" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, base) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         install pid g =
           let (ts, g1) = Game.freshTimestamp g
               eff =
@@ -3452,10 +3452,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     grappler <- S.printingOf s registry "Goblin Grappler"
     giant <- S.printingOf s registry "Hill Giant"
     dominion <- S.printingOf s registry "Synthetic Goblin Dominion"
-    let (goblin, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-        (nonGoblin, without) = S.addCreature giant S.bob g1
-        (_, gs) = S.addCreature dominion S.alice without
-        (late, later) = S.addCreature grappler S.bob gs
+    let (goblin, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (nonGoblin, without) = S.addPermanent giant S.bob g1
+        (_, gs) = S.addPermanent dominion S.alice without
+        (late, later) = S.addPermanent grappler S.bob gs
     Spec.assertEqWith s "alice's static ability takes bob's Goblin (CR 613.1b)" (Projection.controllerOf goblin gs) (Just S.alice)
     Spec.assertEqWith s "and leaves his Hill Giant, which is no Goblin" (Projection.controllerOf nonGoblin gs) (Just S.bob)
     Spec.assertEqWith s "a Goblin entering later is taken too (CR 611.3a)" (Projection.controllerOf late later) (Just S.alice)
@@ -3474,9 +3474,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     giant <- S.printingOf s registry "Hill Giant"
     dominion <- S.printingOf s registry "Synthetic Goblin Dominion"
-    let (original, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        (clone, g2) = S.addCreature giant S.bob g1
-        (_, unstamped) = S.addCreature dominion S.alice g2
+    let (original, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (clone, g2) = S.addPermanent giant S.bob g1
+        (_, unstamped) = S.addPermanent dominion S.alice g2
         snapshot = Projection.copiableCharacteristics original unstamped
         gs = unstamped {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}) clone (GameState.objects unstamped)}
     Spec.assertEqWith s "stamped as a copy of a Goblin, alice controls it (CR 613.2c)" (Projection.controllerOf clone gs) (Just S.alice)
@@ -3486,11 +3486,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "a copy binding seeds the fold with the copied object's copiable P/T" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, gs1) = S.addCreature piker S.alice gs0
+        (pikerId, gs1) = S.addPermanent piker S.alice gs0
         -- The Piker's copiable value (base 2/1) computed via the new function.
         snapshot = Projection.copiableCharacteristics pikerId gs1
         -- A second, unrelated creature (another Piker) we turn into a "copy":
-        (cloneId, gs2) = S.addCreature piker S.alice gs1
+        (cloneId, gs2) = S.addPermanent piker S.alice gs1
         stamped = gs2 {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}) cloneId (GameState.objects gs2)}
     Spec.assertEqWith s "copy projects the snapshot power" (Projection.powerOf cloneId stamped) (Just 2)
     Spec.assertEqWith s "copy projects the snapshot toughness" (Projection.toughnessOf cloneId stamped) (Just 1)
@@ -3499,7 +3499,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "an object with no copy binding projects its own base P/T" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, gs1) = S.addCreature piker S.alice gs0
+        (pikerId, gs1) = S.addPermanent piker S.alice gs0
     Spec.assertEqWith s "base power" (Projection.powerOf pikerId gs1) (Just 2)
     Spec.assertEqWith s "base toughness" (Projection.toughnessOf pikerId gs1) (Just 1)
 
@@ -3510,9 +3510,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     scales <- S.printingOf s registry "Hardened Scales"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, gs1) = S.addCreature piker S.alice gs0
-        (scalesId, gs2) = S.addCreature scales S.alice gs1
-        (cloneId, gs3) = S.addCreature piker S.alice gs2
+        (pikerId, gs1) = S.addPermanent piker S.alice gs0
+        (scalesId, gs2) = S.addPermanent scales S.alice gs1
+        (cloneId, gs3) = S.addPermanent piker S.alice gs2
         creatures = Filter.Type.HasCardType CardType.Creature
         enchantments = Filter.Type.HasCardType CardType.Enchantment
     Spec.assertEqWith s "excludes self, includes the other creature" (Replacement.legalCopyTargets Set.empty creatures cloneId gs3) [pikerId]
@@ -3520,7 +3520,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   Spec.it s "viewOfObject reads a projected creature's characteristics" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         view = Projection.viewOfObject oid gs
     Spec.assertBool s (Set.member CardType.Creature (Filter.cardTypes view)) "is a creature"
     Spec.assertEqWith s "controller" (Filter.controller view) (Just S.alice)
@@ -3550,7 +3550,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
           oid : _ -> oid
           [] -> error "Pawl.ProjectionSpec: landsInPlay should place one Mountain"
-        (travelerId, gs) = S.addCreature traveler S.alice gs0
+        (travelerId, gs) = S.addPermanent traveler S.alice gs0
         snapshotView oid g = Count.viewOfSnapshot Nothing False Map.empty (Projection.project oid g)
         asks view = Filter.matches (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) view Filter.Type.HasActivatedAbility
     Spec.assertBool s (asks (Projection.viewOfCard (S.combinedFace mountain))) "viewOfCard: a Mountain card has one"
@@ -3657,7 +3657,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     goyf <- S.printingOf s registry "Tarmogoyf"
     let (_, gs0) = S.addGraveyardCard mountain S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs1) = S.addGraveyardCard bolt S.alice gs0
-        (onBattlefield, gs2) = S.addCreature goyf S.alice gs1
+        (onBattlefield, gs2) = S.addPermanent goyf S.alice gs1
         (inLibrary, gs3) = S.addLibraryCard goyf S.alice gs2
         libraryPower = Filter.power (Projection.viewOfObject inLibrary gs3)
     Spec.assertEqWith s "on the battlefield" (Projection.powerOf onBattlefield gs3) (Just 2)
@@ -3756,7 +3756,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     (_, _, _, gs) <- elspethEmblemBoard s registry True
     let wiped = gs {GameState.battlefield = mempty, GameState.objects = Map.filterWithKey (\oid _ -> Set.member oid (GameState.command gs)) (GameState.objects gs)}
-        (fresh, afterFresh) = S.addCreature piker S.alice wiped
+        (fresh, afterFresh) = S.addPermanent piker S.alice wiped
     Spec.assertEqWith s "the emblem is still in the command zone" (Set.size (GameState.command wiped)) 1
     Spec.assertEqWith s "and buffs the new creature" (Projection.powerOf fresh afterFresh, Projection.toughnessOf fresh afterFresh) (Just 4, Just 3)
 
@@ -3794,9 +3794,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     forge <- S.printingOf s registry "Synthetic Emblem Forge"
     evangel <- S.printingOf s registry "Cabal Evangel"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
-        (blackId, g2) = S.addCreature evangel S.bob g1
-        (redId, g3) = S.addCreature piker S.bob g2
+    let (mineId, g1) = S.addPermanent evangel S.alice (Setup.emptyGame S.bothPlayers)
+        (blackId, g2) = S.addPermanent evangel S.bob g1
+        (redId, g3) = S.addPermanent piker S.bob g2
         board = forgedBoard forge g3
         red = dealTo redId mineId 2 board
         black = dealTo blackId mineId 2 board
@@ -3879,8 +3879,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 113.6p an emblem's own replacement row floors the life total from the command zone" $ do
     serra <- S.printingOf s registry "Serra the Benevolent"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (srcId, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-        (mineId, g2) = S.addCreature piker S.alice g1
+    let (srcId, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (mineId, g2) = S.addPermanent piker S.alice g1
         lives = atLife S.alice 2 . atLife S.bob 3
         (serraId, armedBoard) = serraEmblemBoard True serra g2
         (idleId, idleBoard) = serraEmblemBoard False serra g2
@@ -3930,9 +3930,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     evangel <- S.printingOf s registry "Cabal Evangel"
     golem <- S.printingOf s registry "Icehide Golem"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
-        (artifactId, g2) = S.addCreature golem S.bob g1
-        (redId, g3) = S.addCreature piker S.bob g2
+    let (mineId, g1) = S.addPermanent evangel S.alice (Setup.emptyGame S.bothPlayers)
+        (artifactId, g2) = S.addPermanent golem S.bob g1
+        (redId, g3) = S.addPermanent piker S.bob g2
     board <- toweredBoard s registry mineId g3
     let byArtifact = dealTo artifactId mineId 2 board
         byCreature = dealTo redId mineId 2 board
@@ -3961,9 +3961,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     evangel <- S.printingOf s registry "Cabal Evangel"
     golem <- S.printingOf s registry "Icehide Golem"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (mineId, g1) = S.addCreature evangel S.alice (Setup.emptyGame S.bothPlayers)
-        (artifactId, g2) = S.addCreature golem S.bob g1
-        (redId, g3) = S.addCreature piker S.bob g2
+    let (mineId, g1) = S.addPermanent evangel S.alice (Setup.emptyGame S.bothPlayers)
+        (artifactId, g2) = S.addPermanent golem S.bob g1
+        (redId, g3) = S.addPermanent piker S.bob g2
     board <- bulwarkBoard s registry g3
     let byArtifact = dealTo artifactId mineId 2 board
         byCreature = dealTo redId mineId 2 board
@@ -3994,7 +3994,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- independent of any count.
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, gs1) = S.addCreature piker S.alice gs0
+        (pikerId, gs1) = S.addPermanent piker S.alice gs0
         gs = S.withEffect pikerId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs1
         cands = Projection.gather gs
     Spec.assertEqWith
@@ -4079,8 +4079,8 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (equip, g2) = S.addCreature bonesplitter S.alice g1
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        (equip, g2) = S.addPermanent bonesplitter S.alice g1
         loose = S.addCounter CounterKind.Hone 2 equip g2
         equipped = S.addCounter CounterKind.Hone 2 equip (S.attach equip pikerId g2)
     Spec.assertEqWith s "2 printed + 2 from the Bonesplitter + 2 from the counters" (Projection.powerOf pikerId equipped) (Just 6)
@@ -4097,9 +4097,9 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     giant <- S.printingOf s registry "Hill Giant"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (pikerId, g1) = S.addCreature piker S.alice base
-        (giantId, g2) = S.addCreature giant S.alice g1
-        (equip, g3) = S.addCreature bonesplitter S.alice g2
+        (pikerId, g1) = S.addPermanent piker S.alice base
+        (giantId, g2) = S.addPermanent giant S.alice g1
+        (equip, g3) = S.addPermanent bonesplitter S.alice g2
         honed = S.addCounter CounterKind.Hone 2 equip g3
         onPiker = S.attach equip pikerId honed
         onGiant = S.attach equip giantId honed
@@ -4131,9 +4131,9 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (vehicle, g1) = S.addCreature dreadnought S.alice base
-        (pikerId, g2) = S.addCreature piker S.alice g1
-        (equip, g3) = S.addCreature bonesplitter S.alice g2
+        (vehicle, g1) = S.addPermanent dreadnought S.alice base
+        (pikerId, g2) = S.addPermanent piker S.alice g1
+        (equip, g3) = S.addPermanent bonesplitter S.alice g2
         honed = S.addCounter CounterKind.Hone 2 equip g3
         onVehicle = S.attach equip vehicle honed
         onPiker = S.attach equip pikerId honed
@@ -4161,10 +4161,10 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     collar <- S.printingOf s registry "Basilisk Collar"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (vehicle, g1) = S.addCreature dreadnought S.alice base
-        (pikerId, g2) = S.addCreature piker S.alice g1
-        (collarId, g3) = S.addCreature collar S.alice g2
-        (equip, g4) = S.addCreature bonesplitter S.alice g3
+        (vehicle, g1) = S.addPermanent dreadnought S.alice base
+        (pikerId, g2) = S.addPermanent piker S.alice g1
+        (collarId, g3) = S.addPermanent collar S.alice g2
+        (equip, g4) = S.addPermanent bonesplitter S.alice g3
         withBonesplitter = S.attach equip vehicle g4
         onVehicle = S.attach collarId vehicle withBonesplitter
         onPiker = S.attach collarId pikerId withBonesplitter
@@ -4190,10 +4190,10 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     strength <- S.printingOf s registry "Unholy Strength"
-    let (defenseId, g1) = S.addCreature defense S.alice (S.landsInPlay plains 5)
-        (pikerId, g2) = S.addCreature piker S.alice g1
-        (equip, g3) = S.addCreature bonesplitter S.alice g2
-        (aura, g4) = S.addCreature strength S.alice g3
+    let (defenseId, g1) = S.addPermanent defense S.alice (S.landsInPlay plains 5)
+        (pikerId, g2) = S.addPermanent piker S.alice g1
+        (equip, g3) = S.addPermanent bonesplitter S.alice g2
+        (aura, g4) = S.addPermanent strength S.alice g3
         onEquip = (S.addCounter CounterKind.Hone 1 equip (S.attach aura pikerId (S.attach equip pikerId g4))) {GameState.priority = Just S.alice}
     case Activate.abilitiesFor defenseId onEquip of
       [only] -> do
@@ -4220,10 +4220,10 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
     giant <- S.printingOf s registry "Hill Giant"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let base = Setup.emptyGame S.bothPlayers
-        (giantId, g1) = S.addCreature giant S.alice base
-        (mine, g2) = S.addCreature bonesplitter S.alice g1
-        (pikerId, g3) = S.addCreature piker S.bob (S.attach mine giantId g2)
-        (theirs, g4) = S.addCreature bonesplitter S.bob g3
+        (giantId, g1) = S.addPermanent giant S.alice base
+        (mine, g2) = S.addPermanent bonesplitter S.alice g1
+        (pikerId, g3) = S.addPermanent piker S.bob (S.attach mine giantId g2)
+        (theirs, g4) = S.addPermanent bonesplitter S.bob g3
         (dwalinId, arrived) = S.entersWithTrigger dwalin S.alice (S.attach theirs pikerId g4)
         placed = S.runPure S.identityAnswer arrived Engine.placePendingTriggers
         after = S.runPure S.identityAnswer placed Stack.resolveTop
@@ -4344,7 +4344,7 @@ studentBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (O
 studentBoard s registry plains = do
   student <- S.printingOf s registry "Student of Warfare"
   plainsPrinting <- S.printingOf s registry "Plains"
-  let (oid, g0) = S.addCreature student S.alice (S.landsInPlay plainsPrinting plains)
+  let (oid, g0) = S.addPermanent student S.alice (S.landsInPlay plainsPrinting plains)
   pure (oid, g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain})
 
 -- The level counters on a permanent, 0 if it has none.
@@ -4423,10 +4423,10 @@ weathervaneChain s registry landName which = do
   land <- S.printingOf s registry landName
   forest <- S.printingOf s registry "Forest"
   weathervane <- S.printingOf s registry "Arcum's Weathervane"
-  let (landId, g0) = S.addCreature land S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g1) = S.addCreature forest S.alice g0
-      (_, g2) = S.addCreature forest S.alice g1
-      (vaneId, board) = S.addCreature weathervane S.alice g2
+  let (landId, g0) = S.addPermanent land S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g1) = S.addPermanent forest S.alice g0
+      (_, g2) = S.addPermanent forest S.alice g1
+      (vaneId, board) = S.addPermanent weathervane S.alice g2
       before = Projection.supertypesOf landId board
   case drop which (Projection.abilitiesOf vaneId board) of
     [] -> Spec.assertFailure s "expected the Weathervane to project both of its activated abilities"
@@ -4448,7 +4448,7 @@ keywordCounterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m
 keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
   Spec.it s "CR 122.1b a flying counter grants flying; without one there is none" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         flying = S.addCounter (CounterKind.Keyword Keyword.Flying) 1 pikerId board
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId board)) "a bare Piker does not fly"
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId flying) "with the counter it does"
@@ -4458,7 +4458,7 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
   -- counter the same Map holds.
   Spec.it s "CR 613.1f the grant is layer 6, so it changes no power or toughness" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         flying = S.addCounter (CounterKind.Keyword Keyword.Flying) 1 pikerId board
     Spec.assertEqWith s "power unchanged" (Projection.powerOf pikerId flying) (Projection.powerOf pikerId board)
     Spec.assertEqWith s "toughness unchanged" (Projection.toughnessOf pikerId flying) (Projection.toughnessOf pikerId board)
@@ -4468,7 +4468,7 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
   -- so two counters must arrive as two grants.
   Spec.it s "CR 122.1b two counters grant two instances, not one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         one = S.addCounter (CounterKind.Keyword Keyword.Flying) 1 pikerId board
         two = S.addCounter (CounterKind.Keyword Keyword.Flying) 2 pikerId board
     Spec.assertEqWith s "one counter, one instance" (Map.lookup Keyword.Flying (Projection.keywordsOf pikerId one)) (Just 1)
@@ -4476,7 +4476,7 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
 
   Spec.it s "CR 122.1b a counter of a DIFFERENT keyword grants that one, not flying" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         hasted = S.addCounter (CounterKind.Keyword Keyword.Haste) 1 pikerId board
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste pikerId hasted) "haste granted"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId hasted)) "flying is not"
@@ -4510,7 +4510,7 @@ keywordCounterSpec s registry = Spec.describe s "KeywordCounter" $ do
 -- so the entry timestamp CR 613.7d gives it is older than Humility either way.
 countered :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
 countered piker humility plains spontaneousFlight humilityFirst =
-  let (target, withCreature) = S.addCreature piker S.alice (S.landsInPlay plains 3)
+  let (target, withCreature) = S.addPermanent piker S.alice (S.landsInPlay plains 3)
       before = if humilityFirst then S.withHumility humility withCreature else withCreature
       (gs, spellId) = S.handOne spontaneousFlight before
       cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
@@ -4548,11 +4548,11 @@ attachedHostSpec s registry = Spec.describe s "AttachedTo" $ do
     gown <- S.printingOf s registry "Bride's Gown"
     finery <- S.printingOf s registry "Groom's Finery"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (bride, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        (groom, g2) = S.addCreature piker S.alice g1
-        (theirs, g3) = S.addCreature piker S.bob g2
-        (gownId, g4) = S.addCreature gown S.alice g3
-        (fineryId, g5) = S.addCreature finery S.alice g4
+    let (bride, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (groom, g2) = S.addPermanent piker S.alice g1
+        (theirs, g3) = S.addPermanent piker S.bob g2
+        (gownId, g4) = S.addPermanent gown S.alice g3
+        (fineryId, g5) = S.addPermanent finery S.alice g4
         loose = S.attach gownId bride g5
         held = S.attach fineryId groom loose
         elsewhere = S.attach fineryId theirs loose
@@ -4577,9 +4577,9 @@ attachedHostSpec s registry = Spec.describe s "AttachedTo" $ do
     bell <- S.printingOf s registry "Kormus Bell"
     gown <- S.printingOf s registry "Bride's Gown"
     swamp <- S.printingOf s registry "Swamp"
-    let (swampId, g1) = S.addCreature swamp S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g2) = S.addCreature bell S.alice g1
-        (gownId, g3) = S.addCreature gown S.alice g2
+    let (swampId, g1) = S.addPermanent swamp S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent bell S.alice g1
+        (gownId, g3) = S.addPermanent gown S.alice g2
         gs = S.attach gownId swampId g3
         cands = Projection.gather gs
         context = Filter.contextFor Teams.none (Just S.alice) (Just gownId)
@@ -4621,14 +4621,14 @@ hasAttachedSpec s registry = Spec.describe s "HasAttached" $ do
     pacifism <- S.printingOf s registry "Pacifism"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (enchanted, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        (equipped, g2) = S.addCreature piker S.alice g1
-        (bare, g3) = S.addCreature piker S.alice g2
-        (theirs, g4) = S.addCreature piker S.bob g3
-        (auraId, g5) = S.addCreature pacifism S.alice g4
-        (gearId, g6) = S.addCreature bonesplitter S.alice g5
-        (theirAura, g7) = S.addCreature pacifism S.bob g6
-        (_, g8) = S.addCreature tale S.alice g7
+    let (enchanted, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (equipped, g2) = S.addPermanent piker S.alice g1
+        (bare, g3) = S.addPermanent piker S.alice g2
+        (theirs, g4) = S.addPermanent piker S.bob g3
+        (auraId, g5) = S.addPermanent pacifism S.alice g4
+        (gearId, g6) = S.addPermanent bonesplitter S.alice g5
+        (theirAura, g7) = S.addPermanent pacifism S.bob g6
+        (_, g8) = S.addPermanent tale S.alice g7
         gs = S.attach theirAura theirs (S.attach gearId equipped (S.attach auraId enchanted g8))
         reading oid = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
     Spec.assertEqWith
@@ -4661,9 +4661,9 @@ hostOfSourceSpec s registry = Spec.describe s "IsHostOfSource" $ do
     ray <- S.printingOf s registry "Ray of Frost"
     maiden <- S.printingOf s registry "Bird Maiden"
     squire <- S.printingOf s registry "Aven Squire"
-    let (maidenId, g1) = S.addCreature maiden S.alice (Setup.emptyGame S.bothPlayers)
-        (squireId, g2) = S.addCreature squire S.alice g1
-        (rayId, g3) = S.addCreature ray S.alice g2
+    let (maidenId, g1) = S.addPermanent maiden S.alice (Setup.emptyGame S.bothPlayers)
+        (squireId, g2) = S.addPermanent squire S.alice g1
+        (rayId, g3) = S.addPermanent ray S.alice g2
         onMaiden = S.attach rayId maidenId g3
         onSquire = S.attach rayId squireId g3
         flying gs = (Projection.hasKeyword Keyword.Flying maidenId gs, Projection.hasKeyword Keyword.Flying squireId gs)
@@ -4693,9 +4693,9 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
     ogre <- S.printingOf s registry "Villainous Ogre"
     demon <- S.printingOf s registry "Master of the Feast"
     swamp <- S.printingOf s registry "Swamp"
-    let (ogreId, base) = S.addCreature ogre S.alice (S.landsInPlay swamp 1)
+    let (ogreId, base) = S.addPermanent ogre S.alice (S.landsInPlay swamp 1)
         alone = base {GameState.priority = Just S.alice}
-        withDemon = (snd (S.addCreature demon S.alice base)) {GameState.priority = Just S.alice}
+        withDemon = (snd (S.addPermanent demon S.alice base)) {GameState.priority = Just S.alice}
         offered gs = (length (Activate.abilitiesFor ogreId gs), any (isActivateOfOgre ogreId) (Action.legalActions S.alice gs))
     Spec.assertEqWith
       s
@@ -4709,8 +4709,8 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
     ogre <- S.printingOf s registry "Villainous Ogre"
     nexus <- S.printingOf s registry "Maskwood Nexus"
     swamp <- S.printingOf s registry "Swamp"
-    let (ogreId, base) = S.addCreature ogre S.alice (S.landsInPlay swamp 1)
-        gs = (snd (S.addCreature nexus S.alice base)) {GameState.priority = Just S.alice}
+    let (ogreId, base) = S.addPermanent ogre S.alice (S.landsInPlay swamp 1)
+        gs = (snd (S.addPermanent nexus S.alice base)) {GameState.priority = Just S.alice}
     Spec.assertEqWith s "the Ogre is a Demon" (Set.member Subtype.Type.Demon (Projection.subtypesOf ogreId gs)) True
     Spec.assertEqWith s "so the ability is offered" (length (Activate.abilitiesFor ogreId gs)) 1
   -- CR 613.1: and the clause is judged at the depth of whoever asked. Asked of
@@ -4726,8 +4726,8 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
   Spec.it s "CR 613.1 the gate reads the board at the layer bound it was asked at" $ do
     ogre <- S.printingOf s registry "Villainous Ogre"
     nexus <- S.printingOf s registry "Maskwood Nexus"
-    let (ogreId, g1) = S.addCreature ogre S.alice (Setup.emptyGame S.bothPlayers)
-        gs = snd (S.addCreature nexus S.alice g1)
+    let (ogreId, g1) = S.addPermanent ogre S.alice (Setup.emptyGame S.bothPlayers)
+        gs = snd (S.addPermanent nexus S.alice g1)
         cands = Projection.gather gs
         context = Filter.contextFor Teams.none (Just S.alice) (Just ogreId)
         onto bound =
@@ -4791,7 +4791,7 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
     grist <- S.printingOf s registry "Grist, the Hunger Tide"
     jace <- S.printingOf s registry "Jace Beleren"
     let board subject =
-          let (entomberId, b1) = S.addCreature entomber S.alice (Setup.emptyGame S.bothPlayers)
+          let (entomberId, b1) = S.addPermanent entomber S.alice (Setup.emptyGame S.bothPlayers)
               (_, b2) = S.addLibraryCard mountain S.alice b1
               (_, b3) = S.addLibraryCard mountain S.alice b2
               (_, b4) = S.addHandCard mountain S.alice b3

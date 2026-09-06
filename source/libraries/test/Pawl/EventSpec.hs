@@ -70,8 +70,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614: with Rest in Peace out, a creature sent to the graveyard is exiled" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-        (theCreature, g1) = S.addCreature piker S.bob g0
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+        (theCreature, g1) = S.addPermanent piker S.bob g0
         after = S.runPure S.identityAnswer g1 (Event.changeZone theCreature Zone.Graveyard)
         inExile = Set.size (GameState.exile after)
         gyCount = length (Game.zoneMembers Zone.Graveyard S.bob after)
@@ -81,8 +81,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 603.2g: the emitted event records the RESOLVED destination (exile)" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-        (theCreature, g1) = S.addCreature piker S.bob g0
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+        (theCreature, g1) = S.addPermanent piker S.bob g0
         after = S.runPure S.identityAnswer g1 (Event.changeZone theCreature Zone.Graveyard)
     case S.zoneChangesOf after of
       zc : _ -> Spec.assertEqWith s "event says exile" (ZoneChange.to zc) Zone.Exile
@@ -90,14 +90,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
 
   Spec.it s "without Rest in Peace, a creature goes to the graveyard" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (theCreature, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (theCreature, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer g1 (Event.changeZone theCreature Zone.Graveyard)
     Spec.assertEq s (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
 
   Spec.it s "CR 608.2n: a resolving spell is exiled from the stack under Rest in Peace" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (bolt, g1) = S.addLibraryCard lightningBolt S.bob g0
         onStack = g1 {GameState.stack = bolt : GameState.stack g1, GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Stack}) bolt (GameState.objects g1)}
         after = S.runPure S.identityAnswer onStack (Event.changeZone bolt Zone.Graveyard)
@@ -140,7 +140,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614 a countered spell is exiled under Rest in Peace" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, g0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
         (spellId, onStack) = S.spellOnStack piker S.bob g0
         after = S.runPure S.identityAnswer onStack (Event.counter S.noSource S.alice spellId)
     Spec.assertEqWith s "not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
@@ -292,7 +292,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     let base = Setup.emptyGame S.bothPlayers
         goblinCard = Printing.card piker
-        (_, withRip) = S.addCreature restInPeace S.bob base
+        (_, withRip) = S.addPermanent restInPeace S.bob base
         (tokId, gs) = S.addToken goblinCard S.alice withRip
         -- Kill the token: route it to the graveyard; RiP redirects to exile.
         dying = S.runPure S.identityAnswer gs (Event.changeZone tokId Zone.Graveyard)
@@ -320,8 +320,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614.1a Anafenza exiles an opponent's dying nontoken creature" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
-        (theirs, g1) = S.addCreature piker S.bob g0
+    let (_, g0) = S.addPermanent anafenza S.alice (Setup.emptyGame S.bothPlayers)
+        (theirs, g1) = S.addPermanent piker S.bob g0
         -- The CR 701.8a destroy funnel, so the redirect is read off the
         -- pre-batch board a CR 608.2f batch supplies.
         after = S.runPure S.identityAnswer g1 (Event.destroy Regenerability.CantBeRegenerated [theirs])
@@ -337,7 +337,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614.1a Anafenza exiles an opponent's creature card headed for a graveyard from a library" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, g0) = S.addPermanent anafenza S.alice (Setup.emptyGame S.bothPlayers)
         (theirs, g1) = S.addLibraryCard piker S.bob g0
         after = S.runPure S.identityAnswer g1 (Event.changeZone theirs Zone.Graveyard)
     Spec.assertEqWith s "it never reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
@@ -350,7 +350,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614.1a Anafenza does not exile an opponent's dying TOKEN creature" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, g0) = S.addPermanent anafenza S.alice (Setup.emptyGame S.bothPlayers)
         (theirs, g1) = S.addToken (Printing.card piker) S.bob g0
         after = S.runPure S.identityAnswer g1 (Event.destroy Regenerability.CantBeRegenerated [theirs])
     Spec.assertEqWith s "the token reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
@@ -361,7 +361,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614.1a Anafenza does not exile an opponent's NONCREATURE card" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, g0) = S.addPermanent anafenza S.alice (Setup.emptyGame S.bothPlayers)
         (theirs, g1) = S.addLibraryCard lightningBolt S.bob g0
         after = S.runPure S.identityAnswer g1 (Event.changeZone theirs Zone.Graveyard)
     Spec.assertEqWith s "the instant reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
@@ -372,8 +372,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 614.1a Anafenza does not exile her own controller's dying creature" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
-        (ours, g1) = S.addCreature piker S.alice g0
+    let (_, g0) = S.addPermanent anafenza S.alice (Setup.emptyGame S.bothPlayers)
+        (ours, g1) = S.addPermanent piker S.alice g0
         after = S.runPure S.identityAnswer g1 (Event.destroy Regenerability.CantBeRegenerated [ours])
     Spec.assertEqWith s "alice's own creature reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
@@ -381,14 +381,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 701.19a / 514.2 a regeneration shield is dropped at cleanup (this turn)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (oid, gs0) = S.addCreature piker S.alice base
+        (oid, gs0) = S.addPermanent piker S.alice base
         cleared = Expiry.dropAtCleanup (S.addRegenShield oid gs0)
     Spec.assertEqWith s "no shields remain" (GameState.replacements cleared) []
 
   Spec.it s "CR 701.19a Event.destroy consumes a shield and regenerates instead" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (oid, gs0) = S.addCreature piker S.alice base
+        (oid, gs0) = S.addPermanent piker S.alice base
         damaged = S.markDamage oid 1 gs0
         shielded = S.addRegenShield oid damaged
         after = S.runPure S.identityAnswer shielded (Event.destroy Regenerability.Regenerable [oid])
@@ -403,7 +403,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 701.19a a second destroy with no shield left kills it" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (oid, gs0) = S.addCreature piker S.alice base
+        (oid, gs0) = S.addPermanent piker S.alice base
         once = S.runPure S.identityAnswer (S.addRegenShield oid gs0) (Event.destroy Regenerability.Regenerable [oid]) -- regenerated
         twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [oid]) -- no shield -> dies
     Spec.assertEqWith s "gone from the battlefield" (Set.member oid (GameState.battlefield twice)) False
@@ -411,7 +411,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 700.4 Event.destroy no-ops on an indestructible permanent" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let base = Setup.emptyGame S.bothPlayers
-        (oid, gs0) = S.addCreature darksteelMyr S.alice base
+        (oid, gs0) = S.addPermanent darksteelMyr S.alice base
         after = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [oid])
     Spec.assertEqWith s "indestructible survives" (Set.member oid (GameState.battlefield after)) True
 
@@ -419,7 +419,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 0
-        (oid, withCreature) = S.addCreature piker S.bob base
+        (oid, withCreature) = S.addPermanent piker S.bob base
         withCounter = S.addCounter CounterKind.PlusOnePlusOne 2 oid withCreature
         -- Bounce to hand: changeZone mints a new incarnation (CR 400.7).
         bounced = S.runPure S.identityAnswer withCounter (Event.changeZone oid Zone.Hand)
@@ -432,7 +432,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 0
-        (oid, gs0) = S.addCreature piker S.bob base
+        (oid, gs0) = S.addPermanent piker S.bob base
         gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
         gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs1
         after = S.settleSba gs2
@@ -442,7 +442,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 0
-        (oid, gs0) = S.addCreature piker S.bob base
+        (oid, gs0) = S.addPermanent piker S.bob base
         gs1 = S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0
         gs2 = S.addCounter CounterKind.MinusOneMinusOne 1 oid gs1
         after = S.settleSba gs2
@@ -468,7 +468,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 704.5q the annihilated pair fires Protean Hydra's removal trigger, and two counters come back at the end step" $ do
     forest <- S.printingOf s registry "Forest"
     hydra <- S.printingOf s registry "Protean Hydra"
-    let (oid, gs0) = S.addCreature hydra S.alice (S.landsInPlay forest 0)
+    let (oid, gs0) = S.addPermanent hydra S.alice (S.landsInPlay forest 0)
         gs1 = S.addCounter CounterKind.MinusOneMinusOne 1 oid (S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0)
         armed = settleAndResolve (settle gs1)
         after = settleAndResolve (settle (beginEndStep armed))
@@ -482,7 +482,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 704.5q with nothing to annihilate, Protean Hydra's trigger does not fire" $ do
     forest <- S.printingOf s registry "Forest"
     hydra <- S.printingOf s registry "Protean Hydra"
-    let (oid, gs0) = S.addCreature hydra S.alice (S.landsInPlay forest 0)
+    let (oid, gs0) = S.addPermanent hydra S.alice (S.landsInPlay forest 0)
         gs1 = S.addCounter CounterKind.PlusOnePlusOne 2 oid gs0
         armed = settleAndResolve (settle gs1)
         after = settleAndResolve (settle (beginEndStep armed))
@@ -502,7 +502,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 704.3 two pairs annihilating together are ONE removal, so Protean Hydra's trigger fires once" $ do
     forest <- S.printingOf s registry "Forest"
     hydra <- S.printingOf s registry "Protean Hydra"
-    let (oid, gs0) = S.addCreature hydra S.alice (S.landsInPlay forest 0)
+    let (oid, gs0) = S.addPermanent hydra S.alice (S.landsInPlay forest 0)
         gs1 = S.addCounter CounterKind.MinusOneMinusOne 2 oid (S.addCounter CounterKind.PlusOnePlusOne 4 oid gs0)
         armed = settleAndResolve (settle gs1)
         after = settleAndResolve (settle (beginEndStep armed))
@@ -528,8 +528,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay plains 1
-        (host, withHost) = S.addCreature piker S.bob base
-        (rider, withRider) = S.addCreature piker S.alice withHost
+        (host, withHost) = S.addPermanent piker S.bob base
+        (rider, withRider) = S.addPermanent piker S.alice withHost
         attached = S.attach rider host withRider
         bounced = S.runPure S.identityAnswer attached (Event.changeZone rider Zone.Hand)
         moved = filter (\o -> Object.zone o == Zone.Hand) (Map.elems (GameState.objects bounced))

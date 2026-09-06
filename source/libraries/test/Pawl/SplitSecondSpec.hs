@@ -81,13 +81,13 @@ data Board = MkBoard
 
 board :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Board
 board mountain suddenShock lightningBolt prodigal =
-  let addMany printing n gs = foldr (\_ g -> snd (S.addCreature printing S.bob g)) gs [1 .. n :: Int]
+  let addMany printing n gs = foldr (\_ g -> snd (S.addPermanent printing S.bob g)) gs [1 .. n :: Int]
       base = addMany mountain (8 :: Int) (S.landsInPlay mountain 8)
       (a, gs1) = S.addHandCard suddenShock S.alice base
       (b, gs2) = S.addHandCard lightningBolt S.alice gs1
       (c, gs3) = S.addHandCard lightningBolt S.alice gs2
       (d, gs4) = S.addHandCard lightningBolt S.bob gs3
-      (_, gs5) = S.addCreature prodigal S.bob gs4
+      (_, gs5) = S.addPermanent prodigal S.bob gs4
    in MkBoard
         { subject = a,
           aliceBolt = b,
@@ -263,7 +263,7 @@ stillAllowedSpec s registry =
       prodigal <- S.printingOf s registry "Prodigal Sorcerer"
       swiftspear <- S.printingOf s registry "Monastery Swiftspear"
       let b = board mountain suddenShock lightningBolt prodigal
-          (_, withSwiftspear) = S.addCreature swiftspear S.alice (state b)
+          (_, withSwiftspear) = S.addPermanent swiftspear S.alice (state b)
           bare = after (subject b) (state b)
           armed = after (subject b) withSwiftspear
       Spec.assertEqWith s "without the Swiftspear the spell is alone on the stack" (length (GameState.stack bare)) 1
@@ -346,8 +346,8 @@ grantedSpec s registry =
       moltenDisaster <- S.printingOf s registry "Molten Disaster"
       piker <- S.printingOf s registry "Goblin Piker"
       birdMaiden <- S.printingOf s registry "Bird Maiden"
-      let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay mountain 8)
-          (maidenId, g2) = S.addCreature birdMaiden S.bob g1
+      let (pikerId, g1) = S.addPermanent piker S.bob (S.landsInPlay mountain 8)
+          (maidenId, g2) = S.addPermanent birdMaiden S.bob g1
           (gs, spellId) = S.handOne moltenDisaster g2
           answer = disaster (KickerDecision.MkKickerDecision 0)
           cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))

@@ -5677,12 +5677,12 @@ m2bCardSpec s registry = Spec.describe s "M2bCards" $ do
   let gs0 = Setup.emptyGame S.bothPlayers
   Spec.it s "the tiger has first strike through the projection" $ do
     sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
-    let (oid, gs) = S.addCreature sabretoothTiger S.alice gs0
+    let (oid, gs) = S.addPermanent sabretoothTiger S.alice gs0
     Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike oid gs) "first strike"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike oid gs)) "not double strike"
   Spec.it s "the raptor has double strike through the projection" $ do
     ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
-    let (oid, gs) = S.addCreature ridgetopRaptor S.alice gs0
+    let (oid, gs) = S.addPermanent ridgetopRaptor S.alice gs0
     Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike oid gs) "double strike"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike oid gs)) "not first strike"
 

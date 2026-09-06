@@ -101,7 +101,7 @@ programSpec s = Spec.describe s "Pawl.Types.Program" $ do
 -- chosen X (Nothing = no amount bound), for exercising Quantity.evaluate's X arm.
 withBoundAmount :: Printing.Printing -> Maybe Natural.Natural -> (ObjectId.ObjectId, GameState.GameState)
 withBoundAmount mountain mAmount =
-  let (oid, gs0) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
+  let (oid, gs0) = S.addPermanent mountain S.alice (Setup.emptyGame S.bothPlayers)
       bindings = Binding.fromChoices Map.empty mAmount Seq.empty
       gs = gs0 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) oid (GameState.objects gs0)}
    in (oid, gs)

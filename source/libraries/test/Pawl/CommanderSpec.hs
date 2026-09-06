@@ -174,8 +174,8 @@ designationSpec s registry = Spec.describe s "Designation" $ do
     mountain <- S.printingOf s registry "Mountain"
     walls <- S.printingOf s registry "The Walls of Ba Sing Se"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, board) = S.addCreature piker S.alice (commanderBoard mountain walls 0)
-        (_, played) = S.addCreature walls S.alice board
+    let (pikerId, board) = S.addPermanent piker S.alice (commanderBoard mountain walls 0)
+        (_, played) = S.addPermanent walls S.alice board
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible pikerId board)) "her Piker is not indestructible while the Walls sits in the command zone"
     Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible pikerId played) "and is once a Walls is on the battlefield beside it"
     Spec.assertEqWith s "setup: the command zone holds the Walls on both boards" (fmap (length . inCommandZone) [board, played]) [1, 1]
@@ -201,8 +201,8 @@ designationSpec s registry = Spec.describe s "Designation" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let deckFor c = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just c, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
         seated = S.runPure S.identityAnswer (commanderBoard mountain grist 0) (Setup.createDeck S.bob (deckFor walls))
-        (pikerId, board) = S.addCreature piker S.bob seated
-        (_, played) = S.addCreature walls S.bob board
+        (pikerId, board) = S.addPermanent piker S.bob seated
+        (_, played) = S.addPermanent walls S.bob board
     case (Game.zoneMembers Zone.Command S.alice board, Game.zoneMembers Zone.Command S.bob board) of
       ([gristId], [_]) -> do
         Spec.assertEqWith s "CR 113.6b Grist is a 1/1 in the command zone" (S.powerToughnessOf gristId board) (Just (1, 1))
@@ -258,7 +258,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
         stating = S.runPure S.identityAnswer (commanderBoard mountain warden 0) (Setup.createDeck S.bob (deckFor walls))
         unstated = S.runPure S.identityAnswer (commanderBoard mountain walls 0) (Setup.createDeck S.bob (deckFor anafenza))
         binned base =
-          let (pikerId, board) = S.addCreature piker S.alice base
+          let (pikerId, board) = S.addPermanent piker S.alice base
            in S.runPure S.identityAnswer board (Event.changeZone pikerId Zone.Graveyard)
     Spec.assertEqWith s "CR 113.6b the Warden's row states this zone and functions from it, so alice's creature is in her library" (length (Game.zoneMembers Zone.Library S.alice (binned stating))) 1
     Spec.assertEqWith s "and the graveyard the move aimed at is empty" (length (Game.zoneMembers Zone.Graveyard S.alice (binned stating))) 0
@@ -605,7 +605,7 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
     kalakscion <- S.printingOf s registry "Kalakscion, Hunger Tyrant"
     jedit <- S.printingOf s registry "Jedit Ojanen"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, board) = S.addCreature piker S.alice (commanderDuel kalakscion jedit)
+    let (_, board) = S.addPermanent piker S.alice (commanderDuel kalakscion jedit)
         after = swing S.aggressiveAnswer S.alice board
     Spec.assertEqWith s "bob took 7 from the commander and 2 from the Piker" (S.lifeOf S.bob after) (Just 31)
     Spec.assertEqWith s "and only the 7 was tallied" (tallyFrom S.alice S.bob after) 7

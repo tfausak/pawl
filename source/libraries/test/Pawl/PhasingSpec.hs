@@ -131,7 +131,7 @@ tap oid gs =
 
 -- Alice controls one Sandbar Crocodile and nothing else has happened.
 crocodileBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
-crocodileBoard crocodile = S.addCreature crocodile S.alice (Setup.emptyGame S.bothPlayers)
+crocodileBoard crocodile = S.addPermanent crocodile S.alice (Setup.emptyGame S.bothPlayers)
 
 -- `owner` controls a Sandbar Crocodile, with an Aura `enchanter` controls
 -- attached to it. Attached directly, which is Pawl.CombatSpec's `pacifying`
@@ -145,8 +145,8 @@ enchantedCrocodile ::
   GameState.GameState ->
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 enchantedCrocodile crocodile pacifism owner enchanter gs =
-  let (crocId, withCroc) = S.addCreature crocodile owner gs
-      (auraId, withAura) = S.addCreature pacifism enchanter withCroc
+  let (crocId, withCroc) = S.addPermanent crocodile owner gs
+      (auraId, withAura) = S.addPermanent pacifism enchanter withCroc
    in (crocId, auraId, S.attach auraId crocId withAura)
 
 attachedHostOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
@@ -208,8 +208,8 @@ equippedBoard ::
   ((ObjectId.ObjectId, ObjectId.ObjectId), ObjectId.ObjectId, GameState.GameState)
 equippedBoard island piker bonesplitter ripple =
   rippleBoard island ripple $ \gs ->
-    let (host, withHost) = S.addCreature piker S.alice gs
-        (equip, withEquip) = S.addCreature bonesplitter S.alice withHost
+    let (host, withHost) = S.addPermanent piker S.alice gs
+        (equip, withEquip) = S.addPermanent bonesplitter S.alice withHost
      in ((host, equip), S.attach equip host withEquip)
 
 -- The sweep every settle runs, and the whole priority loop, at the answerer
@@ -238,8 +238,8 @@ stolenBoard ::
   ((ObjectId.ObjectId, ObjectId.ObjectId), ObjectId.ObjectId, GameState.GameState)
 stolenBoard island darksteelMyr masterThief ripple =
   rippleBoard island ripple $ \gs ->
-    let (myr, withMyr) = S.addCreature darksteelMyr S.bob gs
-        (thief, withThief) = S.addCreature masterThief S.alice withMyr
+    let (myr, withMyr) = S.addPermanent darksteelMyr S.bob gs
+        (thief, withThief) = S.addPermanent masterThief S.alice withMyr
         entered = ZoneChange.MkZoneChange thief thief Zone.Stack Zone.Battlefield
         seen = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thief withThief))] withThief
      in ((thief, myr), resolveAll (settleFor seen))
@@ -282,8 +282,8 @@ concealBoard ::
   ((ObjectId.ObjectId, ObjectId.ObjectId), ObjectId.ObjectId, GameState.GameState)
 concealBoard plains piker bonesplitter conceal =
   let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
-      (host, withHost) = S.addCreature piker S.alice base
-      (equip, withEquip) = S.addCreature bonesplitter S.alice withHost
+      (host, withHost) = S.addPermanent piker S.alice base
+      (equip, withEquip) = S.addPermanent bonesplitter S.alice withHost
       (board, spell) = S.handOne conceal (S.attach equip host withEquip)
    in ((host, equip), spell, board)
 
@@ -309,8 +309,8 @@ borrowedBoard ::
   )
 borrowedBoard island piker ripple command =
   let base = S.landsFor island S.alice 8 (Setup.emptyGame S.threePlayers)
-      (victim, withOne) = S.addCreature piker S.bob base
-      (bystander, withTwo) = S.addCreature piker S.bob withOne
+      (victim, withOne) = S.addPermanent piker S.bob base
+      (bystander, withTwo) = S.addPermanent piker S.bob withOne
       (borrow, withCommand) = S.addHandCard command S.alice withTwo
       (first, withFirst) = S.addHandCard ripple S.alice withCommand
       (second, board) = S.addHandCard ripple S.alice withFirst
@@ -350,8 +350,8 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     ripple <- S.printingOf s registry "Reality Ripple"
     let ((victim, bystander), spell, board) =
           rippleBoard island ripple $ \gs ->
-            let (a, g1) = S.addCreature piker S.bob gs
-                (b, g2) = S.addCreature piker S.bob g1
+            let (a, g1) = S.addPermanent piker S.bob gs
+                (b, g2) = S.addPermanent piker S.bob g1
              in ((a, b), g2)
         after = rippleAt victim spell board
     Spec.assertEqWith s "setup: both of bob's Pikers are on the battlefield" (fmap (`onBattlefield` board) [victim, bystander]) [True, True]
@@ -377,8 +377,8 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     ripple <- S.printingOf s registry "Reality Ripple"
     let ((victim, bystander), spell, board) =
           rippleBoard island ripple $ \gs ->
-            let (a, g1) = S.addCreature piker S.bob gs
-                (b, g2) = S.addCreature piker S.bob g1
+            let (a, g1) = S.addPermanent piker S.bob gs
+                (b, g2) = S.addPermanent piker S.bob g1
              in ((a, b), g2)
         after = rippleAt victim spell board
         legalIn gs = case S.spellTargetSlot ripple of
@@ -400,8 +400,8 @@ effectSpec s registry = Spec.describe s "Effect" $ do
     ripple <- S.printingOf s registry "Reality Ripple"
     let ((victim, _), spell, board) =
           rippleBoard island ripple $ \gs ->
-            let (a, g1) = S.addCreature piker S.bob gs
-                (b, g2) = S.addCreature piker S.bob g1
+            let (a, g1) = S.addPermanent piker S.bob gs
+                (b, g2) = S.addPermanent piker S.bob g1
              in ((a, b), g2)
         gone = rippleAt victim spell board
         alices = untapStep S.alice gone
@@ -530,7 +530,7 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
     crocodile <- S.printingOf s registry "Sandbar Crocodile"
     pacifism <- S.printingOf s registry "Pacifism"
     let (_, auraId, enchanted) = enchantedCrocodile crocodile pacifism S.alice S.alice (Setup.emptyGame S.bothPlayers)
-        (looseId, board) = S.addCreature pacifism S.alice enchanted
+        (looseId, board) = S.addPermanent pacifism S.alice enchanted
         settled = S.settleSba (untapStep S.alice board)
     Spec.assertEqWith s "alice's graveyard was empty before" (length (Game.zoneMembers Zone.Graveyard S.alice board)) 0
     Spec.assertEqWith s "and holds exactly one card after, so the pass ran" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
@@ -553,8 +553,8 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
     isle <- S.printingOf s registry "Teferi's Isle"
     garrison <- S.printingOf s registry "Darksteel Garrison"
     let base = Setup.emptyGame S.bothPlayers
-        (isleId, withIsle) = S.addCreature isle S.alice base
-        (garrisonId, withGarrison) = S.addCreature garrison S.alice withIsle
+        (isleId, withIsle) = S.addPermanent isle S.alice base
+        (garrisonId, withGarrison) = S.addPermanent garrison S.alice withIsle
         board = S.attachTo garrisonId (Recipient.ToObject isleId) withGarrison
         after = S.settleSba (untapStep S.alice board)
     Spec.assertEqWith s "both were on the battlefield before the step" (fmap (`onBattlefield` board) [isleId, garrisonId]) [True, True]
@@ -650,7 +650,7 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
     pacifism <- S.printingOf s registry "Pacifism"
     ripple <- S.printingOf s registry "Reality Ripple"
     let base = S.landsFor plains S.alice 3 (S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (brambleId, withBramble) = S.addCreature bramble S.alice base
+        (brambleId, withBramble) = S.addPermanent bramble S.alice base
         (armed, auraSpell) = S.handOne pacifism withBramble
         cast = S.runPure (aimedAt brambleId) armed (S.cast S.alice auraSpell)
         entered = S.runPure (aimedAt brambleId) cast (Monad.void Stack.resolveTop)
@@ -697,8 +697,8 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
     ripple <- S.printingOf s registry "Reality Ripple"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let base = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (pikerId, withPiker) = S.addCreature piker S.alice base
-        (gearId, withGear) = S.addCreature wargear S.alice withPiker
+        (pikerId, withPiker) = S.addPermanent piker S.alice base
+        (gearId, withGear) = S.addPermanent wargear S.alice withPiker
         ready = withGear {GameState.priority = Just S.alice}
     case Projection.abilitiesOf gearId ready of
       [] -> Spec.assertFailure s "Grafted Wargear should offer rule 702.6a's minted equip ability"
@@ -754,7 +754,7 @@ phaseOutSpec s registry = Spec.describe s "PhaseOut" $ do
   -- rule 702.26a's "with phasing". Goblin Piker has no phasing and stays.
   Spec.it s "CR 702.26a a permanent without phasing does not phase out" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, board) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         after = untapStep S.alice board
     Spec.assertEqWith s "the Piker is still on the battlefield" (onBattlefield pikerId after) True
     Spec.assertEqWith s "and is not phased out" (Phasing.isPhasedOut pikerId after) False
@@ -886,7 +886,7 @@ departureSpec s registry = Spec.describe s "Departure" $ do
   -- observe it with.
   Spec.it s "CR 702.26k a phased-out permanent leaves the game with its owner" $ do
     crocodile <- S.printingOf s registry "Sandbar Crocodile"
-    let (crocId, board) = S.addCreature crocodile S.alice (Setup.emptyGame S.threePlayers)
+    let (crocId, board) = S.addPermanent crocodile S.alice (Setup.emptyGame S.threePlayers)
         gone = untapStep S.alice board
         after = S.runPure S.identityAnswer gone (Departure.leaveGame Departure.Type.Conceded S.alice)
     Spec.assertEqWith s "it was phased out under alice" (Phasing.phasedOutUnder crocId gone) (Just S.alice)
@@ -1001,7 +1001,7 @@ bestowedBoard ::
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 bestowedBoard plains mountain piker rollicker conceal =
   let base = S.landsFor mountain S.alice 2 (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
-      (host, withHost) = S.addCreature piker S.alice base
+      (host, withHost) = S.addPermanent piker S.alice base
       (withRollicker, spellId) = S.handOne rollicker withHost
       (concealId, board) = S.addHandCard conceal S.alice withRollicker
       cast = S.runPure (bestowingOn host) board (S.cast S.alice spellId)
@@ -1158,7 +1158,7 @@ attachedSpec s registry = Spec.describe s "Attached" $ do
     plains <- S.printingOf s registry "Plains"
     curse <- S.printingOf s registry "Curse of Death's Hold"
     conceal <- S.printingOf s registry "Clever Concealment"
-    let (aura, withAura) = S.addCreature curse S.alice (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
+    let (aura, withAura) = S.addPermanent curse S.alice (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
         (board, spell) = S.handOne conceal (S.attachTo aura (Recipient.ToPlayer S.bob) withAura)
         gone = concealAll (Set.singleton aura) spell board
         back = untapStep S.alice gone
