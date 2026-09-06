@@ -94,6 +94,7 @@ import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -720,7 +721,11 @@ rewriteEffect pairs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect
-  Effect.OfferCast {} -> effect
+  -- The ObjectRef alone: rule 612 swaps words in a card's TEXT, and a Filter the
+  -- reference carries is card text (GrantPlayFromExile's arm below). The caster is
+  -- a PlayerRef and the riders are CR 118.9's and CR 712.11a's, neither of which
+  -- is a word rule 612 can name.
+  Effect.OfferCast offer -> Effect.OfferCast offer {OfferCast.ref = rewriteObjectRef pairs (OfferCast.ref offer)}
   Effect.GrantPlayFromExile grant ->
     Effect.GrantPlayFromExile
       grant
