@@ -240,6 +240,7 @@ import qualified Pawl.Codec.LifeLossRewriteSpec
 import qualified Pawl.Codec.LimitUnlessSpec
 import qualified Pawl.Codec.LoggedEventSpec
 import qualified Pawl.Codec.LookAtSpec
+import qualified Pawl.Codec.LoyaltyKindSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaAdditionSpec
 import qualified Pawl.Codec.ManaCostSpec
@@ -837,6 +838,7 @@ spec s registry = do
   Pawl.Codec.LookAtSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaAdditionSpec.spec s
+  Pawl.Codec.LoyaltyKindSpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaCountSpec.spec s
   Pawl.Codec.ManaFilterSpec.spec s
@@ -1121,6 +1123,7 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlaneswalkerSpec.combinedLoyaltyCostSpec s registry
   Pawl.PlaneswalkerSpec.countersRemovedSpec s registry
+  Pawl.PlaneswalkerSpec.loyaltyAbilityOnlySpec s registry
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry

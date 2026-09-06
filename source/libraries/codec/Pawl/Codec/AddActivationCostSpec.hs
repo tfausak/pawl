@@ -9,6 +9,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -21,6 +22,7 @@ spec s = Spec.describe s "Pawl.Codec.AddActivationCost" $ do
       AddActivationCost.codec
       ( AddActivationCost.MkAddActivationCost
           { AddActivationCost.whichAbilities = Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken],
+            AddActivationCost.whichLoyalty = Nothing,
             AddActivationCost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasCardType CardType.Land))],
             AddActivationCost.scale = CostScale.Once
           }
@@ -34,9 +36,24 @@ spec s = Spec.describe s "Pawl.Codec.AddActivationCost" $ do
       AddActivationCost.codec
       ( AddActivationCost.MkAddActivationCost
           { AddActivationCost.whichAbilities = Filter.And [],
+            AddActivationCost.whichLoyalty = Nothing,
             AddActivationCost.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasSubtype Subtype.Swamp))],
             AddActivationCost.scale = CostScale.PerColoredSymbol Color.Black
           }
       )
       " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"components\":[{\"type\":\"Sacrifice\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Swamp\"}}}}],\"scale\":{\"type\":\"PerColoredSymbol\",\"value\":{\"type\":\"Black\"}}} "
+  -- The other half of the defaulted loyalty key: Carth the Lion's sentence names
+  -- CR 606.2's classification, so the key appears on the wire.
+  Spec.it s "MkAddActivationCost, a loyalty kind written on the wire" $
+    Common.assertCodec
+      s
+      AddActivationCost.codec
+      ( AddActivationCost.MkAddActivationCost
+          { AddActivationCost.whichAbilities = Filter.HasCardType CardType.Planeswalker,
+            AddActivationCost.whichLoyalty = Just LoyaltyKind.LoyaltyAbility,
+            AddActivationCost.components = [CostComponent.AddLoyaltyToThis 1],
+            AddActivationCost.scale = CostScale.Once
+          }
+      )
+      " {\"whichAbilities\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Planeswalker\"}},\"whichLoyalty\":{\"type\":\"LoyaltyAbility\"},\"components\":[{\"type\":\"AddLoyaltyToThis\",\"value\":1}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s AddActivationCost.codec

@@ -48,6 +48,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
@@ -457,13 +458,13 @@ payableCostGiven aimable sources pcs = payableCostAtGiven aimable sources pcs 0
 -- announcement exposes.
 payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt aimable x family pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven aimable sources pcs x family pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable family (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs)
 
 -- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
 -- predicate holds if SOME aiming this activation could still take leaves the
@@ -511,8 +512,8 @@ payableCostAtGiven aimable sources pcs x family pid srcId gs cost =
 -- that arrives on a component CR 601.2f's adjustments add is not seen here and
 -- its cost takes the cheap search (#2959). No cost adjustment in `data/cards/`
 -- adds a component with a criterion naming a slot.
-aimingSomewhere :: Bool -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe KeywordFamily.KeywordFamily -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
-aimingSomewhere slotReading aimable family pid srcId gs payable =
+aimingSomewhere :: Bool -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe KeywordFamily.KeywordFamily -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> (Map.Map SlotName (Set.Set ObjectId) -> CostAdjustments.CostAdjustments -> Bool) -> Bool
+aimingSomewhere slotReading aimable family loyalty pid srcId gs payable =
   -- CR 605.1a's kind is AbilityKind.NonManaAbility at all three sites in this
   -- module, and CR 605.3b is why: activatableGiven refuses a mana ability
   -- outright and the cost conjunct this gate serves sits after that refusal,
@@ -521,7 +522,12 @@ aimingSomewhere slotReading aimable family pid srcId gs payable =
   -- nor Zirda's "that aren't mana abilities" ever turns an adjustment away on
   -- this path -- the mana window is where they do
   -- (Cost.manaActivationAdjustments).
-  let gather aimedAt = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility pid srcId gs
+  --
+  -- CR 606.2's kind is the CALLER's, because this gate is handed a cost rather
+  -- than an ability: Cost.loyaltyKindOf reads it off the same printed cost the
+  -- caller is measuring, which is what lets Carth the Lion's addition reach a
+  -- planeswalker's loyalty ability and spare a granted ability beside it.
+  let gather aimedAt = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility loyalty pid srcId gs
       candidates = Set.unions (concatMap Map.elems aimable)
       blind = gather Set.empty
    in if slotReading
@@ -954,7 +960,7 @@ activateAbility pid srcId ability = do
           -- target-aware reduction therefore cannot change which nonhybrid
           -- equivalent or Phyrexian half a player would announce. The reductions
           -- themselves are gathered again below, once the targets exist.
-          let gathered = Cost.activationAdjustments Set.empty family AbilityKind.NonManaAbility pid srcId gs
+          let gathered = Cost.activationAdjustments Set.empty family AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
           -- The Phyrexian life record is DISCARDED here: CR 702.150a reads what
           -- the player who CAST a spell announced, and no rule asks the same of
           -- an activation cost.
@@ -1011,7 +1017,7 @@ activateAbility pid srcId ability = do
               -- -- so the increases and the CR 601.2f components the announcement
               -- above measured are the same ones charged below.
               let aimedAt = Set.unions (fmap recipientObjects (Map.elems chosen))
-                  targeted = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility pid srcId gs
+                  targeted = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               let paidCost = Cost.totalWith adjustments announcedCost
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
