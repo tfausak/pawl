@@ -487,7 +487,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- Humility leaves alice's Dryad Arbor (Land Creature -- Forest Dryad) tapping
   -- for nothing. The Forest beside it is the control on one board -- same
   -- subtype, same controller, no creature type -- so the {G}{G} that stops being
-  -- payable can only be the Arbor's half (#3267).
+  -- payable can only be the Arbor's half; see #3267.
   Spec.it s "CR 613.1f Humility strips Dryad Arbor's CR 305.6 mana ability" $ do
     arbor <- S.printingOf s registry "Dryad Arbor"
     forest <- S.printingOf s registry "Forest"

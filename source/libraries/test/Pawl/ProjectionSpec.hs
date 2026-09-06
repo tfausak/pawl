@@ -3569,7 +3569,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- The same three builders under CR 613.1f: Humility strips the Dryad Arbor's
   -- CR 305.6 ability, and the two builders with a projection to read must say so
   -- together. viewOfCard is the third and answers True still -- it describes a
-  -- CARD, which no continuous effect has reached (#3267).
+  -- CARD, which no continuous effect has reached; see #3267.
   Spec.it s "CR 613.1f a Dryad Arbor under Humility has no activated ability in either projected builder" $ do
     arbor <- S.printingOf s registry "Dryad Arbor"
     mountain <- S.printingOf s registry "Mountain"
