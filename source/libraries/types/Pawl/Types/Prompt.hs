@@ -172,10 +172,8 @@ data Prompt r where
   ChooseMovedCounterOrNone :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (CounterKind.CounterKind Keyword.Keyword) -> Prompt (Maybe (CounterKind.CounterKind Keyword.Keyword))
   -- | CR 107.14: how much {E} the player pays to an Effect.PayAnyEnergy as
   -- the object resolves; the Natural is their energy, enforced (CR 118.3),
-  -- and zero declines the "may".
-  --
-  -- Not implemented: skipping it when the bound is 0, where the one payable
-  -- amount is determined (#1920).
+  -- and zero declines the "may". Not raised for a bound of 0, where that same
+  -- rule leaves 0 as the only payable amount.
   ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.155b / 714.3b: which chapter a Saga with read ahead enters on; the
   -- Natural is the final chapter (CR 714.2d), the answer clamped into the

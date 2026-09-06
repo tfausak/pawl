@@ -7,6 +7,7 @@
 -- Pawl.KeywordTriggerSpec, which keeps the machinery.
 module Pawl.CounterKeywordTriggerSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -1163,6 +1164,35 @@ piaNalaarSpec s registry =
           let resolved = payAtEndStep 0 (S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice after)
           Spec.assertEqWith s "no Aetherjet" (aetherjetIds resolved) []
           Spec.assertEqWith s "and every {E} she held is still hers" (energy resolved) 5
+        -- CR 118.3 at the bound of zero. Pia connects alone, so nothing gained
+        -- {E} that turn and "pay one or more {E}" has no payable amount: one
+        -- outcome, and so nothing to ask. The board cannot tell paying zero from
+        -- being spared the question by what happens on it -- both leave the
+        -- Aetherjet uncreated -- so the count of Prompt.ChoosePaidEnergy is the
+        -- assertion this case exists for. The pointless-looking add of 0 keeps
+        -- this board and its twin below differing in the amount alone.
+        Spec.it s "CR 118.3 a payer with no {E} is not asked how much to pay" $ do
+          after <- board ["Pia Nalaar, Chief Mechanic"]
+          let (resolved, asked) = payAtEndStepCounting 0 (S.addPlayerCounter PlayerCounterKind.Energy 0 S.alice after)
+          Spec.assertEqWith s "the trigger really resolved with an empty pool" (energy resolved) 0
+          Spec.assertEqWith s "and she was never asked how much to pay" asked 0
+          Spec.assertEqWith s "no Aetherjet, nothing being payable" (aetherjetIds resolved) []
+        -- The twin, differing in the two {E} alone: the same trigger on the same
+        -- board is a real choice, so it IS raised, and the amount it binds is the
+        -- token's box. Whether the box reads the energy paid or the energy held
+        -- is the neighbouring case's discrimination, not this one's.
+        Spec.it s "CR 107.14 two {E} makes it a real choice, and the Aetherjet is a 2/2" $ do
+          after <- board ["Pia Nalaar, Chief Mechanic"]
+          giant <- S.printingOf s registry "Hill Giant"
+          let (resolved, asked) = payAtEndStepCounting 2 (S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice after)
+              (_, withCrewer) = S.addPermanent giant S.alice resolved
+          case aetherjetIds resolved of
+            [jet] -> do
+              let crewed = crewWith S.identityAnswer jet (withCrewer {GameState.priority = Just S.alice})
+              Spec.assertEqWith s "crewed, a 2/2: both {E} were paid" (S.powerToughnessOf jet crewed) (Just (2, 2))
+            other -> Spec.assertFailure s ("expected exactly one Aetherjet, got " <> show (length other))
+          Spec.assertEqWith s "and the two really left her pool" (energy resolved) 0
+          Spec.assertEqWith s "she was asked exactly once" asked 1
 
 -- Pia's end-step trigger, driven to its answer: alice's end step begins, the
 -- trigger is put on the stack, and it resolves with `n` paid to
@@ -1170,16 +1200,28 @@ piaNalaarSpec s registry =
 -- S.identityAnswer, which answers the same way on both boards below and so
 -- could not tell paying three from declining.
 payAtEndStep :: Natural -> GameState.GameState -> GameState.GameState
-payAtEndStep n gs =
+payAtEndStep n = fst . payAtEndStepCounting n
+
+-- The same drive, also reporting how many times Prompt.ChoosePaidEnergy was
+-- raised. A pure answerer cannot say whether it was called, and two boards that
+-- differ only in whether the question was worth asking look alike on the board
+-- itself, so the count is threaded through State the way Pawl.ManaSpec's
+-- countingAnswer does.
+payAtEndStepCounting :: Natural -> GameState.GameState -> (GameState.GameState, Int)
+payAtEndStepCounting n gs =
   let endStep = Phase.Ending EndingStep.EndStep
       begun = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
-      settled = snd (Engine.runGamePure (paying n) begun Engine.settleForPriority)
-   in S.settleSba (snd (Engine.runGamePure (paying n) settled Stack.resolveTop))
-
-paying :: Natural -> Prompt.Prompt r -> r
-paying n p = case p of
-  Prompt.ChoosePaidEnergy {} -> n
-  _ -> S.identityAnswer p
+      counting :: Prompt.Prompt r -> State.State Int r
+      counting p = case p of
+        Prompt.ChoosePaidEnergy {} -> do
+          State.modify' (+ 1)
+          pure n
+        _ -> pure (S.identityAnswer p)
+      driven = do
+        (_, settled) <- Engine.runGame counting begun Engine.settleForPriority
+        (_, resolved) <- Engine.runGame counting settled Stack.resolveTop
+        pure (S.settleSba resolved)
+   in State.runState driven 0
 
 -- The tokens named for Pia's Vehicle. By NAME rather than by S.tokensOf alone,
 -- so a token minted by anything else could not be mistaken for hers.

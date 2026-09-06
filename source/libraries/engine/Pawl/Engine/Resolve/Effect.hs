@@ -6128,13 +6128,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Through Pawl.Engine.Cost's own reader and writer, so CR 107.14 has one
   -- meaning here and in a CostComponent.PayEnergy payment.
   --
-  -- Not implemented: skipping the offer when the payer has no energy, where 0 is
-  -- the only payable amount (#1920).
+  -- The offer is skipped at a bound of 0, where CR 118.3 leaves 0 as the only
+  -- payable amount and there is nothing to decide. Proven by
+  -- Pawl.CounterKeywordTriggerSpec's "a payer with no {E} is not asked how much
+  -- to pay", whose twin one {E} higher is asked.
   Effect.PayAnyEnergy slot -> do
     gs <- State.get
     let have = Cost.energyOf controller gs
-    answer <- Game.choose (Prompt.ChoosePaidEnergy (Decide.deciderFor controller gs) controller resolving have)
-    let paid = min answer have
+    paid <-
+      if have == 0
+        then pure 0
+        else do
+          answer <- Game.choose (Prompt.ChoosePaidEnergy (Decide.deciderFor controller gs) controller resolving have)
+          pure (min answer have)
     Cost.spendEnergy controller paid
     -- Bound onto this effect's SOURCE even when nothing was paid, Effect.Destroy's
     -- count for its reason: zero is an answer, where an unbound slot would leave a
