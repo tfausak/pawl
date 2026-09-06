@@ -58,24 +58,33 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- 603.7c). The parallel for a sourceless inherent ability is
 -- Monarch.inherentMatch, which has no bearer to scope a shared matcher to.
 --
--- THE FIRST ARGUMENT IS NOT READ OFF THE EVENT, and is the one datum here that
--- is not: CR 400.7f's "the new object that each Aura enchanting that permanent
--- became in its owner's graveyard" is a fact about the BEARER's own zone change,
--- which the event that fired the trigger says nothing about. `eventTriggers`
--- computes it off the same CR 117.5 batch and hands it in; `delayedPending` has
--- no bearer departure to scan for and hands in Nothing. Kept here rather than
--- unioned in at the call site so that eventBindingSlots below stays the single
--- statement of which slots a condition makes available, which is what the card
--- lint reads.
+-- THE SECOND AND THIRD ARGUMENTS ARE NOT READ OFF THE EVENT, and are the two
+-- data here that are not. Both come off the same CR 117.5 batch, which
+-- `eventTriggers` scans once and hands in; `delayedPending` has no batch scan of
+-- its own and hands in Nothing and the empty map. Kept here rather than unioned
+-- in at the call site so that eventBindingSlots below stays the single statement
+-- of which slots a condition makes available, which is what the card lint reads.
 --
--- THE THIRD ARGUMENT is CR 109.5 / 603.3a's "you", the ability's controller --
+-- The SECOND is CR 400.7f's "the new object that each Aura enchanting that
+-- permanent became in its owner's graveyard", a fact about the BEARER's own zone
+-- change, which the event that fired the trigger says nothing about.
+--
+-- The THIRD is the batch's whole battlefield-to-graveyard arrival table, keyed by
+-- the id that departed. CR 603.10a's look-back is what makes it necessary: a
+-- sacrifice is recorded BEFORE the move, so GameEvent.PermanentSacrificed names
+-- the pre-move id and CR 400.7e's new object is nowhere on the event. The
+-- PermanentSacrificed arm below is the one reader, and the reason it is a MAP
+-- rather than a second Maybe is that the permanent the event names is not the
+-- bearer -- Prowling Geistcatcher watches other creatures die.
+--
+-- THE FOURTH ARGUMENT is CR 109.5 / 603.3a's "you", the ability's controller --
 -- matchesTriggerGiven's own third argument, and read the same way at both call
 -- sites (eventTriggers' `ctrl`, delayedPending's `DelayedTrigger.controller`).
 -- Most arms never read it; DamageToPlayerPrevented below does, to re-ask the
 -- condition's relation of a record a wider shield stamped for more than one
 -- player (#3079).
-eventBindings :: GameState -> Maybe ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
-eventBindings gs bearerBecame you cond event = case (cond, event) of
+eventBindings :: GameState -> Maybe ObjectId -> Map.Map ObjectId ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
+eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, event) of
   -- CR 603.2b's "that player": the active player, on whose turn the step began.
   -- Shizuko, Caller of Autumn's "at the beginning of each player's upkeep, THAT
   -- PLAYER adds {G}{G}{G}" is the reader, and the seat it names is nobody the
@@ -732,11 +741,34 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- Unconditional given a match: GameEvent.PermanentSacrificed carries a PlayerId
   -- outright, CR 701.21a's sacrifice having exactly one performer.
   --
-  -- The PERMANENT is not bound. The id the event carries is the pre-move one CR
-  -- 603.10a looked back for, and which slot a printed "exile it" wants is the
-  -- question #977 still holds open.
+  -- CR 400.7e's new object BESIDE it -- the graveyard card Prowling
+  -- Geistcatcher's "exile it" has to move -- and it is the reason this arm is
+  -- handed the batch's arrival table at all: CR 603.10a records the sacrifice
+  -- BEFORE the move (Event.sacrifice), so the id the event carries is the
+  -- battlefield permanent CR 400.7 went on to delete and nothing on the event
+  -- names what it became. `becameInGraveyard` is keyed by exactly that departed
+  -- id.
+  --
+  -- CONDITIONAL, so the slot is claimed by eventBindingSlotsSometimes rather than
+  -- by the floor: a CR 614.1 replacement can send the sacrificed permanent
+  -- somewhere other than a graveyard -- the sacrifice still happened and is still
+  -- recorded -- which leaves the table without the row, and delayedPending scans
+  -- no batch at all. A payload that then finds nothing is what CR 400.7e
+  -- prescribes rather than the silent no-op the card lint exists to catch.
+  --
+  -- The BEARER's own arrival is not consulted, unlike the AttachedCreatureDies arm
+  -- above: this is a bystander condition and the permanent the event names is
+  -- somebody else's -- Prowling Geistcatcher's "another creature".
+  --
+  -- Not implemented: CR 603.10a's departed permanent, which the event carries
+  -- unconditionally and which a printed "if that creature was a token" would
+  -- read. Prowling Geistcatcher's second sentence is that card, and the slot
+  -- alone would not serve it (#3329).
   (TriggerCondition.PermanentSacrificed {}, GameEvent.PermanentSacrificed ev) ->
-    Binding.setTriggerPlayer (PermanentWasSacrificed.player ev) Map.empty
+    let arrival = case Map.lookup (PermanentWasSacrificed.permanent ev) becameInGraveyard of
+          Nothing -> Map.empty
+          Just arrived -> Binding.setBecame arrived Map.empty
+     in Binding.setTriggerPlayer (PermanentWasSacrificed.player ev) arrival
   -- CR 603.3b's "that Saga" and "that player": GameEvent.AbilityTriggered names
   -- the object the chapter ability hangs on (CR 113.7) and the player who
   -- controls it (CR 603.3a), and the watcher is neither of them.
@@ -1413,9 +1445,12 @@ eventBindingSlots cond = case cond of
   -- PLAYER: Vengeful Tracker's "deals 2 damage to them" reads the seat that
   -- sacrificed, which the eventBindings arm stamps for every match.
   --
-  -- Not implemented: the sacrificed PERMANENT. This event is recorded before the
-  -- move (CR 603.10a's look-back), so the id it carries is the pre-move one, and
-  -- which slot a printed "exile it" should name is what #977 still holds open.
+  -- CR 400.7e's new object is NOT guaranteed and so is no member here; it is
+  -- claimed by eventBindingSlotsSometimes below, and the eventBindings arm says
+  -- what withholds it.
+  --
+  -- Not implemented: CR 603.10a's departed permanent, which the event does carry
+  -- unconditionally (#3329).
   TriggerCondition.PermanentSacrificed {} -> Set.singleton Binding.triggerPlayer
   -- CR 601.2i's spell, the object the event names and nobody the bearer already
   -- does. Guaranteed given a match for the reason CR 615.13's amount is:
@@ -1502,11 +1537,13 @@ eventBindingSlots cond = case cond of
 -- PRESCRIBES, not the silent no-op the lint exists to catch. Every other reader
 -- wants the floor, a slot bound sometimes being no guarantee at all.
 --
--- Two arms and no more, which is a fact about eventBindings above rather than a
--- convenience: CR 400.7e's public-zone proviso is the only guard there that
--- turns on the EVENT's own shape and that a match does not already settle, and
--- it stands on exactly these two conditions (CR 603.6c admits every destination
--- for both). The other two conditional arms turn on GAME STATE instead --
+-- Three arms and no more, which is a fact about eventBindings above rather than
+-- a convenience. Two of them are CR 400.7e's public-zone proviso, the only guard
+-- there that turns on the EVENT's own shape and that a match does not already
+-- settle, standing on exactly the two conditions CR 603.6c admits every
+-- destination for. The third is PermanentSacrificed, where CR 400.7e's new
+-- object is not on the event at all and the arrival table may not carry it --
+-- see that arm. The other two conditional arms turn on GAME STATE instead --
 -- AttachedCreatureDies on CR 400.7f's arrival and PermanentReturnedToHand on CR
 -- 608.2h's record -- and the floor claims both outright, each for the reasons
 -- its own arm gives.
@@ -1532,4 +1569,11 @@ eventBindingSlotsSometimes cond = case cond of
   -- unlike the arm above this condition is not silent about the departure --
   -- nothing in data/cards/ names the arrival under it.
   TriggerCondition.PermanentLeavesTheBattlefield _ -> Set.singleton Binding.became
+  -- CR 400.7e's new object again, withheld for a different reason: this event is
+  -- CR 603.10a's look-back, recorded before the move, so the arrival is not on it
+  -- and eventBindings has to be handed the batch's table instead. A CR 614.1
+  -- replacement that redirects the sacrifice leaves the table without the row,
+  -- and delayedPending scans no batch at all. data/cards/prowling-geistcatcher.json
+  -- is the reader.
+  TriggerCondition.PermanentSacrificed {} -> Set.singleton Binding.became
   _ -> Set.empty
