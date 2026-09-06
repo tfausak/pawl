@@ -343,6 +343,9 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- What a MATCH is is a Filter, and no arm here reports the slots a Filter
   -- reads, for the reason the header states.
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> quantitySlots count
+  -- No count and no filter, so the SEAT is the whole read -- and it is
+  -- objectRefPlayerRefs' half, reported by the fold this case is joined into.
+  ObjectRef.TopOfGraveyard _ -> Map.empty
   -- Both halves name a slot: WHO CHOOSES through the Chooser, and WHOSE
   -- graveyards through the scope -- reported for EachCardInGraveyard's reason,
   -- since Grasping Tentacles' scope is a read of the slot its own mill targets.
@@ -403,6 +406,8 @@ objectRefQuantities ref = case ref of
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
   -- The arm above's count, measured in MATCHES rather than in cards.
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> [count]
+  -- CR 404.1's top card is ONE card, so the graveyard arm states no depth at all.
+  ObjectRef.TopOfGraveyard _ -> []
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _) -> []
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand _ _) -> []
   -- How many cards are picked out of the group -- Ancestral Memories' printed
@@ -440,6 +445,9 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.ChosenPlayer -> []
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> [player]
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _ _) -> [player]
+  -- Whose graveyard, the two library walks' own read over CR 400.1's other
+  -- per-player zone.
+  ObjectRef.TopOfGraveyard player -> [player]
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ _) -> []
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player _) -> [player]
   -- The seat that picks out of the group -- Animal Magnetism's opponent, and by
@@ -2088,6 +2096,18 @@ objectRefObjects legal resolving controller source gs ref = case ref of
               oid : rest -> oid : walkDown (if matches oid then remaining - 1 else remaining) rest
         walk pid = walkDown wanted (Game.zoneMembers Zone.Library pid gs)
      in concatMap walk (filter (`elem` named) (Game.apnapOrder gs))
+  -- CR 404.1's ordered pile, whose top is the NEWEST arrival -- the LAST member,
+  -- the opposite end from the two library walks above, because
+  -- Game.insertIntoZone appends a graveyard arrival where it prepends a library
+  -- one. One card per named graveyard, in APNAP order over the players still in
+  -- the turn order (CR 608.2f, CR 101.4), and none at all from an empty one (CR
+  -- 101.3). No Quantity to evaluate and no prompt: CR 404.2 keeps a graveyard's
+  -- order out of the players' hands, so "the top card" names exactly one.
+  ObjectRef.TopOfGraveyard player ->
+    let named = playerRefPlayers legal controller gs player
+     in Maybe.mapMaybe
+          (\pid -> Maybe.listToMaybe (reverse (Game.zoneMembers Zone.Graveyard pid gs)))
+          (filter (`elem` named) (Game.apnapOrder gs))
   -- A card somebody CHOOSES is a QUESTION, and this function cannot ask one; the
   -- MoveToZone arm's own gather does. Under any other opcode this empty answer is
   -- an inert card-data error.

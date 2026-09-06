@@ -651,6 +651,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.TopOfGraveyard _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachSpell _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachOnStack _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
@@ -3054,6 +3055,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- reason: the whole batch comes off one walk of each library (CR
               -- 608.2c, CR 608.2f).
               ObjectRef.TopOfLibraryUntil {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- CR 404.1's top card, read from the PRE-MOVE state for the two
+              -- arms above's reason: one look at each named graveyard (CR
+              -- 608.2c, CR 608.2f).
+              ObjectRef.TopOfGraveyard _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
               -- One card per chooser, and the only ref whose gather asks a question

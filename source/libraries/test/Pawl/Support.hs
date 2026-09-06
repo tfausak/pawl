@@ -1138,8 +1138,9 @@ addLibraryCard printing pid gs =
 -- One card of a printing in pid's graveyard, ON TOP of whatever is already
 -- there -- CR 404.1, and the end Pawl.Engine.Game.insertIntoZone puts a real
 -- arrival at, so a fixture built by repeated calls has the order a game would
--- have produced. That is load-bearing for CR 404.2's "the top creature card"
--- (Pawl.Engine.Cost.topExileCandidate), which reads the LAST member.
+-- have produced. That is load-bearing for both readers of that end: CR 404.2's
+-- "the top creature card" (Pawl.Engine.Cost.topExileCandidate) and
+-- Pawl.Types.ObjectRef.TopOfGraveyard, each of which reads the LAST member.
 addGraveyardCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addGraveyardCard printing pid gs =
   let (printingId, gsP) = Game.intern printing gs

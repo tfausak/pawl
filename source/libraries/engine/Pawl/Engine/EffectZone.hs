@@ -96,6 +96,7 @@ zoneFunctionedFrom delayed effect = case effect of
     ObjectRef.ChosenPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.TopOfLibraryUntil {} -> Nothing
+    ObjectRef.TopOfGraveyard _ -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
     ObjectRef.ChosenCardInHand {} -> Nothing
     ObjectRef.ChosenCardFromAmong {} -> Nothing

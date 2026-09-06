@@ -567,6 +567,10 @@ refReachesLibrary ref = case ref of
   ObjectRef.EachOpponent -> False
   ObjectRef.ChosenPlayer -> False
   ObjectRef.ChosenCardInGraveyard {} -> False
+  -- FALSE: the position is in a GRAVEYARD, so the ref itself reaches no library.
+  -- Soldevi Digger's own ability still answers True through the MoveToZone's
+  -- DESTINATION, which is where "on the bottom of your library" is said.
+  ObjectRef.TopOfGraveyard _ -> False
   ObjectRef.ChosenCardInHand {} -> False
   -- TRUE, and the second arm that answers so: a group a look or a reveal
   -- bound is still in the LIBRARY it was shown from (CR 701.20b), so

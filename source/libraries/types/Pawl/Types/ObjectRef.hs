@@ -8,6 +8,7 @@ import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -75,6 +76,18 @@ data ObjectRef
   | -- | CR 401.2 / Treasure Hunt, Open the Way: the cards on top of a library down
     -- to and INCLUDING the one whose match completes the payload's count.
     TopOfLibraryUntil TopOfLibraryUntil.TopOfLibraryUntil
+  | -- | CR 404.1 / Soldevi Digger: the top card of each graveyard the PlayerRef
+    -- names -- the NEWEST arrival, which is the LAST member of the pile and the
+    -- opposite end from the library arms above (Pawl.Engine.Game.insertIntoZone
+    -- appends a graveyard arrival). No depth, no Filter and no prompt: every
+    -- printing that reads this position reads exactly one card, and CR 404.2
+    -- leaves the order out of the players' hands, so there is nothing to ask.
+    --
+    -- Not implemented: a card that TESTS the top card rather than acting on it
+    -- unconditionally -- Guiding Spirit's "if the top card of target player's
+    -- graveyard is a creature card" -- which wants a Condition that can name this
+    -- position, not another field here (gap #3318).
+    TopOfGraveyard PlayerRef.PlayerRef
   | -- | CR 608.2d / Port of Karfell: a card in a graveyard matching the Filter,
     -- chosen as the effect runs rather than targeted (CR 115.1).
     --
