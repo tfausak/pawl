@@ -5416,13 +5416,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- observable -- every earlier one was an instant or a sorcery, whose next cast
   -- is a new object (CR 400.7) with an empty set of its own.
   --
-  -- Not implemented, and no printing reaches either: a resolution whose text
+  -- What the assignment costs, and no printing spends it: a resolution whose text
   -- instructs a SECOND, separate choice keeps only the later name, where CR 201.4
-  -- read twice would leave two; and a permanent that chose as it entered (CR
-  -- 614.1c, Runed Halo) would lose that name to a later resolution of its own.
-  -- No card in data/cards writes two ChooseCardName instructions, and none pairs
-  -- an as-enters choice with a resolution-time one -- Runed Halo has no activated
-  -- ability, and Conjurer's Ban names once (Scryfall, 2026-09-06).
+  -- read twice would leave two, and a permanent that chose as it entered (CR
+  -- 614.1c) would lose that name to a later resolution of its own. No card in
+  -- data/cards writes two ChooseCardName instructions, and none pairs an
+  -- as-enters choice with a resolution-time one -- Runed Halo, the pool's
+  -- as-enters chooser, has no activated ability, and Conjurer's Ban names once
+  -- (Oracle text, Scryfall, 2026-09-06). Either card would refute this.
   --
   -- Written to the SOURCE and not to `resolving`: Pawl.Engine.PlayerEffect
   -- .chosenNamesOf and the resolution's own context both ask about a source (CR
@@ -5437,8 +5438,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           g <- State.get
           Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction)
     picked <- fmap Set.fromList (Monad.mapM ask (apnapPlayersOf ref legal controller gs))
-    let stamp o = o {Object.chosenNames = picked}
-    State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
+    -- CR 101.3: a reference naming NOBODY leaves nothing to do, so the write is
+    -- skipped rather than assigning the empty set -- which would clear a name an
+    -- earlier instruction chose, and the assignment above is the whole reason
+    -- that would now be visible.
+    Monad.unless (Set.null picked) $ do
+      let stamp o = o {Object.chosenNames = picked}
+      State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
   -- CR 400.11c: the resolving controller reveals a card they own from outside the
   -- game matching the filter and puts it into their hand -- Burning Wish.
   --
