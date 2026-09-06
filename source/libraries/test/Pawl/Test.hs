@@ -295,6 +295,7 @@ import qualified Pawl.Codec.PendingEntryEffectSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PermanentCandidateSpec
 import qualified Pawl.Codec.PermanentSacrificedSpec
+import qualified Pawl.Codec.PermanentTappedForManaSpec
 import qualified Pawl.Codec.PermanentWasSacrificedSpec
 import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
@@ -892,6 +893,7 @@ spec s registry = do
   Pawl.Codec.CounterPlacementSpec.spec s
   Pawl.Codec.PermanentCandidateSpec.spec s
   Pawl.Codec.PermanentSacrificedSpec.spec s
+  Pawl.Codec.PermanentTappedForManaSpec.spec s
   Pawl.Codec.PermanentWasSacrificedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
   Pawl.Codec.PhaseSelectorSpec.spec s

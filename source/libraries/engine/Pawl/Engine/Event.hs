@@ -6553,6 +6553,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfBecomesUntapped -> False
   -- CR 106.12a is a first-pass event as well, and not an ability triggering.
   TriggerCondition.AttachedPermanentTappedForMana -> False
+  -- The same event under a relation and a filter, so the same answer.
+  TriggerCondition.PermanentTappedForMana {} -> False
   TriggerCondition.PermanentSacrificed {} -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
@@ -6668,6 +6670,10 @@ controllerTurnScoped cond = case cond of
   -- Nor does CR 106.12a: an enchanted land can be tapped for mana on anyone's
   -- turn, and Wild Growth's whole point is that the mana is its controller's.
   TriggerCondition.AttachedPermanentTappedForMana -> False
+  -- Nor read by a bystander: the RELATION names a seat and not a turn, the
+  -- PermanentSacrificed arm's reason -- Autumn Willow, Harmony's controller taps
+  -- a land creature for mana on an opponent's turn too.
+  TriggerCondition.PermanentTappedForMana {} -> False
   -- Rule 702.149c names no turn either, and the SelfAttacks arm below settles the
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.

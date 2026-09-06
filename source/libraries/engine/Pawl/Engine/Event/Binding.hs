@@ -698,6 +698,16 @@ eventBindings gs bearerBecame you cond event = case (cond, event) of
   -- permanent IS the bearer's host, so the id is always there.
   (TriggerCondition.AttachedPermanentTappedForMana, GameEvent.TappedForMana tapped) ->
     Binding.setManaSource tapped Map.empty
+  -- The same slot for the bystander reading: Autumn Willow, Harmony's "add an
+  -- additional {G}" goes to CR 109.5's "you", but a printing of this shape whose
+  -- recipient is the tapping player instead reads the source through
+  -- PlayerRef.ControllerOfBound, and the two seats come apart under an Opponent
+  -- relation.
+  --
+  -- Unconditional given a match, the arm above's reason: matchesTrigger accepts
+  -- only a GameEvent.TappedForMana, which carries the permanent outright.
+  (TriggerCondition.PermanentTappedForMana {}, GameEvent.TappedForMana tapped) ->
+    Binding.setManaSource tapped Map.empty
   -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
   -- whose creature the trigger then targets and whose crown its duration watches.
   -- Bound whichever relation matched, for the reason the PlayerLosesLife arm
@@ -1392,6 +1402,9 @@ eventBindingSlots cond = case cond of
   -- The permanent tapped for mana, which the arm above stamps for every
   -- match: Wild Growth reads it through PlayerRef.ControllerOfBound.
   TriggerCondition.AttachedPermanentTappedForMana -> Set.singleton Binding.manaSource
+  -- The same slot for the bystander reading, stamped by the arm above for every
+  -- match.
+  TriggerCondition.PermanentTappedForMana {} -> Set.singleton Binding.manaSource
   -- Empty for SelfEvolves' reason and not for AttachedCreatureMentors' -- rule
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
