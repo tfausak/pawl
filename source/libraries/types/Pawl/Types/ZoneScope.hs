@@ -15,7 +15,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- evaluator has no slots to resolve, so an InSlot arm there would be an arm those
 -- carriers could not answer. And not Pawl.Types.PlayerRef, whose Relative arm
 -- cannot say CR 806.1's "each opponent" as one value. Neither of those types
--- subsumes this one; this is the pair of readings a TARGET POOL, a
+-- subsumes this one; these are the readings a TARGET POOL, a
 -- resolution-time SWEEP and a resolution-time CHOICE all need, and all three
 -- resolve it through Pawl.Engine.Target.zoneScopePlayers.
 data ZoneScope
@@ -35,4 +35,12 @@ data ZoneScope
     -- alongside the slot keys (Pawl.Engine.Modal.instanceTargetSlots), so the
     -- payload names that occurrence's own slot (CR 700.2d).
     InSlot SlotName.SlotName
+  | -- | CR 108.4 / CR 608.2h: the controller of the OBJECT a slot names -- Hour
+    -- of Glory's "its controller reveals their hand", where the slot holds the
+    -- creature the spell targeted rather than a player. Read through last known
+    -- information, since the clause naming the player generally moved the object
+    -- first and CR 108.4 leaves a card that is neither permanent nor spell with
+    -- no controller at all; Pawl.Types.PlayerRef.ControllerOfBound is the same
+    -- read one type over.
+    ControllerOfBound SlotName.SlotName
   deriving (Eq, Ord, Show)

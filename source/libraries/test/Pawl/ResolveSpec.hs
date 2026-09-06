@@ -1331,6 +1331,49 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "the two cards of other names stayed in the library"
       (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
       (Set.fromList [bifurcateLibraryPiker board, bifurcateLibraryMountain board])
+  -- Hour of Glory -- "Exile target creature. If that creature was a God, its
+  -- controller reveals their hand and exiles all cards from it with the same
+  -- name as that creature." The whole-card proof that a HAND SWEEP's filter is
+  -- matched in the resolution's own context (CR 608.2c): its CR 201.2a
+  -- comparison is against the slot the FIRST clause already emptied, so the
+  -- names come from CR 608.2h's last-known reader
+  -- (Pawl.Engine.Resolve.Slots.effectContext), and a bare Filter.contextFor
+  -- would leave the sweep exiling nothing at all. Amnesia, the pool's other hand
+  -- sweep, reads no slot and so cannot tell the two apart.
+  --
+  -- TWO cases over ONE board, differing in exactly which creature was targeted:
+  -- the God separates "the name in the target slot" from "every card in hand",
+  -- since bob's hand holds one card of each battlefield creature's name, and the
+  -- Goblin Piker case is the one an unconditioned sweep fails.
+  Spec.it s "CR 201.2a whole card: Hour of Glory exiles the hand cards sharing a name with the God it targeted" $ do
+    board <- gloryBoard s registry
+    let settled = resolveGlory (gloryGod board) board
+    Spec.assertEqWith
+      s
+      "the same-named card left bob's hand and the differently-named one stayed"
+      (Set.fromList (Game.zoneMembers Zone.Hand S.bob settled))
+      (Set.fromList [gloryHandPiker board])
+    -- The PROXY, after the assertion above rather than before it: a zone change
+    -- mints a new id (CR 400.7), so exile is counted rather than named -- the
+    -- God's own incarnation and the hand card that shared its name.
+    Spec.assertEqWith
+      s
+      "two cards are in bob's exile, the God and the card of its name"
+      (length (Game.zoneMembers Zone.Exile S.bob settled))
+      2
+  Spec.it s "CR 201.2a whole card: Hour of Glory aimed at the non-God leaves both hand cards alone" $ do
+    board <- gloryBoard s registry
+    let settled = resolveGlory (gloryPiker board) board
+    Spec.assertEqWith
+      s
+      "bob keeps both cards, the one sharing the target's name included"
+      (Set.fromList (Game.zoneMembers Zone.Hand S.bob settled))
+      (Set.fromList [gloryHandGod board, gloryHandPiker board])
+    Spec.assertEqWith
+      s
+      "and only the targeted creature reached exile"
+      (length (Game.zoneMembers Zone.Exile S.bob settled))
+      1
   -- Mana Severance -- "Search your library for any number of land cards, exile
   -- them, then shuffle." The whole-card proof that a search can state NO count
   -- (CR 701.23a: the find is bounded by what the zone holds, not by a number the
@@ -2648,6 +2691,48 @@ resolveBifurcate target board =
   let answer :: Prompt.Prompt r -> r
       answer = bifurcateAnswer target
       cast = snd (Engine.runGamePure answer (bifurcateState board) (S.cast S.alice (bifurcateSpell board)))
+   in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
+-- Hour of Glory's board. Bob controls two creatures with DIFFERENT names -- one
+-- a God, one not -- and holds one card of each of those names, so the pair of
+-- cases below differs in exactly which creature the spell targeted and every
+-- other reading of the sweep (all cards, the wrong name, no condition) fails one
+-- of them.
+data GloryBoard = MkGloryBoard
+  { gloryState :: GameState.GameState,
+    glorySpell :: ObjectId.ObjectId,
+    -- | Birgi, God of Storytelling, on bob's battlefield.
+    gloryGod :: ObjectId.ObjectId,
+    -- | The Goblin Piker on bob's battlefield, which is no God.
+    gloryPiker :: ObjectId.ObjectId,
+    -- | The Birgi card in bob's hand.
+    gloryHandGod :: ObjectId.ObjectId,
+    -- | The Goblin Piker card in bob's hand.
+    gloryHandPiker :: ObjectId.ObjectId
+  }
+
+gloryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GloryBoard
+gloryBoard s registry = do
+  swamp <- S.printingOf s registry "Swamp"
+  birgi <- S.printingOf s registry "Birgi, God of Storytelling"
+  piker <- S.printingOf s registry "Goblin Piker"
+  glory <- S.printingOf s registry "Hour of Glory"
+  let (godId, g1) = S.addPermanent birgi S.bob (S.landsInPlay swamp 4)
+      (pikerId, g2) = S.addPermanent piker S.bob g1
+      (handGod, g3) = S.addHandCard birgi S.bob g2
+      (handPiker, g4) = S.addHandCard piker S.bob g3
+      (gs, spellId) = S.handOne glory g4
+  pure (MkGloryBoard gs spellId godId pikerId handGod handPiker)
+
+-- Aims the one target slot at `target`, filtering the offered recipients rather
+-- than building one, so the Creatures pool's own ToCreature is announced.
+resolveGlory :: ObjectId.ObjectId -> GloryBoard -> GameState.GameState
+resolveGlory target board =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just target) . Recipient.objectOf) sets
+        _ -> findFirst p
+      cast = snd (Engine.runGamePure answer (gloryState board) (S.cast S.alice (glorySpell board)))
    in snd (Engine.runGamePure answer cast Engine.priorityLoop)
 
 -- Mana Severance's board. Two Islands pay the {1}{U}, and the library holds the

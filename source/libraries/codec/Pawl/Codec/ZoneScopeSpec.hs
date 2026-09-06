@@ -22,4 +22,10 @@ spec s = Spec.describe s "Pawl.Codec.ZoneScope" $ do
       ZoneScope.codec
       (ZoneScope.InSlot (SlotName.MkSlotName (Text.pack "player")))
       " {\"type\":\"InSlot\",\"value\":\"player\"} "
+  Spec.it s "ControllerOfBound" $
+    Common.assertCodec
+      s
+      ZoneScope.codec
+      (ZoneScope.ControllerOfBound (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"ControllerOfBound\",\"value\":\"target\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneScope.codec

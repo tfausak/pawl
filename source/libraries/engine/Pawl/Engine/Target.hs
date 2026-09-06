@@ -1,5 +1,6 @@
 module Pawl.Engine.Target where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -982,12 +983,20 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 --     is itself InSlot-scoped is answerable but not usefully so: legalSets fills
 --     `bindings` from a pass that gave it no bindings of its own, so it holds
 --     nothing and this is empty -- which terminates rather than recurring.
+--
+--   * ControllerOfBound is the arm above's read turned CR 108.4's way -- Hour of
+--     Glory's "its controller" -- and the one arm that needs the GameState: the
+--     slot holds an OBJECT, which the arm above passes over, and whose it is
+--     comes from Projection.controllerWithLastKnown, so CR 608.2h answers for a
+--     permanent the same resolution has already moved. Folded over the whole set
+--     for the arm above's reason, so CR 601.2c's not-yet-announced moment gets
+--     the superset and CR 608.2b's re-check the one object.
 graveyardRecipients :: Filter.Context -> Map SlotName (Set Recipient) -> ZoneScope.ZoneScope -> GameState -> Set Recipient
 graveyardRecipients context bindings scope gs =
   graveyardsOf (zoneScopePlayers (Filter.perspective context) bindings scope gs) gs
 
--- The players a ZoneScope names, and the WHOLE of what either reading of
--- that type means: the two arms are exactly the two paragraphs above, and this is
+-- The players a ZoneScope names, and the WHOLE of what any reading of
+-- that type means: the arms are exactly the paragraphs above, and this is
 -- the one place they are read.
 --
 -- Shared with Pawl.Engine.Resolve, whose ObjectRef.EachCardInGraveyard sweep asks
@@ -1002,6 +1011,10 @@ zoneScopePlayers perspective bindings scope gs = case scope of
   ZoneScope.Scoped playerScope -> Maybe.fromMaybe [] (PlayerEffect.playersInScope perspective gs playerScope)
   ZoneScope.InSlot slot ->
     Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings))
+  ZoneScope.ControllerOfBound slot ->
+    Maybe.mapMaybe
+      (Recipient.objectOf Monad.>=> \oid -> Projection.controllerWithLastKnown oid gs)
+      (Set.toList (Map.findWithDefault Set.empty slot bindings))
 
 -- CR 404.1 over a list of players, deduplicated by the Set the caller gets back.
 graveyardsOf :: [PlayerId] -> GameState -> Set Recipient
@@ -1264,11 +1277,14 @@ scopeSlot pool = case pool of
   -- Its graveyard half carries the same axis, so the answer is that half's.
   Pool.CreaturesAndCardsInGraveyard scope -> zoneScopeSlot scope
 
--- The slot a ZoneScope names, if it names one.
+-- The slot a ZoneScope names, if it names one. Both slot-named arms do, and the
+-- dependency is the same one either way: what this pool offers turns on how
+-- another slot of the same announcement was answered.
 zoneScopeSlot :: ZoneScope.ZoneScope -> Maybe SlotName
 zoneScopeSlot scope = case scope of
   ZoneScope.Scoped _ -> Nothing
   ZoneScope.InSlot slot -> Just slot
+  ZoneScope.ControllerOfBound slot -> Just slot
 
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually
