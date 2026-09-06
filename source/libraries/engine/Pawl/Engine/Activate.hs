@@ -33,7 +33,6 @@ import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
-import qualified Pawl.Types.ActivationRestriction as ActivationRestriction.Type
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
@@ -1047,22 +1046,12 @@ activateAbility pid srcId ability = do
                     (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
                     (State.modify' (Event.recordEvent (GameEvent.LoyaltyAbilityActivated srcId)))
                   -- CR 602.5b: record that THIS ability of this permanent has now
-                  -- been activated, which is the whole of the once-only limit's
-                  -- storage (ActivationRestriction.OnlyOnce reads it). Beside the
+                  -- been activated, which is the whole of both counted riders'
+                  -- storage -- see ActivationRestriction.recordActivation, the
+                  -- one writer this and CR 605.3b's mana road share. Beside the
                   -- loyalty record above and for its reason: every rejecting path
                   -- restores `before`, so no refused activation leaves one behind.
-                  --
-                  -- On the SOURCE permanent rather than the ability object, which
-                  -- CR 602.5b names ("continues to apply to that object") and
-                  -- which CR 400.7 then forgets for free. Map.adjust is a no-op
-                  -- when the cost sacrificed it, and that is right: the object the
-                  -- restriction was about is gone.
-                  --
-                  -- Only for an ability that PRINTS the rider, so nothing else
-                  -- grows the set.
-                  Monad.when
-                    (elem ActivationRestriction.Type.OnlyOnce (ActivatedAbility.restrictions ability))
-                    (State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.activatedOnce = Set.insert ability (Object.activatedOnce o)}) srcId (GameState.objects g)}))
+                  State.modify' (ActivationRestriction.recordActivation srcId ability)
                   -- CR 601.2c through CR 602.2b: each chosen object became a
                   -- target of this ability, which is what CR 702.21a's ward
                   -- watches -- and an activated ability is the half

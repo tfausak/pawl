@@ -133,4 +133,12 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       ActivationRestriction.codec
       ActivationRestriction.OnlyOnce
       " {\"type\":\"OnlyOnce\"} "
+  -- CR 602.5b's own example, the same rider timed per turn: Locust Swarm's
+  -- "Activate only once each turn".
+  Spec.it s "OnlyOnceEachTurn" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      ActivationRestriction.OnlyOnceEachTurn
+      " {\"type\":\"OnlyOnceEachTurn\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

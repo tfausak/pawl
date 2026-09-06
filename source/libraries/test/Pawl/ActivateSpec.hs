@@ -125,6 +125,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationRestrictionSpec s registry
   printedActivationBoardConditionSpec s registry
   printedActivationOnlyOnceSpec s registry
+  printedActivationOnlyOnceEachTurnSpec s registry
   printedActivationThresholdReductionSpec s registry
   printedActivationConjunctionSpec s registry
   printedActivationCombatPointSpec s registry
@@ -4583,3 +4584,103 @@ printedActivationOnlyOnceSpec s registry = Spec.describe s "PrintedActivationOnl
         backId = case toPlay of b Seq.:<| _ -> b; _ -> S.noSource
     Spec.assertEqWith s "the returned permanent is a 2/2 again -- CR 400.7 dropped the counters" (S.powerToughnessOf backId returned) (Just (2, 2))
     Spec.assertEqWith s "and its once-only ability is offered again" (length (filter isOnlyOnce (activationsOf backId (Action.legalActions S.alice returned)))) 1
+
+-- CR 602.5b's own example of a "restriction on its use", printed on a card about
+-- itself: Locust Swarm (Mirage) prints "{G}: Regenerate this creature." beside
+-- "{G}: Untap this creature. Activate only once each turn." Oracle text checked
+-- against Scryfall 2026-09-06.
+--
+-- THE RIDER IS ON ONE OF TWO ABILITIES of one permanent, which is the grain a
+-- record keyed only by the source cannot express (CR 606.3's loyalty limit is
+-- keyed that way and needs no more): the regenerate ability stays offered while
+-- the untap one is spent.
+--
+-- FOUR Forests, which is four activations of {G}: the rider is the only thing
+-- between alice and a second untap, so a board that ignored it would tap every
+-- Forest. The Swarm starts TAPPED, so the activation that IS allowed has
+-- something to do and the board can say it happened.
+locustBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+locustBoard swarm forest =
+  let (swarmId, gs) = S.addPermanent swarm S.alice (S.landsInPlay forest 4)
+   in ( swarmId,
+        (S.tapObject swarmId gs)
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.empty
+          }
+      )
+
+-- The offer carrying CR 602.5b's per-turn rider, told from the same permanent's
+-- other ability by the rider itself rather than by an index into the face, as
+-- isOnlyOnce above is.
+isOnlyOnceEachTurn :: A.Action -> Bool
+isOnlyOnceEachTurn a = case a of
+  A.Activate _ ability -> elem ActivationRestriction.OnlyOnceEachTurn (ActivatedAbility.restrictions ability)
+  _ -> False
+
+-- Takes the once-each-turn activation whenever the engine offers it and passes
+-- otherwise, so a second one is refused by the rules rather than declined by the
+-- interpreter -- and the regenerate ability is never taken, which is what leaves
+-- the tapped-Forest count reading the rider alone.
+onlyOnceEachTurnAnswer :: Prompt.Prompt r -> r
+onlyOnceEachTurnAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isOnlyOnceEachTurn options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+-- CR 500.5 / 502.3: two handoffs, the pools swept and everything untapped -- the
+-- same permanent on a later turn, without running a turn's priority and drawing a
+-- fixture library empty (CR 104.3c). Engine.beginTurnOf is where
+-- GameState.activatedThisTurn is cleared, so this is the reset under test.
+nextTurnOfAlice :: GameState.GameState -> GameState.GameState
+nextTurnOfAlice gs =
+  S.runPure
+    S.identityAnswer
+    (Mana.emptyManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
+    (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+
+printedActivationOnlyOnceEachTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationOnlyOnceEachTurnSpec s registry = Spec.describe s "PrintedActivationOnlyOnceEachTurn" $ do
+  -- The gameplay-level proof (design.md section 4), driven through the priority
+  -- loop rather than by calling Activate.activateAbility, which does not gate.
+  -- alice takes the untap activation every time it is offered; ONE tapped Forest
+  -- rather than four is the whole assertion, and the three untapped ones are what
+  -- say the second activation was refused by the rider and not by the mana.
+  Spec.it s "CR 602.5b whole card: the untap ability is activated once and refused for the rest of the turn" $ do
+    swarm <- S.printingOf s registry "Locust Swarm"
+    forest <- S.printingOf s registry "Forest"
+    let (swarmId, board) = locustBoard swarm forest
+        after = S.runPure onlyOnceEachTurnAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "the Swarm is tapped before anything is activated" (fmap Object.tapped (Game.lookupObject swarmId board)) (Just TapState.Tapped)
+    Spec.assertEqWith s "exactly one Forest is tapped, so three remain to pay a second activation and the rider is what refused it" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "and the Swarm is untapped, so the one activation the rider allows did resolve" (fmap Object.tapped (Game.lookupObject swarmId after)) (Just TapState.Untapped)
+
+  -- CR 602.5b's grain: the restriction is about the ABILITY, not the permanent.
+  -- The same board, once the untap ability is spent -- the {G} regenerate ability
+  -- is still offered off the same object, and the untap one is not.
+  Spec.it s "CR 602.5b the permanent's other ability is untouched" $ do
+    swarm <- S.printingOf s registry "Locust Swarm"
+    forest <- S.printingOf s registry "Forest"
+    let (swarmId, board) = locustBoard swarm forest
+        after = S.runPure onlyOnceEachTurnAnswer board Engine.priorityLoop
+        offered = activationsOf swarmId (Action.legalActions S.alice after)
+    Spec.assertEqWith s "the once-each-turn ability is not offered again this turn" (filter isOnlyOnceEachTurn offered) []
+    Spec.assertEqWith s "but the Swarm's regenerate ability still is" (length (filter (not . isOnlyOnceEachTurn) offered)) 1
+
+  -- The two counted riders differing in exactly one thing, the period: the same
+  -- handoff, the same untap step, the same empty pools. CR 602.5b's per-turn
+  -- clause is back and CR 702.177a's per-game one (Greenbelt Guardian, spent on
+  -- guardianBoard above) is not.
+  Spec.it s "CR 602.5b the per-turn rider resets at the handoff and the per-game one does not" $ do
+    swarm <- S.printingOf s registry "Locust Swarm"
+    forest <- S.printingOf s registry "Forest"
+    guardian <- S.printingOf s registry "Greenbelt Guardian"
+    let (swarmId, board) = locustBoard swarm forest
+        next = nextTurnOfAlice (S.runPure onlyOnceEachTurnAnswer board Engine.priorityLoop)
+        (guardianId, guarded) = guardianBoard guardian forest
+        guardedNext = nextTurnOfAlice (S.runPure onlyOnceAnswer guarded Engine.priorityLoop)
+    Spec.assertEqWith s "the once-each-turn ability is offered again on alice's next turn" (length (filter isOnlyOnceEachTurn (activationsOf swarmId (Action.legalActions S.alice next)))) 1
+    Spec.assertEqWith s "and the once-per-game ability is still refused after the same handoff" (filter isOnlyOnce (activationsOf guardianId (Action.legalActions S.alice guardedNext))) []

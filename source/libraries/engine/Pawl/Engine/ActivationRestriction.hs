@@ -12,14 +12,16 @@
 -- Pawl.Engine.Turn, beside the other two windows these arms ask about.
 -- Two arms read no window at all: CR 602.5's board condition, which imports
 -- Pawl.Engine.Condition and Pawl.Engine.Projection, neither of which reaches back
--- here, and CR 602.5b's counted rider, which reads the source object's own record
--- of what it has already activated.
+-- here, and CR 602.5b's two counted riders, which read what this source has
+-- already activated -- for the whole game, off the object, and for this turn,
+-- off GameState.activatedThisTurn.
 --
 -- The only module that may CASE on Pawl.Types.ActivationRestriction, exactly as
 -- Pawl.Engine.CombatRestriction is of the type it names. Casing on the arms is a
 -- classification, not an effect's identity.
 module Pawl.Engine.ActivationRestriction where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Event.Match as Event
@@ -76,11 +78,11 @@ restrictionsOk pid srcId ability restrictions gs = all (restrictionMet pid srcId
 
 -- Does the game state satisfy this one printed clause?
 --
--- The SOURCE's id rides along for the OnlyIf and OnlyOnce arms: CR 602.5's board
--- condition is a Pawl.Types.Condition, and Pawl.Engine.Condition.holds evaluates
--- every Quantity in one against an object, while CR 602.5b's counted rider is
--- remembered on that object. Every other arm reads a phase, a turn or the combat
--- record and ignores it.
+-- The SOURCE's id rides along for the OnlyIf arm and both counted ones: CR
+-- 602.5's board condition is a Pawl.Types.Condition, and
+-- Pawl.Engine.Condition.holds evaluates every Quantity in one against an object,
+-- while CR 602.5b's two counted riders are keyed to it. Every other arm reads a
+-- phase, a turn or the combat record and ignores it.
 restrictionMet :: PlayerId -> ObjectId -> Maybe (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> GameState -> ActivationRestriction.ActivationRestriction -> Bool
 restrictionMet pid srcId ability gs restriction = case restriction of
   -- CR 307.5's three conjuncts, and Turn.sorcerySpeedWindow is that window shared
@@ -146,8 +148,8 @@ restrictionMet pid srcId ability gs restriction = case restriction of
       gs
       srcId
       condition
-  -- CR 602.5b's counted rider, and the one arm that reads neither a window nor
-  -- the board: has THIS ability of THIS object already been activated? CR 400.7
+  -- CR 602.5b's counted rider, one of the two arms that read neither a window nor
+  -- the board: has THIS ability of THIS object already been activated, EVER? CR 400.7
   -- ends the memory with the incarnation (Object.newIncarnation), so a permanent
   -- that leaves and returns answers True again -- Pawl.ActivateSpec's "CR 400.7 /
   -- 602.5b the permanent that returns may activate it again" is what proves it.
@@ -167,6 +169,45 @@ restrictionMet pid srcId ability gs restriction = case restriction of
     Just this -> case Game.lookupObject srcId gs of
       Nothing -> True
       Just object -> Set.notMember this (Object.activatedOnce object)
+  -- CR 602.5b's own example, the same question asked of THIS TURN: has this
+  -- ability of this object been activated since the turn began? The record is
+  -- GameState.activatedThisTurn, which Engine.beginTurnOf clears -- so the reset
+  -- is the turn handoff itself and nothing on the object survives it.
+  --
+  -- Nothing is CR 305.6's intrinsic route, which prints no rider, exactly as
+  -- OnlyOnce above. No object is looked up: the record is keyed by the id, so a
+  -- source that has left keeps whatever it spent until the turn ends, and
+  -- Activate.activatable has already required the source of an OFFER to be
+  -- somewhere it offers abilities from.
+  ActivationRestriction.OnlyOnceEachTurn -> case ability of
+    Nothing -> False
+    Just this -> Set.notMember this (Map.findWithDefault Set.empty srcId (GameState.activatedThisTurn gs))
+
+-- CR 602.5b: record that THIS ability of this source has now been activated,
+-- for whichever counted rider it prints. The writer both readers above are
+-- served from, so the two roads to an activation cannot disagree:
+-- Pawl.Engine.Activate.activateAbility for an ability CR 602.2a puts on the
+-- stack, and Pawl.Engine.Cost.tapForManaWith for one CR 605.3b keeps off it.
+--
+-- Only for an ability that PRINTS the rider, so nothing else grows either store,
+-- and only after the payment was made -- every rejecting path restores the state
+-- it started from, so no refused activation leaves a record behind.
+--
+-- The per-GAME store is on the source object, which CR 602.5b names ("continues
+-- to apply to that object") and CR 400.7 then forgets for free; Map.adjust is a
+-- no-op when the cost sacrificed it, and that is right. The per-TURN store is
+-- GameState.activatedThisTurn, cleared at the handoff (Engine.beginTurnOf), and
+-- an entry for a source the cost sacrificed is kept rather than dropped: object
+-- ids are not reused, so it can name nothing else before the turn ends.
+recordActivation :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> GameState
+recordActivation srcId ability gs =
+  let prints restriction = elem restriction (ActivatedAbility.restrictions ability)
+      perGame g =
+        g {GameState.objects = Map.adjust (\o -> o {Object.activatedOnce = Set.insert ability (Object.activatedOnce o)}) srcId (GameState.objects g)}
+      perTurn g =
+        g {GameState.activatedThisTurn = Map.insertWith Set.union srcId (Set.singleton ability) (GameState.activatedThisTurn g)}
+   in (if prints ActivationRestriction.OnlyOnceEachTurn then perTurn else id)
+        ((if prints ActivationRestriction.OnlyOnce then perGame else id) gs)
 
 -- CR 307.5's empty-stack conjunct asked ABOUT THE RIDER rather than about the
 -- board: does this clause need an empty stack to be met?
@@ -207,3 +248,6 @@ needsEmptyStack restriction = case restriction of
   -- 602.2a's move cannot write one: nothing is spent until the payment
   -- `restrictionsOk` gates.
   ActivationRestriction.OnlyOnce -> False
+  -- The same record, timed per turn, and the same argument: CR 601.2a's and CR
+  -- 602.2a's move ends no turn and spends no activation.
+  ActivationRestriction.OnlyOnceEachTurn -> False

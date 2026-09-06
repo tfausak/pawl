@@ -1195,11 +1195,11 @@ towerBoard tower victim =
 -- where that card is exercised. Lavinia, Foil to Conspiracy is in the pool and
 -- gates these same two windows, but through CR 102.1's turn axis alone
 -- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
--- Ornitier and every other hit ride on "only once each turn" -- which
--- Pawl.Types.ActivationRestriction still cannot say, its OnlyOnce arm being CR
--- 702.177a's per-GAME clause (#3306) -- or on "only if
--- <condition>", which is its OnlyIf arm and names no window, so neither kind
--- reaches the phase axis this pair is about.
+-- Ornitier and every other hit ride on "only once each turn" -- which is
+-- ActivationRestriction.OnlyOnceEachTurn and names no window either
+-- (translatorSpec below is where that arm is exercised on this road) -- or on
+-- "only if <condition>", which is its OnlyIf arm and names no window, so neither
+-- kind reaches the phase axis this pair is about.
 --
 -- The two cases below are the SAME board at two moments, and the phase is the
 -- one thing that differs. That is what makes the pair a proof about the rider
@@ -3123,6 +3123,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   priorityWindowSpec s registry
   riderWindowSpec s registry
   lootSpec s registry
+  translatorSpec s registry
   laviniaTurnRiderSpec s registry
   wellspringSpec s registry
   manaConfluenceSpec s registry
@@ -3172,9 +3173,11 @@ untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.
 
 -- Two turn handoffs, CR 500.5's sweep of the pools, and then that untap: bob
 -- takes a turn, alice takes the next one, whatever she floated is gone and
--- everything she controls untaps (CR 502.3). CR 602.5b's memory is on the OBJECT
--- and no rule clears it at a handoff, which is what this is for -- the same
--- permanent, untapped and with an empty pool, on a later turn.
+-- everything she controls untaps (CR 502.3) -- the same permanent, untapped and
+-- with an empty pool, on a later turn. CR 602.5b's per-GAME memory is on the
+-- object and no rule clears it at a handoff, which is what lootSpec reads;
+-- Engine.beginTurnOf clears its per-TURN twin, which is what translatorSpec
+-- reads.
 nextTurnOfAlice :: GameState.GameState -> GameState.GameState
 nextTurnOfAlice gs = untapStep (Mana.emptyManaPools (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob gs)))
 
@@ -3269,3 +3272,63 @@ lootSpec s registry = Spec.describe s "Loot, the Pathfinder" $ do
     let (firstBolt, _, board) = lootBoard loot forest bolt
         afterFirst = snd (Engine.runGamePure lootAnswer board (do S.cast S.alice firstBolt; Stack.resolveTop))
     Spec.assertEqWith s "two red float once the Bolt has spent one of the three" (poolTypes S.alice afterFirst) [ManaType.Colored Color.Red, ManaType.Colored Color.Red]
+
+-- CR 602.5b's rider timed PER TURN and printed on a MANA ability, which CR 605.3b
+-- keeps off the stack entirely: Kozilek's Translator (Oath of the Gatewatch)
+-- prints "Pay 1 life: Add {C}. Activate only once each turn." Oracle text checked
+-- against Scryfall 2026-09-06. Locust Swarm is the same rider on the road CR
+-- 602.2a puts on the stack (Pawl.ActivateSpec's PrintedActivationOnlyOnceEachTurn).
+--
+-- NO {T} in the cost, so nothing but the rider bounds the route: alice could
+-- otherwise pay for every {1} in her hand out of one permanent, at a life apiece.
+--
+-- TWO Bonesplitters and NO lands, so the Translator's route is the only way to
+-- pay for either of them, and both of CR 605.3a's windows run through
+-- Cost.manaActivationsGiven rather than through Pawl.Engine.Activate, which
+-- refuses a mana ability outright (CR 605.3b). Bonesplitter does nothing until it
+-- is equipped, so the board it lands on is the board it left.
+--
+-- THE PAIR is the two moments below: the same permanents and the same hand,
+-- differing only in whether the route was already spent this turn.
+translatorBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+translatorBoard translator splitter =
+  let (_, gs1) = S.addPermanent translator S.alice (Setup.emptyGame S.bothPlayers)
+      (firstSplitter, gs2) = S.addHandCard splitter S.alice gs1
+      (secondSplitter, gs3) = S.addHandCard splitter S.alice gs2
+   in ( firstSplitter,
+        secondSplitter,
+        gs3
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.empty
+          }
+      )
+
+-- One choice to pin: the payment asks which source to tap for mana, and the
+-- Translator is the only one on the board.
+translatorAnswer :: Prompt.Prompt r -> r
+translatorAnswer p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+translatorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+translatorSpec s registry = Spec.describe s "Kozilek's Translator" $ do
+  Spec.it s "CR 605.3a / 602.5b the per-turn mana ability pays for one spell and is withheld until the next turn" $ do
+    translator <- S.printingOf s registry "Kozilek's Translator"
+    splitter <- S.printingOf s registry "Bonesplitter"
+    let (firstSplitter, secondSplitter, board) = translatorBoard translator splitter
+        castOf oid gs = snd (Engine.runGamePure translatorAnswer gs (do S.cast S.alice oid; Stack.resolveTop))
+        spent = castOf firstSplitter board
+        next = nextTurnOfAlice spent
+        inHand oid gs = elem oid (Game.zoneMembers Zone.Hand S.alice gs)
+    Spec.assertBool s (not (inHand firstSplitter spent)) "CR 605.3a the route is offered, so the first Bonesplitter is paid for and resolves"
+    Spec.assertEqWith s "and the life the route cost was paid" (S.lifeOf S.alice spent) (Just 19)
+    Spec.assertBool s (inHand secondSplitter (castOf secondSplitter spent)) "CR 602.5b the second Bonesplitter cannot be paid for this turn, so it is still in her hand"
+    Spec.assertEqWith s "and no second life was paid, so it was the rider and not the cost that refused it" (S.lifeOf S.alice (castOf secondSplitter spent)) (Just 19)
+    Spec.assertBool s (not (inHand secondSplitter (castOf secondSplitter next))) "CR 602.5b the handoff resets the rider, so the same card IS paid for on alice's next turn"
+    Spec.assertEqWith s "and a second life went with it" (S.lifeOf S.alice (castOf secondSplitter next)) (Just 18)
+    -- CR 605.3a's OTHER window, which reaches the same capacity through
+    -- Mana.manaSourcesGiven rather than through a payment: the Translator is a
+    -- source again on the later turn and is none once its route is spent.
+    Spec.assertEqWith s "CR 605.3a the priority window drops the source whose only route is spent, and offers it again next turn" (fmap (length . filter isManaActivation . Action.legalActions S.alice) [spent, next]) [0, 1]

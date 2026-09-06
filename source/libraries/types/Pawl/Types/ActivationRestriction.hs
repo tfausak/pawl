@@ -20,9 +20,9 @@ import qualified Pawl.Types.TurnScope as TurnScope
 -- description can hold exactly one. That is the same pressure Rally the Troops
 -- put on the casting side, which is a list for the same reason.
 --
--- A sum type rather than a Bool apiece: no boolean blindness, and the next clause
--- (split second, "only once each turn") is a constructor here rather than a flag
--- on the ability.
+-- A sum type rather than a Bool apiece: no boolean blindness, and a clause that
+-- names no window at all ("only once", "only once each turn") is a constructor
+-- here rather than a flag on the ability.
 --
 -- Deliberately NOT a synonym for Pawl.Types.CastingRestriction, which carries two
 -- arms spelled the same way. CR 307.5's last two sentences are the reason and
@@ -157,4 +157,22 @@ data ActivationRestriction
     -- 605.3a's two windows read this arm through Pawl.Types.ManaOption rather
     -- than through Pawl.Engine.Activate.
     OnlyOnce
+  | -- | CR 602.5b's own example of a "restriction on its use": "Activate only
+    -- once each turn" (Locust Swarm). CR 702.142a's boast rewrites itself into
+    -- the same words, and CR 702.57b states them of every forecast ability.
+    --
+    -- ONCE PER TURN, so OnlyOnce above is not it: the two sentences differ only
+    -- in the period, and this one resets at every turn handoff. Its memory is
+    -- Pawl.Types.GameState.activatedThisTurn rather than an object field for
+    -- exactly that reason -- Pawl.Engine.Engine.beginTurnOf clears it beside the
+    -- event log and CR 121.1's draw tally, and a stamp on the object would need a
+    -- sweep of every zone to say the same thing.
+    --
+    -- Keyed by the OBJECT and the ability, the grain both halves of CR 602.5b
+    -- need: the restriction "continues to apply to that object even if its
+    -- controller changes", and a permanent may print the rider on one of two
+    -- abilities (Locust Swarm regenerates freely and untaps once). CR 400.7's
+    -- forgetting is free, the returning permanent being a new object with a new
+    -- id.
+    OnlyOnceEachTurn
   deriving (Eq, Ord, Show)

@@ -53,8 +53,6 @@ import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityKind as AbilityKind
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationRestriction as ActivationRestriction.Type
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
@@ -3213,28 +3211,19 @@ tapForManaWith perform inFlight oid = do
               -- where the source stands in for it.
               ManaAbilityPerformer.effects perform oid controller (ManaOption.effects chosen)
               -- CR 602.5b: record that THIS ability of this permanent has now
-              -- been activated, which is the whole of the once-only limit's
-              -- storage (ActivationRestriction.OnlyOnce reads it, and
-              -- `capacity` above is where it is read on this path). CR 605.3b
-              -- leaves a mana ability no stack object, so this is the activation
-              -- and Activate.activateAbility never sees it.
+              -- been activated, which is the whole of both counted riders'
+              -- storage (`capacity` above is where they are read on this path).
+              -- CR 605.3b leaves a mana ability no stack object, so this is the
+              -- activation and Activate.activateAbility never sees it -- and
+              -- ActivationRestriction.recordActivation is the writer the two
+              -- roads share, so they cannot disagree about what was spent.
               --
-              -- On the SOURCE permanent rather than the route, which CR 602.5b
-              -- names ("continues to apply to that object") and which CR 400.7
-              -- then forgets for free. Map.adjust is a no-op when the cost
-              -- sacrificed it, and that is right: the object the restriction was
-              -- about is gone.
-              --
-              -- Only after Payment.Paid, and only for an ability that PRINTS the
-              -- rider -- Activate.activateAbility's arrangement, so a route
-              -- refused mid-payment leaves no record and nothing else grows the
-              -- set. CR 305.6's intrinsic route has no ability and prints no
+              -- Only after Payment.Paid, so a route refused mid-payment leaves no
+              -- record. CR 305.6's intrinsic route has no ability and prints no
               -- rider, so it can never reach this.
               case ManaOption.ability chosen of
-                Just spent
-                  | elem ActivationRestriction.Type.OnlyOnce (ActivatedAbility.restrictions spent) ->
-                      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.activatedOnce = Set.insert spent (Object.activatedOnce o)}) oid (GameState.objects g)})
-                _ -> pure ()
+                Just spent -> State.modify' (ActivationRestriction.recordActivation oid spent)
+                Nothing -> pure ()
               -- CR 106.12: this activation "tapped [the permanent] for mana"
               -- exactly when {T} was in its cost and it produced mana, which is
               -- what CR 106.12a's condition watches. Recorded LAST, after CR
