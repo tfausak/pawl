@@ -1812,6 +1812,21 @@ chooseNewTargetsFor controller copyId = do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
+-- CR 707.9a's "this ability", read off the RESOLVING object: rule 603.3 puts a
+-- triggered ability on the stack carrying its own text
+-- (Pawl.Types.TriggeredAbilitySource), so the words point at a value already in
+-- hand.
+--
+-- A CLASSIFICATION of the resolving object under CR 113.3 and never a question
+-- about which ability it is, so the closed half stays closed. Nothing for every
+-- other arm: a spell, an emblem and CR 725.2's sourceless trigger have no ability
+-- to point at, and an ACTIVATED ability has one this cannot return -- CR 707.9a
+-- reaches it too, and it would go in another list (#3325).
+thisTriggeredAbility :: ObjectId -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+thisTriggeredAbility resolving gs = case fmap Object.source (Game.lookupObject resolving gs) of
+  Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.ability triggered)
+  _ -> Nothing
+
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
 --
@@ -1825,20 +1840,6 @@ chooseNewTargetsFor controller copyId = do
 -- environment is read back, and where CR 601.2b's announced X lives. Not
 -- `source`: for an ability the two differ (CR 113.7a), and that permanent can be
 -- gone before a later effect of the same list runs.
--- CR 707.9a's "this ability", read off the RESOLVING object: rule 603.3 puts a
--- triggered ability on the stack carrying itself (Pawl.Types.TriggeredAbilitySource),
--- so the words point at a value already in hand.
---
--- A CLASSIFICATION of the resolving object under CR 113.3 and never a question
--- about which ability it is, so the closed half stays closed. Nothing for every
--- other arm: a spell, an emblem and CR 725.2's sourceless trigger have no ability
--- to point at, and an ACTIVATED ability has one this cannot return -- CR 707.9a
--- reaches it too, and it would go in another list (#3325).
-thisTriggeredAbility :: ObjectId -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-thisTriggeredAbility resolving gs = case fmap Object.source (Game.lookupObject resolving gs) of
-  Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.ability triggered)
-  _ -> Nothing
-
 applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage parts dealer excess) -> do

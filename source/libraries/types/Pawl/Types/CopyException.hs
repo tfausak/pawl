@@ -74,9 +74,8 @@ data CopyException
     -- (Pawl.Engine.Resolve.Effect's BecomeCopy arm), and what is written into the
     -- snapshot is that whole ability -- this exception included. So the copy's
     -- own instance is what "this ability" names the next time it resolves, which
-    -- is what lets a Shapeshifter copy a second creature and a third.
-    -- A payload would have to be the ability that contains it, which no finite
-    -- value is.
+    -- is what lets a Shapeshifter copy a second creature and a third. A payload
+    -- would have to be the ability that contains it, which no finite value is.
     --
     -- Not implemented: the exception that QUOTES an ability instead of pointing
     -- at this one (Copycrook's "except it has 'Whenever this creature attacks, it

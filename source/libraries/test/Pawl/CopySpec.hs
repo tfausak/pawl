@@ -1214,7 +1214,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- Shapeshifter-as-copy has it too -- where a CR 613 layer-6 grant would be left
   -- behind by rule 707.2's exclusion of "other effects".
   --
-  -- Cackling Counterpart {1}{U} Instant is the token maker, aimed at the
+  -- Cackling Counterpart {1}{U}{U} Instant is the token maker, aimed at the
   -- Shapeshifter and at nothing else. Its token entering is itself a creature
   -- entering, so the Shapeshifter's own trigger fires and is left on the stack;
   -- the settle below drains both that and the pair the Blind-Spot Giant raises.

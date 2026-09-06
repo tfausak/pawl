@@ -3726,9 +3726,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- a once-per-turn flag, and no Filter over objects.
   PlayerEffect.StateCoinFlip _ -> []
 
--- CR 707.9's "except ..." clauses. Only the CR 707.9a arm reaches a Filter, and
--- only through the keyword it names; CR 707.9b's two arms name a pair of literals
--- and a set of card types, neither of which narrows anything.
+-- CR 707.9's "except ..." clauses. Only the GainKeywords arm reaches a Filter,
+-- and only through the keyword it names; CR 707.9b's two arms name a pair of
+-- literals and a set of card types, neither of which narrows anything.
 copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyExceptionFilters exception = case exception of
   CopyException.SetPowerToughness _ -> []
@@ -4494,9 +4494,9 @@ effectFilters effect = case effect of
   -- count's and the riders' Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> frame SourceHostFramed (objectRefFilters ref)
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
-  -- The exceptions carry Filters on the CR 707.9a keyword road, AsCopy's arm
-  -- below; unframed, since a keyword's Filter describes the object the keyword
-  -- reads and not this effect's host.
+  -- The exceptions beside them carry Filters through a KEYWORD, and frame them
+  -- themselves (copyExceptionFilters) -- EntryRewrite's AsCopy arm takes the same
+  -- walk over the same list.
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject) <> concatMap copyExceptionFilters exceptions
   -- BOTH refs, CreateCopy's arm above: an EachMatching Filter is card text, and
   -- CR 707.10d's candidates are named by one.
