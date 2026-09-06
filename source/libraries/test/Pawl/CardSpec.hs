@@ -682,7 +682,8 @@ conditionCounts = concatMap quantityCounts . conditionQuantities
 
 -- Every Condition an "activate only ..." clause holds: only CR 602.5's OnlyIf
 -- carries one, the rest naming a window or, for CR 602.5b's counted rider, a
--- record of past activations. Both card sweeps take from it,
+-- record of past activations, whether for the game or for the turn. Both card
+-- sweeps take from it,
 -- conditionQuantities' role one type up.
 restrictionConditions :: ActivationRestriction.ActivationRestriction -> [Condition.Type.Condition]
 restrictionConditions restriction = case restriction of
@@ -694,6 +695,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.BeforeCombatDamage -> []
   ActivationRestriction.OnlyIf condition -> [condition]
   ActivationRestriction.OnlyOnce -> []
+  ActivationRestriction.OnlyOnceEachTurn -> []
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
