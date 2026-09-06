@@ -33,6 +33,7 @@ import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction.Engine
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Keyword as Keyword.Engine
@@ -82,6 +83,9 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -815,6 +819,85 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [drawsTally (PlayerRef.Relative PlayerRelation.You)])))
       "where a number naming no slot at all is accepted"
+  -- The same equality one field further out: CR 118.12's gate multiplier
+  -- (Pawl.Types.PayGate.perEach), which is a Quantity a clause carries outside
+  -- its effects, so neither Resolve.slotsOf nor the payer field reaches it. A
+  -- gate scaled per bound object whose payer is CR 109.5's "you" names the slot
+  -- nowhere else, and until Resolve.modeSlots folded quantitySlots over this
+  -- field an undeclared read passed the lint and then evaluated to nothing --
+  -- zero copies of the cost, which CR 118.5 makes a payable {0}.
+  --
+  -- BOTH carriers again, because either alone would pass if only the other were
+  -- folded: a PlayerRef nested in the Count's SCOPE, and a bound named by its
+  -- FILTER.
+  Spec.it s "the lint itself catches a slot read only from a clause's gate multiplier, and CR 603.3b sees it too" $ do
+    let scaled quantity =
+          Mode.MkMode
+            ( Seq.singleton
+                ( Clause.MkClause
+                    Nothing
+                    Nothing
+                    Nothing
+                    Optionality.Mandatory
+                    ( Just
+                        PayGate.MkPayGate
+                          { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
+                            PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [],
+                            PayGate.branch = PayBranch.IfNotPaid,
+                            PayGate.obligation = PayObligation.Optional,
+                            PayGate.perEach = Just quantity,
+                            PayGate.offeredAt = Nothing
+                          }
+                    )
+                    (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) Nothing)))
+                )
+            )
+            Map.empty
+        counting scope filter_ = Quantity.Type.Count (Count.Type.MkCount scope filter_ Aggregation.Members)
+        -- "for each permanent that player controls", the slot named by the zone
+        -- the Count folds over.
+        throughScope = counting (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.InSlot Binding.triggerPlayer))) (Filter.Type.And [])
+        -- The same read one carrier over: the slot is named by the Count's
+        -- FILTER rather than by its scope's PlayerRef.
+        throughCountFilter = counting (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) (Filter.Type.ControlledByBound Binding.triggerPlayer)
+        -- And the board that differs in exactly one thing: the same fold naming
+        -- no slot, so the lint reads the reference rather than rejecting every
+        -- scaled gate.
+        throughNoSlot = counting (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) (Filter.Type.And [])
+        rejected condition quantity = triggeredAbilityOffends (modalTrigger condition [scaled quantity])
+        -- CR 603.3b's consumer of the same map: Engine.orderInert elides the
+        -- ordering prompt for a batch of EQUAL entries only when the mode reads
+        -- no slot at all, so a gate scaled per bound object was reported inert
+        -- and the batch went on the stack in the engine's canonical order -- the
+        -- engine making a player's choice, since the two entries' gates are
+        -- measured against different bound objects. Asserted on the carrier
+        -- rather than at gameplay level: no card in `data/cards/` writes a gate
+        -- scaled per bound object, so no board raises the prompt.
+        inert quantity = Engine.orderInert (modalTrigger TriggerCondition.SelfDealsCombatDamageToPlayer [scaled quantity])
+        -- One tagged list over both consumers rather than an assertion apiece,
+        -- FilterPositionLintSpec's shape: a carrier the fold stops at names
+        -- itself instead of hiding behind whichever assertion runs first.
+        rows =
+          [ ("D4: a scope's player, unbound", rejected TriggerCondition.SelfEnters throughScope),
+            ("D4: a scope's player, bound", rejected TriggerCondition.SelfDealsCombatDamageToPlayer throughScope),
+            ("D4: a count's filter, unbound", rejected TriggerCondition.SelfEnters throughCountFilter),
+            ("D4: a count's filter, bound", rejected TriggerCondition.SelfDealsCombatDamageToPlayer throughCountFilter),
+            ("D4: no slot at all", rejected TriggerCondition.SelfEnters throughNoSlot),
+            ("CR 603.3b: inert scaled per bound object", inert throughScope),
+            ("CR 603.3b: inert scaled by a slotless fold", inert throughNoSlot)
+          ]
+    Spec.assertEqWith
+      s
+      "CR 118.12 a gate multiplier's slot read reaches both readers of Resolve.modeSlots"
+      rows
+      [ ("D4: a scope's player, unbound", True),
+        ("D4: a scope's player, bound", False),
+        ("D4: a count's filter, unbound", True),
+        ("D4: a count's filter, bound", False),
+        ("D4: no slot at all", False),
+        ("CR 603.3b: inert scaled per bound object", False),
+        ("CR 603.3b: inert scaled by a slotless fold", True)
+      ]
   -- The same equality over a card's ACTIVATED abilities, the one carrier with no
   -- event slot answering a read at all: an activation is not an event. See
   -- activatedAbilityOffends for the whole of it.
