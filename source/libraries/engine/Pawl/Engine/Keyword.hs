@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Earthbend as Earthbend
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.AbilityName as AbilityName
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
@@ -2768,10 +2769,14 @@ decayed =
             ArmDelayedTrigger.duration = Nothing
           }
 
--- CR 603.7: the delayed triggered abilities RULE 702 declares, keyed by the name
--- its own arming opcode names. Pawl.Engine.Resolve falls back to this map when a
--- name is on no face's Face.delayedAbilities, a keyword having no card text to
--- declare the far end in.
+-- CR 603.7: the delayed triggered abilities the RULEBOOK declares, keyed by the
+-- name its own arming opcode names. Pawl.Engine.Resolve falls back to this map
+-- when a name is on no face's Face.delayedAbilities, a keyword or keyword action
+-- having no card text to declare the far end in.
+--
+-- Rule 702's keywords and rule 701's keyword actions alike: decayed's sacrifice
+-- is rule 702.147a's, earthbend's return is rule 701.66a's, and both are engine
+-- text for the same reason.
 --
 -- Read by NAME and never off the board, which is what CR 603.7 asks for: a source
 -- that has since lost the keyword -- or left the battlefield -- still sacrifices.
@@ -2782,7 +2787,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.singleton decayedSacrificeName decayedSacrifice
+mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (Earthbend.returnName, Earthbend.returnAbility)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.

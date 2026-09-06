@@ -71,6 +71,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
+import qualified Pawl.Types.Earthbend as Earthbend
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
@@ -613,6 +614,8 @@ effectObjectRefs effect = case effect of
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight {} -> []
+  -- CR 701.66a's "target land you control".
+  Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> [ref]
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
@@ -749,6 +752,8 @@ effectPlayerRefs effect = case effect of
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
+  -- Rule 701.66a reaches no player the card did not target.
+  Effect.Earthbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.PlayerSacrifices {} -> []
@@ -824,6 +829,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Bolster quantity -> quantitySlots quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
+  Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantitySlots quantity
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
@@ -1277,6 +1283,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
   Effect.Venture {} -> True
   Effect.ExileHandThenDraw -> True
@@ -1484,6 +1491,7 @@ readsX = any effectReadsX
       Effect.Bolster quantity -> Quantity.readsX quantity
       Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
       Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.readsX quantity
       Effect.TemptWithTheRing -> False
       Effect.Venture {} -> False
       Effect.ExileHandThenDraw -> False
@@ -1665,6 +1673,11 @@ boundSlots effect = case effect of
   Effect.Bolster _ -> Set.empty
   Effect.Amass _ -> Set.empty
   Effect.Blight _ -> Set.empty
+  -- Binding.earthbentLand is stamped by Pawl.Engine.Resolve.Effect, not defined
+  -- here: it is a reserved slot the engine writes for its own delayed ability,
+  -- and reporting it would make every earthbending card fail Pawl.CardSpec's
+  -- reserved-binding sweep.
+  Effect.Earthbend _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
   Effect.Venture {} -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty

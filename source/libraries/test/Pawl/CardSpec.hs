@@ -134,6 +134,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -550,6 +551,7 @@ objectRefPositions =
     ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
     ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
     ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
+    ("earthbend", Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Type.Literal 1) (plantedRef "eb")), [plantedRef "eb"]),
     ("goad", Effect.Goad (plantedRef "go"), [plantedRef "go"]),
     ("does-not-untap-next", Effect.DoesNotUntapNext (plantedRef "du"), [plantedRef "du"]),
     ("transform", Effect.Transform (plantedRef "tr"), [plantedRef "tr"]),
@@ -908,6 +910,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
   TriggerCondition.LoseControlOfBound _ -> []
+  TriggerCondition.BoundDiesOrIsExiled _ -> []
   TriggerCondition.RoomEntered _ -> []
   -- CR 309.7's condition carries a PlayerRelation, which is no Count.
   TriggerCondition.PlayerCompletesDungeon _ -> []
@@ -1009,6 +1012,8 @@ ownCounts effect = case effect of
   -- Blight's N is a Quantity like bolster's above, so its Counts are reachable
   -- from here.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  -- Earthbend's N likewise.
+  Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1333,6 +1338,7 @@ effectNestedEffects effect = case effect of
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight {} -> []
+  Effect.Earthbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1754,6 +1760,7 @@ effectReplacements effect = case effect of
   Effect.Bolster _ -> []
   Effect.Amass _ -> []
   Effect.Blight _ -> []
+  Effect.Earthbend _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
@@ -2026,6 +2033,7 @@ reservedSlots =
       Binding.mayPlayers,
       Binding.became,
       Binding.departedPermanent,
+      Binding.earthbentLand,
       Binding.eventAmount,
       Binding.sacrificedCount,
       Binding.sacrificedPermanent,
@@ -2135,6 +2143,7 @@ effectMintedFaces effect = case effect of
   -- rather than embedded in card data, so this arm mints no face of the card's own.
   Effect.Amass _ -> []
   Effect.Blight _ -> []
+  Effect.Earthbend _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
@@ -3251,6 +3260,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.7's slot-named condition holds a SlotName, which is no Filter -- what
   -- the slot holds was selected by the arming spell's own target slot.
   TriggerCondition.LoseControlOfBound _ -> []
+  TriggerCondition.BoundDiesOrIsExiled _ -> []
   TriggerCondition.RoomEntered _ -> []
   -- CR 309.7's condition carries a PlayerRelation, which is no Filter.
   TriggerCondition.PlayerCompletesDungeon _ -> []
@@ -3432,6 +3442,11 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- Command's "when you lose control of the creature" watches the permanent its
   -- own spell targeted.
   TriggerCondition.LoseControlOfBound slot -> [slot]
+  -- Rule 701.66a's slot-named condition, the second arm with an answer. Never
+  -- reached from card data -- Pawl.Engine.Earthbend mints the only ability that
+  -- carries it -- but answered rather than defaulted, so the singularity above is
+  -- claimed for it too.
+  TriggerCondition.BoundDiesOrIsExiled slot -> [slot]
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
@@ -4418,6 +4433,9 @@ effectFilters effect = case effect of
   -- Filter on the card names it, and a PlayerRef carries none either -- Draw's
   -- arm below answers the same way.
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  -- PutCounters' shape above: rule 701.66a's count and the target land's own
+  -- Filters, the latter framed by the source's host as every ObjectRef is.
+  Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref)
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []

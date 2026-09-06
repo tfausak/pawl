@@ -458,6 +458,7 @@ import qualified Pawl.DepartureSpec
 import qualified Pawl.DetainSpec
 import qualified Pawl.DiceSpec
 import qualified Pawl.DungeonSpec
+import qualified Pawl.EarthbendSpec
 import qualified Pawl.EffectLintSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EntryReplacementSpec
@@ -1057,6 +1058,7 @@ spec s registry = do
   Pawl.CrewSpec.spec s registry
   Pawl.DamageSpec.spec s registry
   Pawl.DungeonSpec.spec s registry
+  Pawl.EarthbendSpec.spec s registry
   Pawl.DaytimeSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s

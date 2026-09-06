@@ -229,6 +229,7 @@ manaProduced effect = case effect of
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
+  Effect.Earthbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
@@ -408,6 +409,7 @@ movesLibraryCard effect = case effect of
   Effect.Bolster _ -> False
   Effect.Amass _ -> False
   Effect.Blight _ -> False
+  Effect.Earthbend _ -> False
   Effect.TemptWithTheRing -> False
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False

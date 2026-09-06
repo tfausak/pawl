@@ -22,6 +22,7 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -532,6 +533,12 @@ data Effect card ability
     -- -1\/-1 counters on a creature they control, each asked separately. Choose,
     -- not target.
     Blight PlayerQuantity.PlayerQuantity
+  | -- | CR 701.66a: "earthbend N" -- the land the payload names becomes a 0\/0
+    -- land creature with haste in addition to its other types, takes N +1\/+1
+    -- counters, and a CR 603.7 delayed ability returns it tapped when it dies or
+    -- is exiled. Performed by Pawl.Engine.Earthbend as one procedure. Targets,
+    -- unlike every other rule 701 arm here.
+    Earthbend Earthbend.Earthbend
   | -- | CR 701.54a: the Ring tempts the resolving controller, performed by
     -- Pawl.Engine.Ring.tempt as one procedure that cannot stop early (CR
     -- 701.54d). Nullary, rule 701.54a fixing everything.

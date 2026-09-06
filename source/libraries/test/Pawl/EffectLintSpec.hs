@@ -80,6 +80,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -221,6 +222,7 @@ ownQuantities effect = case effect of
   Effect.Bolster quantity -> [quantity]
   Effect.Amass (Amass.MkAmass quantity _) -> [quantity]
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> [quantity]
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1090,6 +1092,9 @@ effectObjectRefs effect = case effect of
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight {} -> []
+  -- CR 701.66a's "target land you control" is an ordinary read, Detain's arm
+  -- below: the animation and the counters act on it and nothing gathers.
+  Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> read_ [ref]
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
