@@ -883,9 +883,9 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.UnderSourceControl -> True
   EntryRewrite.SacrificeAnyNumber {} -> True
   -- CR 614.1c states no condition of its own: "as this creature enters, exile an
-  -- instant or sorcery card from your graveyard" is unconditional, and an empty
-  -- graveyard is nothing to exile rather than a row that does not apply (CR
-  -- 101.3), which Pawl.Engine.Event's arm is where.
+  -- instant or sorcery card from your graveyard" is unconditional. An empty
+  -- graveyard is nothing to exile rather than a row that does not apply, which CR
+  -- 101.3 settles in Pawl.Engine.Event's arm rather than here.
   EntryRewrite.ExileFromGraveyard _ -> True
   -- CR 702.155b states no condition of its own -- a Saga with read ahead always
   -- has both intrinsic abilities -- so this admits every entry the row is
@@ -1306,7 +1306,8 @@ sacrificeCandidates slots pid source filter_ gs =
 
 -- CR 614.1c: the cards in this player's graveyard an as-enters exile may take,
 -- ascending -- the order Prompt.ChooseCardInGraveyard offers them in, which is
--- what makes the elision test and the transcript fallback deterministic.
+-- what lets a test pin its answer by index (Pawl.PowerToughnessSpec's Living
+-- Lore) and what makes the transcript fallback deterministic.
 --
 -- sacrificeCandidates' shape one zone over, and the two differences are the
 -- rules': CR 701.21a's restrictions are about sacrificing and reach no card in a
