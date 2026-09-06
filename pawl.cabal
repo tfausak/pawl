@@ -397,6 +397,7 @@ library codec
     Pawl.Codec.EachCardInGraveyardSpec
     Pawl.Codec.EachCardInHand
     Pawl.Codec.EachCardInHandSpec
+    Pawl.Codec.Earthbend
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
@@ -972,6 +973,7 @@ library engine
     Pawl.Engine.Departure
     Pawl.Engine.Detain
     Pawl.Engine.Dungeon
+    Pawl.Engine.Earthbend
     Pawl.Engine.EffectZone
     Pawl.Engine.EndEffect
     Pawl.Engine.Engine
@@ -1333,6 +1335,7 @@ library test
     Pawl.DetainSpec
     Pawl.DiceSpec
     Pawl.DungeonSpec
+    Pawl.EarthbendSpec
     Pawl.EffectLintSpec
     Pawl.EngineSpec
     Pawl.EntryReplacementSpec
@@ -1592,6 +1595,7 @@ library types
     Pawl.Types.EachCardFromAmong
     Pawl.Types.EachCardInGraveyard
     Pawl.Types.EachCardInHand
+    Pawl.Types.Earthbend
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EndTurnSignal

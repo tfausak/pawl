@@ -2352,6 +2352,13 @@ representativeEvents cond =
         -- arbitrary -- this condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
         TriggerCondition.LoseControlOfBound _ -> one (GameEvent.ControlChanged (ControlChanged.MkControlChanged departed S.alice S.bob))
+        -- CR 701.66a's first destination. Rule 701.66a's other one (exile) would
+        -- do as well: Event.eventBindings' arm reads the ZoneChange without
+        -- casing on the destination, and both are public zones (CR 400.2), so
+        -- the floor it claims is the same either way. Which id is bound is not
+        -- read here at all -- the pin is about the SLOTS, and the match's own
+        -- binding lookup is Pawl.EarthbendSpec's business.
+        TriggerCondition.BoundDiesOrIsExiled _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 309.4c's own event. The dungeon id and the room are arbitrary: this
         -- condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
@@ -2553,6 +2560,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.You,
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent,
     TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")),
+    TriggerCondition.BoundDiesOrIsExiled (SlotName.MkSlotName (Text.pack "target")),
     TriggerCondition.RoomEntered RoomIndex.topmost,
     -- BOTH relations for each of the two, on the PlayerBecomesMonarch pair's
     -- reasoning: an eventBindings arm that had cased on the relation and stamped

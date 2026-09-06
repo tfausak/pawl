@@ -120,6 +120,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
+  Effect.Earthbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing

@@ -61,6 +61,7 @@ import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
@@ -1129,6 +1130,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       )
       "Detain and Tap of the same slot encode differently"
+  -- CR 701.66a, the one rule 701 arm carrying an ObjectRef: the count rides
+  -- beside it, so a codec that dropped either field would leave an earthbend with
+  -- no land or with no counters. Both ObjectRef arms, Detain's reason -- rule
+  -- 701.66a's own wording is the slot, and the filter arm costs nothing.
+  Spec.it s "Earthbend round-trips its count and both ObjectRef arms" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Literal 4) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      " {\"type\":\"Earthbend\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":4},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Literal 2) (ObjectRef.EachMatching (Filter.HasCardType CardType.Land))))
+      " {\"type\":\"Earthbend\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":2},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   -- CR 701.15a, which shares Detain's wire shape down to the field: both are a
   -- bare ObjectRef whose duration and whose actor the rulebook fixes, so the tag
   -- is the only thing telling them apart. data/cards prints the slot arm (Jeering

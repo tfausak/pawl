@@ -174,11 +174,10 @@ backFace = (Set.singleton antagonizerName, Just (4, 2), Set.fromList [Subtype.Ga
 -- transforms it and whose front face shares a subtype with a corpus
 -- transformer would refute the choice, not the rule.
 --
--- Not implemented: Aang's back face prints "at the beginning of combat on your
--- turn, earthbend 2", and CR 701.66a's keyword action does not exist, so the
--- transcription omits that ability (#2216). The omission runs the card
--- STRICTER than printed and no case here reads the back face for anything but
--- its name and its power/toughness.
+-- Aang's back face also prints "at the beginning of combat on your turn,
+-- earthbend 2"; it is transcribed, and Pawl.EarthbendSpec is what proves it. No
+-- case here reads the back face for anything but its name and its
+-- power/toughness, so nothing below can be that trigger's doing.
 aangFront, aangBack :: CardName.CardName
 aangFront = CardName.MkCardName (Text.pack "Aang, at the Crossroads")
 aangBack = CardName.MkCardName (Text.pack "Aang, Destined Savior")

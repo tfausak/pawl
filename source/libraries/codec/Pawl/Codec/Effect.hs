@@ -35,6 +35,7 @@ import qualified Pawl.Codec.Destroy as Destroy
 import qualified Pawl.Codec.Discard as Discard
 import qualified Pawl.Codec.Draw as Draw
 import qualified Pawl.Codec.DurationRef as DurationRef
+import qualified Pawl.Codec.Earthbend as Earthbend
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
@@ -156,6 +157,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),
       Arm.payload "Untap" ObjectRef.codec Effect.Untap (\x -> case x of Effect.Untap y -> Just y; _ -> Nothing),
       Arm.payload "Detain" ObjectRef.codec Effect.Detain (\x -> case x of Effect.Detain y -> Just y; _ -> Nothing),
+      Arm.payload "Earthbend" Earthbend.codec Effect.Earthbend (\x -> case x of Effect.Earthbend y -> Just y; _ -> Nothing),
       Arm.payload "Goad" ObjectRef.codec Effect.Goad (\x -> case x of Effect.Goad y -> Just y; _ -> Nothing),
       Arm.payload "DoesNotUntapNext" ObjectRef.codec Effect.DoesNotUntapNext (\x -> case x of Effect.DoesNotUntapNext y -> Just y; _ -> Nothing),
       Arm.payload "Transform" ObjectRef.codec Effect.Transform (\x -> case x of Effect.Transform y -> Just y; _ -> Nothing),
