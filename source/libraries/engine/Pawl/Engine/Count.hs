@@ -164,8 +164,41 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
 -- the binding was written -- CR 111.7's token, whose exile leaves nothing.
 findableAfterMove :: GameState -> ObjectId -> Bool
 findableAfterMove gs oid = case Game.lookupObject oid gs of
+  -- The id is the one that DEPARTED, which is the shape a slot bound before the
+  -- move has -- Hour of Glory's "if that creature was a God", read off the
+  -- target slot after the first clause exiled it, where Psychic Miasma's slot
+  -- was bound by the move itself and so holds the arrival. CR 400.7j is the same
+  -- gate either way, asked of where the object LANDED; what the caller then
+  -- reads is CR 608.2h's last known information, since the departed id has no
+  -- object left to read.
+  --
+  -- A departure into a hidden zone is refused here, which is narrower than CR
+  -- 608.2h alone would be: that rule answers with last known information
+  -- wherever the object went, while CR 400.7j grants the find only into a public
+  -- one. The arrival arm below takes the same posture, and no printing in the
+  -- pool reads a slot whose object this resolution put into a hand.
+  --
+  -- Nothing when nothing arrived: CR 111.7's token, whose exile leaves nothing
+  -- for this to find, keeps the False it had.
+  Nothing -> any (arrivedFindable gs) (arrivalsOf gs oid)
+  Just _ -> arrivedFindable gs oid
+
+-- The arm above's public-zone question about an id that IS live, asked directly
+-- of a binding that holds the arrival and through arrivalsOf of one that holds
+-- the departure, so the two roads cannot answer differently.
+arrivedFindable :: GameState -> ObjectId -> Bool
+arrivedFindable gs oid = case Game.lookupObject oid gs of
   Nothing -> False
   Just object -> not (Game.isHiddenZone (Object.zone object)) || revealedArriving gs oid
+
+-- revealedArriving's traversal turned around: the ids a Moved entry naming this
+-- one as its DEPARTURE arrived as.
+arrivalsOf :: GameState -> ObjectId -> [ObjectId]
+arrivalsOf gs oid =
+  let arrivedFrom event = case event of
+        GameEvent.Moved m | ZoneChange.departed (Moved.change m) == oid -> Foldable.toList (Moved.arrivals m)
+        _ -> []
+   in concatMap (arrivedFrom . LoggedEvent.event) (GameState.events gs)
 
 -- Was the card revealed as it left the zone this incarnation arrived from?
 -- The Moved entry naming this id as its arrival gives the departed id; a

@@ -256,6 +256,7 @@ instanceZoneScope :: (SlotName -> SlotName) -> ZoneScope.ZoneScope -> ZoneScope.
 instanceZoneScope rename scope = case scope of
   ZoneScope.Scoped _ -> scope
   ZoneScope.InSlot slot -> ZoneScope.InSlot (rename slot)
+  ZoneScope.ControllerOfBound slot -> ZoneScope.ControllerOfBound (rename slot)
 
 -- CR 700.2d: the binding-shaped environment ONE chosen instance's effects read.
 -- Three parts, and each is a rule rather than a convenience:

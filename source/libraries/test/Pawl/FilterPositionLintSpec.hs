@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Cost as Cost.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -67,6 +67,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -113,6 +114,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
@@ -135,6 +137,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- The zone set of every search a face authors (CR 701.23a). A wildcard rather
 -- than one arm per effect, as storedPlayerScope takes: Pawl.Types.Effect is the
@@ -313,6 +316,10 @@ hostFramed framing = case framing of
   -- overlays it (Resolve.Slots.objectRefObjects), and the mill arm does not, so
   -- the tally cannot ask a CR 303.4b question either.
   MillTallyFramed -> False
+  -- The hand sweep is the one ObjectRef position whose arm overlays no
+  -- `sourceAttachedTo`: no card in a hand names what its Aura's host is
+  -- (Pawl.Engine.Resolve.Slots.objectRefObjects).
+  HandSweepFramed -> False
 
 -- How many CR 701.3a atoms this card carries in an attach opcode's destination
 -- filter -- Effect.AttachTarget's or Effect.AttachTargetToEach's -- and how many
@@ -560,22 +567,22 @@ ofChosenPlayerOffends card =
 sameNameAsBoundTag :: Text.Text
 sameNameAsBoundTag = Text.pack "SameNameAsBound"
 
--- How many CR 709.4a atoms this card carries in one of the two ADMITTED
--- positions -- a MODE's target slot filter (Harness the Storm) or a CR 701.23
--- search filter (Bifurcate) -- and how many anywhere else. The second number is
--- the offence.
+-- How many CR 709.4a atoms this card carries in one of the three ADMITTED
+-- positions -- a MODE's target slot filter (Harness the Storm), a CR 701.23
+-- search filter (Bifurcate) or a CR 608.2c hand sweep's (Hour of Glory) -- and
+-- how many anywhere else. The second number is the offence.
 --
--- An ALLOWLIST of two rather than "wherever Filter.Context.slotNames is filled",
--- which since #2141's search half is the wider set: every position a resolution
+-- An ALLOWLIST rather than "wherever Filter.Context.slotNames is filled", which
+-- since #2141's search half is the wider set: every position a resolution
 -- reaches through Pawl.Engine.Resolve.Slots.effectContext has the names -- an
 -- ObjectRef's own affected set among them, which is SourceHostFramed inside an
 -- effect (Resolve.battlefieldMatching). So this rejects the atom in positions
 -- that would in fact answer, and only in that direction -- widen it when a card
 -- wants one of them, which is the posture sweptForSingularSlots takes at
--- SlotlessCostFramed.
+-- SlotlessCostFramed and what the hand sweep's own entry is.
 sameNameAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameNameAsBoundCounts card =
-  let total wanted = sum [filterAtoms sameNameAsBoundTag f | (framing, f) <- cardFilters card, elem framing [InTargetSlot, SearchFramed] == wanted]
+  let total wanted = sum [filterAtoms sameNameAsBoundTag f | (framing, f) <- cardFilters card, elem framing [InTargetSlot, SearchFramed, HandSweepFramed] == wanted]
    in (total True, total False)
 
 -- CR 709.4a's bound-name comparison is answerable only where
@@ -1000,20 +1007,21 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (length (concatMap (searchZoneSets . S.combinedFace) ps) > 5) "and the pool gives the sweep other searches to be about"
   -- CR 709.4a's Filter.SameNameAsBound is in CR 701.3a's position one axis over:
   -- answerable only where Filter.Context.slotNames is filled, and unanswerable --
-  -- a silent False -- everywhere else. The two positions ADMITTED here are a
-  -- MODE's target slot and a CR 701.23 search filter, the second since
-  -- Pawl.Engine.Resolve's Effect.Search arm took its context from the resolution
-  -- (Pawl.ResolveSpec's Bifurcate cases). That pair is narrower than the set that
-  -- would answer -- sameNameAsBoundCounts says why -- so this rejects in the safe
-  -- direction only. See sameNameAsBoundOffends for the two offences and Framing
-  -- for why CR 303.4a's enchant slot is not one of the safe positions.
-  Spec.it s "CR 709.4a no card asks SameNameAsBound outside a mode's target slot or a search filter" $ do
+  -- a silent False -- everywhere else. The three positions ADMITTED here are a
+  -- MODE's target slot, a CR 701.23 search filter and a CR 608.2c hand sweep's
+  -- own filter, the last two since their arms took their context from the
+  -- resolution (Pawl.ResolveSpec's Bifurcate and Hour of Glory cases). That set
+  -- is narrower than the set that would answer -- sameNameAsBoundCounts says why
+  -- -- so this rejects in the safe direction only. See sameNameAsBoundOffends
+  -- for the two offences and Framing for why CR 303.4a's enchant slot is not one
+  -- of the safe positions.
+  Spec.it s "CR 709.4a no card asks SameNameAsBound outside a mode's target slot, a search filter or a hand sweep" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace sameNameAsBoundOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in a target slot's or a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "the atom sits only in a target slot's, a search's or a hand sweep's filter" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sibling sweeps would be alone: the pool authors the
-    -- atom, and the two cards that do are ACCEPTED here rather than skipped -- one
-    -- in each of the two positions, so neither half of the pair is unwitnessed.
+    -- atom, and the three cards that do are ACCEPTED here rather than skipped --
+    -- one in each admitted position, so no member of the set is unwitnessed.
     harness <- S.printingOf s registry "Harness the Storm"
     Spec.assertEqWith
       s
@@ -1026,11 +1034,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Bifurcate's one atom is in its search's filter"
       (sameNameAsBoundCounts (S.combinedFace bifurcate))
       (1, 0)
+    glory <- S.printingOf s registry "Hour of Glory"
     Spec.assertEqWith
       s
-      "and they are the pool's only two"
+      "Hour of Glory's one atom is in its hand sweep's filter"
+      (sameNameAsBoundCounts (S.combinedFace glory))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and they are the pool's only three"
       (sum (fmap (uncurry (+) . sameNameAsBoundCounts . S.combinedFace) ps))
-      2
+      3
     -- Both sides of the split, with room to spare under the pool's real figures:
     -- a traversal that had stopped walking, or a Framing that had stopped marking
     -- target slots, would fail here rather than pass the sweep above by iterating
@@ -1703,7 +1717,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (KeywordFramed, []),
         (SlotlessCostFramed, [bound]),
         (MintedTargetSlot, [bound]),
-        (MillTallyFramed, [bound])
+        (MillTallyFramed, [bound]),
+        (HandSweepFramed, [bound])
       ]
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
@@ -2089,7 +2104,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- each is asserted through sameNameAsBoundCounts as well as the predicate -- the
   -- counts say the TRAVERSAL put it in that position, where the predicate alone is
   -- also satisfied by the codec half noticing an atom the traversal missed.
-  Spec.it s "the lint itself catches SameNameAsBound outside a mode's target slot or a search filter" $ do
+  Spec.it s "the lint itself catches SameNameAsBound outside a mode's target slot, a search filter or a hand sweep" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     harness <- S.printingOf s registry "Harness the Storm"
@@ -2229,6 +2244,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       s
       "a buried atom in a search's filter is accepted"
       (sameNameAsBoundOffends searched, sameNameAsBoundCounts searched)
+      (False, (1, 0))
+    -- The THIRD accepted position, and the one that separates this lint from a
+    -- rule about ObjectRefs: EachCardInHand's own filter is matched in the
+    -- resolution's context (Resolve.Slots.objectRefObjects), where the
+    -- EachMatching set planted above is not a position slotNames reaches -- the
+    -- two sit in the same field of the same effect and answer differently.
+    let sweptHand = base {Face.spell = spellOf [Effect.Reveal (Reveal.MkReveal (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.ControllerOfBound slot) (Just buried))) Nothing)] Map.empty}
+    Spec.assertEqWith
+      s
+      "a buried atom in a hand sweep's filter is accepted"
+      (sameNameAsBoundOffends sweptHand, sameNameAsBoundCounts sweptHand)
       (False, (1, 0))
     Spec.assertEqWith
       s

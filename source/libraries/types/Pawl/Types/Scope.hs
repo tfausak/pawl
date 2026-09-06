@@ -66,7 +66,12 @@ data Scope
     -- discarded into a hidden zone with every characteristic undefined only when
     -- it got there without being revealed.
     --
-    -- The slot names a CR 115.10a group binding rather than a target, so it is
-    -- read through Pawl.Engine.Filter's slot map exactly as Filter.IsBound is.
+    -- The slot is read through Pawl.Engine.Filter's slot map exactly as
+    -- Filter.IsBound is, and may be either a CR 115.10a group binding whose ids
+    -- are the ARRIVALS a move wrote (Psychic Miasma) or a TARGET slot bound
+    -- before this resolution moved it, whose id is the DEPARTURE (Hour of
+    -- Glory's "if that creature was a God"). findableAfterMove asks CR 400.7j of
+    -- where the object landed either way; what the fold then reads for a
+    -- departure is CR 608.2h's last known information.
     OverBound SlotName.SlotName
   deriving (Eq, Ord, Show)
