@@ -27,8 +27,12 @@ module Pawl.Types.RequiredDefender where
 -- Pawl.Types.CombatRestriction carries. Two would want an arm here: Cogwork
 -- Tracker's "a player you noted for cards named Cogwork Tracker", a draft
 -- designation with no carrier in pawl at all, and Trove of Temptation's "you or
--- a planeswalker you control", whose subject clause is unwritable anyway
--- (#3257).
+-- a planeswalker you control".
+--
+-- Not implemented: an arm naming a player TOGETHER WITH the permanents they
+-- control, which is Trove of Temptation's whole object clause; its subject
+-- clause is Pawl.Types.RequirementArity.AnySubject, which Seeker of Slaanesh
+-- already writes (#3333).
 data RequiredDefender
   = -- | CR 108.4 / 303.4m: the controller of the object the source is attached
     -- to. Names nobody when the source is attached to nothing, or to a player

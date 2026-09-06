@@ -11,10 +11,8 @@
 -- which card produced one, nor which carrier.
 module Pawl.Engine.AttackRequirement where
 
-import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -22,6 +20,7 @@ import qualified Pawl.Engine.Goad as Goad
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Requirement as Requirement
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -32,10 +31,12 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.RequiredDefender as RequiredDefender
+import qualified Pawl.Types.RequirementArity as RequirementArity
 
--- CR 508.1d: every requirement in force right now, INSTANTIATED as the
--- (creature, target) pairs the active player is required to declare, each
--- carrying HOW MANY requirements name it.
+-- CR 508.1d: every requirement in force right now, INSTANTIATED against the
+-- (creature, target) pairs the active player may declare -- as a weight on one
+-- pair where the sentence states a requirement per creature, and as a SET of
+-- pairs where it states one over them all.
 --
 -- Keyed by the pair, because CR 508.1d counts requirements being OBEYED by a
 -- particular declaration, and a declaration obeys an instance exactly when it
@@ -81,29 +82,40 @@ import qualified Pawl.Types.RequiredDefender as RequiredDefender
 -- board with no such card, which is the case attackCeiling's search reduces to
 -- when no restriction binds.
 --
--- A FENCE on the KEY, because nothing else is one: attackCeiling's search is
--- greedy, and it is exact only while a requirement is a weight on ONE (creature,
--- target) pair, so that a declaration's obedience is a sum of independent
--- non-negative terms. A requirement spanning two creatures -- anything that
--- widened this key -- would break that, and -Werror would say nothing. Re-derive
--- the argument at Combat.attackCeilingGiven before widening it.
+-- The GROUP half is Pawl.Types.RequirementArity.AnySubject -- "each opponent
+-- must attack with at least one creature each combat if able", one requirement
+-- obeyed by any single announcement in the set. Its atoms are announcements and
+-- not creatures because CR 508.1d is obeyed by an ANNOUNCEMENT rather than by
+-- attacking as such -- the object axis narrows which announcements count, so a
+-- group narrowed on that axis (#3333) is a set of pairs and not a set of
+-- creatures.
+--
+-- A FENCE on both halves, because nothing else is one: attackCeiling's scan is
+-- greedy over the pairs, and exact only while a pair requirement is a weight on
+-- ONE (creature, target) pair, so that the pair half of a declaration's
+-- obedience is a sum of independent non-negative terms. The group half is exact
+-- only because the search pins a WITNESS announcement per group and scans the
+-- rest, which costs a factor per DISTINCT group. A third arity -- one obeyed by
+-- some number of subjects between one and all -- is neither, and -Werror would
+-- say nothing. Re-derive the argument at Combat.attackCeilingGiven before adding
+-- one.
 --
 -- No `able` predicate BESIDE the candidate list, where the blocking twin has
 -- one: there, CR 509.1b's restrictions are pairwise (flying, fear) and cannot
 -- be decided per blocker. Every attacking restriction pawl models is either per
 -- creature -- already inside Combat.canAttack -- or about the whole declaration,
 -- which no per-creature predicate could carry either.
-instances :: [ObjectId] -> [AttackTarget.AttackTarget] -> GameState -> Map (ObjectId, AttackTarget.AttackTarget) Natural
+instances :: [ObjectId] -> [AttackTarget.AttackTarget] -> GameState -> Requirement.Instances (ObjectId, AttackTarget.AttackTarget)
 instances candidates targets gs =
   let -- Hoisted out of the walk as BlockRequirement.instances hoists them, and
       -- both unforced until some permanent actually declares a requirement.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
       fromPermanent source = case Game.faceOf source gs of
-        Nothing -> []
+        Nothing -> ([], [])
         Just face -> case Face.attackRequirements face of
           -- Every permanent in almost every game.
-          [] -> []
+          [] -> ([], [])
           requirements ->
             -- The same two ability losses BlockRequirement.instances asks
             -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
@@ -123,8 +135,8 @@ instances candidates targets gs =
                 -- The SOURCE's changes and not the required creature's: CR 612.1
                 -- changes the words printed on THAT object, and the subject clause
                 -- below is printed on the card stating the requirement.
-                concatMap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements
-              else []
+                mconcat (fmap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements)
+              else ([], [])
       -- One whole-board projection and one grant walk for the whole walk, both
       -- unforced until some permanent actually reaches `named`.
       pcs = Projection.projectAll gs
@@ -144,11 +156,22 @@ instances candidates targets gs =
       -- CR 612.1: a hacked "Swamps attack each combat if able" requires Islands.
       fromRequirement source changes requirement =
         let subject = AttackRequirement.subject requirement
-         in [ (creature, target)
-            | inForce source changes requirement,
-              creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates,
-              target <- admissible source requirement
-            ]
+            announcements =
+              [ (creature, target)
+              | creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates,
+                target <- admissible source requirement
+              ]
+         in if not (inForce source changes requirement)
+              then ([], [])
+              else case AttackRequirement.arity requirement of
+                RequirementArity.EachSubject -> (announcements, [])
+                -- ONE group for the whole requirement, where the blocking twin
+                -- mints one per attacker its object axis names: this side's
+                -- object axis narrows WHOM to attack rather than naming a
+                -- second set of creatures, so every announcement obeying the
+                -- sentence belongs to the same group and attacking with any one
+                -- creature obeys it once.
+                RequirementArity.AnySubject -> ([], [Set.fromList announcements])
       -- CR 508.1d's OBJECT axis. An unnarrowed requirement mints a pair per
       -- announcement CR 508.1b admits, so any announcement obeys it; a narrowed
       -- one mints only the announcements against the player it names, and
@@ -245,10 +268,12 @@ instances candidates targets gs =
       fromStored active =
         let creature = ActiveAttackRequirement.attacker active
             target = AttackTarget.OfPlayer (ActiveAttackRequirement.defender active)
-         in [ (creature, target)
-            | creature `elem` candidates,
-              target `elem` targets
-            ]
+         in ( [ (creature, target)
+              | creature `elem` candidates,
+                target `elem` targets
+              ],
+              []
+            )
       -- CR 701.15b, off the THIRD carrier (Object.goadedBy): a goaded creature
       -- "attacks each combat if able and attacks a player other than the
       -- controller of the permanent, spell, or ability that caused it to be
@@ -278,22 +303,20 @@ instances candidates targets gs =
       -- because that is the pruning fromStored gets from membership -- only a
       -- creature that can attack can obey either requirement.
       fromGoad creature =
-        [ pair
-        | goader <- Set.toList (Goad.goadedBy creature gs),
-          pair <-
-            [(creature, target) | target <- targets]
-              <> [(creature, target) | target <- targets, target /= AttackTarget.OfPlayer goader, isPlayer target]
-        ]
+        ( [ pair
+          | goader <- Set.toList (Goad.goadedBy creature gs),
+            pair <-
+              [(creature, target) | target <- targets]
+                <> [(creature, target) | target <- targets, target /= AttackTarget.OfPlayer goader, isPlayer target]
+          ],
+          []
+        )
       isPlayer target = case target of
         AttackTarget.OfPlayer _ -> True
         AttackTarget.OfPlaneswalker _ -> False
         AttackTarget.OfBattle _ -> False
-   in Map.fromListWith
-        (+)
-        ( fmap
-            (\pair -> (pair, 1))
-            ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
-                <> concatMap fromStored (GameState.attackRequirements gs)
-                <> concatMap fromGoad candidates
-            )
-        )
+      gathered =
+        fmap fromPermanent (Set.toList (GameState.battlefield gs))
+          <> fmap fromStored (GameState.attackRequirements gs)
+          <> fmap fromGoad candidates
+   in Requirement.gather (concatMap fst gathered) (concatMap snd gathered)

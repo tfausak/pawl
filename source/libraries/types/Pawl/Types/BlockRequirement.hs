@@ -2,6 +2,7 @@ module Pawl.Types.BlockRequirement where
 
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.RequirementArity as RequirementArity
 
 -- | CR 509.1c: one printed BLOCKING REQUIREMENT -- an effect saying a creature
 -- must block, or must block if some condition is met. Lure, and Nemesis Mask's
@@ -33,7 +34,9 @@ import qualified Pawl.Types.Condition as Condition
 -- enchanted creature do so"); Razorgrass Screen prints the subject alone ("this
 -- creature blocks each combat if able"), naming no attacker at all. Rule
 -- 509.1c's second reading -- "must block if some condition is met" -- is the
--- third field, `while`, and Pawl.Types.AttackRequirement carries the same three.
+-- third field, `while`, and how many requirements the sentence states over the
+-- subject set is the fourth, `arity`. Pawl.Types.AttackRequirement carries the
+-- same four axes on the other side of the combat phase.
 --
 -- Pawl.Types.ActiveBlockRequirement is the sibling that carries both axes as
 -- bare ObjectIds, and it is still not a widening of this one: it is the
@@ -84,6 +87,22 @@ data BlockRequirement = MkBlockRequirement
     -- restriction. Re-read on every look like both axes above, so a graveyard
     -- shrinking below seven lifts the requirement at once, and the "you" inside
     -- it is CR 109.5's: the controller of the permanent printing the sentence.
-    while :: Maybe Condition.Condition
+    while :: Maybe Condition.Condition,
+    -- | CR 509.1c counted: whether the sentence states one requirement per
+    -- creature the subject names (Lure) or ONE over them all, obeyed by any
+    -- single one of them (Gaea's Protector's "this creature must be blocked if
+    -- able").
+    --
+    -- The group is per ATTACKER the object axis names, not per source: "must be
+    -- blocked if able" is a fact about the creature to be blocked, which is how
+    -- the rule is applied to Hinterland Scourge and Gorm the Great. So a
+    -- requirement naming two attackers under AnySubject is two group
+    -- requirements, one each, and each is obeyed by any single subject creature
+    -- blocking that attacker.
+    --
+    -- Pawl.Types.AttackRequirement carries the same axis for CR 508.1d, where
+    -- the group is per requirement rather than per object -- that side's object
+    -- axis narrows WHOM to attack rather than naming a second subject.
+    arity :: RequirementArity.RequirementArity
   }
   deriving (Eq, Ord, Show)

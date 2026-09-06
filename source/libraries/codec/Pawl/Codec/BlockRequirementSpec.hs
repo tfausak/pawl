@@ -15,6 +15,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RequirementArity as RequirementArity
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
 
@@ -26,7 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockRequirement" $ do
     Common.assertCodec
       s
       BlockRequirement.codec
-      (BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing)
+      (BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing RequirementArity.EachSubject)
       " {\"attacker\":{\"type\":\"Attached\"}} "
   -- Razorgrass Screen's shape: the requirement names its own source and no
   -- attacker, so the object axis is the absent one.
@@ -34,7 +35,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockRequirement" $ do
     Common.assertCodec
       s
       BlockRequirement.codec
-      (BlockRequirement.MkBlockRequirement (Just Affected.Attached) Nothing Nothing)
+      (BlockRequirement.MkBlockRequirement (Just Affected.Attached) Nothing Nothing RequirementArity.EachSubject)
       " {\"subject\":{\"type\":\"Attached\"}} "
   -- Seton's Desire's shape: CR 509.1c's second reading, "or that it must block
   -- if some condition is met", written as CR 604.2's "as long as" clause over
@@ -62,6 +63,15 @@ spec s = Spec.describe s "Pawl.Codec.BlockRequirement" $ do
                   )
               )
           )
+          RequirementArity.EachSubject
       )
       " {\"attacker\":{\"type\":\"Attached\"},\"while\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":7}}}} "
+  -- Gaea's Protector's shape: CR 509.1c read as ONE requirement over every able
+  -- blocker, with the object axis naming the card printing it.
+  Spec.it s "a group requirement" $
+    Common.assertCodec
+      s
+      BlockRequirement.codec
+      (BlockRequirement.MkBlockRequirement Nothing (Just (Affected.Matching Filter.IsSource)) Nothing RequirementArity.AnySubject)
+      " {\"attacker\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"arity\":{\"type\":\"AnySubject\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockRequirement.codec

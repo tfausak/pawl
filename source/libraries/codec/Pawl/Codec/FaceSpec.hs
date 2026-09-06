@@ -66,6 +66,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RequirementArity as RequirementArity
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -255,9 +256,9 @@ populatedFace =
       Face.rooms = Seq.empty,
       Face.dungeonEntryQuality = Nothing,
       Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.CantCastSpells}],
-      Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing],
+      Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing RequirementArity.EachSubject],
       Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
-      Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing],
+      Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing RequirementArity.EachSubject],
       Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing)],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
@@ -467,7 +468,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing]}
+        baseFace {Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing RequirementArity.EachSubject]}
         (init baseFaceJson <> ",\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}]}")
     Spec.it s "blockPermissions" $
       Common.assertJsonCodec
@@ -481,7 +482,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing]}
+        baseFace {Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing RequirementArity.EachSubject]}
         (init baseFaceJson <> ",\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}]}")
     Spec.it s "combatRestrictions" $
       Common.assertJsonCodec
