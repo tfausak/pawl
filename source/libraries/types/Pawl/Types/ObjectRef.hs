@@ -79,9 +79,12 @@ data ObjectRef
   | -- | CR 404.1 / Soldevi Digger: the top card of each graveyard the PlayerRef
     -- names -- the NEWEST arrival, which is the LAST member of the pile and the
     -- opposite end from the library arms above (Pawl.Engine.Game.insertIntoZone
-    -- appends a graveyard arrival). No depth, no Filter and no prompt: every
-    -- printing that reads this position reads exactly one card, and CR 404.2
-    -- leaves the order out of the players' hands, so there is nothing to ask.
+    -- appends a graveyard arrival). No depth, no Filter and no prompt: CR 404.2
+    -- leaves the order out of the players' hands, so "the top card" names exactly
+    -- one and there is nothing to ask -- and Scryfall
+    -- @o:/top card of .*graveyard/@, 2026-09-06, returns no printing that reads
+    -- this position more than one card deep. A card naming "the top two cards of
+    -- your graveyard" would want the depth the library arm above carries.
     --
     -- Not implemented: a card that TESTS the top card rather than acting on it
     -- unconditionally -- Guiding Spirit's "if the top card of target player's
