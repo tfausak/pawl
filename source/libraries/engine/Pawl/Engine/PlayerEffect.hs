@@ -70,6 +70,7 @@ import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
@@ -1331,8 +1332,8 @@ spellCostAdjustments pid oid gs =
 -- sentence says "this effect", so an effect that states no floor is not bound by
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
-activationCostAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustments targets family kind pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets family kind srcId gs
+activationCostAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustments targets family kind loyalty pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets family kind loyalty srcId gs
 
 -- The same gather given the effect list the CALLER has already taken, which is
 -- the half a per-permanent loop wants: `applying` is a walk of everything in
@@ -1348,8 +1349,8 @@ activationCostAdjustments targets family kind pid srcId gs = activationCostAdjus
 -- The rows arrive PAIRED WITH THEIR SOURCE and not stripped to bare effects,
 -- because CR 303.4b's "enchanted" is a fact about the row's own permanent: the
 -- criterion is matched through matchesObjectFrom, which needs it.
-activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustmentsGiven effects targets family kind srcId gs =
+activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
   let -- CR 601.2c's chosen targets, asked of ReduceActivationCost's third
       -- criterion: Dwarven Mauler's "equip abilities you activate THAT TARGET
       -- THIS CREATURE". ANY rather than all, which is what the sentence says of
@@ -1468,9 +1469,19 @@ activationCostAdjustmentsGiven effects targets family kind srcId gs =
       -- reading the reductions use -- the ability's source permanent -- and
       -- CONCATENATED rather than resolved between, because two effects each
       -- adding a cost both add it (CR 601.2f totals them all in).
+      --
+      -- `loyalty` is read here the way `kind` is read above, and CR 606.2 is the
+      -- whole of that read: Carth the Lion's "Planeswalkers' loyalty abilities
+      -- you activate" is a fact about the ability being activated, which the
+      -- source filter cannot answer -- a planeswalker's granted mana ability (A
+      -- Realm Reborn) sits on a permanent the filter matches. An addition
+      -- carrying no `whichLoyalty` ignores it, which is Brutal Suppression and
+      -- Drought.
       additionOf (source, effect) = case effect of
-        PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost criterion components scale) ->
-          if matchesObjectFrom source criterion srcId gs then Just (fmap ((,) scale) components) else Nothing
+        PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost criterion wantedLoyalty components scale) ->
+          if matchesObjectFrom source criterion srcId gs && maybe True (== loyalty) wantedLoyalty
+            then Just (fmap ((,) scale) components)
+            else Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing

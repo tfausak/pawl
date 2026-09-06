@@ -84,6 +84,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -441,7 +442,7 @@ selfReductions pid oid gs =
 -- way and read by the same gather -- empty for every caller standing before CR
 -- 601.2c, which is where a reducer naming a target (Dwarven Mauler) simply does
 -- not apply.
-activationAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+activationAdjustments :: Set.Set ObjectId -> Maybe KeywordFamily.KeywordFamily -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 activationAdjustments = PlayerEffect.activationCostAdjustments
 
 -- Every way CR 118.7e's choice could resolve the reductions that apply --
@@ -1006,6 +1007,17 @@ sicknessOkGiven pcs pid oid cost gs =
 -- ActivationRestriction.SorcerySpeed.
 isLoyaltyCost :: Cost Keyword.Type.Keyword -> Bool
 isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
+
+-- The same question in the shape a cost adjustment asks it
+-- (Pawl.Types.AddActivationCost.whichLoyalty, Pawl.Types.LoyaltyKind).
+--
+-- Asked of the PRINTED cost, never of the total: Carth the Lion's own addition
+-- is a loyalty component, so a reading taken after CR 601.2f folded the
+-- adjustments in would make every ability it touched a loyalty ability and tax
+-- itself into applying. Pawl.Engine.Activate.loyaltyOk reads CR 606.3 off the
+-- printed cost for that reason too.
+loyaltyKindOf :: Cost Keyword.Type.Keyword -> LoyaltyKind.LoyaltyKind
+loyaltyKindOf cost = if isLoyaltyCost cost then LoyaltyKind.LoyaltyAbility else LoyaltyKind.NonLoyaltyAbility
 
 isLoyaltyComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 isLoyaltyComponent = Maybe.isJust . loyaltyAmountOf
@@ -1694,6 +1706,12 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
 -- elided, and CR 605.1a is the argument: a keyword-granted ability that adds
 -- mana would have to move no card to or from a library, which cycling does.
 --
+-- LoyaltyKind.NonLoyaltyAbility is exact rather than elided for the same reason
+-- and off the same rule: CR 605.1a's third criterion is "it's not a loyalty
+-- ability", so nothing reaching this function can be one, and Carth the Lion's
+-- addition spares every activation gathered here -- including a planeswalker's
+-- granted mana ability (A Realm Reborn).
+--
 -- AbilityKind.ManaAbility is the THIRD criterion, and the Nothing above could
 -- never have stood in for it: no rule-702 provenance is equally true of every
 -- ordinary activated ability arriving through Pawl.Engine.Activate, while
@@ -1706,7 +1724,7 @@ manaActivationAdjustments pid oid gs = manaActivationAdjustmentsGiven (PlayerEff
 
 -- The same gather off a hoisted effect list; see manaActivationsGiven.
 manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty Nothing AbilityKind.ManaAbility
+manaActivationAdjustmentsGiven effects = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty Nothing AbilityKind.ManaAbility LoyaltyKind.NonLoyaltyAbility
 
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
 -- manaActivations makes that could ask itself. Nothing is CR 118.6's unpayable

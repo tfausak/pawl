@@ -41,11 +41,22 @@
 -- loyalty cost to somebody else's loyalty ability, which is what makes CR 606.5
 -- observable. Only the second sentence is read here; the first -- the
 -- enters-or-planeswalker-dies trigger -- is Pawl.MassEffectSpec's CarthTheLion
--- group. One thing about pawl's Carth is not the printed card: its "loyalty
--- abilities" is transcribed as "abilities of a planeswalker", because
--- AddActivationCost.whichAbilities filters the ability's source permanent rather
--- than the ability (gap #1698). That leaves the tax at least as expensive as
--- printed, so it cannot make an activation legal that the real card refuses.
+-- group. Its "loyalty abilities" is AddActivationCost.whichLoyalty, which asks CR
+-- 606.2 of the ability being activated where whichAbilities can only ask about
+-- the source permanent; the LoyaltyAbilityOnly group is what proves the two are
+-- not the same question.
+--
+-- A Realm Reborn -- {4}{G}{G} Enchantment, "Other permanents you control have
+-- '{T}: Add one mana of any color.'" (name, cost, type line and Oracle text
+-- checked against api.scryfall.com, 2026-09-06) -- is that group's second card,
+-- and it is there to put a NON-loyalty activated ability on the very
+-- planeswalker Carth taxes. Scryfall
+-- `t:planeswalker (o:/^\{T\}:/ or o:/^\{[0-9WUBRGCXSP\/]+\}(, \{T\})?:/) include:extras`,
+-- 2026-09-06, three hits and all of them flip cards whose front face is the
+-- creature: no printing gives a planeswalker such an ability of its own, so a
+-- GRANTED one is the only board on which both halves of CR 606.2 sit on a single
+-- permanent. Gideon Blackblade under Presence of Gond would refute that, and
+-- would give the group a non-mana ability besides.
 module Pawl.PlaneswalkerSpec where
 
 import qualified Control.Monad as Monad
@@ -58,6 +69,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -83,9 +95,18 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaOption as ManaOption
+import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
+import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -93,6 +114,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- Jace Beleren's abilities in printed order: +2, -1, -10. Indexed rather than
@@ -752,6 +774,89 @@ combinedLoyaltyCostSpec s registry = Spec.describe s "CombinedLoyaltyCost" $ do
         after = useAbility minusOne jace jaceId withCarth
     Spec.assertEqWith s "still 3, neither 2 nor 4" (S.counterOf CounterKind.Loyalty jaceId after) 3
     Spec.assertEqWith s "and the ability did resolve: exactly one player drew" (S.handSize S.alice after + S.handSize S.bob after) 1
+
+-- Jace, Carth and A Realm Reborn, all alice's. ONE board on which Jace carries
+-- both halves of CR 606.2: his three printed loyalty abilities, and the
+-- "{T}: Add one mana of any color" A Realm Reborn grants every other permanent
+-- alice controls.
+--
+-- The three Islands jaceOnBattlefield paid with are tapped, so the granted
+-- ability leaves exactly two untapped mana sources -- Jace and Carth -- and the
+-- source window is a real choice rather than an elided one.
+taxedBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+taxedBoard island jace carth realm =
+  let (jaceId, board) = jaceOnBattlefield island jace
+      withCarth = snd (S.addPermanent carth S.alice board)
+   in (jaceId, snd (S.addPermanent realm S.alice withCarth))
+
+-- CR 601.2g's source window and CR 105.4's colour, both pinned -- Pawl.ManaSpec's
+-- `prefersSource`, plus the yield the cost needs.
+--
+-- Pinned rather than searched: both untapped sources offer the same five
+-- colours, so an answerer taking any legal one could tap Carth instead, and
+-- Carth is not a permanent Carth's own filter matches -- the {R} would be paid
+-- with no counter added on any implementation, mutated or not.
+tappingFor :: ObjectId.ObjectId -> ManaType.ManaType -> Prompt.Prompt r -> r
+tappingFor wanted wantedType p = case p of
+  Prompt.ChooseManaSource _ _ candidates ->
+    Just (if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates)
+  Prompt.ChooseManaYield _ _ _ options ->
+    case filter (any ((==) wantedType . ManaUnit.manaType) . Mana.unwrap . ManaOption.yield) (NonEmpty.toList options) of
+      option : _ -> option
+      [] -> NonEmpty.head options
+  _ -> S.identityAnswer p
+
+-- CR 606.2: "An activated ability with a loyalty symbol in its cost is a loyalty
+-- ability." Carth the Lion taxes those and nothing else, so his addition has to
+-- ask a question about the ABILITY -- which is the field CR 601.2f's gather
+-- reads beside the source filter.
+--
+-- The pair is two abilities of ONE permanent on ONE board, differing in exactly
+-- what CR 606.2 divides: Jace's +2 carries a loyalty symbol, the ability A Realm
+-- Reborn grants him does not. A source-permanent filter cannot tell them apart --
+-- both are abilities of the same planeswalker -- so a board with only one of them
+-- would prove nothing about which question the gather asks.
+--
+-- What this board does NOT separate is CR 605.1a: the untaxed ability is a mana
+-- ability as well as a non-loyalty one, so a criterion reading the kind instead
+-- would answer alike here (gap #3323).
+loyaltyAbilityOnlySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+loyaltyAbilityOnlySpec s registry = Spec.describe s "LoyaltyAbilityOnly" $ do
+  Spec.it s "CR 606.2 / 601.2f Carth's added +1 reaches Jace's own +2" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    carth <- S.printingOf s registry "Carth the Lion"
+    realm <- S.printingOf s registry "A Realm Reborn"
+    let (jaceId, board) = taxedBoard island jace carth realm
+        after = useAbility plusTwo jace jaceId board
+    Spec.assertEqWith s "3 + 2 + Carth's 1" (S.counterOf CounterKind.Loyalty jaceId after) 6
+
+  -- The other half, on that same board: tapping Jace for mana is an activated
+  -- ability of a permanent Carth's filter matches, and CR 606.2 keeps the tax
+  -- off it. Red, which nothing else on the board produces, so a payment that
+  -- succeeded proves the granted ability is what paid.
+  Spec.it s "CR 606.2 the granted mana ability of that same Jace is untaxed" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    carth <- S.printingOf s registry "Carth the Lion"
+    realm <- S.printingOf s registry "A Realm Reborn"
+    let (jaceId, board) = taxedBoard island jace carth realm
+        red = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Red)]
+        (paid, after) = S.runPureWith (tappingFor jaceId (ManaType.Colored Color.Red)) board (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice red)
+    -- The two preconditions the loyalty reading below rests on, asserted on the
+    -- board rather than assumed: an unpaid window leaves the counters alone too,
+    -- so a fixture that never reached Jace's ability would read 3 for the wrong
+    -- reason. Neither can absorb a mutation of the criterion: an added loyalty
+    -- counter is payable on any board, so a wrongly taxed activation still pays
+    -- and still taps, and only the count below moves.
+    Spec.assertBool s paid "A Realm Reborn's granted ability pays the {R}"
+    Spec.assertEqWith s "and Jace is what was tapped for it" (fmap Object.tapped (Game.lookupObject jaceId after)) (Just TapState.Tapped)
+    Spec.assertEqWith s "CR 606.2: no loyalty counter was added to pay for it" (S.counterOf CounterKind.Loyalty jaceId after) 3
 
 -- CR 306.5a's printed loyalty is a number on every planeswalker but one. Nissa,
 -- Steward of Elements prints CR 107.3's X there, and CR 107.3m says what it is

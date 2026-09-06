@@ -531,6 +531,8 @@ library codec
     Pawl.Codec.LookAt
     Pawl.Codec.LookAtSpec
     Pawl.Codec.Loyalty
+    Pawl.Codec.LoyaltyKind
+    Pawl.Codec.LoyaltyKindSpec
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.Mana
     Pawl.Codec.ManaAddition
@@ -1672,6 +1674,7 @@ library types
     Pawl.Types.LoggedEvent
     Pawl.Types.LookAt
     Pawl.Types.Loyalty
+    Pawl.Types.LoyaltyKind
     Pawl.Types.Mana
     Pawl.Types.ManaAbilityPerformer
     Pawl.Types.ManaAddition
