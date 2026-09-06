@@ -274,6 +274,7 @@ manaProduced effect = case effect of
   -- the pool prints, and CR 605.1a would then want it seen here.
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing
+  Effect.PreventNextDamageInstance {} -> Nothing
   Effect.RedirectDamage {} -> Nothing
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
@@ -468,6 +469,7 @@ movesLibraryCard effect = case effect of
   -- this ability.
   Effect.PreventNextDamage {} -> False
   Effect.PreventAllDamage {} -> False
+  Effect.PreventNextDamageInstance {} -> False
   Effect.RedirectDamage {} -> False
   -- CR 701.6: a countered spell goes to its owner's GRAVEYARD.
   Effect.Counter {} -> False
@@ -570,6 +572,7 @@ refReachesLibrary ref = case ref of
   ObjectRef.EachPlayer -> False
   ObjectRef.EachOpponent -> False
   ObjectRef.ChosenPlayer -> False
+  ObjectRef.Players _ -> False
   ObjectRef.ChosenCardInGraveyard {} -> False
   -- FALSE: the position is in a GRAVEYARD, so the ref itself reaches no library.
   -- Soldevi Digger's own ability still answers True through the MoveToZone's

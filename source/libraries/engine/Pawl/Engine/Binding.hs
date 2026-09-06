@@ -299,6 +299,39 @@ became = SlotName.MkSlotName (Text.pack "became")
 eventAmount :: SlotName
 eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 
+-- CR 615.13 / 120.1: the reserved slot under which a prevention trigger's
+-- SOURCE is bound -- the object that would have dealt the damage, which
+-- Deflecting Palm's "that source's controller" reads through
+-- PlayerRef.ControllerOfBound. Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings alongside `eventAmount`, off
+-- Pawl.Types.DamagePrevented.source.
+--
+-- Distinct from `triggerSource` (CR 113.7a), which names the ability's own
+-- source: the bearer here is the card that shielded, and the object that would
+-- have dealt the damage is somebody else's. Distinct from `triggerPlayer` for
+-- the reason Pawl.Types.PlayerRef.ControllerOfBound gives: the printed sentence
+-- names a player through an OBJECT, and CR 108.4's controller is read as the
+-- payload runs rather than snapshotted as the damage was stopped.
+--
+-- ROUTINELY DEAD by the time the payload runs -- the source may have been a
+-- spell that has since resolved (CR 609.7a admits one) -- which is
+-- `blockingCreature`'s posture and the payload's problem: every read of it goes
+-- through last known information, ControllerOfBound's own
+-- Projection.controllerWithLastKnown among them.
+--
+-- NOT named by Pawl.Engine.Resolve.Slots.effectViewOf, `unattachedHost`'s
+-- posture: no printing reads a CHARACTERISTIC off the source whose damage was
+-- stopped. Honorable Passage's "damage from a red source" looks like one and is
+-- not -- that predicate sits on the trigger's CONDITION, which
+-- Pawl.Engine.Event matches through Projection.viewWithLastKnown already. A
+-- payload saying "equal to that source's power" would want the arm.
+--
+-- Not a target (CR 115.10a; nothing was chosen), so the same CR 608.2b posture
+-- and the same "no card's targetSlots may name it" sweep as `became`, and the
+-- binding-side sweep `eventAmount` has.
+preventedDamageSource :: SlotName
+preventedDamageSource = SlotName.MkSlotName (Text.pack "thatDamageSource")
+
 -- CR 614.1c: the reserved slot under which an as-enters sacrifice records HOW
 -- MANY permanents were sacrificed -- Wood Elemental's "the number of Forests
 -- sacrificed as it entered". Stamped by Pawl.Engine.Event's
@@ -797,6 +830,10 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 -- Bind an object under the reserved became slot (CR 400.7e).
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
+
+-- Bind an object under the reserved preventedDamageSource slot (CR 615.13).
+setPreventedDamageSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setPreventedDamageSource oid = Map.insert preventedDamageSource (toObject oid)
 
 -- setBecame for CR 712.21c's plural: the SEVERAL cards a melded permanent became
 -- as it left the battlefield, bound as a group so an ObjectRef.InSlot reader acts

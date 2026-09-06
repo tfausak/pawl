@@ -119,6 +119,7 @@ import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -339,6 +340,10 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   ObjectRef.EachOpponent -> Map.empty
   -- The seat comes from the source's own entry choice (CR 614.12a), not a slot.
   ObjectRef.ChosenPlayer -> Map.empty
+  -- The slots the reference itself names, which is objectRefPlayerRefs' half
+  -- everywhere else in this module: the seat is a PlayerRef and may be read out
+  -- of a slot (Deflecting Palm's ControllerOfBound).
+  ObjectRef.Players player -> playerRefSlots player
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> quantitySlots count
   -- The arm above's count, and no more: the SEAT is objectRefPlayerRefs' half.
   -- What a MATCH is is a Filter, and no arm here reports the slots a Filter
@@ -404,6 +409,8 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachPlayer -> []
   ObjectRef.EachOpponent -> []
   ObjectRef.ChosenPlayer -> []
+  -- A seat, never a count.
+  ObjectRef.Players _ -> []
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary _ count) -> [count]
   -- The arm above's count, measured in MATCHES rather than in cards.
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ _ count) -> [count]
@@ -444,6 +451,8 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.EachPlayer -> []
   ObjectRef.EachOpponent -> []
   ObjectRef.ChosenPlayer -> []
+  -- The reference IS a seat, so it is its own whole answer here.
+  ObjectRef.Players player -> [player]
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> [player]
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil player _ _) -> [player]
   -- Whose graveyard, the two library walks' own read over CR 400.1's other
@@ -545,6 +554,8 @@ effectObjectRefs effect = case effect of
   -- Absent where the shield's recipients are described rather than named.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> Maybe.maybeToList ref
+  -- One ref, and never optional: CR 615.8's shield always names its recipient.
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _) -> [ref]
   -- CR 614.9's two sides, the damage's old recipient -- absent where the card
   -- describes it instead -- and its new one.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from _ _ to _) -> Maybe.maybeToList from <> [to]
@@ -692,6 +703,7 @@ effectPlayerRefs effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> [ref]
   Effect.PreventNextDamage {} -> []
   Effect.PreventAllDamage {} -> []
+  Effect.PreventNextDamageInstance {} -> []
   Effect.RedirectDamage {} -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
@@ -921,6 +933,11 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The same reads, minus the shield size this opcode does not carry and plus CR
   -- 609.7b's printed source properties, the one field only this opcode spells
   -- out; they ride the row and are rechecked at the damage event (CR 615.9).
+  -- The two arms above's reads, minus every field this opcode does not carry:
+  -- a duration and CR 609.7a's chosen-source predicate, and no rider to descend
+  -- into.
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ chosenSource) ->
+    joinSlots [durationSlots duration, filterSlotsOf chosenSource]
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ whatRecipient _ chosenSource whatSource rider) ->
     joinSlots
       [ durationSlots duration,
@@ -1347,6 +1364,7 @@ ownSlotsAreExhaustive effect = case effect of
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) ->
     durationSlotsAreExhaustive duration && all slotsAreExhaustive rider
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _) -> durationSlotsAreExhaustive duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> durationSlotsAreExhaustive duration && all Quantity.slotsAreExhaustive amount
   Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -1539,6 +1557,8 @@ readsX = any effectReadsX
       -- CR 601.2b's X reaches the rider too.
       Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
       Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> readsX (Foldable.toList rider)
+      -- No quantity and no rider, so CR 601.2b's X cannot reach it.
+      Effect.PreventNextDamageInstance {} -> False
       Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ amount _ _ _ _ _) -> any Quantity.readsX amount
       Effect.Counter {} -> False
       Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
@@ -1717,6 +1737,8 @@ boundSlots effect = case effect of
   -- name IT authors is a name this card authors. Both shields.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> foldMap boundSlots rider
+  -- The third shield binds nothing at all, having no rider to author a name.
+  Effect.PreventNextDamageInstance {} -> Set.empty
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
   -- countered this way", and the permanents whose abilities were (CR 113.7).
@@ -2059,6 +2081,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.EachPlayer -> []
   ObjectRef.EachOpponent -> []
   ObjectRef.ChosenPlayer -> []
+  ObjectRef.Players _ -> []
   -- CR 401.2's ordered pile, whose head is the top (CR 121.1). The depth is taken
   -- from EACH named library, top first, and a shorter library gives what it has
   -- (CR 609.3). Restricted to the players still in the turn order and delivered in

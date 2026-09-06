@@ -72,6 +72,12 @@ to agents as written. What it doesn't say:
   `cabal`, so every file edit made there lands on whatever branch the owner
   has checked out, alongside their uncommitted changes.
 
+- The isolation guard refuses a command whose text holds the bare word
+  `source` (the tree's top directory), a heredoc beside another command, or a
+  `sed` expression carrying parentheses, a pipe or a `$` --- `script/mutate.sh`'s
+  argument most of all. Grep as `grep -rn X . --include='*.hs'` or against a
+  quoted deeper path, and run a heredoc as a command of its own.
+
 - Every worktree shares ONE stash stack, so a stash made in yours can be popped
   by an agent in another --- losing your edits and landing theirs in your tree.
   Never stash; copy the file aside and move it back.

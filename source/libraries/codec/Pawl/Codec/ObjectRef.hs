@@ -52,6 +52,10 @@ codec =
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
       Arm.nullary "EachOpponent" ObjectRef.EachOpponent,
       Arm.nullary "ChosenPlayer" ObjectRef.ChosenPlayer,
+      -- The second arm carrying a bare 'Pawl.Codec.PlayerRef', beside
+      -- 'TopOfGraveyard' below: an indirection to a seat is the whole of what a
+      -- card writes here, so there is no payload record to make.
+      Arm.payload "Players" PlayerRef.codec ObjectRef.Players (\x -> case x of ObjectRef.Players y -> Just y; _ -> Nothing),
       Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
       Arm.payload "TopOfLibraryUntil" TopOfLibraryUntil.codec ObjectRef.TopOfLibraryUntil (\x -> case x of ObjectRef.TopOfLibraryUntil y -> Just y; _ -> Nothing),
       -- CR 404.1's own end of the pile, and the one position arm carrying a bare

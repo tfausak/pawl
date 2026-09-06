@@ -51,6 +51,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity
@@ -297,6 +298,11 @@ data Effect card ability
     -- recipients (Selfless Squire) -- PreventNextDamage with the Quantity
     -- removed, so it ends only when its duration does.
     PreventAllDamage (PreventAllDamage.PreventAllDamage (Effect card ability))
+  | -- | CR 615.8: install a shield that stops ONE instance of damage from the
+    -- source CR 609.7a had its controller choose, whatever that instance's size,
+    -- and is then used up (Deflecting Palm). Between the two above: no counted
+    -- amount, and no second application.
+    PreventNextDamageInstance PreventNextDamageInstance.PreventNextDamageInstance
   | -- | CR 614.9: install a floating redirection effect (Turn the Tables); the
     -- Maybe DamageKind is printed rather than assumed.
     RedirectDamage RedirectDamage.RedirectDamage

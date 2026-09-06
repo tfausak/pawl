@@ -69,6 +69,17 @@ data ObjectRef
   | -- | CR 614.12a / 120.3a / Stuffy Doll: the player this effect's source chose as
     -- it entered the battlefield, read off Object.chosenPlayer there.
     ChosenPlayer
+  | -- | CR 120.3a: the players a PlayerRef names -- Deflecting Palm's "that
+    -- source's controller", where the seat is identified by an object a slot
+    -- holds rather than by a noun a card can print.
+    --
+    -- The three arms above are the printed NOUNS ("each player", "each
+    -- opponent", the seat Stuffy Doll chose) and this one is the INDIRECTION,
+    -- which is why it is a fourth arm rather than a widening that swallows them:
+    -- Pawl.Types.PlayerRef can spell every one of those too, and rewriting the
+    -- pool onto this arm would trade three names a reader recognises for one
+    -- that has to be unfolded.
+    Players PlayerRef.PlayerRef
   | -- | CR 401.2 / 121.1 / Count on Luck, Act on Impulse: the cards on top of the
     -- libraries the payload's PlayerRef names, as deep as its Quantity, deepest
     -- named last.

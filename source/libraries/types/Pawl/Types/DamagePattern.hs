@@ -39,10 +39,12 @@ import qualified Pawl.Types.Recipient as Recipient
 --
 -- That Recipient is BAKED by the engine, never authored, exactly as
 -- Pawl.Types.PhasePattern.whosePhase is: card data cannot name an ObjectId or a
--- PlayerId. Resolve's three arms that bake one (PreventNextDamage,
--- PreventAllDamage and RedirectDamage) share one `installDamageRow`, and all
--- three thread a printed KIND through -- Turn the Tables' "all combat damage",
--- Decorated Griffin's "the next 1 combat damage". The fourth producer is a RULE
+-- PlayerId. Resolve's four arms that bake one (PreventNextDamage,
+-- PreventAllDamage, PreventNextDamageInstance and RedirectDamage) share one
+-- `installDamageRow`, and all but the CR 615.8 shield thread a printed KIND
+-- through -- Turn the Tables' "all combat damage", Decorated Griffin's "the next
+-- 1 combat damage"; no printing of CR 615.8's shape narrows the kind, so that
+-- opcode has no such field and passes Nothing. The last producer is a RULE
 -- rather than a resolution: CR 702.16e's player half, which
 -- Pawl.Engine.Replacement.collect mints naming the protected seat, since a
 -- PlayerRelation would have to be read against a perspective this row's CR 109.5
