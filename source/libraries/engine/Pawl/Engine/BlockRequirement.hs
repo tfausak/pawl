@@ -10,26 +10,26 @@
 -- which card produced one, nor which carrier.
 module Pawl.Engine.BlockRequirement where
 
-import Data.Map (Map)
-import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Requirement as Requirement
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.RequirementArity as RequirementArity
 
--- CR 509.1c: every requirement in force right now, INSTANTIATED as the
--- (blocker, attacker) pairs the defending player is required to declare, each
--- carrying HOW MANY requirements name it.
+-- CR 509.1c: every requirement in force right now, INSTANTIATED against the
+-- (blocker, attacker) pairs the defending player may declare -- as a weight on
+-- one pair where the sentence states a requirement per creature, and as a SET of
+-- pairs where it states one over them all.
 --
 -- Keyed by the pair, because CR 509.1c counts requirements being OBEYED by a
 -- particular declaration, and a declaration obeys an instance exactly when it
@@ -46,9 +46,17 @@ import Pawl.Types.ObjectId (ObjectId)
 -- "two requirements on ONE pair count twice".
 --
 -- The multiplicity counts DISTINCT REQUIREMENTS, not gathering events: every
--- source is walked once (the battlefield is a Set and the stored rows are their
--- own carriers), and within a source `attackers` and `candidates` are duplicate-
--- free, so a pair is emitted once per requirement that names it.
+-- carrier is walked once (the battlefield is a Set and the stored rows are their
+-- own carriers), and within one of them `attackers` and `candidates` are
+-- duplicate-free, so a pair is emitted once per requirement that names it.
+--
+-- The GROUP half is Pawl.Types.RequirementArity.AnySubject -- "this creature
+-- must be blocked if able", one requirement obeyed by any single able blocker.
+-- It is a set of pairs and not a weight because CR 509.1c counts it once
+-- however many creatures block, and Combat.blockCeilingGiven's search reads it
+-- that way. Combat.bestBlockDeclaration is where widening either half is
+-- re-derived: its bound assumes a pair is worth its weight to whichever blocker
+-- takes it and a group is worth its weight once.
 --
 -- `able` is the caller's CR 509.1b restriction check, which is what Lure's
 -- "able to block" means. Passed IN rather than computed here, so this module
@@ -64,17 +72,17 @@ instances ::
   [ObjectId] ->
   [ObjectId] ->
   GameState ->
-  Map (ObjectId, ObjectId) Natural
+  Requirement.Instances (ObjectId, ObjectId)
 instances able candidates attackers gs =
   let -- Hoisted out of the walk as PlayerEffect.applying hoists them, and both
       -- unforced until some permanent actually declares a requirement.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
       fromPermanent source = case Game.faceOf source gs of
-        Nothing -> []
+        Nothing -> ([], [])
         Just face -> case Face.blockRequirements face of
           -- Every permanent in almost every game.
-          [] -> []
+          [] -> ([], [])
           requirements ->
             -- TWO ability losses, the same pair PlayerEffect.applying asks
             -- about.
@@ -109,8 +117,8 @@ instances able candidates attackers gs =
                 -- The SOURCE's changes and not the attacker's: CR 612.1 changes the
                 -- words printed on THAT object, and the attacker clause below is
                 -- printed on the card stating the requirement.
-                concatMap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements
-              else []
+                mconcat (fmap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements)
+              else ([], [])
       -- One whole-board projection and one grant walk for the whole walk, both
       -- unforced until some permanent actually reaches `named`.
       pcs = Projection.projectAll gs
@@ -146,12 +154,17 @@ instances able candidates attackers gs =
               Just clause -> filter (named source (rewrite clause)) these
             subjects = narrow BlockRequirement.subject candidates
             wanted = narrow BlockRequirement.attacker attackers
-         in [ (blocker, attacker)
-            | inForce source changes requirement,
-              attacker <- wanted,
-              blocker <- subjects,
-              able blocker attacker
-            ]
+            blockersOf attacker = [(blocker, attacker) | blocker <- subjects, able blocker attacker]
+         in if not (inForce source changes requirement)
+              then ([], [])
+              else case BlockRequirement.arity requirement of
+                RequirementArity.EachSubject -> (concatMap blockersOf wanted, [])
+                -- ONE group per ATTACKER the object axis names, which is what
+                -- Gaea's Protector's sentence is about; the subject set is the
+                -- creatures that could obey it. Two attackers under one such
+                -- requirement are two group requirements, not one obeyed by
+                -- blocking either.
+                RequirementArity.AnySubject -> ([], fmap (Set.fromList . blockersOf) wanted)
       -- CR 509.1c's second shape -- "or that it must block if some condition is
       -- met" -- read as CR 604.2's "as long as" clause and asked exactly as
       -- AttackRequirement.instances and BlockPermission.instances ask their own
@@ -189,16 +202,14 @@ instances able candidates attackers gs =
       fromStored active =
         let blocker = ActiveBlockRequirement.blocker active
             attacker = ActiveBlockRequirement.attacker active
-         in [ (blocker, attacker)
-            | blocker `elem` candidates,
-              attacker `elem` attackers,
-              able blocker attacker
-            ]
-   in Map.fromListWith
-        (+)
-        ( fmap
-            (\pair -> (pair, 1))
-            ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
-                <> concatMap fromStored (GameState.blockRequirements gs)
+         in ( [ (blocker, attacker)
+              | blocker `elem` candidates,
+                attacker `elem` attackers,
+                able blocker attacker
+              ],
+              []
             )
-        )
+      gathered =
+        fmap fromPermanent (Set.toList (GameState.battlefield gs))
+          <> fmap fromStored (GameState.blockRequirements gs)
+   in Requirement.gather (concatMap fst gathered) (concatMap snd gathered)

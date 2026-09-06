@@ -747,6 +747,8 @@ library codec
     Pawl.Codec.RequireBlockSpec
     Pawl.Codec.RequiredDefender
     Pawl.Codec.RequiredDefenderSpec
+    Pawl.Codec.RequirementArity
+    Pawl.Codec.RequirementAritySpec
     Pawl.Codec.RestartSignal
     Pawl.Codec.RestartSignalSpec
     Pawl.Codec.RestrictedCreatures
@@ -1019,6 +1021,7 @@ library engine
     Pawl.Engine.Rad
     Pawl.Engine.Replacement
     Pawl.Engine.Replay
+    Pawl.Engine.Requirement
     Pawl.Engine.Resolve
     Pawl.Engine.Resolve.Effect
     Pawl.Engine.Resolve.Slots
@@ -1805,6 +1808,7 @@ library types
     Pawl.Types.RequireAttack
     Pawl.Types.RequireBlock
     Pawl.Types.RequiredDefender
+    Pawl.Types.RequirementArity
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.RestrictedCreatures
