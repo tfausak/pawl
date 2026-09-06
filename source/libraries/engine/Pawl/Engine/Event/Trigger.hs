@@ -276,6 +276,8 @@ looksBack condition = case condition of
   -- tapped for mana is standing on the battlefield when the ability is
   -- gathered.
   TriggerCondition.AttachedPermanentTappedForMana -> False
+  -- The same event and the same reason, whoever watches it.
+  TriggerCondition.PermanentTappedForMana {} -> False
   -- CR 603.10a's first family again, read off the event rather than off the
   -- bearer: this triggers when a permanent leaves the battlefield. Inert today --
   -- the bearer is a card in exile, which no look-back source can offer -- but a
@@ -493,6 +495,8 @@ batchScoped condition = case condition of
   -- CR 106.12a names one resolution of one mana ability, so one occurrence;
   -- no printing of it says "one or more".
   TriggerCondition.AttachedPermanentTappedForMana -> False
+  -- One occurrence for the arm above's reason, bystander or not.
+  TriggerCondition.PermanentTappedForMana {} -> False
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.AnyOf conditions -> any batchScoped conditions
@@ -1869,6 +1873,10 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.SelfBecomesUntapped -> battlefield
   -- The same default and the same reason, one event over.
   TriggerCondition.AttachedPermanentTappedForMana -> battlefield
+  -- CR 113.6's default once more: Autumn Willow, Harmony is a creature watching
+  -- from the board it stands on, and CR 113.6k's exception -- for a condition
+  -- that cannot trigger from the battlefield at all -- does not apply.
+  TriggerCondition.PermanentTappedForMana {} -> battlefield
   -- The same default from the training creature's own side: rule 702.149a's ability
   -- fires on an attack, so its bearer is on the battlefield and CR 113.6k's
   -- exception -- for a condition that cannot trigger from there at all -- does not
@@ -2295,6 +2303,8 @@ stateTriggers gs
               -- above: a mana ability having resolved is nothing a later
               -- board read can recover.
               TriggerCondition.AttachedPermanentTappedForMana -> False
+              -- The same resolution read by a bystander, so the same answer.
+              TriggerCondition.PermanentTappedForMana {} -> False
               -- CR 702.149c the same: it fires on a resolution, and the counter
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.

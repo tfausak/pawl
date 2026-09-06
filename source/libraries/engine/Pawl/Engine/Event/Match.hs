@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
@@ -65,6 +66,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
@@ -3412,6 +3414,88 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TappedForMana tapped ->
       let hostOfBearer = Object.attachedTo =<< Game.lookupObject bearer gs
        in (Recipient.objectOf =<< hostOfBearer) == Just tapped
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 106.12a read by a BYSTANDER, where the arm above reads it off an
+  -- attachment link: Autumn Willow, Harmony's "whenever you tap a land creature
+  -- for mana". Both halves of the printed sentence are compared, the
+  -- PermanentSacrificed arm's posture -- the tapping player against CR 109.5's
+  -- `you`, and the permanent against the Filter -- and a wording that narrows
+  -- neither spells itself out as AnyPlayer over the trivial Filter.
+  --
+  -- The TAPPING player is the tapped permanent's controller: CR 602.2's default
+  -- gives an activated ability to its object's controller, and
+  -- Pawl.Engine.Cost.tapForManaWith has no other activator to offer, reading
+  -- Projection.controllerOf and never CR 602.1b's Activator (#3087). A printing
+  -- that let anyone tap it for mana would make the two come apart.
+  --
+  -- LIVE, the arm above's reason and not the PermanentSacrificed arm's: nothing
+  -- has moved, and Pawl.Engine.Cost.applyManaTriggers records this event with
+  -- the permanent standing tapped on the battlefield. viewWithLastKnown all the
+  -- same, so a permanent that left between the tap and the gather is answered
+  -- for rather than silently missed.
+  TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana relation f) -> case event of
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana tapped -> case Projection.View.controllerOf tapped gs of
+      -- Nothing is a permanent that is gone, about which no relation can
+      -- honestly answer -- the PermanentSacrificed arm's closing note.
+      Nothing -> False
+      Just tapper
+        | PlayerRelation.holds (Game.teams gs) relation you tapper ->
+            case Projection.viewWithLastKnown tapped gs tapped of
+              Nothing -> False
+              Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+        | otherwise -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False

@@ -22,6 +22,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -494,6 +495,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedPermanentTappedForMana
       " {\"type\":\"AttachedPermanentTappedForMana\"} "
+  -- The same event read by a bystander, so both halves of the printed sentence
+  -- ride the condition -- Autumn Willow, Harmony's "whenever YOU tap a LAND
+  -- CREATURE for mana".
+  Spec.it s "PermanentTappedForMana round-trips both halves" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.You (Filter.HasCardType CardType.Land)))
+      " {\"type\":\"PermanentTappedForMana\",\"value\":{\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
   -- CR 702.55b/702.55c's exile-zone death watch. Nullary: the link it matches on
   -- is board state, so nothing about it rides the condition.
   Spec.it s "HauntedCreatureDies" $

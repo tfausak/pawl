@@ -283,11 +283,10 @@ permanentSpellCase s registry = do
 -- Willow, Harmony ({3}{G}{G}) is the maker, whose enters trigger creates a 1/1
 -- green Forest Dryad LAND creature token.
 --
--- Not implemented, recorded here because a card's JSON carries no comment:
--- Autumn Willow's third sentence, which adds mana when a land creature is tapped
--- (#2866). That omission leaves pawl's card STRICTER than printed -- it
--- withholds mana from its controller -- so it cannot flatter the cases below.
--- Worms of the Earth carries its whole text box; its each-upkeep offer is
+-- Both cards carry their whole text box. The Willow's third sentence, which adds
+-- mana when a land creature is tapped, is proved in Pawl.ManaSpec's "Autumn
+-- Willow, Harmony" group and adds nothing here, no land creature being tapped
+-- for mana. Worms of the Earth's each-upkeep offer is
 -- Pawl.ResolveSpec's "an either-or announced by each player" group.
 tokenCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenCase s registry = do
