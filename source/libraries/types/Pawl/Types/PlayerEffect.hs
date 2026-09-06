@@ -146,8 +146,10 @@ data PlayerEffect
     -- moment CR 307.5 defines -- a main phase of their own turn with an empty
     -- stack, priority in hand.
     CastOnlyAtSorcerySpeed
-  | -- | CR 305.1 / Damping Engine: this player can't play lands.
-    CantPlayLands
+  | -- | CR 305.1 / Damping Engine, City in a Bottle: this player can't play a land
+    -- matching the Filter, which Damping Engine's unrestricted sentence writes as
+    -- @And []@.
+    CantPlayLands (Filter.Filter Keyword.Keyword)
   | -- | CR 601.3 / Yawgmoth's Will, Garruk's Horde, Sen Triplets: this player may
     -- cast a matching card from the zone the payload names.
     --

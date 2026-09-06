@@ -10,9 +10,9 @@ import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 
 -- | The sacrificer is ELIDED when it is CR 701.21a's ordinary "sacrifice it",
--- which is every card in the pool but Golgothian Sylex; the other arm is
--- otherwise written only by the emblem Pawl.Engine.Ring mints, and that is not
--- card data.
+-- which is every card in the pool but Golgothian Sylex and City in a Bottle;
+-- the other arm is otherwise written only by the emblem Pawl.Engine.Ring mints,
+-- and that is not card data.
 codec :: Codec.Codec SacrificeEffect.SacrificeEffect
 codec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec SacrificeEffect.ref

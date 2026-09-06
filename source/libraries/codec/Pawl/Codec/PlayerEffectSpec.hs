@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CoinFace as CoinFace
@@ -377,13 +378,14 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.CantActivateAbilities
       " {\"type\":\"CantActivateAbilities\"} "
-  -- CR 305.1 / Damping Engine's land half.
+  -- CR 305.1 / City in a Bottle's land half, whose Filter names the land
+  -- (Damping Engine's writes the empty And instead).
   Spec.it s "CantPlayLands" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      PlayerEffect.CantPlayLands
-      " {\"type\":\"CantPlayLands\"} "
+      (PlayerEffect.CantPlayLands (Filter.HasName (CardName.MkCardName (Text.pack "Bazaar of Baghdad"))))
+      " {\"type\":\"CantPlayLands\",\"value\":{\"type\":\"HasName\",\"value\":\"Bazaar of Baghdad\"}} "
   -- CR 601.3 / Yawgmoth's Will, whose sentence names no quality of the spell and
   -- whose zone is the caster's own.
   Spec.it s "CastFrom, an empty filter" $

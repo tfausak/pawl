@@ -3255,6 +3255,57 @@ golgothianSylexSpec s registry =
           Spec.assertEqWith s "CR 701.21a the Tracker names each sacrificing seat: alice for two artifacts, carol for one" (lives after) (Just 16, Just 20, Just 18)
           Spec.assertEqWith s "everyone started at 20" (lives board) (Just 20, Just 20, Just 20)
 
+-- City in a Bottle {2} Artifact -- first sentence: "Whenever one or more other
+-- nontoken permanents with a name originally printed in the Arabian Nights
+-- expansion are on the battlefield, their controllers sacrifice them." (name,
+-- cost, type line and Oracle text checked against api.scryfall.com, 2026-09-06.)
+--
+-- CR 603.8's state trigger, whose condition is a Count over CR 206.3a's name
+-- list and whose effect is Golgothian Sylex's sweep: an EachMatching over the
+-- same Filter, sacrificed by Sacrificer.PermanentController.
+--
+-- The board tells apart the readings a wrong Filter takes:
+--
+--   * OTHER versus every listed permanent. The Bottle's own name is on CR
+--     206.3a's list, so `Not IsSource` is the only conjunct keeping it on the
+--     battlefield -- and a card that sacrificed itself would also switch its
+--     own second sentence off.
+--   * NONTOKEN versus every permanent (CR 111.1). carol's token is built from
+--     the same Kird Ape card, so its name matches too.
+--   * ITS controller versus the ability's. The Kird Ape is bob's, so CR
+--     701.21a's second sentence would refuse an EffectController reading -- and
+--     that reading does not merely fail an assertion, it HANGS: the sweep leaves
+--     the Ape standing, the condition holds, and CR 603.3c re-triggers on the
+--     next settle pass forever, which is the non-termination
+--     Pawl.Engine.Event.Trigger.stateTriggers documents. Golgothian Sylex is
+--     where the sacrificer axis is proved instead.
+--   * A LISTED name versus every permanent. alice's Goblin Piker is not on the
+--     list.
+cityInABottleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+cityInABottleSpec s registry =
+  Spec.describe s "CityInABottle" $ do
+    Spec.it s "CR 603.8 each other listed nontoken permanent is sacrificed by its own controller" $ do
+      bottle <- S.printingOf s registry "City in a Bottle"
+      plains <- S.printingOf s registry "Plains"
+      kirdApe <- S.printingOf s registry "Kird Ape"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (bottleId, g1) = S.addPermanent bottle S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
+          (pikerId, g2) = S.addPermanent piker S.alice g1
+          (apeId, g3) = S.addPermanent kirdApe S.bob g2
+          (tokenId, g4) = S.addToken (Printing.card kirdApe) S.carol g3
+          board =
+            g4
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          after = S.runPure S.identityAnswer board Engine.priorityLoop
+      Spec.assertBool s (S.onBattlefield apeId board) "the fixture really put bob's Kird Ape onto the battlefield"
+      Spec.assertBool s (not (S.onBattlefield apeId after)) "CR 603.8 bob's Kird Ape, a listed nontoken permanent, was sacrificed by bob"
+      Spec.assertBool s (S.onBattlefield tokenId after) "CR 111.1 carol's token of that same listed card survives"
+      Spec.assertBool s (S.onBattlefield bottleId after) "and the Bottle itself survives, its own sentence saying `other`"
+      Spec.assertBool s (S.onBattlefield pikerId after) "as does alice's Goblin Piker, whose name CR 206.3a does not list"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   plummetSpec s registry
@@ -3280,3 +3331,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   communeWithLavaSpec s registry
   apocalypseChimeSpec s registry
   golgothianSylexSpec s registry
+  cityInABottleSpec s registry

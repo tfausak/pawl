@@ -12,8 +12,8 @@ import qualified Pawl.Types.Sacrificer as Sacrificer
 data SacrificeEffect = MkSacrificeEffect
   { -- | ObjectRef and not a bare SlotName so a filtered sweep of the battlefield
     -- reaches CR 701.21a -- Golgothian Sylex's "each nontoken permanent with a
-    -- name originally printed in the Antiquities expansion". InSlot is the arm
-    -- every other card in the pool writes.
+    -- name originally printed in the Antiquities expansion", and City in a
+    -- Bottle's own sweep. InSlot is the arm the rest of the pool writes.
     ref :: ObjectRef.ObjectRef,
     -- | CR 701.21a: whom the printed sentence addresses.
     sacrificer :: Sacrificer.Sacrificer
