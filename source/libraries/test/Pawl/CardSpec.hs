@@ -1527,6 +1527,11 @@ cardCounts card =
     -- Juggernaut counts its controller's graveyard). The requirement's SUBJECT
     -- is an Affected, which holds a Filter but no Count.
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AttackRequirement.while) (Face.attackRequirements card)
+    -- CR 509.1c's identically worded second reading, on the other side of the
+    -- combat phase (Seton's Desire counts its controller's graveyard, the same
+    -- threshold clause). Both of this requirement's axes are Affecteds, which
+    -- hold a Filter but no Count.
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . BlockRequirement.while) (Face.blockRequirements card)
     -- CR 508.1h's counted share (Sphere of Safety's "the number of enchantments
     -- you control"), the one Count a cost to attack can hold: its subject is an
     -- Affected, which holds a Filter but no Count.
@@ -3917,14 +3922,17 @@ combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
 
--- BOTH of a blocking requirement's Filter positions -- CR 509.1c's subject axis
--- (Razorgrass Screen) and its object axis (Lure) -- each optional, and an absent
--- one contributing nothing rather than a stand-in filter, combatRestrictionFilters'
--- posture for its size-bounding arms.
-blockRequirementFilters :: BlockRequirement.BlockRequirement -> [Filter.Type.Filter Keyword.Keyword]
+-- ALL THREE of a blocking requirement's Filter positions -- CR 509.1c's subject
+-- axis (Razorgrass Screen), its object axis (Lure) and the CR 604.2 clause the
+-- second reading of that rule rides on (Seton's Desire), whose Count holds a
+-- Filter. Each is optional, and an absent one contributes nothing rather
+-- than a stand-in filter, combatRestrictionFilters' posture for its
+-- size-bounding arms.
+blockRequirementFilters :: BlockRequirement.BlockRequirement -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 blockRequirementFilters requirement =
-  foldMap affectedFilters (BlockRequirement.subject requirement)
-    <> foldMap affectedFilters (BlockRequirement.attacker requirement)
+  unframed (foldMap affectedFilters (BlockRequirement.subject requirement))
+    <> unframed (foldMap affectedFilters (BlockRequirement.attacker requirement))
+    <> foldMap conditionFilters (BlockRequirement.while requirement)
 
 -- All three of a blocking permission's Filter positions: the subject it names, CR
 -- 604.2's "as long as" gate beside it (Entourage of Trest), and the counted arity
@@ -4711,8 +4719,8 @@ activatedAbilityFilters ability =
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
 --     (CR 509.1c), `attackCosts` (CR 508.1h) and `blockCosts` (CR 509.1d) --
 --     an affected set each, plus each combat cost's Counted share, which is a
---     Quantity, plus the CR 604.2 "as long as" clause an attacking requirement
---     may carry (CR 508.1d's second reading).
+--     Quantity, plus the CR 604.2 "as long as" clause an attacking or blocking
+--     requirement may carry (CR 508.1d's and CR 509.1c's second readings).
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target slots and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -4758,7 +4766,7 @@ cardFilters card =
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
-        <> concatMap (unframed . blockRequirementFilters) (Face.blockRequirements card)
+        <> concatMap (frame Unframed . blockRequirementFilters) (Face.blockRequirements card)
         <> concatMap blockPermissionFilters (Face.blockPermissions card)
         <> concatMap (frame Unframed . attackRequirementFilters) (Face.attackRequirements card)
         <> concatMap (unframed . affectedFilters . AttackCost.subject) (Face.attackCosts card)

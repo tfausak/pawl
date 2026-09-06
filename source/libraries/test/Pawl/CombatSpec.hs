@@ -2723,6 +2723,13 @@ luring lure mine theirs =
           let (aura, withAura) = S.addPermanent lure S.alice gs
            in (S.attach aura attacker withAura, ours, yours)
 
+-- CR 604.2's threshold gate, stocked: `n` copies of `printing` in ALICE's
+-- graveyard, alice controlling every source these cases attach. CR 109.5 is what
+-- makes that the right seat -- "your graveyard" on a static ability is the
+-- current controller's.
+filling :: Printing.Printing -> Int -> GameState.GameState -> GameState.GameState
+filling printing n gs = List.foldl' (\g _ -> snd (S.addGraveyardCard printing S.alice g)) gs [1 .. n]
+
 -- CR 509.1c, proved by Lure ("All creatures able to block enchanted creature do
 -- so") -- the pool's first blocking REQUIREMENT, and the first board on which
 -- declining to block is not a legal answer.
@@ -3021,6 +3028,83 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     Spec.assertEqWith s "and the 2/1 Piker killed the 2/1 Screen" (S.creaturesInPlay S.bob blocked) 0
     Spec.assertEqWith s "an Ogre Sentry with no requirement declines, so bob takes two" (S.lifeOf S.bob unblocked) (Just 18)
     Spec.assertEqWith s "and it survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
+  -- CR 509.1c's CONDITION -- "or that it must block if some condition is met" --
+  -- which every card above leaves absent. Seton's Desire ({2}{G} Enchantment --
+  -- Aura, "Enchant creature. Enchanted creature gets +2/+2. Threshold -- As long
+  -- as there are seven or more cards in your graveyard, all creatures able to
+  -- block enchanted creature do so." -- checked against Scryfall, 2026-09-06) is
+  -- Lure's sentence behind CR 604.2's "as long as" clause, and the clause is the
+  -- one Otarian Juggernaut prints on the attacking side.
+  --
+  -- The printings that word the gate on themselves instead -- The Masamune,
+  -- Ace's Baseball Bat, Enkira, Hostile Scavenger and Frodo Baggins -- all say
+  -- "must be BLOCKED if able", which is one requirement obeyed by any single
+  -- blocker rather than one per able creature, and pawl's carrier cannot say
+  -- that (gap #3303). None of them is transcribable whatever the gate does.
+  --
+  -- The two boards differ in ONE thing, the number of cards in alice's
+  -- graveyard, and the threshold falls between them -- the pair
+  -- Pawl.CombatCostSpec's conditionalAttackRequirementSpec builds for the same
+  -- clause on the attacking side.
+  Spec.it s "CR 509.1c a threshold blocking requirement bites only once the gate holds" $ do
+    -- THE AXIS UNDER TEST. The second assertion is what keeps the first from
+    -- passing vacuously: the Piker really is an able blocker under the
+    -- threshold, so declining is legal because the gate is false and not because
+    -- there is nothing to block.
+    desire <- S.printingOf s registry "Seton's Desire"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = luring desire [piker] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        let under = filling piker 6 gs
+            over = filling piker 7 gs
+            blocks = Map.singleton b (Set.singleton a)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty under) "six cards in the graveyard: declining is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks under) "and blocking is still legal, so the combat is live"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty over)) "seven cards: the gate holds and declining is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks over) "blocking the enchanted attacker is legal"
+        Spec.assertEqWith s "and the ceiling counts the requirement, so the forced declaration is that block" (Combat.forcedBlockDeclaration S.bob over) blocks
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 509.1c the gated requirement still names only the enchanted attacker" $ do
+    -- The object axis under the gate: a Piker attacking beside the enchanted one
+    -- carries no requirement, so blocking it instead obeys nothing however full
+    -- the graveyard is. Fails against a reader that lets a holding gate lure
+    -- every attacker.
+    desire <- S.printingOf s registry "Seton's Desire"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = luring desire [piker, piker] [piker]
+    case (mine, theirs) of
+      ([enchanted, other], b : _) -> do
+        let over = filling piker 7 gs
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton enchanted)) over) "blocking the enchanted attacker is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton other)) over)) "blocking the other attacker instead is illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty over)) "and declining is illegal"
+      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  Spec.it s "CR 509.1c whole cards: the threshold forces a block through a real declare blockers step" $ do
+    -- Gameplay level, under an answerer that DECLINES. Both boards carry the
+    -- Aura -- so its +2/+2 is on both and the 4/3 attacker is the same creature
+    -- either way -- and differ only in the graveyard, and both assertions
+    -- differ between them: over the threshold the Piker is forced to block and
+    -- dies while bob takes nothing; under it nobody blocks, bob takes 4 and the
+    -- blocker lives.
+    desire <- S.printingOf s registry "Seton's Desire"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
+        declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareBlockers {} -> Map.empty
+          _ -> S.aggressiveAnswer p
+        enchanted = case mine of
+          -- Unreachable: the fixture has one attacking printing.
+          [] -> gs
+          a : _ -> let (aura, withAura) = S.addPermanent desire S.alice gs in S.attach aura a withAura
+        run n = S.settleSba (S.fightWith declining (filling piker n enchanted))
+        blocked = run 7
+        unblocked = run 6
+    Spec.assertEqWith s "seven cards in the graveyard: the Piker was forced to block, so bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
+    Spec.assertEqWith s "and the blocker died to the 4/3" (S.creaturesInPlay S.bob blocked) 0
+    Spec.assertEqWith s "six cards: the gate is false and bob takes four" (S.lifeOf S.bob unblocked) (Just 16)
+    Spec.assertEqWith s "and the blocker survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
 
 -- A combat board that has NOT yet declared attackers, with Curse of the Nightly
 -- Hunt on the battlefield attached to `who`. The attacking twin of `luring`, and
