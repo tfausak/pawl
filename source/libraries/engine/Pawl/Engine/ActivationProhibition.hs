@@ -128,8 +128,8 @@ cantActivate asked candidates gs =
       -- ability. And no CR 116.2d filter: a stored row carries no name for a
       -- payment to refer to, which Pawl.Types.ActiveActivationProhibition argues
       -- is exact rather than a shortcut.
-      storedSubjects = fmap ActiveActivationProhibition.object (GameState.activationProhibitions gs)
-   in Set.fromList (concatMap fromProhibition (gathered gs) <> filter (`elem` storedSubjects) candidates)
+      storedSubjects = Set.fromList (fmap ActiveActivationProhibition.object (GameState.activationProhibitions gs))
+   in Set.fromList (concatMap fromProhibition (gathered gs)) <> Set.intersection storedSubjects (Set.fromList candidates)
 
 -- CR 116.2d's WHO on this carrier: the permanents that `source`'s ability named
 -- `name` forbids activations on right now. Unioned with

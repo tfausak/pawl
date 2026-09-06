@@ -32,6 +32,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -40,11 +41,13 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.TapState as TapState
 
 -- The permanents an activation action names, of either shape: CR 602.2's
 -- ordinary activation and CR 605.3a's mana one go on one list, so no case can
@@ -147,8 +150,8 @@ unenchantedSpec s registry = Spec.describe s "Unenchanted" $ do
 -- lands in GameState.activationProhibitions and
 -- Pawl.Engine.ActivationProhibition.cantActivate is what reads it.
 --
--- Not implemented, and STRICTER than printed nowhere: every clause of the card
--- is transcribed. The second producer of the sentence, Dovin Baan's "until your
+-- Every clause of the card is transcribed, the entry rewrite and the energy
+-- trigger included. The sentence's second producer, Dovin Baan's "until your
 -- next turn", is left for a card of its own; its duration arm is the one
 -- Chronomantic Escape already exercises.
 --
@@ -171,6 +174,7 @@ storedSpec s registry = Spec.describe s "Stored" $ do
     Spec.assertBool s (notElem victim offered) "the named Troll's regeneration is withheld"
     Spec.assertEqWith s "and its twin's is the one Troll offer left" offered [twin]
     Spec.assertEqWith s "one prohibition was stored, over the Troll named" (fmap ActiveActivationProhibition.object (GameState.activationProhibitions resolved)) [victim]
+    Spec.assertEqWith s "and the ability's other clause tapped that same Troll" (fmap Object.tapped (Game.lookupObject victim resolved)) (Just TapState.Tapped)
   -- The pair's other half: the same activation, aimed at the twin.
   Spec.it s "CR 602.2 aimed at the twin, the first Troll is the one still offered" $ do
     (victim, twin, resolved) <- deadlockResolved s registry "Uthden Troll" (\_ t -> t)
