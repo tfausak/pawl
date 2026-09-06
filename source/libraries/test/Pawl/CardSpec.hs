@@ -2047,6 +2047,7 @@ reservedSlots =
       Binding.departedPermanent,
       Binding.earthbentLand,
       Binding.eventAmount,
+      Binding.preventedDamageSource,
       Binding.sacrificedCount,
       Binding.sacrificedPermanent,
       Binding.tappedPermanent,

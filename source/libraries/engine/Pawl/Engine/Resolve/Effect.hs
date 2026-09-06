@@ -4683,10 +4683,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- the damage, so a shield that prevented none -- CR 615.12's unpreventable
     -- damage, a source whose properties stopped matching -- is not used up.
     --
-    -- ONE ROW PER NAMED RECIPIENT, PreventNextDamage's split. Every printing of
-    -- this rule names one recipient, so the fold installs one row; a card naming
-    -- two would install two shields, which is CR 615.11's answer and not this
-    -- rule's, and none is written.
+    -- ONE ROW PER NAMED RECIPIENT, PreventNextDamage's split, and a fold rather
+    -- than a single row because an ObjectRef may name several. Every printing of
+    -- this rule names exactly one -- Deflecting Palm's "to you", Honorable
+    -- Passage's "to any target" -- so one row is what is installed today.
     gs <- State.get
     let context = effectContext gs controller source legal (slotBindings resolving gs)
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)

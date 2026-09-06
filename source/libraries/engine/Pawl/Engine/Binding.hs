@@ -319,6 +319,13 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 -- through last known information, ControllerOfBound's own
 -- Projection.controllerWithLastKnown among them.
 --
+-- NOT named by Pawl.Engine.Resolve.Slots.effectViewOf, `unattachedHost`'s
+-- posture: no printing reads a CHARACTERISTIC off the source whose damage was
+-- stopped. Honorable Passage's "damage from a red source" looks like one and is
+-- not -- that predicate sits on the trigger's CONDITION, which
+-- Pawl.Engine.Event matches through Projection.viewWithLastKnown already. A
+-- payload saying "equal to that source's power" would want the arm.
+--
 -- Not a target (CR 115.10a; nothing was chosen), so the same CR 608.2b posture
 -- and the same "no card's targetSlots may name it" sweep as `became`, and the
 -- binding-side sweep `eventAmount` has.
