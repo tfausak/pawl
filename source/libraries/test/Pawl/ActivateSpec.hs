@@ -1611,13 +1611,28 @@ printedActivationRestrictionSpec s registry = Spec.describe s "PrintedActivation
   -- to its toughness, that creature has been dealt lethal damage and is
   -- destroyed." One damage on a 2/1.
   Spec.it s "CR 307.5 whole card: Desert pings the attacker dead in the end of combat step" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    desert <- S.printingOf s registry "Desert"
-    let (desertId, attackerId, board) = desertBoard piker desert
-        after = S.runCombat pingAnswer board
+    let attacker = S.aliasRef "attacker"
+        desert = S.aliasRef "desert"
+        board =
+          S.duel
+            S.beginningOfCombat
+            [S.settled "attacker" "Goblin Piker"]
+            [S.aliased "desert" (S.permanent "Desert")]
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget attacker],
+              S.choiceManaSources = Seq.singleton Nothing
+            }
+        script =
+          S.turn
+            1
+            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
+              S.on S.endOfCombat S.bob (S.activateAction desert choices)
+            ]
+    after <- S.play s registry board script S.combatGame
     Spec.assertEqWith s "the Piker connected first" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertBool s (not (Set.member attackerId (GameState.battlefield after))) "and then died to the ping"
-    Spec.assertEqWith s "the Desert paid its {T}" (fmap Object.tapped (Game.lookupObject desertId after)) (Just TapState.Tapped)
+    Spec.assertEqWith s "and then died to the ping" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "the Desert paid its {T}" (S.tappedCount S.bob after) 1
 
   -- The control for the whole-card test: the same board and the same combat,
   -- with an interpreter that never activates. The Piker survives, so what

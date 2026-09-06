@@ -182,6 +182,23 @@ the WHOLE corpus load; grep the corpus for the old spelling rather than
 eyeballing your diff --- then re-run the load-bearing mutations, since a bad
 conflict resolution can neuter a test while leaving the suite green.
 
+## Gameplay harness
+
+Prefer `Pawl.Support`'s `Board`, timed script entries and `play` for gameplay
+tests whose state and player decisions they can state directly. The harness
+checks that a scheduled action was actually offered, keeps its follow-up
+choices attached to it, and fails when a scripted moment or choice was not
+reached. Extend its vocabulary only alongside a gameplay test that needs the
+new decision.
+
+Keep a test-local answerer when the prompt protocol itself is the subject, when
+structurally identical prompts must receive different answers, or when the
+harness cannot express the state or decision without hiding what the test
+proves. Nested games, replayed or randomized decisions, serialized scenarios,
+and end-state check programs remain outside this harness. Do not migrate a
+working test merely to reduce its line count; migrate when the harness makes
+the rule's preconditions and decisions more explicit.
+
 ## Vacuity traps
 
 Each of these has shipped a green-but-meaningless test in this repository:
@@ -215,11 +232,12 @@ Each of these has shipped a green-but-meaningless test in this repository:
   `State.State` counting or indexing its calls, as `Pawl.CopySpec` and
   `Pawl.ManaSpec` do with `countingAnswer` --- and assert on the sequence.
 - **A fixture supplies preconditions your assertion rests on.**
-  `Pawl.Support`'s builders settle what they place (`S.addPermanent` writes
-  `Sickness.Settled`), stock what they draw from, and leave what they place
-  untapped. Name the precondition the behaviour needs and assert it on the
-  board, or the test proves the fixture --- and a hand-built negative lacking
-  it differs in two things.
+  `Pawl.Support`'s older builders settle what they place (`S.addPermanent`
+  writes `Sickness.Settled`), while `Board` preserves the sickness, tap state
+  and damage its object setup states and does not settle the result. Name the
+  precondition the behaviour needs and assert it on the board, or the test
+  proves the fixture --- and a hand-built negative lacking it differs in two
+  things.
 - **A `Pawl.Support` counter may index by a different question than your
   assertion's wording.** `S.countOnBattlefieldByName` takes a `PlayerId`, but
   `Game.zoneMembers` indexes the battlefield by OWNER (CR 108.3), so it cannot
