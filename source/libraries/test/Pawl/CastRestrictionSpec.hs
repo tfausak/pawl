@@ -7,6 +7,7 @@
 -- which keeps the machinery.
 module Pawl.CastRestrictionSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -2625,10 +2626,9 @@ terrorOfThePeaksSpec s registry = Spec.describe s "Terror of the Peaks" $ do
 -- Last Kappa: You may cast a spell from among cards exiled with Shell of the
 -- Last Kappa without paying its mana cost."
 --
--- Not implemented: the second ability. Effect.OfferCast names a SLOT, and no
--- pool or effect binds the cards exiled with a source into one, so nothing can
--- make the offer (#2946). The omission takes a benefit off the Shell's
--- controller, which leaves the card stricter than printed.
+-- The second ability is CR 601.3's offer over a SET: Effect.OfferCast reads an
+-- ObjectRef, and ObjectRef.EachCardExiledWithSource is CR 607.2a's link to the
+-- pile. ShellSecondAbility below is what proves it.
 --
 -- THREE SEATS, so "you" is told from "a player": bob's Lightning Bolt aims at
 -- alice on one board and at carol on the next, alice holds the Shell and three
@@ -2658,8 +2658,111 @@ shellRun :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> ObjectId.Ob
 shellRun aim shellId boltId board =
   let cast = S.runPure aim board (S.cast S.bob boltId)
    in case Activate.abilitiesFor shellId cast of
-        [ability] -> S.runPure (avenAnswer boltId) cast (Activate.activateAbility S.alice shellId ability >> Engine.priorityLoop)
+        -- The FIRST printed ability: the Shell prints two, and the second one is
+        -- ShellSecondAbility's.
+        ability : _ -> S.runPure (avenAnswer boltId) cast (Activate.activateAbility S.alice shellId ability >> Engine.priorityLoop)
         _ -> cast
+
+-- The second ability's board: alice's Shell untapped among three Islands, bob's
+-- Goblin Piker on the battlefield, and THREE cards of bob's in exile -- a
+-- Lightning Bolt ({R}) and a Doom Blade ({1}{B}) filed against the Shell by CR
+-- 607.2a, plus a second Bolt filed against nothing.
+--
+-- The exiledWith rows stand in for two earlier activations of the FIRST ability,
+-- which is proven on its own board above; two activations would need the Shell
+-- untapped twice and settle nothing this case is about.
+--
+-- FOUR things the board is built to tell apart. Neither exiled card's colour is
+-- one three Islands can make, so a cast that happens at all happened without
+-- paying the mana cost (CR 118.9). The Doom Blade needs a legal creature and the
+-- Bolt does not, so the two casts are observable in different places -- a life
+-- total and a battlefield. The unlinked second Bolt is the ZONE decoy: an offer
+-- that swept exile rather than following GameState.exiledWith would carry three
+-- options. And the two linked cards are DISTINCT printings, so the answer pinned
+-- by index below cannot be repaired into the other one.
+shellPileBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+shellPileBoard island shell piker bolt blade =
+  let (shellId, g1) = S.addPermanent shell S.alice (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers))
+      (_, g2) = S.addPermanent piker S.bob g1
+      (boltId, g3) = S.addExiledCard bolt S.bob g2
+      (bladeId, g4) = S.addExiledCard blade S.bob g3
+      (_, g5) = S.addExiledCard bolt S.bob g4
+   in (shellId, g5 {GameState.exiledWith = Map.fromList [(boltId, shellId), (bladeId, shellId)]})
+
+-- Activates the Shell's SECOND ability and answers CR 601.3's choice with the
+-- option at `wanted`, then resolves the stack down.
+--
+-- The choice is pinned BY INDEX into the offered list rather than searched for by
+-- name: an answerer that looked for a castable option would find the other card
+-- again after a mutation, and the point of the case is which option the engine
+-- offered where. `casts` records what it was offered, so a shrunken or reordered
+-- offer shows up rather than being silently answered.
+shellPileRun :: Int -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [[CardName.CardName]])
+shellPileRun wanted shellId board =
+  let answering :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
+      answering p = case p of
+        Prompt.ChooseOfferedCastSpell _ _ options -> do
+          State.modify' (<> [fmap snd (NonEmpty.toList options)])
+          pure (NonEmpty.toList options !! min wanted (length options - 1))
+        Prompt.OfferedCast {} -> pure OptionalDecision.Exercises
+        -- BOB wherever he is legal, so the Bolt goes at him rather than at the
+        -- Piker: the Piker is the Doom Blade's observable, and a Bolt that killed
+        -- it would make the two cases read the same. The Doom Blade's own slot
+        -- offers no player at all, so preferring falls back to the creature there.
+        Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== Just S.bob) . Recipient.playerOf) sets)
+        _ -> pure (S.identityAnswer p)
+      driven = case drop 1 (Activate.abilitiesFor shellId board) of
+        ability : _ -> Activate.activateAbility S.alice shellId ability >> Engine.priorityLoop
+        [] -> pure ()
+   in State.runState (fmap snd (Engine.runGame answering board driven)) []
+
+-- CR 601.3's choice among several cards, which is what separates the Shell's
+-- second ability from every other offered cast in the pool: the others name one
+-- object and this one names a pile.
+shellSecondAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+shellSecondAbilitySpec s registry = Spec.describe s "ShellSecondAbility" $ do
+  Spec.it s "CR 601.3 alice casts the Bolt she picked out of the Shell's pile" $ do
+    (shellId, board, bolt, blade, piker) <- shellPilePrintings s registry
+    let (after, offers) = shellPileRun 0 shellId board
+    Spec.assertEqWith s "CR 601.3 the Bolt alice picked was cast and is in bob's graveyard" (avenNamed bolt Zone.Graveyard S.bob after) 1
+    Spec.assertEqWith s "and the Doom Blade she did not pick stayed in exile" (avenNamed blade Zone.Exile S.bob after) 1
+    Spec.assertEqWith s "with the Piker the Doom Blade would have killed still on the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.bob after) 1
+    Spec.assertEqWith s "and bob took the Bolt's 3" (S.lifeOf S.bob after) (Just 17)
+    -- The offer itself, after the behaviour: two options and not three, so the
+    -- unlinked Bolt in the same exile zone was never on it (CR 607.2a).
+    Spec.assertEqWith s "CR 607.2a the offer carried the two cards the Shell exiled and no more" offers [[S.printingName bolt, S.printingName blade]]
+    -- CR 118.9: three Islands paid the ability's {3} and nothing else was
+    -- available, so the {R} was never paid.
+    Spec.assertEqWith s "CR 118.9 only the three Islands tapped, so the {R} went unpaid" (S.tappedCount S.alice after) 3
+  -- The pair, one index over: same board, same answerer shape, a different option
+  -- taken. Without it "alice was asked" could not be told from "the engine cast
+  -- the first thing it found".
+  Spec.it s "CR 601.3 the same pile casts the Doom Blade when she picks that instead" $ do
+    (shellId, board, bolt, blade, piker) <- shellPilePrintings s registry
+    let (after, offers) = shellPileRun 1 shellId board
+    Spec.assertEqWith s "CR 601.3 the Doom Blade alice picked was cast and killed the Piker" (S.countOnBattlefieldByName (S.printingName piker) S.bob after) 0
+    Spec.assertEqWith s "and both Bolts stayed in exile" (avenNamed bolt Zone.Exile S.bob after) 2
+    Spec.assertEqWith s "so bob took no damage" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "the Doom Blade itself is in bob's graveyard" (avenNamed blade Zone.Graveyard S.bob after) 1
+    Spec.assertEqWith s "off the same two-option offer" offers [[S.printingName bolt, S.printingName blade]]
+    Spec.assertEqWith s "CR 118.9 and the {1}{B} went unpaid, three Islands having paid the {3}" (S.tappedCount S.alice after) 3
+
+-- shellPileBoard's printings, fetched once per case.
+shellPilePrintings :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState, Printing.Printing, Printing.Printing, Printing.Printing)
+shellPilePrintings s registry = do
+  island <- S.printingOf s registry "Island"
+  shell <- S.printingOf s registry "Shell of the Last Kappa"
+  piker <- S.printingOf s registry "Goblin Piker"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  blade <- S.printingOf s registry "Doom Blade"
+  let (shellId, board) = shellPileBoard island shell piker bolt blade
+  pure (shellId, board, bolt, blade, piker)
 
 shellOfTheLastKappaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 shellOfTheLastKappaSpec s registry = Spec.describe s "Shell of the Last Kappa" $ do
@@ -2711,4 +2814,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   avenInterrupterSpec s registry
   terrorOfThePeaksSpec s registry
   shellOfTheLastKappaSpec s registry
+  shellSecondAbilitySpec s registry
   senTripletsSpec s registry

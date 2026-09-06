@@ -3310,7 +3310,7 @@ miracle cost =
     offer =
       Effect.OfferCast
         OfferCast.MkOfferCast
-          { OfferCast.slot = Binding.triggerSource,
+          { OfferCast.ref = ObjectRef.InSlot Binding.triggerSource,
             -- Rule 702.94a's "YOU may cast it": the revealer, who is the
             -- trigger's controller, and a "may".
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,

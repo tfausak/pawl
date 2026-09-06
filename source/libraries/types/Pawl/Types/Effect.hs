@@ -562,9 +562,10 @@ data Effect card ability
     -- and nothing moves. A second arm rather than an empty ref on the one above,
     -- which would send cards through the CR 400.7 funnel.
     Shuffle PlayerRef.PlayerRef
-  | -- | CR 608.2g: offer a player the cast of the object the slot names (CR
-    -- 310.12b). The slot is a read, not a definition; CR 601.3's permission
-    -- comes from the offer itself, and an offer is never a cast.
+  | -- | CR 608.2g: offer a player the cast of the objects the ObjectRef names (CR
+    -- 310.12b), at most one of them. The reference is a read, not a definition;
+    -- CR 601.3's permission comes from the offer itself, and an offer is never a
+    -- cast.
     OfferCast OfferCast.OfferCast
   | -- | CR 601.3: grant the permission to play the objects the ObjectRef names,
     -- for a duration (Victor Mancha, Runaway) -- a standing permission where

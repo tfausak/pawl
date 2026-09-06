@@ -327,7 +327,7 @@ siegeDefeat =
     offer =
       Effect.OfferCast
         OfferCast.MkOfferCast
-          { OfferCast.slot = Binding.became,
+          { OfferCast.ref = ObjectRef.InSlot Binding.became,
             -- Rule 310.12b's "YOU may cast it": the trigger's controller, which
             -- is the resolving controller, and a "may".
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,

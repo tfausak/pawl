@@ -2132,7 +2132,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseOptional decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseClause decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OfferedCast decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseOfferedCastFace decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseOfferedCastSpell decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OfferedMiracleReveal decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseToPay decider _ _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.AnnouncePhyrexianPayment decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2249,7 +2249,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseOptional {} -> "ChooseOptional"
   Prompt.ChooseClause {} -> "ChooseClause"
   Prompt.OfferedCast {} -> "OfferedCast"
-  Prompt.ChooseOfferedCastFace {} -> "ChooseOfferedCastFace"
+  Prompt.ChooseOfferedCastSpell {} -> "ChooseOfferedCastSpell"
   Prompt.OfferedMiracleReveal {} -> "OfferedMiracleReveal"
   Prompt.ChooseToPay {} -> "ChooseToPay"
   Prompt.AnnouncePhyrexianPayment {} -> "AnnouncePhyrexianPayment"

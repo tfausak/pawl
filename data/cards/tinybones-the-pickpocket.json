@@ -45,7 +45,10 @@
                               "type": "AnyType"
                             }
                           },
-                          "slot": "stolen"
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "stolen"
+                          }
                         }
                       }
                     ]

@@ -484,9 +484,15 @@ data Prompt r where
   -- them to (CR 310.12b), the CardName being the half CR 712.11a puts on the
   -- stack; never elided, and not raised for CR 608.2g's "instructs".
   OfferedCast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
-  -- | CR 709.3 / 712.11b / 715.3: which half an OfferedCast casts, from those
-  -- Cast.castableWhenOffered admits; asked before the "may".
-  ChooseOfferedCastFace :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
+  -- | CR 601.3 / 709.3 / 712.11b / 715.3: WHICH CAST an OfferedCast makes, from
+  -- those Cast.castableWhenOffered admits; asked before the "may".
+  --
+  -- An object AND a name per option, because CR 601.3's offer ranges over a set
+  -- of cards (Shell of the Last Kappa's exiled pile) as readily as over the
+  -- halves of one (CR 709.3), and one prompt has to carry both -- a card with two
+  -- castable halves contributes two options naming the same object. Elided when
+  -- only one survives the gate.
+  ChooseOfferedCastSpell :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty (ObjectId.ObjectId, CardName.CardName) -> Prompt (ObjectId.ObjectId, CardName.CardName)
   -- | CR 702.94a / 121.9: whether the drawn card is revealed for miracle, the
   -- cast being OfferedCast's separate "may"; never elided where asked.
   OfferedMiracleReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
