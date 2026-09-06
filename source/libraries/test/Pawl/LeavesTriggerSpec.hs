@@ -641,7 +641,7 @@ warpedDevotionSpec s registry =
               Spec.assertEqWith
                 s
                 "the owner and the departed permanent, nothing else"
-                (Event.eventBindings gone Nothing S.bob (TriggerCondition.PermanentReturnedToHand (Filter.Type.And [])) ev)
+                (Event.eventBindings gone Nothing Map.empty S.bob (TriggerCondition.PermanentReturnedToHand (Filter.Type.And [])) ev)
                 (Map.fromList [(Binding.triggerPlayer, Binding.toPlayer S.bob), (Binding.departedPermanent, Binding.toObject pikerId)])
             other -> Spec.assertFailure s ("expected one move of the Piker, got " <> show (length other))
 
@@ -735,14 +735,14 @@ becameSlotSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
+          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
         -- A condition that is not a look-back gets no such slot: Narcomoeba's
         -- bearer IS the arriving card, so binding it again would be a second
         -- name for the same object.
         Spec.it s "CR 113.6k a library-to-graveyard trigger binds nothing" $ do
           let oid = ObjectId.MkObjectId 1
               milled = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "no became slot" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
+          Spec.assertEqWith s "no became slot" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
         -- CR 400.7f's arm, the one place the slot comes from something other than
         -- the event: the BEARER's own arrival, which eventTriggers computes off
         -- the batch. Pinned in isolation so the rule is stated once here and once
@@ -757,7 +757,7 @@ becameSlotSpec s registry =
           Spec.assertEqWith
             s
             "became names the Aura's incarnation, not the host's"
-            (Event.eventBindings (Setup.emptyGame S.bothPlayers) (Just bearerArrived) S.alice TriggerCondition.AttachedCreatureDies hostDied)
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) (Just bearerArrived) Map.empty S.alice TriggerCondition.AttachedCreatureDies hostDied)
             (Map.fromList [(Binding.became, Binding.toObject bearerArrived), (Binding.departedPermanent, Binding.toObject departed)])
           -- CR 303.4b's half stands alone where the bearer reached no graveyard:
           -- the host's departure is the EVENT's datum and CR 704.5n's Equipment
@@ -766,7 +766,7 @@ becameSlotSpec s registry =
           Spec.assertEqWith
             s
             "and the host alone where the bearer reached no graveyard"
-            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice TriggerCondition.AttachedCreatureDies hostDied)
+            (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice TriggerCondition.AttachedCreatureDies hostDied)
             (Map.singleton Binding.departedPermanent (Binding.toObject departed))
         -- The pin on Event.eventBindingSlots, the per-CONDITION slot set the
         -- card lint asks (CardSpec's "every slot a triggered ability reads is
@@ -826,7 +826,7 @@ becameSlotSpec s registry =
           Spec.assertBool s (not (Map.null (GameState.lastKnown pinState))) "the funnel filed a last-known record for the bounced Piker"
           mapM_
             ( \cond ->
-                let stamped = fmap (Map.keysSet . Event.eventBindings pinState bearerBecame S.alice cond) (representativeEvents cond)
+                let stamped = fmap (\(arrivals, event) -> Map.keysSet (Event.eventBindings pinState bearerBecame arrivals S.alice cond event)) (representativeEvents cond)
                  in Spec.assertEqWith s ("the slots bound for " <> show cond) (Event.eventBindingSlots cond) (foldr Set.intersection (NonEmpty.head stamped) (NonEmpty.tail stamped))
             )
             everyTriggerCondition
@@ -850,7 +850,7 @@ becameSlotSpec s registry =
                 Nothing -> empty
           mapM_
             ( \cond ->
-                let stamped = fmap (Map.keysSet . Event.eventBindings pinState bearerBecame S.alice cond) (representativeEvents cond)
+                let stamped = fmap (\(arrivals, event) -> Map.keysSet (Event.eventBindings pinState bearerBecame arrivals S.alice cond event)) (representativeEvents cond)
                  in Spec.assertEqWith
                       s
                       ("the slots ever bound for " <> show cond)
@@ -1008,7 +1008,7 @@ promiseOfTomorrowSpec s registry =
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the graveyard incarnation and departedPermanent the battlefield one" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.fromList [(Binding.became, Binding.toObject arrived), (Binding.departedPermanent, Binding.toObject departed)])
+          Spec.assertEqWith s "became names the graveyard incarnation and departedPermanent the battlefield one" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.fromList [(Binding.became, Binding.toObject arrived), (Binding.departedPermanent, Binding.toObject departed)])
 
 -- CR 603.10a's departed permanent under a BYSTANDER's DIES trigger, which
 -- promiseOfTomorrowSpec above deliberately does not read: Promise of Tomorrow
@@ -2823,7 +2823,7 @@ aetherFlashSpec s registry =
           let castCard = ObjectId.MkObjectId 1
               entered = ObjectId.MkObjectId 2
               entry = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
-          Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
+          Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
         -- CR 603.6a's "EACH TIME an event puts one or more permanents onto
         -- the battlefield" met with a per-entrant payload: Dragon Fodder
         -- ({1}{R} Sorcery, "create two 1/1 red Goblin creature tokens") makes

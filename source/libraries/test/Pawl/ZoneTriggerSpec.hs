@@ -1880,7 +1880,7 @@ leavesBattlefieldSpec s registry =
         Spec.it s "CR 400.2 eventBindings binds became for every PUBLIC destination and for no hidden one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              leftFor to = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
+              leftFor to = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
               bound = Map.singleton Binding.became (Binding.toObject arrived)
           Spec.assertEqWith s "a graveyard is public" (leftFor Zone.Graveyard) bound
           Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
@@ -1935,10 +1935,17 @@ leavesBattlefieldSpec s registry =
 -- represented by a one-element list, for which the floor is that event's exact
 -- keyset. The exceptions are SelfLeavesTheBattlefield, whose two destinations
 -- differ because CR 400.7e binds `became` for the public one and withholds it
--- for the hidden one (CR 400.2); SelfIsDealtDamage, which admits both of CR
--- 120.3's damage kinds; and SelfBecomesBlockedByOneOrMore and
--- CreatureBecomesBlockedByAtLeast, which each admit rule 509.3e's two producers
--- under two different event constructors.
+-- for the hidden one (CR 400.2); PermanentSacrificed, whose two rows differ over
+-- the ARRIVAL TABLE rather than over the event (see below); SelfIsDealtDamage,
+-- which admits both of CR 120.3's damage kinds; and SelfBecomesBlockedByOneOrMore
+-- and CreatureBecomesBlockedByAtLeast, which each admit rule 509.3e's two
+-- producers under two different event constructors.
+--
+-- EACH ROW CARRIES ITS OWN ARRIVAL TABLE, Event.eventBindings' CR 400.7e
+-- argument, because one condition's floor turns on that rather than on the event:
+-- CR 603.10a records a sacrifice BEFORE the move, so the arrival is nowhere on
+-- GameEvent.PermanentSacrificed and a CR 614.1 replacement can leave the table
+-- without the row. Empty for every other row, none of whose arms reads it.
 --
 -- Exhaustive with no wildcard, which is half of what keeps the pin honest -- a
 -- new TriggerCondition fails to compile here. The other half, the list below, is
@@ -1962,7 +1969,7 @@ bareAbility condition =
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
-representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty GameEvent.GameEvent
+representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty (Map.Map ObjectId.ObjectId ObjectId.ObjectId, GameEvent.GameEvent)
 representativeEvents cond =
   let departed = representativeDeparted
       arrived = ObjectId.MkObjectId 2
@@ -1970,7 +1977,13 @@ representativeEvents cond =
       combatDamage =
         GameEvent.DamageDealt
           (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
-      one e = e NonEmpty.:| []
+      -- A row whose arm reads no arrival table, which is every arm but one.
+      noTable e = (Map.empty, e)
+      one e = noTable e NonEmpty.:| []
+      -- The batch's CR 400.7e table, with the sacrificed permanent's graveyard
+      -- arrival in it -- Event.eventTriggers' `becameInGraveyard` for a sacrifice
+      -- that reached a graveyard.
+      buried = Map.singleton departed arrived
       -- CR 614.5's identity for a shield the BEARER's own resolution installed,
       -- which is what "prevented this way" compares against.
       preventedByBearer = CandidateId.OfFloating (FloatingCandidate.MkFloatingCandidate departed (Timestamp.MkTimestamp 1))
@@ -1988,8 +2001,8 @@ representativeEvents cond =
         -- condition is the one damage arm that admits both: a floor claimed for
         -- one kind and not the other would come apart here.
         TriggerCondition.SelfIsDealtDamage ->
-          GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 2 False False False 0 Nothing DamageKind.Noncombat)
-            NonEmpty.:| [GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 3 False False False 0 Nothing DamageKind.Combat)]
+          noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 2 False False False 0 Nothing DamageKind.Noncombat))
+            NonEmpty.:| [noTable (GameEvent.DamageDealt (DamageEvent.MkDamageEvent arrived (Recipient.ToCreature departed) 3 False False False 0 Nothing DamageKind.Combat))]
         -- The same event read by a bystander, and the only one this condition
         -- admits.
         TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> one combatDamage
@@ -2018,8 +2031,8 @@ representativeEvents cond =
         -- discard and a cycle are each an event it genuinely admits, and an arm
         -- that read the cause would pin nothing for one of them.
         TriggerCondition.SelfDiscarded ->
-          GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary)
-            NonEmpty.:| [GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost)]
+          noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary))
+            NonEmpty.:| [noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost))]
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary))
         -- The CYCLING cause, which is the only one this condition admits -- an
         -- Ordinary discard is an event it rejects, and eventBindings is consulted
@@ -2105,8 +2118,8 @@ representativeEvents cond =
         -- eventBindings arm added here without eventBindingSlots being told
         -- would break.
         TriggerCondition.SelfBecomesBlockedByOneOrMore _ ->
-          GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol 1)
-            NonEmpty.:| [GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)})]
+          noTable (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol 1))
+            NonEmpty.:| [noTable (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)}))]
         -- The same grouped event once more, with the ids read the other way from
         -- every arm above it: the bearer is a BYSTANDER, so `departed` sits in
         -- the attacker position and is what this one binds -- an arm that bound
@@ -2121,8 +2134,8 @@ representativeEvents cond =
         -- indistinguishable from one where the trigger never fired -- so the
         -- intersection is the fence for exactly that.
         TriggerCondition.CreatureBecomesBlockedByAtLeast {} ->
-          GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol 1)
-            NonEmpty.:| [GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)})]
+          noTable (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol 1))
+            NonEmpty.:| [noTable (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)}))]
         -- The same declaration's unblocked branch, which carries the attacker
         -- and nothing else -- so the floor it pins is the empty set.
         TriggerCondition.SelfAttacksUnblocked -> one (GameEvent.AttackerUnblocked departed)
@@ -2136,7 +2149,7 @@ representativeEvents cond =
         -- exists: CR 712.21's second card is announced by a CardArrived event
         -- rather than a Moved one, and the floor has to hold for each.
         TriggerCondition.CardPutIntoGraveyard _ ->
-          moved Zone.Hand Zone.Graveyard NonEmpty.:| [GameEvent.CardArrived (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard)]
+          noTable (moved Zone.Hand Zone.Graveyard) NonEmpty.:| [noTable (GameEvent.CardArrived (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard))]
         TriggerCondition.SelfDies -> one (moved Zone.Battlefield Zone.Graveyard)
         TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- The same one event, and NOT because the batch reading matches nothing:
@@ -2152,13 +2165,13 @@ representativeEvents cond =
         -- all, so there is no arriving object for CR 400.7e to offer and it
         -- binds nothing -- which is what keeps the floor empty.
         TriggerCondition.SelfLeavesTheBattlefield ->
-          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
+          noTable (moved Zone.Battlefield Zone.Graveyard) NonEmpty.:| [noTable (moved Zone.Battlefield Zone.Hand), noTable (GameEvent.LeftTheGame departed)]
         -- The bystander reading of the arm above, whose three events are the same
         -- three. Its CR 400.7e arrival is withheld for the same two reasons, but
         -- the floor is NOT empty: CR 603.10a's departed permanent is bound by
         -- every one of the three, which is what these events pin.
         TriggerCondition.PermanentLeavesTheBattlefield _ ->
-          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
+          noTable (moved Zone.Battlefield Zone.Graveyard) NonEmpty.:| [noTable (moved Zone.Battlefield Zone.Hand), noTable (GameEvent.LeftTheGame departed)]
         -- The one destination the arm above's three events narrow to, and the
         -- only event this condition admits at all: CR 400.2 makes a hand hidden,
         -- so CR 400.7e withholds the arrival; what the floor holds is the
@@ -2326,7 +2339,16 @@ representativeEvents cond =
         -- board -- which is fine for what this pins: the arm binds the event's
         -- player under every relation the condition admits, so the floor is the
         -- same either way.
-        TriggerCondition.PermanentSacrificed {} -> one (GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed S.alice departed))
+        --
+        -- TWO ROWS OFF ONE EVENT, the only arm here whose pair differs in the
+        -- ARRIVAL TABLE rather than in the event. CR 400.7e's new object is not
+        -- on this event at all -- CR 603.10a records the sacrifice before the
+        -- move -- so the second row is the CR 614.1 case (Rest in Peace redirects
+        -- it, or delayedPending scans no batch) and the floor has to hold for it
+        -- as well as for the ordinary burial.
+        TriggerCondition.PermanentSacrificed {} ->
+          (buried, GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed S.alice departed))
+            NonEmpty.:| [noTable (GameEvent.PermanentSacrificed (PermanentWasSacrificed.MkPermanentWasSacrificed S.alice departed))]
         -- CR 603.3b's own event, and the only one this condition admits. The
         -- pair does NOT actually match here -- `departed` projects as no Saga on
         -- the empty board Event.matchesTrigger is asked about -- which is fine

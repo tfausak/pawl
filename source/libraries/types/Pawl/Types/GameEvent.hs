@@ -297,10 +297,9 @@ data GameEvent
     -- and distinct from the Moved event the same sacrifice records: CR 700.4
     -- makes a sacrifice a death, whose zone change a destruction writes too. CR
     -- 603.10a is why the record is written BEFORE the move, naming the pre-move
-    -- id.
-    --
-    -- Not implemented: a slot for the sacrificed permanent, which "sacrifice a
-    -- creature ... return IT" would read (#977).
+    -- id, which is why Pawl.Engine.Event.Binding.eventBindings is handed the
+    -- batch's arrival table to bind CR 400.7e's new object for Prowling
+    -- Geistcatcher's "exile it".
     PermanentSacrificed PermanentWasSacrificed.PermanentWasSacrificed
   | -- | CR 603.3b: an ABILITY TRIGGERED -- what it hangs on (CR 113.7), the
     -- ability's controller as it triggered (CR 603.3a), and the ability itself.

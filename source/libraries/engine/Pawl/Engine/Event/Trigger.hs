@@ -907,11 +907,15 @@ eventTriggers events gs =
       -- CR 603.10a's look-back at the permanent this event removed: the
       -- abilities it had that functioned on the battlefield, `battlefieldAbilitiesOf`
       -- above's filter and `conditionPutsSelfInto`'s exception both applying.
-      -- CR 400.7f's own datum, and the one thing `eventBindings` is told that it
-      -- could not read off the event it was handed: for each permanent this batch
-      -- put from the battlefield into a graveyard, the id it BECAME there.
-      -- `departed` is the key because that is the id a borne trigger carries as
-      -- its source (CR 113.7a), so `pend` below can ask it about the bearer.
+      -- CR 400.7f's own datum, and part of the one thing `eventBindings` is told
+      -- that it could not read off the event it was handed: for each permanent
+      -- this batch put from the battlefield into a graveyard, the id it BECAME
+      -- there. `departed` is the key because that is the id a borne trigger
+      -- carries as its source (CR 113.7a), so `pend` below can ask it about the
+      -- bearer -- and because CR 603.10a's look-back events name the pre-move id
+      -- too, which is why the WHOLE table goes to eventBindings beside the
+      -- bearer's own row: a sacrifice is recorded before its move, so nothing on
+      -- GameEvent.PermanentSacrificed names CR 400.7e's new object.
       --
       -- Battlefield to GRAVEYARD alone, that being the only destination the rule
       -- names ("in its owner's graveyard"); every other departure contributes
@@ -1470,7 +1474,7 @@ eventTriggers events gs =
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) ctrl (TriggeredAbility.condition ab) event) Nothing
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard ctrl (TriggeredAbility.condition ab) event) Nothing
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -2490,8 +2494,11 @@ delayedPending grouped gs =
           -- Nothing for CR 400.7f's bearer arrival: this scan looks for events a
           -- delayed entry watches, not for a bearer's own departure, and the
           -- entry's captured environment (CR 603.7c) is where what it knows about
-          -- its own object comes from.
-          (Map.union (eventBindings gs Nothing (DelayedTrigger.controller entry) (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
+          -- its own object comes from. The empty arrival table beside it for the
+          -- same reason -- this scan gathers no batch -- which is why CR 400.7e's
+          -- new object is claimed by eventBindingSlotsSometimes and not by the
+          -- floor wherever eventBindings reads that table.
+          (Map.union (eventBindings gs Nothing Map.empty (DelayedTrigger.controller entry) (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
           -- CR 603.7a: what tells the ability this becomes apart from one its
           -- source simply has, once it is on the stack.
           (Just (DelayedTrigger.createdAt entry))
