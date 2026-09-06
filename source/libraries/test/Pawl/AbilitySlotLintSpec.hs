@@ -865,18 +865,18 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
         -- scaled gate.
         throughNoSlot = counting (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.AnyPlayer))) (Filter.Type.And [])
         rejected condition quantity = triggeredAbilityOffends (modalTrigger condition [scaled quantity])
-        -- One tagged list rather than five assertions, FilterPositionLintSpec's
-        -- shape: a carrier the fold stops at names itself instead of hiding
-        -- behind whichever assertion happens to run first.
-        -- CR 603.3b's consumer of the same map, in the same list: Engine.orderInert
-        -- elides the ordering prompt for a batch of EQUAL entries only when the
-        -- mode reads no slot at all, so a gate scaled per bound object was
-        -- reported inert and the batch went on the stack in the engine's
-        -- canonical order -- the engine making a player's choice, since the two
-        -- entries' gates are measured against different bound objects. Asserted
-        -- on the carrier rather than at gameplay level: no card in `data/cards/`
-        -- writes a gate scaled per bound object, so no board raises the prompt.
+        -- CR 603.3b's consumer of the same map: Engine.orderInert elides the
+        -- ordering prompt for a batch of EQUAL entries only when the mode reads
+        -- no slot at all, so a gate scaled per bound object was reported inert
+        -- and the batch went on the stack in the engine's canonical order -- the
+        -- engine making a player's choice, since the two entries' gates are
+        -- measured against different bound objects. Asserted on the carrier
+        -- rather than at gameplay level: no card in `data/cards/` writes a gate
+        -- scaled per bound object, so no board raises the prompt.
         inert quantity = Engine.orderInert (modalTrigger TriggerCondition.SelfDealsCombatDamageToPlayer [scaled quantity])
+        -- One tagged list over both consumers rather than an assertion apiece,
+        -- FilterPositionLintSpec's shape: a carrier the fold stops at names
+        -- itself instead of hiding behind whichever assertion runs first.
         rows =
           [ ("D4: a scope's player, unbound", rejected TriggerCondition.SelfEnters throughScope),
             ("D4: a scope's player, bound", rejected TriggerCondition.SelfDealsCombatDamageToPlayer throughScope),
