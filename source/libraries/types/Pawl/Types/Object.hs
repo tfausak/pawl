@@ -142,6 +142,11 @@ data Object = MkObject
     -- among them. Empty for everything that never chose, which matches no card at
     -- all (CR 201.2a). Not a copiable value and per-incarnation, for chosenColor's
     -- reasons.
+    --
+    -- ASSIGNED by both writers and never added to, so CR 608.2c's scope holds for
+    -- a PERMANENT that chooses on two separate resolutions: the later choice is
+    -- the whole of what "the chosen name" then means (Petra Sphinx activated
+    -- twice, Pawl.ResolveSpec).
     chosenNames :: Set.Set CardName.CardName,
     -- | CR 614.1c: a player this object's controller chose as it entered (Stuffy
     -- Doll). Read by Pawl.Engine.Resolve's ObjectRef.ChosenPlayer arm off the

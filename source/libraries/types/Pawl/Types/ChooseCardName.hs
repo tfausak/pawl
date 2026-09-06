@@ -12,9 +12,11 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- Conundrum Sphinx's. Pawl.Types.Search carries two of these for the same
 -- reason: whose library is searched is a question the card asks, not a constant.
 --
--- Not implemented: the names each chooser picked, kept apart per player. They
--- are unioned into the one Object.chosenNames set on the source, so a reference
--- to "the name THEY chose" cannot pick its chooser's out (#3316).
+-- Not implemented: the names the several choosers of ONE instruction picked,
+-- kept apart per player. They union into the one Object.chosenNames set on the
+-- source, so a reference to "the name THEY chose" cannot pick its chooser's out
+-- (#3316). A card naming ONE chooser is exact, the resolve arm assigning that
+-- set rather than adding to whatever an earlier resolution left.
 data ChooseCardName = MkChooseCardName
   { player :: PlayerRef.PlayerRef,
     restriction :: Filter.Filter Keyword.Keyword
