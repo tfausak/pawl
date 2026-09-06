@@ -11,9 +11,18 @@ import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 -- 707.9a's; Phyrexian Metamorph's "except it's an artifact in addition to its
 -- other types" is the carve-out CR 707.9d's last two sentences make.
 --
--- A LIST of these rides EntryRewrite.AsCopy rather than one: the printed clauses
--- are joined by "and" (Moritte of the Frost states three), and CR 707.9f reads
--- "any other exceptions that effect includes" -- plural, of one effect.
+-- A LIST of these rides EntryRewrite.AsCopy and Pawl.Types.BecomeCopy rather than
+-- one: the printed clauses are joined by "and" (Moritte of the Frost states
+-- three), and CR 707.9f reads "any other exceptions that effect includes" --
+-- plural, of one effect.
+--
+-- BOTH CARRIERS take the same list, since CR 707.9 is a rider on the copying
+-- process rather than on the door the copy arrives by: Copycrook's "except it
+-- has [ability]" and Unstable Shapeshifter's "except it has this ability" are the
+-- same sentence over CR 707.5's entry replacement and CR 707.4's battlefield
+-- change. Pawl.Types.CreateCopy takes none, and that is card-driven rather than
+-- structural -- every printed "create a token copy ... except it has haste"
+-- pairs the clause with a delayed sacrifice pawl cannot yet write (#2302).
 --
 -- Every arm writes into the COPIABLE snapshot, never into a CR 613 layer, which
 -- is what CR 707.9a and CR 707.9b both require: the excepted value or ability
@@ -55,6 +64,32 @@ data CopyException
     -- picks up an excepted changeling at CR 613.3's start-of-layer moment rather
     -- than in timestamp order (Omni-Changeling).
     GainKeywords (Set.Set Keyword.Keyword)
+  | -- | CR 707.9a again, one ability kind over: the copy gains the ability this
+    -- copy effect is written inside ("except it has this ability", Unstable
+    -- Shapeshifter), so that ability joins the copiable values.
+    --
+    -- NULLARY, and self-referential by construction. The printed words are a
+    -- reference and not a quotation, so there is nothing to carry: the ability is
+    -- read off the resolving object at CR 608.2's execution
+    -- (Pawl.Engine.Resolve.Effect's BecomeCopy arm), and what is written into the
+    -- snapshot is that whole ability -- this exception included. So the copy's
+    -- own instance is what "this ability" names the next time it resolves, which
+    -- is what lets a Shapeshifter copy a second creature and a third. A payload
+    -- would have to be the ability that contains it, which no finite value is.
+    --
+    -- Not implemented: the exception that QUOTES an ability instead of pointing
+    -- at this one (Copycrook's "except it has 'Whenever this creature attacks, it
+    -- connives'", Estrid's Invocation). That payload is a whole
+    -- Pawl.Types.GrantedAbility, which this module may not name -- CR 707.9's
+    -- exceptions ride Pawl.Types.Effect's BecomeCopy, and GrantedAbility reaches
+    -- Effect -- so it wants this type parametric in the ability the way
+    -- Pawl.Types.EntryRewrite is parametric in the effect (#1292).
+    --
+    -- Not implemented: the same words in an ACTIVATED ability (Dimir
+    -- Doppelganger's "{1}{U}: ... becomes a copy of that card, except it has this
+    -- ability"), which would write Pawl.Types.ProjectedCharacteristics'
+    -- activatedAbilities instead (#3325).
+    GainThisAbility
   | -- | CR 707.9b: the copy is these card types "in addition to its other types"
     -- (Phyrexian Metamorph's "except it's an artifact"), so they JOIN the copied
     -- type line rather than replacing it (CR 205.1b).

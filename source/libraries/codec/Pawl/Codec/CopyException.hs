@@ -17,6 +17,7 @@ codec =
       Arm.payload "GainKeywords" (Common.set Keyword.codec) CopyException.GainKeywords $ \x -> case x of
         CopyException.GainKeywords y -> Just y
         _ -> Nothing,
+      Arm.nullary "GainThisAbility" CopyException.GainThisAbility,
       Arm.payload "AddCardTypes" (Common.set CardType.codec) CopyException.AddCardTypes $ \x -> case x of
         CopyException.AddCardTypes y -> Just y
         _ -> Nothing

@@ -535,7 +535,7 @@ objectRefPositions =
     ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
     ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
     ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders), [plantedRef "cc"]),
-    ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject")), [plantedRef "bc-original", plantedRef "bc-subject"]),
+    ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") []), [plantedRef "bc-original", plantedRef "bc-subject"]),
     ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied), [plantedRef "cs"]),
     -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
     -- reach: a copy effect whose candidate description reads a slot no clause
@@ -3726,14 +3726,18 @@ playerEffectFilters playerEffect = case playerEffect of
   -- a once-per-turn flag, and no Filter over objects.
   PlayerEffect.StateCoinFlip _ -> []
 
--- CR 707.9's "except ..." clauses. Only the CR 707.9a arm reaches a Filter, and
--- only through the keyword it names; CR 707.9b's two arms name a pair of literals
--- and a set of card types, neither of which narrows anything.
+-- CR 707.9's "except ..." clauses. Only the GainKeywords arm reaches a Filter,
+-- and only through the keyword it names; CR 707.9b's two arms name a pair of
+-- literals and a set of card types, neither of which narrows anything.
 copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyExceptionFilters exception = case exception of
   CopyException.SetPowerToughness _ -> []
   CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
   CopyException.AddCardTypes _ -> []
+  -- CR 707.9a's "this ability" carries no payload, so nothing to narrow. The
+  -- ability it points at is the resolving one, which this walk reaches where the
+  -- card prints it.
+  CopyException.GainThisAbility -> []
 
 -- CR 208.2b's entry option. The P/T pair narrows nothing; the keywords reach a
 -- Filter apiece, copyExceptionFilters' road one rule over.
@@ -4490,7 +4494,10 @@ effectFilters effect = case effect of
   -- count's and the riders' Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> frame SourceHostFramed (objectRefFilters ref)
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject)
+  -- The exceptions beside them carry Filters through a KEYWORD, and frame them
+  -- themselves (copyExceptionFilters) -- EntryRewrite's AsCopy arm takes the same
+  -- walk over the same list.
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject) <> concatMap copyExceptionFilters exceptions
   -- BOTH refs, CreateCopy's arm above: an EachMatching Filter is card text, and
   -- CR 707.10d's candidates are named by one.
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> frame SourceHostFramed (objectRefFilters ref <> copyTargetsFilters targets)

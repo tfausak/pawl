@@ -1132,7 +1132,7 @@ effectObjectRefs effect = case effect of
   Effect.Create {} -> []
   Effect.Conjure {} -> []
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> read_ [ref]
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> read_ [original, subject]
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> read_ (ref : copyTargetsRefs targets)
   Effect.Replace {} -> []
   Effect.SkipNextPhase {} -> []

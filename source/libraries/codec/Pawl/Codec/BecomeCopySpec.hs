@@ -5,6 +5,7 @@ import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SlotName as SlotName
@@ -21,8 +22,23 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
       BecomeCopy.codec
       ( BecomeCopy.MkBecomeCopy
           { BecomeCopy.original = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")),
-            BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource
+            BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource,
+            BecomeCopy.exceptions = []
           }
       )
       " {\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
+  -- The Shapeshifter's own third key. Written out because it is DEFAULTED: an
+  -- absent `exceptions` decodes to the empty list above, so only a case that
+  -- states one proves the key is read at all (CR 707.9a).
+  Spec.it s "MkBecomeCopy, with an exception" $
+    Common.assertCodec
+      s
+      BecomeCopy.codec
+      ( BecomeCopy.MkBecomeCopy
+          { BecomeCopy.original = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")),
+            BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource,
+            BecomeCopy.exceptions = [CopyException.GainThisAbility]
+          }
+      )
+      " {\"exceptions\":[{\"type\":\"GainThisAbility\"}],\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BecomeCopy.codec

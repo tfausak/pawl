@@ -47,6 +47,14 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       (CopyException.AddCardTypes (Set.fromList [CardType.Enchantment, CardType.Artifact]))
       " {\"type\":\"AddCardTypes\",\"value\":[{\"type\":\"Artifact\"},{\"type\":\"Enchantment\"}]} "
 
+  -- CR 707.9a's second arm is NULLARY, so the tag alone is the whole value.
+  Spec.it s "GainThisAbility round-trips as a bare tag" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      CopyException.GainThisAbility
+      " {\"type\":\"GainThisAbility\"} "
+
   Spec.it s "rejects a payload of the wrong length" $
     Spec.assertBool
       s

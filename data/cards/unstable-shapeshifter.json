@@ -56,6 +56,11 @@
                       {
                         "type": "BecomeCopy",
                         "value": {
+                          "exceptions": [
+                            {
+                              "type": "GainThisAbility"
+                            }
+                          ],
                           "original": {
                             "type": "InSlot",
                             "value": "became"

@@ -496,8 +496,10 @@ rewriteEffect pairs effect = case effect of
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword, Create's arm above (#1190).
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders))
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) ->
-    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject))
+  -- The exceptions ride this opcode too, and take the same walk AsCopy's do
+  -- (rewriteEntryRewrite below).
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) ->
+    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject) (fmap (rewriteCopyException pairs) exceptions))
   -- BOTH refs, CreateCopy's reason: CR 707.2 keeps a text change out of the
   -- copiable values, so what the copy becomes is not rewritten, but CR 707.10d's
   -- description of the candidates ("each other creature you control") is card
@@ -1073,6 +1075,10 @@ rewriteCopyException pairs exception = case exception of
   -- CR 707.9b's type clause names CARD types (CR 205.2a's list), and CR 612.2's
   -- swap reaches only subtypes, so there is nothing here for a pair to change.
   CopyException.AddCardTypes _ -> exception
+  -- CR 707.9a's "this ability" carries no word of its own. The ability it points
+  -- at is the resolving one, which the projection already rewrote where it was
+  -- read (rewriteTriggeredAbility).
+  CopyException.GainThisAbility -> exception
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
