@@ -8,6 +8,7 @@ module Pawl.CastSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -863,10 +864,30 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   Spec.it s "Blaze at X=3 deals 3 to the opponent (CR 601.2b/f/h, 608.2)" $ do
     -- Falsifier: an engine that ignored the chosen value (treated X as 0, or
     -- as the {X} mana value) would leave bob at 20.
-    blaze <- S.printingOf s registry "Blaze"
-    mountain <- S.printingOf s registry "Mountain"
-    let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
-        after = snd (Engine.runGamePure (answerXOf 3) gs0 (do S.cast S.alice oid; Stack.resolveTop))
+    let mana1 = S.aliased "first mana" (S.permanent "Mountain")
+        mana2 = S.aliased "second mana" (S.permanent "Mountain")
+        mana3 = S.aliased "third mana" (S.permanent "Mountain")
+        mana4 = S.aliased "fourth mana" (S.permanent "Mountain")
+        spell = S.aliased "spell" (S.cardSetup "Blaze")
+        alice =
+          (S.battlefield S.alice [mana1, mana2, mana3, mana4])
+            { S.setupHand = Seq.singleton spell
+            }
+        board = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkPlayerTarget S.bob],
+              S.choiceX = Just 3,
+              S.choiceManaSources =
+                Seq.fromList
+                  [ Just (S.aliasRef "first mana"),
+                    Just (S.aliasRef "second mana"),
+                    Just (S.aliasRef "third mana"),
+                    Just (S.aliasRef "fourth mana")
+                  ]
+            }
+        script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
+    after <- S.play s registry board script S.priorityGame
     Spec.assertEqWith s "Bob at 17" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "four Mountains paid {3}{R}" (S.tappedCount S.alice after) 4
   Spec.it s "Blaze at X=0 is castable and deals nothing (the X=0 floor)" $ do

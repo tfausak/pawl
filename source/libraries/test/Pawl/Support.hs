@@ -67,6 +67,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -88,10 +89,13 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
@@ -140,9 +144,9 @@ dave = PlayerId.MkPlayerId 3
 newtype ObjectAlias = MkObjectAlias Text.Text
   deriving (Eq, Ord, Show)
 
--- The observable state of one permanent on a Board. This first vertical
--- slice needs battlefield objects only; other zones join when a migrated test
--- supplies their vocabulary.
+-- The observable state of one arranged card object. Its PlayerSetup field
+-- supplies the zone; the remaining fields are shared by hand and battlefield
+-- objects.
 data ObjectSetup = MkObjectSetup
   { objectName :: CardName.CardName,
     objectAlias :: Maybe ObjectAlias,
@@ -171,8 +175,11 @@ objectSetup name =
     }
 
 -- Test-source spelling of objectSetup: a Magic card name, never a corpus slug.
+cardSetup :: String -> ObjectSetup
+cardSetup = objectSetup . CardName.MkCardName . Text.pack
+
 permanent :: String -> ObjectSetup
-permanent = objectSetup . CardName.MkCardName . Text.pack
+permanent = cardSetup
 
 aliased :: String -> ObjectSetup -> ObjectSetup
 aliased name object = object {objectAlias = Just (MkObjectAlias (Text.pack name))}
@@ -188,12 +195,13 @@ ready object = object {objectSickness = Sickness.Settled alice}
 settled :: String -> String -> ObjectSetup
 settled name card = ready (aliased name (permanent card))
 
--- The observable part of one player's arranged state. The battlefield sequence
--- is creation order, which makes name-plus-occurrence references deterministic.
+-- The observable part of one player's arranged state. The object sequences are
+-- creation order, which makes name-plus-occurrence references deterministic.
 data PlayerSetup = MkPlayerSetup
   { setupPlayer :: PlayerId.PlayerId,
     setupLife :: Integer,
-    setupBattlefield :: Seq.Seq ObjectSetup
+    setupBattlefield :: Seq.Seq ObjectSetup,
+    setupHand :: Seq.Seq ObjectSetup
   }
   deriving (Eq, Ord, Show)
 
@@ -202,12 +210,17 @@ playerSetup pid =
   MkPlayerSetup
     { setupPlayer = pid,
       setupLife = 20,
-      setupBattlefield = Seq.empty
+      setupBattlefield = Seq.empty,
+      setupHand = Seq.empty
     }
 
 battlefield :: PlayerId.PlayerId -> [ObjectSetup] -> PlayerSetup
 battlefield pid objects =
   (playerSetup pid) {setupBattlefield = Seq.fromList objects}
+
+hand :: PlayerId.PlayerId -> [ObjectSetup] -> PlayerSetup
+hand pid objects =
+  (playerSetup pid) {setupHand = Seq.fromList objects}
 
 -- A structurally coherent board to construct, not a claim that it is
 -- rules-reachable or settled. Construction performs no engine advancement.
@@ -268,6 +281,35 @@ data DamageRecipient
   | MkPlayerRecipient PlayerId.PlayerId
   deriving (Eq, Ord, Show)
 
+data TargetRef
+  = MkObjectTarget ObjectRef
+  | MkPlayerTarget PlayerId.PlayerId
+  deriving (Eq, Ord, Show)
+
+-- Choices made while announcing and paying for one priority action. They live
+-- on that action rather than in the timed-entry queue, so two casts at one
+-- moment cannot consume one another's targets or payment plan.
+data ActionChoices = MkActionChoices
+  { choiceTargets :: Maybe [TargetRef],
+    choiceModes :: Maybe (Seq.Seq ModeIndex.ModeIndex),
+    choiceX :: Maybe Natural,
+    choiceCost :: Maybe ManaCost.ManaCost,
+    choiceManaSources :: Seq.Seq (Maybe ObjectRef),
+    choiceManaYields :: Seq.Seq Mana.Mana
+  }
+  deriving (Eq, Ord, Show)
+
+noChoices :: ActionChoices
+noChoices =
+  MkActionChoices
+    { choiceTargets = Nothing,
+      choiceModes = Nothing,
+      choiceX = Nothing,
+      choiceCost = Nothing,
+      choiceManaSources = Seq.empty,
+      choiceManaYields = Seq.empty
+    }
+
 -- The moment an entry is eligible: turn, phase or step, and WHO ANSWERS.
 --
 -- The answering seat is the decider, not the player the prompt is about: CR
@@ -279,10 +321,15 @@ data DamageRecipient
 data When = MkWhen Natural Phase.Phase PlayerId.PlayerId
   deriving (Eq, Ord, Show)
 
--- The decision vocabulary proved by the first combat migration. Priority
--- actions and their attached subchoices join only after this shape is reviewed.
+-- The decision vocabulary shared by gameplay tests. Choices that follow a
+-- priority action are carried by that entry rather than timed independently.
 data Entry
-  = MkAttack (Seq.Seq ObjectRef)
+  = MkCast ObjectRef (Maybe (CardName.CardName, Facing.Facing)) ActionChoices
+  | MkPlayLand ObjectRef (Maybe CardName.CardName)
+  | MkActivate ObjectRef ActionChoices
+  | MkChooseDefender PlayerId.PlayerId
+  | MkChooseAttackTarget AttackTarget.AttackTarget
+  | MkAttack (Seq.Seq ObjectRef)
   | MkBlock (Map.Map ObjectRef (Set.Set ObjectRef))
   | MkAssignDamage (Map.Map DamageRecipient Natural)
   | MkConcede
@@ -319,6 +366,21 @@ block =
 
 assignDamage :: [(DamageRecipient, Natural)] -> Entry
 assignDamage = MkAssignDamage . Map.fromList
+
+castAction :: ObjectRef -> ActionChoices -> Entry
+castAction ref = MkCast ref Nothing
+
+playLand :: ObjectRef -> Entry
+playLand ref = MkPlayLand ref Nothing
+
+activateAction :: ObjectRef -> ActionChoices -> Entry
+activateAction = MkActivate
+
+chooseDefender :: PlayerId.PlayerId -> Entry
+chooseDefender = MkChooseDefender
+
+attackPlayer :: PlayerId.PlayerId -> Entry
+attackPlayer = MkChooseAttackTarget . AttackTarget.OfPlayer
 
 -- One entry written without its turn number, which `turn` stamps on. The turn
 -- is written once per turn rather than once per entry, since a script names far
@@ -371,9 +433,12 @@ data HarnessFailure
   | MkNestedGamePrompt PromptLocation Text.Text
   | MkUnscheduledPrompt PromptLocation Text.Text [Text.Text]
   | MkUnexpectedPrompt When Entry Text.Text [Text.Text]
-  | -- | Guard 2 from #3050, with the turn and phase the game stopped at: a
-    -- entry whose moment never arrived usually means the board never got
-    -- there, not that the entry was wrong.
+  | MkActionNotOffered When Entry [Text.Text]
+  | MkAmbiguousAction When Entry [Text.Text]
+  | MkUnexpectedActionChoice When Entry Text.Text
+  | MkUnusedActionChoices When Entry ActionChoices
+  | -- | The turn and phase where a script stopped before reaching its remaining
+    -- entries, which usually means the board never got there.
     MkUnreachedEntries Natural Phase.Phase (Seq.Seq Timed)
   deriving (Eq, Ord, Show)
 
@@ -551,7 +616,10 @@ boardFailure setup =
       counts = Map.fromListWith (+) (fmap (\pid -> (pid, 1 :: Natural)) ids)
       duplicatePlayer = fmap fst (List.find ((> 1) . snd) (Map.toAscList counts))
       known = Set.fromList ids
-      objects = concatMap (Foldable.toList . setupBattlefield) seats
+      objects =
+        concatMap
+          (\seat -> Foldable.toList (setupBattlefield seat) <> Foldable.toList (setupHand seat))
+          seats
       controllers = Maybe.mapMaybe objectController objects
       unknownController = List.find (not . flip Set.member known) controllers
       aliases = Maybe.mapMaybe objectAlias objects
@@ -570,13 +638,16 @@ buildPlayers :: (Monad m) => Registry.Registry m -> [PlayerSetup] -> BuiltBoard 
 buildPlayers registry seats built = case seats of
   [] -> pure (Right built)
   seat : rest -> do
-    result <- buildObjects registry seat (Foldable.toList (setupBattlefield seat)) built
-    case result of
+    battlefieldResult <- buildObjects registry Zone.Battlefield seat (Foldable.toList (setupBattlefield seat)) built
+    handResult <- case battlefieldResult of
+      Left failure -> pure (Left failure)
+      Right withBattlefield -> buildObjects registry Zone.Hand seat (Foldable.toList (setupHand seat)) withBattlefield
+    case handResult of
       Left failure -> pure (Left failure)
       Right next -> buildPlayers registry rest next
 
-buildObjects :: (Monad m) => Registry.Registry m -> PlayerSetup -> [ObjectSetup] -> BuiltBoard -> m (Either HarnessFailure BuiltBoard)
-buildObjects registry player objects built = case objects of
+buildObjects :: (Monad m) => Registry.Registry m -> Zone.Zone -> PlayerSetup -> [ObjectSetup] -> BuiltBoard -> m (Either HarnessFailure BuiltBoard)
+buildObjects registry zone player objects built = case objects of
   [] -> pure (Right built)
   object : rest -> do
     found <- Registry.fetchCard registry (objectName object)
@@ -584,7 +655,7 @@ buildObjects registry player objects built = case objects of
       Nothing -> pure (Left (MkUnknownCard (objectName object)))
       Just card -> do
         let owner = setupPlayer player
-            (oid, withObject) = addPermanent (Printing.MkPrinting card) owner (builtState built)
+            (oid, withObject) = addObjectIn zone (Printing.MkPrinting card) owner (builtState built)
             controller = Maybe.fromMaybe owner (objectController object)
             -- objectSickness says why the arranged seat is discarded.
             readiness = case objectSickness object of
@@ -615,7 +686,7 @@ buildObjects registry player objects built = case objects of
               Nothing -> builtAliases built
               Just name -> Map.insert name oid (builtAliases built)
             next = MkBuiltBoard state aliases
-        buildObjects registry player rest next
+        buildObjects registry zone player rest next
 
 redRed :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed fetch = do
@@ -780,9 +851,9 @@ playLandAnswer p = case p of
           [] -> A.Pass
   _ -> identityAnswer p
 
--- Any printing, on the battlefield under pid's control, untapped and Settled.
-addPermanent :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
-addPermanent printing pid gs =
+-- Any printing, directly inserted into one zone with no event.
+addObjectIn :: Zone.Zone -> Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addObjectIn zone printing pid gs =
   let (printingId, gsP) = Game.intern printing gs
       (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
@@ -791,7 +862,7 @@ addPermanent printing pid gs =
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
             Object.source = Source.OfCard printingId,
-            Object.zone = Zone.Battlefield,
+            Object.zone = zone,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
             Object.exiledFaceDown = False,
@@ -830,12 +901,12 @@ addPermanent printing pid gs =
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
-   in ( oid,
-        gs2
-          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
-            GameState.battlefield = Set.insert oid (GameState.battlefield gs2)
-          }
-      )
+      withObject = gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
+   in (oid, Game.insertIntoZone zone LibraryPosition.Bottom pid oid withObject)
+
+-- Any printing, on the battlefield under pid's control, untapped and Settled.
+addPermanent :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addPermanent = addObjectIn Zone.Battlefield
 
 -- Install a SetController continuous effect (CR 108.4) making pid the
 -- controller of oid, and settle it under pid (Sickness.Settled pid) so a test
@@ -1614,12 +1685,12 @@ fightWith answer gs =
 
 data HarnessState = MkHarnessState
   { harnessQueues :: Map.Map When (Seq.Seq Timed),
-    harnessAliases :: Map.Map ObjectAlias ObjectId.ObjectId
+    harnessAliases :: Map.Map ObjectAlias ObjectId.ObjectId,
+    harnessAction :: Maybe (When, Entry, ActionChoices)
   }
 
--- Run one explicit engine entry point under a keyed decision script. The final
--- queue check is guard 2 from #3050: an entry whose moment never arrives is a
--- failure, not a silently skipped claim.
+-- Run one explicit engine entry point under a keyed decision script. An entry
+-- whose moment never arrives is a failure, not a silently skipped claim.
 runScript :: Seq.Seq Timed -> BuiltBoard -> Game.Type.Game a -> Either HarnessFailure (a, GameState.GameState)
 runScript script built game =
   let add queue timed =
@@ -1631,21 +1702,25 @@ runScript script built game =
       initial =
         MkHarnessState
           { harnessQueues = Foldable.foldl' add Map.empty script,
-            harnessAliases = builtAliases built
+            harnessAliases = builtAliases built,
+            harnessAction = Nothing
           }
    in case State.runStateT (Engine.runGameAsked answerPrompt (builtState built) game) initial of
         Left failure -> Left failure
-        Right ((value, final), state) ->
-          let remaining = foldMap snd (Map.toAscList (harnessQueues state))
-           in if Seq.null remaining
-                then Right (value, final)
-                else
-                  Left
-                    ( MkUnreachedEntries
-                        (GameState.turnNumber final)
-                        (GameState.phase final)
-                        remaining
-                    )
+        Right ((value, final), state) -> case harnessAction state of
+          Just (key, verb, choices)
+            | choices /= noChoices -> Left (MkUnusedActionChoices key verb choices)
+          _ ->
+            let remaining = foldMap snd (Map.toAscList (harnessQueues state))
+             in if Seq.null remaining
+                  then Right (value, final)
+                  else
+                    Left
+                      ( MkUnreachedEntries
+                          (GameState.turnNumber final)
+                          (GameState.phase final)
+                          remaining
+                      )
 
 -- Build a board, run a script against one engine entry point, and fail the case
 -- on either error: the whole of the common case in one call. A case that wants
@@ -1661,67 +1736,293 @@ runScriptOrFail s script built game = case runScript script built game of
   Left failure -> Spec.assertFailure s (renderFailure failure)
   Right result -> pure result
 
+-- One bounded priority round. The board does not imply a priority window;
+-- naming this entry point is what starts one, and the loop itself hands
+-- priority to the board's active player (CR 117.3a).
+priorityGame :: Game.Type.Game ()
+priorityGame = Engine.priorityLoop
+
 answerPrompt :: Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
-answerPrompt asked =
+answerPrompt asked = do
   let prompt = Asked.prompt asked
       gs = Asked.game asked
       kind = promptKind prompt
       location = MkPromptLocation (GameState.turnNumber gs) (GameState.phase gs) (promptDecider prompt)
-   in -- Hoisted above the entry arms: a nested game (CR 729.1) is out of scope for
-      -- every verb alike, so the check belongs to the prompt and not to each arm
-      -- that answers one.
-      if not (null (Asked.enclosing asked))
-        then failHarness (MkNestedGamePrompt location kind)
-        else case prompt of
-          Prompt.ChooseAction {} -> pure A.Pass
-          -- CR 723.6: keyed on the conceding player rather than on a decider,
-          -- which this prompt does not carry.
-          Prompt.Concede pid -> do
-            let key = whenOf gs pid
-            found <- peekTimed key
-            case found of
-              Just timed
-                | entry timed == MkConcede -> case qualifier timed of
-                    Just ref -> failHarness (MkUnexpectedQualifier key kind ref)
-                    Nothing -> do
-                      popTimedAt key 0
-                      pure Concession.Concedes
-              _ -> pure Concession.Continues
-          Prompt.DeclareAttackers decider _ candidates -> do
-            let key = whenOf gs (Decider.unwrap decider)
-            offers <- describeAll gs candidates
-            onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-              MkAttack refs ->
-                Just $ do
-                  resolved <- mapM (resolveOffered gs key kind candidates) refs
-                  pure (Foldable.toList resolved)
-              _ -> Nothing
-          Prompt.DeclareBlockers decider _ blockers attackers -> do
-            let candidates = blockers <> attackers
-                key = whenOf gs (Decider.unwrap decider)
-            offers <- describeAll gs candidates
-            onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-              MkBlock blocks ->
-                Just $ do
-                  pairs <- mapM (resolveBlock gs key kind candidates) (Map.toAscList blocks)
-                  pure (Map.fromList pairs)
-              _ -> Nothing
-          Prompt.AssignCombatDamage decider _ source thresholds _ -> do
-            let key = whenOf gs (Decider.unwrap decider)
-                offered = Map.keysSet thresholds
-            offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
-            onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
-              MkAssignDamage assignment ->
-                Just $ do
-                  pairs <- mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)
-                  pure (Map.fromList pairs)
-              _ -> Nothing
-          _ -> failHarness (MkUnscheduledPrompt location kind [])
+  -- Hoisted above every arm: a nested game (CR 729.1) is out of scope for every
+  -- prompt alike, a pending action's sub-choices included.
+  if not (null (Asked.enclosing asked))
+    then failHarness (MkNestedGamePrompt location kind)
+    else do
+      pending <- State.gets harnessAction
+      case pending of
+        Just (key@(MkWhen _ _ pid), verb, choices)
+          | subChoiceFor pid prompt -> answerActionChoice key verb choices asked
+          -- Any other prompt means the action has finished. A choice it never
+          -- asked for is a script error, reported here rather than at the next
+          -- prompt that happens to want an answer.
+          | choices /= noChoices -> failHarness (MkUnusedActionChoices key verb choices)
+        Just {} -> do
+          State.modify' (\state -> state {harnessAction = Nothing})
+          answerTopPrompt location asked
+        Nothing -> answerTopPrompt location asked
+
+-- Whether `prompt` is one a cast or activation asks its decider between the
+-- ChooseAction that began it and its completion (CR 601.2b-h, CR 602.2b).
+-- Matched on the decider, so another player's prompt of the same kind is not
+-- answered from this player's pending action.
+subChoiceFor :: PlayerId.PlayerId -> Prompt.Prompt r -> Bool
+subChoiceFor pid prompt = case prompt of
+  Prompt.ChooseTargets decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseModes decider _ _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseX decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseCost decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseManaSource decider _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseExtraManaSource decider _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseManaYield decider _ _ _ -> Decider.unwrap decider == pid
+  _ -> False
+
+answerTopPrompt :: PromptLocation -> Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
+answerTopPrompt location asked =
+  let prompt = Asked.prompt asked
+      gs = Asked.game asked
+      kind = promptKind prompt
+   in case prompt of
+        Prompt.ChooseAction decider _ actions ->
+          answerActionPrompt gs (Decider.unwrap decider) actions
+        -- CR 723.6: keyed on the conceding player rather than on a decider,
+        -- which this prompt does not carry.
+        Prompt.Concede pid -> do
+          let key = whenOf gs pid
+          found <- peekTimed key
+          case found of
+            Just timed
+              | entry timed == MkConcede -> case qualifier timed of
+                  Just ref -> failHarness (MkUnexpectedQualifier key kind ref)
+                  Nothing -> do
+                    popTimedAt key 0
+                    pure Concession.Concedes
+            _ -> pure Concession.Continues
+        Prompt.ChooseDefender decider _ candidates -> do
+          let key = whenOf gs (Decider.unwrap decider)
+              offers = fmap renderPlayer (NonEmpty.toList candidates)
+          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            MkChooseDefender pid
+              | List.elem pid candidates -> Just (pure pid)
+              | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
+            _ -> Nothing
+        Prompt.DeclareAttackers decider _ candidates -> do
+          let key = whenOf gs (Decider.unwrap decider)
+          offers <- describeAll gs candidates
+          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            MkAttack refs ->
+              Just $ do
+                resolved <- mapM (resolveOffered gs key kind candidates) refs
+                pure (Foldable.toList resolved)
+            _ -> Nothing
+        Prompt.ChooseAttackTarget decider _ source candidates -> do
+          let key = whenOf gs (Decider.unwrap decider)
+              offers = fmap (Text.pack . show) (NonEmpty.toList candidates)
+          onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
+            MkChooseAttackTarget target
+              | List.elem target candidates -> Just (pure target)
+              | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
+            _ -> Nothing
+        Prompt.DeclareBlockers decider _ blockers attackers -> do
+          let candidates = blockers <> attackers
+              key = whenOf gs (Decider.unwrap decider)
+          offers <- describeAll gs candidates
+          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            MkBlock blocks ->
+              Just $ do
+                pairs <- mapM (resolveBlock gs key kind candidates) (Map.toAscList blocks)
+                pure (Map.fromList pairs)
+            _ -> Nothing
+        Prompt.AssignCombatDamage decider _ source thresholds _ -> do
+          let key = whenOf gs (Decider.unwrap decider)
+              offered = Map.keysSet thresholds
+          offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
+          onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
+            MkAssignDamage assignment ->
+              Just $ do
+                pairs <- mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)
+                pure (Map.fromList pairs)
+            _ -> Nothing
+        _ -> failHarness (MkUnscheduledPrompt location kind [])
+
+answerActionPrompt :: GameState.GameState -> PlayerId.PlayerId -> [A.Action] -> State.StateT HarnessState (Either HarnessFailure) A.Action
+answerActionPrompt gs pid actions = do
+  let key = whenOf gs pid
+  entries <- queueAt key
+  -- The first ACTION entry at this key, not the head. An entry for a prompt the
+  -- engine elides (an attack target with one candidate, say) stays queued ahead
+  -- of the action behind it; it is reported as MkUnreachedEntries rather than
+  -- silently passing every priority at this key.
+  case List.find (isAction . entry . snd) (zip [0 ..] (Foldable.toList entries)) of
+    Nothing -> pure A.Pass
+    Just (index, timed) -> takeAction key index timed (entry timed)
+  where
+    isAction verb = case verb of
+      MkCast {} -> True
+      MkPlayLand {} -> True
+      MkActivate {} -> True
+      _ -> False
+    takeAction key index timed verb = case qualifier timed of
+      Just ref -> failHarness (MkUnexpectedQualifier key (Text.pack "ChooseAction") ref)
+      Nothing -> do
+        offered <- mapM (describeAction gs) actions
+        matching <- actionsMatching gs verb actions
+        chosen <- case matching of
+          [] -> failHarness (MkActionNotOffered key verb offered)
+          [action] -> pure action
+          _ -> failHarness (MkAmbiguousAction key verb offered)
+        popTimedAt key index
+        State.modify' (\state -> state {harnessAction = Just (key, verb, choicesOf verb)})
+        pure chosen
+
+choicesOf :: Entry -> ActionChoices
+choicesOf verb = case verb of
+  MkCast _ _ choices -> choices
+  MkActivate _ choices -> choices
+  _ -> noChoices
+
+actionsMatching :: GameState.GameState -> Entry -> [A.Action] -> State.StateT HarnessState (Either HarnessFailure) [A.Action]
+actionsMatching gs verb actions = case verb of
+  MkCast ref selector _ -> do
+    oid <- resolveObject ref gs
+    pure $ filter (matchesCast oid selector) actions
+  MkPlayLand ref face -> do
+    oid <- resolveObject ref gs
+    pure $ filter (matchesPlay oid face) actions
+  MkActivate ref _ -> do
+    oid <- resolveObject ref gs
+    pure $ filter (matchesActivation oid) actions
+  _ -> pure []
+
+matchesCast :: ObjectId.ObjectId -> Maybe (CardName.CardName, Facing.Facing) -> A.Action -> Bool
+matchesCast oid selector action = case action of
+  A.Cast candidate name facing ->
+    candidate == oid
+      && Maybe.maybe True (== (name, facing)) selector
+  _ -> False
+
+matchesPlay :: ObjectId.ObjectId -> Maybe CardName.CardName -> A.Action -> Bool
+matchesPlay oid face action = case action of
+  A.Play candidate chosen ->
+    candidate == oid
+      && case face of
+        Nothing -> True
+        Just wanted -> chosen == Just wanted
+  _ -> False
+
+matchesActivation :: ObjectId.ObjectId -> A.Action -> Bool
+matchesActivation oid action = case action of
+  A.Activate candidate _ -> candidate == oid
+  _ -> False
+
+describeAction :: GameState.GameState -> A.Action -> State.StateT HarnessState (Either HarnessFailure) Text.Text
+describeAction gs action = case action of
+  A.Pass -> pure (Text.pack "pass")
+  A.Cast oid (CardName.MkCardName name) facing ->
+    fmap (\object -> Text.pack "cast " <> object <> Text.pack (" as " <> show facing <> " ") <> name) (describeOne gs oid)
+  A.Play oid face ->
+    fmap
+      ( \object ->
+          Text.pack "play "
+            <> object
+            <> foldMap (\(CardName.MkCardName name) -> Text.pack " as " <> name) face
+      )
+      (describeOne gs oid)
+  A.Activate oid _ -> fmap (Text.pack "activate " <>) (describeOne gs oid)
+  _ -> pure (Text.pack (show action))
+
+describeOne :: GameState.GameState -> ObjectId.ObjectId -> State.StateT HarnessState (Either HarnessFailure) Text.Text
+describeOne gs oid = State.gets (\state -> describeObject gs (harnessAliases state) oid)
+
+answerActionChoice :: When -> Entry -> ActionChoices -> Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
+answerActionChoice key verb choices asked =
+  let prompt = Asked.prompt asked
+      gs = Asked.game asked
+      kind = promptKind prompt
+      unexpected = failHarness (MkUnexpectedActionChoice key verb kind)
+   in case prompt of
+        Prompt.ChooseTargets _ _ _ offered -> case (choiceTargets choices, Map.toList offered) of
+          (Just targets, [(slot, (count, candidates))])
+            | Natural.length targets == count -> do
+                resolved <- mapM (resolveTarget gs key verb kind candidates) targets
+                let selected = Set.fromList resolved
+                if Natural.length selected == count
+                  then do
+                    updateActionChoices (\current -> current {choiceTargets = Nothing})
+                    pure (Map.singleton slot selected)
+                  else unexpected
+          _ -> unexpected
+        Prompt.ChooseModes _ _ _ legal selection -> case choiceModes choices of
+          Just modes
+            | Modal.selectionSatisfiedBy legal selection modes -> do
+                updateActionChoices (\current -> current {choiceModes = Nothing})
+                pure modes
+          _ -> unexpected
+        Prompt.ChooseX _ _ _ maximumX -> case choiceX choices of
+          Just x
+            | x <= maximumX -> do
+                updateActionChoices (\current -> current {choiceX = Nothing})
+                pure x
+          _ -> unexpected
+        Prompt.ChooseCost _ _ _ candidates -> case choiceCost choices of
+          Just wanted -> case filter ((== Just wanted) . Cost.Type.mana) candidates of
+            [cost] -> do
+              updateActionChoices (\current -> current {choiceCost = Nothing})
+              pure cost
+            _ -> unexpected
+          Nothing -> unexpected
+        Prompt.ChooseManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
+        Prompt.ChooseExtraManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
+        Prompt.ChooseManaYield _ _ _ candidates -> case Seq.viewl (choiceManaYields choices) of
+          Seq.EmptyL -> unexpected
+          wanted Seq.:< rest -> case filter ((== wanted) . ManaOption.yield) (NonEmpty.toList candidates) of
+            [option] -> do
+              updateActionChoices (\current -> current {choiceManaYields = rest})
+              pure option
+            _ -> unexpected
+        _ -> unexpected
+
+answerManaSource ::
+  GameState.GameState ->
+  When ->
+  Entry ->
+  ActionChoices ->
+  Text.Text ->
+  NonEmpty.NonEmpty ObjectId.ObjectId ->
+  State.StateT HarnessState (Either HarnessFailure) (Maybe ObjectId.ObjectId)
+answerManaSource gs key verb choices kind candidates = case Seq.viewl (choiceManaSources choices) of
+  Seq.EmptyL -> failHarness (MkUnexpectedActionChoice key verb kind)
+  wanted Seq.:< rest -> do
+    resolved <- case wanted of
+      Nothing -> pure Nothing
+      Just ref -> fmap Just (resolveOffered gs key kind (NonEmpty.toList candidates) ref)
+    updateActionChoices (\current -> current {choiceManaSources = rest})
+    pure resolved
+
+resolveTarget :: GameState.GameState -> When -> Entry -> Text.Text -> Set.Set Recipient.Recipient -> TargetRef -> State.StateT HarnessState (Either HarnessFailure) Recipient.Recipient
+resolveTarget gs key verb kind offered target = case target of
+  MkPlayerTarget pid
+    | Set.member (Recipient.ToPlayer pid) offered -> pure (Recipient.ToPlayer pid)
+    | otherwise -> failHarness (MkUnexpectedActionChoice key verb kind)
+  MkObjectTarget ref -> do
+    oid <- resolveObject ref gs
+    case filter ((== Just oid) . Recipient.objectOf) (Set.toList offered) of
+      [recipient] -> pure recipient
+      _ -> failHarness (MkUnexpectedActionChoice key verb kind)
+
+updateActionChoices :: (ActionChoices -> ActionChoices) -> State.StateT HarnessState (Either HarnessFailure) ()
+updateActionChoices f =
+  State.modify' $ \state ->
+    state {harnessAction = fmap (\(key, verb, choices) -> (key, verb, f choices)) (harnessAction state)}
 
 -- The require-match-pop sequence every entry arm shares: nothing at this moment
 -- is an unscheduled prompt, an entry carrying some other verb is an unexpected
--- one, and the pop that keeps guard 2 honest happens exactly once, before the
--- arm resolves anything.
+-- one, and the pop happens exactly once, before the arm resolves anything, so
+-- an entry whose moment never arrives is still reported as unreached.
 onEntry ::
   PromptLocation ->
   When ->
@@ -1940,6 +2241,17 @@ renderLocation (MkPromptLocation number step pid) =
 
 renderEntry :: Entry -> Text.Text
 renderEntry verb = case verb of
+  MkCast ref face _ ->
+    Text.pack "cast "
+      <> renderRef ref
+      <> foldMap (\(CardName.MkCardName name, facing) -> Text.pack (" as " <> show facing <> " ") <> name) face
+  MkPlayLand ref face ->
+    Text.pack "play "
+      <> renderRef ref
+      <> foldMap (\(CardName.MkCardName name) -> Text.pack " as " <> name) face
+  MkActivate ref _ -> Text.pack "activate " <> renderRef ref
+  MkChooseDefender pid -> Text.pack "choose " <> renderPlayer pid <> Text.pack " as defender"
+  MkChooseAttackTarget target -> Text.pack "attack " <> Text.pack (show target)
   MkAttack refs -> Text.pack "attack " <> renderList (fmap renderRef (Foldable.toList refs))
   MkBlock blocks ->
     Text.pack "block "
@@ -2019,6 +2331,30 @@ renderFailure failure =
         <> kind
         <> Text.pack " prompt"
         <> renderOffers offers
+    MkActionNotOffered moment verb offers ->
+      renderWhen moment
+        <> Text.pack ": "
+        <> renderEntry verb
+        <> Text.pack " was not offered"
+        <> renderOffers offers
+    MkAmbiguousAction moment verb offers ->
+      renderWhen moment
+        <> Text.pack ": "
+        <> renderEntry verb
+        <> Text.pack " matched more than one offered action"
+        <> renderOffers offers
+    MkUnexpectedActionChoice moment verb kind ->
+      renderWhen moment
+        <> Text.pack ": "
+        <> renderEntry verb
+        <> Text.pack " has no matching answer for "
+        <> kind
+    MkUnusedActionChoices moment verb choices ->
+      renderWhen moment
+        <> Text.pack ": "
+        <> renderEntry verb
+        <> Text.pack " finished without using "
+        <> Text.pack (show choices)
     MkUnreachedEntries number step timed ->
       Text.intercalate (Text.pack "; ") (fmap renderTimed (Foldable.toList timed))
         <> Text.pack " was never reached; the game stopped at "

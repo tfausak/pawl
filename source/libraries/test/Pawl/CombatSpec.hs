@@ -878,20 +878,31 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- And bob's untapped creature is never offered, per CR 509.1a.
     Spec.assertEqWith s "bob's creature is in no candidate list" (filter (\oid -> elem oid bobs) offeredBlockers) []
     Spec.assertEqWith s "carol's block was recorded" (Map.size (Combat.Type.blockers (GameState.combat after))) 1
-  Spec.it s "CR 725.2/507.1 the crown follows whichever opponent was chosen as the defending player" $ do
+  Spec.it s "CR 725.2/802.3 the crown follows whichever defending player was attacked" $ do
     -- CR 725.2's second inherent ability: "Whenever a creature deals combat
     -- damage to the monarch, its controller becomes the monarch." bob is the
     -- monarch. alice attacks with an unblocked 2/1; the two runs differ ONLY
-    -- in the answer to Prompt.ChooseDefender.
+    -- in that creature's announced attack target.
     --
     -- Discriminating: run A is what the deleted head-of-list behaviour did
     -- whatever the answer, so run A alone proves nothing. Run B is
     -- unreachable under it, and the pair is the proof.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (board, _, _, _) = S.threePlayerCombat [piker] [] []
-        crowned = S.withMonarch S.bob board
-        hitBob = S.runCombat (S.attackTo S.bob) crowned
-        hitCarol = S.runCombat (S.attackTo S.carol) crowned
+    let attacker = S.aliasRef "attacker"
+        board =
+          S.board
+            (S.battlefield S.alice [S.settled "attacker" "Goblin Piker"] NonEmpty.:| [S.playerSetup S.bob, S.playerSetup S.carol])
+            S.alice
+            S.beginningOfCombat
+        script who =
+          S.turn
+            1
+            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
+              S.onSource S.declareAttackers S.alice attacker (S.attackPlayer who)
+            ]
+    built <- S.buildBoardOrFail s registry board
+    let crowned = built {S.builtState = S.withMonarch S.bob (S.builtState built)}
+    (_, hitBob) <- S.runScriptOrFail s (script S.bob) crowned S.combatGame
+    (_, hitCarol) <- S.runScriptOrFail s (script S.carol) crowned S.combatGame
     -- Run A: attacking the monarch takes the crown.
     Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob hitBob) (Just 18)
     Spec.assertEqWith s "carol was untouched" (S.lifeOf S.carol hitBob) (Just 20)

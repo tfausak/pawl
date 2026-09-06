@@ -9,8 +9,10 @@ module Pawl.CastPermissionSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -101,12 +103,22 @@ extraLandDropsSpec s registry =
 
     -- Exploration's one extra. A gate that ignored the effect answers one here.
     Spec.it s "CR 305.2 Exploration raises the allowance to two" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      exploration <- S.printingOf s registry "Exploration"
-      let board = landDropBoard mountain [exploration] S.alice
-          after = playEveryLand board
-      Spec.assertEqWith s "the allowance is two" (PlayerEffect.landPlaysAllowed S.alice board) 2
-      Spec.assertEqWith s "two Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 2
+      let first = S.aliased "first land" (S.cardSetup "Mountain")
+          second = S.aliased "second land" (S.cardSetup "Mountain")
+          alice =
+            (S.battlefield S.alice [S.permanent "Exploration"])
+              { S.setupHand = Seq.fromList [first, second, S.cardSetup "Mountain", S.cardSetup "Mountain", S.cardSetup "Mountain"]
+              }
+          board = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+          script =
+            S.turn
+              1
+              [ S.on S.precombatMain S.alice (S.playLand (S.aliasRef "first land")),
+                S.on S.precombatMain S.alice (S.playLand (S.aliasRef "second land"))
+              ]
+      after <- S.play s registry board script S.priorityGame
+      Spec.assertEqWith s "the allowance is two" (PlayerEffect.landPlaysAllowed S.alice after) 2
+      Spec.assertEqWith s "two Mountains landed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Mountain")) S.alice after) 2
       Spec.assertEqWith s "three are still in hand" (S.handSize S.alice after) 3
       Spec.assertEqWith s "and the third is refused" (filter isPlay (Action.legalActions S.alice after)) []
 
@@ -214,21 +226,37 @@ vedalkenOrrerySpec s registry =
       Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
 
     -- The gameplay half, driven through the priority loop rather than by calling
-    -- Cast.castSpell: S.castAnswer takes whatever Cast action it is OFFERED, so
-    -- the two runs differ in the Orrery and in nothing that a test wrote by hand.
-    -- Without it alice is offered no cast at all and simply passes.
+    -- Cast.castSpell: the script selects its named cast only when it is OFFERED,
+    -- so the two runs differ in the Orrery and in nothing a test wrote by hand.
+    -- Without it alice is offered no cast at all, and the same script fails as
+    -- MkActionNotOffered rather than passing while proving nothing.
     Spec.it s "CR 601.3b the offered cast resolves and the creature enters on the opponent's turn" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      piker <- S.printingOf s registry "Goblin Piker"
-      orrery <- S.printingOf s registry "Vedalken Orrery"
-      let (_, _, board) = flashBoard mountain piker [orrery]
-          (_, _, bare) = flashBoard mountain piker []
-          play gs = S.runPure S.castAnswer gs Engine.priorityLoop
-          after = play board
+      let mana1 = S.aliased "first mana" (S.permanent "Mountain")
+          mana2 = S.aliased "second mana" (S.permanent "Mountain")
+          spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+          alice extras =
+            (S.battlefield S.alice ([mana1, mana2] <> replicate 7 (S.permanent "Mountain") <> extras))
+              { S.setupHand = Seq.fromList [spell, S.cardSetup "Mountain"]
+              }
+          setup extras = S.board (alice extras NonEmpty.:| [S.playerSetup S.bob]) S.bob S.precombatMain
+          choices =
+            S.noChoices
+              { S.choiceManaSources =
+                  Seq.fromList
+                    [ Just (S.aliasRef "first mana"),
+                      Just (S.aliasRef "second mana"),
+                      Nothing
+                    ]
+              }
+          script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
+      after <- S.play s registry (setup [S.permanent "Vedalken Orrery"]) script S.priorityGame
       Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
-      Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
-      Spec.assertEqWith s "and without the Orrery it never left her hand" (S.countOnBattlefieldByName (S.printingName piker) S.alice (play bare)) 0
-      Spec.assertEqWith s "which is where it still is" (S.handSize S.alice (play bare)) 2
+      Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+      bare <- S.buildBoardOrFail s registry (setup [])
+      case S.runScript script bare S.priorityGame of
+        Left (S.MkActionNotOffered _ (S.MkCast {}) _) -> pure ()
+        Left failure -> Spec.assertFailure s (S.renderFailure failure)
+        Right _ -> Spec.assertFailure s "without the Orrery the cast was offered anyway"
 
     -- CR 702.8a's keyword is untouched: the card the Orrery let through never
     -- gained flash, and nothing was written onto it.

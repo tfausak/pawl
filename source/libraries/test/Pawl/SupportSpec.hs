@@ -9,18 +9,27 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -120,6 +129,179 @@ spec s registry = Spec.describe s "Support" $ do
         Spec.assertEqWith s "ChooseAction passed and left the combat entry alone" entries script
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the unrelated combat entry was consumed"
+
+  Spec.it s "a scheduled cast is selected from the offered actions" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        alice = S.hand S.alice [spell]
+        setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        verb = S.castAction (S.aliasRef "spell") S.noChoices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+        case S.runScript script built (Game.ask prompt) of
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right (chosen, after) -> do
+            Spec.assertEqWith s "the offered cast" chosen action
+            Spec.assertEqWith s "answering emitted no history itself" (S.eventsOf after) []
+
+  Spec.it s "a scheduled action that was not offered fails" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        verb = S.castAction (S.aliasRef "spell") S.noChoices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+        prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass]
+    built <- S.buildBoardOrFail s registry setup
+    case S.runScript script built (Game.ask prompt) of
+      Left (S.MkActionNotOffered _ failed _) ->
+        Spec.assertEqWith s "the rejected verb" failed verb
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "the unoffered cast was accepted"
+
+  Spec.it s "an underspecified action that matches two offers fails" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        verb = S.castAction (S.aliasRef "spell") S.noChoices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let front = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            back = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker Back")) Facing.FaceUp
+            prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [front, back]
+        case S.runScript script built (Game.ask prompt) of
+          Left (S.MkAmbiguousAction _ failed _) ->
+            Spec.assertEqWith s "the ambiguous verb" failed verb
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "the ambiguous cast was guessed"
+
+  Spec.it s "attached choices are consumed by their action" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        target = S.aliased "target" (S.permanent "Goblin Piker")
+        alice = (S.hand S.alice [spell]) {S.setupBattlefield = Seq.singleton target}
+        setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "target")],
+              S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
+              S.choiceX = Just 3,
+              S.choiceCost = Just (ManaCost.MkManaCost [])
+            }
+        verb = S.castAction (S.aliasRef "spell") choices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case (Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built), Map.lookup (S.MkObjectAlias (Text.pack "target")) (S.builtAliases built)) of
+      (Just spellId, Just targetId) -> do
+        let action = A.Cast spellId (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            actionPrompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+            mode = ModeIndex.MkModeIndex 1
+            modePrompt = Prompt.ChooseModes (Decider.MkDecider S.alice) S.alice spellId (Set.singleton mode) (ModeSelection.ChooseExactly 1)
+            xPrompt = Prompt.ChooseX (Decider.MkDecider S.alice) S.alice spellId 9
+            cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
+            costPrompt = Prompt.ChooseCost (Decider.MkDecider S.alice) S.alice spellId [cost]
+            slot = SlotName.MkSlotName (Text.pack "target")
+            targetPrompt =
+              Prompt.ChooseTargets
+                (Decider.MkDecider S.alice)
+                S.alice
+                spellId
+                (Map.singleton slot (1, Set.singleton (Recipient.ToCreature targetId)))
+            asks = (,,,,) <$> Game.ask actionPrompt <*> Game.ask modePrompt <*> Game.ask xPrompt <*> Game.ask costPrompt <*> Game.ask targetPrompt
+        case S.runScript script built asks of
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right ((chosen, modes, x, chosenCost, targets), _) -> do
+            Spec.assertEqWith s "the priority action" chosen action
+            Spec.assertEqWith s "the action's modes" modes (Seq.singleton mode)
+            Spec.assertEqWith s "the action's X" x 3
+            Spec.assertEqWith s "the action's cost" chosenCost cost
+            Spec.assertEqWith s "the action's target" targets (Map.singleton slot (Set.singleton (Recipient.ToCreature targetId)))
+      _ -> Spec.assertFailure s "the board omitted an action alias"
+
+  Spec.it s "an unused attached choice fails" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices = S.noChoices {S.choiceX = Just 3}
+        verb = S.castAction (S.aliasRef "spell") choices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+        case S.runScript script built (Game.ask prompt) of
+          Left (S.MkUnusedActionChoices _ failed _) ->
+            Spec.assertEqWith s "the unfinished verb" failed verb
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "the unused X was ignored"
+
+  Spec.it s "a leftover choice fails at the next prompt rather than answering it" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices = S.noChoices {S.choiceManaSources = Seq.singleton Nothing}
+        verb = S.castAction (S.aliasRef "spell") choices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+        case S.runScript script built (Game.ask prompt *> Game.ask prompt) of
+          Left (S.MkUnusedActionChoices _ failed _) ->
+            Spec.assertEqWith s "the unfinished verb" failed verb
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "the leftover mana source was carried into the next priority"
+
+  Spec.it s "another decider's sub-choice is not answered from the pending action" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices = S.noChoices {S.choiceX = Just 3}
+        verb = S.castAction (S.aliasRef "spell") choices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            actionPrompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+            xPrompt = Prompt.ChooseX (Decider.MkDecider S.bob) S.bob oid 9
+        case S.runScript script built (Game.ask actionPrompt *> Game.ask xPrompt) of
+          Left (S.MkUnusedActionChoices _ failed _) ->
+            Spec.assertEqWith s "the unfinished verb" failed verb
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "bob's X was answered from alice's cast"
+
+  Spec.it s "an action queued behind an unreached entry is still taken" $ do
+    let land = S.aliased "land" (S.cardSetup "Mountain")
+        setup = S.board (S.hand S.alice [land] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        stranded = S.on S.precombatMain S.alice (S.attack [])
+        script = S.turn 1 [stranded, S.on S.precombatMain S.alice (S.playLand (S.aliasRef "land"))]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "land")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Play oid Nothing
+            prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+        case S.runScript script built (Game.ask prompt) of
+          Left (S.MkUnreachedEntries _ _ entries) ->
+            Spec.assertEqWith s "only the stranded entry remains" entries (S.turn 1 [stranded])
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "the stranded entry was consumed"
+
+  Spec.it s "a scheduled defender must be offered" $ do
+    let setup = S.board (S.playerSetup S.alice NonEmpty.:| [S.playerSetup S.bob, S.playerSetup S.carol]) S.alice S.beginningOfCombat
+        verb = S.chooseDefender S.carol
+        script = S.turn 1 [S.on S.beginningOfCombat S.alice verb]
+        prompt = Prompt.ChooseDefender (Decider.MkDecider S.alice) S.alice (S.bob NonEmpty.:| [S.carol])
+    built <- S.buildBoardOrFail s registry setup
+    case S.runScript script built (Game.ask prompt) of
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right (chosen, _) -> Spec.assertEqWith s "the named defender" chosen S.carol
 
   Spec.it s "concession is opt-in at its scheduled moment" $ do
     let setup = S.duel S.precombatMain [] []

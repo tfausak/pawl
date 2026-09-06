@@ -1529,21 +1529,21 @@ desertBoard piker desert =
         -- unreachable; a bogus id fails the assertions rather than the suite.
         [] -> (desertId, S.noSource, gs1)
 
+-- The board the two whole-card tests share: alice's Piker, already able to
+-- attack, against bob's Desert, at the beginning of combat.
+desertDuel :: S.Board
+desertDuel =
+  S.duel
+    S.beginningOfCombat
+    [S.settled "attacker" "Goblin Piker"]
+    [S.aliased "desert" (S.permanent "Desert")]
+
 -- Declares alice's attack and hands priority to bob, the defending player (CR
 -- 506.2). The board every timing assertion below starts from, and the ones that
 -- name a later step do it by overwriting GameState.phase on this.
 desertAttacked :: GameState.GameState -> GameState.GameState
 desertAttacked gs =
   (S.runPure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice)) {GameState.priority = Just S.bob}
-
--- Activates the first offered activation, else passes -- the interpreter that
--- takes the Desert's ping the moment the engine offers it.
-pingAnswer :: Prompt.Prompt r -> r
-pingAnswer p = case p of
-  Prompt.ChooseAction _ _ options -> case filter isActivate options of
-    a : _ -> a
-    [] -> A.Pass
-  _ -> S.aggressiveAnswer p
 
 printedActivationRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedActivationRestrictionSpec s registry = Spec.describe s "PrintedActivationRestriction" $ do
@@ -1614,24 +1614,33 @@ printedActivationRestrictionSpec s registry = Spec.describe s "PrintedActivation
   -- to its toughness, that creature has been dealt lethal damage and is
   -- destroyed." One damage on a 2/1.
   Spec.it s "CR 307.5 whole card: Desert pings the attacker dead in the end of combat step" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    desert <- S.printingOf s registry "Desert"
-    let (desertId, attackerId, board) = desertBoard piker desert
-        after = S.runCombat pingAnswer board
+    let attacker = S.aliasRef "attacker"
+        desert = S.aliasRef "desert"
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget attacker],
+              S.choiceManaSources = Seq.singleton Nothing
+            }
+        script =
+          S.turn
+            1
+            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
+              S.on S.endOfCombat S.bob (S.activateAction desert choices)
+            ]
+    after <- S.play s registry desertDuel script S.combatGame
     Spec.assertEqWith s "the Piker connected first" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertBool s (not (Set.member attackerId (GameState.battlefield after))) "and then died to the ping"
-    Spec.assertEqWith s "the Desert paid its {T}" (fmap Object.tapped (Game.lookupObject desertId after)) (Just TapState.Tapped)
+    Spec.assertEqWith s "and then died to the ping" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "the Desert paid its {T}" (S.tappedCount S.bob after) 1
 
   -- The control for the whole-card test: the same board and the same combat,
-  -- with an interpreter that never activates. The Piker survives, so what
-  -- killed it above was the ability and not combat.
+  -- with a script that never activates. The Piker survives, so what killed it
+  -- above was the ability and not combat.
   Spec.it s "CR 307.5 whole card: the attacker survives a combat bob does not ping in" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    desert <- S.printingOf s registry "Desert"
-    let (_, attackerId, board) = desertBoard piker desert
-        after = S.runCombat S.aggressiveAnswer board
+    let attacker = S.aliasRef "attacker"
+        script = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [attacker])]
+    after <- S.play s registry desertDuel script S.combatGame
     Spec.assertEqWith s "the Piker still connected" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertBool s (Set.member attackerId (GameState.battlefield after)) "and is still on the battlefield"
+    Spec.assertEqWith s "and is still on the battlefield" (S.creaturesInPlay S.alice after) 1
 
 -- CR 602.5's conjunction, printed on a card about itself: Kongming's
 -- Contraptions (Portal Three Kingdoms) prints "{T}: This creature deals 2 damage
@@ -1894,8 +1903,8 @@ augurUpkeep active gs =
       GameState.remaining = Seq.drop 1 (GameState.remaining gs)
     }
 
--- Activates the first offered activation, else passes -- pingAnswer's twin for
--- the Augur, and the interpreter that takes the pump the moment it is offered.
+-- Activates the first offered activation, else passes -- the interpreter that
+-- takes the Augur's pump the moment it is offered.
 pumpAnswer :: Prompt.Prompt r -> r
 pumpAnswer p = case p of
   Prompt.ChooseAction _ _ options -> case filter isActivate options of
