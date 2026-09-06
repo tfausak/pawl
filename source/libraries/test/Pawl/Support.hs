@@ -827,7 +827,8 @@ addPermanent printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1067,7 +1068,8 @@ addToken card pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1123,7 +1125,8 @@ addLibraryCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1183,7 +1186,8 @@ addGraveyardCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1248,7 +1252,8 @@ addExiledCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1318,7 +1323,8 @@ addHandCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1397,7 +1403,8 @@ landsFor land pid n base =
                   Object.detainedUntil = Set.empty,
                   Object.goadedBy = Set.empty,
                   Object.doesNotUntapNext = False,
-                  Object.exertedBy = Set.empty
+                  Object.exertedBy = Set.empty,
+                  Object.activatedOnce = Set.empty
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1452,7 +1459,8 @@ handOne printing base =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1513,7 +1521,8 @@ pikerInHand land piker n ph =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
       gs3 =
         gs2
@@ -2688,7 +2697,8 @@ oneMountainState mountain ph =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in GameState.MkGameState
         { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none},
@@ -2890,7 +2900,8 @@ spellOnStack printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2

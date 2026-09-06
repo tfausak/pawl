@@ -1196,7 +1196,8 @@ towerBoard tower victim =
 -- gates these same two windows, but through CR 102.1's turn axis alone
 -- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
 -- Ornitier and every other hit ride on "only once each turn" -- which
--- Pawl.Types.ActivationRestriction still cannot say (#3020) -- or on "only if
+-- Pawl.Types.ActivationRestriction still cannot say, its OnlyOnce arm being CR
+-- 702.177a's per-GAME clause (#3306) -- or on "only if
 -- <condition>", which is its OnlyIf arm and names no window, so neither kind
 -- reaches the phase axis this pair is about.
 --

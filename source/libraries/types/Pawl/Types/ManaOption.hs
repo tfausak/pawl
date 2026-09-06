@@ -19,6 +19,11 @@ import qualified Pawl.Types.Mana as Mana
 -- says nothing about timing, and CR 305.6's intrinsic ability has a cost with no
 -- ability to have printed a rider at all.
 --
+-- Not implemented: CR 602.5b's counted rider, which is a fact about the ABILITY
+-- rather than about the route and so cannot be read off these clauses.
+-- Pawl.Engine.ActivationRestriction.restrictionMet answers False for it here, and
+-- Loot, the Pathfinder is the printing that wants better (#3305).
+--
 -- The cost and the yield both, because either alone loses a distinction the player is entitled
 -- to make. The yield alone cannot separate an Urborg'd Mana Confluence's free
 -- {B} from the {B} it charges 1 life for (#1117); the cost alone cannot separate
