@@ -1326,7 +1326,7 @@ sacrificeCandidates slots pid source filter_ gs =
 -- here and no guard of that shape would fix it. Excluding them means threading
 -- the move's remaining targets into the entry loop, and that lands with the
 -- widening (#3293) -- unobservable until then, an instant or sorcery card being
--- the only thing this offer matches today and CR 110.1 keeping one off the
+-- the only thing this offer matches today and CR 110.4 keeping one off the
 -- battlefield.
 graveyardCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 graveyardCandidates pid filter_ gs =
