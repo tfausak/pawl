@@ -5409,25 +5409,36 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Engine.runGameAsked, where the registry is, and covers this arm
   -- and the entry twin alike by covering the one Prompt they share.
   --
-  -- Set.insert rather than a fresh singleton: CR 201.4g's interchangeable names
-  -- aside, nothing in rule 201.4 says a second choice unmakes the first, and a
-  -- source that chose as it entered keeps that name too. No printed card chooses
-  -- twice, so the two readings agree on the pool.
+  -- ASSIGNED and not unioned in, the entry twin's own write: CR 608.2c scopes
+  -- "the chosen name" to the resolution that chose it, so a permanent that
+  -- resolves this instruction twice must answer about the SECOND name alone.
+  -- Petra Sphinx activated on two turns is the producer that made the difference
+  -- observable -- every earlier one was an instant or a sorcery, whose next cast
+  -- is a new object (CR 400.7) with an empty set of its own.
+  --
+  -- Not implemented, and no printing reaches either: a resolution whose text
+  -- instructs a SECOND, separate choice keeps only the later name, where CR 201.4
+  -- read twice would leave two; and a permanent that chose as it entered (CR
+  -- 614.1c, Runed Halo) would lose that name to a later resolution of its own.
+  -- No card in data/cards writes two ChooseCardName instructions, and none pairs
+  -- an as-enters choice with a resolution-time one -- Runed Halo has no activated
+  -- ability, and Conjurer's Ban names once (Scryfall, 2026-09-06).
   --
   -- Written to the SOURCE and not to `resolving`: Pawl.Engine.PlayerEffect
   -- .chosenNamesOf and the resolution's own context both ask about a source (CR
   -- 113.7), and for a spell the two ids are the same object anyway.
   --
-  -- Not implemented: SEVERAL choosers' names kept apart. They union into the one
-  -- set on the source, so Conundrum Sphinx's "the name they chose" would read
-  -- every chooser's (#3316).
+  -- Not implemented: SEVERAL choosers of ONE instruction kept apart. Their
+  -- answers union into the one set on the source, so Conundrum Sphinx's "the name
+  -- they chose" would read every chooser's (#3316).
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> do
     gs <- State.get
-    Monad.forM_ (apnapPlayersOf ref legal controller gs) $ \chooser -> do
-      g <- State.get
-      answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction)
-      let stamp o = o {Object.chosenNames = Set.insert answer (Object.chosenNames o)}
-      State.modify' $ \g' -> g' {GameState.objects = Map.adjust stamp source (GameState.objects g')}
+    let ask chooser = do
+          g <- State.get
+          Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction)
+    picked <- fmap Set.fromList (Monad.mapM ask (apnapPlayersOf ref legal controller gs))
+    let stamp o = o {Object.chosenNames = picked}
+    State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
   -- CR 400.11c: the resolving controller reveals a card they own from outside the
   -- game matching the filter and puts it into their hand -- Burning Wish.
   --

@@ -1088,8 +1088,12 @@ data Context = MkContext
     -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside an admitted
     -- position", the sweep sourcePower's, slotNames' and
     -- sourceAttachedTo's siblings each have -- a fence over CARD data, which the
-    -- replacement filler above is not. That lint is an ALLOWLIST narrower than
-    -- what this field now answers, since effectContext fills it everywhere.
+    -- replacement filler above is not. That lint is an ALLOWLIST, and narrower
+    -- than what this field answers only inside a resolution: effectContext fills
+    -- it at every position of one, and the lint admits three of them. Outside a
+    -- resolution the field is empty and the lint refuses the atom, which is what
+    -- Pawl.CardSpec's StandingHostFramed exists to keep apart from an effect's own
+    -- ObjectRef.
     sourceChosenNames :: Set.Set CardName.CardName,
     -- CR 702.16k: the player chosen (CR 614.1c) by the permanent whose
     -- PROTECTION ability wrote the filter being matched, for the one atom that
