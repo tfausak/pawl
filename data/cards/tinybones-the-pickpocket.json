@@ -40,6 +40,11 @@
                       {
                         "type": "OfferCast",
                         "value": {
+                          "offer": {
+                            "spending": {
+                              "type": "AnyType"
+                            }
+                          },
                           "slot": "stolen"
                         }
                       }

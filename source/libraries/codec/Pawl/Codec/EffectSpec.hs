@@ -1001,7 +1001,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
                 CastOffer.Type.MkCastOffer
                   { CastOffer.Type.transformed = True,
                     CastOffer.Type.withoutPayingManaCost = True,
-                    CastOffer.Type.payingInstead = Nothing
+                    CastOffer.Type.payingInstead = Nothing,
+                    CastOffer.Type.spending = ManaSpending.AsProduced
                   }
             }
       )

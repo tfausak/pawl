@@ -782,7 +782,8 @@ slotOne slot resolving gs = do
 --      702.162a's alternative cost is the only road to when this offer states an
 --      alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
---      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates.
+--      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates, and
+--      how mana may be spent toward it (CR 118.14's `spending`).
 --   4. MAY IT BE CAST AT ALL -- Cast.castableWhenOffered, asked BEFORE the
 --      prompt so no cast is offered that the announcement would reverse.
 --
@@ -843,7 +844,7 @@ offerCast resolving caster slot optionality offer = do
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) (pure . Cost.untagged) applied
-         in if Cast.castableWhenOffered caster oid name candidates proposed
+         in if Cast.castableWhenOffered (CastOffer.spending offer) caster oid name candidates proposed
               then
                 -- CR 118.8c, read off the same candidates the cast will be
                 -- announced with: CR 118.9d keeps the face's additional costs on
@@ -873,7 +874,7 @@ offerCast resolving caster slot optionality offer = do
   case chosen of
     Nothing -> pure ()
     Just (oid, name, applied, excused) -> do
-      let cast = Cast.castSpellWith performManaAbility True applied caster oid name Facing.FaceUp
+      let cast = Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
           -- The SAME prompt on both paths: CR 118.8c creates no new decision.
           mayCast = do
             let decider = Decide.deciderFor caster gs

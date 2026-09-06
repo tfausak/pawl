@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -41,7 +42,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
               CastOffer.Type.MkCastOffer
                 { CastOffer.Type.transformed = True,
                   CastOffer.Type.withoutPayingManaCost = True,
-                  CastOffer.Type.payingInstead = Nothing
+                  CastOffer.Type.payingInstead = Nothing,
+                  CastOffer.Type.spending = ManaSpending.AsProduced
                 }
           }
       )
@@ -60,7 +62,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
               CastOffer.Type.MkCastOffer
                 { CastOffer.Type.transformed = False,
                   CastOffer.Type.withoutPayingManaCost = True,
-                  CastOffer.Type.payingInstead = Nothing
+                  CastOffer.Type.payingInstead = Nothing,
+                  CastOffer.Type.spending = ManaSpending.AsProduced
                 }
           }
       )

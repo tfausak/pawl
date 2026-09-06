@@ -99,6 +99,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -1492,7 +1493,7 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
           Prompt.ChooseOfferedCastFace {} -> ratchetBack
           Prompt.OfferedCast {} -> OptionalDecision.Exercises
           _ -> S.identityAnswer p
-        offered = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing}
+        offered = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
         under o = S.runPure wantingBack board (Resolve.offerCast resolving S.alice slot CastObligation.Optional o)
         resolvedUnder o = S.runPure wantingBack (under o) Stack.resolveTop
         free = offered {CastOffer.withoutPayingManaCost = True}

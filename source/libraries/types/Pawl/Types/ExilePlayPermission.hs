@@ -47,8 +47,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- so the rider expires exactly when the permission does and needs no sweep of
 -- its own. CR 609.4b is the limit on what it may do -- it changes neither the
 -- cost nor what mana was actually spent. Pawl.Engine.Cast.spendingFor is the one
--- place that reads this field, and Pawl.Engine.Mana.relax is what acts on the
--- value it hands back.
+-- place that reads this field -- joined there with an offer's own rider
+-- (Pawl.Types.CastOffer.spending) by Pawl.Engine.Cast.spendingWith -- and
+-- Pawl.Engine.Mana.relax is what acts on the value it hands back.
 --
 -- `origin` is which rule granted this permission, and CR 715.3d's closing clause
 -- is the one place it is read: "it can't be cast as an Adventure this way,
