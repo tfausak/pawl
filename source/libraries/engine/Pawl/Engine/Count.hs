@@ -290,6 +290,10 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsSource -> predicate
   Filter.Type.TargetsSource -> predicate
   Filter.Type.TargetsOnlySource -> predicate
+  -- NOT descended into, for the reason AttachedTo below is not: `candidate` here
+  -- is a PLAYER, and CR 115.1 puts no player on the stack, so
+  -- Pawl.Engine.Filter answers this atom False for a player candidate whatever
+  -- the nest says and never evaluates it.
   Filter.Type.TargetsOnlyOne _ -> predicate
   Filter.Type.TargetsPlayer _ -> predicate
   Filter.Type.IsBound _ -> predicate
@@ -824,6 +828,7 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 115.1: a snapshot is of an object that has left the stack or never
       -- was on it, and records no announcement -- `zone` above's reason.
       Filter.targets = Set.empty,
+      Filter.targetViews = Map.empty,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,

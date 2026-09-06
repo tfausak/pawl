@@ -329,7 +329,6 @@ import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.PutCountersFromSpec
 import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
-import qualified Pawl.Codec.RecipientKindSpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RedirectDamageSpec
 import qualified Pawl.Codec.ReduceActivationCostSpec
@@ -925,7 +924,6 @@ spec s registry = do
   Pawl.Codec.PutCountersFromSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
-  Pawl.Codec.RecipientKindSpec.spec s
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RedirectDamageSpec.spec s
   Pawl.Codec.ReduceActivationCostSpec.spec s
@@ -1044,6 +1042,7 @@ spec s registry = do
   Pawl.CopySpec.copyAbilityOnStackSpec s registry
   Pawl.CopySpec.copiedTriggerTargetSpec s registry
   Pawl.CopySpec.ivySpec s registry
+  Pawl.CopySpec.leylineOfResonanceSpec s registry
   Pawl.CopySpec.zadaSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
