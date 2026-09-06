@@ -229,6 +229,7 @@ manaProduced effect = case effect of
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
+  Effect.Earthbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
@@ -301,6 +302,7 @@ manaProduced effect = case effect of
   Effect.CantBeRegenerated {} -> Nothing
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
+  Effect.ForbidActivation {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -407,6 +409,7 @@ movesLibraryCard effect = case effect of
   Effect.Bolster _ -> False
   Effect.Amass _ -> False
   Effect.Blight _ -> False
+  Effect.Earthbend _ -> False
   Effect.TemptWithTheRing -> False
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
@@ -503,6 +506,7 @@ movesLibraryCard effect = case effect of
   Effect.CantBeRegenerated {} -> False
   Effect.ForbidBlock {} -> False
   Effect.ForbidAttack {} -> False
+  Effect.ForbidActivation {} -> False
   Effect.RequireAttack {} -> False
   Effect.CreateEmblem {} -> False
   Effect.Designate (Designate.MkDesignate _ _) -> False
@@ -565,6 +569,10 @@ refReachesLibrary ref = case ref of
   ObjectRef.EachOpponent -> False
   ObjectRef.ChosenPlayer -> False
   ObjectRef.ChosenCardInGraveyard {} -> False
+  -- FALSE: the position is in a GRAVEYARD, so the ref itself reaches no library.
+  -- Soldevi Digger's own ability still answers True through the MoveToZone's
+  -- DESTINATION, which is where "on the bottom of your library" is said.
+  ObjectRef.TopOfGraveyard _ -> False
   ObjectRef.ChosenCardInHand {} -> False
   -- TRUE, and the second arm that answers so: a group a look or a reveal
   -- bound is still in the LIBRARY it was shown from (CR 701.20b), so

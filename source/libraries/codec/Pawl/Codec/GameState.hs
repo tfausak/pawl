@@ -6,6 +6,7 @@ module Pawl.Codec.GameState where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Codec.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Codec.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Codec.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Codec.ActiveBlockProhibition as ActiveBlockProhibition
@@ -134,6 +135,7 @@ codec resolve = Fields.object $ do
   unregeneratables <- Fields.defaulted "unregeneratables" [] (Common.list ActiveUnregeneratable.codec) GameState.unregeneratables
   blockProhibitions <- Fields.defaulted "blockProhibitions" [] (Common.list ActiveBlockProhibition.codec) GameState.blockProhibitions
   attackProhibitions <- Fields.defaulted "attackProhibitions" [] (Common.list ActiveAttackProhibition.codec) GameState.attackProhibitions
+  activationProhibitions <- Fields.defaulted "activationProhibitions" [] (Common.list ActiveActivationProhibition.codec) GameState.activationProhibitions
   ignoredAbilities <- Fields.defaulted "ignoredAbilities" [] (Common.list IgnoredAbility.codec) GameState.ignoredAbilities
   turnOrder <- Fields.required "turnOrder" (Common.list PlayerId.codec) GameState.turnOrder
   activePlayer <- Fields.required "activePlayer" PlayerId.codec GameState.activePlayer
@@ -208,6 +210,7 @@ codec resolve = Fields.object $ do
         GameState.unregeneratables = unregeneratables,
         GameState.blockProhibitions = blockProhibitions,
         GameState.attackProhibitions = attackProhibitions,
+        GameState.activationProhibitions = activationProhibitions,
         GameState.ignoredAbilities = ignoredAbilities,
         GameState.turnOrder = turnOrder,
         GameState.activePlayer = activePlayer,

@@ -1,5 +1,6 @@
 module Pawl.Types.BecomeCopy where
 
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- | The payload of Pawl.Types.Effect's BecomeCopy arm: an effect turning an
@@ -49,6 +50,13 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- continuous effect beside the stamp (#1753).
 data BecomeCopy = MkBecomeCopy
   { original :: ObjectRef.ObjectRef,
-    subject :: ObjectRef.ObjectRef
+    subject :: ObjectRef.ObjectRef,
+    -- | CR 707.9's "except ..." clause, empty for a copy effect that states none.
+    -- The SAME list EntryRewrite.AsCopy carries, and applied by the same fold
+    -- (Pawl.Engine.Replacement.applyCopyExceptions) into the snapshot this opcode
+    -- stamps, which is what CR 707.9a asks for: the gained ability "becomes part
+    -- of the copiable values for the copy", so a token copy of the Shapeshifter
+    -- taken afterwards has it too (CR 707.2).
+    exceptions :: [CopyException.CopyException]
   }
   deriving (Eq, Ord, Show)

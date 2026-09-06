@@ -711,7 +711,8 @@ handInPlay printing board =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),
@@ -2562,11 +2563,10 @@ harnessTheStormSpec s registry = Spec.describe s "HarnessTheStorm" $ do
 -- the offer now says so. Havengul Lich would take the CR 601.3 road instead,
 -- which still has no one-object permission to write.
 --
--- Not implemented: "mana of any type can be spent to cast that spell" (CR
--- 118.14). Effect.OfferCast carries no spending rider where
--- Effect.GrantPlayFromExile does, so pawl's Tinybones is STRICTER than printed
--- -- the caster owes the stolen card's own coloured mana, which is why the
--- Swamps below and the {B} Vessel are chosen to match (#3251).
+-- "and mana of any type can be spent to cast that spell" is CR 118.14, carried
+-- by the OFFER (Pawl.Types.CastOffer.spending) where Dire Fleet Daredevil's rides
+-- the exile permission. PickpocketAnyType below is what proves it: alice pays a
+-- {1}{R} Goblin Piker out of two Swamps.
 
 -- alice attacks with a Tinybones and holds two Swamps; bob's graveyard holds an
 -- Archfiend's Vessel, a Goblin Piker, a Swamp and a Dryad Arbor, and alice's own
@@ -2701,6 +2701,68 @@ arborTargetSpec s registry =
       -- really was sitting in bob's graveyard to be offered.
       Spec.assertEqWith s "off the combat damage the trigger watches for" (S.lifeOf S.bob after) (fmap (subtract 1) (S.lifeOf S.bob board))
       Spec.assertBool s (elem arborId (Game.zoneMembers Zone.Graveyard S.bob after)) "with the Arbor still in bob's graveyard"
+
+-- pickpocketBoard's stolen card swapped for one alice CANNOT produce mana for:
+-- bob's graveyard holds a Goblin Piker ({1}{R} Creature -- Goblin Warrior) and an
+-- Archfiend's Vessel ({1}{B}), and alice's only lands are `swamps` Swamps. CR
+-- 118.14's rider is the whole difference between paying {1}{R} out of them and
+-- not.
+--
+-- The Vessel stays in the pile as the REPAIR decoy: {1}{B} is payable out of two
+-- Swamps with or without the rider, so an answerer that searched for a legal
+-- target rather than being pinned to the Piker would go on casting something
+-- whatever CR 118.14 did.
+--
+-- `swamps` is the only thing the two cases below differ in, and it is what tells
+-- CR 118.14's widening apart from an "everything is payable": the rider is
+-- applied to the demands a cost resolves into (Pawl.Engine.Mana.relax) and CR
+-- 609.4b keeps the cost itself alone, so one Swamp still cannot pay a two-mana
+-- spell.
+anyTypeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, ObjectId.ObjectId, Printing.Printing)
+anyTypeBoard s registry swamps = do
+  swamp <- S.printingOf s registry "Swamp"
+  tinybones <- S.printingOf s registry "Tinybones, the Pickpocket"
+  vessel <- S.printingOf s registry "Archfiend's Vessel"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (combat, _, _) = S.combatBoardOf [tinybones] []
+      (stolen, g1) = S.addGraveyardCard piker S.bob (S.landsFor swamp S.alice swamps combat)
+      (_, g2) = S.addGraveyardCard vessel S.bob g1
+  pure (g2, stolen, piker)
+
+-- CR 118.14 on the offered-cast road, which is the road Pawl.Types.CastOffer's
+-- `spending` rider exists for. Dire Fleet Daredevil proves the same rule on the
+-- exile-permission road (Pawl.CastRestrictionSpec).
+anyTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+anyTypeSpec s registry = Spec.describe s "PickpocketAnyType" $ do
+  Spec.it s "CR 118.14 two Swamps pay a stolen {1}{R} card's red mana" $ do
+    (board, stolen, piker) <- anyTypeBoard s registry 2
+    let (after, (_, offers)) = runPickpocket stolen board
+        pikers =
+          [ oid
+          | oid <- Set.toList (GameState.battlefield after),
+            S.soleFaceName oid after == S.printingName piker
+          ]
+    -- The gameplay reading, ahead of every proxy: alice produces no red mana at
+    -- all, and the Piker is on the battlefield under her control anyway.
+    case pikers of
+      [taken] -> Spec.assertEqWith s "CR 118.14 alice controls the {1}{R} Piker she paid for with Swamps" (View.controllerOf taken after) (Just S.alice)
+      other -> Spec.assertFailure s ("expected exactly one Piker on the battlefield, got " <> show (length other))
+    Spec.assertEqWith s "and the cast alice was offered was the Piker's" offers [S.printingName piker]
+    Spec.assertBool s (notElem stolen (Game.zoneMembers Zone.Graveyard S.bob after)) "so it left bob's graveyard"
+    -- The precondition the reading rests on, last: alice's mana really is all
+    -- black, so no board of hers could have paid {R} as {R}.
+    Spec.assertEqWith s "off a board whose only lands are two Swamps" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Swamp")) S.alice board) 2
+  -- The pair, one Swamp short: CR 609.4b's "it doesn't change that cost", so the
+  -- rider widens which mana pays a demand and never how many demands there are.
+  Spec.it s "CR 609.4b one Swamp still cannot pay two mana" $ do
+    (board, stolen, piker) <- anyTypeBoard s registry 1
+    let (after, (_, offers)) = runPickpocket stolen board
+    Spec.assertBool s (elem stolen (Game.zoneMembers Zone.Graveyard S.bob after)) "CR 609.4b the Piker stayed in bob's graveyard"
+    Spec.assertEqWith s "and no cast was offered off it" offers []
+    Spec.assertEqWith s "with the same printing the case above cast" (S.printingName piker) (CardName.MkCardName (Text.pack "Goblin Piker"))
+    -- The trigger really did resolve, so the empty offer is CR 118.9's
+    -- affordability and not a trigger that never happened.
+    Spec.assertEqWith s "off the combat damage the trigger watches for" (S.lifeOf S.bob after) (fmap (subtract 1) (S.lifeOf S.bob board))
 
 flashbackCardTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
@@ -3018,6 +3080,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   harnessTheStormSpec s registry
   pickpocketSpec s registry
   arborTargetSpec s registry
+  anyTypeSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry
 

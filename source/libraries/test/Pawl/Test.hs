@@ -28,6 +28,7 @@ import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationProhibitionSpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.ActivatorSpec
+import qualified Pawl.Codec.ActiveActivationProhibitionSpec
 import qualified Pawl.Codec.ActiveAttackProhibitionSpec
 import qualified Pawl.Codec.ActiveAttackRequirementSpec
 import qualified Pawl.Codec.ActiveBlockProhibitionSpec
@@ -204,6 +205,7 @@ import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
 import qualified Pawl.Codec.ForEachSpec
+import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
 import qualified Pawl.Codec.ForbidBlockSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
@@ -238,6 +240,7 @@ import qualified Pawl.Codec.LifeLossRewriteSpec
 import qualified Pawl.Codec.LimitUnlessSpec
 import qualified Pawl.Codec.LoggedEventSpec
 import qualified Pawl.Codec.LookAtSpec
+import qualified Pawl.Codec.LoyaltyKindSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaAdditionSpec
 import qualified Pawl.Codec.ManaCostSpec
@@ -455,6 +458,7 @@ import qualified Pawl.DepartureSpec
 import qualified Pawl.DetainSpec
 import qualified Pawl.DiceSpec
 import qualified Pawl.DungeonSpec
+import qualified Pawl.EarthbendSpec
 import qualified Pawl.EffectLintSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EntryReplacementSpec
@@ -625,6 +629,7 @@ spec s registry = do
   Pawl.Codec.ActivatorSpec.spec s
   Pawl.Codec.ActiveAttackProhibitionSpec.spec s
   Pawl.Codec.ActiveAttackRequirementSpec.spec s
+  Pawl.Codec.ActiveActivationProhibitionSpec.spec s
   Pawl.Codec.ActiveBlockProhibitionSpec.spec s
   Pawl.Codec.ActiveBlockRequirementSpec.spec s
   Pawl.Codec.ActivePlayerEffectSpec.spec s
@@ -799,6 +804,7 @@ spec s registry = do
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
+  Pawl.Codec.ForbidActivationSpec.spec s
   Pawl.Codec.ForbidBlockSpec.spec s
   Pawl.Codec.FromOutsideTheGameSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
@@ -833,6 +839,7 @@ spec s registry = do
   Pawl.Codec.LookAtSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaAdditionSpec.spec s
+  Pawl.Codec.LoyaltyKindSpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaCountSpec.spec s
   Pawl.Codec.ManaFilterSpec.spec s
@@ -1051,6 +1058,7 @@ spec s registry = do
   Pawl.CrewSpec.spec s registry
   Pawl.DamageSpec.spec s registry
   Pawl.DungeonSpec.spec s registry
+  Pawl.EarthbendSpec.spec s registry
   Pawl.DaytimeSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
@@ -1117,6 +1125,7 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlaneswalkerSpec.combinedLoyaltyCostSpec s registry
   Pawl.PlaneswalkerSpec.countersRemovedSpec s registry
+  Pawl.PlaneswalkerSpec.loyaltyAbilityOnlySpec s registry
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry

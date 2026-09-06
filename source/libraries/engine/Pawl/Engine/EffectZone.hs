@@ -96,6 +96,7 @@ zoneFunctionedFrom delayed effect = case effect of
     ObjectRef.ChosenPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.TopOfLibraryUntil {} -> Nothing
+    ObjectRef.TopOfGraveyard _ -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
     ObjectRef.ChosenCardInHand {} -> Nothing
     ObjectRef.ChosenCardFromAmong {} -> Nothing
@@ -120,6 +121,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
   Effect.Blight _ -> Nothing
+  Effect.Earthbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Venture {} -> Nothing
   Effect.ExileHandThenDraw -> Nothing
@@ -218,6 +220,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.CantBeRegenerated {} -> Nothing
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
+  Effect.ForbidActivation {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing

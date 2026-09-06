@@ -29,7 +29,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
-import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Projection as Projection
@@ -52,7 +51,6 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -82,6 +80,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -91,6 +90,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -213,7 +213,7 @@ ownQuantities effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationQuantities duration <> Projection.quantitiesOf modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
-  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> Maybe.maybeToList quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
@@ -222,6 +222,7 @@ ownQuantities effect = case effect of
   Effect.Bolster quantity -> [quantity]
   Effect.Amass (Amass.MkAmass quantity _) -> [quantity]
   Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
+  Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> [quantity]
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
@@ -295,6 +296,7 @@ ownQuantities effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationQuantities duration
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationQuantities duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationQuantities duration
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationQuantities duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationQuantities duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
   Effect.CreateEmblem _ -> []
@@ -1020,6 +1022,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenPlayer -> False
   ObjectRef.TopOfLibrary {} -> False
   ObjectRef.TopOfLibraryUntil {} -> False
+  ObjectRef.TopOfGraveyard {} -> False
   ObjectRef.EachCardFromAmong {} -> False
   ObjectRef.ChosenCardInGraveyard {} -> True
   ObjectRef.ChosenCardInHand {} -> True
@@ -1089,6 +1092,9 @@ effectObjectRefs effect = case effect of
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight {} -> []
+  -- CR 701.66a's "target land you control" is an ordinary read, Detain's arm
+  -- below: the animation and the counters act on it and nothing gathers.
+  Effect.Earthbend (Earthbend.MkEarthbend _ ref) -> read_ [ref]
   Effect.TemptWithTheRing -> []
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
@@ -1126,7 +1132,7 @@ effectObjectRefs effect = case effect of
   Effect.Create {} -> []
   Effect.Conjure {} -> []
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> read_ [ref]
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) -> read_ [original, subject]
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> read_ (ref : copyTargetsRefs targets)
   Effect.Replace {} -> []
   Effect.SkipNextPhase {} -> []
@@ -1176,6 +1182,7 @@ effectObjectRefs effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> read_ [ref]
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
     RestrictedCreatures.Named ref -> read_ [ref]
     RestrictedCreatures.Matching _ -> []
@@ -1203,7 +1210,7 @@ effectObjectRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> read_ [ref]
   -- No ObjectRef at all: the opcode names a library.
   Effect.Shuffle {} -> []
-  Effect.OfferCast {} -> []
+  Effect.OfferCast offer -> read_ [OfferCast.ref offer]
   Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
   Effect.ForEach (ForEach.MkForEach ref _ _) -> read_ [ref]
   where
@@ -1313,7 +1320,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no printed box holds a computed quantity" (fmap (S.nameOf . Printing.card) offenders) []
     -- The sweep is vacuous on a predicate that accepts everything, so both
     -- directions are asserted on real card data. Rootha, Mastering the Moment
-    -- prints a computed box (Miming Slime's Ooze is the other), and it sits on a
+    -- prints a computed box (Miming Slime's Ooze and Phyrexian Rebirth's Horror
+    -- are two more; grep data/cards/ for the shape), and it sits on a
     -- MINTED face (CR 111.3), which is exactly the shape the sweep above must not
     -- reach and the predicate must still reject.
     rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
@@ -1530,6 +1538,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- bounds how many cards it passes first. The same reading the computed
           -- depth above gets -- this lint asks what a card may be written as.
           ObjectRef.TopOfLibraryUntil {} -> False
+          -- TRUE at one seat: CR 404.1's top card is exactly one card per
+          -- graveyard, so the only thing that can make it plural is a PlayerRef
+          -- naming several -- TopOfLibrary's namesOneSeat with no depth to fail.
+          ObjectRef.TopOfGraveyard player -> namesOneSeat player
           -- One card per CHOOSER: the resolving controller chooses once however
           -- many graveyards the scope draws candidates from, where Exhume's
           -- "each player" is one choice each and so several cards on any board
@@ -1697,7 +1709,6 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> [slot]
           Effect.TurnFaceUp slot -> [slot]
           Effect.BecomesBlocked slot -> [slot]
-          Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
           Effect.Designate (Designate.MkDesignate _ slot) -> [slot]
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
           Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
@@ -1898,13 +1909,11 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         victimSlot = SlotName.MkSlotName (Text.pack "victim")
         discarding = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard victimSlot (Quantity.Type.Literal 1) (Just destroyedSlot)))
         minting n = Effect.Create (Create.MkCreate (Quantity.Type.Literal n) (oneFaced (vanillaFace "Soldier" (spellLine CardType.Creature Set.empty Set.empty))) EntryRiders.defaultValue (Just destroyedSlot) (PlayerRef.Relative PlayerRelation.You))
-    -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
-    -- OTHER half is Wild Evocation, whose OfferCast reads a slot a RANDOM reveal
-    -- of one card bound -- singular either way, so the two never meet. The
-    -- REJECTING direction is therefore proven against a hand-built pair rather
-    -- than by a corpus sweep, the posture the phase-skip lint below takes
-    -- against Eon Hub, and the sweep is a fence against a future card authoring
-    -- the shape.
+    -- Half the rejected shape is in the pool: Act on Impulse binds a group. No
+    -- card in data/cards/ pairs one with a singular read of the same slot, so the
+    -- REJECTING direction is proven against a hand-built pair rather than by a
+    -- corpus sweep -- the posture the phase-skip lint below takes against Eon Hub
+    -- -- and the sweep is a fence against a future card authoring the shape.
     Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a plural move minted"
     -- The same guard for the two arms added to the binding side: an arm no card
     -- reaches is a fence the corpus sweep can never exercise. Psychic Miasma is
@@ -1915,16 +1924,16 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
       s
       ( clashes
           [ Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Zone.Exile EntryRiders.defaultValue (Just exiledSlot) Nothing LibraryPlacement.defaultValue Nothing),
-            Effect.OfferCast (OfferCast.MkOfferCast exiledSlot (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue)
+            Effect.TurnFaceUp exiledSlot
           ]
       )
       "a singular read of a plurally bound slot is caught"
-    -- Neither OfferCast nor MoveToZone is the only half. The enumeration above IS
-    -- the lint, so a fence only OfferCast's slot could trip would leave every
+    -- Neither TurnFaceUp nor MoveToZone is the only half. The enumeration above IS
+    -- the lint, so a fence only TurnFaceUp's slot could trip would leave every
     -- other one-object instruction open. Paired with the board below, which
     -- differs in the slot name alone, so what catches is the intersection rather
     -- than `clashes` answering True for any two effects.
-    Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside OfferCast is caught"
+    Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside TurnFaceUp is caught"
     Spec.assertBool s (not (clashes [destruction, removal elsewhereSlot])) "a singular read of another slot is left alone"
     -- The other funnel on the same board: ExileHaunting's haunting card is read
     -- through slotOne rather than through legalOne. Paired with AttachBound,

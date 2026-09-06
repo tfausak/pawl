@@ -40,7 +40,7 @@
                         "type": "Search",
                         "value": {
                           "destination": {
-                            "type": "BattlefieldAttachedToSource"
+                            "type": "BattlefieldAttachedOrHand"
                           },
                           "filter": {
                             "type": "And",

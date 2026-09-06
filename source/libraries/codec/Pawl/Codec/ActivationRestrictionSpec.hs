@@ -125,4 +125,12 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
           )
       )
       " {\"type\":\"OnlyIf\",\"value\":{\"type\":\"Compares\",\"value\":{\"comparison\":{\"type\":\"AtLeast\"},\"measured\":{\"type\":\"Count\",\"value\":{\"aggregation\":{\"type\":\"Members\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"scope\":{\"type\":\"InZone\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}}}},\"threshold\":{\"type\":\"Literal\",\"value\":7}}}} "
+  -- CR 602.5b's counted rider, which CR 702.177a's exhaust rewrites into:
+  -- Greenbelt Guardian's "Activate only once".
+  Spec.it s "OnlyOnce" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      ActivationRestriction.OnlyOnce
+      " {\"type\":\"OnlyOnce\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

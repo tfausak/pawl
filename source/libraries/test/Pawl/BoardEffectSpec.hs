@@ -17,6 +17,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -25,6 +26,7 @@ import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
@@ -36,6 +38,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
@@ -61,8 +64,10 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
@@ -898,6 +903,157 @@ countOnLuckSpec s registry =
           Spec.assertEqWith s "bob's library is still untouched" (namesIn Zone.Library S.bob after) [named "Ogre Sentry"]
           Spec.assertBool s (S.onBattlefield luckId after) "and alice is still in the game with her enchantment"
           Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
+
+-- CR 404.1's ordered pile read from ITS end: ObjectRef.TopOfGraveyard, whose top
+-- is the NEWEST arrival and so the LAST member -- the opposite end from the
+-- library arms above, which is the way this reference is written wrong.
+--
+-- Soldevi Digger {2} Artifact -- "{2}: Put the top card of your graveyard on the
+-- bottom of your library." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com). Its whole printed text is that one ability, so nothing else
+-- on the card can be what these assertions read.
+--
+-- The board is built so that the readings of "the top card of your graveyard" are
+-- told apart, since a board that cannot distinguish them proves nothing:
+--
+--   * The NEWEST card versus the oldest. alice's graveyard is stocked with three
+--     distinct printings, and both the card that moved and the two left behind
+--     are asserted by name, in the pile's order.
+--   * The BOTTOM of the library versus its top. Her library already holds a
+--     card, so the two ends are different positions and the arriving card is
+--     asserted to be under it.
+--   * YOUR graveyard versus each player's. bob's graveyard is stocked with a
+--     printing alice never has, and it must be untouched.
+--   * ONE card versus the pile. Two cards stay, so a sweep of the graveyard
+--     would be visible.
+soldeviDiggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soldeviDiggerSpec s registry =
+  let -- alice controls Soldevi Digger and two Plains, and her graveyard holds
+      -- `buried` OLDEST FIRST -- S.addGraveyardCard puts each card on top, so
+      -- the last name given is the top card. Her library holds one Benalish
+      -- Hero, so the bottom is a position of its own; bob's graveyard holds one
+      -- Ogre Sentry, a printing alice never has.
+      board buried = do
+        digger <- S.printingOf s registry "Soldevi Digger"
+        plains <- S.printingOf s registry "Plains"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        hero <- S.printingOf s registry "Benalish Hero"
+        stocked <- mapM (S.printingOf s registry) buried
+        let (diggerId, g1) = S.addPermanent digger S.alice (S.landsInPlay plains 2)
+            g2 = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) g1 stocked
+            g3 = snd (S.addGraveyardCard sentry S.bob g2)
+            g4 = snd (S.addLibraryCard hero S.alice g3)
+        pure
+          ( digger,
+            diggerId,
+            g4
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          )
+      named = Just . CardName.MkCardName . Text.pack
+      -- Both piles in their own stored order: a graveyard reads OLDEST FIRST
+      -- (CR 404.1's arrival end is the last member) and a library TOP FIRST
+      -- (CR 401.2), which is why the arriving card is expected at opposite ends
+      -- of the two lists.
+      piles gs = (namesIn Zone.Graveyard S.alice gs, namesIn Zone.Library S.alice gs)
+   in Spec.describe s "SoldeviDigger" $ do
+        Spec.it s "CR 404.1 the NEWEST card in your graveyard, and only it, goes to the bottom of your library" $ do
+          (digger, diggerId, before) <- board ["Goblin Piker", "Bird Maiden", "Hill Giant"]
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              let after = S.runPure S.identityAnswer before (Activate.activateAbility S.alice diggerId ability >> Engine.priorityLoop)
+              Spec.assertEqWith
+                s
+                "the Hill Giant buried last is under the Benalish Hero in the library, and the two older cards are still in the graveyard in order"
+                (piles after)
+                ([named "Goblin Piker", named "Bird Maiden"], [named "Benalish Hero", named "Hill Giant"])
+              Spec.assertEqWith
+                s
+                "the fixture really buried the Hill Giant last, on top of the other two"
+                (fst (piles before))
+                [named "Goblin Piker", named "Bird Maiden", named "Hill Giant"]
+              Spec.assertEqWith
+                s
+                "bob's graveyard is untouched, so this is not each player's graveyard"
+                (namesIn Zone.Graveyard S.bob after, namesIn Zone.Library S.bob after)
+                ([named "Ogre Sentry"], [])
+              Spec.assertBool s (S.onBattlefield diggerId after) "the artifact is still on the battlefield, so nothing swept it"
+        -- ONE card, which is the case where the two ends of the pile coincide:
+        -- the same card is the top and the bottom, so an arm reading either end
+        -- moves it, and what this case proves is only that the graveyard empties.
+        Spec.it s "CR 404.1 a one-card graveyard gives up its one card" $ do
+          (digger, diggerId, before) <- board ["Bird Maiden"]
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              let after = S.runPure S.identityAnswer before (Activate.activateAbility S.alice diggerId ability >> Engine.priorityLoop)
+              Spec.assertEqWith
+                s
+                "the graveyard is empty and the card is under the Benalish Hero"
+                (piles after)
+                ([], [named "Benalish Hero", named "Bird Maiden"])
+        -- CR 404.3's arrangement is what this reference READS: the owner puts
+        -- simultaneous arrivals in an order of their own, and pawl records one on
+        -- the surveil path (Pawl.Engine.Resolve.Effect.surveilOne). alice
+        -- surveils two cards into an empty graveyard, and the ability then takes
+        -- the one the ANSWER named last -- the card that went in last is on top
+        -- (CR 404.1). The pair differs in exactly one thing, the order the answer
+        -- names, and a different card comes back for it.
+        Spec.it s "CR 404.3 the top card is the one the owner's own arrangement put there" $ do
+          (digger, diggerId, before) <- board []
+          maiden <- S.printingOf s registry "Bird Maiden"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              -- Stocked DEEPEST FIRST, so the surveil looks at piker then maiden;
+              -- the Benalish Hero the fixture put in is beneath both.
+              let (maidenId, g1) = S.addLibraryCard maiden S.alice before
+                  (pikerId, stocked) = S.addLibraryCard piker S.alice g1
+                  surveilTwo = Effect.Surveil (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
+                  -- Answers the surveil with a FIXED order and leaves every other
+                  -- prompt alone: an answerer that picked a legal split for itself
+                  -- would repair the assertion after a mutation.
+                  binning :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+                  binning order p = case p of
+                    Prompt.ChooseSurveil {} -> (order, [])
+                    _ -> S.identityAnswer p
+                  run order =
+                    S.runPure (binning order) stocked $ do
+                      Resolve.applyEffect diggerId diggerId S.alice Map.empty Map.empty surveilTwo
+                      Activate.activateAbility S.alice diggerId ability
+                      Engine.priorityLoop
+                  pikerLast = run [maidenId, pikerId]
+                  maidenLast = run [pikerId, maidenId]
+              Spec.assertEqWith
+                s
+                "named last, the Goblin Piker is on top of the graveyard, so it is the card that goes under the Benalish Hero"
+                (piles pikerLast)
+                ([named "Bird Maiden"], [named "Benalish Hero", named "Goblin Piker"])
+              Spec.assertEqWith
+                s
+                "and with the order swapped the Bird Maiden is the top card instead"
+                (piles maidenLast)
+                ([named "Goblin Piker"], [named "Benalish Hero", named "Bird Maiden"])
+        -- The empty pile, which CR 101.3 does as much of as it can -- none of it.
+        -- CR 104.3c takes nobody out of the game: an empty pile only loses when
+        -- its owner would DRAW from a library, and this ability draws nothing.
+        Spec.it s "CR 404.1 an empty graveyard has no top card, so the ability moves nothing" $ do
+          (digger, diggerId, before) <- board []
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              let after = S.runPure S.identityAnswer before (Activate.activateAbility S.alice diggerId ability >> Engine.priorityLoop)
+              Spec.assertEqWith
+                s
+                "both piles are what they were"
+                (piles after)
+                ([], [named "Benalish Hero"])
+              Spec.assertEqWith s "bob's graveyard is still untouched" (namesIn Zone.Graveyard S.bob after) [named "Ogre Sentry"]
+              Spec.assertEqWith s "the game has no result: an empty graveyard is not itself a loss" (GameState.result after) Nothing
 
 -- The DEPTH on ObjectRef.TopOfLibrary, and the group binding a move of several
 -- cards owes its second sentence.
@@ -2609,6 +2765,129 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     Spec.assertEqWith s "none for bob either" (length (centaursControlledBy S.bob resolved)) 0
     Spec.assertBool s (S.onBattlefield bystander resolved) "the creature that is neither an artifact nor an enchantment stands"
 
+-- Phyrexian Rebirth {4}{W}{W} Sorcery: "Destroy all creatures, then create an
+-- X/X colorless Phyrexian Horror artifact creature token, where X is the number
+-- of creatures destroyed this way." Oracle text checked against
+-- api.scryfall.com, 2026-09-06.
+--
+-- Rampage of the Clans' sweep with Destroy's COUNT rider instead of its
+-- permanents one, read where no card had read it before: inside the token's own
+-- printed box. CR 111.3 makes the value the creating effect defines part of the
+-- token's TEXT, which is why Resolve.bakeTokenCharacteristics stamps it as a
+-- literal at the mint rather than leaving a board-reading box on a permanent.
+--
+-- THREE SEATS, and the doomed creatures are split across two of them, so a
+-- count keyed to the caster's own board would read 1 rather than 3. carol's
+-- Darksteel Myr is a creature the filter MATCHES and CR 702.12b will not let be
+-- destroyed, so a box counting the SWEPT set would read 4.
+castRebirth :: Printing.Printing -> Printing.Printing -> GameState.GameState -> GameState.GameState
+castRebirth plains rebirth board =
+  let (withSpell, spell) = S.handOne rebirth (S.landsFor plains S.alice 6 board)
+   in S.settleSba (S.runPure S.identityAnswer withSpell (S.cast S.alice spell >> Engine.priorityLoop))
+
+-- The Horror's printed power AS TEXT, which is CR 111.3's "this becomes the
+-- token's text" made observable: a stamped literal cannot be re-read, and
+-- the spell that bound the count is in a graveyard under a fresh id by now
+-- (CR 400.7), so a box left standing would answer nothing at all.
+horrorPrintedPower :: ObjectId.ObjectId -> GameState.GameState -> Maybe Quantity.Quantity
+horrorPrintedPower oid gs = fmap Power.unwrap (Game.faceOf oid gs >>= Face.power)
+
+phyrexianRebirthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianRebirthSpec s registry = Spec.describe s "PhyrexianRebirth" $ do
+  -- The case that PROVES a token's printed box may be a Quantity.InSlot naming
+  -- an amount an EARLIER effect of the same resolution bound, which
+  -- Resolve.bakeTokenCharacteristics reads against the resolution rather than
+  -- against the token.
+  --
+  -- Every other reading gives a different number here, which is the whole point
+  -- of the board: 4 for the swept set, 1 for the caster's own creatures, 2 and 1
+  -- for the Pikers' printed box, and 0 for a box that reads the token's own
+  -- (empty) bindings.
+  Spec.it s "CR 111.3 the Horror is an X/X where X is the number of creatures DESTROYED" $ do
+    plains <- S.printingOf s registry "Plains"
+    rebirth <- S.printingOf s registry "Phyrexian Rebirth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    evangel <- S.printingOf s registry "Cabal Evangel"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    let (alicePiker, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.threePlayers)
+        (bobPiker, g2) = S.addPermanent piker S.bob g1
+        (bobEvangel, g3) = S.addPermanent evangel S.bob g2
+        (carolMyr, board) = S.addPermanent myr S.carol g3
+        resolved = castRebirth plains rebirth board
+        horrors = fmap (\oid -> S.powerToughnessOf oid resolved) (S.tokensOf resolved)
+    Spec.assertEqWith s "a 3/3 Horror: three creatures were destroyed, four were swept, one was alice's" horrors [Just (3, 3)]
+    Spec.assertEqWith s "CR 111.3 and 3 is its printed power, stamped as text at the mint" (fmap (`horrorPrintedPower` resolved) (S.tokensOf resolved)) [Just (Quantity.Literal 3)]
+    Spec.assertBool s (not (S.onBattlefield alicePiker resolved)) "alice's Piker died"
+    Spec.assertBool s (not (S.onBattlefield bobPiker resolved)) "bob's Piker died"
+    Spec.assertBool s (not (S.onBattlefield bobEvangel resolved)) "bob's Evangel died"
+    Spec.assertBool s (S.onBattlefield carolMyr resolved) "CR 702.12b carol's indestructible Myr was swept and stands"
+    Spec.assertEqWith s "stack empty: the spell resolved" (length (GameState.stack resolved)) 0
+  -- The discriminating twin, differing from the case above in ONE thing: bob's
+  -- Evangel is not on the board, so two creatures are destroyed instead of
+  -- three. A literal, a one-shot, or the caster's own tally would answer the
+  -- same number on both boards; this box does not.
+  Spec.it s "one creature fewer destroyed makes the Horror one smaller" $ do
+    plains <- S.printingOf s registry "Plains"
+    rebirth <- S.printingOf s registry "Phyrexian Rebirth"
+    piker <- S.printingOf s registry "Goblin Piker"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    let (_, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.threePlayers)
+        (_, g2) = S.addPermanent piker S.bob g1
+        (carolMyr, board) = S.addPermanent myr S.carol g2
+        resolved = castRebirth plains rebirth board
+        horrors = fmap (\oid -> S.powerToughnessOf oid resolved) (S.tokensOf resolved)
+    Spec.assertEqWith s "a 2/2 Horror: two creatures were destroyed" horrors [Just (2, 2)]
+    Spec.assertBool s (S.onBattlefield carolMyr resolved) "CR 702.12b carol's indestructible Myr stands here too"
+  -- CR 111.3 with a bound zero: the sweep destroys nothing, so Destroy binds 0
+  -- and the token is a 0/0 that CR 704.5f puts away at once -- a real answer
+  -- rather than CR 208.2a's undeterminable one. The Myr is what
+  -- makes the sweep non-empty in every other sense, so this is a case about the
+  -- COUNT and not about an empty board.
+  Spec.it s "CR 704.5f destroying nothing mints a 0/0 Horror, which dies" $ do
+    plains <- S.printingOf s registry "Plains"
+    rebirth <- S.printingOf s registry "Phyrexian Rebirth"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    let (carolMyr, board) = S.addPermanent myr S.carol (Setup.emptyGame S.threePlayers)
+        resolved = castRebirth plains rebirth board
+    Spec.assertEqWith s "no Horror is left on the battlefield" (S.tokensOf resolved) []
+    Spec.assertBool s (S.onBattlefield carolMyr resolved) "and the indestructible Myr is all that is left"
+  -- The STATIC-ANALYSIS half. The gameplay cases above pass whatever the walkers
+  -- answer, because Pawl.Engine.Resolve.Effect.bakeTokenCharacteristics evaluates
+  -- the box whether or not anything reported it -- so only this case says that
+  -- CR 603.3b's dataflow lint can SEE the read, which is what stops a token box
+  -- from naming a slot nothing binds.
+  --
+  -- Off the printed card and not a planted effect: the whole face's reads are
+  -- asserted, so the entry can only have come from the token's box. The
+  -- Destroy that binds it reports nothing here -- a bind is a definition, and
+  -- boundSlots is what reports those -- which is why the two halves of the
+  -- lint's subtraction are asserted together.
+  Spec.it s "CR 111.3 the token's printed box reports its slot read, and the Destroy defines it" $ do
+    rebirth <- S.cardOf s registry "Phyrexian Rebirth"
+    let face = NonEmpty.head (Card.Type.faces rebirth)
+        destroyed = SlotName.MkSlotName (Text.pack "destroyed")
+    Spec.assertEqWith
+      s
+      "the face reads `destroyed` as an amount, and reads it only through the Horror's X/X"
+      (foldMap Resolve.slotsOf (Card.allEffects face))
+      (Map.singleton destroyed SlotArity.Amount)
+    Spec.assertEqWith
+      s
+      "and the sweep defines it, so the read dangles nowhere"
+      (foldMap Resolve.boundSlots (Card.allEffects face))
+      (Set.singleton destroyed)
+    -- The other two walkers over the same position -- slotsAreExhaustive and
+    -- readsX -- take the widening as REGRESSION FENCES rather than proven
+    -- behaviour, so nothing here asserts them: a token box naming a slot is
+    -- exhaustive either way, and no card in data/cards/ writes one that reads CR
+    -- 601.2b's X, so mutating the box out of both leaves the suite green
+    -- (2026-09-06). They are kept because CR 111.3 makes the box the creating
+    -- effect's number for all three readers alike.
+    Spec.assertBool
+      s
+      (all Resolve.slotsAreExhaustive (Card.allEffects face))
+      "CR 603.3b nothing this face reads is a slot the walkers cannot report"
+
 -- Plummet ({1}{G} Instant, "Destroy target creature with flying"), the pool's
 -- first card whose Filter names a KEYWORD (Filter.HasKeyword, CR 702.9).
 --
@@ -2991,10 +3270,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   auraThiefSpec s registry
   baneOfProgressSpec s registry
   rampageOfTheClansSpec s registry
+  phyrexianRebirthSpec s registry
   comeBackWrongSpec s registry
   swiftSilenceSpec s registry
   glenElendrasAnswerSpec s registry
   countOnLuckSpec s registry
+  soldeviDiggerSpec s registry
   actOnImpulseSpec s registry
   communeWithLavaSpec s registry
   apocalypseChimeSpec s registry

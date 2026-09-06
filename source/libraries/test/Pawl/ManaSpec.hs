@@ -184,6 +184,11 @@ oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, Mana
 pikerCost :: ManaCost.ManaCost
 pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
 
+-- {G}{G}: the cost alice's Dryad Arbor and Forest together pay and either alone
+-- cannot, which is what makes the CR 613.1f case below discriminating.
+greenGreen :: ManaCost.ManaCost
+greenGreen = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Green)]
+
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
@@ -476,6 +481,31 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pikerId sick)) "it is a land now"
     Spec.assertBool s (Projection.isCreatureOf pikerId sick) "and still a creature"
     Spec.assertBool s (pikerId `notElem` Mana.manaSources Cost.manaActivations S.alice sick) "so the sick creature is no mana source"
+
+  -- CR 305.6 makes the intrinsic "{T}: Add {G}" an ability OF the land, so CR
+  -- 613.1f's layer-6 "loses all abilities" takes it with the printed ones: bob's
+  -- Humility leaves alice's Dryad Arbor (Land Creature -- Forest Dryad) tapping
+  -- for nothing. The Forest beside it is the control on one board -- same
+  -- subtype, same controller, no creature type -- so the {G}{G} that stops being
+  -- payable can only be the Arbor's half; see #3267.
+  Spec.it s "CR 613.1f Humility strips Dryad Arbor's CR 305.6 mana ability" $ do
+    arbor <- S.printingOf s registry "Dryad Arbor"
+    forest <- S.printingOf s registry "Forest"
+    humility <- S.printingOf s registry "Humility"
+    let base = Setup.emptyGame S.bothPlayers
+        (arborId, g1) = S.addPermanent arbor S.alice base
+        (forestId, g2) = S.addPermanent forest S.alice g1
+        (humilityId, gs) = S.addPermanent humility S.bob g2
+        -- CR 611.3b: a static ability's effect applies only while its permanent
+        -- is on the battlefield, so the ability rule 305.6 gives the land comes
+        -- back once Humility is destroyed.
+        gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [humilityId])
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice greenGreen gs)) "under Humility alice cannot pay {G}{G}"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice greenGreen gone) "and can once Humility has left"
+    Spec.assertEqWith s "the Arbor adds nothing under Humility" (Mana.manaTypesOf arborId gs) []
+    Spec.assertBool s (arborId `notElem` Mana.manaSources Cost.manaActivations S.alice gs) "so it is no mana source"
+    Spec.assertEqWith s "the Forest is untouched -- Humility reaches creatures only" (Mana.manaTypesOf forestId gs) [ManaType.Colored Color.Green]
+    Spec.assertEqWith s "and the Arbor taps for green again" (Mana.manaTypesOf arborId gone) [ManaType.Colored Color.Green]
 
   Spec.it s "CR 605.1a a {T}: Add {G} ability is a mana ability" $
     let ab =
@@ -1166,7 +1196,8 @@ towerBoard tower victim =
 -- gates these same two windows, but through CR 102.1's turn axis alone
 -- (laviniaTurnRiderSpec below), so she leaves the phase axis unexercised. Vivi
 -- Ornitier and every other hit ride on "only once each turn" -- which
--- Pawl.Types.ActivationRestriction still cannot say (#3020) -- or on "only if
+-- Pawl.Types.ActivationRestriction still cannot say, its OnlyOnce arm being CR
+-- 702.177a's per-GAME clause (#3306) -- or on "only if
 -- <condition>", which is its OnlyIf arm and names no window, so neither kind
 -- reaches the phase axis this pair is about.
 --

@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Earthbend as Earthbend
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.AbilityName as AbilityName
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
@@ -76,6 +77,7 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -483,7 +485,10 @@ cycling cost searchFor =
               -- CR 702.29e prints no "up to", and its quality-stating filter puts
               -- the search under CR 701.23b anyway, so this value is unobservable.
               Search.upTo = False,
-              Search.destination = SearchDestination.RevealThenHand
+              Search.destination = SearchDestination.RevealThenHand,
+              -- CR 702.29e's destination attaches nothing and its filter asks no
+              -- CR 701.3a question, so no object is fixed for one to be about.
+              Search.subject = Nothing
             }
 
 -- CR 702.77a's whole ability. Cycling's one clause over, and the first hand
@@ -2729,7 +2734,7 @@ ward cost =
           PayGate.cost = cost,
           PayGate.branch = PayBranch.IfNotPaid,
           PayGate.obligation = PayObligation.Optional,
-          PayGate.perCounter = Nothing,
+          PayGate.perEach = Nothing,
           PayGate.offeredAt = Nothing
         }
     effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing Nothing)
@@ -2764,10 +2769,14 @@ decayed =
             ArmDelayedTrigger.duration = Nothing
           }
 
--- CR 603.7: the delayed triggered abilities RULE 702 declares, keyed by the name
--- its own arming opcode names. Pawl.Engine.Resolve falls back to this map when a
--- name is on no face's Face.delayedAbilities, a keyword having no card text to
--- declare the far end in.
+-- CR 603.7: the delayed triggered abilities the RULEBOOK declares, keyed by the
+-- name its own arming opcode names. Pawl.Engine.Resolve falls back to this map
+-- when a name is on no face's Face.delayedAbilities, a keyword or keyword action
+-- having no card text to declare the far end in.
+--
+-- Rule 702's keywords and rule 701's keyword actions alike: decayed's sacrifice
+-- is rule 702.147a's, earthbend's return is rule 701.66a's, and both are engine
+-- text for the same reason.
 --
 -- Read by NAME and never off the board, which is what CR 603.7 asks for: a source
 -- that has since lost the keyword -- or left the battlefield -- still sacrifices.
@@ -2778,7 +2787,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.singleton decayedSacrificeName decayedSacrifice
+mintedDelayedAbilities = Map.fromList [(decayedSacrificeName, decayedSacrifice), (Earthbend.returnName, Earthbend.returnAbility)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
@@ -3110,7 +3119,7 @@ fabricate n =
           -- Optional because rule 702.123a prints the "may" itself; no offeredAt,
           -- one clause making its own offer.
           PayGate.obligation = PayObligation.Optional,
-          PayGate.perCounter = Nothing,
+          PayGate.perEach = Nothing,
           PayGate.offeredAt = Nothing
         }
     spawn =
@@ -3309,12 +3318,12 @@ miracle cost =
     offer =
       Effect.OfferCast
         OfferCast.MkOfferCast
-          { OfferCast.slot = Binding.triggerSource,
+          { OfferCast.ref = ObjectRef.InSlot Binding.triggerSource,
             -- Rule 702.94a's "YOU may cast it": the revealer, who is the
             -- trigger's controller, and a "may".
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
             OfferCast.optionality = CastObligation.Optional,
-            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost}
+            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced}
           }
 
 -- CR 702.94a's STATIC half, read as the one thing its reader needs: what this
@@ -3467,7 +3476,7 @@ fading =
 --
 -- CR 118.12a's rewriting puts the sacrifice on the IfNotPaid branch of an
 -- Optional offer -- ward's shape -- with rule 702.24a's "for each age counter on
--- it" riding PayGate.perCounter, which multiplies the offered cost by the pile.
+-- it" riding PayGate.perEach, which multiplies the offered cost by the pile.
 -- Rule 702.24a's "either the entire set of costs is paid, or none of them is
 -- paid" is that one multiplied cost rather than a run of offers.
 --
@@ -3514,7 +3523,7 @@ cumulativeUpkeep cost =
           PayGate.cost = cost,
           PayGate.branch = PayBranch.IfNotPaid,
           PayGate.obligation = PayObligation.Optional,
-          PayGate.perCounter = Just CounterKind.Age,
+          PayGate.perEach = Just (Quantity.ObjectCounters CounterKind.Age),
           PayGate.offeredAt = Nothing
         }
 

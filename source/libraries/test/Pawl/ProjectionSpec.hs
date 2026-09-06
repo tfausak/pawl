@@ -2776,7 +2776,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- CR 205.3i's list, directly: the classification the arm above folds with,
   -- and the boundary that makes "keeps its creature types" mean anything.
   -- Desert is in the list too, and is why this is not the same question as
-  -- Pawl.Engine.Mana.subtypeMana's CR 305.6 one: "Of that list, Forest, Island,
+  -- Pawl.Engine.Subtype.subtypeMana's CR 305.6 one: "Of that list, Forest, Island,
   -- Mountain, Plains, and Swamp are the basic land types", so a Desert is a
   -- land type that grants no intrinsic mana ability. Pawl.ManaSpec pins the
   -- other half of that pair.
@@ -3565,6 +3565,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- 605.1a's exclusion from both fields.
     Spec.assertBool s (not (Filter.nonManaActivatedAbility (Projection.viewOfObject landId gs))) "CR 605.1a excludes it from the sibling field"
     Spec.assertBool s (not (Filter.nonManaActivatedAbility (snapshotView landId gs))) "CR 605.1a again, in the snapshot"
+
+  -- The same three builders under CR 613.1f: Humility strips the Dryad Arbor's
+  -- CR 305.6 ability, and the two builders with a projection to read must say so
+  -- together. viewOfCard is the third and answers True still -- it describes a
+  -- CARD, which no continuous effect has reached; see #3267.
+  Spec.it s "CR 613.1f a Dryad Arbor under Humility has no activated ability in either projected builder" $ do
+    arbor <- S.printingOf s registry "Dryad Arbor"
+    mountain <- S.printingOf s registry "Mountain"
+    humility <- S.printingOf s registry "Humility"
+    let gs0 = S.landsInPlay mountain 1
+        landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
+          oid : _ -> oid
+          [] -> error "Pawl.ProjectionSpec: landsInPlay should place one Mountain"
+        (arborId, gs1) = S.addPermanent arbor S.alice gs0
+        gs = S.withHumility humility gs1
+        snapshotView oid g = Count.viewOfSnapshot Nothing False Map.empty (Projection.project oid g)
+        asks view = Filter.matches (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) view Filter.Type.HasActivatedAbility
+    Spec.assertBool s (not (asks (Projection.viewOfObject arborId gs))) "viewOfCharacteristics: the ability is gone"
+    Spec.assertBool s (not (asks (snapshotView arborId gs))) "viewOfSnapshot: and gone there too"
+    Spec.assertBool s (asks (Projection.viewOfObject landId gs)) "viewOfCharacteristics: the Mountain is no creature and keeps its"
+    Spec.assertBool s (asks (snapshotView landId gs)) "viewOfSnapshot: the Mountain again"
+    Spec.assertBool s (asks (Projection.viewOfCard (S.combinedFace arbor))) "viewOfCard: the CARD still has one, no layer having reached it"
 
   Spec.it s "viewOfCard reads a printed basic land's supertypes off the battlefield" $ do
     mountain <- S.printingOf s registry "Mountain"

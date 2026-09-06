@@ -71,6 +71,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -123,6 +124,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   hoistDifferentialSpec s registry
   printedActivationRestrictionSpec s registry
   printedActivationBoardConditionSpec s registry
+  printedActivationOnlyOnceSpec s registry
   printedActivationThresholdReductionSpec s registry
   printedActivationConjunctionSpec s registry
   printedActivationCombatPointSpec s registry
@@ -134,6 +136,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   textChangedAbilitySpec s registry
   textChangedCostSpec s registry
   textChangedTargetSpec s registry
+  textChangedOfferedCostSpec s registry
   graveyardEffectZoneSpec s registry
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
@@ -2628,6 +2631,66 @@ textChangedCostSpec s registry =
           Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
           Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
 
+-- CR 612.1 reaching CR 118.9's STATED alternative cost, on the offer that applies
+-- it (Pawl.Types.CastOffer.payingInstead).
+--
+-- Synthetic Woodland Bargainer {2} Artifact, "{T}: You may cast target creature
+-- card from your graveyard by sacrificing a Forest rather than paying its mana
+-- cost." SYNTHETIC because no printing states this wording on an offered cast:
+-- every Effect.OfferCast in data/cards/ either states no alternative cost or
+-- states CR 118.9's "without paying its mana cost", which is a Bool and names no
+-- word. CR 118.9 admits both wordings for a cost "applied to it from another
+-- effect", so nothing in the CR forbids the card; a printing that states one
+-- replaces it.
+--
+-- textChangedCostSpec above one field over. The same rules make it card text: CR
+-- 118.1 puts a cost in the text box CR 612.1 reaches, and CR 608.2g's cast then
+-- pays what the projected offer states.
+--
+-- BOTH readings are payable -- alice has a Forest and an Island -- so the cast
+-- happens either way and the only thing that moves is WHICH land dies. A board
+-- where one reading could not pay would confuse the swap with an unaffordable
+-- offer.
+textChangedOfferedCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedOfferedCostSpec s registry =
+  let forestName = CardName.MkCardName (Text.pack "Forest")
+      islandName = CardName.MkCardName (Text.pack "Island")
+      -- CR 608.2g's "may", taken. S.identityAnswer bottoms out in
+      -- Replay.defaultAnswer, which DECLINES every offered cast, so a case
+      -- asserting the cast happened would otherwise pass for want of a cast.
+      taking :: Prompt.Prompt r -> r
+      taking p = case p of
+        Prompt.OfferedCast {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      run hacked = do
+        bargainer <- S.printingOf s registry "Synthetic Woodland Bargainer"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        seat <- S.printingOf s registry "Seat of the Synod"
+        magicalHack <- S.printingOf s registry "Magical Hack"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (subjectId, _, _, hackId, g0) = textChangeBoard bargainer forest island seat magicalHack
+            (_, g1) = S.addGraveyardCard piker S.alice g0
+            board = withForestHackedToIsland hacked subjectId hackId g1
+        case soleProjectedAbility subjectId board of
+          Nothing -> Spec.assertFailure s "expected the Bargainer to carry exactly one activated ability"
+          Just ability -> pure (piker, S.runPure taking board (do Activate.activateAbility S.alice subjectId ability; Stack.resolveTop; Stack.resolveTop))
+   in Spec.describe s "TextChangedOfferedCost" $ do
+        -- The control: unhacked, the printed word stands and the FOREST is the
+        -- only thing that can pay the offer.
+        Spec.it s "CR 118.9 whole card: an unhacked offer is paid by sacrificing the Forest" $ do
+          (piker, after) <- run False
+          Spec.assertEqWith s "the Piker was cast off the offer" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+          Spec.assertEqWith s "the Forest is gone" (S.countOnBattlefieldByName forestName S.alice after) 0
+          Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
+        -- The swap. alice's board did not move, but the cost the offer states now
+        -- reads "sacrificing an Island", so the Island is what dies.
+        Spec.it s "CR 612.1 whole card: hacking the Bargainer moves which land its offer demands" $ do
+          (piker, after) <- run True
+          Spec.assertEqWith s "the Piker was still cast off the offer" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+          Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
+          Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
+
 -- CR 612.1 reaching a mode's TARGET SLOT, end to end.
 --
 -- Arbor Elf {G} Creature -- Elf Druid 1/1, "{T}: Untap target Forest." (checked
@@ -4430,3 +4493,93 @@ printedActivationThresholdReductionSpec s registry = Spec.describe s "PrintedAct
     Spec.assertEqWith s "nothing was flashed back, so nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
     Spec.assertEqWith s "Think Twice is still in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 6
     Spec.assertEqWith s "and alice drew nothing" (S.handSize S.alice after) 0
+
+-- CR 602.5b's counted rider, printed on a card about itself: Greenbelt Guardian
+-- (Aetherdrift) prints "{G}: Target creature gains trample until end of turn."
+-- beside "Exhaust -- {3}{G}: Put three +1/+1 counters on this creature.", and CR
+-- 702.177a rewrites the second into "{3}{G}: ... Activate only once." Oracle text
+-- checked against Scryfall 2026-09-06.
+--
+-- pawl's transcription omits the printed word "Exhaust" and states the rider it
+-- rewrites into directly (ActivationRestriction.OnlyOnce). Nothing on this card
+-- reads the marker, so the omission is behaviourally exact here; a card that
+-- names "exhaust abilities" cannot be written yet (#3044, #3021).
+--
+-- EIGHT Forests, which is exactly two activations of {3}{G}: the rider is the
+-- only thing standing between alice and the second one, so a board that ignored
+-- it would end the loop with six counters rather than three. The OTHER ability is
+-- what makes the rider a fact about the ABILITY -- Greenbelt Guardian's {G} is
+-- still offered once the exhaust one is spent.
+guardianBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+guardianBoard guardian forest =
+  let (guardianId, gs) = S.addPermanent guardian S.alice (S.landsInPlay forest 8)
+   in ( guardianId,
+        gs
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The offer carrying CR 602.5's once-only rider, told from the same permanent's
+-- other ability by the rider itself rather than by an index into the face: the
+-- ability rides on the action (Action.Activate), so this filters the offered set
+-- instead of building one.
+isOnlyOnce :: A.Action -> Bool
+isOnlyOnce a = case a of
+  A.Activate _ ability -> elem ActivationRestriction.OnlyOnce (ActivatedAbility.restrictions ability)
+  _ -> False
+
+-- Takes the once-only activation whenever the engine offers it and passes
+-- otherwise, so the second activation is refused by the rules rather than
+-- declined by the interpreter.
+onlyOnceAnswer :: Prompt.Prompt r -> r
+onlyOnceAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isOnlyOnce options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+printedActivationOnlyOnceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationOnlyOnceSpec s registry = Spec.describe s "PrintedActivationOnlyOnce" $ do
+  -- The gameplay-level proof (design.md section 4), driven through the priority
+  -- loop rather than by calling Activate.activateAbility, which does not gate.
+  -- alice takes the exhaust activation every time it is offered; three counters
+  -- rather than six is the whole assertion, and the untapped Forests after it are
+  -- what say the second activation was refused by the rider and not by the mana.
+  Spec.it s "CR 602.5b / 702.177a whole card: the exhaust ability resolves once and is refused the second time" $ do
+    guardian <- S.printingOf s registry "Greenbelt Guardian"
+    forest <- S.printingOf s registry "Forest"
+    let (guardianId, board) = guardianBoard guardian forest
+        after = S.runPure onlyOnceAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "the Guardian is a 2/2 before anything is activated" (S.powerToughnessOf guardianId board) (Just (2, 2))
+    Spec.assertEqWith s "and a 5/5 after, so three counters went on and not six" (S.powerToughnessOf guardianId after) (Just (5, 5))
+    Spec.assertEqWith s "exactly four Forests were tapped, so four remain to pay a second activation and the rider is what refused it" (length (filter (\oid -> fmap Object.tapped (Game.lookupObject oid after) == Just TapState.Tapped) (Set.toList (GameState.battlefield after)))) 4
+
+  -- CR 602.5b's grain: the restriction is about the ABILITY, not the permanent.
+  -- The same board, once the exhaust ability is spent -- the {G} trample ability
+  -- is still offered off the same object, and the exhaust one is not.
+  Spec.it s "CR 602.5b the permanent's other ability is untouched" $ do
+    guardian <- S.printingOf s registry "Greenbelt Guardian"
+    forest <- S.printingOf s registry "Forest"
+    let (guardianId, board) = guardianBoard guardian forest
+        after = S.runPure onlyOnceAnswer board Engine.priorityLoop
+        offered = activationsOf guardianId (Action.legalActions S.alice after)
+    Spec.assertEqWith s "the once-only ability is not offered again" (filter isOnlyOnce offered) []
+    Spec.assertEqWith s "but the Guardian's other ability still is" (length (filter (not . isOnlyOnce) offered)) 1
+
+  -- CR 400.7 over CR 602.5b: the permanent that comes back is a new object with
+  -- no memory, so its exhaust ability is available again. The same board as
+  -- above, differing only in the two zone changes.
+  Spec.it s "CR 400.7 / 602.5b the permanent that returns may activate it again" $ do
+    guardian <- S.printingOf s registry "Greenbelt Guardian"
+    forest <- S.printingOf s registry "Forest"
+    let (guardianId, board) = guardianBoard guardian forest
+        after = S.runPure onlyOnceAnswer board Engine.priorityLoop
+        (toHand, bounced) = S.runPureWith S.identityAnswer after (Event.changeZoneReturning guardianId Zone.Hand)
+        inHand = case toHand of h Seq.:<| _ -> h; _ -> S.noSource
+        (toPlay, returned) = S.runPureWith S.identityAnswer bounced (Event.changeZoneReturning inHand Zone.Battlefield)
+        backId = case toPlay of b Seq.:<| _ -> b; _ -> S.noSource
+    Spec.assertEqWith s "the returned permanent is a 2/2 again -- CR 400.7 dropped the counters" (S.powerToughnessOf backId returned) (Just (2, 2))
+    Spec.assertEqWith s "and its once-only ability is offered again" (length (filter isOnlyOnce (activationsOf backId (Action.legalActions S.alice returned)))) 1

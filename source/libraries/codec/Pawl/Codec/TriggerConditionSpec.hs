@@ -857,6 +857,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")))
       " {\"type\":\"LoseControlOfBound\",\"value\":\"target\"} "
+  -- CR 701.66a's slot-named condition, the arm above's wire shape. No card prints
+  -- it -- Pawl.Engine.Earthbend mints the only ability that carries it -- and it
+  -- must not collapse into LoseControlOfBound, which shares the payload exactly.
+  Spec.it s "BoundDiesOrIsExiled round-trips its slot, and is not LoseControlOfBound" $ do
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.BoundDiesOrIsExiled (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"BoundDiesOrIsExiled\",\"value\":\"target\"} "
+    Spec.assertBool
+      s
+      (TriggerCondition.BoundDiesOrIsExiled (SlotName.MkSlotName (Text.pack "target")) /= TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")))
+      "BoundDiesOrIsExiled and LoseControlOfBound of the same slot are different conditions"
   -- CR 309.4c. No dungeon card prints this condition -- Pawl.Engine.Dungeon mints
   -- one per room -- but it round-trips like every other arm.
   Spec.it s "RoomEntered round-trips its room" $

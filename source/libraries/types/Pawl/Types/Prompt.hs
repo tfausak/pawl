@@ -172,10 +172,8 @@ data Prompt r where
   ChooseMovedCounterOrNone :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (CounterKind.CounterKind Keyword.Keyword) -> Prompt (Maybe (CounterKind.CounterKind Keyword.Keyword))
   -- | CR 107.14: how much {E} the player pays to an Effect.PayAnyEnergy as
   -- the object resolves; the Natural is their energy, enforced (CR 118.3),
-  -- and zero declines the "may".
-  --
-  -- Not implemented: skipping it when the bound is 0, where the one payable
-  -- amount is determined (#1920).
+  -- and zero declines the "may". Not raised for a bound of 0, where that same
+  -- rule leaves 0 as the only payable amount.
   ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.155b / 714.3b: which chapter a Saga with read ahead enters on; the
   -- Natural is the final chapter (CR 714.2d), the answer clamped into the
@@ -336,9 +334,9 @@ data Prompt r where
   -- | CR 105.4 / 106.3: which mana a resolving object adds when the type it
   -- names is not settled, from Pawl.Engine.Mana.producedTypes.
   ChooseManaType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaType.ManaType -> Prompt ManaType.ManaType
-  -- | CR 201.4 / 614.1c: the card name a player chooses as an object enters;
-  -- the Filter is CR 201.4a's restriction, and the PlayerId is the chooser,
-  -- asked in APNAP order.
+  -- | CR 201.4: the card name a player chooses, as an object enters (CR 614.1c)
+  -- or as a resolution instructs (CR 608.2c); the Filter is CR 201.4a's
+  -- restriction, and the PlayerId is the chooser, asked in APNAP order.
   --
   -- No candidate list: rule 201.4's offer is every card in the Oracle card
   -- reference, which is not a set the engine holds. The answer is judged on the
@@ -484,9 +482,15 @@ data Prompt r where
   -- them to (CR 310.12b), the CardName being the half CR 712.11a puts on the
   -- stack; never elided, and not raised for CR 608.2g's "instructs".
   OfferedCast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
-  -- | CR 709.3 / 712.11b / 715.3: which half an OfferedCast casts, from those
-  -- Cast.castableWhenOffered admits; asked before the "may".
-  ChooseOfferedCastFace :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
+  -- | CR 601.3 / 709.3 / 712.11b / 715.3: WHICH CAST an OfferedCast makes, from
+  -- those Cast.castableWhenOffered admits; asked before the "may".
+  --
+  -- An object AND a name per option, because CR 601.3's offer ranges over a set
+  -- of cards (Shell of the Last Kappa's exiled pile) as readily as over the
+  -- halves of one (CR 709.3), and one prompt has to carry both -- a card with two
+  -- castable halves contributes two options naming the same object. Elided when
+  -- only one survives the gate.
+  ChooseOfferedCastSpell :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty (ObjectId.ObjectId, CardName.CardName) -> Prompt (ObjectId.ObjectId, CardName.CardName)
   -- | CR 702.94a / 121.9: whether the drawn card is revealed for miracle, the
   -- cast being OfferedCast's separate "may"; never elided where asked.
   OfferedMiracleReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision

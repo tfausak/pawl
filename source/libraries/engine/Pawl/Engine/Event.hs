@@ -737,7 +737,8 @@ mintCard pid under printingId dest position gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         Game.insertIntoZone
@@ -921,7 +922,8 @@ createEmblem pid card = do
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
-                Object.exertedBy = Set.empty
+                Object.exertedBy = Set.empty,
+                Object.activatedOnce = Set.empty
               }
       Just <$> placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -1716,7 +1718,10 @@ apply batch candidate event =
                   -- (CR 707.9b) rather than an effect layered over them. Only on
                   -- this branch: a declined copy is no copying process, so its
                   -- exceptions do not happen either.
-                  let stamped = Replacement.applyCopyExceptions (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
+                  -- Nothing for "this ability": the copy effect here is a
+                  -- replacement effect, and no printed one points at itself --
+                  -- applyCopyExceptions records the query.
+                  let stamped = Replacement.applyCopyExceptions Nothing (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
                       stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 -- CR 614.1d, inside the same sentence: Vesuva enters TAPPED as a
@@ -2238,7 +2243,10 @@ apply batch candidate event =
       -- spends is a card in a graveyard rather than a permanent on the
       -- battlefield -- and CR 614.12b's combined budget across a batch falls out
       -- here for the same reason, the choice being made and paid inside the entry
-      -- loop before the next member of the batch runs its own (CR 614.13b).
+      -- loop before the next member of the batch runs its own (CR 614.13b). Only
+      -- CR 614.13b: rule 614.13a's exclusion of a card entering beside this one is
+      -- the half that does not fall out, and Replacement.graveyardCandidates is
+      -- where that is recorded.
       --
       -- MANDATORY, and so unlike the two "or tapped" arms there is no declining
       -- half: the card prints no "may". An empty offer exiles nothing (CR 101.3),
@@ -5841,7 +5849,8 @@ createTokens controller card copy n tapped entering = do
                       Object.detainedUntil = Set.empty,
                       Object.goadedBy = Set.empty,
                       Object.doesNotUntapNext = False,
-                      Object.exertedBy = Set.empty
+                      Object.exertedBy = Set.empty,
+                      Object.activatedOnce = Set.empty
                     }
             Monad.replicateM (Natural.toIntSaturating (TokenLot.count lot)) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           minted <- State.get
@@ -6026,7 +6035,8 @@ meld controller victims resultCard = do
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
-                Object.exertedBy = Set.empty
+                Object.exertedBy = Set.empty,
+                Object.activatedOnce = Set.empty
               }
       newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
       -- Alchemy's "perpetually", the ARRIVAL direction of what perpetuate does at
@@ -6383,6 +6393,8 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 603.7's own event is a control change, not an ability triggering, so it
   -- belongs to CR 603.3b's first pass.
   TriggerCondition.LoseControlOfBound _ -> False
+  -- CR 701.66a's event is a zone change, likewise rule 603.3b's first pass.
+  TriggerCondition.BoundDiesOrIsExiled _ -> False
   -- CR 309.4c's event is a venture marker moving, not an ability triggering.
   TriggerCondition.RoomEntered _ -> False
   -- CR 309.7's event is a dungeon card leaving the game, not an ability
@@ -6799,6 +6811,9 @@ controllerTurnScoped cond = case cond of
   -- delayed ability watches on the turn the spell resolved, but that is the
   -- DURATION's doing rather than a restriction the condition states.
   TriggerCondition.LoseControlOfBound _ -> False
+  -- Carries no TurnScope either: rule 701.66a's delayed ability watches for as
+  -- long as it takes, on whoever's turn the land dies or is exiled.
+  TriggerCondition.BoundDiesOrIsExiled _ -> False
   -- Carries no TurnScope either, and CR 603.12 restricts a reflexive to no turn:
   -- it fires on whatever turn the ability that created it resolved on, which for
   -- an instant-speed creator is an opponent's as readily as its controller's.

@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Cost as Cost.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -45,6 +45,7 @@ import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Compares as Compares
@@ -299,6 +300,10 @@ canHostSubjects predicate = case predicate of
 hostFramed :: Framing -> Bool
 hostFramed framing = case framing of
   SourceHostFramed -> True
+  -- The three positions #3320 split off SourceHostFramed keep its answer here:
+  -- what the split is about is CR 201.4's chosen names, not CR 303.4b's host,
+  -- which all four evaluators supply.
+  StandingHostFramed -> True
   ReplacementRowFramed -> True
   Unframed -> False
   AttachDestination -> False
@@ -443,7 +448,8 @@ canAttachToSubjectTag = Text.pack "CanAttachToSubject"
 
 -- How many CR 701.3a candidate-side atoms this card carries inside a SEARCH's
 -- filter, and how many anywhere else. The second number is the offence; the first
--- is what Auratouched Mage legitimately has one of.
+-- is what Auratouched Mage and Sovereigns of Lost Alara legitimately have one of
+-- each.
 canAttachToSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canAttachToSubjectCounts card =
   let total wanted = sum [filterAtoms canAttachToSubjectTag f | (framing, f) <- cardFilters card, (framing == SearchFramed) == wanted]
@@ -469,33 +475,57 @@ canAttachToSubjectOffends card =
 hasChosenNameTag :: Text.Text
 hasChosenNameTag = Text.pack "HasChosenName"
 
--- How many CR 201.4 chosen-name atoms this card carries inside one of the two
--- positions that overlay Filter.Context.sourceChosenNames -- a CR 701.23 search's
--- filter or a CR 701.17 mill's tally -- and how many anywhere else. The second
--- number is the offence; the first is what Ancient Vendetta and Predict
+-- How many CR 201.4 chosen-name atoms this card carries inside one of the three
+-- ADMITTED positions -- a CR 701.23 search's filter, a CR 701.17 mill's tally, or
+-- an EFFECT's ObjectRef -- and how many anywhere else. The second number is
+-- the offence; the first is what Ancient Vendetta, Predict and Petra Sphinx
 -- legitimately have one each of.
+--
+-- SourceHostFramed and not `hostFramed`: since #3320 that tag means an effect's
+-- ObjectRef and nothing else, which is what makes it admissible here. The
+-- positions it used to share the tag with carry StandingHostFramed and are
+-- REJECTED -- CR 604.2's clause, CR 603.4's intervening "if" and a printed player
+-- ability's own Filters are each read outside a resolution, through
+-- Filter.contextFor or Filter.contextWithSlots, where sourceChosenNames is empty.
+-- The self-test below plants the atom in a static condition and expects the
+-- offence.
+--
+-- An ALLOWLIST rather than "wherever Filter.Context.sourceChosenNames is filled",
+-- sameNameAsBoundCounts' posture and for its reason: since #2992 the field is
+-- filled by Pawl.Engine.Resolve.Slots.effectContext itself, so every position a
+-- RESOLUTION reaches has it, and this rejects the atom in positions that would in
+-- fact answer. Widen it when a card wants one of them.
 hasChosenNameCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenNameCounts card =
-  let total wanted = sum [filterAtoms hasChosenNameTag f | (framing, f) <- cardFilters card, elem framing [SearchFramed, MillTallyFramed] == wanted]
+  let total wanted = sum [filterAtoms hasChosenNameTag f | (framing, f) <- cardFilters card, elem framing [SearchFramed, MillTallyFramed, SourceHostFramed] == wanted]
    in (total True, total False)
 
 -- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
--- is filled, and two sites a CARD can reach fill it: Pawl.Engine.Resolve.Effect's
--- Effect.Search arm and its Effect.Mill arm's tally, each overlaying the field on
--- the resolution's own context -- Pawl.Engine.Replacement.candidateContext is the
--- third, and rule 702.16e's minted shield is the only filter written there.
--- Filter.contextFor, Filter.contextWithSlots, Filter.contextComparingPower and
+-- is filled, which two callers do: Pawl.Engine.Resolve.Slots.effectContext, which
+-- all but one of a resolution's positions go through -- the search filter, the
+-- mill tally and an ObjectRef's own Filter among them -- and
+-- Pawl.Engine.Replacement.candidateContext, where rule 702.16e's minted shield is
+-- the only filter written. Filter.contextFor, Filter.contextWithSlots,
+-- Filter.contextComparingPower and
 -- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
--- a target slot, an affected set, a Count filter or a cost criterion is a silent
--- False rather than a rejected card. This is where that is made loud.
+-- a target slot, an affected set, a static ability's CR 604.2 condition, a
+-- triggered ability's CR 603.4 intervening "if", a printed player ability or a
+-- cost criterion is a silent False rather than a rejected card. This is where
+-- that is made loud -- the three condition positions through StandingHostFramed,
+-- which #3320 split off SourceHostFramed precisely so this allowlist could
+-- refuse them.
+--
+-- The three positions hasChosenNameCounts admits are narrower than that, on
+-- purpose: see its own note. So a card rejected here is not necessarily one the
+-- engine would answer wrong.
 --
 -- SearchFramed is the framing canAttachToSubjectOffends fences, and for a
 -- different rule: that atom needs the search arm's own VIEW as well as its
 -- context, so it is admitted in that one position where this atom is admitted in
--- two.
+-- three.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside those two positions, or the traversal and the codec
+-- traversal found the atom outside those three positions, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence. Unlike its three siblings' the second disjunct is PROVED here rather
@@ -828,7 +858,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 701.3a: "An Aura, Equipment, or Fortification can't be attached to an
   -- object or player it couldn't enchant, equip, or fortify, respectively." The
   -- atom that asks that question is answerable only where an attach frames the
-  -- match, and vacuously False everywhere else. See canHostSubjectOffends for the
+  -- match, and vacuously False everywhere else. Not implemented: the atom at a
+  -- CHOICE, where Takklemaggot's "chooses a creature that this card could
+  -- enchant" writes it (#3312). See canHostSubjectOffends for the
   -- two offences this one predicate covers.
   Spec.it s "CR 701.3a no card asks CanHostSubject outside an attach's destination" $ do
     ps <- S.allPrintings s
@@ -872,6 +904,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
+  -- Not implemented: the atom at an ATTACH, where Bruna, Light of Alabaster's
+  -- "attach any number of Aura cards that could enchant it" writes it (#3311).
+  --
   -- CR 701.3a from the candidate's side: Filter.CanAttachToSubject is answerable
   -- only where the evaluator supplies the fixed host, which is a search's filter
   -- and nothing else. See canAttachToSubjectOffends for the two offences.
@@ -879,36 +914,43 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace canAttachToSubjectOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only in a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and the one card that does is
-    -- ACCEPTED here rather than skipped.
+    -- NOT vacuous: the pool authors the atom, and both cards that do are
+    -- ACCEPTED here rather than skipped -- one saying "it" of its own source and
+    -- one saying "that creature" of a slot its trigger bound, which is the axis
+    -- Pawl.Types.Search.subject carries and this lint is blind to.
     mage <- S.printingOf s registry "Auratouched Mage"
     Spec.assertEqWith
       s
       "Auratouched Mage's one atom is framed by its own search"
       (canAttachToSubjectCounts (S.combinedFace mage))
       (1, 0)
+    sovereigns <- S.printingOf s registry "Sovereigns of Lost Alara"
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "and so is Sovereigns of Lost Alara's"
+      (canAttachToSubjectCounts (S.combinedFace sovereigns))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those are the pool's only two"
       (sum (fmap (uncurry (+) . canAttachToSubjectCounts . S.combinedFace) ps))
-      1
+      2
     -- The unframed side has room to spare, so a Framing that had stopped marking
     -- searches would fail here rather than pass the sweep above by iterating over
     -- nothing.
     let positions = concatMap (cardFilters . S.combinedFace) ps
     Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 5) "the pool gives the accepted side search filters to be about"
   -- CR 201.4's chosen name is CR 701.3a's atom in nearly the same frame:
-  -- answerable only where a resolution overlays the field, which
-  -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its Effect.Mill tally each
-  -- do, and a silent False everywhere else. See hasChosenNameOffends for the two
-  -- offences.
-  Spec.it s "CR 201.4 no card asks HasChosenName outside a search's filter or a mill's tally" $ do
+  -- answerable only where the resolution's own context is built
+  -- (Pawl.Engine.Resolve.Slots.effectContext), and a silent False everywhere
+  -- else. See hasChosenNameOffends for the two offences.
+  Spec.it s "CR 201.4 no card asks HasChosenName outside an admitted position" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace hasChosenNameOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only where the resolution overlays the chosen names" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and BOTH cards that do are ACCEPTED
-    -- here rather than skipped -- one per admitted position, so a framing that
-    -- stopped marking either would redden.
+    -- NOT vacuous: the pool authors the atom, and ALL THREE cards that do are
+    -- ACCEPTED here rather than skipped -- one per admitted position, so a
+    -- framing that stopped marking any would redden.
     vendetta <- S.printingOf s registry "Ancient Vendetta"
     Spec.assertEqWith
       s
@@ -921,11 +963,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Predict's one atom is framed by its own mill tally"
       (hasChosenNameCounts (S.combinedFace predict))
       (1, 0)
+    sphinx <- S.printingOf s registry "Petra Sphinx"
     Spec.assertEqWith
       s
-      "and the two are the pool's only ones"
+      "Petra Sphinx's one atom is framed by the ObjectRef its move names"
+      (hasChosenNameCounts (S.combinedFace sphinx))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and the three are the pool's only ones"
       (sum (fmap (uncurry (+) . hasChosenNameCounts . S.combinedFace) ps))
-      2
+      3
   -- CR 702.16k's chosen player in the same frame one atom over: answerable only
   -- where a protection quality is read, and every one of those four positions
   -- takes its filter off a keyword. See ofChosenPlayerOffends for the two
@@ -1358,7 +1406,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                                           PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)],
                                           PayGate.branch = PayBranch.IfNotPaid,
                                           PayGate.obligation = PayObligation.Optional,
-                                          PayGate.perCounter = Nothing,
+                                          PayGate.perEach = Nothing,
                                           PayGate.offeredAt = Nothing
                                         }
                                   )
@@ -1546,16 +1594,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         anywhere = ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)
         riders = EntryRiders.defaultValue {EntryRiders.counters = Map.singleton kind one}
-        -- CR 118.12's gate, whose counter kind is rule 702.24a's multiplier;
-        -- see #2876. Its cost is empty, so the row below reports the KIND rather
-        -- than a walk that found the cost's filters instead.
+        -- CR 118.12's gate, whose multiplier is a Quantity and so writes the kind
+        -- as a NUMBER (rule 702.24a's own count); see #2876. Its cost is empty, so
+        -- the row below reports the multiplier rather than a walk that found the
+        -- cost's filters instead.
         gate =
           PayGate.MkPayGate
             { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
               PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [],
               PayGate.branch = PayBranch.IfNotPaid,
               PayGate.obligation = PayObligation.Optional,
-              PayGate.perCounter = Just kind,
+              PayGate.perEach = Just (Quantity.Type.ObjectCounters kind),
               PayGate.offeredAt = Nothing
             }
         -- The PAIR, not just the Filter: PR #2739's reader's test says a keyword's
@@ -1573,7 +1622,6 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- traversal that has to reach it. An arm that stops digging names itself.
         walked =
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
-            ("CR 118.12's gate kind", holds (payGateFilters gate)),
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
             ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot)))),
             ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
@@ -1588,15 +1636,18 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ("CR 614.1c's as-enters sacrifice", holds (entryRewriteFilters (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.Type.HasCardType CardType.Creature) (Just kind))))),
             ("CR 614.1c's as-enters counters", holds (entryRewriteFilters (EntryRewrite.WithCounters (WithCounters.one kind one)))),
             ("CR 614.1e's turn-up counters", holds (turnUpRewriteFilters (TurnUpRewrite.WithCounters (WithCounters.one kind one)))),
-            -- The three roads a card writes the kind inside a NUMBER instead, each
+            -- The four roads a card writes the kind inside a NUMBER instead, each
             -- reaching a Quantity by its own traversal (#2740). Reading a
-            -- Condition's, a Duration's or an ObjectRef's Counts alone answers []
-            -- here, since quantityCounts has no Count to hand back for an
-            -- ObjectCounters.
+            -- Condition's, a Duration's, an ObjectRef's or a CR 118.12 gate's
+            -- Counts alone answers [] here, since quantityCounts has no Count to
+            -- hand back for an ObjectCounters.
             ("a Condition's own number", holds (conditionFilters counting)),
             ("CR 611.2b's for-as-long-as clause", holds (durationFilters (Duration.ForAsLongAs counting))),
             ("a library depth", holds (objectRefFilters topDepth)),
             ("its reveal-until mirror", holds (objectRefFilters (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Type.HasCardType CardType.Land) (Quantity.Type.ObjectCounters kind))))),
+            -- The fourth: the gate is a clause's FIELD rather than an effect, so
+            -- payGateFilters is the only traversal that reaches it (#2876).
+            ("CR 118.12's gate multiplier", holds (payGateFilters gate)),
             -- And the same three as cardFilters actually reaches them, one opcode
             -- or trigger condition deep, so the tagging survives the quoting
             -- position rather than only the leaf.
@@ -1711,6 +1762,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (AttachDestination, [bound]),
         (InTargetSlot, [bound]),
         (SourceHostFramed, [bound]),
+        (StandingHostFramed, [bound]),
         (SearchFramed, [bound]),
         (ReplacementRowFramed, [bound]),
         (OutsideTheGameFramed, [bound]),
@@ -1923,7 +1975,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "a Search filter",
-              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand, Search.subject = Nothing}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
               base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
@@ -2039,7 +2091,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}]]}
+              base {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand, Search.subject = Nothing}]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)
@@ -2239,7 +2291,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- filter is matched in the resolution's own context
     -- (Pawl.Engine.Resolve.Slots.effectContext), so the same buried atom that offends
     -- in every position above is accepted here.
-    let searched = base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+    let searched = base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand, Search.subject = Nothing}] Map.empty}
     Spec.assertEqWith
       s
       "a buried atom in a search's filter is accepted"
@@ -2273,7 +2325,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- Every fixture buries the atom under all three combinators, for the sibling's
   -- reason, and each is asserted through hasChosenNameCounts as well as the
   -- predicate.
-  Spec.it s "the lint itself catches HasChosenName outside a search's filter or a mill's tally" $ do
+  Spec.it s "the lint itself catches HasChosenName outside an admitted position" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     vendetta <- S.printingOf s registry "Ancient Vendetta"
@@ -2285,7 +2337,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           Modal.MkModal
             (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
             (ModeSelection.ChooseExactly 1)
-        searchFor f = Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = f, Search.upTo = False, Search.destination = SearchDestination.Exile}
+        searchFor f = Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = f, Search.upTo = False, Search.destination = SearchDestination.Exile, Search.subject = Nothing}
         planted =
           [ ( "a mode's target slot",
               base {Face.spell = spellOf [] (Map.singleton slot (TargetSlot.required Pool.Permanents (Just buried)))}
@@ -2306,10 +2358,35 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 201.4a's own restriction on the choosing effect",
-              base {Face.spell = spellOf [Effect.ChooseCardName buried] Map.empty}
+              base {Face.spell = spellOf [Effect.ChooseCardName (ChooseCardName.MkChooseCardName (PlayerRef.Relative PlayerRelation.You) buried)] Map.empty}
             ),
-            ( "an ObjectRef.EachMatching set",
-              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
+            -- THE counter-example to the ObjectRef position accepted below, and
+            -- the reason StandingHostFramed is a constructor of its own (#3320):
+            -- Pawl.Engine.Projection.conditionHolds builds this clause's context
+            -- through Filter.contextFor, which leaves sourceChosenNames empty, so
+            -- the atom here is the silent False the lint exists to catch. It was
+            -- ACCEPTED between #2992 and #3320, when both positions shared a tag.
+            ( "CR 604.2's clause gating a static ability",
+              base
+                { Face.staticAbilities =
+                    [ StaticAbility.MkStaticAbility
+                        (Affected.Matching Filter.Type.IsSource)
+                        ( Just
+                            ( Condition.Type.Compares
+                                ( Compares.MkCompares
+                                    ( Quantity.Type.Count
+                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                    )
+                                    Comparison.AtLeast
+                                    (Quantity.Type.Literal 1)
+                                )
+                            )
+                        )
+                        Set.empty
+                        Nothing
+                        (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
+                    ]
+                }
             ),
             ( "CR 603.6a's trigger condition",
               base
@@ -2357,14 +2434,24 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "a buried atom in a search's filter is accepted"
       (hasChosenNameOffends searched, hasChosenNameCounts searched)
       (False, (1, 0))
-    -- The second accepting position, grafted the same way (#2141): the mill arm
-    -- overlays the chosen names onto the resolution's own context, so the tally's
-    -- filter answers exactly as the search's does.
+    -- The second accepting position, grafted the same way (#2141): the mill arm's
+    -- tally reads the resolution's own context, so its filter answers exactly as
+    -- the search's does.
     let tallied = base {Face.spell = spellOf [Effect.Mill (Mill.MkMill (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) (Just (MillTally.MkMillTally slot buried)) Nothing)] Map.empty}
     Spec.assertEqWith
       s
       "a buried atom in a mill's tally is accepted"
       (hasChosenNameOffends tallied, hasChosenNameCounts tallied)
+      (False, (1, 0))
+    -- And the third, see #2992: an ObjectRef's own Filter is matched through
+    -- Resolve.Slots.objectRefObjects, which builds the same context, so Petra
+    -- Sphinx's "if that card has the chosen name" answers there too. This one was
+    -- among the rejections above until then.
+    let referenced = base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
+    Spec.assertEqWith
+      s
+      "a buried atom in an ObjectRef's own filter is accepted"
+      (hasChosenNameOffends referenced, hasChosenNameCounts referenced)
       (False, (1, 0))
     Spec.assertEqWith
       s

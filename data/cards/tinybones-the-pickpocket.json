@@ -40,7 +40,15 @@
                       {
                         "type": "OfferCast",
                         "value": {
-                          "slot": "stolen"
+                          "offer": {
+                            "spending": {
+                              "type": "AnyType"
+                            }
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "stolen"
+                          }
                         }
                       }
                     ]

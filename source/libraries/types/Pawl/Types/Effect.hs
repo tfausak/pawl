@@ -8,6 +8,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
@@ -21,19 +22,19 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Fight as Fight
-import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
@@ -268,9 +269,11 @@ data Effect card ability
     -- another object (Unstable Shapeshifter), by writing CR 707.2's copiable
     -- values themselves.
     --
-    -- Not implemented: the CR 707.9a exception every printed producer carries
-    -- ("except it has this ability"), so pawl's Shapeshifter loses its own
-    -- trigger as it copies and cannot copy again (#1292); and a stated duration
+    -- The payload carries CR 707.9's exceptions, so the Shapeshifter keeps the
+    -- trigger that copied and can copy again.
+    --
+    -- Not implemented: a stated duration ("until your next turn", Crystalline
+    -- Resonance), which needs a layer-1 continuous effect beside the stamp
     -- (#1753).
     BecomeCopy BecomeCopy.BecomeCopy
   | -- | CR 707.10: put a copy of a spell or of an activated or triggered ability
@@ -422,6 +425,10 @@ data Effect card ability
   | -- | CR 508.1c / 613.11: install a stored attacking restriction for a
     -- duration (Netter en-Dal), ForbidBlock's twin one rule over.
     ForbidAttack ForbidAttack.ForbidAttack
+  | -- | CR 602.2 / 613.11: install a stored activation prohibition over the
+    -- permanents the ref names, for a duration (Deadlock Trap). The printed form
+    -- gathered live off a source is Pawl.Types.ActivationProhibition instead.
+    ForbidActivation ForbidActivation.ForbidActivation
   | -- | CR 114.2: the resolving controller gets an emblem with the given
     -- abilities, put into the command zone. Targetless; the abilities ride a
     -- Card so the emblem reuses the whole ability pipeline.
@@ -510,15 +517,13 @@ data Effect card ability
     -- counter, then give each one additional counter of each kind it already
     -- has. Choose, not target, so the set is picked on resolution.
     Proliferate
-  | -- | CR 201.4 via CR 608.2c: the resolving controller chooses a card name,
-    -- written to Object.chosenNames on the resolving object (Ancient Vendetta).
-    -- The Filter is CR 201.4a's restriction, carried to the prompt for the
-    -- answerer to obey; Pawl.Interpreter.policingCardNames is what judges the
-    -- answer, the engine being unable to resolve a name at all.
-    --
-    -- Not implemented: a chooser other than CR 109.5's "you" -- Petra Sphinx's
-    -- "target player chooses a card name" (#2233).
-    ChooseCardName (Filter.Filter Keyword.Keyword)
+  | -- | CR 201.4 via CR 608.2c: the players the payload's PlayerRef names each
+    -- choose a card name, written to Object.chosenNames on the resolving object
+    -- (Ancient Vendetta, Petra Sphinx). The Filter is CR 201.4a's restriction,
+    -- carried to the prompt for the answerer to obey;
+    -- Pawl.Interpreter.policingCardNames is what judges the answer, the engine
+    -- being unable to resolve a name at all.
+    ChooseCardName ChooseCardName.ChooseCardName
   | -- | CR 701.39a: "bolster N" -- choose a creature the resolving controller
     -- controls with the least toughness, or tied for least, then put that many
     -- +1\/+1 counters on it. Choose, not target.
@@ -530,6 +535,12 @@ data Effect card ability
     -- -1\/-1 counters on a creature they control, each asked separately. Choose,
     -- not target.
     Blight PlayerQuantity.PlayerQuantity
+  | -- | CR 701.66a: "earthbend N" -- the land the payload names becomes a 0\/0
+    -- land creature with haste in addition to its other types, takes N +1\/+1
+    -- counters, and a CR 603.7 delayed ability returns it tapped when it dies or
+    -- is exiled. Performed by Pawl.Engine.Earthbend as one procedure. Targets,
+    -- unlike every other rule 701 arm here.
+    Earthbend Earthbend.Earthbend
   | -- | CR 701.54a: the Ring tempts the resolving controller, performed by
     -- Pawl.Engine.Ring.tempt as one procedure that cannot stop early (CR
     -- 701.54d). Nullary, rule 701.54a fixing everything.
@@ -557,9 +568,10 @@ data Effect card ability
     -- and nothing moves. A second arm rather than an empty ref on the one above,
     -- which would send cards through the CR 400.7 funnel.
     Shuffle PlayerRef.PlayerRef
-  | -- | CR 608.2g: offer a player the cast of the object the slot names (CR
-    -- 310.12b). The slot is a read, not a definition; CR 601.3's permission
-    -- comes from the offer itself, and an offer is never a cast.
+  | -- | CR 608.2g: offer a player the cast of the objects the ObjectRef names (CR
+    -- 310.12b), at most one of them. The reference is a read, not a definition;
+    -- CR 601.3's permission comes from the offer itself, and an offer is never a
+    -- cast.
     OfferCast OfferCast.OfferCast
   | -- | CR 601.3: grant the permission to play the objects the ObjectRef names,
     -- for a duration (Victor Mancha, Runaway) -- a standing permission where

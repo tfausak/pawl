@@ -97,6 +97,8 @@ library codec
     Pawl.Codec.ActivationRestrictionSpec
     Pawl.Codec.Activator
     Pawl.Codec.ActivatorSpec
+    Pawl.Codec.ActiveActivationProhibition
+    Pawl.Codec.ActiveActivationProhibitionSpec
     Pawl.Codec.ActiveAttackProhibition
     Pawl.Codec.ActiveAttackProhibitionSpec
     Pawl.Codec.ActiveAttackRequirement
@@ -224,6 +226,7 @@ library codec
     Pawl.Codec.CharacteristicPTSpec
     Pawl.Codec.ChooseBetween
     Pawl.Codec.ChooseBetweenSpec
+    Pawl.Codec.ChooseCardName
     Pawl.Codec.ChoosePlayer
     Pawl.Codec.ChoosePlayerSpec
     Pawl.Codec.Chooser
@@ -394,6 +397,7 @@ library codec
     Pawl.Codec.EachCardInGraveyardSpec
     Pawl.Codec.EachCardInHand
     Pawl.Codec.EachCardInHandSpec
+    Pawl.Codec.Earthbend
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
@@ -452,6 +456,8 @@ library codec
     Pawl.Codec.FlipCoinSpec
     Pawl.Codec.FloatingCandidate
     Pawl.Codec.FloatingCandidateSpec
+    Pawl.Codec.ForbidActivation
+    Pawl.Codec.ForbidActivationSpec
     Pawl.Codec.ForbidAttack
     Pawl.Codec.ForbidAttackSpec
     Pawl.Codec.ForbidBlock
@@ -525,6 +531,8 @@ library codec
     Pawl.Codec.LookAt
     Pawl.Codec.LookAtSpec
     Pawl.Codec.Loyalty
+    Pawl.Codec.LoyaltyKind
+    Pawl.Codec.LoyaltyKindSpec
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.Mana
     Pawl.Codec.ManaAddition
@@ -967,6 +975,7 @@ library engine
     Pawl.Engine.Departure
     Pawl.Engine.Detain
     Pawl.Engine.Dungeon
+    Pawl.Engine.Earthbend
     Pawl.Engine.EffectZone
     Pawl.Engine.EndEffect
     Pawl.Engine.Engine
@@ -1328,6 +1337,7 @@ library test
     Pawl.DetainSpec
     Pawl.DiceSpec
     Pawl.DungeonSpec
+    Pawl.EarthbendSpec
     Pawl.EffectLintSpec
     Pawl.EngineSpec
     Pawl.EntryReplacementSpec
@@ -1419,6 +1429,7 @@ library types
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
     Pawl.Types.Activator
+    Pawl.Types.ActiveActivationProhibition
     Pawl.Types.ActiveAttackProhibition
     Pawl.Types.ActiveAttackRequirement
     Pawl.Types.ActiveBlockProhibition
@@ -1489,6 +1500,7 @@ library types
     Pawl.Types.ChangeText
     Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
+    Pawl.Types.ChooseCardName
     Pawl.Types.ChoosePlayer
     Pawl.Types.Chooser
     Pawl.Types.ChosenCardFromAmong
@@ -1585,6 +1597,7 @@ library types
     Pawl.Types.EachCardFromAmong
     Pawl.Types.EachCardInGraveyard
     Pawl.Types.EachCardInHand
+    Pawl.Types.Earthbend
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EndTurnSignal
@@ -1615,6 +1628,7 @@ library types
     Pawl.Types.Filter
     Pawl.Types.FlipCoin
     Pawl.Types.FloatingCandidate
+    Pawl.Types.ForbidActivation
     Pawl.Types.ForbidAttack
     Pawl.Types.ForbidBlock
     Pawl.Types.ForEach
@@ -1660,6 +1674,7 @@ library types
     Pawl.Types.LoggedEvent
     Pawl.Types.LookAt
     Pawl.Types.Loyalty
+    Pawl.Types.LoyaltyKind
     Pawl.Types.Mana
     Pawl.Types.ManaAbilityPerformer
     Pawl.Types.ManaAddition

@@ -129,6 +129,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TokenLot as TokenLot
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
@@ -1314,11 +1315,20 @@ sacrificeCandidates slots pid source filter_ gs =
 -- graveyard, and the filter is matched against the CARD's projection there (CR
 -- 400.7) rather than against a permanent's.
 --
--- CR 614.13a's exclusion needs no clause here. A permanent entering the
--- battlefield out of a graveyard has already been materialized on the
--- battlefield when Pawl.Engine.Event runs this loop, so no member of the batch is
--- in the zone this reads -- which is the rule's own example, Sutured Ghoul and
--- Runeclaw Bear entering together out of one graveyard.
+-- Not implemented: CR 614.13a's "or any other object entering the battlefield at
+-- the same time", whose own example is a graveyard read -- Sutured Ghoul and
+-- Runeclaw Bear entering together out of one graveyard. A batch bound for the
+-- battlefield is moved one member at a time (Pawl.Engine.Resolve.Effect's
+-- MoveToZone folds moveOne, each member's runEntry finishing before the next
+-- departs), so the members still to come are sitting in the graveyard this reads
+-- and are offered. The `batch` set the entry loop carries does not name them: it
+-- holds the siblings that have already ARRIVED, whose CR 400.7 incarnations are
+-- on the battlefield, which is why sacrificeCandidates' guard has nothing to do
+-- here and no guard of that shape would fix it. Excluding them means threading
+-- the move's remaining targets into the entry loop, and that lands with the
+-- widening (#3293) -- unobservable until then, an instant or sorcery card being
+-- the only thing this offer matches today and CR 110.4 keeping one off the
+-- battlefield.
 graveyardCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 graveyardCandidates pid filter_ gs =
   let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
@@ -1991,14 +2001,21 @@ applyEntryOption oid option gs =
 -- behind. Pawl.CopySpec's "a token copy of an excepted copy keeps the exception"
 -- is what proves the two apart: it reads 7/7 here and the copied Tarmogoyf's CDA
 -- under the layer reading.
-applyCopyExceptions :: [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
-applyCopyExceptions exceptions snapshot = List.foldl' applyCopyException snapshot exceptions
+--
+-- The first argument is what CR 707.9a's "this ability" points at -- the ability
+-- the copy effect is written inside, which only the caller can know. Nothing on
+-- the CR 707.5 entry road, where the copy effect is a replacement effect and no
+-- printed card writes those two words (Scryfall
+-- @o:"enter as a copy" o:"except it has this ability"@, 2026-09-06, no hit;
+-- Copycrook would refute it by quoting an ability instead).
+applyCopyExceptions :: Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
+applyCopyExceptions this exceptions snapshot = List.foldl' (applyCopyException this) snapshot exceptions
 
 -- One arm per CopyException constructor, no wildcard, for Event.apply's reason: a
 -- new exception shape must break the build here rather than silently copy without
 -- it.
-applyCopyException :: PC.ProjectedCharacteristics -> CopyException.CopyException -> PC.ProjectedCharacteristics
-applyCopyException snapshot exception = case exception of
+applyCopyException :: Maybe (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> PC.ProjectedCharacteristics -> CopyException.CopyException -> PC.ProjectedCharacteristics
+applyCopyException this snapshot exception = case exception of
   -- CR 707.9b sets the pair; CR 707.9d is the second write -- an exception that
   -- "provides a specific set of values for a certain characteristic" does not
   -- copy the characteristic-defining ability that defines it, and leaving the CDA
@@ -2026,6 +2043,21 @@ applyCopyException snapshot exception = case exception of
   -- characteristic, and gaining an ability provides none.
   CopyException.GainKeywords keywords ->
     snapshot {PC.keywords = Map.unionWith (+) (PC.keywords snapshot) (Map.fromSet (const 1) keywords)}
+  -- CR 707.9a over a whole ability rather than a keyword: "this ability" is
+  -- appended to the copied ones for the arm above's reason, and Nothing appends
+  -- nothing -- a copy effect whose carrier has no ability to point at (#3325).
+  --
+  -- The ability written here still CONTAINS this exception, which is what makes
+  -- the reference self-renewing: the copy's own instance is what resolves next,
+  -- and it points at itself again. Pawl.CopySpec's "the Shapeshifter copies a
+  -- second creature with the ability it kept" is what proves it.
+  --
+  -- CR 604.3a is silent here and that is right: it makes a copy-acquired STATIC
+  -- ability characteristic-defining, and a triggered ability is neither static
+  -- nor defines a characteristic. CR 707.9d's strip is silent for the
+  -- GainKeywords arm's reason -- an ability provides no values.
+  CopyException.GainThisAbility ->
+    snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> Maybe.maybeToList this}
   -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
   -- copied type line rather than the replacement CR 205.1a's own sentence would
   -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.

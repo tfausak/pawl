@@ -269,7 +269,7 @@ targetable pid oid name gs = case proposedFace oid name gs of
 -- The SPENDING permission is CR 118.14's and comes in as an argument for the
 -- same reason the cost does: after CR 601.2a's move the object being priced is a
 -- stack incarnation that holds no permission, so a gate that read one off the
--- board would answer this cast's question about the wrong object. `spendingFor`
+-- board would answer this cast's question about the wrong object. `spendingWith`
 -- is what the pre-move callers derive it with.
 payableCost :: ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
@@ -809,6 +809,22 @@ spendingFor :: PlayerId -> ObjectId -> GameState -> ManaSpending
 spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromExile of
   Just permission | ExilePlayPermission.player permission == pid -> ExilePlayPermission.spending permission
   _ -> ManaSpending.AsProduced
+
+-- CR 118.14 from the OTHER road: the rider an offering effect states in its own
+-- sentence (Pawl.Types.CastOffer.spending), joined with the one riding an exile
+-- permission above. Tinybones, the Pickpocket prints the offer's; Dire Fleet
+-- Daredevil prints the permission's.
+--
+-- Either sentence alone is a permission, so AnyType wins -- rule 118.14 grants
+-- and never restricts, and two grants are not a conflict CR 101.2 has to settle.
+-- Each ARGUMENT is proved: Pawl.CastSpec's PickpocketAnyType drives the offer's
+-- and Pawl.CastRestrictionSpec's Dire Fleet Daredevil group the permission's. The
+-- case where BOTH say AnyType is a regression fence, no card in data/cards/
+-- carrying an offer over a card that also holds the permission.
+spendingWith :: ManaSpending -> PlayerId -> ObjectId -> GameState -> ManaSpending
+spendingWith offered pid oid gs = case (offered, spendingFor pid oid gs) of
+  (ManaSpending.AsProduced, ManaSpending.AsProduced) -> ManaSpending.AsProduced
+  _ -> ManaSpending.AnyType
 
 -- CR 702.170d: may this player cast this PLOTTED card? Four conjuncts, and the
 -- rule states each of them:
@@ -1358,7 +1374,7 @@ castableWhileSearching pid gs =
             -- not have (CR 708.2a). Unreachable either way -- no card holds both.
             proposed = asProposed oid name Facing.FaceUp gs
          in permitsCastWhileSearching face
-              && castableWhenOffered pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed
+              && castableWhenOffered ManaSpending.AsProduced pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed
       proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (foldMap Card.castableFaces (Game.cardOf oid gs)))
    in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
 
@@ -1391,8 +1407,13 @@ castableWhileSearching pid gs =
 --
 -- `gs` must already be `asProposed`-stamped for the half being offered, as
 -- `castable`'s conjuncts require.
-castableWhenOffered :: PlayerId -> ObjectId -> CardName.CardName -> [CandidateCost.CandidateCost] -> GameState -> Bool
-castableWhenOffered pid oid name candidates proposed =
+--
+-- `spending` arrives as an argument for the candidates' reason: CR 118.14's rider
+-- can be the OFFER's own sentence (Pawl.Types.CastOffer.spending) rather than the
+-- exiled card's permission, and the gate has to price the offer the way the cast
+-- will pay for it.
+castableWhenOffered :: ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> [CandidateCost.CandidateCost] -> GameState -> Bool
+castableWhenOffered spending pid oid name candidates proposed =
   -- CR 702.61a, for CR 601.3's own reason: an offered cast is still a cast.
   -- Reachable because CR 702.61b keeps triggered abilities going on the stack, so
   -- one can resolve ABOVE the split-second spell and offer a cast while it is
@@ -1413,7 +1434,7 @@ castableWhenOffered pid oid name candidates proposed =
       ( \candidate ->
           candidateAllowed pid oid name proposed candidate
             && candidateFillable pid oid name proposed candidate
-            && payableCost (spendingFor pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
+            && payableCost (spendingWith spending pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
       )
       candidates
     && printedRestrictionsOk pid oid name proposed
@@ -1492,7 +1513,7 @@ castWhileSearching perform pid = do
 -- object is put onto the stack, so it cannot be a prompt inside the
 -- announcement.
 castSpell :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpell perform = castSpellWith perform False Nothing
+castSpell perform = castSpellWith perform False Nothing ManaSpending.AsProduced
 
 -- castSpell with CR 118.9's other source of an alternative cost: one "applied to
 -- it from another effect" rather than listed in the spell's own text. Just c
@@ -1514,8 +1535,13 @@ castSpell perform = castSpellWith perform False Nothing
 -- which is what lets Cost.candidateCostsGiven price a card in a graveyard at all.
 -- It is passed to the SAME function the gate above priced the offer with, so the
 -- announcement cannot be offered a candidate the cast then refuses to find.
-castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpellWith perform offered applied pid oid name facing = do
+--
+-- `widened` is CR 118.14's, and a third question again: how the caster may spend
+-- mana toward whatever cost the two above settled on. Joined with the exile
+-- permission's rider by `spendingWith`, one step ahead of CR 601.2a's move for
+-- `spendingFor`'s reason.
+castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Maybe (Cost Keyword) -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpellWith perform offered applied widened pid oid name facing = do
   before <- State.get
   -- The state the GATE measured, which is `before` with CR 709.3's half and CR
   -- 708.4's facing stamped on. Read from rather than written to the game: the
@@ -1594,7 +1620,7 @@ castSpellWith perform offered applied pid oid name facing = do
           -- on the exiled card, and CR 400.7's new incarnation on the stack has
           -- none -- so every payability question below, which asks about `sid`,
           -- has to be handed the answer rather than look it up.
-          spending = spendingFor pid oid before
+          spending = spendingWith widened pid oid before
           -- CR 611.2a: the one-shot flash grants this cast would spend, asked of
           -- the PROPOSED state -- the view the gate read, one step ahead of the
           -- move that forgets the card -- and consumed by castProposed only once

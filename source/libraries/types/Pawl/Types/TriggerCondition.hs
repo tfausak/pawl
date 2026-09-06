@@ -372,6 +372,13 @@ data TriggerCondition
     -- the only condition naming a slot, its subject being an object CR 603.7c's
     -- captured environment chose earlier.
     LoseControlOfBound SlotName.SlotName
+  | -- | CR 701.66a: the object bound at this slot is put into a graveyard or
+    -- into exile from the battlefield -- "when that land dies or is put into
+    -- exile", the far end of earthbend's delayed ability. Minted by
+    -- Pawl.Engine.Earthbend rather than written by card data, and the second
+    -- condition after LoseControlOfBound above to name a slot, its subject being
+    -- the object CR 603.7c's captured environment chose earlier.
+    BoundDiesOrIsExiled SlotName.SlotName
   | -- | CR 309.4c: "when you move your venture marker into this room".
     -- Self-scoped through the bearer and the room index; minted by
     -- Pawl.Engine.Dungeon rather than written by card data.

@@ -1249,10 +1249,10 @@ asmorSpec s registry =
     -- only the fixture.
     --
     -- A REGRESSION FENCE and not a gameplay case, and it cannot be more than
-    -- that today: the only producer of a scaled CR 118.12 cost is
-    -- Pawl.Types.PayGate.perCounter, no card in `data/cards/` writes one, and
-    -- rule 702.24a's own mint puts the age counter on before the offer, so no
-    -- board reaches a count of zero.
+    -- that today: a scaled CR 118.12 cost rides Pawl.Types.PayGate.perEach, and
+    -- both writers of one offer a cost with a MANA part -- Rakshasa's Disdain's
+    -- {1}, rule 702.24a's printed cost -- so a count of zero reaches CR 118.5's
+    -- payable {0} above rather than this rule's Nothing.
     Spec.it s "CR 118.6 scaling an unpayable cost by any count leaves it unpayable" $ do
       swamp <- S.printingOf s registry "Swamp"
       asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"

@@ -32,7 +32,8 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = True,
-            Search.destination = SearchDestination.BattlefieldTapped
+            Search.destination = SearchDestination.BattlefieldTapped,
+            Search.subject = Nothing
           }
       )
       " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"zones\":[{\"type\":\"Library\"},{\"type\":\"Graveyard\"}],\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"}} "
@@ -52,7 +53,8 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = False,
-            Search.destination = SearchDestination.BattlefieldTapped
+            Search.destination = SearchDestination.BattlefieldTapped,
+            Search.subject = Nothing
           }
       )
       " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"BattlefieldTapped\"}} "
@@ -71,7 +73,8 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.quantity = Nothing,
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = False,
-            Search.destination = SearchDestination.Exile
+            Search.destination = SearchDestination.Exile,
+            Search.subject = Nothing
           }
       )
       " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":null,\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"Exile\"}} "

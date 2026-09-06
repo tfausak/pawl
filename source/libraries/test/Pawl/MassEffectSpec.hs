@@ -1865,8 +1865,8 @@ openTheWaySpec s registry =
 -- Planeswalkers' loyalty abilities you activate cost an additional [+1] to
 -- activate." (name, cost, type line, power, toughness and Oracle text checked
 -- against api.scryfall.com, 2026-08-20). The second sentence is
--- Pawl.PlaneswalkerSpec's, and is transcribed as "abilities of a planeswalker"
--- for the reason recorded there (gap #1698).
+-- Pawl.PlaneswalkerSpec's, whose LoyaltyAbilityOnly group is what proves CR
+-- 606.2's "loyalty" narrows it.
 --
 -- ONE CHOICE, revealed AND moved: the reveal names ObjectRef.ChosenCardFromAmong
 -- and binds what it showed to a slot, and the move reads that slot. A second

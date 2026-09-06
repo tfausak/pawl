@@ -189,9 +189,9 @@ attachmentFor src destination gs
 --
 -- The Aura branch alone, where attachmentFor has an Equipment branch beside it:
 -- the only reader is CR 701.3a's search-side question, Pawl.CardSpec's position
--- lint keeps Filter.CanAttachToSubject inside a search's filter, and the one
--- search that names it looks for an Aura. An Equipment answers False here, which
--- is the direction that finds LESS than printed rather than more.
+-- lint keeps Filter.CanAttachToSubject inside a search's filter, and every search
+-- in data/cards that names it looks for an Aura. An Equipment answers False here,
+-- which is the direction that finds LESS than printed rather than more.
 --
 -- No AttachRestriction gate, where attachmentFor asks one first: CR 613.11 makes
 -- a destination's "can't be enchanted" a continuous effect IN FORCE, and a host

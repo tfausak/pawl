@@ -27,8 +27,10 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastFromZone as CastFromZone
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -63,6 +65,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -72,6 +75,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -93,6 +97,7 @@ import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -326,8 +331,10 @@ rewritePlayerEffect pairs effect = case effect of
   -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
   -- reading of CR 612.2 carried to a component that is added to a cost rather
   -- than printed in one. The scale beside them names a COLOUR, which CR 612.2's
-  -- subtype pairs cannot reach.
-  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
+  -- subtype pairs cannot reach, and neither can they reach the loyalty criterion
+  -- the activation arm carries beside it: CR 606.2's classification is not a
+  -- word on the card.
+  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f loyalty components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) loyalty (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
@@ -392,12 +399,12 @@ rewriteEffect pairs effect = case effect of
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
     Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
   Effect.AddMana _ -> effect
-  Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination)
+  Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
   -- rewrites it exactly as it rewrites a search's filter above.
-  Effect.ChooseCardName restriction -> Effect.ChooseCardName (Filter.rewrite pairs restriction)
+  Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref (Filter.rewrite pairs restriction))
   -- CR 612.1 again: "a sorcery card you own from outside the game" is printed
   -- card text like the search's filter above, so a text-changer reaches it the
   -- same way. A REGRESSION FENCE rather than a proven behaviour -- no card in
@@ -411,6 +418,9 @@ rewriteEffect pairs effect = case effect of
   Effect.Amass (Amass.MkAmass quantity subtype) ->
     Effect.Amass (Amass.MkAmass (rewriteQuantity pairs quantity) (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
   Effect.Blight x -> Effect.Blight (rewritePlayerQuantity pairs x)
+  -- CR 612 reaches the count and the ObjectRef's own filters; rule 701.66a
+  -- names no subtype word.
+  Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> Effect.Earthbend (Earthbend.MkEarthbend (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   Effect.TemptWithTheRing -> effect
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
   -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
@@ -486,8 +496,10 @@ rewriteEffect pairs effect = case effect of
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword, Create's arm above (#1190).
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders))
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject) ->
-    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject))
+  -- The exceptions ride this opcode too, and take the same walk AsCopy's do
+  -- (rewriteEntryRewrite below).
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) ->
+    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject) (fmap (rewriteCopyException pairs) exceptions))
   -- BOTH refs, CreateCopy's reason: CR 707.2 keeps a text change out of the
   -- copiable values, so what the copy becomes is not rewritten, but CR 707.10d's
   -- description of the candidates ("each other creature you control") is card
@@ -663,6 +675,8 @@ rewriteEffect pairs effect = case effect of
     Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) ->
     Effect.ForbidBlock (ForbidBlock.MkForbidBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) ->
+    Effect.ForbidActivation (ForbidActivation.MkForbidActivation (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   -- CR 612.1 reaches the creatures' words on either arm -- a Named ref's Filters
   -- and a Matching class's -- and not the AimedAt: a PlayerScope prints no word
   -- a text-changing effect reaches, and the kinds are CR 506.3's list.
@@ -717,7 +731,25 @@ rewriteEffect pairs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect
-  Effect.OfferCast {} -> effect
+  -- TWO places, and both descend. A Filter the ObjectRef carries is card text
+  -- (GrantPlayFromExile's arm below); so is CR 118.9's STATED alternative cost,
+  -- which is a whole Cost and not a flag, printed in the same text box rule 612
+  -- reaches -- Filter.rewriteCost's own reading, and the reason
+  -- ActivatedAbility.cost and PayGate.cost descend through it.
+  --
+  -- The rest name no word a subtype pair could reach: the caster is a PlayerRef,
+  -- `transformed` is CR 712.11a's Bool, `withoutPayingManaCost` is CR 118.9's
+  -- other wording and states no cost of its own, and `spending` is CR 118.14's
+  -- ManaSpending, which speaks of mana types rather than of subtypes.
+  Effect.OfferCast oc ->
+    Effect.OfferCast
+      oc
+        { OfferCast.ref = rewriteObjectRef pairs (OfferCast.ref oc),
+          OfferCast.offer =
+            (OfferCast.offer oc)
+              { CastOffer.payingInstead = fmap (Filter.rewriteCost pairs) (CastOffer.payingInstead (OfferCast.offer oc))
+              }
+        }
   Effect.GrantPlayFromExile grant ->
     Effect.GrantPlayFromExile
       grant
@@ -758,6 +790,10 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.ChosenPlayer -> ref
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p c) -> ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary p (rewriteQuantity pairs c))
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil p f c) -> ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
+  -- Names a POSITION and a seat, and neither is a subtype word, so CR 612.1 has
+  -- nothing to swap: the arms above reach one only through a Filter or a
+  -- Quantity, and this one carries neither.
+  ObjectRef.TopOfGraveyard _ -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n f c w) -> ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n (Filter.rewrite pairs f) (rewriteQuantity pairs c) w)
@@ -1039,6 +1075,10 @@ rewriteCopyException pairs exception = case exception of
   -- CR 707.9b's type clause names CARD types (CR 205.2a's list), and CR 612.2's
   -- swap reaches only subtypes, so there is nothing here for a pair to change.
   CopyException.AddCardTypes _ -> exception
+  -- CR 707.9a's "this ability" carries no word of its own. The ability it points
+  -- at is the resolving one, which the projection already rewrote where it was
+  -- read (rewriteTriggeredAbility).
+  CopyException.GainThisAbility -> exception
 
 -- CR 612.1 through what a CR 614.1c/614.1d entry replacement does. Exhaustive for
 -- rewriteReplacementEffect's reason.
@@ -1172,10 +1212,14 @@ rewriteModal pairs modal =
 -- because the word is used as a land type.
 --
 -- Written out field by field rather than as a record update, rewriteComponent's
--- posture one level up: `cost` is the only field a printed word can reach --
--- `payer` names a player, `branch` and `obligation` name rules categories, and
--- `offeredAt` is CR 608.2e's ordinal -- so a later field carrying one must fail
--- to compile here instead of silently keeping the printed word.
+-- posture one level up: `cost` and `perEach` are the fields a printed word can
+-- reach -- `payer` names a player, `branch` and `obligation` name rules
+-- categories, and `offeredAt` is CR 608.2e's ordinal -- so a later field carrying
+-- one must fail to compile here instead of silently keeping the printed word.
+--
+-- `perEach` takes rewriteQuantity, rewriteEffect's own descent through a counted
+-- amount: a gate scaled by "for each Elf you control" counts what a Magical Hack
+-- made an Elf.
 rewritePayGate :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PayGate.PayGate -> PayGate.PayGate
 rewritePayGate pairs gate =
   PayGate.MkPayGate
@@ -1183,7 +1227,7 @@ rewritePayGate pairs gate =
       PayGate.cost = Filter.rewriteCost pairs (PayGate.cost gate),
       PayGate.branch = PayGate.branch gate,
       PayGate.obligation = PayGate.obligation gate,
-      PayGate.perCounter = fmap (Filter.rewriteCounterKind pairs) (PayGate.perCounter gate),
+      PayGate.perEach = fmap (rewriteQuantity pairs) (PayGate.perEach gate),
       PayGate.offeredAt = PayGate.offeredAt gate
     }
 
@@ -1312,6 +1356,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 603.7's slot name is card data but not card TEXT, so no CR 612.1 swap
   -- reaches it; what the slot holds is read off the projection instead.
   TriggerCondition.LoseControlOfBound _ -> condition
+  -- Rule 701.66a's slot name is engine text, not card text, so no CR 612.1 swap
+  -- reaches it either.
+  TriggerCondition.BoundDiesOrIsExiled _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
   TriggerCondition.RingTemptsPlayer _ -> condition

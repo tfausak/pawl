@@ -225,10 +225,21 @@ producedTypes oid gs production = case production of
 -- Ring's "{T}: Add {C}{C}" is one option adding two mana; an Urborg'd Mountain
 -- is two options of one mana each.
 --
--- Read through the projection (abilitiesOf), so Humility (layer 6) strips a
--- creature's mana ability too -- and so does CR 305.7 at layer 4, which is what
--- swaps a Blood Moon'd Reliquary Tower's printed "{T}: Add {C}" for the
--- Mountain's {R} rather than adding to it.
+-- Both halves read through the projection, so Humility (layer 6) strips a
+-- creature's printed mana ability AND CR 305.6's intrinsic one -- the second
+-- through Pawl.Engine.Subtype.intrinsicManaAbilityOf, the reader
+-- Filter.HasActivatedAbility shares, so the atom and the route cannot disagree
+-- about whether the ability is there. CR 305.7 at layer 4 is what swaps a Blood
+-- Moon'd Reliquary Tower's printed "{T}: Add {C}" for the Mountain's {R} rather
+-- than adding to it, and reaches the intrinsic route by rewriting the subtypes
+-- it is minted from.
+--
+-- The route asks for the LAND card type as well as the basic land type, rule
+-- 305.6 giving the ability to "an object with the land card type and a basic
+-- land type". A REGRESSION FENCE rather than a proved behaviour: the pool's two
+-- Modification.SetCardType writers are Song of the Dryads, which sets Land, and
+-- Gliding Licid, which sets Enchantment on a creature holding no basic land
+-- type, so no board can tell the conjunct from its absence.
 --
 -- One route per SELECTION (Modal.selectionEffects), not per mode: CR 700.2's
 -- selection is what a player actually makes, so a choose-two ability's route is
@@ -259,10 +270,13 @@ producedTypes oid gs production = case production of
 -- run it. CR 305.6's intrinsic route says nothing beyond its mana.
 manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], [ManaAddition.ManaAddition], [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)])]
 manaRoutesOfGiven pcs oid gs =
-  let fromSubtypes =
-        fmap
-          (\manaType -> (intrinsicManaCost, [], [intrinsicManaAddition manaType], []))
-          (Maybe.mapMaybe Subtype.Engine.subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
+  let pc = Projection.projectGiven pcs oid gs
+      fromSubtypes
+        | Subtype.Engine.intrinsicManaAbilityOf pc =
+            fmap
+              (\manaType -> (intrinsicManaCost, [], [intrinsicManaAddition manaType], []))
+              (Maybe.mapMaybe Subtype.Engine.subtypeMana (Set.toList (PC.subtypes pc)))
+        | otherwise = []
       selectionRoutes ability =
         fmap
           (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects))

@@ -21,6 +21,7 @@ import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.ChangeText as ChangeText
+import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
@@ -34,19 +35,19 @@ import qualified Pawl.Codec.Destroy as Destroy
 import qualified Pawl.Codec.Discard as Discard
 import qualified Pawl.Codec.Draw as Draw
 import qualified Pawl.Codec.DurationRef as DurationRef
+import qualified Pawl.Codec.Earthbend as Earthbend
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Fight as Fight
-import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.FlipCoin as FlipCoin
 import qualified Pawl.Codec.ForEach as ForEach
+import qualified Pawl.Codec.ForbidActivation as ForbidActivation
 import qualified Pawl.Codec.ForbidAttack as ForbidAttack
 import qualified Pawl.Codec.ForbidBlock as ForbidBlock
 import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.InitiativeTarget as InitiativeTarget
-import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LookAt as LookAt
 import qualified Pawl.Codec.ManaAddition as ManaAddition
 import qualified Pawl.Codec.Meld as Meld
@@ -99,7 +100,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,
-      Arm.payload "ChooseCardName" (Filter.codec Keyword.codec) Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseCardName" ChooseCardName.codec Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
       Arm.payload "FromOutsideTheGame" FromOutsideTheGame.codec Effect.FromOutsideTheGame (\x -> case x of Effect.FromOutsideTheGame y -> Just y; _ -> Nothing),
       Arm.nullary "ExileThisSpell" Effect.ExileThisSpell,
       Arm.payload "Bolster" Quantity.codec Effect.Bolster (\x -> case x of Effect.Bolster y -> Just y; _ -> Nothing),
@@ -156,6 +157,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),
       Arm.payload "Untap" ObjectRef.codec Effect.Untap (\x -> case x of Effect.Untap y -> Just y; _ -> Nothing),
       Arm.payload "Detain" ObjectRef.codec Effect.Detain (\x -> case x of Effect.Detain y -> Just y; _ -> Nothing),
+      Arm.payload "Earthbend" Earthbend.codec Effect.Earthbend (\x -> case x of Effect.Earthbend y -> Just y; _ -> Nothing),
       Arm.payload "Goad" ObjectRef.codec Effect.Goad (\x -> case x of Effect.Goad y -> Just y; _ -> Nothing),
       Arm.payload "DoesNotUntapNext" ObjectRef.codec Effect.DoesNotUntapNext (\x -> case x of Effect.DoesNotUntapNext y -> Just y; _ -> Nothing),
       Arm.payload "Transform" ObjectRef.codec Effect.Transform (\x -> case x of Effect.Transform y -> Just y; _ -> Nothing),
@@ -172,6 +174,7 @@ codec cardCodec abilityCodec =
       Arm.payload "CantBeRegenerated" CantBeRegenerated.codec Effect.CantBeRegenerated (\x -> case x of Effect.CantBeRegenerated y -> Just y; _ -> Nothing),
       Arm.payload "RequireAttack" RequireAttack.codec Effect.RequireAttack (\x -> case x of Effect.RequireAttack y -> Just y; _ -> Nothing),
       Arm.payload "ForbidBlock" ForbidBlock.codec Effect.ForbidBlock (\x -> case x of Effect.ForbidBlock y -> Just y; _ -> Nothing),
+      Arm.payload "ForbidActivation" ForbidActivation.codec Effect.ForbidActivation (\x -> case x of Effect.ForbidActivation y -> Just y; _ -> Nothing),
       Arm.payload "ForbidAttack" ForbidAttack.codec Effect.ForbidAttack (\x -> case x of Effect.ForbidAttack y -> Just y; _ -> Nothing),
       Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
       Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch (\x -> case x of Effect.BecomeMonarch y -> Just y; _ -> Nothing),

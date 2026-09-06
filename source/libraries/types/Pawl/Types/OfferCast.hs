@@ -2,13 +2,22 @@ module Pawl.Types.OfferCast where
 
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.SlotName as SlotName
 
--- | CR 608.2g: offer a player the cast of the object a slot names, under CR
--- 310.12b's riders.
+-- | CR 608.2g: offer a player the cast of the objects a reference names, under
+-- CR 310.12b's riders.
 data OfferCast = MkOfferCast
-  { slot :: SlotName.SlotName,
+  { -- | WHICH cards are on offer. An ObjectRef and not a SlotName because CR
+    -- 601.3's offer ranges over a SET as often as over one card -- Shell of the
+    -- Last Kappa's "a spell from among cards exiled with Shell of the Last
+    -- Kappa" is ObjectRef.EachCardExiledWithSource, CR 607.2a's linked set,
+    -- where Tinybones, the Pickpocket's one target is ObjectRef.InSlot.
+    --
+    -- Several cards is a CHOICE, not several casts: Pawl.Engine.Resolve.Effect's
+    -- offerCast puts the whole set to the caster as one Prompt.ChooseOfferedCastSpell
+    -- and casts at most one.
+    ref :: ObjectRef.ObjectRef,
     -- | WHO casts. Rule 608.2g says "a player" rather than the resolving
     -- controller, and CR 601.2's announcements then belong to whoever that is --
     -- Wild Evocation's "that player casts it" is the upkeep player, not the

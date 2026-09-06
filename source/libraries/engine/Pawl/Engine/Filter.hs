@@ -365,8 +365,7 @@ data View = MkView
     -- conjunct is the rule's rather than the card's (Attach.turnUpHosts).
     -- The question with the two roles SWAPPED -- a candidate that could be
     -- attached to a fixed host -- is `canAttachToSubject` below rather than a
-    -- widening of this field. Rule 701.3a asked with the host fixed by anything
-    -- but a searching ability's source is #2028.
+    -- widening of this field.
     canHostSubject :: Bool,
     -- CR 701.3a read the other way: could THIS CANDIDATE legally be attached to
     -- the object the surrounding instruction fixes -- Auratouched Mage's "an Aura
@@ -378,7 +377,8 @@ data View = MkView
     -- Pawl.Engine.Resolve's Effect.Search arm is the only site that fills it,
     -- from Pawl.Engine.Attach.attachableWithLastKnown -- whose live half is the
     -- same function that performs the move, and whose other half is CR 608.2h's
-    -- reading of a host that has left the battlefield.
+    -- reading of a host that has left the battlefield. Which object is fixed is
+    -- Pawl.Types.Search.subject, the source or a bound slot.
     --
     -- LAZY, for attachedToView's cost reason: filling it projects the candidate
     -- and sweeps the battlefield for the fixed host's admission, so a search
@@ -608,7 +608,9 @@ data View = MkView
     --
     -- WIDER than the abilities that field measures, and by exactly CR 305.6's
     -- intrinsic "{T}: Add [mana symbol]", which no ability list holds: every
-    -- builder answers it through Pawl.Engine.Subtype.intrinsicManaAbility, and
+    -- builder answers it through Pawl.Engine.Subtype's intrinsicManaAbility --
+    -- intrinsicManaAbilityOf where there is a projection to read CR 613.1f's
+    -- layer-6 removal off -- and
     -- Pawl.ProjectionSpec's "CR 305.6 / 602.1 a Mountain has an activated ability
     -- in every view builder" is what holds the three to one answer. The field
     -- above needs no such disjunct, CR 605.1a excluding a mana ability from it.
@@ -1059,10 +1061,10 @@ data Context = MkContext
     -- CR 201.4: the names the SOURCE has chosen, for the one atom that compares a
     -- candidate's against them (HasChosenName, Ancient Vendetta). Supplied by the
     -- caller for slotNames' reason -- this module holds no game state and cannot
-    -- read an object's chosen names -- and by THREE callers:
-    -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its Effect.Mill tally,
-    -- the two positions a CARD may write the atom in (CR 608.2c's choice during a
-    -- resolution -- Ancient Vendetta's search, Predict's tally), and
+    -- read an object's chosen names -- and by TWO callers:
+    -- Pawl.Engine.Resolve.Slots.effectContext, which every position of a
+    -- resolution goes through (CR 608.2c's choice during a resolution -- Ancient
+    -- Vendetta's search, Predict's tally, Petra Sphinx's revealed card), and
     -- Pawl.Engine.Replacement.candidateContext, where the atom is written by rule
     -- 702.16e's MINTED player-protection shield rather than by card data (CR
     -- 614.1c's as-enters choice, Runed Halo).
@@ -1079,14 +1081,19 @@ data Context = MkContext
     --
     -- EMPTY in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is
-    -- vacuously False in every position but those three -- an empty
+    -- vacuously False in every position but those two -- an empty
     -- intersection, which is this atom's arm answering rather than a posture the
     -- record enforces; slotControllers' atom answers True on ITS unfilled read.
     -- What keeps a card out of those positions
-    -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
-    -- filter or a mill's tally", the sweep sourcePower's, slotNames' and
+    -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside an admitted
+    -- position", the sweep sourcePower's, slotNames' and
     -- sourceAttachedTo's siblings each have -- a fence over CARD data, which the
-    -- replacement filler above is not.
+    -- replacement filler above is not. That lint is an ALLOWLIST, and narrower
+    -- than what this field answers only inside a resolution: effectContext fills
+    -- it at every position of one, and the lint admits three of them. Outside a
+    -- resolution the field is empty and the lint refuses the atom, which is what
+    -- Pawl.CardSpec's StandingHostFramed exists to keep apart from an effect's own
+    -- ObjectRef.
     sourceChosenNames :: Set.Set CardName.CardName,
     -- CR 702.16k: the player chosen (CR 614.1c) by the permanent whose
     -- PROTECTION ability wrote the filter being matched, for the one atom that
@@ -1138,12 +1145,11 @@ data Context = MkContext
 -- no honest player to substitute.
 --
 -- CR 201.4's chosen-name atom is a further one a CARD may write (Ancient
--- Vendetta, Predict), and it reads the empty set here in every position but the
--- three that supply it -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its
--- Effect.Mill tally, each building its context from effectContext and then
--- overlaying sourceChosenNames, and Pawl.Engine.Replacement.candidateContext,
--- which does the same for a minted row. See that field above for the lint that
--- keeps a card to the first two.
+-- Vendetta, Predict, Petra Sphinx), and it reads the empty set here in every
+-- position but the two that supply it -- Pawl.Engine.Resolve.Slots.effectContext,
+-- which every position of a resolution goes through, and
+-- Pawl.Engine.Replacement.candidateContext, which fills it for a minted row. See
+-- that field above for the lint that keeps a card to a subset of the first.
 --
 -- CR 702.16k's chosen-player atom (True-Name Nemesis) is a further one a CARD may
 -- write, and it reads the Nothing here in every position but the four rule 702.16

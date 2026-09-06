@@ -401,6 +401,10 @@ looksBack condition = case condition of
   -- permanent still on the battlefield, Engine.sampleControl sampling nowhere else,
   -- and its bearer is a CR 603.7 delayed entry the store keeps rather than the log.
   TriggerCondition.LoseControlOfBound _ -> False
+  -- CR 603.10a's look-back IS this condition's subject -- the land is gone by the
+  -- time the ability triggers -- but the match reads the bound id rather than any
+  -- characteristic of it, so nothing here needs a snapshot to answer from.
+  TriggerCondition.BoundDiesOrIsExiled _ -> False
   -- CR 603.10a's look-back is a question about which event fired the ability, and
   -- a reflexive is fired by none. Its bearer is a CR 603.7 delayed entry too.
   TriggerCondition.Reflexive -> False
@@ -602,6 +606,7 @@ batchScoped condition = case condition of
   TriggerCondition.SagaFinalChapterTriggers _ -> False
   TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.LoseControlOfBound _ -> False
+  TriggerCondition.BoundDiesOrIsExiled _ -> False
   TriggerCondition.Reflexive -> False
 
 -- The log cut into its CR 704.3 / CR 608.2f events: one block per
@@ -2051,6 +2056,10 @@ zonesTriggeredFrom cond = case cond of
   -- GameState.delayedTriggers rather than out of a zone. The default is right
   -- anyway -- the event it matches happens on the battlefield.
   TriggerCondition.LoseControlOfBound _ -> battlefield
+  -- Never consulted either, and for LoseControlOfBound's reason: rule 701.66a's
+  -- delayed ability is a GameState.delayedTriggers entry, gathered out of the
+  -- store rather than out of a zone.
+  TriggerCondition.BoundDiesOrIsExiled _ -> battlefield
   -- Never consulted either, and for the same reason: CR 603.12 routes a
   -- reflexive through rule 603.7, so its only carrier is a delayed entry
   -- Event.delayedPending gathers out of GameState.delayedTriggers. EMPTY rather
@@ -2230,6 +2239,9 @@ stateTriggers gs
               -- CHANGING, and a settle re-reading "somebody else controls it" would
               -- fire it again on every pass thereafter.
               TriggerCondition.LoseControlOfBound _ -> False
+              -- CR 603.2 event trigger too: it fires on the land BEING put into a
+              -- graveyard or into exile, not on its being there.
+              TriggerCondition.BoundDiesOrIsExiled _ -> False
               -- CR 603.12 sends a reflexive through rule 603.7, and CR 603.8's
               -- state triggers are a different family: nothing about "when you
               -- do" is a state that could be standing true.

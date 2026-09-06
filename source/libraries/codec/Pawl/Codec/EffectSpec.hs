@@ -27,6 +27,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.CoinReading as CoinReading
@@ -60,6 +61,7 @@ import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
@@ -70,6 +72,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -261,7 +264,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               Search.quantity = Just (Quantity.Literal 2),
               Search.filter = Filter.HasCardType CardType.Land,
               Search.upTo = False,
-              Search.destination = SearchDestination.BattlefieldTapped
+              Search.destination = SearchDestination.BattlefieldTapped,
+              Search.subject = Nothing
             }
       )
       " {\"type\":\"Search\",\"value\":{\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":2},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"destination\":{\"type\":\"BattlefieldTapped\"}}} "
@@ -763,7 +767,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))) (ObjectRef.EachMatching Filter.IsSource)))
+      (Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))) (ObjectRef.EachMatching Filter.IsSource) []))
       " {\"type\":\"BecomeCopy\",\"value\":{\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}}} "
   Spec.it s "Replace" $
     Common.assertJsonCodec
@@ -979,13 +983,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       ( Effect.OfferCast
           OfferCast.MkOfferCast
-            { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+            { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.defaultValue
             }
       )
-      " {\"type\":\"OfferCast\",\"value\":{\"slot\":\"exiled\"}} "
+      " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
     -- CR 310.12b's two riders, which is what stops the offer being elided.
     Common.assertJsonCodec
       s
@@ -993,18 +997,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       ( Effect.OfferCast
           OfferCast.MkOfferCast
-            { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+            { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer =
                 CastOffer.Type.MkCastOffer
                   { CastOffer.Type.transformed = True,
                     CastOffer.Type.withoutPayingManaCost = True,
-                    CastOffer.Type.payingInstead = Nothing
+                    CastOffer.Type.payingInstead = Nothing,
+                    CastOffer.Type.spending = ManaSpending.AsProduced
                   }
             }
       )
-      " {\"type\":\"OfferCast\",\"value\":{\"slot\":\"exiled\",\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "
+      " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "
   Spec.it s "PutCounters" $
     Common.assertJsonCodec
       s
@@ -1125,6 +1130,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       )
       "Detain and Tap of the same slot encode differently"
+  -- CR 701.66a, the one rule 701 arm carrying an ObjectRef: the count rides
+  -- beside it, so a codec that dropped either field would leave an earthbend with
+  -- no land or with no counters. Both ObjectRef arms, Detain's reason -- rule
+  -- 701.66a's own wording is the slot, and the filter arm costs nothing.
+  Spec.it s "Earthbend round-trips its count and both ObjectRef arms" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Literal 4) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      " {\"type\":\"Earthbend\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":4},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Literal 2) (ObjectRef.EachMatching (Filter.HasCardType CardType.Land))))
+      " {\"type\":\"Earthbend\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":2},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   -- CR 701.15a, which shares Detain's wire shape down to the field: both are a
   -- bare ObjectRef whose duration and whose actor the rulebook fixes, so the tag
   -- is the only thing telling them apart. data/cards prints the slot arm (Jeering
@@ -1492,6 +1514,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       codec
       (Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
       " {\"type\":\"ForbidBlock\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
+  Spec.it s "ForbidActivation" $
+    Common.assertCodec
+      s
+      codec
+      (Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      " {\"type\":\"ForbidActivation\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   Spec.it s "ForbidAttack" $
     Common.assertCodec
       s
@@ -1690,15 +1718,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       " {\"type\":\"Proliferate\"} "
-  -- CR 201.4a's restriction on which names may be chosen, and nothing else: rule
-  -- 109.5 fixes the chooser and rule 201.4 the count.
+  -- CR 201.4's chooser and CR 201.4a's restriction on which names they may
+  -- choose. Rule 201.4 fixes the count, so there is no third key.
   Spec.it s "ChooseCardName" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChooseCardName (Filter.Not (Filter.HasCardType CardType.Land)))
-      " {\"type\":\"ChooseCardName\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
+      (Effect.ChooseCardName (ChooseCardName.MkChooseCardName (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land))))
+      " {\"type\":\"ChooseCardName\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"restriction\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   -- CR 400.11c: the filter and CR 701.20a's reveal, Burning Wish's "reveal a
   -- sorcery card". Everything else about the sentence is the rule's -- the pool is
   -- the resolving controller's own (CR 108.3b) and the destination their hand.

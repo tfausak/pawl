@@ -694,7 +694,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.detainedUntil = Set.empty,
               Object.goadedBy = Set.empty,
               Object.doesNotUntapNext = False,
-              Object.exertedBy = Set.empty
+              Object.exertedBy = Set.empty,
+              Object.activatedOnce = Set.empty
             }
         g4 =
           g3
@@ -759,7 +760,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.detainedUntil = Set.empty,
               Object.goadedBy = Set.empty,
               Object.doesNotUntapNext = False,
-              Object.exertedBy = Set.empty
+              Object.exertedBy = Set.empty,
+              Object.activatedOnce = Set.empty
             }
         g3 =
           g2
@@ -831,7 +833,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.detainedUntil = Set.empty,
               Object.goadedBy = Set.empty,
               Object.doesNotUntapNext = False,
-              Object.exertedBy = Set.empty
+              Object.exertedBy = Set.empty,
+              Object.activatedOnce = Set.empty
             }
         g3 =
           g2
@@ -852,7 +855,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             []
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Activator.Controller
             Nothing
@@ -861,7 +864,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty
+          Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -871,10 +874,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -897,7 +900,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             []
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Activator.Controller
             Nothing
@@ -906,7 +909,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty
+          Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -925,7 +928,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             []
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Activator.Controller
             Nothing
@@ -934,7 +937,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty
+          Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty False 0 (Mana.MkMana []) Nothing Nothing Set.empty Set.empty False Set.empty Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -1999,6 +2002,77 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "bob milled the top card of his library, and only it"
       (namesIn Zone.Graveyard S.bob settled)
       [nameOf "Crucible of Worlds"]
+  -- Petra Sphinx -- "{T}: Target player chooses a card name, then reveals the top
+  -- card of their library. If that card has the chosen name, that player puts it
+  -- into their hand. If it doesn't, the player puts it into their graveyard." The
+  -- whole-card proof of BOTH halves the card needs: CR 201.4's chooser is a
+  -- target slot rather than CR 109.5's "you", see #2233, and CR 201.4's atom is
+  -- asked about a REVEALED card rather than inside a search, see #2992 -- an
+  -- ObjectRef's own filter, matched through Resolve.Slots.objectRefObjects in the
+  -- resolution's own context.
+  --
+  -- A PAIR of boards differing in exactly ONE thing: bob's library holds the same
+  -- three cards in both and only the TOP one differs. The answerer names by
+  -- CHOOSER -- Chromatic Star if bob is asked, Crucible of Worlds otherwise -- so
+  -- an engine that asked alice instead flips BOTH boards' outcomes rather than
+  -- neither. An atom that cannot see the chosen name sends the card to the
+  -- graveyard on both; one that admits everything sends it to the hand on both.
+  Spec.it s "CR 201.4/701.20a whole card: Petra Sphinx matches the name its target chose against the card it revealed" $ do
+    settled <- resolveSphinx s registry "Chromatic Star"
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    -- The gameplay assertion, and first.
+    Spec.assertEqWith
+      s
+      "the revealed card carried the name bob chose, so it went to his hand"
+      (namesIn Zone.Hand S.bob settled)
+      [nameOf "Chromatic Star"]
+    Spec.assertEqWith s "and his graveyard is empty" (namesIn Zone.Graveyard S.bob settled) []
+    Spec.assertEqWith
+      s
+      "the reveal took the top card only (CR 701.20b moved nothing itself)"
+      (namesIn Zone.Library S.bob settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+  Spec.it s "CR 201.4 Petra Sphinx sends a top card its target did not name to the graveyard" $ do
+    settled <- resolveSphinx s registry "Crucible of Worlds"
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "the revealed card did not carry the name bob chose, so it went to his graveyard"
+      (namesIn Zone.Graveyard S.bob settled)
+      [nameOf "Crucible of Worlds"]
+    Spec.assertEqWith s "and his hand is empty" (namesIn Zone.Hand S.bob settled) []
+    Spec.assertEqWith
+      s
+      "and the rest of the library is untouched"
+      (namesIn Zone.Library S.bob settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+  -- CR 608.2c scopes "the chosen name" to the resolution that chose it, so a
+  -- PERMANENT that resolves the instruction twice answers about the second name
+  -- alone. The set on the source is assigned rather than added to, which is what
+  -- this pins: every earlier ChooseCardName producer was an instant or a sorcery,
+  -- whose next cast is a new object (CR 400.7) with an empty set of its own, so
+  -- Petra Sphinx is the first card that can tell the two writes apart.
+  --
+  -- bob names Goblin Piker first and Chromatic Star second, and the two reveals
+  -- are Crucible of Worlds then a Goblin Piker -- so the SECOND reveal is the one
+  -- the FIRST name would have matched. Under a union the Piker reaches bob's
+  -- hand; under CR 201.4 read through rule 608.2c both cards go to his graveyard.
+  Spec.it s "CR 201.4/608.2c a second activation of Petra Sphinx forgets the name the first one chose" $ do
+    settled <- twiceSphinx s registry
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    -- The gameplay assertion, and first: a set that kept the first name sends the
+    -- second reveal to bob's HAND instead.
+    Spec.assertEqWith s "neither reveal carried the name its own activation chose" (namesIn Zone.Hand S.bob settled) []
+    Spec.assertEqWith
+      s
+      "so both went to bob's graveyard, in the order revealed"
+      (namesIn Zone.Graveyard S.bob settled)
+      [nameOf "Crucible of Worlds", nameOf "Goblin Piker"]
+    Spec.assertEqWith
+      s
+      "and two of the four cards are still in his library"
+      (namesIn Zone.Library S.bob settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2062,7 +2136,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.detainedUntil = Set.empty,
               Object.goadedBy = Set.empty,
               Object.doesNotUntapNext = False,
-              Object.exertedBy = Set.empty
+              Object.exertedBy = Set.empty,
+              Object.activatedOnce = Set.empty
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -2152,7 +2227,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.detainedUntil = Set.empty,
               Object.goadedBy = Set.empty,
               Object.doesNotUntapNext = False,
-              Object.exertedBy = Set.empty
+              Object.exertedBy = Set.empty,
+              Object.activatedOnce = Set.empty
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
         resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
@@ -2253,7 +2329,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.detainedUntil = Set.empty,
               Object.goadedBy = Set.empty,
               Object.doesNotUntapNext = False,
-              Object.exertedBy = Set.empty
+              Object.exertedBy = Set.empty,
+              Object.activatedOnce = Set.empty
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -2561,7 +2638,8 @@ installControlBy mindslaver controller target gs0 =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
    in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)
@@ -3182,6 +3260,74 @@ resolvePredict s registry top = do
   (gs, spellId) <- predictBoard s registry top
   pure (S.runPure predictAnswer gs (S.cast S.alice spellId >> Stack.resolveTop))
 
+-- atBobAnswer with CR 201.4's name read off the CHOOSER the prompt names. Bob is
+-- the seat the card targets, so an engine that asked alice -- CR 109.5's "you" --
+-- takes the other branch, and the pair of boards below turns on which name came
+-- back. A pure answerer can tell these two prompts apart because
+-- Prompt.ChooseCardName carries the chooser.
+sphinxAnswer :: Prompt.Prompt r -> r
+sphinxAnswer p = case p of
+  Prompt.ChooseCardName _ chooser _ _ ->
+    CardName.MkCardName (Text.pack (if chooser == S.bob then "Chromatic Star" else "Crucible of Worlds"))
+  _ -> atBobAnswer p
+
+-- Alice's Petra Sphinx over bob's three-card library, `top` on top of it. The two
+-- fillers are what keep the library assertion from being vacuous -- a one-card
+-- library empties whichever way the comparison goes -- and keep bob off CR
+-- 104.3c.
+sphinxBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (GameState.GameState, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), ObjectId.ObjectId)
+sphinxBoard s registry top = do
+  sphinx <- S.printingOf s registry "Petra Sphinx"
+  piker <- S.printingOf s registry "Goblin Piker"
+  card <- S.printingOf s registry top
+  -- Added last is on top, S.addLibraryCard's order and predictBoard's reason.
+  let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
+      (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
+      g1 = foldl (flip stock) g0 [piker, piker, card]
+  pure (g1 {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)), sphinxId)
+
+-- One activation and resolution, the narrowest path that shows the comparison.
+-- The ability is read off the PRINTING rather than conjured, so what is proved is
+-- the card in data/cards/.
+resolveSphinx :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m GameState.GameState
+resolveSphinx s registry top = do
+  (gs, ability, sphinxId) <- sphinxBoard s registry top
+  case ability of
+    Nothing -> pure gs
+    Just a -> pure (S.runPure sphinxAnswer gs (Activate.activateAbility S.alice sphinxId a >> Stack.resolveTop))
+
+-- sphinxAnswer with the name FIXED rather than read off the chooser: the
+-- two-activation case needs a different name per activation, and a pure
+-- Prompt -> r answerer cannot tell two structurally identical prompts apart, so
+-- the two activations are run under two answerers instead.
+sphinxNaming :: String -> Prompt.Prompt r -> r
+sphinxNaming named p = case p of
+  Prompt.ChooseCardName {} -> CardName.MkCardName (Text.pack named)
+  _ -> atBobAnswer p
+
+-- Alice's Petra Sphinx over a four-card library of bob's, activated on two
+-- separate resolutions with a different name each time. The untap between them
+-- is Event.untap, the same road CR 502.1 takes, so the second activation pays a
+-- real {T}.
+twiceSphinx :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+twiceSphinx s registry = do
+  sphinx <- S.printingOf s registry "Petra Sphinx"
+  piker <- S.printingOf s registry "Goblin Piker"
+  crucible <- S.printingOf s registry "Crucible of Worlds"
+  let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
+      (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
+      -- Top first: Crucible of Worlds, then a Goblin Piker, then two more to
+      -- keep bob off CR 104.3c and to keep the library assertion a count.
+      g1 = foldl (flip stock) g0 [piker, piker, piker, crucible]
+      board = g1 {GameState.priority = Just S.alice}
+  case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)) of
+    Nothing -> pure board
+    Just a -> do
+      let once named gs = S.runPure (sphinxNaming named) gs (Activate.activateAbility S.alice sphinxId a >> Stack.resolveTop)
+          first_ = once "Goblin Piker" board
+          untapped = S.runPure S.identityAnswer first_ (Event.untap sphinxId)
+      pure (once "Chromatic Star" untapped)
+
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be
 -- provable at all, and the head of the offered list is where a shuffle left it
@@ -3534,7 +3680,8 @@ subgameSpellOn borrowed name effects gs0 =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in (spellId, gs2 {GameState.objects = Map.insert spellId spellObj (GameState.objects gs2), GameState.stack = spellId : GameState.stack gs2})
 

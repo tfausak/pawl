@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Dungeon as Dungeon
+import qualified Pawl.Engine.Earthbend as Earthbend
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -66,6 +67,7 @@ import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
@@ -92,6 +94,7 @@ import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -132,6 +135,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
+import qualified Pawl.Types.Earthbend as Earthbend.Type
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
@@ -150,6 +154,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import Pawl.Types.Game (Game)
@@ -399,10 +404,12 @@ armsReflexive source effect gs = case effect of
 
 -- The players a PlayerRef names, in CR 101.4's APNAP order -- playerRefPlayers
 -- answers in PlayerId order and says so, leaving the ordering rule to its
--- caller. Two callers ask, and for the same reason: the seats a resolution cost
--- is offered to (CR 118.12a) and the seats CR 111.2 has creating tokens. Mana
--- Leak's reference names one and Rishadan Cutpurse's names every opponent; the
--- order is only observable for the second.
+-- caller. Three callers ask, and for the same reason: the seats a resolution cost
+-- is offered to (CR 118.12a), the seats CR 111.2 has creating tokens, and the
+-- seats CR 201.4 has naming a card. Mana Leak's reference names one and Rishadan
+-- Cutpurse's names every opponent; the order is observable only where the
+-- reference names more than one seat, which no printing in the pool does at the
+-- naming caller (Petra Sphinx's is a target slot).
 apnapPlayersOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> [PlayerId]
 apnapPlayersOf ref legal controller gs =
   let named = playerRefPlayers legal controller gs ref
@@ -646,6 +653,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.TopOfGraveyard _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachSpell _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachOnStack _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient. APNAP (CR 608.2f) via
@@ -773,19 +781,21 @@ slotOne slot resolving gs = do
 --
 -- The four questions, in the order the rules ask them:
 --
---   1. IS THERE ANYTHING TO OFFER -- the slot's id (CR 400.7) may no longer
---      resolve to an object (CR 603.7c).
+--   1. IS THERE ANYTHING TO OFFER -- an id the reference named (CR 400.7) may no
+--      longer resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
 --      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3), less the face CR
 --      702.162a's alternative cost is the only road to when this offer states an
 --      alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
---      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates.
+--      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates, and
+--      how mana may be spent toward it (CR 118.14's `spending`).
 --   4. MAY IT BE CAST AT ALL -- Cast.castableWhenOffered, asked BEFORE the
 --      prompt so no cast is offered that the announcement would reverse.
 --
--- Questions 3 and 4 are asked of EACH half separately (CR 709.3a, CR 712.11c);
--- where more than one survives, CR 709.3's choice is put to the caster before
+-- Questions 3 and 4 are asked of EACH half of EACH named card separately (CR
+-- 709.3a, CR 712.11c); where more than one survives, CR 601.3's choice is put to
+-- the caster before
 -- the "may" below, since CR 118.8c's excuse is a property of the spell being
 -- cast. At CastObligation.Mandatory the cast is not a decision, so
 -- Prompt.OfferedCast is elided; question 4 is what a printed "if able" comes to
@@ -795,8 +805,8 @@ slotOne slot resolving gs = do
 -- The caster is a parameter and not the resolving controller: CR 608.2g says "a
 -- player". Everything above is a CLASSIFICATION carried by the opcode's
 -- CastOffer and its CastObligation; nothing here asks which card is offered.
-offerCast :: ObjectId -> PlayerId -> SlotName -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
-offerCast resolving caster slot optionality offer = do
+offerCast :: [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
+offerCast named caster optionality offer = do
   gs <- State.get
   let -- Whether this offer states CR 118.9's alternative cost, in either of the
       -- two wordings `applied` below reads. NOT `transformed`, which is CR
@@ -841,7 +851,7 @@ offerCast resolving caster slot optionality offer = do
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) (pure . Cost.untagged) applied
-         in if Cast.castableWhenOffered caster oid name candidates proposed
+         in if Cast.castableWhenOffered (CastOffer.spending offer) caster oid name candidates proposed
               then
                 -- CR 118.8c, read off the same candidates the cast will be
                 -- announced with: CR 118.9d keeps the face's additional costs on
@@ -852,26 +862,34 @@ offerCast resolving caster slot optionality offer = do
                 -- (#1834).
                 Just (oid, name, applied, any (Cost.statesHiddenQuality . CandidateCost.cost) candidates)
               else Nothing
-      offers = Maybe.fromMaybe [] $ do
-        oid <- slotOne slot resolving gs
-        card <- Game.cardOf oid gs
-        fmap (Maybe.mapMaybe (proposal oid)) (faces card)
-  -- No survivor is no offer; one survivor is one outcome, so CR 709.3's choice
-  -- is elided there rather than asked.
+      -- EVERY object the reference names, each contributing one entry per
+      -- castable half (CR 709.3a) -- Shell of the Last Kappa's whole exiled pile
+      -- as readily as Tinybones, the Pickpocket's one target. The caller's
+      -- objectRefObjects is what makes the two the same read.
+      offers =
+        concatMap
+          ( \oid -> Maybe.fromMaybe [] $ do
+              card <- Game.cardOf oid gs
+              fmap (Maybe.mapMaybe (proposal oid)) (faces card)
+          )
+          named
+  -- No survivor is no offer; one survivor is one outcome, so CR 601.3's choice is
+  -- elided there rather than asked.
   chosen <- case offers of
     [] -> pure Nothing
     [sole] -> pure (Just sole)
     first : rest -> do
       let decider = Decide.deciderFor caster gs
-          nameOf (_, name, _, _) = name
-          oidOf (oid, _, _, _) = oid
-      picked <- Game.choose (Prompt.ChooseOfferedCastFace decider caster (oidOf first) (fmap nameOf (first NonEmpty.:| rest)))
-      -- Reject-not-repair: a name the offer did not include is no cast at all.
-      pure (List.find ((== picked) . nameOf) offers)
+          keyOf (oid, name, _, _) = (oid, name)
+      picked <- Game.choose (Prompt.ChooseOfferedCastSpell decider caster (fmap keyOf (first NonEmpty.:| rest)))
+      -- Reject-not-repair: a pair the offer did not include is no cast at all.
+      -- The PAIR and not the name alone, for castWhileSearching's reason: one
+      -- card's half must not answer another card's.
+      pure (List.find ((== picked) . keyOf) offers)
   case chosen of
     Nothing -> pure ()
     Just (oid, name, applied, excused) -> do
-      let cast = Cast.castSpellWith performManaAbility True applied caster oid name Facing.FaceUp
+      let cast = Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
           -- The SAME prompt on both paths: CR 118.8c creates no new decision.
           mayCast = do
             let decider = Decide.deciderFor caster gs
@@ -1794,6 +1812,21 @@ chooseNewTargetsFor controller copyId = do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
+-- CR 707.9a's "this ability", read off the RESOLVING object: rule 603.3 puts a
+-- triggered ability on the stack carrying its own text
+-- (Pawl.Types.TriggeredAbilitySource), so the words point at a value already in
+-- hand.
+--
+-- A CLASSIFICATION of the resolving object under CR 113.3 and never a question
+-- about which ability it is, so the closed half stays closed. Nothing for every
+-- other arm: a spell, an emblem and CR 725.2's sourceless trigger have no ability
+-- to point at, and an ACTIVATED ability has one this cannot return -- CR 707.9a
+-- reaches it too, and it would go in another list (#3325).
+thisTriggeredAbility :: ObjectId -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
+thisTriggeredAbility resolving gs = case fmap Object.source (Game.lookupObject resolving gs) of
+  Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.ability triggered)
+  _ -> Nothing
+
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
 --
@@ -2075,7 +2108,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ManaUnit.rider = rider
                       }
               State.modify' (Mana.addMana pid (replicate howMany unit))
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -2088,10 +2121,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- context would have answered False for on every card in the library.
     -- Pawl.ResolveSpec's Bifurcate cases are what prove it.
     --
-    -- A FUNCTION of the board rather than a value, sourceChosenNames' reason
-    -- below, and the slots come with it: CR 608.2c has the clauses carried out in
-    -- order, so a slot an earlier clause of this same resolution bound is read
-    -- here rather than as it stood when the arm was entered.
+    -- A FUNCTION of the board rather than a value, so the slots come with it: CR
+    -- 608.2c has the clauses carried out in order, so a slot an earlier clause of
+    -- this same resolution bound is read here rather than as it stood when the
+    -- arm was entered.
     --
     -- CR 109.5's "you" is the resolving controller, which effectContext supplies
     -- as the perspective; a search filter in the pool names no player, so no
@@ -2100,7 +2133,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 701.3a: one candidate's VIEW carries the field no projection can fill --
     -- whether the CANDIDATE could legally be attached to the object this
     -- instruction fixes (Auratouched Mage's "an Aura card that could enchant
-    -- it"), which for a search is the searching ability's own SOURCE. Answered by
+    -- it"). WHICH object that is comes from Search.subject: the searching
+    -- ability's own SOURCE where the card says "it" of itself (CR 113.7), and
+    -- otherwise the one object a slot this resolution has bound names --
+    -- Sovereigns of Lost Alara's "that creature", CR 506.5's lone attacker, which
+    -- its trigger stamped under Binding.attackingCreature. Answered by
     -- Attach.attachableWithLastKnown, whose live half is the same function the
     -- move goes through, so the offer and the move cannot disagree -- and whose
     -- other half is CR 608.2h: a source killed while its own trigger was on the
@@ -2109,21 +2146,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- where that card then goes. Lazy, so a filter that never names
     -- Filter.CanAttachToSubject pays nothing for it.
     --
+    -- A slot naming no object, or more than one, leaves rule 701.3a's question
+    -- with nothing to be about, and the atom is False for every candidate -- a
+    -- search that finds nothing rather than one that finds anything. The same
+    -- reading putFound takes for where the card then goes, so the offer and the
+    -- move agree there too.
+    --
     -- No recursion to bound: this is called from a resolution rather than from
     -- inside a CR 613 fold, so the projections that question reaches start fresh.
     --
-    -- CR 201.4: the ONE field the context does fill is the SOURCE's chosen names,
-    -- which is what Filter.HasChosenName reads (Ancient Vendetta's "cards with
-    -- that name"). A function of the board rather than a value, so the read is
-    -- LIVE: CR 608.2c has the controller follow the instructions in order, and the
-    -- clause that chose the name is an earlier one of this same resolution. A
-    -- context built once when the arm was entered would have been the stale read.
-    -- Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
-    -- filter" is what keeps the atom to this position, the one that answers.
-    let searchContext g = (effectContext g controller source legal (slotBindings resolving g)) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) g}
+    -- CR 201.4's chosen names ride along with the slots, effectContext filling
+    -- them for every position of a resolution alike (Ancient Vendetta's "cards
+    -- with that name"). A function of the board rather than a value for the same
+    -- reason the slots are: the clause that chose the name is an earlier one of
+    -- this same resolution.
+    let searchContext g = effectContext g controller source legal (slotBindings resolving g)
+        subjectOf g = maybe (Just source) (\slot -> Filter.slotOneObject slot (searchContext g)) subject
         viewOfCandidate g oid =
           (Projection.viewOfObject oid g)
-            { Filter.canAttachToSubject = Attach.attachableWithLastKnown oid source g
+            { Filter.canAttachToSubject = Maybe.maybe False (\host -> Attach.attachableWithLastKnown oid host g) (subjectOf g)
             }
         matches1 g oid = Filter.matches (searchContext g) (viewOfCandidate g oid) filter_
         -- CR 400.2: the library and the hand are the hidden zones. CR 701.23b,
@@ -2286,7 +2327,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 701.23e says the same of the reveal. The searcher is the
             -- revealer (CR 701.20a), and the cards go in the order the searcher
             -- named them.
-            Monad.mapM_ (putFound searcher source destination) found
+            -- Read HERE rather than when the arm was entered, the reason the
+            -- context above is a function of the board: CR 608.2c carries the
+            -- clauses out in order, so the slot an earlier clause bound is read
+            -- as it stands now.
+            host <- State.gets subjectOf
+            Monad.mapM_ (putFound searcher host destination) found
             -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
             -- The library shuffled is the one that was READ, so this seat is the
             -- owner -- and only where a LIBRARY is among the zones the searcher
@@ -3028,6 +3074,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               ObjectRef.TopOfLibraryUntil {} -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
+              -- CR 404.1's top card, read from the PRE-MOVE state for the two
+              -- arms above's reason: one look at each named graveyard (CR
+              -- 608.2c, CR 608.2f).
+              ObjectRef.TopOfGraveyard _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
               -- One card per chooser, and the only ref whose gather asks a question
               -- rather than reading the board, which is why it is answered here in
               -- the Game monad. Candidates come from the pre-move state (CR 608.2c),
@@ -3298,12 +3350,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
     Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Event.shuffleLibrary
-  Effect.OfferCast (OfferCast.MkOfferCast slot caster optionality offer) -> do
+  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality offer) -> do
     gs <- State.get
+    -- The sweep every ObjectRef-taking opcode shares, read HERE rather than
+    -- inside offerCast so that one function takes the objects and never the
+    -- reference: CR 601.3's offer over a set (Shell of the Last Kappa) and over
+    -- one target (Tinybones, the Pickpocket) are then the same call.
+    let named = objectRefObjects legal resolving controller source gs ref
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
     -- cast to nobody.
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
-      offerCast resolving pid slot optionality offer
+      offerCast named pid optionality offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- as CR 109.5's "you" and the stated duration.
   --
@@ -3527,7 +3584,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- across every miller, as no Quantity has a per-player reader.
     Monad.forM_ mTally $ \tally -> do
       gs' <- State.get
-      let tallyContext = (effectContext gs' controller source legal (slotBindings resolving gs')) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs'}
+      let tallyContext = effectContext gs' controller source legal (slotBindings resolving gs')
           viewOfMilled = Projection.viewsOf gs
           counted oid = Filter.matches tallyContext (viewOfMilled oid) (MillTally.filter tally)
       State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
@@ -4200,7 +4257,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- simultaneously and none may copy a sibling.
                 Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
       _ -> pure ()
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef) ->
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in
       -- whatever zone it already sits -- CR 707.4's "while remaining on the
@@ -4216,12 +4273,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- re-apply over the new base -- CR 707.4's "doesn't change any noncopy
       -- effects presently affecting the permanent".
       --
-      -- Not implemented: CR 707.9a's "except it has this ability", which every
-      -- printed producer carries (#1292); pawl's copy is stricter, losing the
-      -- ability that made it. Nor a stated duration (#1753).
+      -- CR 707.9's exceptions are folded into the snapshot on the way in, exactly
+      -- as the CR 707.5 entry road folds AsCopy's (Event's EntryR arm), so the
+      -- excepted ability is part of the copy's own copiable values (CR 707.9a)
+      -- rather than an effect layered over them.
+      --
+      -- "This ability" is the RESOLVING object's own -- thisTriggeredAbility, off
+      -- Pawl.Types.Source, so the ability is read where CR 603.3 already carries
+      -- it rather than being looked back up on a source that may have left (CR
+      -- 113.7a). Not implemented: a stated duration (#1753).
       case objectRefObjects legal resolving controller source gs originalRef of
         [original] ->
-          let snapshot = Event.copiedSnapshotWithLastKnown original gs
+          let snapshot = Replacement.applyCopyExceptions (thisTriggeredAbility resolving gs) exceptions (Event.copiedSnapshotWithLastKnown original gs)
               write o = o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
@@ -4811,6 +4874,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               | object <- objects
               ]
          in gs1 {GameState.blockProhibitions = stored <> GameState.blockProhibitions gs1}
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) ->
+    -- CR 602.2 / 611.1: store one prohibition per permanent the ref names.
+    -- ForbidBlock above is the model and every one of its arguments carries over:
+    -- the ref is enumerated ONCE, for the CR 608.2f simultaneity objectRefObjects
+    -- buys, and an illegal slot (CR 608.2b) stores nothing, which is Deadlock
+    -- Trap's fizzle.
+    --
+    -- Nothing is written onto the permanent itself, and nothing is projected: CR
+    -- 613.11 keeps a prohibition on an activation out of the layers, so the row
+    -- is read at Pawl.Engine.ActivationProhibition.cantActivate and never by a
+    -- projection.
+    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let objects = objectRefObjects legal resolving controller source gs ref
+            (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              [ ActiveActivationProhibition.MkActiveActivationProhibition
+                  { ActiveActivationProhibition.source = source,
+                    ActiveActivationProhibition.timestamp = ts,
+                    ActiveActivationProhibition.expiry = expiry,
+                    ActiveActivationProhibition.object = object
+                  }
+              | object <- objects
+              ]
+         in gs1 {GameState.activationProhibitions = stored <> GameState.activationProhibitions gs1}
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected aimedAt) ->
     -- CR 508.1c / 611.1: store one restriction per permanent a Named ref names,
     -- or ONE row for a Matching class. ForbidBlock above is the model for the
@@ -5319,11 +5409,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- ONE call per kind per permanent inside it, which is CR 614.16's own unit.
     Monad.unless (Map.null tally) . Event.simultaneously . Monad.forM_ targets $ \target ->
       Monad.forM_ (Map.toList tally) (uncurry (Event.putCounters (CounterCause.ByEffect controller) target))
-  -- CR 201.4 via CR 608.2c: the resolving controller names a card, and the name
-  -- is stamped on the SOURCE so a later clause of the same resolution can read it
-  -- (Ancient Vendetta). Object.chosenNames is the same store CR 614.1c's
-  -- as-enters twin writes (Pawl.Engine.Event's EntryRewrite.ChooseCardNames arm),
-  -- and Pawl.Engine.Filter's HasChosenName is the one reader on the match side.
+  -- CR 201.4 via CR 608.2c: the players the PlayerRef names each name a card,
+  -- and the names are stamped on the SOURCE so a later clause of the same
+  -- resolution can read them (Ancient Vendetta, Petra Sphinx).
+  -- Object.chosenNames is the same store CR 614.1c's as-enters twin writes
+  -- (Pawl.Engine.Event's EntryRewrite.ChooseCardNames arm), and
+  -- Pawl.Engine.Filter's HasChosenName is the one reader on the match side.
+  --
+  -- APNAP (CR 101.4) over the named players, the order the entry twin's own loop
+  -- takes: who is asked first is public information, so it is a fact about the
+  -- rules rather than about PlayerId's Ord.
   --
   -- CHOOSE, not target: no CR 608.2b legality to re-check, and the prompt is
   -- raised unconditionally because CR 201.4's offer is every card in the Oracle
@@ -5337,19 +5432,42 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Engine.runGameAsked, where the registry is, and covers this arm
   -- and the entry twin alike by covering the one Prompt they share.
   --
-  -- Set.insert rather than a fresh singleton: CR 201.4g's interchangeable names
-  -- aside, nothing in rule 201.4 says a second choice unmakes the first, and a
-  -- source that chose as it entered keeps that name too. No printed card chooses
-  -- twice, so the two readings agree on the pool.
+  -- ASSIGNED and not unioned in, the entry twin's own write: CR 608.2c scopes
+  -- "the chosen name" to the resolution that chose it, so a permanent that
+  -- resolves this instruction twice must answer about the SECOND name alone.
+  -- Petra Sphinx activated on two turns is the producer that made the difference
+  -- observable -- every earlier one was an instant or a sorcery, whose next cast
+  -- is a new object (CR 400.7) with an empty set of its own.
+  --
+  -- What the assignment costs, and no printing spends it: a resolution whose text
+  -- instructs a SECOND, separate choice keeps only the later name, where CR 201.4
+  -- read twice would leave two, and a permanent that chose as it entered (CR
+  -- 614.1c) would lose that name to a later resolution of its own. No card in
+  -- data/cards writes two ChooseCardName instructions, and none pairs an
+  -- as-enters choice with a resolution-time one -- Runed Halo, the pool's
+  -- as-enters chooser, has no activated ability, and Conjurer's Ban names once
+  -- (Oracle text, Scryfall, 2026-09-06). Either card would refute this.
   --
   -- Written to the SOURCE and not to `resolving`: Pawl.Engine.PlayerEffect
-  -- .chosenNamesOf and the search arm's context both ask about a source (CR
+  -- .chosenNamesOf and the resolution's own context both ask about a source (CR
   -- 113.7), and for a spell the two ids are the same object anyway.
-  Effect.ChooseCardName restriction -> do
+  --
+  -- Not implemented: SEVERAL choosers of ONE instruction kept apart. Their
+  -- answers union into the one set on the source, so Conundrum Sphinx's "the name
+  -- they chose" would read every chooser's (#3316).
+  Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> do
     gs <- State.get
-    answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller source restriction)
-    let stamp o = o {Object.chosenNames = Set.insert answer (Object.chosenNames o)}
-    State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
+    let ask chooser = do
+          g <- State.get
+          Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction)
+    picked <- fmap Set.fromList (Monad.mapM ask (apnapPlayersOf ref legal controller gs))
+    -- CR 101.3: a reference naming NOBODY leaves nothing to do, so the write is
+    -- skipped rather than assigning the empty set -- which would clear a name an
+    -- earlier instruction chose, and the assignment above is the whole reason
+    -- that would now be visible.
+    Monad.unless (Set.null picked) $ do
+      let stamp o = o {Object.chosenNames = picked}
+      State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
   -- CR 400.11c: the resolving controller reveals a card they own from outside the
   -- game matching the filter and puts it into their hand -- Burning Wish.
   --
@@ -5967,6 +6085,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- replacements get their opportunity.
           Monad.when (n > 0) . Monad.void $
             Event.putCounters (CounterCause.ByEffect controller) bolstered CounterKind.PlusOnePlusOne (Integer.toNaturalSaturating n)
+  -- CR 701.66a: "earthbend N" -- the whole keyword action, whose three
+  -- instructions Pawl.Engine.Earthbend writes as Effects and this arm runs
+  -- through the SAME executor a card's own instructions run through. Nothing
+  -- here reads which effects those are.
+  --
+  -- TARGETS, alone among the rule 701 arms: rule 701.66a says "target land you
+  -- control", so the card declares the slot and CR 608.2b has already narrowed
+  -- `legal` by the time this runs. An illegal or unfilled slot leaves `lands`
+  -- empty and the ObjectRef sweeps inside the instructions empty too, so the
+  -- whole action is a no-op rather than a partial one.
+  --
+  -- THE SWEEP IS REPEATED, once per instruction, where CR 608.2f would enumerate
+  -- once. Indistinguishable here and only here: rule 701.66a names ONE target,
+  -- and no instruction in the list moves it, changes who controls it or changes
+  -- whether it is a land, so every sweep answers the same id.
+  --
+  -- The land is bound under Binding.earthbentLand BEFORE the arming opcode and
+  -- after the counters, which is CR 608.2c's written order plus CR 603.7c: the
+  -- delayed ability captures the resolving object's whole environment, and this
+  -- is the slot its condition names.
+  Effect.Earthbend earthbend -> do
+    gs <- State.get
+    let lands = objectRefObjects legal resolving controller source gs (Earthbend.Type.ref earthbend)
+    Monad.forM_ (Earthbend.instructions earthbend) (applyEffectWith runSubgame resolving source controller legal chosen)
+    Monad.forM_ lands $ \land -> do
+      State.modify' (bindEarthbentLand resolving land)
+      applyEffectWith runSubgame resolving source controller legal chosen Earthbend.arm
   -- CR 701.47a: the resolving controller amasses; the keyword action is
   -- Pawl.Engine.Amass.amass's, and this arm evaluates only the printed N.
   --
@@ -6068,13 +6213,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Through Pawl.Engine.Cost's own reader and writer, so CR 107.14 has one
   -- meaning here and in a CostComponent.PayEnergy payment.
   --
-  -- Not implemented: skipping the offer when the payer has no energy, where 0 is
-  -- the only payable amount (#1920).
+  -- The offer is skipped at a bound of 0, where CR 118.3 leaves 0 as the only
+  -- payable amount and there is nothing to decide. Proven by
+  -- Pawl.CounterKeywordTriggerSpec's "a payer with no {E} is not asked how much
+  -- to pay", whose twin one {E} higher is asked.
   Effect.PayAnyEnergy slot -> do
     gs <- State.get
     let have = Cost.energyOf controller gs
-    answer <- Game.choose (Prompt.ChoosePaidEnergy (Decide.deciderFor controller gs) controller resolving have)
-    let paid = min answer have
+    paid <-
+      if have == 0
+        then pure 0
+        else do
+          answer <- Game.choose (Prompt.ChoosePaidEnergy (Decide.deciderFor controller gs) controller resolving have)
+          pure (min answer have)
     Cost.spendEnergy controller paid
     -- Bound onto this effect's SOURCE even when nothing was paid, Effect.Destroy's
     -- count for its reason: zero is an answer, where an unbound slot would leave a
@@ -6408,6 +6559,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         pushRound ts = List.foldl' (\acc pid -> entry pid : acc) ts takers
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts _ -> pushRound ts) (GameState.extraTurns g) [1 .. turns]})
 
+-- CR 603.7c: stamp the land an earthbend animated onto the resolving object, so
+-- the environment the arming opcode captures next carries it. Pawl.Engine.Earthbend's
+-- delayed ability names Binding.earthbentLand and nothing else can supply it: the
+-- ability is engine text and cannot know what a card called its own target slot.
+--
+-- Written as a TARGET binding because Binding.objectSlots -- what the condition
+-- reads -- is the targets field. Not a target in CR 115.10a's sense: the choice
+-- was made by the spell or ability that earthbent, and CR 608.2b re-checked it
+-- before this arm ran.
+bindEarthbentLand :: ObjectId -> ObjectId -> GameState -> GameState
+bindEarthbentLand resolving land gs =
+  let put obj = obj {Object.bindings = Map.insert Binding.earthbentLand (Binding.toObject land) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put resolving (GameState.objects gs)}
+
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
 applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
@@ -6693,8 +6858,8 @@ changeLifeByDelta pid delta =
 -- CR 701.23: do to a found card what the search said -- a move for every
 -- destination and, for one of them, a CR 701.20a reveal first, through the CR
 -- 400.7 funnel either way.
-putFound :: PlayerId -> ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
-putFound searcher source destination cardId = case destination of
+putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
+putFound searcher subject destination cardId = case destination of
   -- Nature's Lore's "put that card onto the battlefield": the plain move, with
   -- no rider naming how it enters, so CR 110.5b's defaults stand and the card
   -- arrives untapped. That is why this is Event.changeZone rather than putTapped
@@ -6712,47 +6877,38 @@ putFound searcher source destination cardId = case destination of
   -- it (CR 701.23e). Which card this instruction exiled is CR 607.2a's link,
   -- filed by recordExiledWith off the effect that ran rather than here.
   SearchDestination.Exile -> Event.changeZone cardId Zone.Exile
-  -- Auratouched Mage's "put that Aura card onto the battlefield attached to it".
-  -- The seed is the RECIPIENT Attach.attachmentFor produced rather than a
-  -- hand-built ToObject, for the reason Event.changeZoneAttaching's CR 303.4f arm
-  -- gives: Sba.stillLegalEnchant compares the (pool, tag) pair, so a mismatched
-  -- tag would have CR 704.5m bury the Aura on the next pass.
+  -- Auratouched Mage's "put that Aura card onto the battlefield attached to it",
+  -- and Sovereigns of Lost Alara's "put it onto the battlefield attached to that
+  -- creature". WHICH object "it" is, is Search.subject, resolved by the arm that
+  -- ran the search -- the same value its filter asked CR 701.3a about, so the
+  -- offer and the move cannot name different hosts. A subject naming no object is
+  -- CR 609.3's "only as much as possible", which for a sentence printing no other
+  -- destination is nothing at all -- the Aura stays where the search found it (CR
+  -- 303.4i).
+  SearchDestination.BattlefieldAttached -> case subject of
+    Nothing -> pure ()
+    Just host -> attachFound searcher host cardId
+  -- The arm above with the card's second sentence added: "If this creature is
+  -- still on the battlefield ... Otherwise, reveal the Aura card and put it into
+  -- your hand."
   --
-  -- Supplying a seed at all is what keeps CR 303.4f's host prompt out of this
-  -- move: the effect DOES specify what the Aura will enchant, so its controller
-  -- chooses nothing.
-  --
-  -- CR 110.2a: it enters under the SEARCHER, the player whose effect is putting
-  -- it there -- not under its owner, which is what the other arms' Event.changeZone
-  -- leaves it to, since none of them puts anything onto the battlefield for
-  -- someone other than its owner.
-  --
-  -- Nothing is CR 303.4i's "the Aura remains in its current zone" -- unreachable
-  -- from a filter naming Filter.CanAttachToSubject, since that atom is this same
-  -- function, and the honest answer for a card whose filter does not.
-  --
-  -- The OUTER branch is the card's own "If this creature is still on the
-  -- battlefield ... Otherwise", asked of the SOURCE's liveness rather than of
-  -- attachmentFor's Nothing. The two are different questions and the rules give
-  -- them opposite answers: an Aura a LIVE host cannot legally hold stays in the
-  -- library (CR 303.4i), while an Aura whose host has gone is revealed and put
-  -- into its owner's hand (CR 608.2h; CR 113.7a is what keeps the ability
-  -- resolving at all with its source gone). Branching on Nothing alone would
-  -- send the first of those to the hand.
+  -- The OUTER branch is that printed "If ... Otherwise", asked of the SUBJECT's
+  -- liveness rather than of attachmentFor's Nothing. The two are different
+  -- questions and the rules give them opposite answers: an Aura a LIVE host
+  -- cannot legally hold stays in the library (CR 303.4i), while an Aura whose
+  -- host has gone is revealed and put into its owner's hand (CR 608.2h; CR 113.7a
+  -- is what keeps the ability resolving at all with its source gone). Branching
+  -- on Nothing alone would send the first of those to the hand.
   --
   -- The ORDER of those two questions is a REGRESSION FENCE rather than a proven
   -- behaviour: rule 303.4i's Nothing is unreachable for the one card that reaches
   -- this arm, whose filter names Filter.CanAttachToSubject, so both readings
   -- produce the same board and swapping them reddens nothing. A card whose search
   -- filter did NOT ask rule 701.3a would be its observer.
-  SearchDestination.BattlefieldAttachedToSource -> do
+  SearchDestination.BattlefieldAttachedOrHand -> do
     gs <- State.get
-    if Set.member source (GameState.battlefield gs)
-      then case Attach.attachmentFor cardId (Recipient.ToObject source) gs of
-        Nothing -> pure ()
-        Just seed ->
-          Monad.void
-            (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried)
+    if maybe False (\host -> Set.member host (GameState.battlefield gs)) subject
+      then Monad.mapM_ (\host -> attachFound searcher host cardId) subject
       else do
         -- CR 701.20b makes the order matter, for RevealThenHand's reason above:
         -- swapped, CR 400.7 has already ceased `cardId` and the reveal shows
@@ -6760,6 +6916,36 @@ putFound searcher source destination cardId = case destination of
         -- is why it is written here rather than in the searching rule.
         Event.reveal RevealCause.Ordinary searcher cardId
         Event.changeZone cardId Zone.Hand
+
+-- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
+-- sentence they have in common is written once.
+--
+-- The seed is the RECIPIENT Attach.attachmentFor produced rather than a
+-- hand-built ToObject, for the reason Event.changeZoneAttaching's CR 303.4f arm
+-- gives: Sba.stillLegalEnchant compares the (pool, tag) pair, so a mismatched tag
+-- would have CR 704.5m bury the Aura on the next pass.
+--
+-- Supplying a seed at all is what keeps CR 303.4f's host prompt out of this move:
+-- the effect DOES specify what the Aura will enchant, so its controller chooses
+-- nothing.
+--
+-- CR 110.2a: it enters under the SEARCHER, the player whose effect is putting it
+-- there -- not under its owner, which is what putFound's other arms'
+-- Event.changeZone leaves it to, since none of them puts anything onto the
+-- battlefield for someone other than its owner.
+--
+-- Nothing from attachmentFor is CR 303.4i's "the Aura remains in its current
+-- zone" -- unreachable from a filter naming Filter.CanAttachToSubject, since that
+-- atom is this same function, and the honest answer for a card whose filter does
+-- not.
+attachFound :: PlayerId -> ObjectId -> ObjectId -> Game ()
+attachFound searcher host cardId = do
+  gs <- State.get
+  case Attach.attachmentFor cardId (Recipient.ToObject host) gs of
+    Nothing -> pure ()
+    Just seed ->
+      Monad.void
+        (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried)
 
 -- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

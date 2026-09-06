@@ -3,7 +3,9 @@ module Pawl.Types.Object where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Binding as Binding
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
@@ -12,6 +14,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -139,6 +142,11 @@ data Object = MkObject
     -- among them. Empty for everything that never chose, which matches no card at
     -- all (CR 201.2a). Not a copiable value and per-incarnation, for chosenColor's
     -- reasons.
+    --
+    -- ASSIGNED by both writers and never added to, so CR 608.2c's scope holds for
+    -- a PERMANENT that chooses on two separate resolutions: the later choice is
+    -- the whole of what "the chosen name" then means (Petra Sphinx activated
+    -- twice, Pawl.ResolveSpec).
     chosenNames :: Set.Set CardName.CardName,
     -- | CR 614.1c: a player this object's controller chose as it entered (Stuffy
     -- Doll). Read by Pawl.Engine.Resolve's ObjectRef.ChosenPlayer arm off the
@@ -466,7 +474,37 @@ data Object = MkObject
     -- letting a permanent be exerted more than once.
     --
     -- Per-incarnation (CR 400.7), and CR 701.43c is why nothing writes it back.
-    exertedBy :: Set.Set PlayerId.PlayerId
+    exertedBy :: Set.Set PlayerId.PlayerId,
+    -- | CR 602.5b: the abilities of this object carrying CR 602.5's once-only
+    -- rider (ActivationRestriction.OnlyOnce) that have already been activated --
+    -- what CR 702.177a's "Activate only once" remembers. Empty for every object
+    -- that has never activated one, which is nearly all of them.
+    --
+    -- ON THE OBJECT because rule 602.5b puts it there: "the restriction continues
+    -- to apply to that object even if its controller changes", so a stolen
+    -- permanent's spent exhaust ability stays spent, and a per-player or
+    -- per-controller record would not say that. CR 400.7 supplies the other end
+    -- for free -- `newIncarnation` below forgets it, so a permanent that leaves
+    -- and returns may activate its exhaust ability again, which is the rule
+    -- rather than an omission.
+    --
+    -- THE ABILITY BY VALUE, the grain rule 702.177a's reminder states ("Activate
+    -- each exhaust ability only once"): Draconautics Engineer prints two exhaust
+    -- abilities and spending one leaves the other, while Greenbelt Guardian's
+    -- other ability carries no rider at all. A Bool, or a count of activations,
+    -- could say neither. The same posture Pawl.Types.Action's Activate arm takes
+    -- -- the ability is carried as a value and matched by equality, never by an
+    -- index into a face's list, since a layer-6 grant and a printed ability are
+    -- members of no one list.
+    --
+    -- CR 602.5c -- an acquired ability's restriction "doesn't apply to other,
+    -- identically worded abilities" -- is what value equality cannot separate: an
+    -- object holding a printed once-only ability and a granted twin of it would
+    -- spend both at once. Nothing in the pool can build that object. Scryfall
+    -- `kw:exhaust`, 2026-09-06, 40 printings: none grants its exhaust ability to
+    -- another permanent, and none prints the same exhaust line twice. A card that
+    -- gave another creature "Exhaust -- [cost]: [effect]" would refute it.
+    activatedOnce :: Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))
   }
   deriving (Eq, Ord, Show)
 
@@ -540,5 +578,8 @@ newIncarnation object =
       -- that returns is not that permanent.
       doesNotUntapNext = False,
       -- CR 701.43c: nobody exerted the object that comes back.
-      exertedBy = Set.empty
+      exertedBy = Set.empty,
+      -- CR 400.7 over CR 602.5b: the object that comes back has activated
+      -- nothing, so its once-only abilities are available again.
+      activatedOnce = Set.empty
     }

@@ -10,25 +10,31 @@
 -- Pawl.Engine.Combat imports Pawl.Engine.Cost, so the two combat-record readers
 -- CR 506.7g and CR 508.3b share with the casting side moved down to
 -- Pawl.Engine.Turn, beside the other two windows these arms ask about.
--- CR 602.5's board condition is the one arm that reads no window at all, and it
--- imports Pawl.Engine.Condition and Pawl.Engine.Projection, neither of which
--- reaches back here.
+-- Two arms read no window at all: CR 602.5's board condition, which imports
+-- Pawl.Engine.Condition and Pawl.Engine.Projection, neither of which reaches back
+-- here, and CR 602.5b's counted rider, which reads the source object's own record
+-- of what it has already activated.
 --
 -- The only module that may CASE on Pawl.Types.ActivationRestriction, exactly as
 -- Pawl.Engine.CombatRestriction is of the type it names. Casing on the arms is a
 -- classification, not an effect's identity.
 module Pawl.Engine.ActivationRestriction where
 
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 
@@ -57,17 +63,24 @@ import Pawl.Types.PlayerId (PlayerId)
 -- that binding: it rejects an action the interpreter was not offered (#219). On
 -- the mana path it also makes the source unpayable, Cost.manaActivations being
 -- asked at both of CR 605.3a's windows.
-restrictionsOk :: PlayerId -> ObjectId -> [ActivationRestriction.ActivationRestriction] -> GameState -> Bool
-restrictionsOk pid srcId restrictions gs = all (restrictionMet pid srcId gs) restrictions
+--
+-- THE ABILITY rides along beside its restrictions because CR 602.5b's counted
+-- rider is about the ability and not only about the object: OnlyOnce asks which
+-- ability of this source has been spent, and the source may hold two.
+-- Pawl.Engine.Activate has it; CR 605.3a's mana window does not, and that arm
+-- says what Nothing costs there.
+restrictionsOk :: PlayerId -> ObjectId -> Maybe (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> [ActivationRestriction.ActivationRestriction] -> GameState -> Bool
+restrictionsOk pid srcId ability restrictions gs = all (restrictionMet pid srcId ability gs) restrictions
 
 -- Does the game state satisfy this one printed clause?
 --
--- The SOURCE's id rides along for the OnlyIf arm alone: CR 602.5's board
+-- The SOURCE's id rides along for the OnlyIf and OnlyOnce arms: CR 602.5's board
 -- condition is a Pawl.Types.Condition, and Pawl.Engine.Condition.holds evaluates
--- every Quantity in one against an object. Every other arm reads a phase, a turn
--- or the combat record and ignores it.
-restrictionMet :: PlayerId -> ObjectId -> GameState -> ActivationRestriction.ActivationRestriction -> Bool
-restrictionMet pid srcId gs restriction = case restriction of
+-- every Quantity in one against an object, while CR 602.5b's counted rider is
+-- remembered on that object. Every other arm reads a phase, a turn or the combat
+-- record and ignores it.
+restrictionMet :: PlayerId -> ObjectId -> Maybe (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> GameState -> ActivationRestriction.ActivationRestriction -> Bool
+restrictionMet pid srcId ability gs restriction = case restriction of
   -- CR 307.5's three conjuncts, and Turn.sorcerySpeedWindow is that window shared
   -- with CR 307.1's casting gate: two rules, the same three facts, one copy.
   --
@@ -131,6 +144,27 @@ restrictionMet pid srcId gs restriction = case restriction of
       gs
       srcId
       condition
+  -- CR 602.5b's counted rider, and the one arm that reads neither a window nor
+  -- the board: has THIS ability of THIS object already been activated? CR 400.7
+  -- ends the memory with the incarnation (Object.newIncarnation), so a permanent
+  -- that leaves and returns answers True again -- Pawl.ActivateSpec's "CR 400.7 /
+  -- 602.5b the permanent that returns may activate it again" is what proves it.
+  --
+  -- An object that is GONE answers True: CR 602.5b's restriction is a fact about
+  -- an object, and Activate.activatable has already required this one to be
+  -- somewhere it offers abilities from.
+  --
+  -- Not implemented: the rider on a MANA ability (CR 605.3a). That window is
+  -- handed a route rather than an ability -- Pawl.Engine.Mana.manaRoutesOfGiven's
+  -- tuple, carried through Pawl.Types.ManaOption -- so `ability` is Nothing there
+  -- and the clause answers False, which never offers the route. Loot, the
+  -- Pathfinder's "Exhaust -- {G}, {T}: Add three mana of any one color" is the
+  -- printing, and it runs STRICTER than printed rather than weaker (#3305).
+  ActivationRestriction.OnlyOnce -> case ability of
+    Nothing -> False
+    Just this -> case Game.lookupObject srcId gs of
+      Nothing -> True
+      Just object -> Set.notMember this (Object.activatedOnce object)
 
 -- CR 307.5's empty-stack conjunct asked ABOUT THE RIDER rather than about the
 -- board: does this clause need an empty stack to be met?
@@ -148,8 +182,8 @@ restrictionMet pid srcId gs restriction = case restriction of
 -- reads a phase, a turn or a combat record, and CR 500.12 puts no game event
 -- between the gate and the payment while CR 601.2a's move changes no phase -- so
 -- their two windows agree already (riderWindowSpec's pair in Pawl.ManaSpec is
--- that argument for the phase axis). OnlyIf's arm below says why the board
--- condition answers False without that argument.
+-- that argument for the phase axis). The two arms below that read no window say
+-- for themselves why each answers False without that argument.
 needsEmptyStack :: ActivationRestriction.ActivationRestriction -> Bool
 needsEmptyStack restriction = case restriction of
   ActivationRestriction.SorcerySpeed -> True
@@ -167,3 +201,7 @@ needsEmptyStack restriction = case restriction of
   -- the supply, and `restrictionsOk` at Cost.payMana reads the real board and
   -- refuses it, so the payment is right and only the offer is optimistic (#3192).
   ActivationRestriction.OnlyIf _ -> False
+  -- A record of past activations reads no stack either, and CR 601.2a's and CR
+  -- 602.2a's move cannot write one: nothing is spent until the payment
+  -- `restrictionsOk` gates.
+  ActivationRestriction.OnlyOnce -> False

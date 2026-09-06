@@ -898,7 +898,8 @@ addObjectIn zone printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
       withObject = gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
    in (oid, Game.insertIntoZone zone LibraryPosition.Bottom pid oid withObject)
@@ -1138,7 +1139,8 @@ addToken card pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1194,7 +1196,8 @@ addLibraryCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1206,8 +1209,9 @@ addLibraryCard printing pid gs =
 -- One card of a printing in pid's graveyard, ON TOP of whatever is already
 -- there -- CR 404.1, and the end Pawl.Engine.Game.insertIntoZone puts a real
 -- arrival at, so a fixture built by repeated calls has the order a game would
--- have produced. That is load-bearing for CR 404.2's "the top creature card"
--- (Pawl.Engine.Cost.topExileCandidate), which reads the LAST member.
+-- have produced. That is load-bearing for both readers of that end: CR 404.2's
+-- "the top creature card" (Pawl.Engine.Cost.topExileCandidate) and
+-- Pawl.Types.ObjectRef.TopOfGraveyard, each of which reads the LAST member.
 addGraveyardCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addGraveyardCard printing pid gs =
   let (printingId, gsP) = Game.intern printing gs
@@ -1254,7 +1258,8 @@ addGraveyardCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1319,7 +1324,8 @@ addExiledCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1389,7 +1395,8 @@ addHandCard printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2
@@ -1468,7 +1475,8 @@ landsFor land pid n base =
                   Object.detainedUntil = Set.empty,
                   Object.goadedBy = Set.empty,
                   Object.doesNotUntapNext = False,
-                  Object.exertedBy = Set.empty
+                  Object.exertedBy = Set.empty,
+                  Object.activatedOnce = Set.empty
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1523,7 +1531,8 @@ handOne printing base =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1584,7 +1593,8 @@ pikerInHand land piker n ph =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
       gs3 =
         gs2
@@ -2468,7 +2478,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseOptional decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseClause decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OfferedCast decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseOfferedCastFace decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseOfferedCastSpell decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OfferedMiracleReveal decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseToPay decider _ _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.AnnouncePhyrexianPayment decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2585,7 +2595,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseOptional {} -> "ChooseOptional"
   Prompt.ChooseClause {} -> "ChooseClause"
   Prompt.OfferedCast {} -> "OfferedCast"
-  Prompt.ChooseOfferedCastFace {} -> "ChooseOfferedCastFace"
+  Prompt.ChooseOfferedCastSpell {} -> "ChooseOfferedCastSpell"
   Prompt.OfferedMiracleReveal {} -> "OfferedMiracleReveal"
   Prompt.ChooseToPay {} -> "ChooseToPay"
   Prompt.AnnouncePhyrexianPayment {} -> "AnnouncePhyrexianPayment"
@@ -3024,7 +3034,8 @@ oneMountainState mountain ph =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in GameState.MkGameState
         { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none},
@@ -3065,6 +3076,7 @@ oneMountainState mountain ph =
           GameState.unregeneratables = [],
           GameState.blockProhibitions = [],
           GameState.attackProhibitions = [],
+          GameState.activationProhibitions = [],
           GameState.attackRequirements = [],
           GameState.ignoredAbilities = [],
           GameState.turnOrder = [alice],
@@ -3225,7 +3237,8 @@ spellOnStack printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2

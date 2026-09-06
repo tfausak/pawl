@@ -98,6 +98,9 @@ combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 combatReplaySpec s =
   let decider = Decide.deciderFor S.alice (Setup.emptyGame S.bothPlayers)
       oid = ObjectId.MkObjectId 7
+      -- A SECOND object, for the one prompt whose options span cards rather than
+      -- halves (CR 601.3).
+      otherOid = ObjectId.MkObjectId 11
       attackPrompt = Prompt.DeclareAttackers decider S.alice [oid]
       blockPrompt = Prompt.DeclareBlockers decider S.bob [oid] [oid]
       damagePrompt = Prompt.AssignCombatDamage decider S.alice oid (Map.singleton (Recipient.ToCreature oid) 0) 2
@@ -1070,40 +1073,43 @@ combatReplaySpec s =
           -- transcript of one from replaying as the other.
           Spec.assertEqWith s "a dungeon choice does not decode as this one" (Replay.decode p (Response.ChoseDungeon (PrintingId.MkPrintingId 7))) Nothing
           Spec.assertEqWith s "a short transcript brings in the first offered" (Replay.defaultAnswer p) a
-        -- CR 709.3 / 712.11b / 715.3: which half of a multi-faced object a player
-        -- chose to cast off an offer is a decision, so it has to survive a
-        -- transcript like any other.
-        Spec.it s "ChooseOfferedCastFace round-trips through the transcript" $ do
-          let a = CardName.MkCardName (Text.pack "Embereth Shieldbreaker")
-              b = CardName.MkCardName (Text.pack "Battle Display")
-              p = Prompt.ChooseOfferedCastFace decider S.alice oid (a NonEmpty.:| [b])
+        -- CR 601.3 / 709.3 / 712.11b / 715.3: which cast a player chose to make
+        -- off an offer is a decision, so it has to survive a transcript like any
+        -- other.
+        Spec.it s "ChooseOfferedCastSpell round-trips through the transcript" $ do
+          let a = (oid, CardName.MkCardName (Text.pack "Embereth Shieldbreaker"))
+              b = (oid, CardName.MkCardName (Text.pack "Battle Display"))
+              p = Prompt.ChooseOfferedCastSpell decider S.alice (a NonEmpty.:| [b])
           Spec.assertEqWith s "choosing the Adventure half round trips" (Replay.decode p (Replay.encode p b)) (Just b)
           -- Discriminating: a decode that ignored the response and returned the
           -- head would pass one leg by accident.
           Spec.assertEqWith s "choosing the creature half round trips" (Replay.decode p (Replay.encode p a)) (Just a)
-        Spec.it s "an offered-half choice does not decode as a named card" $ do
-          -- Discriminating: fails if ChooseOfferedCastFace reuses ChoseCardName
-          -- rather than getting its own constructor. Both are a Prompt over one
-          -- CardName, so nothing but a distinct constructor keeps a transcript of
-          -- one from replaying as the other.
+          -- CR 601.3's other axis: two CARDS rather than two halves of one, which
+          -- Shell of the Last Kappa's exiled pile offers. A response carrying only
+          -- the name could not tell these apart.
+          let c = (otherOid, CardName.MkCardName (Text.pack "Embereth Shieldbreaker"))
+              q = Prompt.ChooseOfferedCastSpell decider S.alice (a NonEmpty.:| [c])
+          Spec.assertEqWith s "choosing the second copy round trips" (Replay.decode q (Replay.encode q c)) (Just c)
+        Spec.it s "an offered cast does not decode as a named card" $ do
+          -- Discriminating: fails if ChooseOfferedCastSpell reuses ChoseCardName
+          -- rather than getting its own constructor.
           let a = CardName.MkCardName (Text.pack "Embereth Shieldbreaker")
-              p = Prompt.ChooseOfferedCastFace decider S.alice oid (a NonEmpty.:| [])
+              p = Prompt.ChooseOfferedCastSpell decider S.alice ((oid, a) NonEmpty.:| [])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseCardName a)) Nothing
-        Spec.it s "a short transcript casts the first half offered" $
-          -- CR 709.3a / 712.11c: every offered half was gated on its own, so the
-          -- first is legal.
+        Spec.it s "a short transcript casts the first cast offered" $
+          -- CR 601.3 / 709.3a / 712.11c: every offered cast was gated on its own,
+          -- so the first is legal.
           Spec.assertEqWith
             s
             "the head"
             ( Replay.defaultAnswer
-                ( Prompt.ChooseOfferedCastFace
+                ( Prompt.ChooseOfferedCastSpell
                     decider
                     S.alice
-                    oid
-                    (CardName.MkCardName (Text.pack "Embereth Shieldbreaker") NonEmpty.:| [CardName.MkCardName (Text.pack "Battle Display")])
+                    ((oid, CardName.MkCardName (Text.pack "Embereth Shieldbreaker")) NonEmpty.:| [(oid, CardName.MkCardName (Text.pack "Battle Display"))])
                 )
             )
-            (CardName.MkCardName (Text.pack "Embereth Shieldbreaker"))
+            (oid, CardName.MkCardName (Text.pack "Embereth Shieldbreaker"))
         -- CR 709.5f / 709.5g: which half an effect locked or unlocked is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseHalf round-trips through the transcript" $ do
@@ -1114,14 +1120,14 @@ combatReplaySpec s =
           -- Discriminating: a decode that ignored the response and returned the
           -- head would pass one leg by accident.
           Spec.assertEqWith s "locking the left door round trips" (Replay.decode p (Replay.encode p a)) (Just a)
-        Spec.it s "a half choice does not decode as an offered-half choice" $ do
-          -- Discriminating: fails if ChooseHalf reuses ChoseOfferedCastFace rather
-          -- than getting its own constructor. Both are a Prompt over one CardName
+        Spec.it s "a half choice does not decode as an offered cast" $ do
+          -- Discriminating: fails if ChooseHalf reuses ChoseOfferedCastSpell rather
+          -- than getting its own constructor. Both are a Prompt naming a CardName
           -- picked out of a NonEmpty of them, so nothing but a distinct
           -- constructor keeps a transcript of one from replaying as the other.
           let a = CardName.MkCardName (Text.pack "Roaring Furnace")
               p = Prompt.ChooseHalf decider S.alice oid (a NonEmpty.:| [])
-          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOfferedCastFace a)) Nothing
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOfferedCastSpell (oid, a))) Nothing
         Spec.it s "a short transcript locks the first half offered" $
           -- CR 709.5f / 709.5g: every offered half is one the instruction admits,
           -- so the first in printed order is legal.
