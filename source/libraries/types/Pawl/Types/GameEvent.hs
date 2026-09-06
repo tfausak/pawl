@@ -8,6 +8,7 @@ import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
+import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
@@ -352,6 +353,14 @@ data GameEvent
     -- phasing in keeps the Object.attachedTo it phased out with, so there is no
     -- attachment to record. Pawl.PhasingSpec holds that fence.
     BecameAttached BecameAttached.BecameAttached
+  | -- | CR 701.3d: an Aura, Equipment or Fortification BECAME UNATTACHED from
+    -- the object or player it was attached to. BecameAttached's mirror, emitted
+    -- by every route rule 701.3d lists -- Pawl.Types.BecameUnattached enumerates
+    -- them, and Pawl.Engine.Event.unattach is the funnel.
+    --
+    -- Not emitted by Pawl.Engine.Phasing, which is CR 702.26j, the same fence
+    -- BecameAttached carries.
+    BecameUnattached BecameUnattached.BecameUnattached
   | -- | A permanent left the GAME rather than the battlefield, by CR 800.4a's
     -- road (its owner having left) or CR 729.4a's (a subgame having brought the
     -- card in). The ObjectId is the id it had while it existed, which is the key

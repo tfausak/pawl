@@ -1248,7 +1248,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
 -- 614.1c's "enters with" naming a keyword rather than a counter. It writes the
 -- one sentence as two rows -- the counters and the keyword -- each on CR 604.2's
 -- "if this creature was kicked", which is why both reach CR 616.1e together and
--- the entry loop asks for an order.
+-- the entry loop asks for an order. That order is pawl's, not the rules': one
+-- printed sentence is one replacement effect, and CR 616.1 asks nothing here
+-- (#3288). `kicks` defers it, so these cases read past it either way.
 --
 -- THE BOARD: nine Islands, the Squadron in hand and a Rite of Replication beside
 -- it. Nine is the two casts added up -- {U} plus the kicker {3}{U} is five, and

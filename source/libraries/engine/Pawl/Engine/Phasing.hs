@@ -312,6 +312,11 @@ phaseOut status oid gs =
 -- CR 702.26i is the one thing that comes back CHANGED: an attachment that phased
 -- out DIRECTLY phases in attached only if what it was attached to is still there,
 -- and unattached otherwise. See hostRemains.
+--
+-- No GameEvent.BecameUnattached for that write, which is CR 702.26j: abilities
+-- that trigger on a permanent becoming attached or unattached do not trigger on
+-- its phasing in or out. Pawl.PhasingSpec holds the fence, beside the one that
+-- keeps GameEvent.BecameAttached out of the same function.
 phaseIn :: PlayerId -> ObjectId -> GameState -> GameState
 phaseIn _ oid gs =
   let -- CR 702.26i names only the DIRECT rows, and the restriction is the rule's

@@ -1,12 +1,13 @@
 module Pawl.Types.ActivationProhibition where
 
 import qualified Pawl.Types.AbilityKind as AbilityKind
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Affected as Affected
 
 -- | CR 602.2 / CR 101.2: one printed ACTIVATION PROHIBITION -- an effect saying
--- an object's "activated abilities can't be activated". Arrest states it of
--- every one of them; Realmbreaker's Grasp states it of every one but a mana
--- ability.
+-- an object's "activated abilities can't be activated". Arrest and Volrath's
+-- Curse state it of every one of them; Realmbreaker's Grasp states it of every
+-- one but a mana ability.
 --
 -- A printed static carrier alongside Pawl.Types.StaticAbility,
 -- Pawl.Types.PlayerStaticAbility, Pawl.Types.CombatRestriction,
@@ -51,9 +52,10 @@ data ActivationProhibition = MkActivationProhibition
     -- objects, never something they act on.
     affected :: Affected.Affected,
     -- | Which CR 605.1a KIND of activated ability the prohibition refuses, or
-    -- Nothing for every kind. Arrest names none ("its activated abilities can't
-    -- be activated"); Realmbreaker's Grasp names one by exclusion ("unless
-    -- they're mana abilities", which leaves NonManaAbility).
+    -- Nothing for every kind. Arrest and Volrath's Curse name none ("its
+    -- activated abilities can't be activated"); Realmbreaker's Grasp names one
+    -- by exclusion ("unless they're mana abilities", which leaves
+    -- NonManaAbility).
     --
     -- Maybe rather than a set, Pawl.Types.CounterRestriction's field one carrier
     -- over: the rulebook's division has two sides, so an empty set would be a
@@ -61,6 +63,16 @@ data ActivationProhibition = MkActivationProhibition
     -- spelling of Nothing. Just ManaAbility is expressible and no printing
     -- writes it; the field is a classification either way, so admitting the
     -- other side costs nothing and asserts nothing.
-    kind :: Maybe AbilityKind.AbilityKind
+    kind :: Maybe AbilityKind.AbilityKind,
+    -- | CR 116.2d: the name this face gives the ability stating the
+    -- prohibition, so that face's own SpecialAction.IgnoreThisUntilEndOfTurn
+    -- can say WHICH effect a payment ignores. Pawl.Types.AffectedUnless.name on
+    -- the combat carrier and Pawl.Types.PlayerStaticAbility.name on the player
+    -- axis, with the same meaning and the same dataflow lint.
+    --
+    -- Nothing for Arrest and Realmbreaker's Grasp, which grant no such
+    -- permission. Volrath's Curse names this row and its two combat
+    -- restrictions alike, one sentence declaring all three.
+    name :: Maybe AbilityName.AbilityName
   }
   deriving (Eq, Ord, Show)

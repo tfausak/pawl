@@ -56,6 +56,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
@@ -674,6 +675,52 @@ indirectSpec s registry = Spec.describe s "Indirect" $ do
     case filter (\oid -> (Game.lookupObject oid phasedIn >>= Object.attachedTo >>= Recipient.objectOf) == Just brambleId) (Set.toList (GameState.battlefield phasedIn)) of
       [auraId] -> Spec.assertEqWith s "CR 702.26g with the Aura back on it" (attachedHostOf auraId phasedIn) (Just (Recipient.ToCreature brambleId))
       other -> Spec.assertFailure s ("expected exactly one Aura back on the Elemental, got " <> show (length other))
+  -- CR 702.26j's UNATTACHED half, on the one board where the phasing path really
+  -- does clear Object.attachedTo: rule 702.26i's phase-in detach. Grafted Wargear
+  -- watches for it ("whenever this Equipment becomes unattached from a permanent,
+  -- sacrifice that permanent") and is equipped through the real CR 702.6a road, so
+  -- the attach behind this board is a genuine event.
+  --
+  -- Reality Ripple phases the WARGEAR out directly, Doom Blade kills the creature
+  -- it was on while it is away, and alice's untap step brings it back -- at which
+  -- point hostRemains is False and Pawl.Engine.Phasing.phaseIn writes the detach.
+  --
+  -- A FENCE rather than a proof, the case above's posture: rule 702.26j is
+  -- satisfied by construction here, phaseIn being a pure GameState -> GameState
+  -- with no way to append to CR 608.2i's log. What it holds is that the write
+  -- stays there and the phasing path stays quiet.
+  Spec.it s "CR 702.26j/702.26i a phase-in detach is no unattachment" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wargear <- S.printingOf s registry "Grafted Wargear"
+    ripple <- S.printingOf s registry "Reality Ripple"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let base = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (pikerId, withPiker) = S.addPermanent piker S.alice base
+        (gearId, withGear) = S.addPermanent wargear S.alice withPiker
+        ready = withGear {GameState.priority = Just S.alice}
+    case Projection.abilitiesOf gearId ready of
+      [] -> Spec.assertFailure s "Grafted Wargear should offer rule 702.6a's minted equip ability"
+      equip : _ -> do
+        let equipped = S.runPure (aimedAt pikerId) ready (Activate.activateAbility S.alice gearId equip >> Monad.void Stack.resolveTop)
+            settled = S.runPure (aimedAt pikerId) (S.runPure (aimedAt pikerId) equipped Engine.settleForPriority) Stack.resolveTop
+            (withRipple, rippleSpell) = S.handOne ripple settled
+            phasedOut = rippleAt gearId rippleSpell withRipple
+            (withBlade, bladeSpell) = S.handOne doomBlade (phasedOut {GameState.priority = Just S.alice})
+            killed = S.runPure (aimedAt pikerId) withBlade (S.cast S.alice bladeSpell >> Monad.void Stack.resolveTop)
+            phasedIn = S.runPure S.identityAnswer (untapStep S.alice killed) Engine.settleForPriority
+            unattachments g = length (filter (\e -> case e of GameEvent.BecameUnattached {} -> True; _ -> False) (S.eventsOf g))
+        -- THE DISCRIMINATOR, and the only assertion that would move: the
+        -- attachment CAME OFF across the cycle and rule 702.26j kept it silent.
+        Spec.assertEqWith s "CR 702.26j the phase cycle logged no unattachment" (unattachments phasedIn) (unattachments phasedOut)
+        Spec.assertEqWith s "CR 702.26i and the Wargear really did come back unattached" (attachedHostOf gearId phasedIn) Nothing
+        -- Without these the count above is vacuous: an equip that never happened,
+        -- or a permanent that never phased, reads zero either way.
+        Spec.assertEqWith s "the Wargear was equipping the Piker before the Ripple" (attachedHostOf gearId settled) (Just (Recipient.ToCreature pikerId))
+        Spec.assertEqWith s "CR 702.26b it phased out" (onBattlefield gearId phasedOut) False
+        Spec.assertEqWith s "CR 702.26a and phased back in at alice's untap step" (onBattlefield gearId phasedIn) True
+        Spec.assertEqWith s "and the host it left behind is gone" (onBattlefield pikerId phasedIn) False
 
 phaseOutSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phaseOutSpec s registry = Spec.describe s "PhaseOut" $ do

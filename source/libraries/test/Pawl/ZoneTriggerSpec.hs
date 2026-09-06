@@ -40,6 +40,7 @@ import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
+import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
@@ -2399,6 +2400,13 @@ representativeEvents cond =
         -- with below is the trivial one, which admits whatever that id resolves
         -- to.
         TriggerCondition.SelfBecomesAttachedBy _ -> one (GameEvent.BecameAttached (BecameAttached.MkBecameAttached arrived (Recipient.ToCreature departed)))
+        -- The same event read from the other end: here `departed` is the
+        -- ATTACHMENT, the bearer position, and `arrived` is the host the slot
+        -- names.
+        TriggerCondition.SelfBecomesAttachedTo _ -> one (GameEvent.BecameAttached (BecameAttached.MkBecameAttached departed (Recipient.ToCreature arrived)))
+        -- CR 701.3d's own event, the arm above's mirror and the only one this
+        -- condition admits.
+        TriggerCondition.SelfBecomesUnattachedFrom _ -> one (GameEvent.BecameUnattached (BecameUnattached.MkBecameUnattached departed (Recipient.ToCreature arrived)))
         -- CR 603.12: a reflexive matches no log entry at all
         -- (Event.matchesTrigger's Reflexive arm answers False for every event),
         -- so any event is as representative as any other -- StateIs' arm above.
@@ -2563,6 +2571,8 @@ everyTriggerCondition =
     TriggerCondition.PermanentExplores (Filter.Type.And []),
     TriggerCondition.SelfExerted,
     TriggerCondition.SelfBecomesAttachedBy (Filter.Type.And []),
+    TriggerCondition.SelfBecomesAttachedTo (Filter.Type.And []),
+    TriggerCondition.SelfBecomesUnattachedFrom (Filter.Type.And []),
     TriggerCondition.Reflexive,
     TriggerCondition.RingTemptsPlayer PlayerRelation.You,
     TriggerCondition.RingTemptsPlayer PlayerRelation.Opponent,

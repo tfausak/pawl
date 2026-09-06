@@ -22,50 +22,41 @@
 -- never what it does.
 module Pawl.Engine.ActivationProhibition where
 
+import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AbilityKind as AbilityKind
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
+import qualified Pawl.Types.Subtype as Subtype
 
--- CR 602.2 with CR 101.2: which of `candidates` an effect in force right now
--- says can't have an activated ability of this CR 605.1a kind activated. Arrest
--- and Realmbreaker's Grasp are the pool's printings.
+-- Every activation prohibition some permanent on the battlefield states right
+-- now, each paired with its SOURCE and with CR 612.1's word swap over that
+-- source's own text -- Pawl.Engine.CombatRestriction.gathered's shape on this
+-- carrier, and shared for its reason: two questions need the same walk read
+-- differently, and restating the CR 305.7 and CR 604.2 gates in the second one
+-- is how the two come to disagree.
 --
--- A set of ids and not a per-candidate predicate, for the reason
--- Pawl.Engine.CombatRestriction.restricted gives: a caller narrowing a whole
--- battlefield asks this once and tests against the answer, where a predicate
--- would re-walk the battlefield per candidate.
-cantActivate :: AbilityKind.AbilityKind -> [ObjectId] -> GameState -> Set ObjectId
-cantActivate asked candidates gs =
+-- CR 605.1a's kind is NOT applied here. `cantActivate` asks about one activation
+-- window and `namedSubjects` about the whole ability, so which rows survive is
+-- the reader's question rather than the walk's.
+gathered :: GameState -> [(ObjectId, [(Subtype.Subtype, Subtype.Subtype)], ActivationProhibition.ActivationProhibition)]
+gathered gs =
   let -- Hoisted out of the walk as SacrificeRestriction.cantBeSacrificed hoists
       -- them, and both unforced until some permanent actually declares a
       -- prohibition.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
-      -- One whole-board projection and one grant walk for the whole walk, both
-      -- unforced until some permanent actually reaches `named`.
-      pcs = Projection.projectAll gs
-      grants = Projection.controlGrants gs
-      -- CR 613.11 puts these effects after every layer, so the affected set is
-      -- read against the FULL projection -- the opposite of Projection.affects's
-      -- callers inside the layer fold, which read characteristics as of their
-      -- own layer.
-      named source affected candidate =
-        Projection.affectsOn
-          pcs
-          grants
-          source
-          candidate
-          affected
-          gs
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face -> case Face.activationProhibitions face of
@@ -87,19 +78,86 @@ cantActivate asked candidates gs =
                 -- folds the whole continuous-effect list, and the empty case
                 -- above already turned away every permanent that prints no
                 -- prohibition.
-                concatMap (fromProhibition source (Projection.textChangesAffecting source gs)) prohibitions
+                fmap (\prohibition -> (source, Projection.textChangesAffecting source gs, prohibition)) prohibitions
               else []
+   in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+
+-- CR 602.2 with CR 101.2: which of `candidates` an effect in force right now
+-- says can't have an activated ability of this CR 605.1a kind activated. Arrest,
+-- Realmbreaker's Grasp and Volrath's Curse are the pool's printings.
+--
+-- A set of ids and not a per-candidate predicate, for the reason
+-- Pawl.Engine.CombatRestriction.restricted gives: a caller narrowing a whole
+-- battlefield asks this once and tests against the answer, where a predicate
+-- would re-walk the battlefield per candidate.
+cantActivate :: AbilityKind.AbilityKind -> [ObjectId] -> GameState -> Set ObjectId
+cantActivate asked candidates gs =
+  let -- One whole-board projection and one grant walk for the whole walk, both
+      -- unforced until some permanent actually reaches `named`.
+      pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
       -- CR 605.1a's division, asked of the row rather than of the ability:
-      -- Nothing is every activated ability (Arrest), and a named kind is only
-      -- the abilities on that side of the rule (Realmbreaker's Grasp, whose
-      -- "unless they're mana abilities" leaves NonManaAbility).
-      fromProhibition source changes prohibition =
+      -- Nothing is every activated ability (Arrest, Volrath's Curse), and a
+      -- named kind is only the abilities on that side of the rule
+      -- (Realmbreaker's Grasp, whose "unless they're mana abilities" leaves
+      -- NonManaAbility).
+      --
+      -- CR 116.2d: a permanent whose CONTROLLER has paid to ignore the ability
+      -- stating this prohibition may have its abilities activated again --
+      -- Volrath's Curse's "that creature's controller may ... for that player to
+      -- ignore this effect until end of turn", the same filter
+      -- Pawl.Engine.CombatRestriction.restrictedIn applies to the other half of
+      -- that one sentence.
+      fromProhibition (source, changes, prohibition) =
         if maybe True (== asked) (ActivationProhibition.kind prohibition)
           then
-            let affected = ActivationProhibition.affected prohibition
-             in filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
+            filter
+              (\candidate -> named pcs grants source changes prohibition candidate gs && not (IgnoredAbility.ignoredForSubject candidate source (ActivationProhibition.name prohibition) gs))
+              candidates
           else []
-   in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
+   in Set.fromList (concatMap fromProhibition (gathered gs))
+
+-- CR 116.2d's WHO on this carrier: the permanents that `source`'s ability named
+-- `name` forbids activations on right now. Unioned with
+-- Pawl.Engine.CombatRestriction.namedSubjects by Pawl.Engine.Ignore, whose offer
+-- is about the ABILITY -- Volrath's Curse states both carriers in one sentence
+-- under one name, so either reaching a permanent offers that permanent's
+-- controller the action.
+--
+-- EVERY CR 605.1a kind, unlike `cantActivate`: what is offered is the ability
+-- rather than one activation window, and one payment lifts whatever the ability
+-- states.
+--
+-- The ignore is NOT applied, Pawl.Engine.CombatRestriction.namedSubjects' reason:
+-- CR 116.2d forbids no repeat, so the offer has to stand after it has been taken.
+namedSubjects :: ObjectId -> AbilityName.AbilityName -> GameState -> [ObjectId]
+namedSubjects source name gs =
+  let pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
+      candidates = Set.toList (GameState.battlefield gs)
+      fromProhibition (rowSource, changes, prohibition)
+        | rowSource == source,
+          ActivationProhibition.name prohibition == Just name =
+            filter (\candidate -> named pcs grants source changes prohibition candidate gs) candidates
+        | otherwise = []
+   in concatMap fromProhibition (gathered gs)
+
+-- CR 613.11 puts these effects after every layer, so the affected set is read
+-- against the FULL projection -- the opposite of Projection.affects's callers
+-- inside the layer fold, which read characteristics as of their own layer.
+--
+-- CR 612.1 again, on the other half of the same printed sentence: the AFFECTED
+-- set is rewritten before it is asked.
+named :: Map.Map ObjectId ProjectedCharacteristics.ProjectedCharacteristics -> [Projection.ControlGrant] -> ObjectId -> [(Subtype.Subtype, Subtype.Subtype)] -> ActivationProhibition.ActivationProhibition -> ObjectId -> GameState -> Bool
+named pcs grants source changes prohibition candidate gs =
+  let affected = ActivationProhibition.affected prohibition
+   in Projection.affectsOn
+        pcs
+        grants
+        source
+        candidate
+        (if null changes then affected else Projection.rewriteAffected changes affected)
+        gs
 
 -- The same question about ONE permanent, which is what both gates hold: an
 -- activation window is asked about the ability's own source.

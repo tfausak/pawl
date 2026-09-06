@@ -414,11 +414,15 @@ data TriggerCondition
     SelfExerted
   | -- | CR 701.3a read by the host: "whenever an Aura becomes attached to this
     -- creature" (Bramble Elemental), with the Filter over the attachment.
-    --
-    -- Not implemented: the other scope, the bearer as the attachment (Enormous
-    -- Energy Blade), which needs its own constructor and a binding for "that
-    -- creature" (gap #1837).
     SelfBecomesAttachedBy (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.3a read by the attachment: "whenever this Equipment becomes
+    -- attached to a creature" (Enormous Energy Blade), with the Filter over the
+    -- host and the host bound as "that creature".
+    SelfBecomesAttachedTo (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.3d read by the attachment: "whenever this Equipment becomes
+    -- unattached from a permanent" (Grafted Wargear), with the Filter over the
+    -- former host and that host bound as "that permanent".
+    SelfBecomesUnattachedFrom (Filter.Filter Keyword.Keyword)
   | -- | CR 603.12's reflexive triggered ability: "when you do" (The Fugitive
     -- Doctor). Nullary, and it matches no GameEvent -- the arm runs only when
     -- the action it hangs off actually happened, CR 701.28e's ignored convert

@@ -171,6 +171,7 @@ library codec
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
     Pawl.Codec.BecameTarget
+    Pawl.Codec.BecameUnattached
     Pawl.Codec.BecomeCopy
     Pawl.Codec.BecomeCopySpec
     Pawl.Codec.BeginningStep
@@ -706,6 +707,7 @@ library codec
     Pawl.Codec.PutCountersSpec
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
+    Pawl.Codec.RandomCardInHand
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientKind
     Pawl.Codec.RecipientKindSpec
@@ -983,6 +985,7 @@ library engine
     Pawl.Engine.Game
     Pawl.Engine.Goad
     Pawl.Engine.Ignore
+    Pawl.Engine.IgnoredAbility
     Pawl.Engine.Initiative
     Pawl.Engine.Interchangeable
     Pawl.Engine.Keyword
@@ -1459,6 +1462,7 @@ library types
     Pawl.Types.BecameBlocking
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
+    Pawl.Types.BecameUnattached
     Pawl.Types.BecomeCopy
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
@@ -1765,6 +1769,7 @@ library types
     Pawl.Types.PutCounters
     Pawl.Types.PutCountersFrom
     Pawl.Types.Quantity
+    Pawl.Types.RandomCardInHand
     Pawl.Types.Recipient
     Pawl.Types.RecipientKind
     Pawl.Types.RedirectDamage

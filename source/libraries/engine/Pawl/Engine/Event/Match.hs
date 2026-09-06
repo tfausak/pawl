@@ -28,6 +28,7 @@ import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
+import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
@@ -182,6 +183,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.VentureMarkerEntered {} -> Nothing
   GameEvent.BecameTarget {} -> Nothing
   GameEvent.BecameAttached {} -> Nothing
+  GameEvent.BecameUnattached {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
   GameEvent.Milled {} -> Nothing
   GameEvent.Scried _ -> Nothing
@@ -276,6 +278,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -357,6 +360,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -413,6 +417,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -475,6 +480,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -541,6 +547,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -615,6 +622,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -695,6 +703,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -772,6 +781,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -836,6 +846,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -908,6 +919,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -977,6 +989,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1046,6 +1059,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1114,6 +1128,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1183,6 +1198,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1264,6 +1280,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1334,6 +1351,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1403,6 +1421,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1496,6 +1515,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1589,6 +1609,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1654,6 +1675,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1745,6 +1767,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1819,6 +1842,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1889,6 +1913,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -1973,6 +1998,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2033,6 +2059,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2109,6 +2136,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2175,6 +2203,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2252,6 +2281,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2324,6 +2354,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2454,6 +2485,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
@@ -2582,6 +2614,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
@@ -2646,6 +2679,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2710,6 +2744,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2777,6 +2812,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -2873,6 +2909,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
           GameEvent.LeftTheGame _ -> False
           GameEvent.Milled {} -> False
           GameEvent.Scried _ -> False
@@ -2939,6 +2976,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3019,6 +3057,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3116,6 +3155,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3199,6 +3239,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3245,6 +3286,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3328,6 +3370,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3421,6 +3464,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
   -- The SAME two trigger events read by a BYSTANDER: PermanentDies' Filter over
   -- CR 608.2h last known information, asked of the arm above's wider destination
   -- test and of its CR 800.4a leaving-the-game form alike.
@@ -3492,6 +3536,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
   -- CR 603.2c's batch reading of PermanentReturnedToHand (Tameshi, Reality
   -- Architect's "whenever ONE OR MORE noncreature permanents are returned to
   -- hand"), delegated for PermanentsDie's reason: which moves this condition
@@ -3573,6 +3618,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
   -- CR 702.55b/702.55c: SelfDies' zone pair, asked of the object the BEARER
   -- HAUNTS rather than of the bearer itself -- so the id compared against
   -- ZoneChange.departed is the one GameState.haunting files the bearer under, and
@@ -3624,6 +3670,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3723,6 +3770,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.VentureMarkerEntered {} -> False
           GameEvent.BecameTarget {} -> False
           GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -3771,6 +3819,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3860,6 +3909,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -3943,6 +3993,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4020,6 +4071,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4097,6 +4149,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4150,6 +4203,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4225,6 +4279,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4328,6 +4383,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4434,6 +4490,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4518,6 +4575,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4554,6 +4612,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Recipient.objectOf (BecameTarget.targeted t) == Just bearer
         && PlayerRelation.holds (Game.teams gs) relation you (BecameTarget.controller t)
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4628,6 +4687,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
         && maybe True (== BecameTarget.kind t) (ControllerBecomesTarget.kind c)
         && PlayerRelation.holds (Game.teams gs) (ControllerBecomesTarget.relation c) you (BecameTarget.controller t)
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4703,6 +4763,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4770,6 +4831,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4839,6 +4901,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -4922,6 +4985,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5007,6 +5071,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5070,6 +5135,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5139,6 +5205,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5196,6 +5263,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5262,6 +5330,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5336,6 +5405,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5417,6 +5487,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5519,6 +5590,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5584,6 +5656,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5646,6 +5719,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ oid entered) -> oid == bearer && entered == room
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5739,6 +5813,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried scryer -> PlayerRelation.holds (Game.teams gs) relation you scryer
@@ -5801,6 +5876,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5862,6 +5938,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5919,6 +5996,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -5985,6 +6063,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6047,6 +6126,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6108,6 +6188,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6174,6 +6255,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6235,6 +6317,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6310,6 +6393,152 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
                Nothing -> False
                Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
            )
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 701.3a read from the ATTACHMENT: the BEARER became attached, and the
+  -- Filter narrows what it went ONTO. The arm above's mirror, and the two
+  -- questions swap sides -- a bare id comparison for the attachment, a Filter
+  -- read for the host.
+  --
+  -- Recipient.objectOf and not equality on the whole Recipient, the arm above's
+  -- reason. A ToPlayer host declines here: CR 702.5a's enchanted player is no
+  -- object for the Filter to read, and Enormous Energy Blade's "a creature" would
+  -- not admit one anyway. That decline is what makes the host binding guaranteed
+  -- given a match, which eventBindingSlots needs.
+  --
+  -- viewWithLastKnown with the host as its OWN source, so CR 608.2h answers for a
+  -- host that is already gone by the CR 117.5 boundary.
+  TriggerCondition.SelfBecomesAttachedTo f -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached a ->
+      BecameAttached.attachment a == bearer
+        && ( case Recipient.objectOf (BecameAttached.host a) of
+               Nothing -> False
+               Just host -> case Projection.viewWithLastKnown host gs host of
+                 Nothing -> False
+                 Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+           )
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 701.3d read from the attachment: the BEARER became unattached, and the
+  -- Filter narrows what it came OFF. Structurally the arm above with the other
+  -- event, which is what the two rules are.
+  --
+  -- viewWithLastKnown is load-bearing here rather than defensive: CR 701.3d
+  -- counts the HOST leaving its zone as becoming unattached, so the ordinary case
+  -- is a host that no longer exists, and CR 603.10c is the rule that says this
+  -- ability looks back at it.
+  TriggerCondition.SelfBecomesUnattachedFrom f -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached a ->
+      BecameUnattached.attachment a == bearer
+        && ( case Recipient.objectOf (BecameUnattached.host a) of
+               Nothing -> False
+               Just host -> case Projection.viewWithLastKnown host gs host of
+                 Nothing -> False
+                 Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+           )
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False
@@ -6373,6 +6602,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.BecameTarget {} -> False
     GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.Scried _ -> False

@@ -33,12 +33,14 @@ import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Vanguard as Vanguard
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
@@ -262,7 +264,7 @@ blockLimit = bounded blockingMoreThan
 -- it.
 attacking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 attacking cr = case cr of
-  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _) -> Just a
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
@@ -273,7 +275,7 @@ attacking cr = case cr of
 blocking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 blocking cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
-  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless a _) -> Just a
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   -- The Affected here names ATTACKERS, never blockers, so this selector must not
   -- see it: answering Just would take the Ring-bearer off CR 509.1a's candidate
   -- list, which is the opposite of what CR 701.54c says.
@@ -289,7 +291,7 @@ attackingAlone cr = case cr of
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
-  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless a _) -> Just a
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
 
@@ -301,7 +303,7 @@ blockedBy :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, Fi
 blockedBy cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
-  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy a f _) -> Just (a, f)
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy a f _ _) -> Just (a, f)
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -318,7 +320,7 @@ attackingPlayer cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a scope kinds _) -> Just (a, scope, kinds)
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a scope kinds _ _) -> Just (a, scope, kinds)
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
@@ -355,13 +357,34 @@ blockingMoreThan cr = case cr of
 -- Nothing is the UNCONDITIONAL restriction (Pacifism), not a gate that fails.
 gate :: CombatRestriction.CombatRestriction -> Maybe Condition.Type.Condition
 gate cr = case cr of
-  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ c) -> c
-  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ c) -> c
-  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ c) -> c
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ c) -> c
-  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ c) -> c
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ c _) -> c
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ c _) -> c
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ c _) -> c
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ c _) -> c
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ c _) -> c
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ c) -> c
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ c) -> c
+
+-- CR 116.2d: the name the source's face gives the ability stating this
+-- restriction, so a payment can say WHICH effect it ignores. Read off any arm
+-- that names a SUBJECT, because the clause is the same one on all of them --
+-- Volrath's Curse's single sentence names both halves of "can't attack or block"
+-- alike, and one payment covers both.
+--
+-- The two BOUNDING arms answer Nothing and carry no such field: CR 116.2d's
+-- offer goes to a player, every printed producer's sentence derives that player
+-- from the object the effect is aimed at ("that creature's controller"), and a
+-- bound names no creature for anyone to be the controller of. So a named bound
+-- would be a name nothing could ever pay to ignore.
+nameOf :: CombatRestriction.CombatRestriction -> Maybe AbilityName.AbilityName
+nameOf cr = case cr of
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ _ n) -> n
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ _ n) -> n
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ _ n) -> n
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ _ n) -> n
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ _ n) -> n
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 -- Every combat restriction some permanent on the battlefield -- or some object in
 -- the command zone, whose abilities CR 114.4 makes function there -- states right
@@ -500,7 +523,7 @@ gathered gs =
         Just obj
           | Set.member Designation.Suspected (Object.designations obj),
             not (removedAfter (Object.timestamp obj) source) ->
-              [(source, [], CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.Type.IsSource) Nothing))]
+              [(source, [], CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.Type.IsSource) Nothing Nothing))]
         _ -> []
       -- The two ability losses the printed rows below check for: CR 305.7's
       -- basic-land subtype set, and CR 604.2 against a CR 613.1f layer-6 removal.
@@ -677,10 +700,66 @@ restrictedIn rows select candidates gs =
       -- ability's affected clause, and the same `changes` the gate in `inForce`
       -- uses -- both clauses are words printed on the SOURCE's card, so one text
       -- change reaches both or neither.
+      --
+      -- CR 116.2d: a creature whose CONTROLLER has paid to ignore the ability
+      -- stating this restriction is not restricted by it -- "that creature's
+      -- controller may ... for that player to ignore this effect until end of
+      -- turn" (Volrath's Curse, Lost in Thought). Asked per (row, creature)
+      -- rather than per row, because the seat comes off the creature and one
+      -- ability may restrict creatures several players control.
+      --
+      -- Dropped HERE, at the walk every subject-carrying reader goes through, so
+      -- one payment reaches CR 508.1a's and CR 509.1a's candidate lists and CR
+      -- 506.5's "alone" question at once and no later gate can forget it.
       fromRestriction (source, changes, restriction) = case select restriction of
         Nothing -> []
-        Just affected -> filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
+        Just affected ->
+          filter
+            (\creature -> named source (if null changes then affected else Projection.rewriteAffected changes affected) creature && not (IgnoredAbility.ignoredForSubject creature source (nameOf restriction) gs))
+            candidates
    in Set.fromList (concatMap fromRestriction rows)
+
+-- CR 116.2d's WHO on the object axis: the permanents that `source`'s ability
+-- named `name` restricts right now. Pawl.Engine.Ignore turns that into the offer,
+-- by asking who CONTROLS them -- "that creature's controller" (Volrath's Curse,
+-- Lost in Thought), which is the object-axis reading of the same "the players
+-- this ability is affecting" that Pawl.Engine.PlayerEffect.affectedBy gives on
+-- the player axis.
+--
+-- The ignore is NOT applied here, and that is the same difference `affectedBy`
+-- keeps from `applying`: CR 116.2d forbids no repeat, so the offer has to stand
+-- after it has been taken. `restrictedIn` is the filtered reading.
+--
+-- EVERY subject-naming arm, through `subjectOf`, rather than the one selector a
+-- particular declaration reads: the offer is about the ability, and one payment
+-- lifts whatever that ability states.
+namedSubjects :: ObjectId -> AbilityName.AbilityName -> GameState -> [ObjectId]
+namedSubjects source name gs =
+  let pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
+      candidates = Set.toList (GameState.battlefield gs)
+      fromRestriction (rowSource, changes, restriction) = case subjectOf restriction of
+        Just affected
+          | rowSource == source,
+            nameOf restriction == Just name ->
+              filter
+                (\candidate -> Projection.affectsOn pcs grants source candidate (if null changes then affected else Projection.rewriteAffected changes affected) gs)
+                candidates
+        _ -> []
+   in concatMap fromRestriction (inForce (defendingSeat gs) gs)
+
+-- The union of the five subject-naming selectors above -- what CR 116.2d's offer
+-- reads, where each declaration's reader takes one of them. The two BOUNDING
+-- arms name no creature, `nameOf`'s reason for refusing them a name at all.
+subjectOf :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
+subjectOf cr = case cr of
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _ _) -> Just a
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless a _ _) -> Just a
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy a _ _ _) -> Just a
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a _ _ _ _) -> Just a
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless a _ _) -> Just a
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 -- CR 509.1b's PAIRWISE restrictions: which (blocker, attacker) pairs an effect in
 -- force right now forbids. CR 701.54c's "can't be blocked by creatures with
@@ -752,7 +831,16 @@ cantBeBlockedBy defending blockers attackers gs =
                   }
               matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
               barred attacker = fmap (\blocker -> (blocker, attacker)) (filter (matched attacker) blockers)
-           in concatMap barred (filter (named source subject) attackers)
+              -- CR 116.2d, `restrictedIn`'s filter on this arm's subject: the
+              -- ATTACKERS are what the sentence restricts, so it is their
+              -- controller whose payment lifts it. No printing states this arm
+              -- and grants an ignore -- CR 116.2d's four producers are Leonin
+              -- Arbiter, Damping Engine, Volrath's Curse and Lost in Thought,
+              -- and the two that aim at an object both state CantAttack and
+              -- CantBlock -- so the filter is a regression fence here rather
+              -- than a proven behaviour.
+              unignored attacker = not (IgnoredAbility.ignoredForSubject attacker source (nameOf restriction) gs)
+           in concatMap barred (filter (\attacker -> named source subject attacker && unignored attacker) attackers)
    in Set.fromList (concatMap fromRestriction (inForce defending gs))
 
 -- CR 508.1c through CR 802.3a: which (creature, player, kind) rows an effect in
@@ -817,7 +905,10 @@ cantAttackPlayer candidates players gs =
               barred = case Projection.controllerOf source gs of
                 Nothing -> []
                 Just you -> filter (\pid -> PlayerEffect.inScope pid you gs scope) [player]
-           in [(creature, pid, kind) | creature <- filter (named source subject) candidates, pid <- barred, kind <- Set.toList kinds]
+              -- CR 116.2d, `cantBeBlockedBy`'s filter on the other pairwise
+              -- arm and a regression fence for the same reason.
+              unignored creature = not (IgnoredAbility.ignoredForSubject creature source (nameOf restriction) gs)
+           in [(creature, pid, kind) | creature <- filter (\creature -> named source subject creature && unignored creature) candidates, pid <- barred, kind <- Set.toList kinds]
       -- CR 508.5 through CR 802.3a: this arm's own gate is read at the seat the
       -- row names, which is the player being attacked and so the defending player
       -- of that announcement. One gather, one gate reading per seat,

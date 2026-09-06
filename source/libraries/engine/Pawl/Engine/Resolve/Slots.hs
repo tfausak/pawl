@@ -117,6 +117,7 @@ import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -335,8 +336,8 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- the ref reads every member of the group to match them.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
   -- The seats whose hands randomness reads are ChosenCardInHand's, and reported
-  -- where that arm's are.
-  ObjectRef.RandomCardInHand _ -> Map.empty
+  -- where that arm's are; the COUNT is TopOfLibrary's read, for its reason.
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ _ count) -> quantitySlots count
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
@@ -380,7 +381,10 @@ objectRefQuantities ref = case ref of
   -- Literal, which reads no slot, so dropping this leaves the suite green.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> [count]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
-  ObjectRef.RandomCardInHand _ -> []
+  -- How many cards randomness names out of each hand -- Fall's printed two. A
+  -- REGRESSION FENCE for the arm above's reason: every count in the pool is a
+  -- Literal, which reads no slot.
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ _ count) -> [count]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
@@ -418,7 +422,7 @@ objectRefPlayerRefs ref = case ref of
   -- one -- Pawl.Types.Chooser's BoundInSlot note says the same of its own.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser) -> [chooser]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
-  ObjectRef.RandomCardInHand player -> [player]
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ _) -> [player]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
@@ -1082,13 +1086,14 @@ addFilter filter_ (filters, quantities) = (filter_ : filters, quantities)
 -- undeclared. The arms answering nothing carry Naturals, constructors and literal
 -- card data, none of which can name a slot.
 --
--- Every arm here is a REGRESSION FENCE rather than a proven behaviour: no
--- Effect.Replace in data/cards/ carries an EntryR whose rewrite is anything but
--- Tapped or UnderSourceControl (Gather Specimens), and both answer nothing here,
--- so neutralizing any arm leaves the whole suite green. They are written
--- because the narrowing one caller over is only sound if this list is complete --
--- a rewrite read left out is a slot the installed row does not carry, and the
--- Filter or Quantity that wanted it then answers vacuously at the event.
+-- Every arm here is a REGRESSION FENCE rather than a proven behaviour: the
+-- Effect.Replace rows in data/cards/ carry Tapped, UnderSourceControl (Gather
+-- Specimens) and WithCounters (Zameck Guildmage), and none of the three names a
+-- slot -- Zameck's count is a Quantity.Literal -- so neutralizing any arm leaves
+-- the whole suite green. They are written because the narrowing one caller over
+-- is only sound if this list is complete -- a rewrite read left out is a slot the
+-- installed row does not carry, and the Filter or Quantity that wanted it then
+-- answers vacuously at the event.
 entryRewriteReads :: EntryRewrite.EntryRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 entryRewriteReads rewrite = case rewrite of
   EntryRewrite.AsCopy asCopy -> ([AsCopy.eligible asCopy], [])

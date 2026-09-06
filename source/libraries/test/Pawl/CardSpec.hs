@@ -218,6 +218,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
@@ -626,7 +627,7 @@ objectRefPlayerRefPositions =
   [ ("top-of-library", ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (plantedPlayer "tl") (Quantity.Type.Literal 1)), [plantedPlayer "tl"]),
     ("top-of-library-until", ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (plantedPlayer "tu") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "tu"]),
     ("chosen-card-in-hand", ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (plantedPlayer "ch") (Filter.Type.And [])), [plantedPlayer "ch"]),
-    ("random-card-in-hand", ObjectRef.RandomCardInHand (plantedPlayer "rh"), [plantedPlayer "rh"])
+    ("random-card-in-hand", ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (plantedPlayer "rh") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "rh"])
   ]
 
 -- plantedRef's player half, named for its position for that function's reason.
@@ -908,6 +909,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
   -- PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy _ -> []
+  -- And so do the attachment-scoped pair, whose Filters are over the host.
+  TriggerCondition.SelfBecomesAttachedTo _ -> []
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> []
   -- CR 603.12's carries nothing at all, so no Count.
   TriggerCondition.Reflexive -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
@@ -1215,13 +1219,13 @@ payGateCostsOf =
 -- is an Affected, which holds a Filter but no Count.
 combatRestrictionCounts :: CombatRestriction.CombatRestriction -> [Count.Type.Count Quantity.Type.Quantity]
 combatRestrictionCounts restriction = case restriction of
-  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
-  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ condition _) -> foldMap conditionCounts condition
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ condition _) -> foldMap conditionCounts condition
   -- The blocker Filter beside the gate holds no Count either.
-  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ condition _) -> foldMap conditionCounts condition
   -- The PlayerScope and the CR 506.3 kinds beside the gate hold no Count either.
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ condition) -> foldMap conditionCounts condition
-  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ condition _) -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition _) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
 
@@ -2005,7 +2009,9 @@ reservedSlots =
       Binding.attackingCreature,
       Binding.attackingPlayer,
       Binding.combatDamager,
-      Binding.mentoredCreature
+      Binding.mentoredCreature,
+      Binding.attachedHost,
+      Binding.unattachedHost
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -2839,10 +2845,12 @@ objectRefFilters ref = case ref of
   -- The arm above's plural: the same Filter position, saying which members are
   -- taken rather than which may be picked, and linted the same way.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ f) -> unframed [f]
-  -- Merfolk Spy's "a card at random from their hand" carries no Filter at all,
-  -- only the PlayerRef naming whose hand, so there is nothing here to lint
-  -- (gap #1742).
-  ObjectRef.RandomCardInHand _ -> []
+  -- Lumbering Lightshield's "a nonland card at random from their hand"; its
+  -- PlayerRef names the seats whose hands are reached, so the Filter is the whole
+  -- of what there is to lint -- the chosen hand card's arm's answer, for its
+  -- reason -- and Fall's count goes through refFilters beside it, TopOfLibrary's
+  -- route above.
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ f _) -> unframed [f] <> refFilters ref
   -- Tovolar's "any number of Human Werewolves you control": EachMatching's
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.
@@ -3220,6 +3228,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 701.3a's carries one over the ATTACHMENT -- Bramble Elemental's "an
   -- Aura" -- which this sweep must see for PermanentTurnedFaceUp's reason.
   TriggerCondition.SelfBecomesAttachedBy f -> unframed [f]
+  -- CR 701.3a and CR 701.3d read from the attachment carry one over the HOST --
+  -- Enormous Energy Blade's "a creature" -- and it needs the same sweep.
+  TriggerCondition.SelfBecomesAttachedTo f -> unframed [f]
+  TriggerCondition.SelfBecomesUnattachedFrom f -> unframed [f]
   -- CR 603.12's carries nothing, so no Filter either.
   TriggerCondition.Reflexive -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
@@ -3388,6 +3400,10 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentExplores _ -> []
   TriggerCondition.SelfExerted -> []
   TriggerCondition.SelfBecomesAttachedBy _ -> []
+  -- Neither attachment-scoped condition names a slot OUTRIGHT either: each binds
+  -- one (Pawl.Engine.Event.Binding.eventBindingSlots) rather than reading one.
+  TriggerCondition.SelfBecomesAttachedTo _ -> []
+  TriggerCondition.SelfBecomesUnattachedFrom _ -> []
   -- CR 603.7c's captured environment is what a reflexive trigger knows, but the
   -- condition itself admits no event and names nothing.
   TriggerCondition.Reflexive -> []
@@ -3856,17 +3872,17 @@ attackRequirementFilters requirement =
 
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 combatRestrictionFilters restriction = case restriction of
-  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless affected condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
-  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless affected condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless affected condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless affected condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   -- Three positions on the PAIRWISE arm: the attackers restricted, the blockers
   -- barred from them, and the gate.
-  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition) -> unframed (affectedFilters affected <> [blockers]) <> foldMap conditionFilters condition
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition _) -> unframed (affectedFilters affected <> [blockers]) <> foldMap conditionFilters condition
   -- Two on the attacking one: the creatures restricted and the gate. The
   -- players they may not attack are a PlayerScope and the announcements barred
   -- at those seats are CR 506.3 kinds, both card data with no Filter in them --
   -- so nothing stands in for either here, the size-bounding arms' posture.
-  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ _ condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
-  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer affected _ _ condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition _) -> unframed (affectedFilters affected) <> foldMap conditionFilters condition
   CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
 

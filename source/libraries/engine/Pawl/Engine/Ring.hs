@@ -471,7 +471,11 @@ theRingCantBeBlockedByGreaterPower =
     CantBeBlockedBy.MkCantBeBlockedBy
       { CantBeBlockedBy.affected = Affected.Matching yourRingBearer,
         CantBeBlockedBy.blockers = Filter.PowerGreaterThanSource,
-        CantBeBlockedBy.unless = Nothing
+        CantBeBlockedBy.unless = Nothing,
+        -- CR 116.2d names an ability a face's own text grants a permission on, and
+        -- rule 701.54c's sentence is the rulebook's rather than a card's, so there
+        -- is nothing here to be referred to.
+        CantBeBlockedBy.name = Nothing
       }
 
 -- CR 701.54c: this player's emblems named The Ring.

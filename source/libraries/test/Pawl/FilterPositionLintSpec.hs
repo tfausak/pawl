@@ -1937,7 +1937,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 508.1c's combat restriction",
-              base {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless (Affected.Matching buried) Nothing)]}
+              base {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless (Affected.Matching buried) Nothing Nothing)]}
             ),
             ( "CR 508.1h's cost to attack",
               base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (PerCreature.Fixed (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) AttackCostScope.Controller]}

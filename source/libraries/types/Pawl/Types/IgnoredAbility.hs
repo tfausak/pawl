@@ -8,6 +8,11 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- | CR 116.2d: one player has taken the special action that lets them ignore the
 -- effect of a permanent's static ability, and for how long.
 --
+-- The PLAYER is always the one who took the action, and what the row suppresses
+-- for them depends on the axis the ability is on: a player-aimed effect stops
+-- applying to them (Pawl.Engine.PlayerEffect.applying), and an object-aimed one
+-- stops restricting the permanents THEY control (Pawl.Engine.IgnoredAbility).
+--
 -- The record Pawl.Types.ExilePlayPermission is, one axis over: a
 -- (player, source, expiry) triple that grants nothing and instead SUPPRESSES.
 -- It lives on Pawl.Types.GameState rather than on the object, unlike that one,
@@ -26,9 +31,10 @@ data IgnoredAbility = MkIgnoredAbility
     -- | The permanent whose static ability is ignored.
     source :: ObjectId.ObjectId,
     -- | CR 116.2d's "that ability", by the name its face gives it
-    -- (PlayerStaticAbility.name). Every row on that face carrying this name is
-    -- suppressed, which is one row for a card naming one ability and two for
-    -- Damping Engine's one sentence.
+    -- (PlayerStaticAbility.name, AffectedUnless.name, ActivationProhibition.name).
+    -- Every row on that face carrying this name is suppressed, which is one row
+    -- for a card naming one ability, two for Damping Engine's one sentence and
+    -- three for Volrath's Curse's.
     ability :: AbilityName.AbilityName,
     -- | CR 116.2d's "for a duration", in the stored form Pawl.Engine.Expiry
     -- sweeps. Every printed producer says "until end of turn", which arms as CR

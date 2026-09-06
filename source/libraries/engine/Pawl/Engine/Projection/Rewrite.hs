@@ -108,6 +108,7 @@ import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
@@ -736,7 +737,8 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- CR 612.1 through an ObjectRef. An InSlot names an object chosen at cast time,
 -- and the player-naming arms hold no subtype word; only the Filters and the
 -- Quantities can carry one -- the Filter that says what ends a walk of a library
--- included, and ChosenCardFromAmong's count beside the two library walks'.
+-- included, and ChosenCardFromAmong's and RandomCardInHand's counts beside the
+-- two library walks'.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
@@ -760,7 +762,10 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n f c w) -> ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n (Filter.rewrite pairs f) (rewriteQuantity pairs c) w)
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n f) -> ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n (Filter.rewrite pairs f))
-  ObjectRef.RandomCardInHand _ -> ref
+  -- A REGRESSION FENCE rather than proven behaviour, EachCardInYourLibrary's
+  -- reason: no card in the pool narrows a random pick by a land type, and no
+  -- printing changes the text of the ones that write this ref.
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand p f c) -> ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
   ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
   ObjectRef.ChosenPermanent f -> ObjectRef.ChosenPermanent (Filter.rewrite pairs f)
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
@@ -1314,6 +1319,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentExplores f -> TriggerCondition.PermanentExplores (Filter.rewrite pairs f)
   TriggerCondition.SelfExerted -> condition
   TriggerCondition.SelfBecomesAttachedBy f -> TriggerCondition.SelfBecomesAttachedBy (Filter.rewrite pairs f)
+  TriggerCondition.SelfBecomesAttachedTo f -> TriggerCondition.SelfBecomesAttachedTo (Filter.rewrite pairs f)
+  TriggerCondition.SelfBecomesUnattachedFrom f -> TriggerCondition.SelfBecomesUnattachedFrom (Filter.rewrite pairs f)
   -- CR 603.12's reflexive carries nothing at all, so there is no subtype to swap.
   TriggerCondition.Reflexive -> condition
 

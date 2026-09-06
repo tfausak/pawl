@@ -35,14 +35,14 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing))
+      (CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing))
       " {\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}} "
   -- CR 509.1b, the blocking counterpart.
   Spec.it s "CantBlock carries its Affected" $
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached Nothing))
+      (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing))
       " {\"type\":\"CantBlock\",\"value\":{\"affected\":{\"type\":\"Attached\"}}} "
   -- CR 509.1b's PAIRWISE arm, whose payload is the only one with a second Filter
   -- position: "blockers" beside "affected", never a second "affected", since the
@@ -51,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy Affected.Attached Filter.PowerGreaterThanSource Nothing))
+      (CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy Affected.Attached Filter.PowerGreaterThanSource Nothing Nothing))
       " {\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}}} "
   -- CR 508.1c's PAIRWISE arm, the attacking one, whose payload spells
   -- "defenders" where CantBeBlockedBy spells "blockers": the players the
@@ -61,7 +61,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer Affected.Attached PlayerScope.You (Set.singleton AttackTargetKind.OfPlaneswalker) Nothing))
+      (CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer Affected.Attached PlayerScope.You (Set.singleton AttackTargetKind.OfPlaneswalker) Nothing Nothing))
       " {\"type\":\"CantAttackPlayer\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"defenders\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"OfPlaneswalker\"}]}} "
   -- CR 508.1c together with CR 506.5, the SET-SHAPED arm: the same payload as
   -- the two above, so the tag is the only thing that tells a reader this one is
@@ -70,7 +70,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless Affected.Attached Nothing))
+      (CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing))
       " {\"type\":\"CantAttackAlone\",\"value\":{\"affected\":{\"type\":\"Attached\"}}} "
   -- The SIZE-BOUNDING arms, whose payload spells "limit" where the three above
   -- spell "affected". They are here as much for the DECODER as for the shape:
@@ -96,7 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Common.assertCodec
       s
       CombatRestriction.codec
-      (CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached (Just anotherGiant)))
+      (CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached (Just anotherGiant) Nothing))
       ( "{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"unless\":"
           <> "{\"type\":\"Compares\",\"value\":"
           <> "{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}},"
@@ -110,8 +110,8 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
     Spec.assertEqWith
       s
       "preserved"
-      (Codec.decode CombatRestriction.codec (Codec.encode CombatRestriction.codec (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached (Just anotherGiant)))))
-      (Right (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached (Just anotherGiant))))
+      (Codec.decode CombatRestriction.codec (Codec.encode CombatRestriction.codec (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached (Just anotherGiant) Nothing))))
+      (Right (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached (Just anotherGiant) Nothing)))
   Spec.it s "has a schema" $ Common.assertHasSchema s CombatRestriction.codec
 
 -- "you control a Giant", without the `Not IsSource` conjunct that would make it

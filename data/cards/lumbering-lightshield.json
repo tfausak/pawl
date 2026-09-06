@@ -1,41 +1,34 @@
 {
   "faces": [
     {
-      "keywords": [
-        {
-          "type": "Landwalk",
-          "value": {
-            "type": "HasSubtype",
-            "value": {
-              "type": "Island"
-            }
-          }
-        }
-      ],
       "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Blue"
+              "type": "White"
             }
           }
         }
       ],
-      "name": "Merfolk Spy",
+      "name": "Lumbering Lightshield",
       "power": {
         "type": "Literal",
         "value": 1
       },
       "toughness": {
         "type": "Literal",
-        "value": 1
+        "value": 4
       },
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfDealsCombatDamageToPlayer"
+            "type": "SelfEnters"
           },
           "modal": {
             "modes": [
@@ -49,9 +42,18 @@
                           "ref": {
                             "type": "RandomCardInHand",
                             "value": {
+                              "filter": {
+                                "type": "Not",
+                                "value": {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Land"
+                                  }
+                                }
+                              },
                               "player": {
                                 "type": "InSlot",
-                                "value": "thatPlayer"
+                                "value": "opponent"
                               }
                             }
                           }
@@ -59,7 +61,20 @@
                       }
                     ]
                   }
-                ]
+                ],
+                "targetSlots": {
+                  "opponent": {
+                    "filter": {
+                      "type": "IsPlayer",
+                      "value": {
+                        "type": "Opponent"
+                      }
+                    },
+                    "pool": {
+                      "type": "Players"
+                    }
+                  }
+                }
               }
             ]
           }
@@ -68,10 +83,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Merfolk"
-          },
-          {
-            "type": "Rogue"
+            "type": "Illusion"
           }
         ],
         "types": [

@@ -30,7 +30,7 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Int as Int
-import Pawl.PreventionSpec (answersFor, castAndResolve, counterBoard, countersOn, newestNamed, nextTurn, raceAnswer, theAbility, wasAskedToReplace)
+import Pawl.PreventionSpec (answersFor, atPostcombatMain, castAndResolve, counterBoard, countersOn, newestNamed, nextTurn, raceAnswer, theAbility, wasAskedToReplace)
 import qualified Pawl.Registry as Registry
 import Pawl.ReplacementSpec (atDeclareAttackers, attackersIn, controlledNamed, declineLastRiot, riotAsks, riotBoard, riotChoosing, wasAskedForRiot)
 import qualified Pawl.Spec as Spec
@@ -51,6 +51,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -1587,8 +1588,8 @@ perennationSpec s registry = Spec.describe s "Perennation (CR 614.5)" $ do
 -- 2026-08-25, answers three printings and no more: this one, Voidpouncer and
 -- Dust Animus. The other two condition the clause, which is CR 604.2's clause on
 -- Pawl.Types.PrintedReplacement rather than anything an EntryRewrite carries --
--- so Dust Animus is in the pool (dustAnimusSpec), and Voidpouncer is not, for
--- the reason unevenToolkitSpec gives.
+-- and both are in the pool too, Dust Animus at dustAnimusSpec and Voidpouncer at
+-- voidpouncerSpec. This one is the unconditional member of the three.
 --
 -- THE BOARD IS PERENNATION'S, and for its reasons: alice's Doubling Season and
 -- bob's Vorinclex are order-sensitive against each other (CR 616.1e), the counts
@@ -1664,23 +1665,64 @@ toolkitOrders seasonFirst seasonId p = case p of
   -- of an opaque one.
   _ -> pure (S.identityAnswer p)
 
+-- voidpouncerSpec's answerer: kick, then order the CR 616.1 pool by the row's
+-- SOURCE and count the orders. Keyed by source rather than by the call index the
+-- way toolkitOrders is, because Voidpouncer's sentence puts a SECOND prompt in
+-- front of the scalers' -- the choice between its own two rows -- and an
+-- index-keyed answer would name the opposite scaler on the prompt that matters.
+-- Both boards therefore order the card's own two rows identically, which is what
+-- leaves the scaler order the only difference between them.
+--
+-- The count is still the guard against a per-kind opportunity (toolkitSpec proves
+-- the same claim the other way, by answering inconsistently and reading whether
+-- the kinds moved apart).
+pounceOrders :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+pounceOrders seasonFirst seasonId p = case p of
+  Prompt.ChooseKicker {} -> pure (KickerDecision.MkKickerDecision 1)
+  Prompt.ChooseReplacement _ _ entries -> do
+    -- Doubling Season's row when `seasonFirst`, the first row that is not hers
+    -- otherwise -- which may be one of Voidpouncer's own, and harmlessly: what
+    -- the counts read is the order of the two SCALERS, and deferring the season
+    -- puts Vorinclex ahead of her whichever of the card's rows goes between. On
+    -- the prompt between Voidpouncer's own two rows neither test can prefer one,
+    -- so both boards fall to the first row offered.
+    let isSeason = (== seasonId) . ReplacementEntry.source
+        wanted = if seasonFirst then isSeason else not . isSeason
+    State.modify' (+ 1)
+    pure (maybe 0 Int.toNaturalSaturating (List.findIndex wanted entries))
+  _ -> pure (S.identityAnswer p)
+
 -- CR 614.5 again, this time with UNEQUAL counts per kind, so halving and
 -- doubling answer DIFFERENTLY for each -- toolkitSpec's four kinds all carry
 -- Literal 1, so an arm that used one kind's evaluated amount for every kind
 -- would still pass it.
 --
--- Synthetic Uneven Toolkit -- {1}{G}{U} Artifact, whole text: "this artifact
--- enters with two +1/+1 counters and a trample counter on it" -- STANDS IN FOR
--- Voidpouncer ({1}{R} Creature - Eldrazi, oracle checked on Scryfall
--- 2026-08-25), whose kicked clause reads exactly that. The kicked condition
--- itself is writable -- CR 604.2's clause on Pawl.Types.PrintedReplacement, the
--- way Monstrous War-Leech writes it -- and this test does not exercise it: the
--- counter placement is unconditional here. The rest of that sentence, "and with
--- haste", is writable too since EntryRewrite.WithKeywords landed, so the real
--- card now outranks this synthetic and the swap is what #3245 tracks.
-unevenToolkitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-unevenToolkitSpec s registry = Spec.describe s "Synthetic Uneven Toolkit (CR 614.5)" $ do
-  let toolkitName = CardName.MkCardName (Text.pack "Synthetic Uneven Toolkit")
+-- Voidpouncer {1}{R} Creature -- Eldrazi 3/1, whole text: "Devoid (This card has
+-- no color.) / Kicker {2}{C} (You may pay an additional {2}{C} as you cast this
+-- spell.) / If this creature was kicked, it enters with two +1/+1 counters and a
+-- trample counter on it and with haste." (oracle checked on Scryfall 2026-09-05)
+--
+-- The card Synthetic Uneven Toolkit stood in for while EntryRewrite.WithKeywords
+-- was missing: a printing outranks a synthetic, so the synthetic is gone. Its
+-- sentence is TWO rows the way Faerie Squadron's is -- the counters and the
+-- keyword -- each on CR 604.2's "if this creature was kicked", so both reach CR
+-- 616.1e together and every board below asks one order the synthetic's did not.
+--
+-- The measured sequence on the scaling board is three orders over pools of 2, 3
+-- and 2: the card's own two rows first, then -- CR 616.1f reconsidering the
+-- modified event once the counters row has been applied -- the row still unapplied
+-- beside Doubling Season and Vorinclex, then the two of those three left. The
+-- control board, with no scaler on it, asks the first of those and nothing else.
+-- Those counts are pawl's and not the rules': one printed sentence is one
+-- replacement effect, so CR 616.1 asks nothing on the control board and once on
+-- the scaling one. The order prompt the split raises is #3288's.
+--
+-- THE BOARD is toolkitSpec's with the mana changed: five Radiant Fountains and a
+-- Mountain pay {1}{R} and the kicker's {2}{C} exactly. Every case kicks; the
+-- unkicked half of CR 604.2 is faerieSquadronSpec's, not this one's.
+voidpouncerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+voidpouncerSpec s registry = Spec.describe s "Voidpouncer (CR 614.5)" $ do
+  let pouncerName = CardName.MkCardName (Text.pack "Voidpouncer")
       -- The two kinds the row names, at their DIFFERENT printed counts.
       kindsOn oid gs =
         ( countersOn CounterKind.PlusOnePlusOne oid gs,
@@ -1688,29 +1730,30 @@ unevenToolkitSpec s registry = Spec.describe s "Synthetic Uneven Toolkit (CR 614
         )
       -- Same board shape as toolkitSpec's, against the uneven printing.
       board scalers = do
-        plains <- S.printingOf s registry "Plains"
-        forest <- S.printingOf s registry "Forest"
-        island <- S.printingOf s registry "Island"
-        toolkit <- S.printingOf s registry "Synthetic Uneven Toolkit"
+        mountain <- S.printingOf s registry "Mountain"
+        fountain <- S.printingOf s registry "Radiant Fountain"
+        pouncer <- S.printingOf s registry "Voidpouncer"
         doublingSeason <- S.printingOf s registry "Doubling Season"
         vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
-        let bare = S.landsFor forest S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay plains 1))
+        let bare = S.landsFor fountain S.alice 5 (S.landsInPlay mountain 1)
             (seasonId, withSeason) = S.addPermanent doublingSeason S.alice bare
             (_, withPraetor) = S.addPermanent vorinclex S.bob withSeason
-            (held, ready) = S.addHandCard toolkit S.alice (if scalers then withPraetor else bare)
+            (held, ready) = S.addHandCard pouncer S.alice (if scalers then withPraetor else bare)
         pure (seasonId, held, ready)
       castIt seasonFirst (seasonId, held, ready) =
-        let ((_, after), asked) = State.runState (Engine.runGame (toolkitOrders seasonFirst seasonId) ready (S.cast S.alice held >> Stack.resolveTop)) 0
-         in (asked, newestNamed toolkitName after, after)
-  -- The control: two +1/+1 counters and one trample counter, and nothing to
-  -- order.
-  Spec.it s "CR 614.1c the artifact enters with two +1/+1 counters and one trample counter" $ do
+        let ((_, after), asked) = State.runState (Engine.runGame (pounceOrders seasonFirst seasonId) ready (S.cast S.alice held >> Stack.resolveTop)) 0
+         in (asked, newestNamed pouncerName after, after)
+  -- The control: two +1/+1 counters and one trample counter, and haste with them
+  -- (CR 604.2's clause gates all of it, so the keyword is what says the row ran
+  -- for the right reason rather than the counters arriving some other way).
+  Spec.it s "CR 614.1c the kicked creature enters with two +1/+1 counters, a trample counter and haste" $ do
     built <- board False
     case castIt True built of
       (asked, Just oid, after) -> do
         Spec.assertEqWith s "two +1/+1 counters and a trample counter" (kindsOn oid after) (2, 1)
-        Spec.assertEqWith s "and with no scaling row in the CR 616.1 pool there was nothing to order" asked 0
-      _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Haste oid after) "CR 614.1c and the keyword half of the same sentence granted haste"
+        Spec.assertEqWith s "and with no scaling row in the CR 616.1 pool the only order was between the sentence's own two rows" asked 1
+      _ -> Spec.assertFailure s "the creature did not reach the battlefield"
   -- The rule, made observable per-kind. Both scaling rows are unconditional on
   -- kind, so BOTH apply in the chosen order (CR 616.1's loop reconsiders the
   -- modified event): doubling then halving is lossless for any count (2N/2 = N
@@ -1726,8 +1769,8 @@ unevenToolkitSpec s registry = Spec.describe s "Synthetic Uneven Toolkit (CR 614
       ((seasonAsked, Just seasoned, seasonBoard), (praetorAsked, Just halved, praetorBoard)) -> do
         Spec.assertEqWith s "Doubling Season first: doubling then halving is lossless, so both kinds are as printed" (kindsOn seasoned seasonBoard) (2, 1)
         Spec.assertEqWith s "the praetor first: the even +1/+1 count survives, the odd trample count rounds to zero" (kindsOn halved praetorBoard) (2, 0)
-        Spec.assertEqWith s "and each board asked for exactly ONE order, not one per kind" (seasonAsked, praetorAsked) (1, 1)
-      _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+        Spec.assertEqWith s "and each board asked three orders -- 2 rows, then 3, then 2 -- not one per kind" (seasonAsked, praetorAsked) (3, 3)
+      _ -> Spec.assertFailure s "the creature did not reach the battlefield"
 
 -- Answer an entry's CR 616.1 orders and COUNT them. The first order taken is
 -- Doubling Season's row when `seasonFirst`, and every later order taken is the
@@ -2224,6 +2267,109 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
             -- layer 7c leaves a 3/3 rather than something CR 704.5f removes.
             Spec.assertEqWith s "CR 613.4c so the 0/0 token is a 3/3" (S.powerToughnessOf token after) (Just (3, 3))
 
+-- Zameck Guildmage {G}{U} Creature -- Elf Wizard 2/2, whole text: "{G}{U}: This
+-- turn, each creature you control enters with an additional +1/+1 counter on it.
+-- / {G}{U}, Remove a +1\/+1 counter from a creature you control: Draw a card."
+-- (oracle checked on Scryfall 2026-09-05)
+--
+-- CR 614.3's FLOATING row carrying CR 614.1c's counter rewrite, aimed at other
+-- permanents by Filter: Gather Specimens' shape with the rewrite swapped from
+-- EntryRewrite.UnderSourceControl to EntryRewrite.WithCounters. Every other
+-- WithCounters in data/cards rides the entering permanent's own static ability
+-- with Filter.IsSource -- Faerie Squadron's, Barkhide Troll's, and the ones
+-- Pawl.Engine.Keyword mints for vanishing, fading and modular -- so this is the
+-- first row that reads the counter count for a permanent OTHER than the one the
+-- row came from.
+--
+-- Not implemented: the second ability, whose "Remove a +1/+1 counter from a
+-- creature you control" cost has no Pawl.Types.CostComponent -- the counter-
+-- removing components all come off the object the cost is on (#3286). The face
+-- is STRICTER than printed for it: alice loses a draw outlet, never gains one.
+--
+-- THE BOARD: alice's Guildmage plus a Forest, an Island, a Mountain and a Plains
+-- -- the ability's {G}{U} and the Goblin Piker's {1}{R} with nothing over -- and
+-- bob holds a Piker of his own over a Mountain and a Plains. The three cases
+-- below are the SAME board and differ in one action each: whether the ability
+-- resolved before the Piker was cast, and whose Piker it was.
+zameckGuildmageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+zameckGuildmageSpec s registry = Spec.describe s "Zameck Guildmage (CR 614.3)" $ do
+  let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      board = do
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        guildmage <- S.printingOf s registry "Zameck Guildmage"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let alicesLands = S.landsFor plains S.alice 1 (S.landsFor mountain S.alice 1 (S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (Setup.emptyGame S.bothPlayers))))
+            lands = S.landsFor plains S.bob 1 (S.landsFor mountain S.bob 1 alicesLands)
+            (mageId, withMage) = S.addPermanent guildmage S.alice lands
+            (alicesPiker, withAlices) = S.addHandCard piker S.alice withMage
+            (bobsPiker, withBobs) = S.addHandCard piker S.bob withAlices
+            -- Stocked so CR 104.3c does not decide the last case before its
+            -- assertion runs: it advances two whole turns, and both players draw.
+            stock g _ = snd (S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.bob g)))
+            stocked = List.foldl' stock withBobs [1 .. (4 :: Int)]
+            ready =
+              stocked
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+        pure (theAbility guildmage, mageId, alicesPiker, bobsPiker, ready)
+      -- Activate the first ability and resolve it, which is what installs the row.
+      arm (ability, mageId, _, _, ready) =
+        S.runPure S.identityAnswer ready (Activate.activateAbility S.alice mageId ability >> Stack.resolveTop)
+      castFor pid gs pikerId = S.runPure S.identityAnswer gs (S.cast pid pikerId >> Stack.resolveTop)
+  -- THE PROVING CASE. The Piker is printed 2/1 and enters 3/2, the counter being
+  -- the observable and the power/toughness what it is for (CR 613.4c layer 7c).
+  Spec.it s "CR 614.1c a creature entering after the ability resolved enters with the additional counter" $ do
+    built@(_, mageId, alicesPiker, _, _) <- board
+    let after = castFor S.alice (arm built) alicesPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "one +1/+1 counter on the Piker that entered" (countersOn CounterKind.PlusOnePlusOne oid after) 1
+        Spec.assertEqWith s "so the printed 2/1 is a 3/2" (S.powerToughnessOf oid after) (Just (3, 2))
+        -- CR 614.1's row replaces an ENTRY, so the permanent that was already on
+        -- the battlefield when the ability resolved gets nothing.
+        Spec.assertEqWith s "and the Guildmage, already on the battlefield, has none" (countersOn CounterKind.PlusOnePlusOne mageId after) 0
+      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
+  -- CR 614.4: the row cannot go back in time. Same board, same Piker, same mana;
+  -- the ability is simply never activated.
+  Spec.it s "CR 614.4 a creature entering before the ability resolved enters without it" $ do
+    (_, _, alicesPiker, _, ready) <- board
+    let after = castFor S.alice ready alicesPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
+      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
+  -- CR 109.5 on an ACTIVATED ability: "you" is the player who activated it, so
+  -- the row's Filter.ControlledBy passes over bob's creature. Without this case
+  -- a row matching every creature would look identical to the printed one.
+  Spec.it s "CR 109.5 the opponent's creature is not one alice controls, so the row passes over it" $ do
+    built@(_, _, _, bobsPiker, _) <- board
+    let after = castFor S.bob (arm built) bobsPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter on bob's Piker" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
+      _ -> Spec.assertFailure s "bob's Piker did not reach the battlefield"
+  -- CR 614.3's "until . . . their duration has expired", through CR 514.2's
+  -- cleanup: two handoffs put alice back in a main phase of her own with the
+  -- Piker still in hand and the lands untapped, and the row gone.
+  Spec.it s "CR 514.2 a creature entering on a later turn enters without it" $ do
+    built@(_, _, alicesPiker, _, _) <- board
+    let armed = arm built
+        alicesNext = atPostcombatMain S.identityAnswer (nextTurn S.identityAnswer (nextTurn S.identityAnswer armed))
+        after = castFor S.alice alicesNext alicesPiker
+    case newestNamed pikerName after of
+      Just oid -> do
+        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
+        Spec.assertEqWith s "so it is the printed 2/1" (S.powerToughnessOf oid after) (Just (2, 1))
+        Spec.assertEqWith s "setup: it is alice's own later turn, so the same cast was legal" (GameState.activePlayer after, GameState.turnNumber after > GameState.turnNumber armed) (S.alice, True)
+      _ -> Spec.assertFailure s "the Piker did not reach the battlefield"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   riotSpec s registry
@@ -2237,10 +2383,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   entryCountersSpec s registry
   perennationSpec s registry
   toolkitSpec s registry
-  unevenToolkitSpec s registry
+  voidpouncerSpec s registry
   wardingBeaconSpec s registry
   dustAnimusSpec s registry
   frontierMastodonSpec s registry
   magneticLockdownSpec s registry
   squadCaptainSpec s registry
   printlifterSpec s registry
+  zameckGuildmageSpec s registry

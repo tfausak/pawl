@@ -139,6 +139,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -1557,8 +1558,13 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- about the ref bounds how many a group holds.
           ObjectRef.EachCardFromAmong {} -> False
           -- One card per SEAT, the arm above's answer with randomness in the
-          -- chooser's place: Merfolk Spy's slot names one seat and so one card.
-          ObjectRef.RandomCardInHand player -> namesOneSeat player
+          -- chooser's place: Merfolk Spy's slot names one seat and so one card,
+          -- and Fall's printed two makes the same seat plural. A COMPUTED count
+          -- is plural whatever the board would make it, ChosenCardFromAmong's
+          -- reading above and for its reason.
+          ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ count) -> case count of
+            Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
+            _ -> False
           -- FALSE, EachCardFromAmong's answer over the battlefield: "any number"
           -- states no bound, so nothing about the ref caps how many permanents
           -- the chooser may name.
@@ -2094,7 +2100,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) anyCard)
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
-        atRandom = ObjectRef.RandomCardInHand (PlayerRef.Relative PlayerRelation.You)
+        atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         anyNumber = ObjectRef.AnyNumberMatching anyCard
         onePermanent = ObjectRef.ChosenPermanent anyCard
         sourceAndOne = ObjectRef.SourceAndChosenPermanent anyCard

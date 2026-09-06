@@ -33,11 +33,12 @@ data SpecialAction
   | -- | CR 116.2d: "some effects from static abilities allow a player to take an
     -- action to ignore the effect from that ability for a duration". Leonin
     -- Arbiter's "any player may pay {2} for that player to ignore this effect
-    -- until end of turn" is one; Damping Engine, Volrath's Curse and Lost in
-    -- Thought are the only others printed.
+    -- until end of turn" is one; Damping Engine and Volrath's Curse are the
+    -- others in the pool, and Lost in Thought is the only printing outside it.
     --
     -- WHICH effect is named by an AbilityName, matched against
-    -- PlayerStaticAbility.name on the same face -- CR 116.2d's own subject is
+    -- PlayerStaticAbility.name, AffectedUnless.name or
+    -- ActivationProhibition.name on the same face -- CR 116.2d's own subject is
     -- "the effect from that ability", singular, and a permanent granting the
     -- permission on one of two unrelated abilities must ignore only the one
     -- named. A name and not an index, for Pawl.Types.AbilityName's reason, and it
@@ -50,12 +51,12 @@ data SpecialAction
     -- printed another would want a Pawl.Types.Duration here.
     --
     -- WHO may take it is not carried either, and needs no payload: the rule's own
-    -- answer is the players the ability is AFFECTING, which the carrier's
-    -- PlayerScope already states. Leonin Arbiter's "any player" is its EachPlayer
-    -- scope and Damping Engine's "that player" is its narrower one, so
-    -- Pawl.Engine.Ignore.canIgnore derives both from
-    -- Pawl.Engine.PlayerEffect.affectedBy. The two Auras narrow by a scope on an
-    -- OBJECT-axis effect instead, which that derivation does not reach (#1268).
+    -- answer is the players the ability is AFFECTING. On the player axis that is
+    -- the carrier's PlayerScope -- Leonin Arbiter's "any player" is its
+    -- EachPlayer scope and Damping Engine's "that player" is its narrower one.
+    -- On the OBJECT axis the ability names no player, so it is the controller of
+    -- what the ability restricts: Volrath's Curse's and Lost in Thought's "that
+    -- creature's controller". Pawl.Engine.Ignore.canIgnore derives all three.
     --
     -- The COST is carried, since it is what the printed sentence varies most
     -- freely -- {2}, sacrificing a permanent, exiling three cards from a

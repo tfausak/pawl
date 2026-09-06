@@ -26,7 +26,8 @@ spec s = Spec.describe s "Pawl.Codec.CantAttackPlayer" $ do
           { CantAttackPlayer.affected = Affected.Matching (Filter.HasCardType CardType.Creature),
             CantAttackPlayer.defenders = PlayerScope.You,
             CantAttackPlayer.kinds = Set.fromList [AttackTargetKind.OfPlayer, AttackTargetKind.OfPlaneswalker],
-            CantAttackPlayer.unless = Nothing
+            CantAttackPlayer.unless = Nothing,
+            CantAttackPlayer.name = Nothing
           }
       )
       " {\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}},\"defenders\":{\"type\":\"You\"},\"kinds\":[{\"type\":\"OfPlayer\"},{\"type\":\"OfPlaneswalker\"}]} "
