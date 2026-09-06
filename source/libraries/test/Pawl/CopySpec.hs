@@ -1367,7 +1367,8 @@ handAppend printing pid gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         gs2

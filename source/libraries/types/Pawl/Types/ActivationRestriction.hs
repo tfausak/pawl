@@ -135,4 +135,22 @@ data ActivationRestriction
     -- 613.1f's named removal reads the abilities an object has, so the two are
     -- not interchangeable.
     OnlyIf Condition.Condition
+  | -- | CR 602.5b's "restriction on its use" counted rather than timed:
+    -- "Activate only once", which CR 702.177a's exhaust rewrites itself into
+    -- (Greenbelt Guardian).
+    --
+    -- ONCE PER GAME, not per turn: rule 702.177a's sentence states no period, so
+    -- nothing resets it. CR 602.5b keys it to the OBJECT -- "the restriction
+    -- continues to apply to that object even if its controller changes" -- and CR
+    -- 400.7 then ends it at a zone change, the permanent that returns being a new
+    -- object with no memory. Pawl.Types.Object.activatedOnce is that memory and
+    -- Pawl.Types.Object.newIncarnation the forgetting.
+    --
+    -- The one arm whose answer depends on the ABILITY as well as the board, which
+    -- is why Pawl.Engine.ActivationRestriction.restrictionsOk takes one: every
+    -- other clause reads a phase, a turn, a combat record or the board, and this
+    -- reads which ability of this object has already been spent. Rule 702.177a's
+    -- "each exhaust ability" is that grain -- Draconautics Engineer prints two,
+    -- and spending one leaves the other.
+    OnlyOnce
   deriving (Eq, Ord, Show)

@@ -737,7 +737,8 @@ mintCard pid under printingId dest position gs =
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
    in ( oid,
         Game.insertIntoZone
@@ -921,7 +922,8 @@ createEmblem pid card = do
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
-                Object.exertedBy = Set.empty
+                Object.exertedBy = Set.empty,
+                Object.activatedOnce = Set.empty
               }
       Just <$> placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -5844,7 +5846,8 @@ createTokens controller card copy n tapped entering = do
                       Object.detainedUntil = Set.empty,
                       Object.goadedBy = Set.empty,
                       Object.doesNotUntapNext = False,
-                      Object.exertedBy = Set.empty
+                      Object.exertedBy = Set.empty,
+                      Object.activatedOnce = Set.empty
                     }
             Monad.replicateM (Natural.toIntSaturating (TokenLot.count lot)) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           minted <- State.get
@@ -6029,7 +6032,8 @@ meld controller victims resultCard = do
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
                 Object.doesNotUntapNext = False,
-                Object.exertedBy = Set.empty
+                Object.exertedBy = Set.empty,
+                Object.activatedOnce = Set.empty
               }
       newId <- placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue
       -- Alchemy's "perpetually", the ARRIVAL direction of what perpetuate does at

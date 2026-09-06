@@ -673,8 +673,9 @@ conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Q
 conditionCounts = concatMap quantityCounts . conditionQuantities
 
 -- Every Condition an "activate only ..." clause holds: only CR 602.5's OnlyIf
--- carries one, every other arm naming a window instead. Both card sweeps take
--- from it, conditionQuantities' role one type up.
+-- carries one, the rest naming a window or, for CR 602.5b's counted rider, a
+-- record of past activations. Both card sweeps take from it,
+-- conditionQuantities' role one type up.
 restrictionConditions :: ActivationRestriction.ActivationRestriction -> [Condition.Type.Condition]
 restrictionConditions restriction = case restriction of
   ActivationRestriction.SorcerySpeed -> []
@@ -684,6 +685,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.AfterBlockersDeclared -> []
   ActivationRestriction.BeforeCombatDamage -> []
   ActivationRestriction.OnlyIf condition -> [condition]
+  ActivationRestriction.OnlyOnce -> []
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs

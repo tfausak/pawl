@@ -1668,7 +1668,7 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         -- permanent's routes to its controller alone, so a mana ability printing
         -- "any player may activate this ability" would run stricter than printed
         -- (#3087).
-        && ActivationRestriction.restrictionsOk pid oid restrictions gs
+        && ActivationRestriction.restrictionsOk pid oid Nothing restrictions gs
         then
           Activations.MkActivations
             { -- The PRINTED mana part, which is what `repeatsOf` reads: a

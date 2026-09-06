@@ -131,14 +131,16 @@ targetSlotSlots slot =
     ]
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
--- [a player] pays" names, every slot a CR 701.46a "if" tests, and every slot a
--- target slot's own pool, filter or bound names. A payer, gate or pool slot no
--- effect also reads would otherwise dangle.
+-- [a player] pays" names, every slot that gate's own "for each" counts over,
+-- every slot a CR 701.46a "if" tests, and every slot a target slot's own pool,
+-- filter or bound names. A payer, multiplier, gate or pool slot no effect also
+-- reads would otherwise dangle.
 modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
   joinSlots
     [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
       joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
+      joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
       joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
       joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
       joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
@@ -147,6 +149,12 @@ modeSlots mode =
   where
     -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
     payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
+    -- And the gate's OTHER slot-reading position, its "for each" multiplier
+    -- (Pawl.Types.PayGate.perEach): a cost scaled by what a bound object names is
+    -- a read the payer field need not repeat, and payGatePaidBy evaluates it
+    -- against this resolution's own context, so the slot really is asked for.
+    -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
+    multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
     -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
     -- clause too, and Jungle Wayfinder's names the table rather than a slot --
     -- but a card may name one, and an asker slot no effect also reads would

@@ -3,6 +3,7 @@ module Pawl.Codec.ObjectSpec where
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.ActivatedAbilitySourceSpec as ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.Object as Object
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -92,7 +93,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.detainedUntil = Set.empty,
           Object.goadedBy = Set.empty,
           Object.doesNotUntapNext = False,
-          Object.exertedBy = Set.empty
+          Object.exertedBy = Set.empty,
+          Object.activatedOnce = Set.empty
         }
       ( " {\"owner\":1,\"source\":{\"type\":\"OfCard\",\"value\":2}"
           <> ",\"zone\":{\"type\":\"Hand\"},\"sickness\":{\"type\":\"Sick\"}"
@@ -191,7 +193,8 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.detainedUntil = Set.singleton (PlayerId.MkPlayerId 21),
           Object.goadedBy = Set.singleton (PlayerId.MkPlayerId 22),
           Object.doesNotUntapNext = True,
-          Object.exertedBy = Set.singleton (PlayerId.MkPlayerId 23)
+          Object.exertedBy = Set.singleton (PlayerId.MkPlayerId 23),
+          Object.activatedOnce = Set.singleton ActivatedAbilitySourceSpec.ability
         }
       ( " {\"owner\":1,\"enteredUnder\":2,\"source\":{\"type\":\"OfToken\",\"value\":3}"
           <> ",\"zone\":{\"type\":\"Battlefield\"},\"tapped\":{\"type\":\"Tapped\"}"
@@ -219,7 +222,9 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
           <> ",\"announcedX\":20,\"castFrom\":{\"type\":\"Graveyard\"}"
           <> ",\"detainedUntil\":[21],\"goadedBy\":[22]"
-          <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]} "
+          <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]"
+          <> ",\"activatedOnce\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}"
+          <> ",\"modal\":{\"modes\":[{}]}}]} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s Object.codec
