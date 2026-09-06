@@ -1480,6 +1480,11 @@ beginTurnOf pid gs =
             -- CR 121.1's per-turn draw tally, cleared for EVERY player: a player
             -- draws on turns that are not theirs, so "each turn" is the whole map.
             GameState.drawsThisTurn = Map.empty,
+            -- CR 602.5b's "Activate only once each turn", cleared for every
+            -- object rather than the active player's: the rider is about the
+            -- object, and a permanent whose controller is not the active player
+            -- gets its activation back here just the same.
+            GameState.activatedThisTurn = Map.empty,
             -- CR 502.2 / 731.2: the count the NEXT turn's untap step asks about
             -- "the previous turn's active player".
             GameState.spellsCastLastTurn = Map.findWithDefault 0 (GameState.activePlayer gs) casts,

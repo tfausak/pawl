@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
@@ -25,6 +26,7 @@ import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.GameSettings as GameSettings
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -227,6 +229,14 @@ data GameState = MkGameState
     -- ordinal onto GameEvent.Drew; cleared for every player at turn handoff,
     -- and after CR 103.3's opening hands.
     drawsThisTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 602.5b: which abilities of which objects have been activated this
+    -- turn, read by ActivationRestriction.OnlyOnceEachTurn alone; cleared at turn
+    -- handoff, which is the whole of "each turn". Keyed by the SOURCE object and
+    -- then by the ability, since a permanent may print the rider on one of two
+    -- abilities (Locust Swarm). The ability BY VALUE, and CR 602.5c's
+    -- identically worded twin is the caveat Object.activatedOnce's haddock states
+    -- about the same key.
+    activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
     -- controlled; last created wins (CR 723.1a), promoted to activeControl at
     -- that player's turn (CR 723.1b).
