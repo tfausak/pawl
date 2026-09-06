@@ -3021,6 +3021,83 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     Spec.assertEqWith s "and the 2/1 Piker killed the 2/1 Screen" (S.creaturesInPlay S.bob blocked) 0
     Spec.assertEqWith s "an Ogre Sentry with no requirement declines, so bob takes two" (S.lifeOf S.bob unblocked) (Just 18)
     Spec.assertEqWith s "and it survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
+  -- CR 509.1c's CONDITION -- "or that it must block if some condition is met" --
+  -- which every card above leaves absent. Enkira, Hostile Scavenger ({3}{B}{G}
+  -- Legendary Creature -- Human Warrior 3/3, "As long as Enkira is equipped, it
+  -- must be blocked if able." -- checked against Scryfall, 2026-09-06) gates the
+  -- requirement on CR 301.5a's "equipped", read as CR 604.2's "as long as"
+  -- clause. Bonesplitter is the Equipment, and the gate is flipped by ATTACHING
+  -- it rather than by adding it, so the two boards hold the same permanents.
+  --
+  -- Not implemented: Enkira's third line, "whenever Enkira and at least two
+  -- Zombies attack, Enkira gains indestructible until end of turn" -- CR 508.3a's
+  -- companion clause admits one matching creature and takes no count, so the
+  -- transcription omits that ability (#3303). The omission runs the card
+  -- STRICTER than printed, and no case here reaches a second combat phase or a
+  -- Zombie.
+  Spec.it s "CR 509.1c an Enkira must be blocked only while it is equipped" $ do
+    -- THE AXIS UNDER TEST, both worlds on one board pair differing in exactly the
+    -- attachment. The second assertion is what keeps the first from passing
+    -- vacuously: the Piker really is an able blocker of the unequipped Enkira, so
+    -- declining is legal because the gate is false and not because there is
+    -- nothing to block.
+    enkira <- S.printingOf s registry "Enkira, Hostile Scavenger"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [enkira] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) -> do
+        let (gear, bare) = S.addPermanent bonesplitter S.alice gs
+            equipped = S.attach gear a bare
+            blocks = Map.singleton b (Set.singleton a)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty bare) "with the Bonesplitter unattached, declining is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks bare) "and blocking is still legal, so the combat is live"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty equipped)) "attached, the gate holds and declining is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks equipped) "blocking the equipped Enkira is legal"
+        Spec.assertEqWith s "and the ceiling counts the requirement, so the forced declaration is that block" (Combat.forcedBlockDeclaration S.bob equipped) blocks
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 509.1c the gate rides the SOURCE, not any attacker beside it" $ do
+    -- IsAttachedToSource is an identity test on Enkira's own attachment: a Piker
+    -- attacking beside an equipped Enkira carries no requirement, so blocking it
+    -- instead obeys nothing. Fails against a reader that answers the gate off the
+    -- board rather than off the source.
+    enkira <- S.printingOf s registry "Enkira, Hostile Scavenger"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [enkira, piker] [piker]
+    case (mine, theirs) of
+      ([a, other], b : _) -> do
+        let (gear, bare) = S.addPermanent bonesplitter S.alice gs
+            equipped = S.attach gear a bare
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) equipped) "blocking Enkira is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton other)) equipped)) "blocking the other attacker instead is illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty equipped)) "and declining is illegal"
+      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  Spec.it s "CR 509.1c whole cards: an equipped Enkira forces a block through a real declare blockers step" $ do
+    -- Gameplay level, under an answerer that DECLINES. The control board leaves
+    -- the same Bonesplitter unattached, so the two differ only in the gate, and
+    -- both assertions differ between them: equipped, the Piker is forced to block
+    -- a 5/3 and dies while bob takes nothing; unattached, nobody blocks, bob
+    -- takes 3 and the Piker lives.
+    enkira <- S.printingOf s registry "Enkira, Hostile Scavenger"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [enkira] [piker]
+        declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareBlockers {} -> Map.empty
+          _ -> S.aggressiveAnswer p
+        (gear, bare) = S.addPermanent bonesplitter S.alice gs
+        equipped = case mine of
+          -- Unreachable: the fixture has one attacking printing.
+          [] -> bare
+          a : _ -> S.attach gear a bare
+        blocked = S.settleSba (S.fightWith declining equipped)
+        unblocked = S.settleSba (S.fightWith declining bare)
+    Spec.assertEqWith s "equipped, the Piker was forced to block, so bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
+    Spec.assertEqWith s "and the blocker died to the 5/3" (S.creaturesInPlay S.bob blocked) 0
+    Spec.assertEqWith s "unattached, the gate is false and bob takes three" (S.lifeOf S.bob unblocked) (Just 17)
+    Spec.assertEqWith s "and the Piker survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
 
 -- A combat board that has NOT yet declared attackers, with Curse of the Nightly
 -- Hunt on the battlefield attached to `who`. The attacking twin of `luring`, and

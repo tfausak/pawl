@@ -52,11 +52,8 @@ data AttackRequirement = MkAttackRequirement
     -- and the "you" inside it is CR 109.5's: the controller of the permanent
     -- printing the sentence.
     --
-    -- Pawl.Types.BlockRequirement is the twin that does not carry this yet: CR
-    -- 509.1c words the shape the same way, and nothing in data/cards/ prints a
-    -- conditional BLOCKING requirement -- Enkira, Hostile Scavenger and Frodo
-    -- Baggins are printings that would, untranscribed. Not implemented: that
-    -- half (#2036).
+    -- Pawl.Types.BlockRequirement spells the twin of this field for CR 509.1c's
+    -- identically worded shape (Enkira, Hostile Scavenger).
     while :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)
