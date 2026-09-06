@@ -13,6 +13,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -243,10 +244,13 @@ data TriggerCondition
     -- attached to (Wild Growth), live rather than through last known
     -- information, as for the arm above.
     --
-    -- Not implemented: CR 106.12a read by a BYSTANDER -- "whenever you tap a
-    -- land for mana" (Mirari's Wake) -- nor CR 605.1b's other two triggers,
-    -- mana being added and a mana ability being activated (#1572).
+    -- Not implemented: CR 605.1b's other two triggers, mana being added and a
+    -- mana ability being activated (#1572).
     AttachedPermanentTappedForMana
+  | -- | CR 106.12a read by a bystander: "whenever you tap a land creature for
+    -- mana" (Autumn Willow, Harmony), the arm above's event under a relation and
+    -- a filter instead of an attachment link.
+    PermanentTappedForMana PermanentTappedForMana.PermanentTappedForMana
   | -- | CR 702.55b / 702.55c: "when the creature this card haunts dies", borne
     -- by the haunting card in exile.
     HauntedCreatureDies

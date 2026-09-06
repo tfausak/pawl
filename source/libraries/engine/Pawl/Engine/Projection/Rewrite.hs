@@ -101,6 +101,7 @@ import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -1350,6 +1351,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.AttachedCreatureBecomesTapped -> condition
   TriggerCondition.SelfBecomesUntapped -> condition
   TriggerCondition.AttachedPermanentTappedForMana -> condition
+  TriggerCondition.PermanentTappedForMana payload -> TriggerCondition.PermanentTappedForMana payload {PermanentTappedForMana.filter = Filter.rewrite pairs (PermanentTappedForMana.filter payload)}
   TriggerCondition.SelfTrains -> condition
   TriggerCondition.PermanentSacrificed payload -> TriggerCondition.PermanentSacrificed payload {PermanentSacrificed.filter = Filter.rewrite pairs (PermanentSacrificed.filter payload)}
   TriggerCondition.SagaFinalChapterTriggers _ -> condition

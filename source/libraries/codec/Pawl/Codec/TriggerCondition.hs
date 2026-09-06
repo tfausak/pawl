@@ -12,6 +12,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Codec.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Codec.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -89,6 +90,7 @@ codec =
       Arm.nullary "AttachedCreatureBecomesTapped" TriggerCondition.AttachedCreatureBecomesTapped,
       Arm.nullary "SelfBecomesUntapped" TriggerCondition.SelfBecomesUntapped,
       Arm.nullary "AttachedPermanentTappedForMana" TriggerCondition.AttachedPermanentTappedForMana,
+      Arm.payload "PermanentTappedForMana" PermanentTappedForMana.codec TriggerCondition.PermanentTappedForMana (\x -> case x of TriggerCondition.PermanentTappedForMana y -> Just y; _ -> Nothing),
       Arm.nullary "HauntedCreatureDies" TriggerCondition.HauntedCreatureDies,
       Arm.payload "SpellOrAbilityCounters" PlayerRelation.codec TriggerCondition.SpellOrAbilityCounters (\x -> case x of TriggerCondition.SpellOrAbilityCounters y -> Just y; _ -> Nothing),
       Arm.payload "DamageToPlayerPrevented" PlayerRelation.codec TriggerCondition.DamageToPlayerPrevented (\x -> case x of TriggerCondition.DamageToPlayerPrevented y -> Just y; _ -> Nothing),

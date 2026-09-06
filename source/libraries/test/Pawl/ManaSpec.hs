@@ -3023,6 +3023,56 @@ wildGrowthSpec s registry = Spec.describe s "Wild Growth" $ do
     Spec.assertEqWith s "nor did an ordinary triggered ability go on the stack" (length (GameState.stack after)) 0
     Spec.assertEqWith s "and the land really is tapped, so the boards differ in nothing else" (fmap Object.tapped (Game.lookupObject bobForest after)) (Just TapState.Tapped)
 
+-- CR 106.12a read by a BYSTANDER rather than off an attachment link, on the
+-- cheapest printing already in `data/cards/`: Autumn Willow, Harmony, "whenever
+-- you tap a land creature for mana, add an additional {G}".
+--
+-- THREE permanents can be tapped for mana on the one board, and each is the
+-- other two's control: alice's Dryad Arbor is a land creature she controls, her
+-- Forest is a land that is no creature, and bob's Dryad Arbor is a land creature
+-- that is not hers. A board of only the first could not tell the Filter or the
+-- PlayerRelation from a condition that read neither.
+autumnWillowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+autumnWillowSpec s registry = Spec.describe s "Autumn Willow, Harmony" $ do
+  Spec.it s "CR 106.12a tapping alice's own land creature for mana adds the Willow's additional {G}" $ do
+    (aliceArbor, aliceForest, bobArbor, board) <- autumnWillowBoard s registry
+    let arbor = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceArbor)
+        -- The same board differing in exactly one thing: which of alice's
+        -- permanents was tapped. Her Forest is a land and no creature.
+        forest = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceForest)
+        -- And differing in exactly one other thing: whose land creature it was.
+        theirs = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer bobArbor)
+        -- CR 605.4a from the other side, the Wild Growth group's reason.
+        settled = resolveDown (S.runPure S.identityAnswer arbor Engine.settleForPriority)
+    Spec.assertEqWith s "CR 106.12a alice's pool holds the Arbor's {G} and the Willow's additional one" (poolTypes S.alice arbor) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
+    Spec.assertEqWith s "the Filter: her Forest is no creature, so tapping it adds one and only one" (poolTypes S.alice forest) [ManaType.Colored Color.Green]
+    Spec.assertEqWith s "the PlayerRelation: bob's land creature is not one SHE tapped, so his pool holds only its own {G}" (poolTypes S.bob theirs) [ManaType.Colored Color.Green]
+    Spec.assertEqWith s "and alice, whose Willow watched it, is given nothing there" (poolTypes S.alice theirs) []
+    Spec.assertEqWith s "CR 605.4a and the triggered mana ability never reached the stack" (length (GameState.stack arbor)) 0
+    Spec.assertEqWith s "CR 605.4a and settling for priority does not place a second copy of it to resolve" (poolTypes S.alice settled) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
+    Spec.assertEqWith s "nor leave anything of it on the stack" (length (GameState.stack settled)) 0
+
+-- alice holds a Forest, a Dryad Arbor and an Autumn Willow, Harmony; bob holds a
+-- Dryad Arbor of his own. Returns alice's Arbor, her Forest, bob's Arbor and the
+-- board.
+--
+-- Both Arbors are placed by S.addPermanent, which settles what it places, so CR
+-- 302.6's summoning sickness does not stop a LAND CREATURE's {T} -- the
+-- precondition this case rests on, and the reason the Willow's own enters
+-- trigger is not used to make the token.
+autumnWillowBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+autumnWillowBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  arbor <- S.printingOf s registry "Dryad Arbor"
+  willow <- S.printingOf s registry "Autumn Willow, Harmony"
+  case Game.zoneMembers Zone.Battlefield S.alice (S.landsInPlay forest 1) of
+    [aliceForest] ->
+      let (aliceArbor, withHers) = S.addPermanent arbor S.alice (S.landsInPlay forest 1)
+          (bobArbor, withHis) = S.addPermanent arbor S.bob withHers
+          (_, withWillow) = S.addPermanent willow S.alice withHis
+       in pure (aliceArbor, aliceForest, bobArbor, withWillow)
+    _ -> Spec.assertFailure s "fixture should give alice exactly one Forest" >> pure (S.noSource, S.noSource, S.noSource, S.landsInPlay forest 1)
+
 -- Resolve the whole stack down, so a board that placed a triggered mana ability
 -- CR 605.4a forbids the stack reads differently from one that placed nothing: a
 -- reading taken with the trigger still waiting could not tell them apart at
@@ -3085,6 +3135,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   mysticGateSpec s registry
   activationAdjustmentSpec s registry
   wildGrowthSpec s registry
+  autumnWillowSpec s registry
 
 -- The units of Alice's pool, so a test can look at a mana's TAGS and not only at
 -- its type -- which is the whole of what CR 107.4h reads.

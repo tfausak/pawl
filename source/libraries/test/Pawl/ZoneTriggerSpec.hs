@@ -100,6 +100,7 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
@@ -2312,6 +2313,10 @@ representativeEvents cond =
         -- either way.
         TriggerCondition.SelfBecomesUntapped -> one (GameEvent.BecameUntapped departed)
         TriggerCondition.AttachedPermanentTappedForMana -> one (GameEvent.TappedForMana departed)
+        -- The same event for the bystander reading, on `departed` for the arm
+        -- above's reason: the arm stamps the tapped permanent under every
+        -- relation it admits, so the floor is the same whether the pair matches.
+        TriggerCondition.PermanentTappedForMana {} -> one (GameEvent.TappedForMana departed)
         -- CR 702.149c's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
@@ -2543,6 +2548,13 @@ everyTriggerCondition =
     TriggerCondition.AttachedCreatureBecomesTapped,
     TriggerCondition.SelfBecomesUntapped,
     TriggerCondition.AttachedPermanentTappedForMana,
+    -- ALL THREE relations, on the PermanentSacrificed rows' reasoning below:
+    -- an eventBindings arm that had cased on the relation and stamped nothing
+    -- under one of them would go unseen if only one were listed. Autumn Willow,
+    -- Harmony prints the You form.
+    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.You (Filter.Type.And [])),
+    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.Opponent (Filter.Type.And [])),
+    TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And [])),
     TriggerCondition.SelfTrains,
     -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
     -- eventBindings arm that had cased on the relation and stamped nothing under

@@ -201,6 +201,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
+import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -827,6 +828,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   TriggerCondition.SelfBecomesUntapped -> []
   TriggerCondition.AttachedPermanentTappedForMana -> []
+  -- CR 106.12a's bystander reading carries a PlayerRelation and a Filter,
+  -- neither of which holds a Count.
+  TriggerCondition.PermanentTappedForMana {} -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   -- CR 701.21a's carries a PlayerRelation and a Filter, neither of which holds a
@@ -3158,6 +3162,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
+  -- CR 106.12a's bystander reading DOES carry a Filter -- Autumn Willow,
+  -- Harmony's "a land creature" -- and is swept like the PermanentSacrificed arm
+  -- below.
+  TriggerCondition.PermanentTappedForMana payload -> unframed [PermanentTappedForMana.filter payload]
   -- CR 701.21a's Filter narrows the sacrificed permanent -- Vengeful Tracker's
   -- "an artifact" -- and is swept like PermanentDies' below.
   TriggerCondition.PermanentSacrificed payload -> unframed [PermanentSacrificed.filter payload]
@@ -3403,6 +3411,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   TriggerCondition.SelfBecomesUntapped -> []
   TriggerCondition.AttachedPermanentTappedForMana -> []
+  TriggerCondition.PermanentTappedForMana {} -> []
   -- CR 702.55a names the haunted creature through the haunting object's own
   -- attachment rather than through a slot.
   TriggerCondition.HauntedCreatureDies -> []
