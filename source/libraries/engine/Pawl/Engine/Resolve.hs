@@ -178,11 +178,13 @@ poolSlot pool = case pool of
   Pool.CardsInGraveyard scope -> case scope of
     ZoneScope.Scoped _ -> Map.empty
     ZoneScope.InSlot slot -> oneSlot slot
+    ZoneScope.ControllerOfBound slot -> oneSlot slot
   Pool.CardsInExile -> Map.empty
   -- The graveyard half's scope; the battlefield half names no slot.
   Pool.CreaturesAndCardsInGraveyard scope -> case scope of
     ZoneScope.Scoped _ -> Map.empty
     ZoneScope.InSlot slot -> oneSlot slot
+    ZoneScope.ControllerOfBound slot -> oneSlot slot
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name.
 armedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName

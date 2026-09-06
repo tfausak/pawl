@@ -921,7 +921,8 @@ data Context = MkContext
     -- object's names -- and by two callers: Pawl.Engine.Target.admittedGiven,
     -- where a target slot's Filter is matched, and
     -- Pawl.Engine.Resolve.Slots.effectContext, which is what all but one of a
-    -- resolution's positions go through (Bifurcate's search filter). The one that
+    -- resolution's positions go through (Bifurcate's search filter, Hour of
+    -- Glory's hand sweep). The one that
     -- does not is slotObjects' Attach.hostsFor above, and is its elision rather
     -- than this field's: a caller building a bare contextFor has neither map.
     --
@@ -940,7 +941,7 @@ data Context = MkContext
     -- False.
     --
     -- What keeps a card out of those positions is Pawl.CardSpec's
-    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot or a search filter",
+    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot, a search filter or a hand sweep",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
     -- CR 110.2: the CONTROLLERS of the objects the surrounding announcement's

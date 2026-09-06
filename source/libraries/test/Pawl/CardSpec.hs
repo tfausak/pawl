@@ -2794,7 +2794,7 @@ objectRefFilters ref = case ref of
   -- Amnesia's "all nonland cards" does state one, and states it here. Optional,
   -- so its reveal half -- the whole hand -- lints nothing, exactly as the linked
   -- exile arm below does for the printings that take all of their set.
-  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ f) -> unframed (Foldable.toList f)
+  ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ f) -> handSweepFramed (Foldable.toList f)
   -- Leveler's "all cards from your library" holds none, for Ignorant Bliss'
   -- reason: the printing takes the whole zone and states no characteristic.
   -- Caldera Breaker's "all Mountain cards from your library" does state one, and
@@ -3917,10 +3917,11 @@ blockPermissionFilters permission =
 --     atom belongs here and nowhere else.
 --   * InTargetSlot -- a MODE's target slot filter, the one position matched by
 --     Pawl.Engine.Target.admittedGiven, which is the one site that fills
---     Filter.Context.slotControllers and one of the two that fill
+--     Filter.Context.slotControllers and one of the callers that fill
 --     Filter.Context.slotNames. CR 110.2's Filter.SameControllerAsBound belongs
 --     here and nowhere else; CR 709.4a's Filter.SameNameAsBound belongs here and
---     in SearchFramed below, the other position slotNames is filled at. Their
+--     in SearchFramed and HandSweepFramed below, the other positions slotNames
+--     is filled at and a card writes it in. Their
 --     vacuous directions differ: an unfilled
 --     slotNames answers False, an unfilled slotControllers answers True. So a
 --     misplaced SameNameAsBound admits nothing and a misplaced
@@ -3955,6 +3956,12 @@ blockPermissionFilters permission =
 --     TARGET SLOT filter: CR 702.6c's equip quality. Answered by
 --     Pawl.Engine.Target.admittedGiven like InTargetSlot, with the bindings and
 --     the chosen player of SlotlessCostFramed, which is to say none.
+--   * HandSweepFramed -- ObjectRef.EachCardInHand's own filter, the third
+--     position a card may write CR 709.4a's Filter.SameNameAsBound in (Hour of
+--     Glory): Resolve.Slots.objectRefObjects matches it through
+--     Resolve.Slots.effectContext, which fills the names. Not SourceHostFramed,
+--     which the arm's siblings carry, because that arm overlays no
+--     Filter.Context.sourceAttachedTo.
 --   * MillTallyFramed -- CR 701.17's mill tally filter, the second position a
 --     card may write CR 201.4's Filter.HasChosenName in (Predict): the
 --     Effect.Mill arm overlays Filter.Context.sourceChosenNames onto the
@@ -4091,6 +4098,17 @@ data Framing
     -- be a silent False. Not Unframed either, which is what it was until the
     -- chosen name became answerable.
     MillTallyFramed
+  | -- | CR 608.2c's hand SWEEP filter -- ObjectRef.EachCardInHand's, the third
+    -- position a card may write CR 709.4a's Filter.SameNameAsBound in (Hour of
+    -- Glory): Pawl.Engine.Resolve.Slots.objectRefObjects matches it in the
+    -- resolution's own context (Resolve.Slots.effectContext), so
+    -- Filter.Context.slotNames is filled.
+    --
+    -- Not SourceHostFramed, which every other ObjectRef Filter carries: that arm
+    -- overlays no Filter.Context.sourceAttachedTo, so a CR 303.4b question is
+    -- unanswerable here where it is answerable at its siblings. Narrowing, and
+    -- no card in the pool loses a position by it.
+    HandSweepFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -4150,6 +4168,8 @@ sweptForSingularSlots framing = case framing of
   -- so a batch slot read singly is as reportable as at Unframed, which is the
   -- framing this position carried before.
   MillTallyFramed -> True
+  -- SWEPT for MillTallyFramed's reason: effectContext fills the slots here too.
+  HandSweepFramed -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -4204,6 +4224,11 @@ mintedTargetSlot = fmap ((,) MintedTargetSlot)
 -- cards a resolution has just milled (CR 701.17).
 millTallyFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 millTallyFramed = fmap ((,) MillTallyFramed)
+
+-- Tag a Filter position as a hand SWEEP's, the one ObjectRef position whose
+-- evaluator supplies the resolution's slots but not the source's host.
+handSweepFramed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+handSweepFramed = fmap ((,) HandSweepFramed)
 
 -- Apply a quoting position's Framing to filters that are ALREADY tagged, filling
 -- in only the ones still Unframed. The lifts above take a bare list, which is

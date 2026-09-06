@@ -271,6 +271,11 @@ zoneScopeSlots :: ZoneScope.ZoneScope -> Map.Map SlotName SlotArity
 zoneScopeSlots scope = case scope of
   ZoneScope.Scoped _ -> Map.empty
   ZoneScope.InSlot slot -> Map.singleton slot SlotArity.Many
+  -- Arity ONE, where the arm above is Many: Hour of Glory's "its controller"
+  -- names the controller of the ONE object the slot holds, so a plural slot
+  -- aimed here would have no singular answer -- PlayerRef.ControllerOfBound's
+  -- reading, one type over.
+  ZoneScope.ControllerOfBound slot -> Map.singleton slot SlotArity.One
 
 -- The slots an ObjectRef reads. InSlot names one directly, and
 -- EachCardInGraveyard and EachCardInHand name one through their scope; the other
@@ -1899,10 +1904,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- 402.3) -- the arm above's answer.
   --
   -- effectContext and NOT Filter.contextFor, so the resolution's own slot
-  -- bindings ride along and a filter reading a slot (Filter.IsBound) is not
-  -- vacuously False here. Amnesia's "nonland" reads no slot, so no test on this
-  -- module can tell the two apart at this site (#2075); the sibling sweeps are
-  -- written the same way for the reason spelled out at EachMatching above.
+  -- bindings and their CR 201.2a names ride along and a filter reading a slot is
+  -- not vacuously False here. PROVED by Pawl.ResolveSpec's Hour of Glory cases:
+  -- its sweep is Filter.SameNameAsBound over the target the FIRST clause exiled,
+  -- so swapping in a bare Filter.contextFor exiles nothing. The sibling sweeps
+  -- are written the same way for the reason spelled out at EachMatching above.
   --
   -- No sourceAttachedTo override, unlike EachMatching: no card in a hand names
   -- what its Aura's host is.
