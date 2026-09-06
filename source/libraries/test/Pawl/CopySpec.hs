@@ -2614,3 +2614,64 @@ ivySpec s registry =
           Spec.assertEqWith s "CR 707.10e a 2/1 Ivy is no legal target for 'power 4 or greater', so the copy isn't created and she lives" (runOn board) (1, 1, 0)
           Spec.assertEqWith s "CR 707.10e a 5/4 Ivy is one, so the copy is created and destroys her" (runOn pumped) (2, 0, 0)
           Spec.assertBool s (ivyId /= berserkersId) "Ivy and the Berserkers are distinct objects"
+
+-- CR 115.1's "targets only a single ..." NARROWED by a description of the one
+-- target, end to end: Leyline of Resonance {2}{R}{R} Enchantment, "If this card
+-- is in your opening hand, you may begin the game with it on the battlefield.
+-- Whenever you cast an instant or sorcery spell that targets only a single
+-- creature you control, copy that spell. You may choose new targets for the
+-- copy." (data/cards/leyline-of-resonance.json, Oracle text verified
+-- 2026-09-05.)
+--
+-- The spell alice casts is Angelic Edict, whose slot names CR 110.1's PERMANENT
+-- pool, so its one target is a Recipient.ToObject. That is deliberate: the
+-- condition is answered off the TARGET's own view, so a "target permanent" spell
+-- aimed at a creature satisfies "a single creature" exactly as a "target
+-- creature" spell does, which is what the printed template asks and what the
+-- recipient tag alone could not say.
+--
+-- Two boards differing in ONE thing -- which creature the Edict names -- carry
+-- the "you control" half: alice's own Spider on one, bob's Piker on the other,
+-- with carol sitting out so the three roles stay apart.
+leylineOfResonanceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+leylineOfResonanceSpec s registry =
+  let boardOf = do
+        plains <- S.printingOf s registry "Plains"
+        leyline <- S.printingOf s registry "Leyline of Resonance"
+        spider <- S.printingOf s registry "Giant Spider"
+        berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+        piker <- S.printingOf s registry "Goblin Piker"
+        edict <- S.printingOf s registry "Angelic Edict"
+        let lands = S.landsFor plains S.alice 5 S.threePlayerGame
+            (_, g1) = S.addPermanent leyline S.alice lands
+            (spiderId, g2) = S.addPermanent spider S.alice g1
+            (berserkersId, g3) = S.addPermanent berserkers S.alice g2
+            (pikerId, g4) = S.addPermanent piker S.bob g3
+            (edictId, g5) = S.addHandCard edict S.alice g4
+        pure (spiderId, berserkersId, pikerId, edictId, g5)
+      -- Pin one announcement by FILTERING the offered set, never by building a
+      -- recipient: CR 608.2b re-reads what was chosen. Reaches the cast and CR
+      -- 707.10c's re-target prompt alike, so each phase below is run with its
+      -- own.
+      aimAt :: ObjectId -> Prompt.Prompt r -> r
+      aimAt oid p = case p of
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) asked
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      -- alice casts the Edict at `victim`, CR 603.3b puts any trigger above it,
+      -- and that trigger alone resolves -- the moment the copy either exists or
+      -- does not. CR 707.10c's prompt then aims the copy at `newTarget`.
+      afterTrigger victim newTarget edictId board =
+        let cast = snd (Engine.runGamePure (aimAt victim) board {GameState.priority = Just S.alice} (S.cast S.alice edictId))
+         in resolveOne (aimAt newTarget) (snd (Engine.runGamePure S.identityAnswer cast Engine.settleForPriority))
+   in Spec.describe s "Pawl.Engine.Copy" . Spec.it s "CR 115.1 the trigger reads the one target's own description, not the pool its slot named" $ do
+        (spiderId, berserkersId, pikerId, edictId, board) <- boardOf
+        let ownRun = drainStack S.identityAnswer (afterTrigger spiderId berserkersId edictId board)
+            othersRun = drainStack S.identityAnswer (afterTrigger pikerId berserkersId edictId board)
+            standing gs = (onBattlefield spiderId gs, onBattlefield berserkersId gs, onBattlefield pikerId gs)
+        -- The fixture's own precondition: all three creatures are on the
+        -- battlefield to start with, so every read below is of a change.
+        Spec.assertEqWith s "all three creatures start on the battlefield" (standing board) (True, True, True)
+        Spec.assertEqWith s "CR 115.1 alice's Spider is one creature she controls, so the copy exiled the Berserkers too" (standing ownRun) (False, False, True)
+        Spec.assertEqWith s "CR 115.1 bob's Piker is not, so no copy was made and both of alice's creatures stand" (standing othersRun) (True, True, False)
+        Spec.assertBool s (spiderId /= berserkersId && berserkersId /= pikerId) "the three creatures are distinct objects"

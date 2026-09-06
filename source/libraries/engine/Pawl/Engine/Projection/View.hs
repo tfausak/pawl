@@ -143,6 +143,7 @@ viewOfCard face =
           Filter.castFrom = Nothing,
           -- CR 115.1: a printed face is on no stack and targets nothing.
           Filter.targets = Set.empty,
+          Filter.targetViews = Map.empty,
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
@@ -355,6 +356,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 115.7 can move them, so nothing here is a stamp. Empty for an id
       -- naming nothing and for everything off the stack.
       Filter.targets = maybe Set.empty (targetsOfStackObject gs) (Game.lookupObject oid gs),
+      -- CR 115.1's targets one indirection along, filled beside them and lazily:
+      -- nothing forces this map but Filter.TargetsOnlyOne's nest.
+      Filter.targetViews = maybe Map.empty (targetViewsOfStackObject peers gs) (Game.lookupObject oid gs),
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3).
@@ -1138,6 +1142,32 @@ targetsOfStackObject gs obj
             Source.OfToken _ -> Set.empty
             Source.OfEmblem _ -> Set.empty
        in Set.unions (Map.elems (Map.restrictKeys (Binding.targetsOf bindings) declared))
+
+-- CR 115.1 one indirection along: a VIEW of each thing the stack object above
+-- targets, which is what Filter.TargetsOnlyOne's nest is matched against. What
+-- Pawl.Engine.Filter.View's `targetViews` is filled from.
+--
+-- Through `peers` for an object target, exactly as `attachedToView` is: the
+-- reader is bounded, and taking a full projection here would re-enter the fold
+-- viewOfCharacteristics stands in. A player target answers Count.playerView,
+-- which no projection reaches at all.
+--
+-- A recipient whose object is gone is DROPPED rather than mapped to a blank
+-- view: CR 608.2b leaves nothing to describe, and Pawl.Engine.Filter answers the
+-- atom False for a missing key.
+targetViewsOfStackObject :: Count.ViewOf -> GameState -> Object.Object -> Map Recipient.Recipient Filter.View
+targetViewsOfStackObject peers gs obj =
+  Map.fromList
+    (Maybe.mapMaybe (\r -> fmap ((,) r) (viewOfRecipient peers gs r)) (Set.toList (targetsOfStackObject gs obj)))
+
+-- The view one recipient answers, splitting CR 115.1's two kinds of target: a
+-- player is Count.playerView's candidate, and an object one the bounded reader
+-- above answers for. Nothing for CR 406.4's pile, which is neither and which CR
+-- 601.2c never leaves on a stack object anyway.
+viewOfRecipient :: Count.ViewOf -> GameState -> Recipient.Recipient -> Maybe Filter.View
+viewOfRecipient peers gs r = case Recipient.playerOf r of
+  Just pid -> Just (Count.playerView gs pid)
+  Nothing -> Recipient.objectOf r >>= peers
 
 -- One control-granting static ability, flattened: the source and the timestamp
 -- its effect takes (CR 613.7a).

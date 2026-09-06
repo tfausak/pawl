@@ -2280,7 +2280,10 @@ filterReads f = case f of
   -- characteristic, so no Modification writes one.
   Filter.Type.TargetsSource -> Set.empty
   Filter.Type.TargetsOnlySource -> Set.empty
-  Filter.Type.TargetsOnlyOne _ -> Set.empty
+  -- DESCENT where its siblings above read nothing: the nest is matched against
+  -- the TARGET's view, so whatever aspect it asks of that object is an aspect a
+  -- Modification can move.
+  Filter.Type.TargetsOnlyOne g -> filterReads g
   Filter.Type.TargetsPlayer _ -> Set.empty
   -- Reads an IDENTITY, which CR 109.3 does not count as a characteristic.
   Filter.Type.IsBound _ -> Set.empty
@@ -2475,12 +2478,17 @@ filterReads f = case f of
 -- board-wide re-ask, a wrong False loses a dependency.
 filterReadsPeers :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
 filterReadsPeers f = case f of
-  -- The four atoms that read a peer view directly.
+  -- The atoms that read a peer view directly, off a field of the candidate's
+  -- own view.
   Filter.Type.AttachedTo _ -> True
   Filter.Type.HasAttached _ -> True
   Filter.Type.IsAttackingPlaneswalker _ -> True
   Filter.Type.IsAttackingBattle _ -> True
-  -- The fifth: abilitiesFromCharacteristics runs CR 604.2's gate through
+  -- CR 115.1's target view comes through `peers` too, whatever the nest asks of
+  -- it -- so True outright rather than by descent.
+  Filter.Type.TargetsOnlyOne _ -> True
+  -- And the two that reach one through a GATE rather than a field:
+  -- abilitiesFromCharacteristics runs CR 604.2's condition through
   -- Condition.holds, which takes `peers` to any object at all (#2633).
   Filter.Type.HasNonManaActivatedAbility -> True
   Filter.Type.HasActivatedAbility -> True
@@ -2533,7 +2541,6 @@ filterReadsPeers f = case f of
   Filter.Type.IsSource -> False
   Filter.Type.TargetsSource -> False
   Filter.Type.TargetsOnlySource -> False
-  Filter.Type.TargetsOnlyOne _ -> False
   Filter.Type.TargetsPlayer _ -> False
   Filter.Type.IsBound _ -> False
   Filter.Type.SameNameAsBound _ -> False

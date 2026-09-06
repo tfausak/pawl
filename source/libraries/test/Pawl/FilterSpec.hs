@@ -23,7 +23,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.RecipientKind as RecipientKind
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -60,6 +59,7 @@ blackCreature =
       -- CR 115.1: a permanent targets nothing; the Targets cases below build a
       -- stack view of their own.
       Filter.targets = Set.empty,
+      Filter.targetViews = Map.empty,
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -120,6 +120,7 @@ devoidBigCreature =
       Filter.zone = Nothing,
       Filter.castFrom = Nothing,
       Filter.targets = Set.empty,
+      Filter.targetViews = Map.empty,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -243,6 +244,16 @@ targetingSpell =
   blackCreature
     { Filter.zone = Just Zone.Stack,
       Filter.targets = Set.fromList [Recipient.ToCreature (ObjectId.MkObjectId 9), Recipient.ToPlayer (PlayerId.MkPlayerId 1)]
+    }
+
+-- `targetingSpell` narrowed to ONE target, with that target's own view filled
+-- beside the recipient the way Pawl.Engine.Projection.View.viewOfCharacteristics
+-- fills it -- which is what TargetsOnlyOne's nest is matched against.
+aimedAt :: Recipient.Recipient -> Filter.View -> Filter.View
+aimedAt r target =
+  targetingSpell
+    { Filter.targets = Set.singleton r,
+      Filter.targetViews = Map.singleton r target
     }
 
 -- The player candidate every "vacuously false" case below is asked about.
@@ -649,21 +660,38 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) aPlayer Filter.Type.TargetsOnlySource)) "player"
       Spec.assertBool s (not (Filter.matches (Filter.contextFor Teams.none (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 9))) blackCreature Filter.Type.TargetsOnlySource)) "a permanent targets nothing"
 
-  -- CR 115.1's "only" asked by KIND rather than by identity: Ivy, Gleeful
-  -- Spellthief's trigger condition. The gameplay-level proof is Pawl.CopySpec's
-  -- Ivy group; these cases pin the atom, and the pair against TargetsOnlySource
-  -- above is what shows the two are different questions -- one target of the
-  -- named kind, whoever it is.
+  -- CR 115.1's "only" asked by DESCRIPTION rather than by identity: Leyline of
+  -- Resonance's trigger condition. The gameplay-level proof is Pawl.CopySpec's
+  -- Leyline of Resonance group; these cases pin the atom, and the pair against
+  -- TargetsOnlySource above is what shows the two are different questions -- one
+  -- target the nest describes, whoever it is.
   Spec.describe s "TargetsOnlyOne" $ do
-    Spec.it s "matches one target of the named kind, and nothing else" $ do
-      Spec.assertBool s (Filter.matches self (targetingSpell {Filter.targets = Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 9))}) (Filter.Type.TargetsOnlyOne RecipientKind.Creature)) "one creature target"
-      Spec.assertBool s (not (Filter.matches self (targetingSpell {Filter.targets = Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 9))}) (Filter.Type.TargetsOnlyOne RecipientKind.Player))) "which is not a player target"
-      Spec.assertBool s (not (Filter.matches self (targetingSpell {Filter.targets = Set.singleton (Recipient.ToObject (ObjectId.MkObjectId 9))}) (Filter.Type.TargetsOnlyOne RecipientKind.Creature))) "and the SAME object named by CR 110.1's permanent pool is not one either"
+    Spec.it s "matches one target the nest describes, and nothing else" $ do
+      Spec.assertBool s (Filter.matches self (aimedAt (Recipient.ToCreature (ObjectId.MkObjectId 9)) blackCreature) (Filter.Type.TargetsOnlyOne (Filter.Type.HasCardType CardType.Creature))) "one creature target"
+      Spec.assertBool s (not (Filter.matches self (aimedAt (Recipient.ToCreature (ObjectId.MkObjectId 9)) blackCreature) (Filter.Type.TargetsOnlyOne (Filter.Type.HasCardType CardType.Land)))) "which is not a land"
+      -- CR 115.1a / 110.1: the SAME object reached through CR 110.1's permanent
+      -- pool rather than CR 115.1a's creature pool. The nest reads the target's
+      -- own view, so the tag the spell's slot carries no longer narrows it --
+      -- the reading that had pawl running stricter than printed, see #3272.
+      Spec.assertBool s (Filter.matches self (aimedAt (Recipient.ToObject (ObjectId.MkObjectId 9)) blackCreature) (Filter.Type.TargetsOnlyOne (Filter.Type.HasCardType CardType.Creature))) "and so is the same creature named by CR 110.1's permanent pool"
 
-    Spec.it s "asks arity as well as kind" $ do
-      Spec.assertBool s (not (Filter.matches self (targetingSpell {Filter.targets = Set.fromList [Recipient.ToCreature (ObjectId.MkObjectId 9), Recipient.ToCreature (ObjectId.MkObjectId 10)]}) (Filter.Type.TargetsOnlyOne RecipientKind.Creature))) "two creature targets are not a single one"
-      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.TargetsOnlyOne RecipientKind.Creature))) "and a permanent targets nothing"
-      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.TargetsOnlyOne RecipientKind.Player))) "as does a player"
+    Spec.it s "CR 115.1 judges the nest in the candidate's own context" $ do
+      Spec.assertBool s (Filter.matches self (aimedAt (Recipient.ToCreature (ObjectId.MkObjectId 9)) blackCreature) (Filter.Type.TargetsOnlyOne (Filter.Type.ControlledBy PlayerRelation.You))) "player 0 controls the one target, from player 0"
+      Spec.assertBool s (not (Filter.matches other (aimedAt (Recipient.ToCreature (ObjectId.MkObjectId 9)) blackCreature) (Filter.Type.TargetsOnlyOne (Filter.Type.ControlledBy PlayerRelation.You)))) "and player 1 does not, from player 1"
+
+    Spec.it s "CR 115.1 a player target answers a player view" $ do
+      Spec.assertBool s (Filter.matches self (aimedAt (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) aPlayer) (Filter.Type.TargetsOnlyOne (Filter.Type.IsPlayer PlayerRelation.AnyPlayer))) "one player target"
+      Spec.assertBool s (not (Filter.matches self (aimedAt (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) aPlayer) (Filter.Type.TargetsOnlyOne (Filter.Type.HasCardType CardType.Creature)))) "which is no creature"
+
+    Spec.it s "asks arity as well as the description" $ do
+      Spec.assertBool s (not (Filter.matches self (targetingSpell {Filter.targets = Set.fromList [Recipient.ToCreature (ObjectId.MkObjectId 9), Recipient.ToCreature (ObjectId.MkObjectId 10)], Filter.targetViews = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 9), blackCreature), (Recipient.ToCreature (ObjectId.MkObjectId 10), blackCreature)]}) (Filter.Type.TargetsOnlyOne (Filter.Type.HasCardType CardType.Creature)))) "two creature targets are not a single one"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.TargetsOnlyOne (Filter.Type.HasCardType CardType.Creature)))) "and a permanent targets nothing"
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.TargetsOnlyOne (Filter.Type.IsPlayer PlayerRelation.AnyPlayer)))) "as does a player"
+
+    -- CR 608.2b: a target whose object has left leaves the map without the key,
+    -- and no description is answerable of it.
+    Spec.it s "CR 608.2b a target with no view answers nothing" $
+      Spec.assertBool s (not (Filter.matches self (targetingSpell {Filter.targets = Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 9)), Filter.targetViews = Map.empty}) (Filter.Type.TargetsOnlyOne (Filter.Type.And [])))) "not even the trivial one"
 
   Spec.describe s "TargetsPlayer" $ do
     Spec.it s "CR 115.1 You matches a spell aimed at the perspective, and Opponent one aimed at another player" $ do

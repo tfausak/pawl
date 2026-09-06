@@ -232,7 +232,10 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsSource -> 0
   Filter.Type.TargetsSource -> 0
   Filter.Type.TargetsOnlySource -> 0
-  Filter.Type.TargetsOnlyOne _ -> 0
+  -- A DESCENT and not a zero, for AttachedTo's reason below: CR 115.1's atom
+  -- carries the one target's description, a Filter position a card author
+  -- writes into like any other.
+  Filter.Type.TargetsOnlyOne f -> canHostSubjects f
   Filter.Type.TargetsPlayer _ -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0

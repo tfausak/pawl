@@ -2958,6 +2958,7 @@ stubView table oid =
                 Filter.castFrom = Nothing,
                 -- CR 115.1: the stub is of a permanent, which targets nothing.
                 Filter.targets = Set.empty,
+                Filter.targetViews = Map.empty,
                 Filter.identity = Just o,
                 Filter.playerIdentity = Nothing,
                 Filter.attacking = False,

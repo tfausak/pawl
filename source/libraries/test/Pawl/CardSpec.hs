@@ -3482,7 +3482,9 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsSource -> []
   Filter.Type.TargetsSource -> []
   Filter.Type.TargetsOnlySource -> []
-  Filter.Type.TargetsOnlyOne _ -> []
+  -- DESCENT, for AttachedTo's reason below: CR 115.1's atom carries the one
+  -- target's description, which a card author writes like any other filter.
+  Filter.Type.TargetsOnlyOne f -> filterSlotsReadSingly f
   Filter.Type.TargetsPlayer _ -> []
   -- Reads the whole bound set off Filter.Context, so a group is every one of its
   -- members rather than nothing -- the atom this lint must NOT report.
