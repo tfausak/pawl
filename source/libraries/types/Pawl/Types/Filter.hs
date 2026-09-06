@@ -315,12 +315,10 @@ data Filter keyword
     -- Aura card that could enchant it", the mirror of CanHostSubject above.
     -- Answered by Pawl.Engine.Attach.attachableWithLastKnown, whose other half is
     -- CR 608.2h's last-known read of a host that has left the battlefield;
-    -- Pawl.CardSpec rejects the atom outside a search's filter.
-    --
-    -- Not implemented: the same question with the host fixed by anything but the
-    -- searching ability's source -- Sovereigns of Lost Alara's bound creature,
-    -- Bruna's, and Takklemaggot's choose-position reading of CanHostSubject
-    -- (#2028).
+    -- Pawl.CardSpec rejects the atom outside a search's filter. WHICH object is
+    -- fixed is Pawl.Types.Search.subject: the searching ability's own source
+    -- (Auratouched Mage) or a slot the resolution bound (Sovereigns of Lost
+    -- Alara's "that creature").
     CanAttachToSubject
   | -- | CR 111.6: the candidate is a token; "nontoken" is @Not IsToken@ (#163).
     -- Uncharacteristic and immutable, CR 111.3 making a token's effect-defined

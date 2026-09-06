@@ -365,8 +365,7 @@ data View = MkView
     -- conjunct is the rule's rather than the card's (Attach.turnUpHosts).
     -- The question with the two roles SWAPPED -- a candidate that could be
     -- attached to a fixed host -- is `canAttachToSubject` below rather than a
-    -- widening of this field. Rule 701.3a asked with the host fixed by anything
-    -- but a searching ability's source is #2028.
+    -- widening of this field.
     canHostSubject :: Bool,
     -- CR 701.3a read the other way: could THIS CANDIDATE legally be attached to
     -- the object the surrounding instruction fixes -- Auratouched Mage's "an Aura
@@ -378,7 +377,8 @@ data View = MkView
     -- Pawl.Engine.Resolve's Effect.Search arm is the only site that fills it,
     -- from Pawl.Engine.Attach.attachableWithLastKnown -- whose live half is the
     -- same function that performs the move, and whose other half is CR 608.2h's
-    -- reading of a host that has left the battlefield.
+    -- reading of a host that has left the battlefield. Which object is fixed is
+    -- Pawl.Types.Search.subject, the source or a bound slot.
     --
     -- LAZY, for attachedToView's cost reason: filling it projects the candidate
     -- and sweeps the battlefield for the fixed host's admission, so a search

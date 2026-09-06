@@ -443,7 +443,8 @@ canAttachToSubjectTag = Text.pack "CanAttachToSubject"
 
 -- How many CR 701.3a candidate-side atoms this card carries inside a SEARCH's
 -- filter, and how many anywhere else. The second number is the offence; the first
--- is what Auratouched Mage legitimately has one of.
+-- is what Auratouched Mage and Sovereigns of Lost Alara legitimately have one of
+-- each.
 canAttachToSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canAttachToSubjectCounts card =
   let total wanted = sum [filterAtoms canAttachToSubjectTag f | (framing, f) <- cardFilters card, (framing == SearchFramed) == wanted]
@@ -828,7 +829,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 701.3a: "An Aura, Equipment, or Fortification can't be attached to an
   -- object or player it couldn't enchant, equip, or fortify, respectively." The
   -- atom that asks that question is answerable only where an attach frames the
-  -- match, and vacuously False everywhere else. See canHostSubjectOffends for the
+  -- match, and vacuously False everywhere else. Not implemented: the atom at a
+  -- CHOICE, where Takklemaggot's "chooses a creature that this card could
+  -- enchant" writes it (#3312). See canHostSubjectOffends for the
   -- two offences this one predicate covers.
   Spec.it s "CR 701.3a no card asks CanHostSubject outside an attach's destination" $ do
     ps <- S.allPrintings s
@@ -872,6 +875,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
+  -- Not implemented: the atom at an ATTACH, where Bruna, Light of Alabaster's
+  -- "attach any number of Aura cards that could enchant it" writes it (#3311).
+  --
   -- CR 701.3a from the candidate's side: Filter.CanAttachToSubject is answerable
   -- only where the evaluator supplies the fixed host, which is a search's filter
   -- and nothing else. See canAttachToSubjectOffends for the two offences.
@@ -879,19 +885,27 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace canAttachToSubjectOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only in a search's filter" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: the pool authors the atom, and the one card that does is
-    -- ACCEPTED here rather than skipped.
+    -- NOT vacuous: the pool authors the atom, and both cards that do are
+    -- ACCEPTED here rather than skipped -- one saying "it" of its own source and
+    -- one saying "that creature" of a slot its trigger bound, which is the axis
+    -- Pawl.Types.Search.subject carries and this lint is blind to.
     mage <- S.printingOf s registry "Auratouched Mage"
     Spec.assertEqWith
       s
       "Auratouched Mage's one atom is framed by its own search"
       (canAttachToSubjectCounts (S.combinedFace mage))
       (1, 0)
+    sovereigns <- S.printingOf s registry "Sovereigns of Lost Alara"
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "and so is Sovereigns of Lost Alara's"
+      (canAttachToSubjectCounts (S.combinedFace sovereigns))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those are the pool's only two"
       (sum (fmap (uncurry (+) . canAttachToSubjectCounts . S.combinedFace) ps))
-      1
+      2
     -- The unframed side has room to spare, so a Framing that had stopped marking
     -- searches would fail here rather than pass the sweep above by iterating over
     -- nothing.
@@ -1926,7 +1940,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "a Search filter",
-              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand, Search.subject = Nothing}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
               base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)] Map.empty}
@@ -2042,7 +2056,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}]]}
+              base {Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand, Search.subject = Nothing}]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)
@@ -2242,7 +2256,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- filter is matched in the resolution's own context
     -- (Pawl.Engine.Resolve.Slots.effectContext), so the same buried atom that offends
     -- in every position above is accepted here.
-    let searched = base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+    let searched = base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = buried, Search.upTo = False, Search.destination = SearchDestination.RevealThenHand, Search.subject = Nothing}] Map.empty}
     Spec.assertEqWith
       s
       "a buried atom in a search's filter is accepted"
@@ -2288,7 +2302,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           Modal.MkModal
             (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
             (ModeSelection.ChooseExactly 1)
-        searchFor f = Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = f, Search.upTo = False, Search.destination = SearchDestination.Exile}
+        searchFor f = Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Type.Literal 1), Search.filter = f, Search.upTo = False, Search.destination = SearchDestination.Exile, Search.subject = Nothing}
         planted =
           [ ( "a mode's target slot",
               base {Face.spell = spellOf [] (Map.singleton slot (TargetSlot.required Pool.Permanents (Just buried)))}

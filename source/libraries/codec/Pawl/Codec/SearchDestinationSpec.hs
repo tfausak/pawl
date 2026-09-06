@@ -31,12 +31,18 @@ spec s = Spec.describe s "Pawl.Codec.SearchDestination" $ do
       SearchDestination.codec
       SearchDestination.Exile
       " {\"type\":\"Exile\"} "
-  Spec.it s "BattlefieldAttachedToSource" $
+  Spec.it s "BattlefieldAttachedOrHand" $
     Common.assertCodec
       s
       SearchDestination.codec
-      SearchDestination.BattlefieldAttachedToSource
-      " {\"type\":\"BattlefieldAttachedToSource\"} "
+      SearchDestination.BattlefieldAttachedOrHand
+      " {\"type\":\"BattlefieldAttachedOrHand\"} "
+  Spec.it s "BattlefieldAttached" $
+    Common.assertCodec
+      s
+      SearchDestination.codec
+      SearchDestination.BattlefieldAttached
+      " {\"type\":\"BattlefieldAttached\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.
