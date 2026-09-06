@@ -952,9 +952,9 @@ prohibitsBecomingMonarch pid gs =
 -- consumers to.
 --
 -- Not implemented: a stored row whose source is still on the battlefield and
--- chooses a SECOND name afterwards reads the later name too, where CR 608.2c
--- made the choice once and the effect should hold that one. No printed card can
--- reach it --
+-- chooses a SECOND name afterwards reads that later name instead, where CR 608.2c
+-- made the choice once and the effect should hold the one it was made with. No
+-- printed card can reach it --
 -- every chosen-name prohibition in the pool either is a permanent's own static
 -- ability or comes from a resolution that leaves the zone at once (#2531).
 --

@@ -2046,6 +2046,33 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "and the rest of the library is untouched"
       (namesIn Zone.Library S.bob settled)
       [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+  -- CR 608.2c scopes "the chosen name" to the resolution that chose it, so a
+  -- PERMANENT that resolves the instruction twice answers about the second name
+  -- alone. The set on the source is assigned rather than added to, which is what
+  -- this pins: every earlier ChooseCardName producer was an instant or a sorcery,
+  -- whose next cast is a new object (CR 400.7) with an empty set of its own, so
+  -- Petra Sphinx is the first card that can tell the two writes apart.
+  --
+  -- bob names Goblin Piker first and Chromatic Star second, and the two reveals
+  -- are Crucible of Worlds then a Goblin Piker -- so the SECOND reveal is the one
+  -- the FIRST name would have matched. Under a union the Piker reaches bob's
+  -- hand; under CR 201.4 read through rule 608.2c both cards go to his graveyard.
+  Spec.it s "CR 201.4/608.2c a second activation of Petra Sphinx forgets the name the first one chose" $ do
+    settled <- twiceSphinx s registry
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    -- The gameplay assertion, and first: a set that kept the first name sends the
+    -- second reveal to bob's HAND instead.
+    Spec.assertEqWith s "neither reveal carried the name its own activation chose" (namesIn Zone.Hand S.bob settled) []
+    Spec.assertEqWith
+      s
+      "so both went to bob's graveyard, in the order revealed"
+      (namesIn Zone.Graveyard S.bob settled)
+      [nameOf "Crucible of Worlds", nameOf "Goblin Piker"]
+    Spec.assertEqWith
+      s
+      "and two of the four cards are still in his library"
+      (namesIn Zone.Library S.bob settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3268,6 +3295,38 @@ resolveSphinx s registry top = do
   case ability of
     Nothing -> pure gs
     Just a -> pure (S.runPure sphinxAnswer gs (Activate.activateAbility S.alice sphinxId a >> Stack.resolveTop))
+
+-- sphinxAnswer with the name FIXED rather than read off the chooser: the
+-- two-activation case needs a different name per activation, and a pure
+-- Prompt -> r answerer cannot tell two structurally identical prompts apart, so
+-- the two activations are run under two answerers instead.
+sphinxNaming :: String -> Prompt.Prompt r -> r
+sphinxNaming named p = case p of
+  Prompt.ChooseCardName {} -> CardName.MkCardName (Text.pack named)
+  _ -> atBobAnswer p
+
+-- Alice's Petra Sphinx over a four-card library of bob's, activated on two
+-- separate resolutions with a different name each time. The untap between them
+-- is Event.untap, the same road CR 502.1 takes, so the second activation pays a
+-- real {T}.
+twiceSphinx :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+twiceSphinx s registry = do
+  sphinx <- S.printingOf s registry "Petra Sphinx"
+  piker <- S.printingOf s registry "Goblin Piker"
+  crucible <- S.printingOf s registry "Crucible of Worlds"
+  let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
+      (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
+      -- Top first: Crucible of Worlds, then a Goblin Piker, then two more to
+      -- keep bob off CR 104.3c and to keep the library assertion a count.
+      g1 = foldl (flip stock) g0 [piker, piker, piker, crucible]
+      board = g1 {GameState.priority = Just S.alice}
+  case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)) of
+    Nothing -> pure board
+    Just a -> do
+      let once named gs = S.runPure (sphinxNaming named) gs (Activate.activateAbility S.alice sphinxId a >> Stack.resolveTop)
+          first_ = once "Goblin Piker" board
+          untapped = S.runPure S.identityAnswer first_ (Event.untap sphinxId)
+      pure (once "Chromatic Star" untapped)
 
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be

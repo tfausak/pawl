@@ -8,6 +8,7 @@ import qualified Pawl.Codec.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Codec.EachCardInHand as EachCardInHand
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.RandomCardInHand as RandomCardInHand
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TopOfLibrary as TopOfLibrary
@@ -53,6 +54,10 @@ codec =
       Arm.nullary "ChosenPlayer" ObjectRef.ChosenPlayer,
       Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
       Arm.payload "TopOfLibraryUntil" TopOfLibraryUntil.codec ObjectRef.TopOfLibraryUntil (\x -> case x of ObjectRef.TopOfLibraryUntil y -> Just y; _ -> Nothing),
+      -- CR 404.1's own end of the pile, and the one position arm carrying a bare
+      -- 'Pawl.Codec.PlayerRef' rather than a payload record: with no depth and no
+      -- filter to state, the seat is the whole of what a card writes.
+      Arm.payload "TopOfGraveyard" PlayerRef.codec ObjectRef.TopOfGraveyard (\x -> case x of ObjectRef.TopOfGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInHand" ChosenCardInHand.codec ObjectRef.ChosenCardInHand (\x -> case x of ObjectRef.ChosenCardInHand y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardFromAmong" ChosenCardFromAmong.codec ObjectRef.ChosenCardFromAmong (\x -> case x of ObjectRef.ChosenCardFromAmong y -> Just y; _ -> Nothing),

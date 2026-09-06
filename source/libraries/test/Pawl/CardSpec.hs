@@ -628,12 +628,13 @@ playerRefPositions =
     playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
     affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
 
--- The same list one type in, for the four ObjectRef arms that count PER SEAT
+-- The same list one type in, for the ObjectRef arms that count PER SEAT
 -- (CR 400.1's per-player zones). Resolve.objectRefPlayerRefs is what owes these.
 objectRefPlayerRefPositions :: [(String, ObjectRef.ObjectRef, [PlayerRef.PlayerRef])]
 objectRefPlayerRefPositions =
   [ ("top-of-library", ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (plantedPlayer "tl") (Quantity.Type.Literal 1)), [plantedPlayer "tl"]),
     ("top-of-library-until", ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (plantedPlayer "tu") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "tu"]),
+    ("top-of-graveyard", ObjectRef.TopOfGraveyard (plantedPlayer "tg"), [plantedPlayer "tg"]),
     ("chosen-card-in-hand", ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (plantedPlayer "ch") (Filter.Type.And [])), [plantedPlayer "ch"]),
     ("random-card-in-hand", ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (plantedPlayer "rh") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "rh"])
   ]
@@ -2876,6 +2877,10 @@ objectRefFilters ref = case ref of
   -- match-defining Filter here, and whatever a Count or a CR 122.1b counter kind
   -- under the count would hold via the arm above's route.
   ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil _ f _) -> unframed [f] <> refFilters ref
+  -- Soldevi Digger's "the top card of your graveyard" names a POSITION with no
+  -- depth and no Filter beside it, so unlike the two library arms above it holds
+  -- nothing at all to lint: its PlayerRef names players.
+  ObjectRef.TopOfGraveyard _ -> []
   -- Port of Karfell's "a creature card from your graveyard"; its ZoneScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
@@ -3113,7 +3118,7 @@ staticAbilityFilters ability =
         <> frame Unframed (concatMap durationFilters (Maybe.maybeToList (StaticAbility.lingers ability)))
         <> concatMap modificationFilters (StaticAbility.modifications ability)
     )
-    <> frame SourceHostFramed (concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability)))
+    <> frame StandingHostFramed (concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability)))
 
 -- CR 603.6a's "whenever [a permanent] enters" carries one directly; CR 603.8's
 -- state trigger carries one through its Condition's Counts.
@@ -3990,18 +3995,32 @@ blockPermissionFilters permission =
 --     misplaced SameNameAsBound admits nothing and a misplaced
 --     SameControllerAsBound admits everything, so this tag carries more for the
 --     second than for the first.
---   * SourceHostFramed -- a position whose evaluator fills
---     Filter.Context.sourceAttachedTo, which is five rather than one: a static
+--   * SourceHostFramed -- an EFFECT's Pawl.Types.ObjectRef
+--     (Pawl.Engine.Resolve.Slots.objectRefObjects), which fills
+--     Filter.Context.sourceAttachedTo and, being a resolution's own context,
+--     everything else effectContext fills too.
+--   * StandingHostFramed -- the other positions that fill
+--     Filter.Context.sourceAttachedTo, none of them inside a resolution: a static
 --     ability's CR 604.2 clause (Pawl.Engine.Projection.conditionHolds), a
---     triggered ability's CR 603.4 clause (Pawl.Engine.Event.Trigger.interveningHolds and
---     Pawl.Engine.Stack's CR 608.2a re-check), an effect's
---     Pawl.Types.ObjectRef (Pawl.Engine.Resolve.Slots.objectRefObjects), a printed
---     PLAYER ability's own effect (Pawl.Engine.PlayerEffect.matchesObjectFrom,
---     which takes the source off the row `applying` returns), and a CR 614.1
---     replacement ROW's own Filters -- its pattern's two and CR 614.9's printed
---     destination -- which Pawl.Engine.Replacement.candidateContext reads
---     (Pariah's "enchanted creature"). CR 303.4b's Filter.IsHostOfSource belongs
---     in those five and nowhere else.
+--     triggered ability's CR 603.4 clause
+--     (Pawl.Engine.Event.Trigger.interveningHolds and Pawl.Engine.Stack's CR
+--     608.2a re-check), and a printed PLAYER ability's own clause and effect
+--     (Pawl.Engine.PlayerEffect.matchesObjectFrom, which takes the source off the
+--     row `applying` returns).
+--
+--     Split off SourceHostFramed by #3320 over ONE field: CR 201.4's
+--     Filter.HasChosenName is answerable at an effect's ObjectRef and nowhere
+--     here, these three building their contexts through Filter.contextFor and
+--     Filter.contextWithSlots, which leave sourceChosenNames empty. Not a general
+--     "these supply nothing" tag -- `hostFramed` treats the two alike, and the
+--     intervening "if" fills Filter.Context.slotObjects off the TRIGGER's
+--     bindings, which is why isBoundCounts admits it exactly as before.
+--
+--     A CR 614.1 replacement ROW's own Filters -- its pattern's two and CR
+--     614.9's printed destination -- fill the host as well, through
+--     Pawl.Engine.Replacement.candidateContext (Pariah's "enchanted creature"),
+--     and carry ReplacementRowFramed below for the reason that constructor
+--     gives.
 --
 --     A printed replacement's CR 604.2 clause is NOT one of them, though it sits
 --     on the same ability: Pawl.Engine.Projection.replacementsOf evaluates it
@@ -4049,6 +4068,11 @@ data Framing
   | AttachDestination
   | InTargetSlot
   | SourceHostFramed
+  | -- | CR 604.2's, CR 603.4's and a printed player ability's own Filters: the
+    -- positions that fill Filter.Context.sourceAttachedTo without being inside a
+    -- resolution, so CR 201.4's chosen names are empty at all three. See the
+    -- overview above for the evaluators and for what the split buys.
+    StandingHostFramed
   | -- | CR 701.23's search filter, the one position whose evaluator supplies the
     -- object a CR 701.3a question can be asked ABOUT from the candidate's side:
     -- Pawl.Engine.Resolve's Effect.Search arm overlays
@@ -4217,6 +4241,11 @@ sweptForSingularSlots framing = case framing of
   AttachDestination -> True
   InTargetSlot -> True
   SourceHostFramed -> True
+  -- SWEPT, as these positions were under SourceHostFramed before #3320 split them
+  -- off: CR 603.4's clause really does read the trigger's slots
+  -- (Filter.contextWithSlots), and where the other two read none the sweep can
+  -- only reject more, SlotlessCostFramed's argument.
+  StandingHostFramed -> True
   SearchFramed -> True
   OutsideTheGameFramed -> True
   ReplacementRowFramed -> True
@@ -4249,14 +4278,18 @@ framedSlotsReadSingly (framing, predicate)
 unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 unframed = fmap ((,) Unframed)
 
--- Tag a Filter position as one whose evaluator supplies the SOURCE's host -- the
--- first four listed on Framing above, the fifth carrying ReplacementRowFramed
--- instead for the reason that constructor gives. An ObjectRef's own Filter is
+-- Tag a Filter position as an EFFECT's ObjectRef -- one whose evaluator supplies
+-- the SOURCE's host AND the resolution's own state. An ObjectRef's own Filter is
 -- always one, whatever
 -- effect carries it, because Pawl.Engine.Resolve.Slots.objectRefObjects is the single
 -- site that turns an ObjectRef into objects.
 sourceHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 sourceHosted = fmap ((,) SourceHostFramed)
+
+-- sourceHosted's sibling for the positions that supply the host and NOTHING a
+-- resolution does; see StandingHostFramed for the list and for the split.
+standingHosted :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+standingHosted = fmap ((,) StandingHostFramed)
 
 -- Tag a Filter position as a SEARCH's, the one position whose evaluator supplies
 -- Filter.View.canAttachToSubject (CR 701.3a from the candidate's side).
@@ -4706,7 +4739,7 @@ triggeredAbilityFilters ability =
     -- Pawl.Engine.Stack's CR 608.2a re-check both supply the source's host here,
     -- and the trigger CONDITION above them is matched by Event.matchesTrigger,
     -- which does not.
-    <> frame SourceHostFramed (concatMap conditionFilters (Maybe.maybeToList (TriggeredAbility.intervening ability)))
+    <> frame StandingHostFramed (concatMap conditionFilters (Maybe.maybeToList (TriggeredAbility.intervening ability)))
     <> modalFilters (TriggeredAbility.modal ability)
 
 activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
@@ -4838,14 +4871,14 @@ cardFilters card =
     -- SOURCE-HOSTED for staticAbilityFilters' reason: a clause on a static
     -- ability is framed against the permanent that has it, so an IsSource inside
     -- it names that permanent rather than being unframed.
-    <> concatMap (frame SourceHostFramed . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
+    <> concatMap (frame StandingHostFramed . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
     -- And the EFFECT beside that clause, for the same reason and see #1242:
     -- Pawl.Engine.PlayerEffect.matchesObjectFrom is handed the row's own source,
     -- so CR 303.4b's atom is answerable in every arm of a printed player ability
     -- (Oppressive Rays' "enchanted creature"). The STORED CR 611.2c carrier is
     -- not -- Effect.AffectPlayers' own filters stay unframed above, because a
     -- resolved spell has no permanent behind it to be attached to anything.
-    <> concatMap (sourceHosted . playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
+    <> concatMap (standingHosted . playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap activatedAbilityFilters (grantedActivatedAbilities card)

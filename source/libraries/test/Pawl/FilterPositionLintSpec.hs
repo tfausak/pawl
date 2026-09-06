@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Cost as Cost.Codec
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -300,6 +300,10 @@ canHostSubjects predicate = case predicate of
 hostFramed :: Framing -> Bool
 hostFramed framing = case framing of
   SourceHostFramed -> True
+  -- The three positions #3320 split off SourceHostFramed keep its answer here:
+  -- what the split is about is CR 201.4's chosen names, not CR 303.4b's host,
+  -- which all four evaluators supply.
+  StandingHostFramed -> True
   ReplacementRowFramed -> True
   Unframed -> False
   AttachDestination -> False
@@ -473,14 +477,23 @@ hasChosenNameTag = Text.pack "HasChosenName"
 
 -- How many CR 201.4 chosen-name atoms this card carries inside one of the three
 -- ADMITTED positions -- a CR 701.23 search's filter, a CR 701.17 mill's tally, or
--- an ObjectRef's own Filter -- and how many anywhere else. The second number is
+-- an EFFECT's ObjectRef -- and how many anywhere else. The second number is
 -- the offence; the first is what Ancient Vendetta, Predict and Petra Sphinx
 -- legitimately have one each of.
+--
+-- SourceHostFramed and not `hostFramed`: since #3320 that tag means an effect's
+-- ObjectRef and nothing else, which is what makes it admissible here. The
+-- positions it used to share the tag with carry StandingHostFramed and are
+-- REJECTED -- CR 604.2's clause, CR 603.4's intervening "if" and a printed player
+-- ability's own Filters are each read outside a resolution, through
+-- Filter.contextFor or Filter.contextWithSlots, where sourceChosenNames is empty.
+-- The self-test below plants the atom in a static condition and expects the
+-- offence.
 --
 -- An ALLOWLIST rather than "wherever Filter.Context.sourceChosenNames is filled",
 -- sameNameAsBoundCounts' posture and for its reason: since #2992 the field is
 -- filled by Pawl.Engine.Resolve.Slots.effectContext itself, so every position a
--- resolution reaches has it, and this rejects the atom in positions that would in
+-- RESOLUTION reaches has it, and this rejects the atom in positions that would in
 -- fact answer. Widen it when a card wants one of them.
 hasChosenNameCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenNameCounts card =
@@ -495,9 +508,12 @@ hasChosenNameCounts card =
 -- the only filter written. Filter.contextFor, Filter.contextWithSlots,
 -- Filter.contextComparingPower and
 -- Pawl.Engine.Target.admittedGiven all leave it empty, so Filter.HasChosenName in
--- a target slot, an affected set, a static ability's condition or a cost
--- criterion is a silent False rather than a rejected card. This is where that is
--- made loud.
+-- a target slot, an affected set, a static ability's CR 604.2 condition, a
+-- triggered ability's CR 603.4 intervening "if", a printed player ability or a
+-- cost criterion is a silent False rather than a rejected card. This is where
+-- that is made loud -- the three condition positions through StandingHostFramed,
+-- which #3320 split off SourceHostFramed precisely so this allowlist could
+-- refuse them.
 --
 -- The three positions hasChosenNameCounts admits are narrower than that, on
 -- purpose: see its own note. So a card rejected here is not necessarily one the
@@ -1746,6 +1762,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (AttachDestination, [bound]),
         (InTargetSlot, [bound]),
         (SourceHostFramed, [bound]),
+        (StandingHostFramed, [bound]),
         (SearchFramed, [bound]),
         (ReplacementRowFramed, [bound]),
         (OutsideTheGameFramed, [bound]),
@@ -2342,6 +2359,34 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ),
             ( "CR 201.4a's own restriction on the choosing effect",
               base {Face.spell = spellOf [Effect.ChooseCardName (ChooseCardName.MkChooseCardName (PlayerRef.Relative PlayerRelation.You) buried)] Map.empty}
+            ),
+            -- THE counter-example to the ObjectRef position accepted below, and
+            -- the reason StandingHostFramed is a constructor of its own (#3320):
+            -- Pawl.Engine.Projection.conditionHolds builds this clause's context
+            -- through Filter.contextFor, which leaves sourceChosenNames empty, so
+            -- the atom here is the silent False the lint exists to catch. It was
+            -- ACCEPTED between #2992 and #3320, when both positions shared a tag.
+            ( "CR 604.2's clause gating a static ability",
+              base
+                { Face.staticAbilities =
+                    [ StaticAbility.MkStaticAbility
+                        (Affected.Matching Filter.Type.IsSource)
+                        ( Just
+                            ( Condition.Type.Compares
+                                ( Compares.MkCompares
+                                    ( Quantity.Type.Count
+                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                    )
+                                    Comparison.AtLeast
+                                    (Quantity.Type.Literal 1)
+                                )
+                            )
+                        )
+                        Set.empty
+                        Nothing
+                        (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
+                    ]
+                }
             ),
             ( "CR 603.6a's trigger condition",
               base
