@@ -150,7 +150,11 @@ data ActivationRestriction
     -- is why Pawl.Engine.ActivationRestriction.restrictionsOk takes one: every
     -- other clause reads a phase, a turn, a combat record or the board, and this
     -- reads which ability of this object has already been spent. Rule 702.177a's
-    -- "each exhaust ability" is that grain -- Draconautics Engineer prints two,
-    -- and spending one leaves the other.
+    -- "each exhaust ability" is that grain -- Loot, the Pathfinder prints three,
+    -- and spending one leaves the others.
+    --
+    -- Loot's first is a MANA ability, which CR 605.3b keeps off the stack, so CR
+    -- 605.3a's two windows read this arm through Pawl.Types.ManaOption rather
+    -- than through Pawl.Engine.Activate.
     OnlyOnce
   deriving (Eq, Ord, Show)

@@ -53,6 +53,8 @@ import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityKind as AbilityKind
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction.Type
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
@@ -1605,7 +1607,7 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- rules charge {2} for. `manaActivationAdjustments` is the gather, and
 -- Cost.tapForManaWith charges the same total off the same one.
 manaActivations :: Mana.Capacity
-manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven (PlayerEffect.applying pid gs) measure pcs pid oid cost restrictions gs
+manaActivations measure pcs pid oid cost restrictions ability gs = manaActivationsGiven (PlayerEffect.applying pid gs) measure pcs pid oid cost restrictions ability gs
 
 -- The same capacity given the player effects the CALLER has already gathered.
 -- `manaActivationAdjustments` is a walk of everything in play asking each what
@@ -1625,7 +1627,7 @@ manaActivations measure pcs pid oid cost restrictions gs = manaActivationsGiven 
 -- Each row carries the SOURCE that printed it, which the gather under this needs
 -- and no reader here reads: see Pawl.Engine.PlayerEffect.matchesObjectFrom.
 manaActivationsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
-manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
+manaActivationsGiven effects measure pcs pid oid printedCost restrictions ability gs =
   let adjustments = manaActivationAdjustmentsGiven effects oid gs
       -- The COMPONENT half of CR 601.2f, applied here so every conjunct below
       -- measures the components an effect added as well as the printed ones. The
@@ -1680,7 +1682,7 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         -- permanent's routes to its controller alone, so a mana ability printing
         -- "any player may activate this ability" would run stricter than printed
         -- (#3087).
-        && ActivationRestriction.restrictionsOk pid oid Nothing restrictions gs
+        && ActivationRestriction.restrictionsOk pid oid ability restrictions gs
         then
           Activations.MkActivations
             { -- The PRINTED mana part, which is what `repeatsOf` reads: a
@@ -1700,11 +1702,12 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
 -- "doesn't target", so the set a reducer would be asked about is empty by the
 -- rule rather than by this caller's position.
 --
--- NO KeywordFamily: a mana route (Mana.manaRoutesOfGiven) carries no record of
--- which rule-702 keyword minted it, so a reducer that names a family --
--- Fluctuator's "cycling abilities" -- never matches one. Exact rather than
--- elided, and CR 605.1a is the argument: a keyword-granted ability that adds
--- mana would have to move no card to or from a library, which cycling does.
+-- NO KeywordFamily, though a route now carries its ability
+-- (Mana.manaRoutesOfGiven) and so could read ActivatedAbility.keyword: a reducer
+-- that names a family -- Fluctuator's "cycling abilities" -- would never match
+-- one anyway. Exact rather than elided, and CR 605.1a is the argument: a
+-- keyword-granted ability that adds mana would have to move no card to or from a
+-- library, which cycling does.
 --
 -- LoyaltyKind.NonLoyaltyAbility is exact rather than elided for the same reason
 -- and off the same rule: CR 605.1a's third criterion is "it's not a loyalty
@@ -1942,10 +1945,10 @@ supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven (Mana.supplyCap
 -- reads the real stack there and refuses the same routes. The gate and the
 -- payment agree because this function states exactly the move between them.
 stackedManaActivations :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
-stackedManaActivations effects measure pcs pid oid cost restrictions gs =
+stackedManaActivations effects measure pcs pid oid cost restrictions ability gs =
   if any ActivationRestriction.needsEmptyStack restrictions
     then Mana.noActivations
-    else manaActivationsGiven effects measure pcs pid oid cost restrictions gs
+    else manaActivationsGiven effects measure pcs pid oid cost restrictions ability gs
 
 -- The same question given a board the CALLER has already walked; handing the
 -- board in changes no answer. Build `sources` with supplyManaSourcesGiven
@@ -3155,7 +3158,7 @@ tapForManaWith perform inFlight oid = do
           -- offers, rather than one per option: `manaActivations` would take its
           -- own, and that walk is the shape #1073 was about.
           capacity = manaActivationsGiven (PlayerEffect.applying controller gs)
-      case filter (\option -> Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
@@ -3209,6 +3212,29 @@ tapForManaWith perform inFlight oid = do
               -- leaving one uncreated; Pawl.Engine.Resolve.Effect.performManaAbility is
               -- where the source stands in for it.
               ManaAbilityPerformer.effects perform oid controller (ManaOption.effects chosen)
+              -- CR 602.5b: record that THIS ability of this permanent has now
+              -- been activated, which is the whole of the once-only limit's
+              -- storage (ActivationRestriction.OnlyOnce reads it, and
+              -- `capacity` above is where it is read on this path). CR 605.3b
+              -- leaves a mana ability no stack object, so this is the activation
+              -- and Activate.activateAbility never sees it.
+              --
+              -- On the SOURCE permanent rather than the route, which CR 602.5b
+              -- names ("continues to apply to that object") and which CR 400.7
+              -- then forgets for free. Map.adjust is a no-op when the cost
+              -- sacrificed it, and that is right: the object the restriction was
+              -- about is gone.
+              --
+              -- Only after Payment.Paid, and only for an ability that PRINTS the
+              -- rider -- Activate.activateAbility's arrangement, so a route
+              -- refused mid-payment leaves no record and nothing else grows the
+              -- set. CR 305.6's intrinsic route has no ability and prints no
+              -- rider, so it can never reach this.
+              case ManaOption.ability chosen of
+                Just spent
+                  | elem ActivationRestriction.Type.OnlyOnce (ActivatedAbility.restrictions spent) ->
+                      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.activatedOnce = Set.insert spent (Object.activatedOnce o)}) oid (GameState.objects g)})
+                _ -> pure ()
               -- CR 106.12: this activation "tapped [the permanent] for mana"
               -- exactly when {T} was in its cost and it produced mana, which is
               -- what CR 106.12a's condition watches. Recorded LAST, after CR
@@ -3317,7 +3343,7 @@ payActivation perform inFlight pid oid cost = do
 -- yield-only answer names both.
 --
 -- Elided exactly when the source offers ONE option -- Mana.manaOptionsOf has
--- already collapsed routes alike in cost and yield.
+-- already collapsed routes alike in cost, yield and ability.
 --
 -- FILTERED, NOT TRUSTED: honouring an option the source does not offer would
 -- mint mana out of nothing, or charge the wrong cost for it.

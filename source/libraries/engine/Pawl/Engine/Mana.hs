@@ -108,7 +108,7 @@ import qualified Pawl.Types.Supertype as Supertype
 -- argument rather than two capacities because only Pawl.Engine.Cost can tell
 -- them apart: the difference is whether the route's own mana part is asked about
 -- (`supplyCapacity`), and this module cannot reach the function that asks.
-type Capacity = Measure -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> [ActivationRestriction.ActivationRestriction] -> GameState -> Activations.Activations
+type Capacity = Measure -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> [ActivationRestriction.ActivationRestriction] -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> GameState -> Activations.Activations
 
 -- WHICH reader is asking a Capacity: CR 605.3a's windows, which offer a route
 -- only when its whole cost is payable right now, or the supply walk, which
@@ -161,9 +161,9 @@ data Measure
 -- The incoming Measure is DISCARDED for that reason: a caller cannot ask the
 -- supply walk for the offer's answer.
 supplyCapacity :: Capacity -> Capacity
-supplyCapacity capacity _measure pcs pid oid cost restrictions gs = case Cost.mana cost of
+supplyCapacity capacity _measure pcs pid oid cost restrictions ability gs = case Cost.mana cost of
   Nothing -> noActivations
-  Just _ -> capacity ForSupply pcs pid oid cost restrictions gs
+  Just _ -> capacity ForSupply pcs pid oid cost restrictions ability gs
 
 -- No activation at all: the answer a Capacity gives for a route this player
 -- cannot take.
@@ -263,23 +263,28 @@ producedTypes oid gs production = case production of
 -- gated by a condition, or one its controller may decline, would run
 -- unconditionally. No mana ability in `data/cards/` prints one.
 --
--- The FOURTH element is CR 405.6c's other half: what the selection says beyond
+-- The THIRD element is the ability itself, which CR 602.5b's counted rider needs
+-- and no other clause of a route can stand in for -- Pawl.Types.ManaOption
+-- carries it onward for the same reason. Nothing for CR 305.6's intrinsic route,
+-- which is printed on no card.
+--
+-- The FIFTH element is CR 405.6c's other half: what the selection says beyond
 -- its mana. Split by the same classification the rest of the mana path runs on
 -- (ManaAbility.manaProduced), so the rules core stays off effect identity, and
 -- carried rather than discarded because Pawl.Engine.Cost.tapForManaWith has to
 -- run it. CR 305.6's intrinsic route says nothing beyond its mana.
-manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], [ManaAddition.ManaAddition], [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)])]
+manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), [ManaAddition.ManaAddition], [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)])]
 manaRoutesOfGiven pcs oid gs =
   let pc = Projection.projectGiven pcs oid gs
       fromSubtypes
         | Subtype.Engine.intrinsicManaAbilityOf pc =
             fmap
-              (\manaType -> (intrinsicManaCost, [], [intrinsicManaAddition manaType], []))
+              (\manaType -> (intrinsicManaCost, [], Nothing, [intrinsicManaAddition manaType], []))
               (Maybe.mapMaybe Subtype.Engine.subtypeMana (Set.toList (PC.subtypes pc)))
         | otherwise = []
       selectionRoutes ability =
         fmap
-          (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects))
+          (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Just ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects))
           (Modal.selectionEffects (ActivatedAbility.modal ability))
       fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
@@ -376,7 +381,7 @@ manaSuppliesGiven capacity pcs pid oid gs =
       -- nothing.
       supply = supplyCapacity capacity
       measured option =
-        ( supply ForOffer pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) gs,
+        ( supply ForOffer pcs pid oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs,
           ManaOption.yield option,
           -- CR 118.6's Nothing never survives the filter below, supplyCapacity
           -- answering 0 for it, so the empty stand-in is unreachable rather than
@@ -398,11 +403,15 @@ manaSuppliesGiven capacity pcs pid oid gs =
 -- colour choice) pair. `traverse` over the list applicative is that product:
 -- Birds of Paradise's one route becomes CR 105.4's five one-mana options.
 --
--- Deduplicated by the WHOLE option. Two routes producing identical mana for an
--- identical cost (an Urborg'd Swamp is a Swamp twice over) are indistinguishable
--- options, so collapsing them elides a prompt with no content; two that charge
--- differently are not, and survive as two -- which is why what survives here is
--- what Pawl.Engine.Cost.chooseManaYield offers whole.
+-- Deduplicated by the WHOLE option, the ABILITY it came from included. Two
+-- routes producing identical mana for an identical cost off the same ability (an
+-- Urborg'd Swamp is a Swamp twice over, and CR 305.6's intrinsic route is no
+-- ability's) are indistinguishable options, so collapsing them elides a prompt
+-- with no content; two that charge differently are not, and neither are two
+-- abilities alike in cost and yield but not in themselves -- CR 602.5b's memory
+-- is keyed to the ability, so spending one leaves the other, and a player choosing
+-- between them is choosing. What survives here is what
+-- Pawl.Engine.Cost.chooseManaYield offers whole.
 manaOptionsOf :: ObjectId -> GameState -> [ManaOption]
 manaOptionsOf = manaOptionsOfGiven Map.empty
 
@@ -439,14 +448,14 @@ manaOptionsOfGiven pcs oid gs =
           }
       -- CR 105.4's choice is per INSTRUCTION, so the count replicates the unit
       -- AFTER the type is picked: an addition of two AnyColor offers five options
-      -- here, not twenty-five. A REGRESSION FENCE rather than a proven behaviour
-      -- -- no mana ability in data/cards/ writes a count above one, Stadium
-      -- Vendors being a triggered ability that resolves off the stack (Resolve's
-      -- arm), so neutralising this replicate leaves the suite green. CR 106.3
-      -- states it anyway, which is why it is here.
-      expand (cost, restrictions, additions, others) =
+      -- here, not twenty-five. Loot, the Pathfinder's "{G}, {T}: Add three mana
+      -- of any one color" is the printing that proves it -- Pawl.ManaSpec's Loot
+      -- group reads three units of one colour off one activation -- and Stadium
+      -- Vendors says the same sentence as a triggered ability that resolves off
+      -- the stack (Resolve's arm).
+      expand (cost, restrictions, ability, additions, others) =
         fmap
-          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.yield = Mana.MkMana (concat units), ManaOption.effects = others})
+          (\units -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.ability = ability, ManaOption.yield = Mana.MkMana (concat units), ManaOption.effects = others})
           (traverse (\addition -> fmap (replicate (Natural.toIntSaturating (ManaAddition.count addition)) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
@@ -641,7 +650,7 @@ manaSourcesGiven capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, restrictions, _, _) -> Activations.times (capacity ForOffer pcs pid oid cost restrictions gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, restrictions, ability, _, _) -> Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
    in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
