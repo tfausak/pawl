@@ -1083,6 +1083,11 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
         { SacrificeAnyNumber.filter = Filter.rewrite pairs (SacrificeAnyNumber.filter s),
           SacrificeAnyNumber.kind = fmap (Filter.rewriteCounterKind pairs) (SacrificeAnyNumber.kind s)
         }
+  -- CR 614.1c's "exile a [matching] card from your graveyard": Living Lore's says
+  -- instant or sorcery, card types CR 612.1 reaches. Latent for RevealOrTapped's
+  -- reason -- that EntryR matches Filter.IsSource, and CR 400.7 forbids carrying a
+  -- text change onto the permanent before it entered.
+  EntryRewrite.ExileFromGraveyard f -> EntryRewrite.ExileFromGraveyard (Filter.rewrite pairs f)
   -- Rules 702.136a, 702.98a and 702.54a state these three whole, bloodthirst's
   -- number included, so the card prints no word for CR 612.1 to reach.
   EntryRewrite.Riot -> rewrite

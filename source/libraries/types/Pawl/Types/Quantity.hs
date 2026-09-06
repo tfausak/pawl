@@ -165,8 +165,8 @@ data Quantity
   | -- | Read the inner quantity against the object that slot names rather than
     -- the effect's source (CR 113.7); Nothing when the slot names no object.
     AgainstSlot (AgainstSlot.AgainstSlot Quantity)
-  | -- | CR 607.2a: the inner quantity read against each card this quantity's
-    -- source exiled, summed (CR 607.3); an empty pile reads 0.
+  | -- | CR 607.2a / 614.14: the inner quantity read against each card this
+    -- quantity's source exiled, summed (CR 607.3); an empty pile reads 0.
     AgainstCardsExiledWith Quantity
   | -- | CR 702.184c: the tapped creature's power, or its toughness where that is
     -- greater and the ability's controller controls a permanent carrying
