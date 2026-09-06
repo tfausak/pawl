@@ -608,7 +608,9 @@ data View = MkView
     --
     -- WIDER than the abilities that field measures, and by exactly CR 305.6's
     -- intrinsic "{T}: Add [mana symbol]", which no ability list holds: every
-    -- builder answers it through Pawl.Engine.Subtype.intrinsicManaAbility, and
+    -- builder answers it through Pawl.Engine.Subtype's intrinsicManaAbility --
+    -- intrinsicManaAbilityOf where there is a projection to read CR 613.1f's
+    -- layer-6 removal off -- and
     -- Pawl.ProjectionSpec's "CR 305.6 / 602.1 a Mountain has an activated ability
     -- in every view builder" is what holds the three to one answer. The field
     -- above needs no such disjunct, CR 605.1a excluding a mana ability from it.

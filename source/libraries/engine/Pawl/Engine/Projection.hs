@@ -216,6 +216,10 @@ applyModification viewOf src gs oid unitTypes m pc =
               PC.activatedAbilities = [],
               PC.replacementEffects = [],
               PC.triggeredAbilities = [],
+              -- CR 305.6's intrinsic mana ability has no list here to empty, so
+              -- the removal is recorded instead and read back by
+              -- Pawl.Engine.Subtype.intrinsicManaAbilityOf.
+              PC.lostAllAbilities = True,
               -- CR 702.5a makes enchant an ability, so CR 613.1f's removal takes
               -- it with the rest. Unproven: Humility reaches only creatures and
               -- nothing in the pool wipes a noncreature permanent's abilities, so
@@ -2428,6 +2432,10 @@ filterReads f = case f of
   -- nonbasic the Mountain ability it did not have, and CR 613.8a's dependency on
   -- an Affected.Matching HasActivatedAbility effect is only seen if the read is
   -- declared here.
+  --
+  -- CR 613.1f's layer-6 wipe reaches the intrinsic ability too
+  -- (ProjectedCharacteristics.lostAllAbilities), and needs no fourth aspect:
+  -- LoseAllAbilities writes Keywords, which this row already declares.
   --
   -- A REGRESSION FENCE rather than a proved behaviour: no card in data/cards/
   -- writes this atom into an Affected or a Count position -- Zirda, the

@@ -41,6 +41,7 @@ sampleSnapshot =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
       PC.enchant = [],
+      PC.lostAllAbilities = False,
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,

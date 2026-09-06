@@ -29,10 +29,12 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- P/T because a land has none. cardTypes/subtypes are the projected type line
 -- (CR 613 layer 4). Ord derived so a copy snapshot can ride a Binding (CR 707.2).
 --
--- There is no "are this object's rules-text abilities live" flag. CR 305.7's
--- strip is not a condition to be recorded and consulted later: the ability
--- fields below simply come back EMPTY, exactly as they do for CR 613.1f's layer-6
--- removal, and every reader sees the strip without having to know it happened.
+-- Wherever there is a list to empty, that list is the whole record of a strip:
+-- CR 305.7's and CR 613.1f's removals leave the ability fields below EMPTY, and
+-- every reader sees the strip without having to know it happened. The one
+-- exception is `lostAllAbilities`, for the one ability with no list -- CR
+-- 305.6's intrinsic mana ability, which is minted from `subtypes` rather than
+-- stored.
 data ProjectedCharacteristics = MkProjectedCharacteristics
   { -- | CR 201.1: the object's names after the layer fold. Copiable (CR 707.2),
     -- which is what earns them a place here rather than a read of the printed
@@ -211,6 +213,27 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- GRANTED one is not, which falls out of where each is written rather than
     -- being enforced here -- the posture activatedAbilities takes.
     enchant :: [TargetSlot.TargetSlot],
+    -- | CR 613.1f: has a layer-6 "loses all abilities" effect applied to this
+    -- object? Recorded rather than left implicit because CR 305.6's intrinsic
+    -- "{T}: Add [mana symbol]" is minted from `subtypes` instead of being stored
+    -- in a list above, so emptying the lists says nothing about it.
+    --
+    -- Layer order and not timestamp order is what makes one flag enough: rule
+    -- 613.1 applies layer 4 before layer 6, so the basic land type that mints
+    -- the ability is always in place before a wipe can reach it. An ability
+    -- GRANTED at layer 6 after the wipe still survives, which this field says
+    -- nothing about -- Pawl.Engine.Projection.applyModification empties the
+    -- lists in timestamp order and sets this beside them.
+    --
+    -- Not copiable, for subtypeWordChanges' reason and by the same construction:
+    -- CR 707.2's list of copiable values holds no layer-6 effect, and this is
+    -- written by the fold rather than by the seed, so
+    -- Pawl.Engine.Projection.View.copiableCharacteristics never carries it.
+    --
+    -- Pawl.Engine.Subtype.intrinsicManaAbilityOf is the one reader, and
+    -- Pawl.ManaSpec's "CR 613.1f Humility strips Dryad Arbor's CR 305.6 mana
+    -- ability" is what proves it reaches the mana routes.
+    lostAllAbilities :: Bool,
     -- | CR 612.1 layer 3: the subtype word swaps applied to this object, in the
     -- order they were applied. A RECORD of what layer 3 did, where every field
     -- above is the RESULT of it -- kept because rule 702's abilities are minted

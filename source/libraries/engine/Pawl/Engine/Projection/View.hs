@@ -667,15 +667,16 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- list, because abilitiesFromCharacteristics mints rule 702's abilities and
       -- not rule 305's: what it folds is PC.activatedAbilities plus the keyword
       -- map, and no layer writes "{T}: Add {R}" onto a Mountain. Read off the
-      -- PROJECTED types, so a land that lost its basic land type in layer 4 has
-      -- lost the ability with it (CR 305.7).
+      -- PROJECTION, so a land that lost its basic land type in layer 4 has lost
+      -- the ability with it (CR 305.7) and one that lost all its abilities in
+      -- layer 6 has too (CR 613.1f).
       --
       -- The neighbour above needs no such disjunct and is right without one: CR
       -- 605.1a makes the intrinsic ability a mana ability, which that field
       -- excludes.
       Filter.hasActivatedAbility =
         not (null (abilitiesFromCharacteristics peers pc oid gs))
-          || Subtype.intrinsicManaAbility (PC.cardTypes pc) (PC.subtypes pc),
+          || Subtype.intrinsicManaAbilityOf pc,
       -- CR 702.184c off the PROJECTION, applyModification's GrantsStationToughness
       -- arm being layer 6's only writer.
       Filter.grantsStationToughness = PC.grantsStationToughness pc
@@ -859,6 +860,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.replacementEffects = [],
         PC.triggeredAbilities = [],
         PC.enchant = [],
+        PC.lostAllAbilities = False,
         PC.subtypeWordChanges = [],
         PC.textChangedKeywords = Map.empty,
         PC.assignsCombatDamageWithToughness = False,
@@ -947,6 +949,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- seed. Read off `face`, so CR 708.2a's face-down substitution leaves
             -- a face-down permanent with none.
             PC.enchant = Face.enchant face,
+            -- CR 613.1's starting point, before layer 6 has run:
+            -- applyModification's LoseAllAbilities arm is the only writer.
+            PC.lostAllAbilities = False,
             -- The seed is CR 613.1's starting point, before layer 3 has run.
             PC.subtypeWordChanges = [],
             PC.textChangedKeywords = Map.empty,
