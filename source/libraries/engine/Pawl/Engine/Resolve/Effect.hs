@@ -775,19 +775,21 @@ slotOne slot resolving gs = do
 --
 -- The four questions, in the order the rules ask them:
 --
---   1. IS THERE ANYTHING TO OFFER -- the slot's id (CR 400.7) may no longer
---      resolve to an object (CR 603.7c).
+--   1. IS THERE ANYTHING TO OFFER -- an id the reference named (CR 400.7) may no
+--      longer resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
 --      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3), less the face CR
 --      702.162a's alternative cost is the only road to when this offer states an
 --      alternative cost of its own (CR 118.9a).
 --   3. WHAT IT COSTS (CR 118.9): `withoutPayingManaCost` or a stated
---      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates.
+--      `payingInstead` (CR 702.94a); otherwise CR 601.2b's own candidates, and
+--      how mana may be spent toward it (CR 118.14's `spending`).
 --   4. MAY IT BE CAST AT ALL -- Cast.castableWhenOffered, asked BEFORE the
 --      prompt so no cast is offered that the announcement would reverse.
 --
--- Questions 3 and 4 are asked of EACH half separately (CR 709.3a, CR 712.11c);
--- where more than one survives, CR 709.3's choice is put to the caster before
+-- Questions 3 and 4 are asked of EACH half of EACH named card separately (CR
+-- 709.3a, CR 712.11c); where more than one survives, CR 601.3's choice is put to
+-- the caster before
 -- the "may" below, since CR 118.8c's excuse is a property of the spell being
 -- cast. At CastObligation.Mandatory the cast is not a decision, so
 -- Prompt.OfferedCast is elided; question 4 is what a printed "if able" comes to
@@ -797,8 +799,8 @@ slotOne slot resolving gs = do
 -- The caster is a parameter and not the resolving controller: CR 608.2g says "a
 -- player". Everything above is a CLASSIFICATION carried by the opcode's
 -- CastOffer and its CastObligation; nothing here asks which card is offered.
-offerCast :: ObjectId -> PlayerId -> SlotName -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
-offerCast resolving caster slot optionality offer = do
+offerCast :: [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game ()
+offerCast named caster optionality offer = do
   gs <- State.get
   let -- Whether this offer states CR 118.9's alternative cost, in either of the
       -- two wordings `applied` below reads. NOT `transformed`, which is CR
@@ -843,7 +845,7 @@ offerCast resolving caster slot optionality offer = do
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.candidateCostsGiven True caster name oid proposed) (pure . Cost.untagged) applied
-         in if Cast.castableWhenOffered caster oid name candidates proposed
+         in if Cast.castableWhenOffered (CastOffer.spending offer) caster oid name candidates proposed
               then
                 -- CR 118.8c, read off the same candidates the cast will be
                 -- announced with: CR 118.9d keeps the face's additional costs on
@@ -854,26 +856,34 @@ offerCast resolving caster slot optionality offer = do
                 -- (#1834).
                 Just (oid, name, applied, any (Cost.statesHiddenQuality . CandidateCost.cost) candidates)
               else Nothing
-      offers = Maybe.fromMaybe [] $ do
-        oid <- slotOne slot resolving gs
-        card <- Game.cardOf oid gs
-        fmap (Maybe.mapMaybe (proposal oid)) (faces card)
-  -- No survivor is no offer; one survivor is one outcome, so CR 709.3's choice
-  -- is elided there rather than asked.
+      -- EVERY object the reference names, each contributing one entry per
+      -- castable half (CR 709.3a) -- Shell of the Last Kappa's whole exiled pile
+      -- as readily as Tinybones, the Pickpocket's one target. The caller's
+      -- objectRefObjects is what makes the two the same read.
+      offers =
+        concatMap
+          ( \oid -> Maybe.fromMaybe [] $ do
+              card <- Game.cardOf oid gs
+              fmap (Maybe.mapMaybe (proposal oid)) (faces card)
+          )
+          named
+  -- No survivor is no offer; one survivor is one outcome, so CR 601.3's choice is
+  -- elided there rather than asked.
   chosen <- case offers of
     [] -> pure Nothing
     [sole] -> pure (Just sole)
     first : rest -> do
       let decider = Decide.deciderFor caster gs
-          nameOf (_, name, _, _) = name
-          oidOf (oid, _, _, _) = oid
-      picked <- Game.choose (Prompt.ChooseOfferedCastFace decider caster (oidOf first) (fmap nameOf (first NonEmpty.:| rest)))
-      -- Reject-not-repair: a name the offer did not include is no cast at all.
-      pure (List.find ((== picked) . nameOf) offers)
+          keyOf (oid, name, _, _) = (oid, name)
+      picked <- Game.choose (Prompt.ChooseOfferedCastSpell decider caster (fmap keyOf (first NonEmpty.:| rest)))
+      -- Reject-not-repair: a pair the offer did not include is no cast at all.
+      -- The PAIR and not the name alone, for castWhileSearching's reason: one
+      -- card's half must not answer another card's.
+      pure (List.find ((== picked) . keyOf) offers)
   case chosen of
     Nothing -> pure ()
     Just (oid, name, applied, excused) -> do
-      let cast = Cast.castSpellWith performManaAbility True applied caster oid name Facing.FaceUp
+      let cast = Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
           -- The SAME prompt on both paths: CR 118.8c creates no new decision.
           mayCast = do
             let decider = Decide.deciderFor caster gs
@@ -3300,12 +3310,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
     Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Event.shuffleLibrary
-  Effect.OfferCast (OfferCast.MkOfferCast slot caster optionality offer) -> do
+  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality offer) -> do
     gs <- State.get
+    -- The sweep every ObjectRef-taking opcode shares, read HERE rather than
+    -- inside offerCast so that one function takes the objects and never the
+    -- reference: CR 601.3's offer over a set (Shell of the Last Kappa) and over
+    -- one target (Tinybones, the Pickpocket) are then the same call.
+    let named = objectRefObjects legal resolving controller source gs ref
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
     -- cast to nobody.
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
-      offerCast resolving pid slot optionality offer
+      offerCast named pid optionality offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- as CR 109.5's "you" and the stated duration.
   --

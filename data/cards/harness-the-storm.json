@@ -67,7 +67,10 @@
                       {
                         "type": "OfferCast",
                         "value": {
-                          "slot": "twin"
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "twin"
+                          }
                         }
                       }
                     ]

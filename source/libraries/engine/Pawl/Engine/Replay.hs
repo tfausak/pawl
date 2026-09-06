@@ -149,7 +149,7 @@ encode p answer = case p of
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
   Prompt.ChooseClause {} -> Response.ChoseClause answer
   Prompt.OfferedCast {} -> Response.ChoseOfferedCast answer
-  Prompt.ChooseOfferedCastFace {} -> Response.ChoseOfferedCastFace answer
+  Prompt.ChooseOfferedCastSpell {} -> Response.ChoseOfferedCastSpell answer
   Prompt.OfferedMiracleReveal {} -> Response.ChoseMiracleReveal answer
   Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
@@ -465,8 +465,8 @@ decode p response = case p of
   Prompt.OfferedCast {} -> case response of
     Response.ChoseOfferedCast decision -> Just decision
     _ -> Nothing
-  Prompt.ChooseOfferedCastFace {} -> case response of
-    Response.ChoseOfferedCastFace name -> Just name
+  Prompt.ChooseOfferedCastSpell {} -> case response of
+    Response.ChoseOfferedCastSpell picked -> Just picked
     _ -> Nothing
   Prompt.OfferedMiracleReveal {} -> case response of
     Response.ChoseMiracleReveal decision -> Just decision
@@ -891,12 +891,12 @@ defaultAnswer p = case p of
   -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
   -- exactly where the resolving effect put it.
   Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 709.3a / 712.11c: every offered half was gated on its own before it
-  -- reached the prompt, so the first is legal. Printed order, so it is the
-  -- earliest surviving half rather than the front face -- a front face the gate
-  -- dropped is not on offer at all. A deterministic fallback, not a
+  -- CR 601.3 / 709.3a / 712.11c: every offered cast was gated on its own before
+  -- it reached the prompt, so the first is legal. Printed order within a card, so
+  -- it is the earliest surviving half rather than the front face -- a front face
+  -- the gate dropped is not on offer at all. A deterministic fallback, not a
   -- recommendation.
-  Prompt.ChooseOfferedCastFace _ _ _ names -> NonEmpty.head names
+  Prompt.ChooseOfferedCastSpell _ _ options -> NonEmpty.head options
   -- CR 709.5f / 709.5g: every offered half is one the instruction admits, and
   -- the prompt is raised only where two or more are, so the first in printed
   -- order is a deterministic fallback rather than a recommendation.

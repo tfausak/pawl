@@ -803,7 +803,8 @@ randomRevealSpec s registry =
 -- indistinguishable from "your upkeep".
 --
 -- The revealed card is bound and read back twice -- once by Filter.IsBound in
--- each branch's condition, once by ObjectRef.InSlot / OfferCast's slot -- which
+-- each branch's condition, once by ObjectRef.InSlot, which OfferCast's own ref
+-- also names -- which
 -- is what makes Effect.Reveal's slot load-bearing rather than decoration.
 --
 -- "If it's a land card" is counted over EVERY player's hand rather than over the
@@ -863,7 +864,7 @@ wildEvocationSpec s registry =
               Prompt.OfferedCast {} -> do
                 State.modify (+ 1)
                 pure (S.identityAnswer p)
-              Prompt.ChooseOfferedCastFace {} -> do
+              Prompt.ChooseOfferedCastSpell {} -> do
                 State.modify (+ 1)
                 pure (S.identityAnswer p)
               _ -> pure (rolling i p)
@@ -876,8 +877,8 @@ wildEvocationSpec s registry =
       halvesOffered gs =
         let recording :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
             recording p = case p of
-              Prompt.ChooseOfferedCastFace _ _ _ options -> do
-                State.modify (<> [NonEmpty.toList options])
+              Prompt.ChooseOfferedCastSpell _ _ options -> do
+                State.modify (<> [fmap snd (NonEmpty.toList options)])
                 pure (NonEmpty.head options)
               _ -> pure (rolling 0 p)
          in State.execState
@@ -886,10 +887,11 @@ wildEvocationSpec s registry =
       -- Test B's answerer, pinning CR 709.3's half BY NAME. Returns the wanted
       -- name whether or not it was offered: Resolve.offerCast rejects rather than
       -- repairs, so a leg whose half stopped being offered goes red instead of
-      -- quietly casting the other one.
+      -- quietly casting the other one. The OBJECT is taken off the prompt, every
+      -- option here being a half of the one card the offer names.
       choosingHalf :: CardName.CardName -> Prompt.Prompt r -> r
       choosingHalf want p = case p of
-        Prompt.ChooseOfferedCastFace {} -> want
+        Prompt.ChooseOfferedCastSpell _ _ options -> (fst (NonEmpty.head options), want)
         _ -> rolling 0 p
       -- The same again, TAKING the offer. S.identityAnswer bottoms out in
       -- Replay.defaultAnswer, whose Prompt.OfferedCast arm declines, so a leg

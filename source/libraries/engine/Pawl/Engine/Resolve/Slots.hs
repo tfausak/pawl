@@ -609,7 +609,7 @@ effectObjectRefs effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
   Effect.Shuffle {} -> []
-  Effect.OfferCast {} -> []
+  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _) -> [ref]
   Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ ref _) -> [ref]
   Effect.MakePlotted ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
@@ -1011,9 +1011,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The arm above's library read, reported at the head; nothing is shuffled into
   -- it, so there is no ref beside it either.
   Effect.Shuffle {} -> Map.empty
-  -- The SLOT alone: the caster is a PlayerRef and is reported at the head. This
-  -- one is a read, bound by an earlier effect of the list (CR 400.7).
-  Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> oneSlot slot
+  -- The REFERENCE alone: the caster is a PlayerRef and is reported at the head.
+  -- This one is a read, bound by an earlier effect of the list (CR 400.7) where
+  -- it names a slot at all.
+  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _) -> objectRefSlots ref
   Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
   -- Everything the BODY reads. The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.

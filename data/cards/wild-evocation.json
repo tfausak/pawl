@@ -179,7 +179,10 @@
                           "optionality": {
                             "type": "Mandatory"
                           },
-                          "slot": "revealed"
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "revealed"
+                          }
                         }
                       }
                     ]

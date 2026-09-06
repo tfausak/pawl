@@ -69,6 +69,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -326,12 +327,12 @@ siegeDefeat =
     offer =
       Effect.OfferCast
         OfferCast.MkOfferCast
-          { OfferCast.slot = Binding.became,
+          { OfferCast.ref = ObjectRef.InSlot Binding.became,
             -- Rule 310.12b's "YOU may cast it": the trigger's controller, which
             -- is the resolving controller, and a "may".
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
             OfferCast.optionality = CastObligation.Optional,
-            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
+            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
           }
 
 -- The intrinsic triggered abilities rule 310 gives a permanent, read off the

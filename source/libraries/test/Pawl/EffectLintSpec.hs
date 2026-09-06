@@ -29,7 +29,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
-import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Projection as Projection
@@ -52,7 +51,6 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -1206,7 +1204,7 @@ effectObjectRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> read_ [ref]
   -- No ObjectRef at all: the opcode names a library.
   Effect.Shuffle {} -> []
-  Effect.OfferCast {} -> []
+  Effect.OfferCast offer -> read_ [OfferCast.ref offer]
   Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
   Effect.ForEach (ForEach.MkForEach ref _ _) -> read_ [ref]
   where
@@ -1701,7 +1699,6 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> [slot]
           Effect.TurnFaceUp slot -> [slot]
           Effect.BecomesBlocked slot -> [slot]
-          Effect.OfferCast (OfferCast.MkOfferCast slot _ _ _) -> [slot]
           Effect.Designate (Designate.MkDesignate _ slot) -> [slot]
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
           Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
@@ -1902,13 +1899,11 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         victimSlot = SlotName.MkSlotName (Text.pack "victim")
         discarding = Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard victimSlot (Quantity.Type.Literal 1) (Just destroyedSlot)))
         minting n = Effect.Create (Create.MkCreate (Quantity.Type.Literal n) (oneFaced (vanillaFace "Soldier" (spellLine CardType.Creature Set.empty Set.empty))) EntryRiders.defaultValue (Just destroyedSlot) (PlayerRef.Relative PlayerRelation.You))
-    -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
-    -- OTHER half is Wild Evocation, whose OfferCast reads a slot a RANDOM reveal
-    -- of one card bound -- singular either way, so the two never meet. The
-    -- REJECTING direction is therefore proven against a hand-built pair rather
-    -- than by a corpus sweep, the posture the phase-skip lint below takes
-    -- against Eon Hub, and the sweep is a fence against a future card authoring
-    -- the shape.
+    -- Half the rejected shape is in the pool: Act on Impulse binds a group. No
+    -- card in data/cards/ pairs one with a singular read of the same slot, so the
+    -- REJECTING direction is proven against a hand-built pair rather than by a
+    -- corpus sweep -- the posture the phase-skip lint below takes against Eon Hub
+    -- -- and the sweep is a fence against a future card authoring the shape.
     Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a plural move minted"
     -- The same guard for the two arms added to the binding side: an arm no card
     -- reaches is a fence the corpus sweep can never exercise. Psychic Miasma is
@@ -1919,16 +1914,16 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
       s
       ( clashes
           [ Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Zone.Exile EntryRiders.defaultValue (Just exiledSlot) Nothing LibraryPlacement.defaultValue Nothing),
-            Effect.OfferCast (OfferCast.MkOfferCast exiledSlot (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue)
+            Effect.TurnFaceUp exiledSlot
           ]
       )
       "a singular read of a plurally bound slot is caught"
-    -- Neither OfferCast nor MoveToZone is the only half. The enumeration above IS
-    -- the lint, so a fence only OfferCast's slot could trip would leave every
+    -- Neither TurnFaceUp nor MoveToZone is the only half. The enumeration above IS
+    -- the lint, so a fence only TurnFaceUp's slot could trip would leave every
     -- other one-object instruction open. Paired with the board below, which
     -- differs in the slot name alone, so what catches is the intersection rather
     -- than `clashes` answering True for any two effects.
-    Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside OfferCast is caught"
+    Spec.assertBool s (clashes [destruction, removal destroyedSlot]) "a singular read outside TurnFaceUp is caught"
     Spec.assertBool s (not (clashes [destruction, removal elsewhereSlot])) "a singular read of another slot is left alone"
     -- The other funnel on the same board: ExileHaunting's haunting card is read
     -- through slotOne rather than through legalOne. Paired with AttachBound,
