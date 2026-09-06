@@ -705,7 +705,7 @@ isPayResponse response = case response of
 -- CR 702.24 cumulative upkeep, the first keyword whose CR 118.12 payment is not
 -- the cost the card prints: rule 702.24a's "you may pay [cost] for each age
 -- counter on it" multiplies the printed cost by a pile that grows an upkeep at a
--- time, which is what Pawl.Types.PayGate.perCounter carries.
+-- time, which is what Pawl.Types.PayGate.perEach carries.
 --
 -- Revered Unicorn {1}{W} Creature -- Unicorn 2/3, "Cumulative upkeep {1}" and
 -- "When this creature leaves the battlefield, you gain life equal to the number

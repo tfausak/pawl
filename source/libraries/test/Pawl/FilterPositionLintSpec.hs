@@ -1358,7 +1358,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                                           PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)],
                                           PayGate.branch = PayBranch.IfNotPaid,
                                           PayGate.obligation = PayObligation.Optional,
-                                          PayGate.perCounter = Nothing,
+                                          PayGate.perEach = Nothing,
                                           PayGate.offeredAt = Nothing
                                         }
                                   )
@@ -1546,16 +1546,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         anywhere = ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)
         riders = EntryRiders.defaultValue {EntryRiders.counters = Map.singleton kind one}
-        -- CR 118.12's gate, whose counter kind is rule 702.24a's multiplier;
-        -- see #2876. Its cost is empty, so the row below reports the KIND rather
-        -- than a walk that found the cost's filters instead.
+        -- CR 118.12's gate, whose multiplier is a Quantity and so writes the kind
+        -- as a NUMBER (rule 702.24a's own count); see #2876. Its cost is empty, so
+        -- the row below reports the multiplier rather than a walk that found the
+        -- cost's filters instead.
         gate =
           PayGate.MkPayGate
             { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
               PayGate.cost = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [],
               PayGate.branch = PayBranch.IfNotPaid,
               PayGate.obligation = PayObligation.Optional,
-              PayGate.perCounter = Just kind,
+              PayGate.perEach = Just (Quantity.Type.ObjectCounters kind),
               PayGate.offeredAt = Nothing
             }
         -- The PAIR, not just the Filter: PR #2739's reader's test says a keyword's
@@ -1573,7 +1574,6 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- traversal that has to reach it. An arm that stops digging names itself.
         walked =
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
-            ("CR 118.12's gate kind", holds (payGateFilters gate)),
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
             ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot)))),
             ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
@@ -1588,15 +1588,18 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ("CR 614.1c's as-enters sacrifice", holds (entryRewriteFilters (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.Type.HasCardType CardType.Creature) (Just kind))))),
             ("CR 614.1c's as-enters counters", holds (entryRewriteFilters (EntryRewrite.WithCounters (WithCounters.one kind one)))),
             ("CR 614.1e's turn-up counters", holds (turnUpRewriteFilters (TurnUpRewrite.WithCounters (WithCounters.one kind one)))),
-            -- The three roads a card writes the kind inside a NUMBER instead, each
+            -- The four roads a card writes the kind inside a NUMBER instead, each
             -- reaching a Quantity by its own traversal (#2740). Reading a
-            -- Condition's, a Duration's or an ObjectRef's Counts alone answers []
-            -- here, since quantityCounts has no Count to hand back for an
-            -- ObjectCounters.
+            -- Condition's, a Duration's, an ObjectRef's or a CR 118.12 gate's
+            -- Counts alone answers [] here, since quantityCounts has no Count to
+            -- hand back for an ObjectCounters.
             ("a Condition's own number", holds (conditionFilters counting)),
             ("CR 611.2b's for-as-long-as clause", holds (durationFilters (Duration.ForAsLongAs counting))),
             ("a library depth", holds (objectRefFilters topDepth)),
             ("its reveal-until mirror", holds (objectRefFilters (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Type.HasCardType CardType.Land) (Quantity.Type.ObjectCounters kind))))),
+            -- The fourth: the gate is a clause's FIELD rather than an effect, so
+            -- payGateFilters is the only traversal that reaches it (#2876).
+            ("CR 118.12's gate multiplier", holds (payGateFilters gate)),
             -- And the same three as cardFilters actually reaches them, one opcode
             -- or trigger condition deep, so the tagging survives the quoting
             -- position rather than only the leaf.

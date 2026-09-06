@@ -15,6 +15,7 @@ import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
 manaLeak :: PayGate.PayGate
@@ -24,7 +25,7 @@ manaLeak =
       PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
       PayGate.branch = PayBranch.IfNotPaid,
       PayGate.obligation = PayObligation.Optional,
-      PayGate.perCounter = Nothing,
+      PayGate.perEach = Nothing,
       PayGate.offeredAt = Nothing
     }
 
@@ -55,6 +56,15 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid, PayGate.obligation = PayObligation.Mandatory}
       " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfPaid\"},\"obligation\":{\"type\":\"Mandatory\"}} "
+  -- CR 118.12's scaled offer: the multiplier a card writes, which is the only
+  -- other key the four cases above elide. Rakshasa's Disdain's is a Count over a
+  -- graveyard; a Literal is enough to prove the key round-trips.
+  Spec.it s "MkPayGate, a cost multiplied by a quantity" $
+    Common.assertCodec
+      s
+      PayGate.codec
+      manaLeak {PayGate.perEach = Just (Quantity.Literal 2)}
+      " {\"payer\":{\"type\":\"ControllerOfBound\",\"value\":\"spell\"},\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]},\"branch\":{\"type\":\"IfNotPaid\"},\"perEach\":{\"type\":\"Literal\",\"value\":2}} "
   Spec.it s "MkPayGate, a clause hanging off an earlier clause's offer" $
     Common.assertCodec
       s
