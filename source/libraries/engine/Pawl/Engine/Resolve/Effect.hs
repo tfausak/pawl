@@ -6776,25 +6776,10 @@ putFound searcher subject destination cardId = case destination of
   -- and Sovereigns of Lost Alara's "put it onto the battlefield attached to that
   -- creature". WHICH object "it" is, is Search.subject, resolved by the arm that
   -- ran the search -- the same value its filter asked CR 701.3a about, so the
-  -- offer and the move cannot name different hosts.
-  --
-  -- The seed is the RECIPIENT Attach.attachmentFor produced rather than a
-  -- hand-built ToObject, for the reason Event.changeZoneAttaching's CR 303.4f arm
-  -- gives: Sba.stillLegalEnchant compares the (pool, tag) pair, so a mismatched
-  -- tag would have CR 704.5m bury the Aura on the next pass.
-  --
-  -- Supplying a seed at all is what keeps CR 303.4f's host prompt out of this
-  -- move: the effect DOES specify what the Aura will enchant, so its controller
-  -- chooses nothing.
-  --
-  -- CR 110.2a: it enters under the SEARCHER, the player whose effect is putting
-  -- it there -- not under its owner, which is what the other arms' Event.changeZone
-  -- leaves it to, since none of them puts anything onto the battlefield for
-  -- someone other than its owner.
-  --
-  -- Nothing is CR 303.4i's "the Aura remains in its current zone" -- unreachable
-  -- from a filter naming Filter.CanAttachToSubject, since that atom is this same
-  -- function, and the honest answer for a card whose filter does not.
+  -- offer and the move cannot name different hosts. A subject naming no object is
+  -- CR 609.3's "only as much as possible", which for a sentence printing no other
+  -- destination is nothing at all -- the Aura stays where the search found it (CR
+  -- 303.4i).
   SearchDestination.BattlefieldAttached -> case subject of
     Nothing -> pure ()
     Just host -> attachFound searcher host cardId
@@ -6828,8 +6813,26 @@ putFound searcher subject destination cardId = case destination of
         Event.changeZone cardId Zone.Hand
 
 -- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
--- sentence they have in common is written once. Nothing from attachmentFor is CR
--- 303.4i's "the Aura remains in its current zone".
+-- sentence they have in common is written once.
+--
+-- The seed is the RECIPIENT Attach.attachmentFor produced rather than a
+-- hand-built ToObject, for the reason Event.changeZoneAttaching's CR 303.4f arm
+-- gives: Sba.stillLegalEnchant compares the (pool, tag) pair, so a mismatched tag
+-- would have CR 704.5m bury the Aura on the next pass.
+--
+-- Supplying a seed at all is what keeps CR 303.4f's host prompt out of this move:
+-- the effect DOES specify what the Aura will enchant, so its controller chooses
+-- nothing.
+--
+-- CR 110.2a: it enters under the SEARCHER, the player whose effect is putting it
+-- there -- not under its owner, which is what putFound's other arms'
+-- Event.changeZone leaves it to, since none of them puts anything onto the
+-- battlefield for someone other than its owner.
+--
+-- Nothing from attachmentFor is CR 303.4i's "the Aura remains in its current
+-- zone" -- unreachable from a filter naming Filter.CanAttachToSubject, since that
+-- atom is this same function, and the honest answer for a card whose filter does
+-- not.
 attachFound :: PlayerId -> ObjectId -> ObjectId -> Game ()
 attachFound searcher host cardId = do
   gs <- State.get

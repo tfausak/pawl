@@ -64,10 +64,10 @@ data SearchDestination
     -- beside it.
     --
     -- A separate arm and not BattlefieldAttachedOrHand with a flag: this card
-    -- prints one sentence where that one prints two, and CR 608.2h is what
-    -- decides what happens when the host has gone -- the effect does as much as
-    -- it can, which for a card that never names a second destination is nothing,
-    -- leaving the Aura in the library. Putting it into a hand instead would be
-    -- this engine printing a sentence the card does not.
+    -- prints one sentence where that one prints two, and CR 609.3 is what decides
+    -- what happens when the host has gone -- the effect does only as much as
+    -- possible, which for a card that never names a second destination is
+    -- nothing, leaving the Aura in the library (CR 303.4i). Putting it into a hand
+    -- instead would be this engine printing a sentence the card does not.
     BattlefieldAttached
   deriving (Bounded, Enum, Eq, Ord, Show)
