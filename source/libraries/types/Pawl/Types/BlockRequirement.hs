@@ -59,9 +59,9 @@ data BlockRequirement = MkBlockRequirement
     -- makes obeying ONE of them the maximum, since a creature blocks one
     -- attacker unless something says otherwise.
     --
-    -- An Affected, and not a bare ObjectId, because two printings in the pool
-    -- already name that creature two different ways: an Aura's requirement names
-    -- Affected.Attached (CR 303.4m) -- Lure -- while a creature's names its own
+    -- An Affected, and not a bare ObjectId, because the pool already names that
+    -- creature two different ways: an Aura's requirement names its attachment
+    -- (CR 303.4m) -- Lure, Seton's Desire -- while a creature's names its own
     -- source, Affected.Matching Filter.IsSource -- Prized Unicorn.
     --
     -- Neither axis is ever frozen, and CR 611.2c is why a resolution-created
