@@ -1161,8 +1161,9 @@ targetViewsOfStackObject peers gs obj =
     (Maybe.mapMaybe (\r -> fmap ((,) r) (viewOfRecipient peers gs r)) (Set.toList (targetsOfStackObject gs obj)))
 
 -- The view one recipient answers, splitting CR 115.1's two kinds of target: a
--- player is Count.playerView's candidate, and everything else is an object the
--- bounded reader above answers for.
+-- player is Count.playerView's candidate, and an object one the bounded reader
+-- above answers for. Nothing for CR 406.4's pile, which is neither and which CR
+-- 601.2c never leaves on a stack object anyway.
 viewOfRecipient :: Count.ViewOf -> GameState -> Recipient.Recipient -> Maybe Filter.View
 viewOfRecipient peers gs r = case Recipient.playerOf r of
   Just pid -> Just (Count.playerView gs pid)

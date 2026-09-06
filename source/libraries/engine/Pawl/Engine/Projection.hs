@@ -2478,7 +2478,8 @@ filterReads f = case f of
 -- board-wide re-ask, a wrong False loses a dependency.
 filterReadsPeers :: Filter.Type.Filter Keyword.Type.Keyword -> Bool
 filterReadsPeers f = case f of
-  -- The five atoms that read a peer view directly.
+  -- The atoms that read a peer view directly, off a field of the candidate's
+  -- own view.
   Filter.Type.AttachedTo _ -> True
   Filter.Type.HasAttached _ -> True
   Filter.Type.IsAttackingPlaneswalker _ -> True
@@ -2486,7 +2487,8 @@ filterReadsPeers f = case f of
   -- CR 115.1's target view comes through `peers` too, whatever the nest asks of
   -- it -- so True outright rather than by descent.
   Filter.Type.TargetsOnlyOne _ -> True
-  -- The fifth: abilitiesFromCharacteristics runs CR 604.2's gate through
+  -- And the two that reach one through a GATE rather than a field:
+  -- abilitiesFromCharacteristics runs CR 604.2's condition through
   -- Condition.holds, which takes `peers` to any object at all (#2633).
   Filter.Type.HasNonManaActivatedAbility -> True
   Filter.Type.HasActivatedAbility -> True
