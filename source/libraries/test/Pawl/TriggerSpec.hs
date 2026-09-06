@@ -229,7 +229,7 @@ scanSpec s registry =
     Spec.it s "CR 603.2b the active player rides a step trigger in the reserved slot" $ do
       let upkeepOf pid = GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) pid)
           cond = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn)
-          boundOf pid = Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing pid cond (upkeepOf pid))
+          boundOf pid = Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty pid cond (upkeepOf pid))
       Spec.assertEqWith s "carol's upkeep binds carol under thatPlayer" (boundOf S.carol) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
       Spec.assertEqWith s "and bob's binds bob" (boundOf S.bob) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.bob)))
       -- The same slot under the OTHER TurnScope, which eventBindingSlots'
@@ -238,7 +238,7 @@ scanSpec s registry =
       Spec.assertEqWith
         s
         "a ControllersTurn step binds it too"
-        (Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)) (upkeepOf S.alice)))
+        (Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)) (upkeepOf S.alice)))
         (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.alice)))
     -- CR 603.3a / 109.5: "your upkeep" is the ABILITY CONTROLLER's (603.3a
     -- controls the ability; 109.5 makes "your" mean that controller), so the
@@ -584,6 +584,129 @@ mayhemDevilSpec s registry =
           Spec.assertEqWith s "CR 701.21a: nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
           Spec.assertBool s (S.onBattlefield victim gs) "the creature was on the battlefield to begin with"
           Spec.assertBool s (not (S.onBattlefield victim after)) "and really left it"
+
+-- Prowling Geistcatcher {3}{B} Creature -- Human Rogue 2/4: "Whenever you
+-- sacrifice another creature, exile it." plus "When this creature leaves the
+-- battlefield, return each card exiled with it to the battlefield under your
+-- control." The reader of CR 400.7e's new object under CR 701.21a's condition:
+-- the sacrifice is recorded BEFORE the move (CR 603.10a), so the id the event
+-- carries is the battlefield permanent CR 400.7 deleted and the payload's "it"
+-- is the graveyard card it became.
+--
+-- Not implemented: the card's second sentence, "if that creature was a token,
+-- put a +1/+1 counter on this creature" -- CR 608.2h's last known information
+-- about a permanent that has ceased to exist, which Count's OverBound scope
+-- cannot reach (#3329). Stricter than printed: the counter is never put.
+prowlingGeistcatcherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowlingGeistcatcherSpec s registry =
+  let -- alice's Geistcatcher, TWO same-named Pikers on the battlefield and a
+      -- THIRD already in her graveyard. The graveyard copy is what makes the
+      -- assertion about identity rather than about a name: an implementation
+      -- that looked the payload's "it" up by card name, or that took the newest
+      -- graveyard card, agrees with the right one on a board holding a single
+      -- candidate.
+      --
+      -- Nontoken victims deliberately: CR 111.7 makes a token exiled from a
+      -- graveyard cease to exist, which would leave the exile assertion
+      -- unobservable.
+      geistBoard geistcatcher piker extra =
+        let place p g = snd (S.addPermanent p S.alice g)
+            (geist, g1) = S.addPermanent geistcatcher S.alice (foldr place S.threePlayerGame extra)
+            (victim, g2) = S.addPermanent piker S.alice g1
+            (bystander, g3) = S.addPermanent piker S.alice g2
+            (buried, g4) = S.addGraveyardCard piker S.alice g3
+         in ( geist,
+              victim,
+              bystander,
+              buried,
+              g4
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      -- CR 701.21a's funnel, then the loop that gathers and resolves what it
+      -- fired -- mayhemDevilSpec's own driver.
+      sacrificeThen pid oid = Event.sacrifice pid oid >> Engine.priorityLoop
+      -- The id `departed` became on its way out of `from`, read back off the log
+      -- the same batch wrote. CR 400.7 mints it, so no test can name it in
+      -- advance, and reading it here is what makes the assertion below an
+      -- IDENTITY claim rather than a count.
+      arrivalOf from departed gs =
+        Maybe.mapMaybe
+          ( \event -> case event of
+              GameEvent.Moved m
+                | ZoneChange.departed (Moved.change m) == departed,
+                  ZoneChange.from (Moved.change m) == from ->
+                    Just (ZoneChange.object (Moved.change m))
+              _ -> Nothing
+          )
+          (S.eventsOf gs)
+      -- The ids that DEPARTED into `to`, the same log read the other way round.
+      departedInto to gs =
+        Maybe.mapMaybe
+          ( \event -> case event of
+              GameEvent.Moved m
+                | ZoneChange.to (Moved.change m) == to ->
+                    Just (ZoneChange.departed (Moved.change m))
+              _ -> Nothing
+          )
+          (S.eventsOf gs)
+   in Spec.describe s "ProwlingGeistcatcher" $ do
+        Spec.it s "CR 400.7e the sacrifice trigger exiles the card the sacrificed creature became" $ do
+          geistcatcher <- S.printingOf s registry "Prowling Geistcatcher"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, victim, bystander, buried, gs) = geistBoard geistcatcher piker []
+              after = S.runPure S.identityAnswer gs (sacrificeThen S.alice victim)
+          -- Read as "what left for exile is exactly what the sacrificed Piker
+          -- became", both sides off the log and neither off the slot: an unbound
+          -- `became` empties the left side alone, and a `became` naming the
+          -- graveyard's OTHER Piker card puts `buried` there instead.
+          Spec.assertEqWith s "CR 400.7e: what the trigger exiled is the card the sacrificed Piker became" (departedInto Zone.Exile after) (arrivalOf Zone.Battlefield victim after)
+          Spec.assertEqWith s "and exile holds exactly that one card" (length (GameState.exile after)) 1
+          Spec.assertBool s (elem buried (Game.zoneMembers Zone.Graveyard S.alice after)) "the same-named card already in the graveyard stayed there"
+          Spec.assertBool s (S.onBattlefield bystander after) "and the same-named creature still on the battlefield was untouched"
+        -- CR 607.2a's linked set, the card's other half: "return each card
+        -- exiled with it" reads GameState.exiledWith, which the exile above
+        -- filed against the Geistcatcher.
+        Spec.it s "CR 607.2a the Geistcatcher leaving returns the card it exiled" $ do
+          geistcatcher <- S.printingOf s registry "Prowling Geistcatcher"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (geist, victim, _, _, gs) = geistBoard geistcatcher piker []
+              exiled = S.runPure S.identityAnswer gs (sacrificeThen S.alice victim)
+              after = S.runPure S.identityAnswer exiled (Event.destroy Regenerability.Regenerable [geist] >> Engine.priorityLoop)
+          Spec.assertEqWith s "CR 607.2a: alice controls two Pikers again, the exiled card among them" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 2
+          Spec.assertBool s (Set.null (GameState.exile after)) "and nothing is left in exile"
+        -- The "ANOTHER creature" half of the condition, one atom from the case
+        -- above: the Geistcatcher sacrificing ITSELF is the permanent its own
+        -- Filter's Not IsSource excludes.
+        Spec.it s "CR 701.21a the Geistcatcher's own sacrifice is not another creature" $ do
+          geistcatcher <- S.printingOf s registry "Prowling Geistcatcher"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (geist, _, bystander, _, gs) = geistBoard geistcatcher piker []
+              after = S.runPure S.identityAnswer gs (sacrificeThen S.alice geist)
+          Spec.assertBool s (Set.null (GameState.exile after)) "CR 701.21a: nothing was exiled"
+          Spec.assertBool s (not (S.onBattlefield geist after)) "though the Geistcatcher really was sacrificed"
+          Spec.assertBool s (S.onBattlefield bystander after) "and the other creature stayed put"
+        -- CR 614.1's redirect, and what keeps CR 400.7e's slot out of
+        -- eventBindingSlots' floor: Rest in Peace sends the sacrificed Piker to
+        -- exile instead of to a graveyard, so the sacrifice is still recorded
+        -- and there is no new object for "exile it" to name. The Piker's card is
+        -- in exile either way, but CR 607.2a's link needs it put there "as a
+        -- result of an instruction to exile them in the first ability" and
+        -- nothing here was, so the Geistcatcher's departure returns nothing --
+        -- which a stale slot naming the redirected card would not.
+        Spec.it s "CR 614.1 a redirected sacrifice leaves the trigger nothing to exile" $ do
+          geistcatcher <- S.printingOf s registry "Prowling Geistcatcher"
+          piker <- S.printingOf s registry "Goblin Piker"
+          restInPeace <- S.printingOf s registry "Rest in Peace"
+          let (geist, victim, _, buried, gs) = geistBoard geistcatcher piker [restInPeace]
+              exiled = S.runPure S.identityAnswer gs (sacrificeThen S.alice victim)
+              after = S.runPure S.identityAnswer exiled (Event.destroy Regenerability.Regenerable [geist] >> Engine.priorityLoop)
+          Spec.assertEqWith s "CR 607.2a: no Piker came back to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+          Spec.assertBool s (not (S.onBattlefield victim exiled)) "the sacrificed Piker really left the battlefield"
+          Spec.assertEqWith s "and nothing reached a graveyard for CR 400.7e to name" (departedInto Zone.Graveyard exiled) []
+          Spec.assertEqWith s "leaving the graveyard as it was" (Game.zoneMembers Zone.Graveyard S.alice exiled) [buried]
 
 -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
@@ -2820,6 +2943,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   permanentEntersSpec s registry
   sacrificeSpec s registry
   mayhemDevilSpec s registry
+  prowlingGeistcatcherSpec s registry
   stateTriggerSpec s registry
   textChangedTriggerSpec s registry
   historySpec s registry

@@ -1664,7 +1664,7 @@ afflictSpec s registry =
         -- 702.130a's "defending player" reads. The falsifier is an arm that binds
         -- the attacking side, or none at all.
         Spec.it s "CR 603.2 the defending player rides the becomes-blocked event in the reserved slot" $ do
-          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing S.alice TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 9) S.carol 1))
+          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 9) S.carol 1))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 702.130b: "If a creature has multiple instances of afflict, each
         -- triggers separately." Asked of the mint rather than of a board, as
