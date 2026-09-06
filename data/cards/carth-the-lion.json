@@ -42,6 +42,9 @@
                 "value": {
                   "type": "Planeswalker"
                 }
+              },
+              "whichLoyalty": {
+                "type": "LoyaltyAbility"
               }
             }
           },
