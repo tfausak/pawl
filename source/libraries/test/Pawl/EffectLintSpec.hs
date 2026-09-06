@@ -1316,7 +1316,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no printed box holds a computed quantity" (fmap (S.nameOf . Printing.card) offenders) []
     -- The sweep is vacuous on a predicate that accepts everything, so both
     -- directions are asserted on real card data. Rootha, Mastering the Moment
-    -- prints a computed box (Miming Slime's Ooze is the other), and it sits on a
+    -- prints a computed box (Miming Slime's Ooze and Phyrexian Rebirth's Horror
+    -- are two more; grep data/cards/ for the shape), and it sits on a
     -- MINTED face (CR 111.3), which is exactly the shape the sweep above must not
     -- reach and the predicate must still reject.
     rootha <- S.printingOf s registry "Rootha, Mastering the Moment"

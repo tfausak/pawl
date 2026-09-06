@@ -77,6 +77,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
@@ -113,6 +114,7 @@ import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
+import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
@@ -146,6 +148,7 @@ import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
+import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -218,6 +221,25 @@ quantitySlots quantity =
 -- `_` -- so the reads are spelled out here and each walker goes through this.
 riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [Quantity.Type.Quantity]
 riderQuantities = Map.elems . EntryRiders.counters
+
+-- The Quantities an Effect.Create's TOKEN CARD carries that the CREATING effect
+-- evaluates rather than the token: the printed power and toughness of every
+-- face, and nothing else. CR 111.3 makes the value the effect defines part of
+-- the token's text, and Pawl.Engine.Resolve.Effect.bakeTokenCharacteristics is
+-- where that happens -- against the RESOLUTION's own object, context and slots,
+-- so a box naming a slot is this effect speaking and the three walkers below
+-- have to report it (Phyrexian Rebirth's "where X is the number of creatures
+-- destroyed this way").
+--
+-- P/T is the whole of it because it is the whole of what bakeTokenCharacteristics
+-- evaluates; every other Quantity on the token's card is literal text, read at
+-- the TOKEN's own resolution in its own (empty) bindings. The two walk together:
+-- widening one without the other is what makes a slot read invisible here.
+tokenBoxQuantities :: Card.Type.Card -> [Quantity.Type.Quantity]
+tokenBoxQuantities card =
+  foldMap
+    (\face -> foldMap (pure . Power.unwrap) (Face.power face) <> foldMap (pure . Toughness.unwrap) (Face.toughness face))
+    (Card.Type.faces card)
 
 -- The slot an entry rider READS, which is CR 509.4's blocking rider and only it:
 -- every other rider is a flag or a Quantity (riderQuantities above). Read singly
@@ -835,7 +857,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- the permanent the loop around it bound -- reported at the head with every
   -- other PlayerRef. So is CR 509.4's blocking rider, which names the attacker
   -- the token enters blocking (Flash Foliage's target), and that one is here.
-  Effect.Create (Create.MkCreate quantity _ riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
+  -- The token's own printed P/T is a read too, and for the same reason the
+  -- riders' counts are: CR 111.3 has the CREATING effect define it, in this
+  -- resolution's slots (tokenBoxQuantities).
+  Effect.Create (Create.MkCreate quantity card riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders <> tokenBoxQuantities card)), riderSlots riders]
   -- The COUNT only: the conjured card is literal card data, its destination is
   -- a constructor, and the conjurer is the resolving controller.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
@@ -1267,12 +1292,15 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.RedistributeLifeTotals -> True
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
-  -- CR 111.1's token is minted with empty bindings, so its card is literal text.
-  -- Its entry riders are not: CR 122.6's count per kind is the effect speaking,
-  -- read in the resolution's own slots.
-  Effect.Create (Create.MkCreate quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
-  -- The conjured card is literal text, Create's token's reason; the COUNT is the
-  -- effect speaking, read in the resolution's own slots.
+  -- CR 111.1's token is minted with empty bindings, so its card is literal text
+  -- but for the printed P/T box, which CR 111.3 has the creating effect define.
+  -- Its entry riders are not either: CR 122.6's count per kind is the effect
+  -- speaking, read in the resolution's own slots.
+  Effect.Create (Create.MkCreate quantity card riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders <> tokenBoxQuantities card)
+  -- The conjured card is literal text THROUGHOUT, unlike Create's token above:
+  -- nothing bakes a conjured card's printed box, so Pawl.Engine.Resolve.Effect
+  -- hands it to Event.conjure exactly as written. The COUNT is the effect
+  -- speaking, read in the resolution's own slots.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
@@ -1471,7 +1499,9 @@ readsX = any effectReadsX
       Effect.RedistributeLifeTotals -> False
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
-      Effect.Create (Create.MkCreate quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
+      -- The token's printed P/T box reaches CR 601.2b's X too: it is the
+      -- creating effect's number (tokenBoxQuantities).
+      Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
       Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.BecomeCopy {} -> False
