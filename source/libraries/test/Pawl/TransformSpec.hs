@@ -55,6 +55,7 @@ module Pawl.TransformSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -64,7 +65,6 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
-import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -99,6 +99,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -110,7 +111,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
-import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -1463,37 +1463,38 @@ moreThanMeetsTheEyeSpec s registry = Spec.describe s "MoreThanMeetsTheEye" $ do
   -- ONE board and one field apart, CastOffer.withoutPayingManaCost: same seat,
   -- same card, same three Plains, same answerer asking for the back face.
   --
-  -- The offer is BUILT here rather than played off a card. data/cards/ holds two
-  -- Effect.OfferCast producers, Wild Evocation and Harness the Storm, and only
-  -- the latter states no alternative cost -- its slot names an instant or sorcery
-  -- card sharing a name with the spell just cast, and every card printing the
-  -- keyword is an artifact creature (Scryfall `keyword:"More Than Meets the
-  -- Eye"`, 2026-08-28, fifteen cards, every front face Legendary Artifact
-  -- Creature -- Robot). A printing whose alternative-free offer could name one
-  -- would be the card that replaces this construction.
+  -- The offer is BUILT here rather than played off a card: the field under test is
+  -- CastOffer.withoutPayingManaCost, and a hand-built pair differing in that field
+  -- alone is what isolates it. Harness the Storm is the printed producer nearest
+  -- to it -- its slot names an instant or sorcery card sharing a name with the
+  -- spell just cast, and every card printing the keyword is an artifact creature
+  -- (Scryfall `keyword:"More Than Meets the Eye"`, 2026-08-28, fifteen cards,
+  -- every front face Legendary Artifact Creature -- Robot). A printing whose
+  -- alternative-free offer could name a converted face would be the card that
+  -- replaces this construction.
   Spec.it s "CR 118.9a an offer stating no alternative cost still reaches the converted face" $ do
     ratchet <- S.printingOf s registry "Ratchet, Field Medic"
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     let (handed, oid) = S.handOne ratchet (S.landsInPlay plains 3)
-        -- Something for the offer to resolve OFF: Resolve.offerCast reads the
-        -- slot off the resolving object's own bindings (CR 603.7c), so the
-        -- Ratchet is named by a binding on a spell already on the stack. Which
-        -- spell is immaterial -- it is never resolved.
-        (resolving, staged) = S.spellOnStack piker S.alice handed
-        slot = SlotName.MkSlotName (Text.pack "offered")
-        bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) Nothing Seq.empty
-        board = staged {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) resolving (GameState.objects staged)}
-        -- Asks for the BACK face wherever CR 709.3's choice is put, and takes
+        -- Something for the offer to resolve alongside: Resolve.offerCast takes
+        -- the objects the opcode's ObjectRef named, so the Ratchet is handed in
+        -- directly. A spell sits on the stack so the board is one a resolution
+        -- could be happening on; which spell is immaterial -- it is never
+        -- resolved.
+        (_, board) = S.spellOnStack piker S.alice handed
+        -- Asks for the BACK face wherever CR 601.3's choice is put, and takes
         -- every offer. Resolve.offerCast rejects rather than repairs, so the leg
         -- that stops offering that face casts the front one instead of nothing.
+        -- The OBJECT comes off the prompt, every option being a half of the one
+        -- card handed in.
         wantingBack :: Prompt.Prompt r -> r
         wantingBack p = case p of
-          Prompt.ChooseOfferedCastFace {} -> ratchetBack
+          Prompt.ChooseOfferedCastSpell _ _ options -> (fst (NonEmpty.head options), ratchetBack)
           Prompt.OfferedCast {} -> OptionalDecision.Exercises
           _ -> S.identityAnswer p
-        offered = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing}
-        under o = S.runPure wantingBack board (Resolve.offerCast resolving S.alice slot CastObligation.Optional o)
+        offered = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
+        under o = S.runPure wantingBack board (Resolve.offerCast [oid] S.alice CastObligation.Optional o)
         resolvedUnder o = S.runPure wantingBack (under o) Stack.resolveTop
         free = offered {CastOffer.withoutPayingManaCost = True}
         ratchetIn gs = filter (\o -> fmap S.nameOf (Game.cardOf o gs) == Just (S.printingName ratchet)) (Game.zoneMembers Zone.Battlefield S.alice gs)

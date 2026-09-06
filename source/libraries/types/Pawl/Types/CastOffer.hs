@@ -2,10 +2,11 @@ module Pawl.Types.CastOffer where
 
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaSpending as ManaSpending
 
 -- | What an effect says about a cast IT offers, beyond what casting the card
 -- would ordinarily mean -- CR 310.12b's "you may cast it transformed without
--- paying its mana cost", whose two riders are these two fields.
+-- paying its mana cost", whose two riders are the first two fields.
 --
 -- Carried by the OPCODE (OfferCast) and not by the card, for
 -- Pawl.Types.EntryRiders' reason: neither rider is a characteristic of the
@@ -20,7 +21,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- without the other -- a cascade's "you may cast it without paying its mana
 -- cost" transforms nothing.
 --
--- The first two are Bools rather than richer choices because each is the presence
+-- Those two are Bools rather than richer choices because each is the presence
 -- or absence of one printed clause. `payingInstead` is CR 118.9's OTHER wording
 -- -- "you may pay [cost] rather than its mana cost" -- and it is a third field
 -- rather than another value of the second for exactly the reason this haddock
@@ -36,6 +37,16 @@ import qualified Pawl.Types.Keyword as Keyword
 data CastOffer = MkCastOffer
   { transformed :: Bool,
     withoutPayingManaCost :: Bool,
-    payingInstead :: Maybe (Cost.Cost Keyword.Keyword)
+    payingInstead :: Maybe (Cost.Cost Keyword.Keyword),
+    -- | CR 118.14's "and mana of any type can be spent to cast that spell",
+    -- printed on Tinybones, the Pickpocket beside the offer itself.
+    --
+    -- A rider of its OWN and not a setting of the three above, for the reason
+    -- `payingInstead` is its own field: rule 118.14 widens how a cost may be PAID
+    -- and says nothing about which cost or which face, so it is independent of
+    -- both. Rule 118.14's last sentence is why it rides the offer rather than the
+    -- card -- the permission is the offering effect's, so the same card cast any
+    -- other way pays its printed colours.
+    spending :: ManaSpending.ManaSpending
   }
   deriving (Eq, Ord, Show)

@@ -980,13 +980,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       ( Effect.OfferCast
           OfferCast.MkOfferCast
-            { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+            { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.defaultValue
             }
       )
-      " {\"type\":\"OfferCast\",\"value\":{\"slot\":\"exiled\"}} "
+      " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
     -- CR 310.12b's two riders, which is what stops the offer being elided.
     Common.assertJsonCodec
       s
@@ -994,18 +994,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       ( Effect.OfferCast
           OfferCast.MkOfferCast
-            { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+            { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
               OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer =
                 CastOffer.Type.MkCastOffer
                   { CastOffer.Type.transformed = True,
                     CastOffer.Type.withoutPayingManaCost = True,
-                    CastOffer.Type.payingInstead = Nothing
+                    CastOffer.Type.payingInstead = Nothing,
+                    CastOffer.Type.spending = ManaSpending.AsProduced
                   }
             }
       )
-      " {\"type\":\"OfferCast\",\"value\":{\"slot\":\"exiled\",\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "
+      " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "
   Spec.it s "PutCounters" $
     Common.assertJsonCodec
       s

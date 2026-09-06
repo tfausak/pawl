@@ -4,8 +4,8 @@ module Pawl.Codec.OfferCast where
 
 import qualified Pawl.Codec.CastObligation as CastObligation
 import qualified Pawl.Codec.CastOffer as CastOffer
+import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.PlayerRef as PlayerRef
-import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CastObligation as CastObligation.Type
@@ -22,13 +22,13 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 -- existing offer into an instruction.
 codec :: Codec.Codec OfferCast.OfferCast
 codec = Fields.object $ do
-  slot <- Fields.required "slot" SlotName.codec OfferCast.slot
+  ref <- Fields.required "ref" ObjectRef.codec OfferCast.ref
   caster <- Fields.defaulted "caster" (PlayerRef.Type.Relative PlayerRelation.You) PlayerRef.codec OfferCast.caster
   optionality <- Fields.defaulted "optionality" CastObligation.Type.Optional CastObligation.codec OfferCast.optionality
   offer <- Fields.defaulted "offer" CastOffer.defaultValue CastOffer.codec OfferCast.offer
   pure
     OfferCast.MkOfferCast
-      { OfferCast.slot = slot,
+      { OfferCast.ref = ref,
         OfferCast.caster = caster,
         OfferCast.optionality = optionality,
         OfferCast.offer = offer

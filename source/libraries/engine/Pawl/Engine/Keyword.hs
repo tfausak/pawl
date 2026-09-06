@@ -76,6 +76,7 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -3309,12 +3310,12 @@ miracle cost =
     offer =
       Effect.OfferCast
         OfferCast.MkOfferCast
-          { OfferCast.slot = Binding.triggerSource,
+          { OfferCast.ref = ObjectRef.InSlot Binding.triggerSource,
             -- Rule 702.94a's "YOU may cast it": the revealer, who is the
             -- trigger's controller, and a "may".
             OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
             OfferCast.optionality = CastObligation.Optional,
-            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost}
+            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost, CastOffer.spending = ManaSpending.AsProduced}
           }
 
 -- CR 702.94a's STATIC half, read as the one thing its reader needs: what this
