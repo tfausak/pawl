@@ -89,6 +89,7 @@ oneMana color =
   ManaOption.MkManaOption
     { ManaOption.cost = Mana.intrinsicManaCost,
       ManaOption.restrictions = [],
+      ManaOption.ability = Nothing,
       -- CR 305.6's intrinsic ability, which says nothing beyond its mana.
       ManaOption.effects = [],
       ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing}]
