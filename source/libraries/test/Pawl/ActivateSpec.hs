@@ -71,6 +71,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -135,6 +136,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   textChangedAbilitySpec s registry
   textChangedCostSpec s registry
   textChangedTargetSpec s registry
+  textChangedOfferedCostSpec s registry
   graveyardEffectZoneSpec s registry
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
@@ -2617,6 +2619,66 @@ textChangedCostSpec s registry =
         Spec.it s "CR 612.1 whole card: hacking Dark Heart of the Wood moves which land its cost demands" $ do
           (before, after) <- run True
           Spec.assertEqWith s "alice gained 3 life" (S.lifeOf S.alice after) (fmap (+ 3) before)
+          Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
+          Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
+
+-- CR 612.1 reaching CR 118.9's STATED alternative cost, on the offer that applies
+-- it (Pawl.Types.CastOffer.payingInstead).
+--
+-- Synthetic Woodland Bargainer {2} Artifact, "{T}: You may cast target creature
+-- card from your graveyard by sacrificing a Forest rather than paying its mana
+-- cost." SYNTHETIC because no printing states this wording on an offered cast:
+-- every Effect.OfferCast in data/cards/ either states no alternative cost or
+-- states CR 118.9's "without paying its mana cost", which is a Bool and names no
+-- word. CR 118.9 admits both wordings for a cost "applied to it from another
+-- effect", so nothing in the CR forbids the card; a printing that states one
+-- replaces it.
+--
+-- textChangedCostSpec above one field over. The same rules make it card text: CR
+-- 118.1 puts a cost in the text box CR 612.1 reaches, and CR 608.2g's cast then
+-- pays what the projected offer states.
+--
+-- BOTH readings are payable -- alice has a Forest and an Island -- so the cast
+-- happens either way and the only thing that moves is WHICH land dies. A board
+-- where one reading could not pay would confuse the swap with an unaffordable
+-- offer.
+textChangedOfferedCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedOfferedCostSpec s registry =
+  let forestName = CardName.MkCardName (Text.pack "Forest")
+      islandName = CardName.MkCardName (Text.pack "Island")
+      -- CR 608.2g's "may", taken. S.identityAnswer bottoms out in
+      -- Replay.defaultAnswer, which DECLINES every offered cast, so a case
+      -- asserting the cast happened would otherwise pass for want of a cast.
+      taking :: Prompt.Prompt r -> r
+      taking p = case p of
+        Prompt.OfferedCast {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      run hacked = do
+        bargainer <- S.printingOf s registry "Synthetic Woodland Bargainer"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        seat <- S.printingOf s registry "Seat of the Synod"
+        magicalHack <- S.printingOf s registry "Magical Hack"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (subjectId, _, _, hackId, g0) = textChangeBoard bargainer forest island seat magicalHack
+            (_, g1) = S.addGraveyardCard piker S.alice g0
+            board = withForestHackedToIsland hacked subjectId hackId g1
+        case soleProjectedAbility subjectId board of
+          Nothing -> Spec.assertFailure s "expected the Bargainer to carry exactly one activated ability"
+          Just ability -> pure (piker, S.runPure taking board (do Activate.activateAbility S.alice subjectId ability; Stack.resolveTop; Stack.resolveTop))
+   in Spec.describe s "TextChangedOfferedCost" $ do
+        -- The control: unhacked, the printed word stands and the FOREST is the
+        -- only thing that can pay the offer.
+        Spec.it s "CR 118.9 whole card: an unhacked offer is paid by sacrificing the Forest" $ do
+          (piker, after) <- run False
+          Spec.assertEqWith s "the Piker was cast off the offer" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+          Spec.assertEqWith s "the Forest is gone" (S.countOnBattlefieldByName forestName S.alice after) 0
+          Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
+        -- The swap. alice's board did not move, but the cost the offer states now
+        -- reads "sacrificing an Island", so the Island is what dies.
+        Spec.it s "CR 612.1 whole card: hacking the Bargainer moves which land its offer demands" $ do
+          (piker, after) <- run True
+          Spec.assertEqWith s "the Piker was still cast off the offer" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
           Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
           Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
 
