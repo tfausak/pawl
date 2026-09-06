@@ -598,7 +598,7 @@ plus base extra =
 -- N of zero over a PAYABLE cost is {0} with no components, which CR 118.5 makes
 -- real and payable and is what "for each" of nothing means. Rule 702.24a reaches
 -- neither zero case -- the age counter is put on before the offer -- but
--- Pawl.Types.PayGate.perCounter is stated over every count.
+-- Pawl.Types.PayGate.perEach is stated over every count.
 repeated :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 repeated n cost = foldr plus (Cost.MkCost (fmap (const (ManaCost.MkManaCost [])) (Cost.mana cost)) []) (List.genericReplicate n cost)
 

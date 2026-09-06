@@ -2,11 +2,11 @@ module Pawl.Types.PayGate where
 
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | CR 118.12's cost, offered to a player as the spell or ability RESOLVES, plus
 -- which of that rule's two branches the clause's instructions are.
@@ -83,17 +83,17 @@ data PayGate = MkPayGate
     -- Optional (CR 118.12a's rewriting prints the "may"), Standstill's
     -- Mandatory.
     obligation :: PayObligation.PayObligation,
-    -- | CR 702.24a's "for each age counter on it": the kind of counter on the
-    -- ability's SOURCE whose count the cost above is multiplied by, one whole
-    -- copy of the cost per counter. Nothing is the unmultiplied case every card
-    -- but cumulative upkeep's mint writes.
+    -- | The "for each" the cost above is multiplied by, one whole copy of the
+    -- cost per thing counted -- Rakshasa's Disdain's "pays {1} for each card in
+    -- your graveyard", CR 702.24a's "for each age counter on it". Nothing is the
+    -- unmultiplied case Mana Leak and every other unscaled gate writes.
     --
-    -- ZERO counters leaves no copies of the cost, which
-    -- Pawl.Engine.Cost.repeated answers for in the cost's own terms: {0} when the
-    -- cost has a mana part, which CR 118.5 makes payable and which admits the
-    -- IfPaid branch, and CR 118.6's unpayable Nothing when it has none, which
-    -- Cost.canPay refuses. Zero copies of an unpayable cost is not a free one;
-    -- see #2875.
+    -- ZERO leaves no copies of the cost, which Pawl.Engine.Cost.repeated answers
+    -- for in the cost's own terms: {0} when the cost has a mana part, which CR
+    -- 118.5 makes payable and which admits the IfPaid branch, and CR 118.6's
+    -- unpayable Nothing when it has none, which Cost.canPay refuses. Zero copies
+    -- of an unpayable cost is not a free one; see #2875. A quantity that will not
+    -- evaluate is zero too (CR 107.1b).
     --
     -- ONE COST, not several offers: rule 702.24a says "either the entire set of
     -- costs is paid, or none of them is paid. Partial payments aren't allowed",
@@ -102,18 +102,19 @@ data PayGate = MkPayGate
     -- rule's "each choice is made separately for each age counter", since
     -- Pawl.Engine.Cost pays a component list one element at a time.
     --
-    -- A COUNTER KIND rather than a general Quantity, because no producer needs
-    -- more; a widened field would take Pawl.Engine.Projection.Rewrite.rewriteQuantity
-    -- through rewritePayGate, as rewriteEffect's own descent already does, where
-    -- the narrow one takes Pawl.Engine.Filter.rewriteCounterKind. Cyclone's
-    -- "sacrifice this enchantment unless you pay {G} for each wind counter on it"
-    -- is rule 702.24a's shape written out on a CR 122.1 named counter, so the
-    -- narrow field says that card too.
+    -- A Quantity and not a counter kind, Pawl.Types.CostReduction.perEach's
+    -- reason: rule 702.24a's own count is Quantity.ObjectCounters, and every
+    -- other printing of the family counts something else entirely -- Rakshasa's
+    -- Disdain a graveyard, Oppressive Will a hand, Override a board. A CR 613
+    -- type change reaches it through
+    -- Pawl.Engine.Projection.Rewrite.rewriteQuantity, as rewriteEffect's own
+    -- descent already does.
     --
-    -- Not implemented: a CR 118.12 cost scaling with anything that is not a
-    -- counter on the ability's source -- Circular Logic's "for each card in your
-    -- graveyard" (#2872).
-    perCounter :: Maybe (CounterKind.CounterKind Keyword.Keyword),
+    -- Evaluated against the RESOLUTION and not against the payer
+    -- (Pawl.Engine.Resolve.payGatePaidBy): CR 109.5 makes Rakshasa's Disdain's
+    -- "your graveyard" the countering spell's controller's, while its payer is
+    -- the targeted spell's controller.
+    perEach :: Maybe Quantity.Quantity,
     -- | Which clause of this mode MAKES the offer, when it is not this one --
     -- CR 118.12 offers a resolution cost once and reads the one answer, so
     -- Don't Make a Sound's second clause names its first rather than asking

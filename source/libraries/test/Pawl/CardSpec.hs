@@ -17,6 +17,7 @@ module Pawl.CardSpec where
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 -- triggered ability's effects (Card.allEffects only reaches the spell).
 -- whole card written by somebody else and so an independent witness to the
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -693,6 +694,15 @@ modeClauseConditions = Maybe.mapMaybe Clause.condition . Foldable.toList . Mode.
 modalClauseConditions :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Condition.Type.Condition]
 modalClauseConditions = concatMap modeClauseConditions . Modal.modes
 
+-- CR 118.12's gate multiplier, the OTHER Quantity a clause carries outside its
+-- effects -- Rakshasa's Disdain's "for each card in your graveyard".
+-- modalClauseConditions' sibling one field over, and swept at the same three
+-- carriers, so a Count written into a gate is not invisible to cardCounts.
+modalPayGateQuantities :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Quantity.Type.Quantity]
+modalPayGateQuantities =
+  concatMap (Maybe.mapMaybe (Clause.payGate Monad.>=> PayGate.perEach) . Foldable.toList . Mode.clauses)
+    . Modal.modes
+
 -- Every Condition a Duration holds: only ForAsLongAs (CR 611.2b) carries one.
 -- conditionQuantities' role one type up -- durationCounts below and
 -- durationFilters further down both take from it, so the CR 122.1b kind under a
@@ -1150,6 +1160,7 @@ activatedAbilityCounts ability =
     <> concatMap conditionCounts (concatMap restrictionConditions (ActivatedAbility.restrictions ability))
     <> concatMap effectCounts (Modal.allEffects (ActivatedAbility.modal ability))
     <> concatMap conditionCounts (modalClauseConditions (ActivatedAbility.modal ability))
+    <> concatMap quantityCounts (modalPayGateQuantities (ActivatedAbility.modal ability))
 
 triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 triggeredAbilityCounts ability =
@@ -1157,15 +1168,16 @@ triggeredAbilityCounts ability =
     <> foldMap conditionCounts (TriggeredAbility.intervening ability)
     <> concatMap effectCounts (Modal.allEffects (TriggeredAbility.modal ability))
     <> concatMap conditionCounts (modalClauseConditions (TriggeredAbility.modal ability))
+    <> concatMap quantityCounts (modalPayGateQuantities (TriggeredAbility.modal ability))
 
 -- Every Count reachable from a card: every site a Pawl.Types.Count can be
 -- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
 -- effect/modification quantity), Condition (a trigger's own condition, a
 -- triggered ability's intervening clause, an activated ability's CR 702.178a
 -- gate, a ForAsLongAs duration, CR 701.46a's per-clause gate, and CR 508.1c's /
--- CR 509.1b's "unless some condition is met"), and every effect
--- (spell, activated, triggered, delayed), recursing into a minted token or
--- emblem.
+-- CR 509.1b's "unless some condition is met"), CR 118.12's gate multiplier
+-- (modalPayGateQuantities), and every effect (spell, activated, triggered,
+-- delayed), recursing into a minted token or emblem.
 --
 -- This traversal is hand-maintained, not derived, so it is NOT enforced
 -- exhaustive by -Werror the way the Zone/Effect/Modification cases inside it
@@ -1494,6 +1506,7 @@ cardCounts card =
     <> concatMap (overFaces cardCounts) (concatMap (replacementMintedCards . PrintedReplacement.effect) (Face.replacementEffects card))
     <> concatMap effectCounts (Card.allEffects card)
     <> concatMap conditionCounts (modalClauseConditions (Face.spell card))
+    <> concatMap quantityCounts (modalPayGateQuantities (Face.spell card))
     <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
@@ -2376,9 +2389,10 @@ withCountersFilters w =
 
 -- Both Filter positions a CR 118.12 gate has: the COST the payer is offered,
 -- whose components carry card text (Lithophage's "unless you sacrifice a
--- Mountain"), and CR 702.24a's counter KIND, which CR 122.1b lets carry a whole
--- Keyword. One function for the same reason riderFilters is one -- the two
--- halves of a gate must not be swept apart.
+-- Mountain"), and the "for each" MULTIPLIER, a Quantity whose Counts and counter
+-- kinds are card text too (Rakshasa's Disdain's graveyard). One function for the
+-- same reason riderFilters is one -- the two halves of a gate must not be swept
+-- apart.
 --
 -- The COST half is SlotlessCostFramed: Pawl.Engine.Resolve.payGatePaidBy pays it
 -- through Pawl.Engine.Cost, whose Filter.Context comes from
@@ -2386,24 +2400,26 @@ withCountersFilters w =
 -- Filter.IsBound there is a silent False. Unframed promised the opposite; see
 -- #2881.
 --
--- The KIND half carries whatever counterKindFilters hands out, which is
--- KeywordFramed for CR 122.1b's keyword counter and nothing at all for every
--- other kind -- so it needs no tag of its own.
+-- The MULTIPLIER half is left as quantityFilters tags it, which is Unframed for
+-- an ordinary Count and KeywordFramed for a CR 122.1b keyword counter. Unframed
+-- is the honest promise there and not the cost half's lie: payGatePaidBy
+-- evaluates the multiplier against Resolve.Slots.effectContext, which carries the
+-- resolution's slots.
 payGateFilters :: PayGate.PayGate -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 payGateFilters gate =
   slotlessCost (costFilters (PayGate.cost gate))
-    <> concatMap counterKindFilters (Maybe.maybeToList (PayGate.perCounter gate))
+    <> concatMap quantityFilters (Maybe.maybeToList (PayGate.perEach gate))
 
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
 -- whole Keyword. Exhaustive so a new kind with a payload breaks this build.
 --
 -- EVERY card-authored CounterKind position goes through this, and the list is
 -- greppable rather than asserted: `counterKindFilters` above the effect
--- traversals, plus riderFilters, withCountersFilters and payGateFilters, is the
--- whole of the positions that name a KIND; see #2728, and #2876 for the gate
--- position, which was written and unswept. The positions that name a NUMBER reach
+-- traversals, plus riderFilters and withCountersFilters, is the whole of the
+-- positions that name a KIND; see #2728. The positions that name a NUMBER reach
 -- it through quantityKindFilters instead, and every traversal that reaches a
--- Quantity goes through quantityFilters to get there; see #2740.
+-- Quantity goes through quantityFilters to get there -- CR 118.12's gate
+-- multiplier among them (payGateFilters, #2876); see #2740.
 --
 -- Tagged pairs and not bare Filters, so that CR 122.1b's keyword counter carries
 -- KeywordFramed out through every quoting position rather than inheriting the

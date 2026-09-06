@@ -27,9 +27,11 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, noSubgame, performManaAbility, targetSlotsOf)
-import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotsAreExhaustive, slotsOf)
+import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotBindings, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -859,33 +861,44 @@ payGatePaid resolving source controller idx cIdx legal announced gate = do
   gs <- State.get
   Monad.foldM
     ( \acc payer -> do
-        paid <- payGatePaidBy resolving source idx cIdx legal payer gate
+        paid <- payGatePaidBy resolving source controller idx cIdx legal payer gate
         pure (Map.insert payer paid acc)
     )
     Map.empty
     (announcedOnly announced (apnapPlayersOf (PayGate.payer gate) legal controller gs))
 
 -- One player's answer to one gate. The cost is the PRINTED one with CR 107.3's X
--- resolved (`announcedXOn`) and then multiplied by CR 702.24a's "for each"
--- (PayGate.perCounter), and that pair of rewrites is what every reader below
+-- resolved (`announcedXOn`) and then multiplied by the gate's "for each"
+-- (PayGate.perEach), and that pair of rewrites is what every reader below
 -- sees -- CR 118.3's affordability test, the prompt the payer is shown, and the
 -- payment itself -- so none of them can disagree about what is owed.
 --
 -- The multiplier is read HERE rather than once for the whole gate, which is the
 -- posture payGatePaid's own comment states: rule 101.4b lets an earlier payer's
 -- answer move the board, and CR 118.12's cost is measured against the board each
--- payer faces. It counts the counters on the ability's SOURCE through
+-- payer faces.
+--
+-- Measured against the RESOLUTION, not against the payer: the context is the
+-- resolving controller's (`effectContext`, never Filter.contextFor -- see
+-- #2141), so Rakshasa's Disdain's "for each card in your graveyard" counts the
+-- graveyard of the player who cast it while the payer is the targeted spell's
+-- controller. The quantity is evaluated against the ability's SOURCE through
 -- `effectViewOf`, so CR 113.7a's last known record answers for a source that has
--- already left -- the same read Quantity.ObjectCounters makes. Whether such an
--- ability should be offering anything at all is its own text's business: rule
--- 702.24a's intervening "if" is what stops it (CR 603.4), proved at
+-- already left, with the announcement id CR 601.2b stamped on the RESOLVING
+-- object -- Resolve.Slots' TopOfLibrary depth is the same pair. An unevaluable
+-- or negative count is zero copies (CR 107.1b). Whether such an ability should
+-- be offering anything at all is its own text's business: rule 702.24a's
+-- intervening "if" is what stops it (CR 603.4), proved at
 -- Pawl.KeywordTriggerSpec's "a Unicorn murdered in response".
-payGatePaidBy :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
-payGatePaidBy resolving source idx cIdx legal payer gate = do
+payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
+payGatePaidBy resolving source controller idx cIdx legal payer gate = do
   gs <- State.get
-  let multiplier = case PayGate.perCounter gate of
+  let multiplier = case PayGate.perEach gate of
         Nothing -> 1
-        Just kind -> maybe 0 (Map.findWithDefault 0 kind . Filter.counters) (effectViewOf source legal gs source)
+        Just quantity ->
+          let viewOf = effectViewOf source legal gs
+              context = effectContext gs controller source legal (slotBindings resolving gs)
+           in maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source quantity)
       cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (PayGate.cost gate))
   if not (Cost.canPay payer source cost gs)
     then pure False

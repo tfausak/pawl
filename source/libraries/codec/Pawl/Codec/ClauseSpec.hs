@@ -122,7 +122,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
                   PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
                   PayGate.branch = PayBranch.IfNotPaid,
                   PayGate.obligation = PayObligation.Optional,
-                  PayGate.perCounter = Nothing,
+                  PayGate.perEach = Nothing,
                   PayGate.offeredAt = Nothing
                 }
           )

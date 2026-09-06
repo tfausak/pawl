@@ -1175,10 +1175,14 @@ rewriteModal pairs modal =
 -- because the word is used as a land type.
 --
 -- Written out field by field rather than as a record update, rewriteComponent's
--- posture one level up: `cost` is the only field a printed word can reach --
--- `payer` names a player, `branch` and `obligation` name rules categories, and
--- `offeredAt` is CR 608.2e's ordinal -- so a later field carrying one must fail
--- to compile here instead of silently keeping the printed word.
+-- posture one level up: `cost` and `perEach` are the fields a printed word can
+-- reach -- `payer` names a player, `branch` and `obligation` name rules
+-- categories, and `offeredAt` is CR 608.2e's ordinal -- so a later field carrying
+-- one must fail to compile here instead of silently keeping the printed word.
+--
+-- `perEach` takes rewriteQuantity, rewriteEffect's own descent through a counted
+-- amount: a gate scaled by "for each Elf you control" counts what a Magical Hack
+-- made an Elf.
 rewritePayGate :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PayGate.PayGate -> PayGate.PayGate
 rewritePayGate pairs gate =
   PayGate.MkPayGate
@@ -1186,7 +1190,7 @@ rewritePayGate pairs gate =
       PayGate.cost = Filter.rewriteCost pairs (PayGate.cost gate),
       PayGate.branch = PayGate.branch gate,
       PayGate.obligation = PayGate.obligation gate,
-      PayGate.perCounter = fmap (Filter.rewriteCounterKind pairs) (PayGate.perCounter gate),
+      PayGate.perEach = fmap (rewriteQuantity pairs) (PayGate.perEach gate),
       PayGate.offeredAt = PayGate.offeredAt gate
     }
 
