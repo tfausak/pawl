@@ -5,7 +5,9 @@ module Pawl.Codec.Object where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Binding as Binding
+import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Color as Color
@@ -14,6 +16,7 @@ import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Codec.Facing as Facing
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Mana as Mana
 import qualified Pawl.Codec.PlayerId as PlayerId
@@ -116,6 +119,7 @@ codec = Fields.object $ do
   goadedBy <- Fields.defaulted "goadedBy" Set.empty (Common.set PlayerId.codec) Object.goadedBy
   doesNotUntapNext <- Fields.defaulted "doesNotUntapNext" False Common.boolean Object.doesNotUntapNext
   exertedBy <- Fields.defaulted "exertedBy" Set.empty (Common.set PlayerId.codec) Object.exertedBy
+  activatedOnce <- Fields.defaulted "activatedOnce" Set.empty (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) Object.activatedOnce
   pure
     Object.MkObject
       { Object.owner = owner,
@@ -157,5 +161,6 @@ codec = Fields.object $ do
         Object.detainedUntil = detainedUntil,
         Object.goadedBy = goadedBy,
         Object.doesNotUntapNext = doesNotUntapNext,
-        Object.exertedBy = exertedBy
+        Object.exertedBy = exertedBy,
+        Object.activatedOnce = activatedOnce
       }

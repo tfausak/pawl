@@ -295,7 +295,8 @@ createCard pid printingId = do
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
             Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty
+            Object.exertedBy = Set.empty,
+            Object.activatedOnce = Set.empty
           }
       gs3 =
         gs2
