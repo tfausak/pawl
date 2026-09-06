@@ -255,7 +255,7 @@ populatedFace =
       Face.rooms = Seq.empty,
       Face.dungeonEntryQuality = Nothing,
       Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.CantCastSpells}],
-      Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached)],
+      Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing],
       Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached Nothing Nothing],
       Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing)],
@@ -467,7 +467,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached)]}
+        baseFace {Face.blockRequirements = [BlockRequirement.MkBlockRequirement Nothing (Just Affected.Attached) Nothing]}
         (init baseFaceJson <> ",\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}]}")
     Spec.it s "blockPermissions" $
       Common.assertJsonCodec

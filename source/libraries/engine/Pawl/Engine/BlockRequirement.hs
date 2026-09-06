@@ -14,6 +14,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
@@ -145,10 +147,35 @@ instances able candidates attackers gs =
             subjects = narrow BlockRequirement.subject candidates
             wanted = narrow BlockRequirement.attacker attackers
          in [ (blocker, attacker)
-            | attacker <- wanted,
+            | inForce source changes requirement,
+              attacker <- wanted,
               blocker <- subjects,
               able blocker attacker
             ]
+      -- CR 509.1c's second shape -- "or that it must block if some condition is
+      -- met" -- read as CR 604.2's "as long as" clause and asked exactly as
+      -- AttackRequirement.instances and BlockPermission.instances ask their own
+      -- `while`: a gate that does not hold mints nothing. The opposite polarity
+      -- to CombatRestriction.inForce's "unless", where a gate that holds lifts
+      -- the restriction.
+      --
+      -- Projection.fullView and not a bounded one, because CR 613.11 puts this
+      -- effect after every layer, so there is no layer to bound against.
+      --
+      -- Asked once per REQUIREMENT rather than per pair: CR 109.5 fixes the
+      -- "you" inside it as the source's controller, so neither the blocker nor
+      -- the attacker could change the answer. The CR 612.1 rewrite is the same
+      -- one both axes get, since all three clauses are printed on the source.
+      -- Proved by blockRequirementSpec's Seton's Desire cases.
+      inForce source changes requirement = case BlockRequirement.while requirement of
+        Nothing -> True
+        Just condition ->
+          Condition.holds
+            (Projection.fullView gs)
+            (Filter.contextFor (Game.teams gs) (Projection.controllerOf source gs) (Just source))
+            gs
+            source
+            (if null changes then condition else Projection.rewriteCondition changes condition)
       -- CR 509.1c again, off the STORED carrier. No CR 305.7 or CR 604.2 gate and
       -- no CR 612.1 rewrite, which is the posture PlayerEffect.applying takes for
       -- its stored rows: those three ask what a permanent's TEXT still says, and a

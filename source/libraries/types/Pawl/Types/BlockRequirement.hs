@@ -1,6 +1,7 @@
 module Pawl.Types.BlockRequirement where
 
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Condition as Condition
 
 -- | CR 509.1c: one printed BLOCKING REQUIREMENT -- an effect saying a creature
 -- must block, or must block if some condition is met. Lure, and Nemesis Mask's
@@ -30,7 +31,9 @@ import qualified Pawl.Types.Affected as Affected
 -- must block -- each optional, Nothing being "unrestricted on that axis". Lure
 -- and Nemesis Mask print the object alone ("all creatures able to block
 -- enchanted creature do so"); Razorgrass Screen prints the subject alone ("this
--- creature blocks each combat if able"), naming no attacker at all.
+-- creature blocks each combat if able"), naming no attacker at all. Rule
+-- 509.1c's second reading -- "must block if some condition is met" -- is the
+-- third field, `while`, and Pawl.Types.AttackRequirement carries the same three.
 --
 -- Pawl.Types.ActiveBlockRequirement is the sibling that carries both axes as
 -- bare ObjectIds, and it is still not a widening of this one: it is the
@@ -56,9 +59,9 @@ data BlockRequirement = MkBlockRequirement
     -- makes obeying ONE of them the maximum, since a creature blocks one
     -- attacker unless something says otherwise.
     --
-    -- An Affected, and not a bare ObjectId, because two printings in the pool
-    -- already name that creature two different ways: an Aura's requirement names
-    -- Affected.Attached (CR 303.4m) -- Lure -- while a creature's names its own
+    -- An Affected, and not a bare ObjectId, because the pool already names that
+    -- creature two different ways: an Aura's requirement names its attachment
+    -- (CR 303.4m) -- Lure, Seton's Desire -- while a creature's names its own
     -- source, Affected.Matching Filter.IsSource -- Prized Unicorn.
     --
     -- Neither axis is ever frozen, and CR 611.2c is why a resolution-created
@@ -67,6 +70,20 @@ data BlockRequirement = MkBlockRequirement
     -- not affected when it began, and CR 613.11 classifies a requirement as
     -- exactly that. So Affected.TheseObjects is the one arm these fields have no
     -- use for.
-    attacker :: Maybe Affected.Affected
+    attacker :: Maybe Affected.Affected,
+    -- | CR 509.1c's second shape -- "or that it must block if some condition is
+    -- met" -- read as CR 604.2's "as long as" clause. Seton's Desire's
+    -- threshold: "as long as there are seven or more cards in your graveyard,
+    -- all creatures able to block enchanted creature do so". Nothing is the
+    -- ungated requirement (Lure, Prized Unicorn, Razorgrass Screen).
+    --
+    -- The same field Pawl.Types.AttackRequirement and
+    -- Pawl.Types.BlockPermission spell `while`, with the same polarity -- a gate
+    -- that HOLDS is what puts the requirement in force -- and the opposite of
+    -- Pawl.Types.CombatRestriction's "unless", where a gate that holds LIFTS the
+    -- restriction. Re-read on every look like both axes above, so a graveyard
+    -- shrinking below seven lifts the requirement at once, and the "you" inside
+    -- it is CR 109.5's: the controller of the permanent printing the sentence.
+    while :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)
