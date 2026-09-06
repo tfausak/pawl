@@ -46,7 +46,10 @@
                   {
                     "type": "TargetsOnlyOne",
                     "value": {
-                      "type": "Creature"
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
                     }
                   },
                   {

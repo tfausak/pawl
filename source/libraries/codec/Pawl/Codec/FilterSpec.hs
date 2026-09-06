@@ -16,7 +16,6 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
-import qualified Pawl.Types.RecipientKind as RecipientKind
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -227,8 +226,8 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
     Common.assertCodec
       s
       codec
-      (Filter.TargetsOnlyOne RecipientKind.Creature)
-      " {\"type\":\"TargetsOnlyOne\",\"value\":{\"type\":\"Creature\"}} "
+      (Filter.TargetsOnlyOne (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"TargetsOnlyOne\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   Spec.it s "TargetsPlayer You" $
     Common.assertCodec
       s

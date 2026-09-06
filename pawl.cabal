@@ -709,8 +709,6 @@ library codec
     Pawl.Codec.QuantitySpec
     Pawl.Codec.RandomCardInHand
     Pawl.Codec.Recipient
-    Pawl.Codec.RecipientKind
-    Pawl.Codec.RecipientKindSpec
     Pawl.Codec.RecipientSpec
     Pawl.Codec.RedirectDamage
     Pawl.Codec.RedirectDamageSpec
@@ -1771,7 +1769,6 @@ library types
     Pawl.Types.Quantity
     Pawl.Types.RandomCardInHand
     Pawl.Types.Recipient
-    Pawl.Types.RecipientKind
     Pawl.Types.RedirectDamage
     Pawl.Types.ReduceActivationCost
     Pawl.Types.ReduceSpellCost
