@@ -1020,6 +1020,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenPlayer -> False
   ObjectRef.TopOfLibrary {} -> False
   ObjectRef.TopOfLibraryUntil {} -> False
+  ObjectRef.TopOfGraveyard {} -> False
   ObjectRef.EachCardFromAmong {} -> False
   ObjectRef.ChosenCardInGraveyard {} -> True
   ObjectRef.ChosenCardInHand {} -> True
@@ -1532,6 +1533,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- bounds how many cards it passes first. The same reading the computed
           -- depth above gets -- this lint asks what a card may be written as.
           ObjectRef.TopOfLibraryUntil {} -> False
+          -- TRUE at one seat: CR 404.1's top card is exactly one card per
+          -- graveyard, so the only thing that can make it plural is a PlayerRef
+          -- naming several -- TopOfLibrary's namesOneSeat with no depth to fail.
+          ObjectRef.TopOfGraveyard player -> namesOneSeat player
           -- One card per CHOOSER: the resolving controller chooses once however
           -- many graveyards the scope draws candidates from, where Exhume's
           -- "each player" is one choice each and so several cards on any board

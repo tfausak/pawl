@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
@@ -63,6 +64,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Power as Power
@@ -901,6 +903,157 @@ countOnLuckSpec s registry =
           Spec.assertEqWith s "bob's library is still untouched" (namesIn Zone.Library S.bob after) [named "Ogre Sentry"]
           Spec.assertBool s (S.onBattlefield luckId after) "and alice is still in the game with her enchantment"
           Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
+
+-- CR 404.1's ordered pile read from ITS end: ObjectRef.TopOfGraveyard, whose top
+-- is the NEWEST arrival and so the LAST member -- the opposite end from the
+-- library arms above, which is the way this reference is written wrong.
+--
+-- Soldevi Digger {2} Artifact -- "{2}: Put the top card of your graveyard on the
+-- bottom of your library." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com). Its whole printed text is that one ability, so nothing else
+-- on the card can be what these assertions read.
+--
+-- The board is built so that the readings of "the top card of your graveyard" are
+-- told apart, since a board that cannot distinguish them proves nothing:
+--
+--   * The NEWEST card versus the oldest. alice's graveyard is stocked with three
+--     distinct printings, and both the card that moved and the two left behind
+--     are asserted by name, in the pile's order.
+--   * The BOTTOM of the library versus its top. Her library already holds a
+--     card, so the two ends are different positions and the arriving card is
+--     asserted to be under it.
+--   * YOUR graveyard versus each player's. bob's graveyard is stocked with a
+--     printing alice never has, and it must be untouched.
+--   * ONE card versus the pile. Two cards stay, so a sweep of the graveyard
+--     would be visible.
+soldeviDiggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soldeviDiggerSpec s registry =
+  let -- alice controls Soldevi Digger and two Plains, and her graveyard holds
+      -- `buried` OLDEST FIRST -- S.addGraveyardCard puts each card on top, so
+      -- the last name given is the top card. Her library holds one Benalish
+      -- Hero, so the bottom is a position of its own; bob's graveyard holds one
+      -- Ogre Sentry, a printing alice never has.
+      board buried = do
+        digger <- S.printingOf s registry "Soldevi Digger"
+        plains <- S.printingOf s registry "Plains"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        hero <- S.printingOf s registry "Benalish Hero"
+        stocked <- mapM (S.printingOf s registry) buried
+        let (diggerId, g1) = S.addPermanent digger S.alice (S.landsInPlay plains 2)
+            g2 = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) g1 stocked
+            g3 = snd (S.addGraveyardCard sentry S.bob g2)
+            g4 = snd (S.addLibraryCard hero S.alice g3)
+        pure
+          ( digger,
+            diggerId,
+            g4
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          )
+      named = Just . CardName.MkCardName . Text.pack
+      -- Both piles in their own stored order: a graveyard reads OLDEST FIRST
+      -- (CR 404.1's arrival end is the last member) and a library TOP FIRST
+      -- (CR 401.2), which is why the arriving card is expected at opposite ends
+      -- of the two lists.
+      piles gs = (namesIn Zone.Graveyard S.alice gs, namesIn Zone.Library S.alice gs)
+   in Spec.describe s "SoldeviDigger" $ do
+        Spec.it s "CR 404.1 the NEWEST card in your graveyard, and only it, goes to the bottom of your library" $ do
+          (digger, diggerId, before) <- board ["Goblin Piker", "Bird Maiden", "Hill Giant"]
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              let after = S.runPure S.identityAnswer before (Activate.activateAbility S.alice diggerId ability >> Engine.priorityLoop)
+              Spec.assertEqWith
+                s
+                "the Hill Giant buried last is under the Benalish Hero in the library, and the two older cards are still in the graveyard in order"
+                (piles after)
+                ([named "Goblin Piker", named "Bird Maiden"], [named "Benalish Hero", named "Hill Giant"])
+              Spec.assertEqWith
+                s
+                "the fixture really buried the Hill Giant last, on top of the other two"
+                (fst (piles before))
+                [named "Goblin Piker", named "Bird Maiden", named "Hill Giant"]
+              Spec.assertEqWith
+                s
+                "bob's graveyard is untouched, so this is not each player's graveyard"
+                (namesIn Zone.Graveyard S.bob after, namesIn Zone.Library S.bob after)
+                ([named "Ogre Sentry"], [])
+              Spec.assertBool s (S.onBattlefield diggerId after) "the artifact is still on the battlefield, so nothing swept it"
+        -- ONE card, which is the case where the two ends of the pile coincide:
+        -- the same card is the top and the bottom, so an arm reading either end
+        -- moves it, and what this case proves is only that the graveyard empties.
+        Spec.it s "CR 404.1 a one-card graveyard gives up its one card" $ do
+          (digger, diggerId, before) <- board ["Bird Maiden"]
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              let after = S.runPure S.identityAnswer before (Activate.activateAbility S.alice diggerId ability >> Engine.priorityLoop)
+              Spec.assertEqWith
+                s
+                "the graveyard is empty and the card is under the Benalish Hero"
+                (piles after)
+                ([], [named "Benalish Hero", named "Bird Maiden"])
+        -- CR 404.3's arrangement is what this reference READS: the owner puts
+        -- simultaneous arrivals in an order of their own, and pawl records one on
+        -- the surveil path (Pawl.Engine.Resolve.Effect.surveilOne). alice
+        -- surveils two cards into an empty graveyard, and the ability then takes
+        -- the one the ANSWER named last -- the card that went in last is on top
+        -- (CR 404.1). The pair differs in exactly one thing, the order the answer
+        -- names, and a different card comes back for it.
+        Spec.it s "CR 404.3 the top card is the one the owner's own arrangement put there" $ do
+          (digger, diggerId, before) <- board []
+          maiden <- S.printingOf s registry "Bird Maiden"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              -- Stocked DEEPEST FIRST, so the surveil looks at piker then maiden;
+              -- the Benalish Hero the fixture put in is beneath both.
+              let (maidenId, g1) = S.addLibraryCard maiden S.alice before
+                  (pikerId, stocked) = S.addLibraryCard piker S.alice g1
+                  surveilTwo = Effect.Surveil (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
+                  -- Answers the surveil with a FIXED order and leaves every other
+                  -- prompt alone: an answerer that picked a legal split for itself
+                  -- would repair the assertion after a mutation.
+                  binning :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+                  binning order p = case p of
+                    Prompt.ChooseSurveil {} -> (order, [])
+                    _ -> S.identityAnswer p
+                  run order =
+                    S.runPure (binning order) stocked $ do
+                      Resolve.applyEffect diggerId diggerId S.alice Map.empty Map.empty surveilTwo
+                      Activate.activateAbility S.alice diggerId ability
+                      Engine.priorityLoop
+                  pikerLast = run [maidenId, pikerId]
+                  maidenLast = run [pikerId, maidenId]
+              Spec.assertEqWith
+                s
+                "named last, the Goblin Piker is on top of the graveyard, so it is the card that goes under the Benalish Hero"
+                (piles pikerLast)
+                ([named "Bird Maiden"], [named "Benalish Hero", named "Goblin Piker"])
+              Spec.assertEqWith
+                s
+                "and with the order swapped the Bird Maiden is the top card instead"
+                (piles maidenLast)
+                ([named "Goblin Piker"], [named "Benalish Hero", named "Bird Maiden"])
+        -- The empty pile, which CR 101.3 does as much of as it can -- none of it.
+        -- CR 104.3c takes nobody out of the game: an empty pile only loses when
+        -- its owner would DRAW from a library, and this ability draws nothing.
+        Spec.it s "CR 404.1 an empty graveyard has no top card, so the ability moves nothing" $ do
+          (digger, diggerId, before) <- board []
+          case soleActivatedAbility digger of
+            Nothing -> Spec.assertFailure s "Soldevi Digger should print exactly one activated ability"
+            Just ability -> do
+              let after = S.runPure S.identityAnswer before (Activate.activateAbility S.alice diggerId ability >> Engine.priorityLoop)
+              Spec.assertEqWith
+                s
+                "both piles are what they were"
+                (piles after)
+                ([], [named "Benalish Hero"])
+              Spec.assertEqWith s "bob's graveyard is still untouched" (namesIn Zone.Graveyard S.bob after) [named "Ogre Sentry"]
+              Spec.assertEqWith s "the game has no result: an empty graveyard is not itself a loss" (GameState.result after) Nothing
 
 -- The DEPTH on ObjectRef.TopOfLibrary, and the group binding a move of several
 -- cards owes its second sentence.
@@ -3122,6 +3275,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   swiftSilenceSpec s registry
   glenElendrasAnswerSpec s registry
   countOnLuckSpec s registry
+  soldeviDiggerSpec s registry
   actOnImpulseSpec s registry
   communeWithLavaSpec s registry
   apocalypseChimeSpec s registry
