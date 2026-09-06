@@ -504,6 +504,83 @@ clashBoard island clash piker x =
       (gs, clashId) = S.handOne clash onStack
    in (victimId, snd (Engine.runGamePure (announcesXBobPays x) gs (S.cast S.alice clashId)))
 
+-- The board every Rakshasa's Disdain case starts from. alice has three Islands
+-- (the Disdain's {2}{U}), a Disdain in hand and `aliceGraveyard` cards in her
+-- graveyard; bob has four untapped Islands, ONE card in his graveyard, and a
+-- Goblin Piker already on the stack. Returns the Piker's id and the state after
+-- alice casts the Disdain at it.
+--
+-- The three counts are all distinct on purpose. "Your graveyard" is the RESOLVING
+-- spell's controller's (CR 109.5), while CR 118.12's payer is the TARGETED spell's
+-- controller, so a gate measured against the payer demands {1} here and taps one
+-- Island; one measured as counters on its own source demands {0} and taps none;
+-- and bob's fourth Island is the spare that keeps "tapped three" from being "he
+-- tapped everything he had".
+--
+-- manaLeakBoard's shape, and its reason for the Piker's placement: the Piker is
+-- on the stack before the Disdain is cast, so it holds the lower object id and
+-- identityAnswer's ChooseTargets aims the Disdain at it.
+disdainBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+disdainBoard island disdain piker aliceGraveyard =
+  let base = S.landsInPlay island 3
+      withBob = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) base [1 .. 4 :: Int]
+      aliceYard = List.foldl' (\g _ -> snd (S.addGraveyardCard piker S.alice g)) withBob [1 .. aliceGraveyard]
+      bobYard = snd (S.addGraveyardCard piker S.bob aliceYard)
+      (victimId, onStack) = S.spellOnStack piker S.bob bobYard
+      (gs, disdainId) = S.handOne disdain onStack
+   in (victimId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice disdainId)))
+
+-- CR 118.12: Rakshasa's Disdain's "Counter target spell unless its controller
+-- pays {1} for each card in your graveyard" -- the same offer Mana Leak makes,
+-- with a cost the resolution MULTIPLIES by something that is not a counter on its
+-- own source (Pawl.Types.PayGate.perEach).
+--
+-- Two graveyard sizes, because one cannot tell a count from a constant: three
+-- cards demand {3} and two demand {2}, off boards that differ in nothing else.
+rakshasasDisdainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rakshasasDisdainSpec s registry = Spec.describe s "RakshasasDisdain" $ do
+  Spec.it s "CR 118.12 the offer is {1} for each card in the RESOLVING controller's graveyard" $ do
+    island <- S.printingOf s registry "Island"
+    disdain <- S.printingOf s registry "Rakshasa's Disdain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = disdainBoard island disdain piker 3
+        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "three cards in alice's graveyard made the offer {3}, tapping three of bob's four Islands" (S.tappedCount S.bob after) 3
+    Spec.assertBool s (elem victimId (GameState.stack after)) "so the Piker was not countered"
+    Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- alice's three plus the Disdain itself (CR 608.2n), which is put there after
+    -- the gate was measured rather than before it.
+    Spec.assertEqWith s "Rakshasa's Disdain finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 4
+    -- CR 400.7 mints a fresh incarnation, so the permanent is counted rather than
+    -- looked up by the spell's id.
+    let played = snd (Engine.runGamePure bobPaysAnswer after Stack.resolveTop)
+    Spec.assertEqWith s "and the Piker then resolves onto the battlefield" (S.creaturesInPlay S.bob played) 1
+  -- The same board with one card fewer in alice's graveyard: the demand follows
+  -- the count rather than sitting at a number this fixture happened to produce.
+  Spec.it s "CR 118.12 a graveyard one card smaller demands one mana less" $ do
+    island <- S.printingOf s registry "Island"
+    disdain <- S.printingOf s registry "Rakshasa's Disdain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = disdainBoard island disdain piker 2
+        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "two cards in alice's graveyard made the offer {2}, tapping two of bob's four Islands" (S.tappedCount S.bob after) 2
+    Spec.assertBool s (elem victimId (GameState.stack after)) "so the Piker was not countered"
+    Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+  -- CR 118.12a's other branch, off the FIRST case's board with bob's answer the
+  -- only difference.
+  Spec.it s "CR 118.12a declining the multiplied cost counters the spell" $ do
+    island <- S.printingOf s registry "Island"
+    disdain <- S.printingOf s registry "Rakshasa's Disdain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_victimId, cast) = disdainBoard island disdain piker 3
+        ((_, after), transcript) = Replay.record S.identityAnswer cast Stack.resolveTop
+    -- bob could have paid {3} out of four Islands, so the refusal is his rather
+    -- than CR 118.3's.
+    Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "the Piker was countered into bob's graveyard, beside the card already there" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
+    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
+    Spec.assertEqWith s "declining spent nothing: bob's Islands are all untapped" (S.tappedCount S.bob after) 0
+
 -- CR 118.4 / CR 107.3a: Clash of Wills, {X}{U} Instant, "Counter target spell
 -- unless its controller pays {X}." The {X} of a cost paid at RESOLUTION (CR
 -- 118.12) is the value the spell's own controller announced as it was cast, so
@@ -2898,6 +2975,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   indestructibleSpec s registry
   counterSpec s registry
   manaLeakSpec s registry
+  rakshasasDisdainSpec s registry
   clashOfWillsSpec s registry
   stymiedHopesSpec s registry
   standstillSpec s registry

@@ -2729,7 +2729,7 @@ ward cost =
           PayGate.cost = cost,
           PayGate.branch = PayBranch.IfNotPaid,
           PayGate.obligation = PayObligation.Optional,
-          PayGate.perCounter = Nothing,
+          PayGate.perEach = Nothing,
           PayGate.offeredAt = Nothing
         }
     effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing Nothing)
@@ -3110,7 +3110,7 @@ fabricate n =
           -- Optional because rule 702.123a prints the "may" itself; no offeredAt,
           -- one clause making its own offer.
           PayGate.obligation = PayObligation.Optional,
-          PayGate.perCounter = Nothing,
+          PayGate.perEach = Nothing,
           PayGate.offeredAt = Nothing
         }
     spawn =
@@ -3467,7 +3467,7 @@ fading =
 --
 -- CR 118.12a's rewriting puts the sacrifice on the IfNotPaid branch of an
 -- Optional offer -- ward's shape -- with rule 702.24a's "for each age counter on
--- it" riding PayGate.perCounter, which multiplies the offered cost by the pile.
+-- it" riding PayGate.perEach, which multiplies the offered cost by the pile.
 -- Rule 702.24a's "either the entire set of costs is paid, or none of them is
 -- paid" is that one multiplied cost rather than a run of offers.
 --
@@ -3514,7 +3514,7 @@ cumulativeUpkeep cost =
           PayGate.cost = cost,
           PayGate.branch = PayBranch.IfNotPaid,
           PayGate.obligation = PayObligation.Optional,
-          PayGate.perCounter = Just CounterKind.Age,
+          PayGate.perEach = Just (Quantity.ObjectCounters CounterKind.Age),
           PayGate.offeredAt = Nothing
         }
 
