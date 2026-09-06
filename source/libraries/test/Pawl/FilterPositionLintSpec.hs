@@ -1588,18 +1588,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             ("CR 614.1c's as-enters sacrifice", holds (entryRewriteFilters (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.Type.HasCardType CardType.Creature) (Just kind))))),
             ("CR 614.1c's as-enters counters", holds (entryRewriteFilters (EntryRewrite.WithCounters (WithCounters.one kind one)))),
             ("CR 614.1e's turn-up counters", holds (turnUpRewriteFilters (TurnUpRewrite.WithCounters (WithCounters.one kind one)))),
-            -- The three roads a card writes the kind inside a NUMBER instead, each
+            -- The four roads a card writes the kind inside a NUMBER instead, each
             -- reaching a Quantity by its own traversal (#2740). Reading a
-            -- Condition's, a Duration's or an ObjectRef's Counts alone answers []
-            -- here, since quantityCounts has no Count to hand back for an
-            -- ObjectCounters.
+            -- Condition's, a Duration's, an ObjectRef's or a CR 118.12 gate's
+            -- Counts alone answers [] here, since quantityCounts has no Count to
+            -- hand back for an ObjectCounters.
             ("a Condition's own number", holds (conditionFilters counting)),
             ("CR 611.2b's for-as-long-as clause", holds (durationFilters (Duration.ForAsLongAs counting))),
             ("a library depth", holds (objectRefFilters topDepth)),
             ("its reveal-until mirror", holds (objectRefFilters (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Type.HasCardType CardType.Land) (Quantity.Type.ObjectCounters kind))))),
-            -- CR 118.12's gate multiplier, a fourth road to a Quantity: the gate is
-            -- a clause's field rather than an effect, so payGateFilters is the only
-            -- traversal that reaches it (#2876).
+            -- The fourth: the gate is a clause's FIELD rather than an effect, so
+            -- payGateFilters is the only traversal that reaches it (#2876).
             ("CR 118.12's gate multiplier", holds (payGateFilters gate)),
             -- And the same three as cardFilters actually reaches them, one opcode
             -- or trigger condition deep, so the tagging survives the quoting
