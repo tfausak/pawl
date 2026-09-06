@@ -6538,8 +6538,6 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         pushRound ts = List.foldl' (\acc pid -> entry pid : acc) ts takers
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts _ -> pushRound ts) (GameState.extraTurns g) [1 .. turns]})
 
--- The no-subgame executor (the ability path and every direct caller): a
--- PlaySubgame resolves as a draw here (see noSubgame).
 -- CR 603.7c: stamp the land an earthbend animated onto the resolving object, so
 -- the environment the arming opcode captures next carries it. Pawl.Engine.Earthbend's
 -- delayed ability names Binding.earthbentLand and nothing else can supply it: the
@@ -6554,6 +6552,8 @@ bindEarthbentLand resolving land gs =
   let put obj = obj {Object.bindings = Map.insert Binding.earthbentLand (Binding.toObject land) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put resolving (GameState.objects gs)}
 
+-- The no-subgame executor (the ability path and every direct caller): a
+-- PlaySubgame resolves as a draw here (see noSubgame).
 applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyEffect = applyEffectWith noSubgame
 

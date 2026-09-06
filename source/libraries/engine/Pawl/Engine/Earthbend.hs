@@ -53,7 +53,6 @@ import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.TapState as TapState
-import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
@@ -135,7 +134,7 @@ returnName = AbilityName.MkAbilityName (Text.pack "earthbend")
 returnAbility :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 returnAbility =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = returnCondition,
+    { TriggeredAbility.condition = TriggerCondition.BoundDiesOrIsExiled Binding.earthbentLand,
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -165,8 +164,3 @@ returnAbility =
             MoveToZone.placement = LibraryPlacement.defaultValue,
             MoveToZone.duration = Nothing
           }
-
--- | The condition alone, so Pawl.Engine.Event.Binding's arms and the specs can
--- name it without building the whole ability.
-returnCondition :: TriggerCondition
-returnCondition = TriggerCondition.BoundDiesOrIsExiled Binding.earthbentLand

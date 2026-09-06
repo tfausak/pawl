@@ -551,6 +551,7 @@ objectRefPositions =
     ("tap", Effect.Tap (plantedRef "ta"), [plantedRef "ta"]),
     ("untap", Effect.Untap (plantedRef "un"), [plantedRef "un"]),
     ("detain", Effect.Detain (plantedRef "dt"), [plantedRef "dt"]),
+    ("earthbend", Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Type.Literal 1) (plantedRef "eb")), [plantedRef "eb"]),
     ("goad", Effect.Goad (plantedRef "go"), [plantedRef "go"]),
     ("does-not-untap-next", Effect.DoesNotUntapNext (plantedRef "du"), [plantedRef "du"]),
     ("transform", Effect.Transform (plantedRef "tr"), [plantedRef "tr"]),
