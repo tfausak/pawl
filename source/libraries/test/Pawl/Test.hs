@@ -347,6 +347,7 @@ import qualified Pawl.Codec.ReplacementProvenanceSpec
 import qualified Pawl.Codec.RequireAttackSpec
 import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RequiredDefenderSpec
+import qualified Pawl.Codec.RequirementAritySpec
 import qualified Pawl.Codec.RestartSignalSpec
 import qualified Pawl.Codec.RestrictedCreaturesSpec
 import qualified Pawl.Codec.ResultSpec
@@ -948,6 +949,7 @@ spec s registry = do
   Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RestrictedCreaturesSpec.spec s
   Pawl.Codec.RequiredDefenderSpec.spec s
+  Pawl.Codec.RequirementAritySpec.spec s
   Pawl.Codec.RestartSignalSpec.spec s
   Pawl.Codec.ResultSpec.spec s
   Pawl.Codec.ReturnWatchSpec.spec s

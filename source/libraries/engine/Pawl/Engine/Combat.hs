@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Requirement as Requirement
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
@@ -463,9 +464,12 @@ withinLimit limit size = case limit of
 --      it as a cardinality cap (withinLimit) plus one exception at size one
 --      (aloneAllows). It never asks WHICH creatures beyond that exception, and
 --      never asks what they were announced against.
---   2. attackRequirementsMet is a sum of non-negative weights over independent
---      (creature, target) PAIRS: AttackRequirement.instances is keyed by the
---      pair, so no requirement spans two creatures.
+--   2. attackRequirementsMet's PAIR half is a sum of non-negative weights over
+--      independent (creature, target) pairs: Requirement.pairs is keyed by the
+--      pair, so no pair requirement spans two creatures. Its GROUP half is not,
+--      and is answered by pinning a witness announcement per group and running
+--      the scan once per system of witnesses (`pinnings` below) -- exact, at a
+--      factor per DISTINCT group in force.
 --   3. What restricts which target a creature may be announced against is a fact
 --      about that creature and that target alone -- an attack cost (CR 508.1d) or
 --      CR 508.1c's aimed-at restriction -- so each creature's best announcement
@@ -480,8 +484,9 @@ withinLimit limit size = case limit of
 --
 -- Any of the three failing silently invalidates this: a restriction reading the
 -- announcements rather than the key set, one naming a (creature, target) pair
--- together with another creature's, a requirement keyed by something other than a
--- pair, or an attack cost read off the whole declaration. attackDeclarationAllowed and
+-- together with another creature's, a pair requirement keyed by something other
+-- than a pair, an arity that is neither one-per-subject nor one-over-all, or an
+-- attack cost read off the whole declaration. attackDeclarationAllowed and
 -- AttackRequirement.instances both carry a comment saying so, because -Werror
 -- cannot.
 --
@@ -492,7 +497,7 @@ withinLimit limit size = case limit of
 -- controller and not attacking a planeswalker they control, so a requirement to
 -- attack the PLAYER is excused while a requirement to attack the planeswalker
 -- stands.
-attackCeiling :: [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
+attackCeiling :: [ObjectId] -> GameState -> (Requirement.Instances (ObjectId, AttackTarget.AttackTarget), Map ObjectId AttackTarget.AttackTarget)
 attackCeiling candidates gs =
   attackCeilingGiven (CombatRestriction.attackLimit gs) (CombatRestriction.cantAttackAlone candidates gs) (barredAnnouncements candidates gs) candidates gs
 
@@ -542,10 +547,11 @@ barredAnnouncements candidates gs =
 -- attackCeiling against the restrictions the caller already gathered: each caller
 -- also asks attackDeclarationAllowed of the player's own declaration, and the two
 -- must be judging the same board.
-attackCeilingGiven :: Maybe Natural -> Set ObjectId -> Set (ObjectId, AttackTarget.AttackTarget) -> [ObjectId] -> GameState -> (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget)
+attackCeilingGiven :: Maybe Natural -> Set ObjectId -> Set (ObjectId, AttackTarget.AttackTarget) -> [ObjectId] -> GameState -> (Requirement.Instances (ObjectId, AttackTarget.AttackTarget), Map ObjectId AttackTarget.AttackTarget)
 attackCeilingGiven limit alone barred candidates gs =
   let targets = declarableTargets gs
       required = AttackRequirement.instances candidates targets gs
+      weights = Requirement.pairs required
       -- CR 508.1d's cost clause. AttackCost.costsOn is asked of the ANNOUNCEMENT,
       -- which is the question that rule's cards ask.
       freely oid target = null (AttackCost.costsOn oid target gs)
@@ -576,7 +582,7 @@ attackCeilingGiven limit alone barred candidates gs =
       -- make both declarations legal and the choice between them is only ever
       -- read out of forcedAttackDeclaration, which attemptAttackDeclaration
       -- reaches only for an interpreter that repeats a rejected declaration.
-      bestFor oid = case fmap (\target -> (target, Map.findWithDefault 0 (oid, target) required)) (announceable oid) of
+      bestFor oid = case fmap (\target -> (target, Map.findWithDefault 0 (oid, target) weights)) (announceable oid) of
         [] -> Nothing
         first : rest -> Just (List.foldl' (\best pair -> if snd pair > snd best then pair else best) first rest)
       -- CR 508.1a's candidates that a declaration may actually contain, in that
@@ -619,32 +625,81 @@ attackCeilingGiven limit alone barred candidates gs =
          in case sized <> singled of
               [] -> Nothing
               scores -> Just (maximum scores)
-      -- Always Just: `sized` admits the empty declaration, which disobeys no
-      -- restriction (CR 508.1c only ever forbids attacking), so the maximum is at
-      -- worst zero and the answer is total without a partial function.
-      maximumMet = Maybe.fromMaybe 0 (ceilingOver [] eligible)
+      -- CR 508.1d's GROUP requirements, one witness announcement pinned per
+      -- group -- the half the prefix scan above cannot answer, since a group is
+      -- worth its weight once however many creatures attack and so is not a sum
+      -- over independent pairs.
+      --
+      -- Every system of witnesses is enumerated: for each group, either no
+      -- witness (that group goes unobeyed) or one announcement from it, pinned
+      -- into the declaration. The maximum over the systems IS CR 508.1d's
+      -- maximum -- the optimal declaration's own witnesses are one of the
+      -- systems, and every system's score is attained by a declaration -- so the
+      -- greedy scan stays exact on the pairs while the groups are settled
+      -- exhaustively. The cost is a factor per DISTINCT group in force, which is
+      -- why Requirement.gather keys the groups by their pair set rather than
+      -- emitting one per permanent.
+      pinnings =
+        Set.toList
+          ( List.foldl'
+              ( \acc (group, _) ->
+                  acc
+                    <> Set.fromList
+                      [ Map.insert oid target pinned
+                      | pinned <- Set.toList acc,
+                        (oid, target) <- Set.toList group,
+                        List.elem target (announceable oid),
+                        Maybe.maybe True (== target) (Map.lookup oid pinned)
+                      ]
+              )
+              (Set.singleton Map.empty)
+              (Map.toList (Requirement.groups required))
+          )
+      -- What a system of witnesses obeys, and the two halves of `ceilingOver`'s
+      -- arguments it fixes: the pinned creatures are held at THEIR announcement
+      -- rather than at their best one, and are off the list the scan ranges over.
+      obeyedBy pinned = Requirement.groupsMet required (Set.fromList (Map.toList pinned))
+      pinnedEntries pinned = [(oid, (target, Map.findWithDefault 0 (oid, target) weights)) | (oid, target) <- Map.toList pinned]
+      scanRest pinned = filter (\entry -> Map.notMember (fst entry) pinned) eligible
+      scoreOf pinned = fmap (obeyedBy pinned +) (ceilingOver (pinnedEntries pinned) (scanRest pinned))
+      -- The empty system always scores: it pins nothing, and `sized` admits the
+      -- empty declaration, which disobeys no restriction (CR 508.1c only ever
+      -- forbids attacking). So the maximum is at worst zero and the answer is
+      -- total without a partial function.
+      maximumMet = maximum (0 : Maybe.mapMaybe scoreOf pinnings)
       -- CR 508.1d fixes the NUMBER and not the declaration, so the witness is
       -- pawl's own choice, and the choice is the least one in CR 508.1a's
       -- candidate order counting "does not attack" as least: walk the candidates
       -- once, leaving each one out whenever the rest can still reach the maximum.
       -- That is the declaration the enumeration this replaced returned, since its
       -- fold kept the first entry attaining the maximum and it emitted
-      -- declarations in exactly that order.
-      settle taken rest = case rest of
+      -- declarations in exactly that order. `target` is what the PAIRS still
+      -- owe once the pinned witnesses have taken their groups' weight, so with
+      -- no group in force it is the maximum itself.
+      settle target taken rest = case rest of
         [] -> taken
         entry : more ->
-          if ceilingOver taken more == Just maximumMet
-            then settle taken more
-            else settle (taken <> [entry]) more
+          if ceilingOver taken more == Just target
+            then settle target taken more
+            else settle target (taken <> [entry]) more
+      -- The witness declaration keeps every pin of the first system attaining
+      -- the maximum, so it obeys at least that system's groups, and settles the
+      -- rest against what the pairs still owe. With no group in force the only
+      -- system is the empty one and this is the walk over `eligible` it replaced.
+      witness = case Maybe.mapMaybe (\pinned -> fmap ((,) pinned) (scoreOf pinned)) pinnings of
+        [] -> []
+        scored -> case filter (\pair -> snd pair == maximumMet) scored of
+          [] -> []
+          pinned : _ -> settle (maximumMet - obeyedBy (fst pinned)) (pinnedEntries (fst pinned)) (scanRest (fst pinned))
    in ( required,
         -- The board almost every game is played on, short-circuited: with no
         -- requirement in force every weight is zero, so the walk below leaves
         -- every candidate out and the answer is the empty declaration. Taken
         -- before `eligible` is forced, which is what keeps AttackCost.costsOn off
         -- the ordinary declare attackers step entirely.
-        if Map.null required
+        if Requirement.vacuous required
           then Map.empty
-          else Map.fromList (fmap (\(oid, (target, _)) -> (oid, target)) (settle [] eligible))
+          else Map.fromList (fmap (\(oid, (target, _)) -> (oid, target)) witness)
       )
 
 -- CR 508.1b's announcement list for the combat in progress, empty when no
@@ -656,18 +711,19 @@ declarableTargets gs =
 
 -- How many of `required` this declaration obeys (CR 508.1d): a requirement
 -- instance is obeyed exactly when the declaration attacks with its creature AND
--- announces its target for that creature. Summing multiplicities rather than
--- counting keys, because CR 508.1d counts REQUIREMENTS: two naming one pair are
--- both obeyed by making that announcement.
-attackRequirementsMet :: Map (ObjectId, AttackTarget.AttackTarget) Natural -> Map ObjectId AttackTarget.AttackTarget -> Natural
+-- announces its target for that creature; a GROUP instance is obeyed by any one
+-- of its announcements. Summing multiplicities rather than counting keys,
+-- because CR 508.1d counts REQUIREMENTS: two naming one pair are both obeyed by
+-- making that announcement.
+attackRequirementsMet :: Requirement.Instances (ObjectId, AttackTarget.AttackTarget) -> Map ObjectId AttackTarget.AttackTarget -> Natural
 attackRequirementsMet required declaration =
-  sum (Map.filterWithKey (\(oid, target) _ -> Map.lookup oid declaration == Just target) required)
+  Requirement.met required (Set.fromList (Map.toList declaration))
 
 -- CR 508.1d asked of a declaration that has already passed CR 508.1a and CR
 -- 508.1c: does it obey at least as many requirements as the maximum? Split out so
 -- declareAttackers can ask it against a ceiling it computed once, and so the two
 -- cannot drift.
-obeysAttackRequirements :: (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget) -> Map ObjectId AttackTarget.AttackTarget -> Bool
+obeysAttackRequirements :: (Requirement.Instances (ObjectId, AttackTarget.AttackTarget), Map ObjectId AttackTarget.AttackTarget) -> Map ObjectId AttackTarget.AttackTarget -> Bool
 obeysAttackRequirements (required, best) chosen =
   attackRequirementsMet required chosen >= attackRequirementsMet required best
 
@@ -724,7 +780,7 @@ legalAttackDeclarationGiven candidates chosen gs =
 -- 508.1c as well as CR 508.1d, attackCeiling's search having ranged over the legal
 -- declarations only. Ordered by `candidates` rather than by Map.toList, so it
 -- comes back in the order the player was offered its creatures.
-forcedAttackDeclaration :: (Map (ObjectId, AttackTarget.AttackTarget) Natural, Map ObjectId AttackTarget.AttackTarget) -> [ObjectId] -> [(ObjectId, AttackTarget.AttackTarget)]
+forcedAttackDeclaration :: (Requirement.Instances (ObjectId, AttackTarget.AttackTarget), Map ObjectId AttackTarget.AttackTarget) -> [ObjectId] -> [(ObjectId, AttackTarget.AttackTarget)]
 forcedAttackDeclaration (_, best) =
   Maybe.mapMaybe (\oid -> fmap ((,) oid) (Map.lookup oid best))
 
@@ -1025,11 +1081,17 @@ blockDeclarationAllowed limit arity pcs able declaration gs =
 
 -- How many of `requirements` this declaration obeys (CR 509.1c): a requirement
 -- instance is obeyed exactly when the declaration has its blocker blocking its
--- attacker. Summing multiplicities rather than counting keys, because CR 509.1c
--- counts REQUIREMENTS and BlockRequirement.instances is a multiset over pairs.
-requirementsMet :: Map (ObjectId, ObjectId) Natural -> Map ObjectId (Set ObjectId) -> Natural
-requirementsMet requirements declaration =
-  sum (Map.filterWithKey (\(blocker, attacker) _ -> Set.member attacker (Map.findWithDefault Set.empty blocker declaration)) requirements)
+-- attacker, or -- for a GROUP -- has some blocker blocking some attacker the
+-- group names. Summing multiplicities rather than counting keys, because CR
+-- 509.1c counts REQUIREMENTS and BlockRequirement.instances is a multiset.
+requirementsMet :: Requirement.Instances (ObjectId, ObjectId) -> Map ObjectId (Set ObjectId) -> Natural
+requirementsMet requirements declaration = Requirement.met requirements (declaredPairs declaration)
+
+-- A block declaration read as the atoms CR 509.1c counts requirements over: one
+-- (blocker, attacker) pair per block it declares.
+declaredPairs :: Map ObjectId (Set ObjectId) -> Set (ObjectId, ObjectId)
+declaredPairs declaration =
+  Set.fromList [(blocker, attacker) | (blocker, attackers) <- Map.toList declaration, attacker <- Set.toList attackers]
 
 -- CR 509.1c's maximization: a declaration obeying the most of `requirements`
 -- that any declaration CR 509.1a lets the defending player write down obeys
@@ -1038,8 +1100,9 @@ requirementsMet requirements declaration =
 --
 -- A bounded depth-first search rather than an enumeration. Each blocker's
 -- options are the subsets, up to its arity, of the attackers it is REQUIRED to
--- block plus the attackers with menace that some blocker is required to block
--- (CR 702.111b: the extra blocker is what makes the required block legal). A
+-- block -- by a pair requirement or as a member of a GROUP -- plus the attackers
+-- with menace that some blocker is required to block (CR 702.111b: the extra
+-- blocker is what makes the required block legal). A
 -- block of any other attacker adds no requirement obeyed and can be dropped
 -- from a legal declaration without making it illegal -- dropping every block of
 -- an unwanted menace attacker together -- so the answer lies in this smaller
@@ -1055,15 +1118,20 @@ requirementsMet requirements declaration =
 -- maximum with a number that is not the maximum. The worst case is still
 -- exponential -- an unbounded arity against wanted menace attackers -- but it
 -- is now the worst case rather than every case.
-bestBlockDeclaration :: Map (ObjectId, ObjectId) Natural -> Maybe Natural -> (ObjectId -> Maybe Natural) -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> GameState -> Map ObjectId (Set ObjectId)
+bestBlockDeclaration :: Requirement.Instances (ObjectId, ObjectId) -> Maybe Natural -> (ObjectId -> Maybe Natural) -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> GameState -> Map ObjectId (Set ObjectId)
 bestBlockDeclaration requirements limit arity pcs able candidates attackers gs =
-  let requiredOf = Map.fromListWith Set.union [(blocker, Set.singleton attacker) | (blocker, attacker) <- Map.keys requirements]
-      wanted = Set.fromList (fmap snd (Map.keys requirements))
+  let weights = Requirement.pairs requirements
+      -- Every pair some requirement names, a GROUP's members included: a block
+      -- of one of those is what obeys the group, so the same options walk
+      -- reaches it.
+      named = Map.keys weights <> concatMap Set.toList (Map.keys (Requirement.groups requirements))
+      requiredOf = Map.fromListWith Set.union [(blocker, Set.singleton attacker) | (blocker, attacker) <- named]
+      wanted = Set.fromList (fmap snd named)
       menaced = Set.filter (\attacker -> Projection.hasKeywordGiven pcs Keyword.Menace attacker gs) wanted
       relevant blocker =
         let required = Map.findWithDefault Set.empty blocker requiredOf
          in filter (\attacker -> able blocker attacker && (Set.member attacker required || Set.member attacker menaced)) attackers
-      valueOf blocker chosen = sum [Map.findWithDefault 0 (blocker, attacker) requirements | attacker <- Set.toList chosen]
+      valueOf blocker chosen = sum [Map.findWithDefault 0 (blocker, attacker) weights | attacker <- Set.toList chosen]
       -- Blockers with some option beyond blocking nothing, with their options
       -- in choicesUpTo's order and the most each could obey alone.
       movers =
@@ -1076,12 +1144,15 @@ bestBlockDeclaration requirements limit arity pcs able candidates attackers gs =
       room used = case limit of
         Nothing -> Nothing
         Just l -> Just (if l <= used then 0 else l - used)
-      -- The most a completion of this node could obey.
-      ceilingOf met used remaining =
+      -- The most a completion of this node could obey. Every group not yet
+      -- obeyed is counted in whole, which over-estimates rather than
+      -- under-estimates -- a group is worth its weight once -- so the prune
+      -- still skips no leaf that could replace the best.
+      ceilingOf met used remaining obeyed =
         let values = List.sortBy (flip compare) (fmap (\(_, _, v) -> v) remaining)
-         in met + sum (maybe values (\k -> take (Natural.toIntSaturating k) values) (room used))
-      go best declaration met used remaining =
-        if ceilingOf met used remaining <= snd best
+         in met + sum (maybe values (\k -> take (Natural.toIntSaturating k) values) (room used)) + Requirement.unobeyed requirements obeyed
+      go best declaration met used remaining obeyed =
+        if ceilingOf met used remaining obeyed <= snd best
           then best
           else case remaining of
             [] ->
@@ -1090,11 +1161,26 @@ bestBlockDeclaration requirements limit arity pcs able candidates attackers gs =
                 else best
             (blocker, options, _) : rest ->
               let try acc chosen
-                    | Set.null chosen = go acc declaration met used rest
+                    | Set.null chosen = go acc declaration met used rest obeyed
                     | room used == Just 0 = acc
-                    | otherwise = go acc (Map.insert blocker chosen declaration) (met + valueOf blocker chosen) (used + 1) rest
+                    | otherwise =
+                        -- A REGRESSION FENCE rather than a proved line: with
+                        -- every group weighing one, neutralizing this gain
+                        -- leaves the Combat subtree green, because `ceilingOf`
+                        -- counts the same group in `unobeyed` for exactly as
+                        -- long and the bound stays admissible. It is still the
+                        -- score CR 509.1c asks for, and a board carrying a
+                        -- group of weight two would read it.
+                        let gained = Requirement.covering requirements obeyed [(blocker, attacker) | attacker <- Set.toList chosen]
+                         in go
+                              acc
+                              (Map.insert blocker chosen declaration)
+                              (met + valueOf blocker chosen + sum (fmap snd gained))
+                              (used + 1)
+                              rest
+                              (obeyed <> Set.fromList (fmap fst gained))
                in List.foldl' try best options
-   in fst (go (Map.empty, 0) Map.empty 0 0 movers)
+   in fst (go (Map.empty, 0) Map.empty 0 0 movers Set.empty)
 
 -- Every subset of `attackers` of size at most `n`, the empty one first, or every
 -- subset at all when `n` is Nothing. Declining to block is always among them,
@@ -1125,10 +1211,10 @@ choicesUpTo n attackers =
 -- force. attackCeilingGiven applies the same clause in the same place, and the
 -- placement is the whole of the rule -- a taxed creature is still a CANDIDATE and
 -- still a legal blocker, it is only never one the defending player must reach for.
-blockCeiling :: PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
+blockCeiling :: PlayerId -> GameState -> (Requirement.Instances (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
 blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
-blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Map (ObjectId, ObjectId) Natural, Map ObjectId (Set ObjectId))
+blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Requirement.Instances (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
 blockCeilingGiven grants pcs pid gs =
   -- CR 802.4b: judged ignoring any creature attacking anyone else.
   let attackers = attackersOn pid gs
@@ -1145,7 +1231,7 @@ blockCeilingGiven grants pcs pid gs =
       -- would have blocked never enters the question.
       freely blocker = BlockCost.blocksFreely blocker gs
    in ( requirements,
-        if Map.null requirements
+        if Requirement.vacuous requirements
           then Map.empty
           else bestBlockDeclaration requirements limit arity pcs able (filter freely candidates) attackers gs
       )

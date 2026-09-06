@@ -2878,6 +2878,114 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton unicorn)) gs) "blocking the Unicorn is legal"
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton other)) gs)) "blocking the other attacker instead is illegal"
       _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  Spec.it s "CR 509.1c a Gaea's Protector is one requirement over three able blockers, not three" $ do
+    -- THE DISCRIMINATOR between the two readings of a sentence naming several
+    -- creatures. "This creature must be blocked if able" is ONE requirement,
+    -- obeyed by any single blocker; Lure's is one PER creature, obeyed only by
+    -- all of them. Three able blockers is what tells them apart -- with one
+    -- able blocker both readings force the same declaration.
+    --
+    -- The one-blocker declaration's LEGALITY is the quantity that separates
+    -- them: the Lure reading makes it illegal. Declining is illegal under both,
+    -- so it proves only that a requirement exists.
+    --
+    -- The control is the same board with a plain Goblin Piker attacking, which
+    -- is what keeps "declining is illegal" from passing for a reason other than
+    -- the requirement.
+    gaeasProtector <- S.printingOf s registry "Gaea's Protector"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [gaeasProtector] [piker, piker, piker]
+        (control, _, _) = attacking [piker] [piker, piker, piker]
+    case (mine, theirs) of
+      (a : _, [first, second, third]) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first (Set.singleton a)) gs) "ONE blocker attains CR 509.1c's maximum"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "declining is illegal"
+        Spec.assertBool
+          s
+          (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, Set.singleton a), (second, Set.singleton a), (third, Set.singleton a)]) gs)
+          "and blocking with all three is legal too, the maximum being one"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty control) "without the requirement, declining is legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and three blockers"
+  Spec.it s "CR 509.1c a Gaea's Protector nobody is able to block requires nothing" $ do
+    -- The "if able" of "must be blocked if able", on the clause CR 509.1a
+    -- states first: a tapped creature is never a candidate, so the group has no
+    -- member and raises the maximum by nothing. A REGRESSION FENCE rather than
+    -- a proof -- the mechanism is the `candidates` list every requirement above
+    -- is already narrowed by -- and the pair of boards is here because the
+    -- group is a new reader of it.
+    gaeasProtector <- S.printingOf s registry "Gaea's Protector"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, theirs) = attacking [gaeasProtector] [piker]
+    case theirs of
+      b : _ -> do
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "untapped, declining is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty (S.tapObject b gs)) "tapped, declining is legal"
+      _ -> Spec.assertFailure s "fixture should have a blocker"
+  Spec.it s "CR 509.1c a Lure and a Gaea's Protector attacking together compose" $ do
+    -- The composition board for the two arities, and the reason the group is a
+    -- term in ONE maximization rather than a check of its own. Three blockers,
+    -- a Lured Piker and the Protector: the Lure is three requirements on its
+    -- own pairs and the Protector one over all three blockers, so the maximum
+    -- is three and TWO declarations attain it -- all three on the Lured Piker,
+    -- or two there and one on the Protector.
+    --
+    -- A group read as a check ("the Protector must be blocked, full stop")
+    -- calls the all-three-on-the-Lure declaration illegal; one read as a
+    -- per-pair weight calls the two-and-one declaration illegal. Both are
+    -- asserted legal, and the two declarations that obey fewer than three are
+    -- asserted illegal.
+    lure <- S.printingOf s registry "Lure"
+    gaeasProtector <- S.printingOf s registry "Gaea's Protector"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, mine, theirs) = attacking [gaeasProtector, piker] [piker, piker, piker]
+    case (mine, theirs) of
+      ([protector, lured], [first, second, third]) -> do
+        let (aura, withAura) = S.addPermanent lure S.alice board
+            gs = S.attach aura lured withAura
+            onLure = Set.singleton lured
+            onProtector = Set.singleton protector
+        Spec.assertBool
+          s
+          (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, onLure), (second, onLure), (third, onLure)]) gs)
+          "all three on the Lured attacker obeys three"
+        Spec.assertBool
+          s
+          (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, onLure), (second, onLure), (third, onProtector)]) gs)
+          "and so does two there and one on the Protector"
+        Spec.assertBool
+          s
+          (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, onLure), (second, onProtector), (third, onProtector)]) gs))
+          "one on the Lure and two on the Protector obeys two and is illegal"
+        Spec.assertBool
+          s
+          (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, onProtector), (second, onProtector), (third, onProtector)]) gs))
+          "and all three on the Protector obeys one"
+      _ -> Spec.assertFailure s "fixture should have two attackers and three blockers"
+  Spec.it s "CR 509.1c whole cards: a Gaea's Protector forces a block through a real declare blockers step" $ do
+    -- The gameplay-level case, run through Combat.declareBlockers with an
+    -- interpreter that declines to block, and a pair of boards differing in ONE
+    -- thing: whether bob's Piker is untapped.
+    --
+    -- WITH the block forced: bob takes nothing, and the 4/2 and the 2/1 trade.
+    -- WITHOUT it (the Piker tapped, so no creature is able): bob takes four and
+    -- both creatures live.
+    gaeasProtector <- S.printingOf s registry "Gaea's Protector"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, theirs) = attacking [gaeasProtector] [piker]
+        declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareBlockers {} -> Map.empty
+          _ -> S.aggressiveAnswer p
+    case theirs of
+      b : _ -> do
+        let after = S.settleSba (S.fightWith declining gs)
+            control = S.settleSba (S.fightWith declining (S.tapObject b gs))
+        Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "the Protector died to the block it forced" (S.creaturesInPlay S.alice after) 0
+        Spec.assertEqWith s "and so did the blocker" (S.creaturesInPlay S.bob after) 0
+        Spec.assertEqWith s "with nobody able to block, bob took four" (S.lifeOf S.bob control) (Just 16)
+        Spec.assertEqWith s "and the Protector lived" (S.creaturesInPlay S.alice control) 1
+      _ -> Spec.assertFailure s "fixture should have a blocker"
   Spec.it s "CR 604.2 Humility strips a Prized Unicorn's block requirement, so declining becomes legal" $ do
     -- CR 604.2: a static ability's continuous effect is active only while the
     -- permanent "remains on the battlefield AND HAS THE ABILITY", so Humility's
@@ -3049,9 +3157,10 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
   --
   -- The printings that word the gate on themselves instead -- The Masamune,
   -- Ace's Baseball Bat, Enkira, Hostile Scavenger and Frodo Baggins -- all say
-  -- "must be BLOCKED if able", which is one requirement obeyed by any single
-  -- blocker rather than one per able creature, and pawl's carrier cannot say
-  -- that (gap #3303). None of them is transcribable whatever the gate does.
+  -- "must be BLOCKED if able", which is the gate beside
+  -- Pawl.Types.RequirementArity.AnySubject rather than beside Lure's arity.
+  -- Gaea's Protector is what proves that arity; Seton's Desire is what proves
+  -- the gate, and no printing in data/cards/ yet states both at once.
   --
   -- The two boards differ in ONE thing, the number of cards in alice's
   -- graveyard, and the threshold falls between them -- the pair
@@ -3239,6 +3348,55 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     let (gs, _, _) = S.combatBoardOf [piker] []
         withAura = snd (S.addPermanent curse S.alice gs)
     Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] withAura) "no attack is legal"
+  Spec.it s "CR 508.1d a Seeker of Slaanesh requires ONE attacker from the opponent whose turn it is" $ do
+    -- The attacking twin of the Gaea's Protector case: "each opponent must
+    -- attack with at least one creature each combat if able" is ONE requirement
+    -- over every creature that opponent controls, obeyed by attacking with any
+    -- one of them, where Curse of the Nightly Hunt beside it is one per
+    -- creature and obeyed only by attacking with all of them.
+    --
+    -- THREE SEATS, because "each opponent" collapses onto one in a two-player
+    -- game. bob prints the Seeker; alice is the opponent declaring attackers,
+    -- and carol is the second opponent, whose Piker matches the Seeker's
+    -- subject clause and could attack on HER turn. CR 508.1a's candidates are
+    -- the ACTIVE player's, so carol's creature is outside the group and cannot
+    -- obey alice's requirement -- which is what the vacuous board below
+    -- asserts, carol's Piker being untouched between the two.
+    --
+    -- TWO creatures for alice, and that is what tells the arities apart: the
+    -- per-creature reading makes attacking with exactly one of them illegal,
+    -- where this one makes it the maximum. Declining is illegal under both, so
+    -- it proves only that a requirement exists.
+    --
+    -- The pair of boards differs in ONE thing: whether alice's two creatures
+    -- are Goblin Pikers or Walls of Stone, whose CR 702.3b defender keeps them
+    -- off the candidate list entirely. That is the "if able", and with no
+    -- member the group raises CR 508.1d's maximum by nothing.
+    seeker <- S.printingOf s registry "Seeker of Slaanesh"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let reach = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) S.identityAnswer
+        (bound, mine, _, _) = S.threePlayerCombat [piker, piker] [seeker] [piker]
+        (vacuous, _, _, _) = S.threePlayerCombat [wallOfStone, wallOfStone] [seeker] [piker]
+        boundAt = reach bound
+        vacuousAt = reach vacuous
+    case mine of
+      [first, second] -> do
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first] boundAt) "ONE attacker attains CR 508.1d's maximum"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] boundAt)) "declining to attack is illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] boundAt) "and attacking with both is legal too, the maximum being one"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] vacuousAt) "with nothing able to attack, declining is legal again"
+        -- The other reader of the ceiling, and the one an interpreter that
+        -- repeats a rewound declaration lands on: the witness declaration keeps
+        -- the pinned announcement the group's maximum was measured through, so
+        -- it names ONE of the two Pikers rather than both or neither.
+        let offered = Combat.legalAttackers S.alice boundAt
+        Spec.assertEqWith
+          s
+          "and the forced declaration names one of them"
+          (length (Combat.forcedAttackDeclaration (Combat.attackCeiling offered boundAt) offered))
+          1
+      _ -> Spec.assertFailure s "fixture should have two creatures for alice"
   Spec.it s "CR 508.1d whole cards: a Curse forces an attack through a real declare attackers step" $ do
     -- The gameplay-level case, run through Engine.runStep -- the priority loop
     -- and the CR 703.4i turn-based action, not a direct call -- with an

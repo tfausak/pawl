@@ -3,6 +3,7 @@ module Pawl.Types.AttackRequirement where
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.RequiredDefender as RequiredDefender
+import qualified Pawl.Types.RequirementArity as RequirementArity
 
 -- | CR 508.1d: one printed ATTACKING REQUIREMENT. Curse of the Nightly Hunt's
 -- "creatures enchanted player controls attack each combat if able".
@@ -23,10 +24,8 @@ data AttackRequirement = MkAttackRequirement
     -- for: a rule-modifying continuous effect can affect objects that were not
     -- affected when it began.
     --
-    -- One requirement per creature the Affected matches, which is CR 508.1d's
-    -- own counting. Not implemented: a requirement over a GROUP, obeyed once by
-    -- any member -- Seeker of Slaanesh's "each opponent must attack with at
-    -- least one creature each combat if able" (#3257).
+    -- How many requirements the Affected states is the `arity` field below,
+    -- CR 508.1d's own counting being one per creature.
     subject :: Affected.Affected,
     -- | CR 508.1d's OBJECT axis -- WHOM the creature has to attack. Nothing is
     -- the unnarrowed requirement (Curse of the Nightly Hunt's "attack each
@@ -55,6 +54,17 @@ data AttackRequirement = MkAttackRequirement
     -- Pawl.Types.BlockRequirement spells the twin of this field for CR 509.1c's
     -- identically worded shape, and Seton's Desire is the same threshold clause
     -- on that side.
-    while :: Maybe Condition.Condition
+    while :: Maybe Condition.Condition,
+    -- | CR 508.1d counted: whether the sentence states one requirement per
+    -- creature the subject names (Curse of the Nightly Hunt) or ONE over them
+    -- all, obeyed by any single one of them (Seeker of Slaanesh's "each
+    -- opponent must attack with at least one creature each combat if able").
+    --
+    -- ONE group per requirement, where Pawl.Types.BlockRequirement's is one per
+    -- attacker the object axis names: this side's object axis says WHOM the
+    -- creature must attack rather than naming a second set of creatures, so the
+    -- group is the subject set crossed with every announcement the object
+    -- admits, obeyed by attacking with any one of them.
+    arity :: RequirementArity.RequirementArity
   }
   deriving (Eq, Ord, Show)
