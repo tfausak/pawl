@@ -83,7 +83,7 @@ soleActivatedAbility p = case Face.activatedAbilities (S.combinedFace p) of
 -- in the mana.
 castDayOfJudgment :: Printing.Printing -> Printing.Printing -> GameState.GameState -> GameState.GameState
 castDayOfJudgment plains dayOfJudgment board =
-  let (withSpell, spell) = S.handOne dayOfJudgment (List.foldl' (\gs _ -> snd (S.addCreature plains S.alice gs)) board [1 :: Int .. 4])
+  let (withSpell, spell) = S.handOne dayOfJudgment (List.foldl' (\gs _ -> snd (S.addPermanent plains S.alice gs)) board [1 :: Int .. 4])
       afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
    in S.runPure S.identityAnswer afterCast Stack.resolveTop
 
@@ -97,9 +97,9 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (hers, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        (his, g2) = S.addCreature piker S.bob g1
-        (equipment, g3) = S.addCreature bonesplitter S.alice g2
+    let (hers, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (his, g2) = S.addPermanent piker S.bob g1
+        (equipment, g3) = S.addPermanent bonesplitter S.alice g2
         resolved = castDayOfJudgment plains dayOfJudgment g3
     Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
     Spec.assertBool s (not (S.onBattlefield his resolved)) "bob's creature died"
@@ -114,8 +114,8 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (myr, g1) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
-        (his, g2) = S.addCreature piker S.bob g1
+    let (myr, g1) = S.addPermanent darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
+        (his, g2) = S.addPermanent piker S.bob g1
         resolved = castDayOfJudgment plains dayOfJudgment g2
     Spec.assertBool s (S.onBattlefield myr resolved) "the Myr can't be destroyed"
     Spec.assertBool s (not (S.onBattlefield his resolved)) "the Piker can"
@@ -127,8 +127,8 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (shielded, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-        (bare, g2) = S.addCreature piker S.bob g1
+    let (shielded, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (bare, g2) = S.addPermanent piker S.bob g1
         resolved = castDayOfJudgment plains dayOfJudgment (S.addRegenShield shielded g2)
     Spec.assertBool s (S.onBattlefield shielded resolved) "the shielded creature stands"
     Spec.assertEqWith s "and CR 701.19a taps it" (fmap Object.tapped (Game.lookupObject shielded resolved)) (Just TapState.Tapped)
@@ -151,9 +151,9 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     march <- S.printingOf s registry "March of the Machines"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (opal, g1) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
-        (animator, g2) = S.addCreature march S.alice g1
-        (equipment, board) = S.addCreature bonesplitter S.alice g2
+    let (opal, g1) = S.addPermanent opalescence S.alice (Setup.emptyGame S.bothPlayers)
+        (animator, g2) = S.addPermanent march S.alice g1
+        (equipment, board) = S.addPermanent bonesplitter S.alice g2
     Spec.assertBool s (Projection.isCreatureOf animator board) "setup: March is a creature via Opalescence"
     Spec.assertBool s (Projection.isCreatureOf equipment board) "setup: the Bonesplitter is a creature via March"
     Spec.assertBool s (animator < equipment) "setup: March is swept first"
@@ -178,9 +178,9 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     walls <- S.printingOf s registry "The Walls of Ba Sing Se"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (granter, g1) = S.addCreature walls S.alice (Setup.emptyGame S.bothPlayers)
-        (protected, g2) = S.addCreature piker S.alice g1
-        (his, board) = S.addCreature piker S.bob g2
+    let (granter, g1) = S.addPermanent walls S.alice (Setup.emptyGame S.bothPlayers)
+        (protected, g2) = S.addPermanent piker S.alice g1
+        (his, board) = S.addPermanent piker S.bob g2
     Spec.assertBool s (granter < protected) "setup: the Walls are swept before the creature they protect"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible granter board)) "setup: the Walls do not benefit from their own grant"
     Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible protected board) "setup: their controller's other creature does"
@@ -199,8 +199,8 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     walls <- S.printingOf s registry "The Walls of Ba Sing Se"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (protected, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        (granter, board) = S.addCreature walls S.alice g1
+    let (protected, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (granter, board) = S.addPermanent walls S.alice g1
     Spec.assertBool s (protected < granter) "setup: the Walls are swept last this time"
     let resolved = castDayOfJudgment plains dayOfJudgment board
     Spec.assertBool s (not (S.onBattlefield granter resolved)) "the Walls are destroyed"
@@ -223,9 +223,9 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
-    let (opal, g1) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
-        (rip, g2) = S.addCreature restInPeace S.alice g1
-        (his, board) = S.addCreature piker S.bob g2
+    let (opal, g1) = S.addPermanent opalescence S.alice (Setup.emptyGame S.bothPlayers)
+        (rip, g2) = S.addPermanent restInPeace S.alice g1
+        (his, board) = S.addPermanent piker S.bob g2
     Spec.assertBool s (Projection.isCreatureOf rip board) "setup: Opalescence animates Rest in Peace"
     Spec.assertBool s (rip < his) "setup: Rest in Peace is swept before the Piker"
     let resolved = castDayOfJudgment plains dayOfJudgment board
@@ -244,8 +244,8 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     dayOfJudgment <- S.printingOf s registry "Day of Judgment"
     let card = Printing.card dayOfJudgment
-        (his, g1) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-        (withSpell, spell) = S.handOne dayOfJudgment (List.foldl' (\gs _ -> snd (S.addCreature plains S.alice gs)) g1 [1 :: Int .. 4])
+        (his, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (withSpell, spell) = S.handOne dayOfJudgment (List.foldl' (\gs _ -> snd (S.addPermanent plains S.alice gs)) g1 [1 :: Int .. 4])
         countingAnswer :: Prompt.Prompt r -> State.State Int r
         countingAnswer p = case p of
           Prompt.ChooseTargets {} -> do
@@ -276,11 +276,11 @@ returnAllSpec s registry = Spec.describe s "ReturnAll" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     evacuation <- S.printingOf s registry "Evacuation"
-    let (herFirst, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        (herSecond, g2) = S.addCreature piker S.alice g1
-        (his, g3) = S.addCreature piker S.bob g2
-        (land, board) = S.addCreature forest S.alice g3
-        (withSpell, spell) = S.handOne evacuation (List.foldl' (\gs _ -> snd (S.addCreature island S.alice gs)) board [1 :: Int .. 5])
+    let (herFirst, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (herSecond, g2) = S.addPermanent piker S.alice g1
+        (his, g3) = S.addPermanent piker S.bob g2
+        (land, board) = S.addPermanent forest S.alice g3
+        (withSpell, spell) = S.handOne evacuation (List.foldl' (\gs _ -> snd (S.addPermanent island S.alice gs)) board [1 :: Int .. 5])
         -- The baseline is taken AFTER the cast, where the Evacuation itself has
         -- already left alice's hand for the stack, so the two deltas below count
         -- returning creatures and nothing else.
@@ -337,8 +337,8 @@ riseOfTheDarkRealmsSpec s registry = Spec.describe s "RiseOfTheDarkRealms" $ do
     murder <- S.printingOf s registry "Murder"
     judgment <- S.printingOf s registry "Day of Judgment"
     forest <- S.printingOf s registry "Forest"
-    let mana = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
-        (heroId, withHero) = S.addCreature hero S.bob mana
+    let mana = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
+        (heroId, withHero) = S.addPermanent hero S.bob mana
         buried =
           List.foldl'
             (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g))
@@ -426,7 +426,7 @@ angelOfFinalitySpec s registry = Spec.describe s "AngelOfFinality" $ do
     murder <- S.printingOf s registry "Murder"
     judgment <- S.printingOf s registry "Day of Judgment"
     forest <- S.printingOf s registry "Forest"
-    let (heroId, withHero) = S.addCreature hero S.bob S.threePlayerGame
+    let (heroId, withHero) = S.addPermanent hero S.bob S.threePlayerGame
         buried =
           List.foldl'
             (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g))
@@ -666,8 +666,8 @@ portOfKarfellSpec s registry =
       -- `stock` into alice's library. Returns the Port's id.
       board port swamp island hero buried stock =
         let mana = S.landsFor island S.alice 5 (S.landsFor swamp S.alice 5 S.threePlayerGame)
-            (_, withHero) = S.addCreature hero S.carol mana
-            (portId, withPort) = S.addCreature port S.alice withHero
+            (_, withHero) = S.addPermanent hero S.carol mana
+            (portId, withPort) = S.addPermanent port S.alice withHero
             withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) withPort buried
             withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) withGraves stock
          in (portId, withStock {GameState.priority = Just S.alice})
@@ -1989,9 +1989,9 @@ carthTheLionSpec s registry =
           jace <- S.printingOf s registry "Jace Beleren"
           printings <- Monad.mapM (S.printingOf s registry) stockNames
           let (stocked, ids) = stock printings (Setup.emptyGame S.bothPlayers)
-              (_, withCarth) = S.addCreature carth S.alice stocked
-              (_, withHers) = S.addCreature jace S.alice withCarth
-              (_, withHis) = S.addCreature jace S.bob withHers
+              (_, withCarth) = S.addPermanent carth S.alice stocked
+              (_, withHers) = S.addPermanent jace S.alice withCarth
+              (_, withHis) = S.addPermanent jace S.bob withHers
               buried = S.settleSba withHis
               answer :: Prompt.Prompt r -> r
               answer = answering (Just 1) Nothing

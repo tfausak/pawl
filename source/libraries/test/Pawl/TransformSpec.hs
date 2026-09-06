@@ -199,8 +199,8 @@ aangBackUp = (Set.singleton aangBack, Just (4, 4))
 -- Moonmist reaches Aang and nothing else on the board.
 aangBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 aangBoard aang piker moonmist forest =
-  let (aangId, g0) = S.addCreature aang S.alice (S.landsInPlay forest 2)
-      (pikerId, g1) = S.addCreature piker S.alice g0
+  let (aangId, g0) = S.addPermanent aang S.alice (S.landsInPlay forest 2)
+      (pikerId, g1) = S.addPermanent piker S.alice g0
       (moonmistId, g2) = S.addHandCard moonmist S.alice g1
    in (aangId, pikerId, moonmistId, g2 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
 
@@ -264,7 +264,7 @@ spec s registry = Spec.describe s "Transform" $ do
   -- put Horror on its type line while it is still a Gargoyle.
   Spec.it s "CR 712.8d a double-faced permanent shows its front face and only that" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
-    let (oid, gs) = S.addCreature gargoyle S.alice emptyBoard
+    let (oid, gs) = S.addPermanent gargoyle S.alice emptyBoard
     Spec.assertEqWith s "every reader sees Thraben Gargoyle" (faceReadings oid gs) frontFace
     Spec.assertEqWith
       s
@@ -314,7 +314,7 @@ spec s registry = Spec.describe s "Transform" $ do
   Spec.it s "CR 701.27a the Gargoyle's own {6} turns it over, and every reader sees the back face" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
-    let (oid, g0) = S.addCreature gargoyle S.alice (S.landsInPlay island 6)
+    let (oid, g0) = S.addPermanent gargoyle S.alice (S.landsInPlay island 6)
         gs = g0 {GameState.priority = Just S.alice}
     case Activate.abilitiesFor oid gs of
       [ability] -> do
@@ -349,7 +349,7 @@ spec s registry = Spec.describe s "Transform" $ do
   Spec.it s "CR 701.27f two of the Gargoyle's own abilities on the stack turn it over once" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
-    let (oid, g0) = S.addCreature gargoyle S.alice (S.landsInPlay island 12)
+    let (oid, g0) = S.addPermanent gargoyle S.alice (S.landsInPlay island 12)
         gs = g0 {GameState.priority = Just S.alice}
         activate g = case Activate.abilitiesFor oid g of
           [ability] -> Right (snd (Engine.runGamePure S.identityAnswer g (Activate.activateAbility S.alice oid ability)))
@@ -377,7 +377,7 @@ spec s registry = Spec.describe s "Transform" $ do
   Spec.it s "CR 701.27f the gate is only for the permanent's own abilities" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
-    let (oid, g0) = S.addCreature gargoyle S.alice (S.landsInPlay island 6)
+    let (oid, g0) = S.addPermanent gargoyle S.alice (S.landsInPlay island 6)
         gs = g0 {GameState.priority = Just S.alice}
     case Activate.abilitiesFor oid gs of
       [ability] -> do
@@ -454,7 +454,7 @@ spec s registry = Spec.describe s "Transform" $ do
   -- call sites and only one of them feeds a card's Quantity.
   Spec.it s "CR 712.8e a transformed permanent keeps its front face's mana value" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
-    let (oid, before) = S.addCreature gargoyle S.alice emptyBoard
+    let (oid, before) = S.addPermanent gargoyle S.alice emptyBoard
         after = sweep before
     Spec.assertEqWith s "front face up: 1" (sum (fmap Quantity.manaValueOf (Game.manaCostFacesOf oid before))) 1
     Spec.assertEqWith s "it is the back face that is up" (faceReadings oid after) backFace
@@ -472,8 +472,8 @@ spec s registry = Spec.describe s "Transform" $ do
   Spec.it s "CR 701.27c a creature that is not double-faced is not turned over" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (gargoyleId, g0) = S.addCreature gargoyle S.alice emptyBoard
-        (pikerId, before) = S.addCreature piker S.alice g0
+    let (gargoyleId, g0) = S.addPermanent gargoyle S.alice emptyBoard
+        (pikerId, before) = S.addPermanent piker S.alice g0
         after = sweep before
     Spec.assertEqWith s "the Gargoyle turned over" (faceReadings gargoyleId after) backFace
     Spec.assertEqWith s "the Goblin Piker did not" (Projection.namesOf pikerId after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")))
@@ -493,7 +493,7 @@ spec s registry = Spec.describe s "Transform" $ do
   -- at all: the case above proves the {6} is gone with the front face.
   Spec.it s "CR 701.27a transforming twice returns the permanent to its front face" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
-    let (oid, before) = S.addCreature gargoyle S.alice emptyBoard
+    let (oid, before) = S.addPermanent gargoyle S.alice emptyBoard
         once = sweep before
         twice = sweep once
     Spec.assertEqWith s "once: the back face" (faceReadings oid once) backFace
@@ -515,7 +515,7 @@ spec s registry = Spec.describe s "Transform" $ do
   -- through: pawl's transform writes one field in place instead.
   Spec.it s "CR 400.7 does not fire: the turned-over permanent is the same object" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
-    let (oid, g0) = S.addCreature gargoyle S.alice emptyBoard
+    let (oid, g0) = S.addPermanent gargoyle S.alice emptyBoard
         counted = g0 {GameState.objects = Map.adjust (\o -> o {Object.counters = Map.insert CounterKind.PlusOnePlusOne 1 (Object.counters o)}) oid (GameState.objects g0)}
         before = S.markDamage oid 1 counted
         after = sweep before
@@ -564,7 +564,7 @@ enterTransformedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry
 enterTransformedSpec s registry = Spec.describe s "Entering the battlefield transformed" $ do
   Spec.it s "CR 712.14a a Saga returned transformed comes back as its back face" $ do
     moths <- S.printingOf s registry "Befriending the Moths"
-    let (sagaId, base) = S.addCreature moths S.alice emptyBoard
+    let (sagaId, base) = S.addPermanent moths S.alice emptyBoard
         -- Two lore counters placed outright, so nothing has crossed a chapter
         -- yet: CR 714.3c's turn-based action then takes the count from two to
         -- three, and CR 714.2b's "was less than N and became at least N" makes
@@ -652,10 +652,10 @@ transformedBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 transformedBoard tovolar wolf connoisseur gargoyle =
-  let (tovolarId, withTovolar) = S.addCreature tovolar S.alice emptyBoard
-      withWolves = foldr (\_ g -> snd (S.addCreature wolf S.alice g)) withTovolar [1 :: Int, 2]
-      (connoisseurId, withConnoisseur) = S.addCreature connoisseur S.alice withWolves
-      (_, withGargoyle) = S.addCreature gargoyle S.alice withConnoisseur
+  let (tovolarId, withTovolar) = S.addPermanent tovolar S.alice emptyBoard
+      withWolves = foldr (\_ g -> snd (S.addPermanent wolf S.alice g)) withTovolar [1 :: Int, 2]
+      (connoisseurId, withConnoisseur) = S.addPermanent connoisseur S.alice withWolves
+      (_, withGargoyle) = S.addPermanent gargoyle S.alice withConnoisseur
    in (tovolarId, connoisseurId, settleDaytime withGargoyle)
 
 -- CR 701.27g, "transformed permanent", asked by a CARD rather than by the
@@ -756,7 +756,7 @@ howlerName = CardName.MkCardName (Text.pack "Wildsong Howler")
 -- symbol is paid with mana and the board has to hold some.
 thallidBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 thallidBoard thallid forest n =
-  let (oid, g0) = S.addCreature thallid S.alice (S.landsInPlay forest n)
+  let (oid, g0) = S.addPermanent thallid S.alice (S.landsInPlay forest n)
    in (oid, g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain})
 
 -- Activate the Thallid's one ability, or say how many it offered instead.
@@ -914,8 +914,8 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   -- for a permanent's own ability.
   Spec.it s "CR 608.2f two Thallids turned at once trigger once each" $ do
     thallid <- S.printingOf s registry "Blightreaper Thallid"
-    let (first, g0) = S.addCreature thallid S.alice emptyBoard
-        (second, g1) = S.addCreature thallid S.alice g0
+    let (first, g0) = S.addPermanent thallid S.alice emptyBoard
+        (second, g1) = S.addPermanent thallid S.alice g0
         turned = sweep g1
         settled = gather turned
         after = resolveStack settled
@@ -979,7 +979,7 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
   Spec.it s "CR 702.145c/701.27e nightfall turns the Piper over and the back face's trigger fires" $ do
     piper <- S.printingOf s registry "Howlpack Piper"
     deck <- mapM (S.printingOf s registry) howlerDeck
-    let (piperId, placed) = S.addCreature piper S.alice emptyBoard
+    let (piperId, placed) = S.addPermanent piper S.alice emptyBoard
         -- CR 702.145d: alice controls a daybound permanent and it is neither day
         -- nor night, so the settle makes it day.
         day = settleDaytime (stockLibrary deck placed)
@@ -1021,7 +1021,7 @@ transformTriggerSpec s registry = Spec.describe s "TransformsInto" $ do
     forest <- S.printingOf s registry "Forest"
     piper <- S.printingOf s registry "Howlpack Piper"
     deck <- mapM (S.printingOf s registry) howlerDeck
-    let (_, withTovolar) = S.addCreature tovolar S.alice (S.landsInPlay forest 4)
+    let (_, withTovolar) = S.addPermanent tovolar S.alice (S.landsInPlay forest 4)
         (inHand, piperSpell) = S.handOne piper (stockLibrary deck withTovolar)
         night = untapStepAfter 0 (settleDaytime inHand)
         cast = S.runPure castsAndTakesTheMay night (S.cast S.alice piperSpell)
@@ -1066,8 +1066,8 @@ bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
   Spec.it s "CR 701.27e a permanent alice controls turning into a non-Human creature makes the Wolf" $ do
     cult <- S.printingOf s registry "Cult of the Waxing Moon"
     aang <- S.printingOf s registry "Aang, at the Crossroads"
-    let (_, withCult) = S.addCreature cult S.alice emptyBoard
-        (aangId, board) = S.addCreature aang S.alice withCult
+    let (_, withCult) = S.addPermanent cult S.alice emptyBoard
+        (aangId, board) = S.addPermanent aang S.alice withCult
         turned = sweep board
         after = resolveStack (gather turned)
     Spec.assertEqWith s "the trigger resolved into one Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 1
@@ -1082,8 +1082,8 @@ bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
   Spec.it s "CR 109.5 a permanent bob controls turning over makes none" $ do
     cult <- S.printingOf s registry "Cult of the Waxing Moon"
     aang <- S.printingOf s registry "Aang, at the Crossroads"
-    let (_, withCult) = S.addCreature cult S.alice emptyBoard
-        (aangId, board) = S.addCreature aang S.bob withCult
+    let (_, withCult) = S.addPermanent cult S.alice emptyBoard
+        (aangId, board) = S.addPermanent aang S.bob withCult
         turned = sweep board
         after = resolveStack (gather turned)
     Spec.assertEqWith s "no Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 0
@@ -1097,8 +1097,8 @@ bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
   Spec.it s "CR 701.27e / 702.161a a permanent turning into a noncreature on bob's turn makes none" $ do
     cult <- S.printingOf s registry "Cult of the Waxing Moon"
     ratchet <- S.printingOf s registry "Ratchet, Field Medic"
-    let (_, withCult) = S.addCreature cult S.alice emptyBoard
-        (ratchetId, board) = S.addCreature ratchet S.alice withCult
+    let (_, withCult) = S.addPermanent cult S.alice emptyBoard
+        (ratchetId, board) = S.addPermanent ratchet S.alice withCult
         bobsTurn = S.runPure S.identityAnswer board Engine.handoffTurn
         turned = sweep bobsTurn
         after = resolveStack (gather turned)
@@ -1119,8 +1119,8 @@ bystanderTransformSpec s registry = Spec.describe s "TransformsIntoWatched" $ do
   Spec.it s "CR 701.27e each event is read at its own turn, not at the scan" $ do
     cult <- S.printingOf s registry "Cult of the Waxing Moon"
     aang <- S.printingOf s registry "Aang, at the Crossroads"
-    let (_, withCult) = S.addCreature cult S.alice emptyBoard
-        (aangId, board) = S.addCreature aang S.alice withCult
+    let (_, withCult) = S.addPermanent cult S.alice emptyBoard
+        (aangId, board) = S.addPermanent aang S.alice withCult
         turned = sweep (sweep board)
         after = resolveStack (gather turned)
     Spec.assertEqWith s "the one turn into a non-Human made one Wolf" (S.countOnBattlefieldByName wolfToken S.alice after) 1
@@ -1213,7 +1213,7 @@ spellsCastLastTurnSpec s registry = Spec.describe s "SpellsCastLastTurn" $ do
     ranger <- S.printingOf s registry "Daybreak Ranger"
     forest <- S.printingOf s registry "Forest"
     fog <- S.printingOf s registry "Fog"
-    let (rangerId, withRanger) = S.addCreature ranger S.alice emptyBoard
+    let (rangerId, withRanger) = S.addPermanent ranger S.alice emptyBoard
         withLands = S.landsFor forest S.bob 4 (S.landsFor forest S.alice 1 withRanger)
         (aliceFog, withAliceFog) = S.addHandCard fog S.alice withLands
         (bobFogA, withA) = S.addHandCard fog S.bob withAliceFog
@@ -1294,7 +1294,7 @@ ratchetReadings oid gs =
 -- fixture that stamped one would gate the very behaviour these cases assert.
 racerBoard :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 racerBoard ratchet gs =
-  let (oid, placed) = S.addCreature ratchet S.alice gs
+  let (oid, placed) = S.addPermanent ratchet S.alice gs
       showBack o = o {Object.face = Just ratchetBack}
    in (oid, placed {GameState.objects = Map.adjust showBack oid (GameState.objects placed)})
 
@@ -1326,7 +1326,7 @@ convertSpec s registry = Spec.describe s "Convert" $ do
     ratchet <- S.printingOf s registry "Ratchet, Field Medic"
     golem <- S.printingOf s registry "Icehide Golem"
     let (ratchetId, withRatchet) = racerBoard ratchet emptyBoard
-        (golemId, board) = S.addCreature golem S.alice withRatchet
+        (golemId, board) = S.addPermanent golem S.alice withRatchet
         settled = S.runPure S.identityAnswer (S.markDamage golemId 2 board) Engine.settleForPriority
         after = S.runPure S.identityAnswer settled Stack.resolveTop
     Spec.assertEqWith s "after: Ratchet, Field Medic" (ratchetReadings ratchetId after) ratchetFrontReadings
@@ -1344,7 +1344,7 @@ convertSpec s registry = Spec.describe s "Convert" $ do
     ratchet <- S.printingOf s registry "Ratchet, Field Medic"
     golem <- S.printingOf s registry "Icehide Golem"
     let (ratchetId, withRatchet) = racerBoard ratchet emptyBoard
-        (golemId, board) = S.addCreature golem S.alice withRatchet
+        (golemId, board) = S.addPermanent golem S.alice withRatchet
         settled = S.runPure S.identityAnswer (S.markDamage golemId 2 board) Engine.settleForPriority
         after = S.runPure S.identityAnswer settled Stack.resolveTop
         transformedInto =
@@ -1387,7 +1387,7 @@ convertSpec s registry = Spec.describe s "Convert" $ do
   -- rather than about living metal, which only the back face has.
   Spec.it s "CR 702.161a the front face, which has no living metal, is a creature on either turn" $ do
     ratchet <- S.printingOf s registry "Ratchet, Field Medic"
-    let (ratchetId, board) = S.addCreature ratchet S.alice emptyBoard
+    let (ratchetId, board) = S.addPermanent ratchet S.alice emptyBoard
         bobsTurn = S.runPure S.identityAnswer board Engine.handoffTurn
     Spec.assertEqWith
       s
@@ -1548,7 +1548,7 @@ medicBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 medicBoard ratchet plains weathervane statue bolt spell =
-  let (ratchetId, g0) = S.addCreature ratchet S.alice (S.landsInPlay plains 3)
+  let (ratchetId, g0) = S.addPermanent ratchet S.alice (S.landsInPlay plains 3)
       (weathervaneId, g1) = S.addGraveyardCard weathervane S.alice g0
       (statueId, g2) = S.addGraveyardCard statue S.alice g1
       (boltId, g3) = S.addGraveyardCard bolt S.alice g2
@@ -1827,9 +1827,9 @@ nightfallName = CardName.MkCardName (Text.pack "Nightfall Predator")
 suspectedRangerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 suspectedRangerBoard piker ranger humility forest =
   let (gs0, mine, _) = S.combatBoardOf [piker] []
-      (suspect, gs1) = S.addCreature ranger S.bob gs0
-      (other, gs2) = S.addCreature piker S.bob gs1
-      gs3 = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs2 [forest, forest]
+      (suspect, gs1) = S.addPermanent ranger S.bob gs0
+      (other, gs2) = S.addPermanent piker S.bob gs1
+      gs3 = List.foldl' (\g p -> snd (S.addPermanent p S.bob g)) gs2 [forest, forest]
       gs4 = S.withHumility humility (suspecting suspect gs3)
       declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.manaPerformer S.alice)
       attacker = case mine of

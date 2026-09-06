@@ -70,7 +70,7 @@ spec s registry = Spec.describe s "Case" $ do
 -- arrives, and its abilities are not entry triggers.
 board :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 board ransackedLab forest fog fogs =
-  let (caseId, withCase) = S.addCreature ransackedLab S.alice (S.landsInPlay forest 12)
+  let (caseId, withCase) = S.addPermanent ransackedLab S.alice (S.landsInPlay forest 12)
       stocked = List.foldl' (\g _ -> snd (S.addLibraryCard fog S.alice g)) withCase [1 .. 10 :: Int]
       (fogIds, filled) = List.foldl' (\(ids, g) _ -> let (i, g') = S.addHandCard fog S.alice g in (ids <> [i], g')) ([], stocked) [1 .. fogs]
    in ( caseId,
@@ -204,6 +204,6 @@ reductionSpec s registry = Spec.describe s "The cost reduction" $ do
     island <- S.printingOf s registry "Island"
     skeins <- S.printingOf s registry "Vision Skeins"
     let (bare, spellId) = S.handOne skeins (S.landsInPlay island 1)
-        withCase = snd (S.addCreature ransackedLab S.alice bare)
+        withCase = snd (S.addPermanent ransackedLab S.alice bare)
     Spec.assertEqWith s "one Island alone cannot pay {1}{U}" (S.castable S.alice spellId bare) False
     Spec.assertEqWith s "with the Case out it can" (S.castable S.alice spellId withCase) True

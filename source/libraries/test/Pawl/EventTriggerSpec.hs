@@ -80,7 +80,7 @@ discardTriggerSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       reunion <- S.printingOf s registry "Cathartic Reunion"
       megrim <- S.printingOf s registry "Megrim"
-      let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 2))
+      let base = snd (S.addPermanent megrim S.bob (S.landsInPlay mountain 2))
           (reunionId, g1) = S.addHandCard reunion S.alice base
           -- Exactly two other cards, so CR 701.9b has nothing to ask and the
           -- discard is forced -- the prompt is not what this case is about.
@@ -107,7 +107,7 @@ discardTriggerSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       mauler <- S.printingOf s registry "Barkhide Mauler"
       megrim <- S.printingOf s registry "Megrim"
-      let base = snd (S.addCreature megrim S.bob (S.landsInPlay forest 2))
+      let base = snd (S.addPermanent megrim S.bob (S.landsInPlay forest 2))
           (_, withLibrary) = S.addLibraryCard piker S.alice base
           (gs, maulerId) = S.handOne mauler withLibrary
       case Activate.abilitiesFor maulerId gs of
@@ -127,7 +127,7 @@ discardTriggerSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       megrim <- S.printingOf s registry "Megrim"
-      let base = snd (S.addCreature megrim S.bob (S.landsInPlay mountain 1))
+      let base = snd (S.addPermanent megrim S.bob (S.landsInPlay mountain 1))
           (_, withAlicesCard) = S.addHandCard piker S.alice base
           (_, gs0) = S.addHandCard piker S.bob withAlicesCard
           gs = gs0 {GameState.priority = Just S.alice}
@@ -163,7 +163,7 @@ marmosetBoard marmoset mauler forest piker cycler =
   let seats = [S.alice, S.bob, S.carol]
       lands = List.foldl' (\g pid -> S.landsFor forest pid 2 g) (Setup.emptyGame S.threePlayers) seats
       libraries = List.foldl' (\g pid -> snd (S.addLibraryCard piker pid g)) lands seats
-      (marmosetId, withMarmoset) = S.addCreature marmoset S.alice libraries
+      (marmosetId, withMarmoset) = S.addPermanent marmoset S.alice libraries
       (maulerId, withMauler) = S.addHandCard mauler cycler withMarmoset
    in ( marmosetId,
         maulerId,
@@ -358,7 +358,7 @@ selfDiscardTriggerSpec s registry =
         -- move, so this is the AnyOf's other branch and nothing else.
         Spec.it s "CR 700.4 the dies half fires once, and the discard half not at all" $ do
           cow <- S.printingOf s registry "Bartered Cow"
-          let (cowId, base) = S.addCreature cow S.alice (Setup.emptyGame S.bothPlayers)
+          let (cowId, base) = S.addPermanent cow S.alice (Setup.emptyGame S.bothPlayers)
               gs = priorityTo base
               killed = S.settleSba (S.markDamage cowId 3 gs)
               after = settle killed
@@ -472,7 +472,7 @@ drawBoard ::
   Int ->
   (ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId])
 drawBoard island piker think wizard copies =
-  let (wizardId, base) = S.addCreature wizard S.alice (S.landsInPlay island (2 * copies))
+  let (wizardId, base) = S.addPermanent wizard S.alice (S.landsInPlay island (2 * copies))
       addThink (ids, g) _ = let (oid, g') = S.addHandCard think S.alice g in (ids <> [oid], g')
       (thinkIds, withHand) = List.foldl' addThink ([], base) [1 .. copies]
       stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withHand [1 .. (10 :: Int)]
@@ -668,9 +668,9 @@ isMiracleReveal event = case event of
 -- 514.1 discards exactly one: the whole board turns on that single discard.
 conscriptBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 conscriptBoard mountain piker megrim conscripts =
-  let (megrimId, g1) = S.addCreature megrim S.bob (Setup.emptyGame S.bothPlayers)
-      (landId, g2) = S.addCreature mountain S.alice g1
-      g3 = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) g2 [1 .. (4 :: Int)]
+  let (megrimId, g1) = S.addPermanent megrim S.bob (Setup.emptyGame S.bothPlayers)
+      (landId, g2) = S.addPermanent mountain S.alice g1
+      g3 = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) g2 [1 .. (4 :: Int)]
       (conscriptsId, g4) = S.addHandCard conscripts S.alice g3
       g5 = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) g4 [1 .. (8 :: Int)]
    in ( megrimId,
@@ -795,8 +795,8 @@ counterTriggerSpec s registry =
       -- exactly one card, so the draw and the discard are both countable, and CR
       -- 701.9b has nothing to ask (a one-card hand discards forced, #63).
       board victim island cancel baral spare =
-        let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
-            withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) withBaral [1 .. (3 :: Int)]
+        let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
+            withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withBaral [1 .. (3 :: Int)]
             (_, withLibrary) = S.addLibraryCard spare S.bob withLands
             (victimId, onStack) = S.spellOnStack victim S.alice withLibrary
             (cancelId, gs) = S.addHandCard cancel S.bob onStack
@@ -871,8 +871,8 @@ counterTriggerSpec s registry =
           mountain <- S.printingOf s registry "Mountain"
           baral <- S.printingOf s registry "Baral, Chief of Compliance"
           bolt <- S.printingOf s registry "Lightning Bolt"
-          let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
-              withLand = snd (S.addCreature mountain S.bob withBaral)
+          let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
+              withLand = snd (S.addPermanent mountain S.bob withBaral)
               (_, withLibrary) = S.addLibraryCard mountain S.bob withLand
               (boltId, gs) = S.addHandCard bolt S.bob withLibrary
               answer :: Prompt.Prompt r -> r
@@ -902,8 +902,8 @@ counterTriggerSpec s registry =
           baral <- S.printingOf s registry "Baral, Chief of Compliance"
           piker <- S.printingOf s registry "Goblin Piker"
           mountain <- S.printingOf s registry "Mountain"
-          let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
-              withLands = List.foldl' (\g _ -> snd (S.addCreature island S.alice g)) withBaral [1 .. (3 :: Int)]
+          let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
+              withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withBaral [1 .. (3 :: Int)]
               (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
               (victimId, onStack) = S.spellOnStack piker S.bob withLibrary
               (cancelId, gs) = S.addHandCard cancel S.alice onStack
@@ -951,10 +951,10 @@ counterTriggerSpec s registry =
               -- and a Stifle in hand. alice: a settled Prodigal Sorcerer (CR
               -- 302.6, so its {T} may be activated) and a Goblin Piker spell on
               -- the stack -- one victim of each kind, standing side by side.
-              let (_, withBaral) = S.addCreature baral S.bob (Setup.emptyGame S.bothPlayers)
-                  withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) withBaral [1 .. (3 :: Int)]
+              let (_, withBaral) = S.addPermanent baral S.bob (Setup.emptyGame S.bothPlayers)
+                  withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withBaral [1 .. (3 :: Int)]
                   (_, withLibrary) = S.addLibraryCard mountain S.bob withLands
-                  (srcId, withSorcerer) = S.addCreature sorcerer S.alice withLibrary
+                  (srcId, withSorcerer) = S.addPermanent sorcerer S.alice withLibrary
                   settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
                   (victimId, onStack) = S.spellOnStack piker S.alice settled
                   (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
@@ -1072,10 +1072,10 @@ auntieOolSpec s registry =
           snuffers <- S.printingOf s registry "Soul Snuffers"
           wall <- S.printingOf s registry "Wall of Stone"
           swamp <- S.printingOf s registry "Swamp"
-          let (oolId, g1) = S.addCreature ool S.alice S.threePlayerGame
-              (aliceWall, g2) = S.addCreature wall S.alice g1
-              (bobWall, g3) = S.addCreature wall S.bob g2
-              (carolWall, g4) = S.addCreature wall S.carol g3
+          let (oolId, g1) = S.addPermanent ool S.alice S.threePlayerGame
+              (aliceWall, g2) = S.addPermanent wall S.alice g1
+              (bobWall, g3) = S.addPermanent wall S.bob g2
+              (carolWall, g4) = S.addPermanent wall S.carol g3
               -- Five cards, where three are drawn: CR 104.3c decks nobody, and a
               -- library that ran out would end the case before its assertions.
               stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 .. (5 :: Int)]
@@ -1109,8 +1109,8 @@ auntieOolSpec s registry =
           snuffers <- S.printingOf s registry "Soul Snuffers"
           piker <- S.printingOf s registry "Goblin Piker"
           swamp <- S.printingOf s registry "Swamp"
-          let (_, g1) = S.addCreature ool S.alice S.threePlayerGame
-              (pikerId, g2) = S.addCreature piker S.bob g1
+          let (_, g1) = S.addPermanent ool S.alice S.threePlayerGame
+              (pikerId, g2) = S.addPermanent piker S.bob g1
               stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g2 [1 .. (5 :: Int)]
               (_, entered) = S.entersWithTrigger snuffers S.alice stocked
               after = resolveEverything entered
@@ -1151,9 +1151,9 @@ youngPyromancerSpec s registry =
       -- nothing at all. Four each is Boil's {3}{R}, and covers Goblin Piker's
       -- {2}{R} with one to spare.
       board mountain pyromancer =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
-            (_, withPyromancer) = S.addCreature pyromancer S.alice withLands
+            (_, withPyromancer) = S.addPermanent pyromancer S.alice withLands
          in withPyromancer
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -1240,7 +1240,7 @@ whisperingWizardSpec s registry =
       firedBy oid gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, AbilityTriggered.source record == TriggerSource.OfObject oid]
       board island bearer n =
         let withLands = S.landsFor island S.alice 10 S.threePlayerGame
-            addBearer (ids, g) _ = let (oid, g') = S.addCreature bearer S.alice g in (ids <> [oid], g')
+            addBearer (ids, g) _ = let (oid, g') = S.addPermanent bearer S.alice g in (ids <> [oid], g')
             (bearers, withBearers) = List.foldl' addBearer ([], withLands) [1 .. (n :: Int)]
             stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
             stocked = List.foldl' stock withBearers [S.alice, S.bob, S.carol]
@@ -1400,7 +1400,7 @@ twinnedVigilSpec s registry =
   let castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
       board island vigil =
         let withLands = S.landsFor island S.alice 10 S.threePlayerGame
-            (_, withVigil) = S.addCreature vigil S.alice withLands
+            (_, withVigil) = S.addPermanent vigil S.alice withLands
             stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard island pid g')) g [1 .. (12 :: Int)]
             stocked = List.foldl' stock withVigil [S.alice, S.bob, S.carol]
          in stocked
@@ -1460,9 +1460,9 @@ clarionSpiritSpec s registry =
       -- Four Mountains per Boil, and no untap step runs in any of these cases,
       -- so alice's sixteen are exactly the four casts the longest one makes.
       board mountain clarion =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 (addLands S.alice 16 S.threePlayerGame)
-            (_, withClarion) = S.addCreature clarion S.alice withLands
+            (_, withClarion) = S.addPermanent clarion S.alice withLands
          in withClarion
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -1554,7 +1554,7 @@ desolationTwinSpec s registry =
       -- {1}{R} with plenty to spare -- the negative case below casts on the same
       -- board, so mana can never be what separates the two.
       board mountain =
-        let withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. (10 :: Int)]
+        let withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. (10 :: Int)]
          in withLands
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -1620,13 +1620,13 @@ presenceOfTheMasterSpec s registry =
       -- Mountains, which is Bad Moon's {1}{B} and Goblin Piker's {1}{R} with
       -- room to spare. carol gets nothing: she is the third seat, not a caster.
       board swamp mountain presence =
-        let addLands pid n printing g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+        let addLands pid n printing g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
             withLands =
               addLands S.bob 3 mountain
                 . addLands S.bob 3 swamp
                 . addLands S.alice 3 mountain
                 $ addLands S.alice 3 swamp S.threePlayerGame
-            (_, withPresence) = S.addCreature presence S.alice withLands
+            (_, withPresence) = S.addPermanent presence S.alice withLands
          in withPresence
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -1712,9 +1712,9 @@ kambalSpec s registry =
       -- Boil's {3}{R} and Goblin Piker's {2}{R}. carol gets nothing at all: she
       -- is the third seat, not a caster.
       board mountain kambal =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 S.threePlayerGame
-            (_, withKambal) = S.addCreature kambal S.alice withLands
+            (_, withKambal) = S.addPermanent kambal S.alice withLands
          in withKambal
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
@@ -1787,9 +1787,9 @@ brinebornCutthroatSpec s registry =
       -- runs between the casts below, so the lands are not reused. bob and carol
       -- get nothing at all -- they are turns here, not casters.
       board forest cutthroat =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature forest pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent forest pid g')) g [1 .. (n :: Int)]
             withLands = addLands S.alice 3 S.threePlayerGame
-            (cutthroatId, withCutthroat) = S.addCreature cutthroat S.alice withLands
+            (cutthroatId, withCutthroat) = S.addPermanent cutthroat S.alice withLands
          in ( cutthroatId,
               withCutthroat
                 { GameState.phase = Phase.PrecombatMain,
@@ -1850,7 +1850,7 @@ brinebornCutthroatSpec s registry =
           mountain <- S.printingOf s registry "Mountain"
           cutthroat <- S.printingOf s registry "Brineborn Cutthroat"
           piker <- S.printingOf s registry "Goblin Piker"
-          let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+          let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addPermanent printing pid g')) g [1 .. (n :: Int)]
               lands = addLands mountain S.alice 3 (addLands island S.alice 2 S.threePlayerGame)
               (cutthroatId, withCutthroat) = S.addHandCard cutthroat S.alice lands
               (pikerId, gs) = S.addHandCard piker S.alice withCutthroat
@@ -1889,8 +1889,8 @@ oreskosSunGuideSpec s registry =
         Spec.it s "CR 502.3 the untap step untaps the Guide and its trigger gains alice 2 life" $ do
           guide <- S.printingOf s registry "Oreskos Sun Guide"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (guideId, g0) = S.addCreature guide S.alice (Setup.emptyGame S.bothPlayers)
-              (pikerId, g1) = S.addCreature piker S.alice g0
+          let (guideId, g0) = S.addPermanent guide S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, g1) = S.addPermanent piker S.alice g0
               board = S.tapObject pikerId (S.tapObject guideId g1)
               stepped = untapStep board
               placed = placeTriggers stepped
@@ -1905,8 +1905,8 @@ oreskosSunGuideSpec s registry =
         Spec.it s "CR 701.26b an already-upright Guide is not untapped, and the Piker's untap is not its own" $ do
           guide <- S.printingOf s registry "Oreskos Sun Guide"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (_, g0) = S.addCreature guide S.alice (Setup.emptyGame S.bothPlayers)
-              (pikerId, g1) = S.addCreature piker S.alice g0
+          let (_, g0) = S.addPermanent guide S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, g1) = S.addPermanent piker S.alice g0
               board = S.tapObject pikerId g1
               stepped = untapStep board
               placed = placeTriggers stepped
@@ -1916,7 +1916,7 @@ oreskosSunGuideSpec s registry =
         -- CR 603.2e's second sentence, the collapse this condition has to
         -- survive: the Guide ENTERS the battlefield untapped, which is not a
         -- transition, so nothing triggers. Through the stack rather than through
-        -- S.addCreature, so the real entry funnel runs.
+        -- S.addPermanent, so the real entry funnel runs.
         Spec.it s "CR 603.2e a Guide that ENTERS untapped does not trigger" $ do
           guide <- S.printingOf s registry "Oreskos Sun Guide"
           let (_, staged) = S.spellOnStack guide S.alice (Setup.emptyGame S.bothPlayers)
@@ -1932,8 +1932,8 @@ oreskosSunGuideSpec s registry =
         Spec.it s "CR 701.26b the one-at-a-time funnel records the same event" $ do
           guide <- S.printingOf s registry "Oreskos Sun Guide"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (guideId, g0) = S.addCreature guide S.alice (Setup.emptyGame S.bothPlayers)
-              (pikerId, g1) = S.addCreature piker S.alice g0
+          let (guideId, g0) = S.addPermanent guide S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, g1) = S.addPermanent piker S.alice g0
               board = S.tapObject pikerId (S.tapObject guideId g1)
               untapOne oid = placeTriggers (S.runPure S.identityAnswer board (Event.untap oid))
           Spec.assertEqWith s "untapping the Guide gains alice 2" (S.lifeOf S.alice (resolveOne (untapOne guideId))) (Just 22)
@@ -2042,10 +2042,10 @@ blightChroniclerBoard s registry withSolemnity withOwnWatcher = do
   gnarlbark <- S.printingOf s registry "Sinister Gnarlbark"
   chronicler <- S.printingOf s registry "Synthetic Blight Chronicler"
   solemnity <- S.printingOf s registry "Solemnity"
-  let (gnarlbarkId, g1) = S.addCreature gnarlbark S.alice (Setup.emptyGame S.bothPlayers)
-      (_, g2) = S.addCreature chronicler S.bob g1
-      g3 = if withSolemnity then snd (S.addCreature solemnity S.bob g2) else g2
-      g4 = if withOwnWatcher then snd (S.addCreature chronicler S.alice g3) else g3
+  let (gnarlbarkId, g1) = S.addPermanent gnarlbark S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addPermanent chronicler S.bob g1
+      g3 = if withSolemnity then snd (S.addPermanent solemnity S.bob g2) else g2
+      g4 = if withOwnWatcher then snd (S.addPermanent chronicler S.alice g3) else g3
       g5 = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 :: Int .. 3]
       g6 = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.bob g)) g5 [1 :: Int .. 3]
       endStep = Phase.Ending EndingStep.EndStep

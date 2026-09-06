@@ -112,7 +112,7 @@ spec s registry = Spec.describe s "Class" $ do
 -- level would be a second moving part with nothing to prove.
 taxBoard :: Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
 taxBoard paladinClass lightningBolt active =
-  let (_, withClass) = S.addCreature paladinClass S.alice (Setup.emptyGame S.bothPlayers)
+  let (_, withClass) = S.addPermanent paladinClass S.alice (Setup.emptyGame S.bothPlayers)
       (bolt, withBolt) = S.addHandCard lightningBolt S.bob withClass
    in ( bolt,
         withBolt
@@ -160,7 +160,7 @@ topSectionSpec s registry = Spec.describe s "Top text box section" $ do
   Spec.it s "CR 716.3 the Class controller's own spell is untaxed on her own turn" $ do
     paladinClass <- S.printingOf s registry "Paladin Class"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (_, withClass) = S.addCreature paladinClass S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, withClass) = S.addPermanent paladinClass S.alice (Setup.emptyGame S.bothPlayers)
         (alicesBolt, gs) = S.addHandCard lightningBolt S.alice withClass
         alicesTurn = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
     Spec.assertEqWith
@@ -183,8 +183,8 @@ topSectionSpec s registry = Spec.describe s "Top text box section" $ do
 -- Class arrives, and Paladin Class has no entry trigger.
 board :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 board paladinClass plains piker =
-  let (classId, withClass) = S.addCreature paladinClass S.alice (S.landsInPlay plains 12)
-      (pikerId, withPiker) = S.addCreature piker S.alice withClass
+  let (classId, withClass) = S.addPermanent paladinClass S.alice (S.landsInPlay plains 12)
+      (pikerId, withPiker) = S.addPermanent piker S.alice withClass
    in ( classId,
         pikerId,
         withPiker
@@ -276,7 +276,7 @@ sectionSpec s registry = Spec.describe s "Level bar section" $ do
 attackBoard :: Printing.Printing -> Printing.Printing -> Natural.Natural -> ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
 attackBoard paladinClass piker level =
   let (gs, pikers, _) = S.combatBoardOf (replicate 4 piker) []
-      (classId, withClass) = S.addCreature paladinClass S.alice gs
+      (classId, withClass) = S.addPermanent paladinClass S.alice gs
    in (pikers, classId, atLevel classId level withClass)
 
 -- CR 716.2b's designation, written straight onto the permanent.
@@ -419,8 +419,8 @@ retentionBoards ::
 retentionBoards paladinClass plains piker mountain song =
   let (classId, pikerId, gs) = board paladinClass plains piker
       levelled = gainLevel classId gs
-      (mountainId, withMountain) = S.addCreature mountain S.alice levelled
-      (songId, unattached) = S.addCreature song S.alice withMountain
+      (mountainId, withMountain) = S.addPermanent mountain S.alice levelled
+      (songId, unattached) = S.addPermanent song S.alice withMountain
       enchanted = S.settleSba (S.attachTo songId (Recipient.ToObject classId) unattached)
    in (classId, pikerId, unattached, enchanted, S.attachTo songId (Recipient.ToObject mountainId) enchanted)
 
@@ -677,10 +677,10 @@ aimAtObject oid p = case p of
 -- with a class level and the identity check has no observer at all.
 talentBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 talentBoard talent island bolt raiseDead =
-  let (classId, withClass) = S.addCreature talent S.alice (S.landsInPlay island 12)
+  let (classId, withClass) = S.addPermanent talent S.alice (S.landsInPlay island 12)
       (mineId, withMine) = S.addGraveyardCard bolt S.alice withClass
       (_, withTheirs) = S.addGraveyardCard raiseDead S.bob withMine
-      (theirClassId, withTheirClass) = S.addCreature talent S.bob withTheirs
+      (theirClassId, withTheirClass) = S.addPermanent talent S.bob withTheirs
    in ( classId,
         mineId,
         atLevel

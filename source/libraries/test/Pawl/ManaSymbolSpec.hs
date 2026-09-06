@@ -145,7 +145,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
     let red = plainOf (ManaType.Colored Color.Red)
         white = plainOf (ManaType.Colored Color.White)
-        seat pid units = snd (S.addCreature dawn S.alice (Mana.setPool pid (Mana.Type.MkMana units) (Setup.emptyGame S.bothPlayers)))
+        seat pid units = snd (S.addPermanent dawn S.alice (Mana.setPool pid (Mana.Type.MkMana units) (Setup.emptyGame S.bothPlayers)))
         redCost = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Red))
         blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
     Spec.assertBool s (payable S.bob redCost (seat S.bob [red])) "bob's red mana still pays {R}"
@@ -163,8 +163,8 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
     asp <- S.printingOf s registry "Nessian Asp"
     let seated = Mana.setPool S.alice (Mana.Type.MkMana (replicate 7 (plainOf (ManaType.Colored Color.White)))) (Setup.emptyGame S.bothPlayers)
-        (aspId, without) = S.addCreature asp S.alice seated
-        with = snd (S.addCreature dawn S.alice without)
+        (aspId, without) = S.addPermanent asp S.alice seated
+        with = snd (S.addPermanent dawn S.alice without)
         canActivate gs = any (\ability -> Activate.activatable S.alice aspId ability gs) (Activate.abilitiesFor aspId gs)
     Spec.assertBool s (canActivate with) "under Celestial Dawn seven white mana pay the {6}{G}"
     Spec.assertBool s (not (canActivate without)) "and without it the same seven cannot"
@@ -179,7 +179,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     dawn <- S.printingOf s registry "Celestial Dawn"
     forest <- S.printingOf s registry "Forest"
     let land = S.landsInPlay forest 1
-        with = snd (S.addCreature dawn S.alice land)
+        with = snd (S.addPermanent dawn S.alice land)
         blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
     Spec.assertBool s (payable S.alice blue with) "the Forest-turned-Plains pays {U}"
     Spec.assertBool s (not (payable S.alice blue land)) "and without the enchantment it pays neither {U} nor, being a Forest, white"
@@ -297,7 +297,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
   -- taken of a symbol that DOES grant one.
   Spec.it s "CR 202.2b Icehide Golem is colorless: its {S} grants no colour" $ do
     icehideGolem <- S.printingOf s registry "Icehide Golem"
-    let (oid, gs) = S.addCreature icehideGolem S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent icehideGolem S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "colorless" (Projection.colorsOf oid gs) Set.empty
 
 -- One colorless mana carrying no production tag: what CR 106.11 turns an "add
@@ -383,7 +383,7 @@ snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
 mixedLands :: Printing.Printing -> Printing.Printing -> Int -> Int -> GameState.GameState
 mixedLands first second n m =
   let base = S.landsInPlay first n
-   in List.foldl' (\g _ -> snd (S.addCreature second S.alice g)) base [1 .. m]
+   in List.foldl' (\g _ -> snd (S.addPermanent second S.alice g)) base [1 .. m]
 
 redGreen :: ManaSymbol.ManaSymbol
 redGreen = ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.Red) (ManaType.Colored Color.Green))
@@ -459,7 +459,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     gyreEngineer <- S.printingOf s registry "Gyre Engineer"
     slipperyBogle <- S.printingOf s registry "Slippery Bogle"
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
-    let (_, board) = S.addCreature gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, board) = S.addPermanent gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
         (withBogle, bogleId) = S.handOne slipperyBogle board
         (elvesId, gs) = S.addHandCard llanowarElves S.alice withBogle
         -- Resolved, not merely cast: the Elves are a creature spell, and CR
@@ -482,7 +482,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
 
   Spec.it s "CR 107.4e a hybrid symbol is ALL of its component colours" $ do
     burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
-    let (oid, gs) = S.addCreature burningTreeEmissary S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent burningTreeEmissary S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "red AND green, not one or the other"
@@ -552,7 +552,7 @@ shuYunSpec s registry = Spec.describe s "Shu Yun, the Silent Tempest" $ do
     boost <- S.printingOf s registry "Synthetic Speed Boost"
     bolt <- S.printingOf s registry "Lightning Bolt"
     let lands = S.landsFor plains S.alice 2 (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
-        (shuYunId, withShuYun) = S.addCreature shuYun S.alice lands
+        (shuYunId, withShuYun) = S.addPermanent shuYun S.alice lands
         (boostId, withBoost) = S.addHandCard boost S.alice withShuYun
         (boltId, withBolt) = S.addHandCard bolt S.alice withBoost
         board =
@@ -750,7 +750,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     mountain <- S.printingOf s registry "Mountain"
     baral <- S.printingOf s registry "Baral, Chief of Compliance"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let (_, board) = S.addCreature baral S.alice (S.landsInPlay mountain 6)
+    let (_, board) = S.addPermanent baral S.alice (S.landsInPlay mountain 6)
         (gs, spellId) = S.handOne flameJavelin board
         (askedGeneric, afterGeneric) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) gs spellId
         (askedTyped, afterTyped) = castAndResolve (announcesHybrid HybridPayment.PaysTyped) gs spellId
@@ -794,7 +794,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     island <- S.printingOf s registry "Island"
     baral <- S.printingOf s registry "Baral, Chief of Compliance"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let withBaral n = S.handOne flameJavelin (snd (S.addCreature baral S.alice (S.landsInPlay island n)))
+    let withBaral n = S.handOne flameJavelin (snd (S.addPermanent baral S.alice (S.landsInPlay island n)))
         (four, fourId) = withBaral 4
         (five, fiveId) = withBaral 5
         (six, sixId) = withBaral 6
@@ -825,7 +825,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
   -- even when six Islands paid for it.
   Spec.it s "CR 107.4e a monocolored hybrid symbol is its coloured half, and only that" $ do
     flameJavelin <- S.printingOf s registry "Flame Javelin"
-    let (oid, gs) = S.addCreature flameJavelin S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent flameJavelin S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "red, not colourless" (Projection.colorsOf oid gs) (Set.singleton Color.Red)
 
 -- Mutagenic Growth's printed cost. Restated rather than read off the card, for
@@ -892,7 +892,7 @@ phyrexianBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 phyrexianBoard forest piker growth elves =
-  let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+  let (_, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
       (withGrowth, growthId) = S.handOne growth withPiker
       (elvesId, gs) = S.addHandCard elves S.alice withGrowth
    in (growthId, elvesId, gs)
@@ -981,7 +981,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
         cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -996,7 +996,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   Spec.it s "CR 107.4f whole card: Mutagenic Growth casts with no mana at all, for 2 life" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (pikerId, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
     Spec.assertBool s (S.castable S.alice spellId g) "castable with an empty battlefield but for the Piker"
     let cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
@@ -1012,7 +1012,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
     let inHandAt n =
-          let (_, withPiker) = S.addCreature piker S.alice (aliceAt n)
+          let (_, withPiker) = S.addPermanent piker S.alice (aliceAt n)
            in S.handOne mutagenicGrowth withPiker
         castableAt n = let (g, spellId) = inHandAt n in S.castable S.alice spellId g
         castsAt n =
@@ -1031,7 +1031,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- object might be."
   Spec.it s "CR 107.4f/202.2d a Phyrexian mana symbol is a COLOURED mana symbol" $ do
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (oid, gs) = S.addCreature mutagenicGrowth S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent mutagenicGrowth S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "green, not colourless" (Projection.colorsOf oid gs) (Set.singleton Color.Green)
 
   -- And the colour survives the route that produces no green mana at all --
@@ -1040,7 +1040,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   Spec.it s "CR 202.2d Mutagenic Growth is green on the stack even when 2 life paid for it" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mutagenicGrowth <- S.printingOf s registry "Mutagenic Growth"
-    let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         (g, spellId) = S.handOne mutagenicGrowth withPiker
         cast = snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice spellId))
     Spec.assertEqWith s "2 life paid, no green mana ever made" (S.lifeOf S.alice cast) (Just 18)
@@ -1099,7 +1099,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- because this calls Cost.payMana directly, with nothing announced.
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
-    let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, gs) = S.addPermanent birds S.alice (Setup.emptyGame S.bothPlayers)
         (paidBlue, afterBlue) = S.runPureWith (prefersColor Color.Blue) gs (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paidBlue "the cost is still paid"
     Spec.assertEqWith s "by 2 life" (S.lifeOf S.alice afterBlue) (Just 18)
@@ -1156,7 +1156,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     growth <- S.printingOf s registry "Mutagenic Growth"
     elves <- S.printingOf s registry "Llanowar Elves"
-    let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         (withGrowth, growthId) = S.handOne growth withPiker
         (_, gs) = S.addHandCard elves S.alice withGrowth
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs growthId
@@ -1183,7 +1183,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
 -- `land`s -- the shape every board below wants and none of Support's helpers
 -- spells directly.
 withPermanent :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
-withPermanent land printing n = snd (S.addCreature printing S.alice (S.landsInPlay land n))
+withPermanent land printing n = snd (S.addPermanent printing S.alice (S.landsInPlay land n))
 
 -- CR 601.2f: "The total cost is the mana cost or alternative cost (as determined
 -- in rule 601.2b), plus all additional costs and cost increases, and minus all
@@ -1255,8 +1255,8 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
     -- ChooseTargets takes the lowest object id and both are 2/1 creatures --
     -- so with Thalia first the Growth would pump HER and the assertion below
     -- would be reading the wrong permanent.
-    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
-        (_, withThalia) = S.addCreature thalia S.alice withPiker
+    let (_, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
+        (_, withThalia) = S.addPermanent thalia S.alice withPiker
         (gs, growthId) = S.handOne growth withThalia
     Spec.assertBool s (S.castable S.alice growthId gs) "castable, by CR 107.4f's life route"
     let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs growthId
@@ -1281,8 +1281,8 @@ totalCostSpec s registry = Spec.describe s "TotalCost" $ do
     dismember <- S.printingOf s registry "Dismember"
     -- Piker before Thalia, for the reason the case above gives: both are 2/1
     -- creatures and identityAnswer targets the lowest object id.
-    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp 2)
-        (_, withThalia) = S.addCreature thalia S.alice withPiker
+    let (_, withPiker) = S.addPermanent piker S.alice (S.landsInPlay swamp 2)
+        (_, withThalia) = S.addPermanent thalia S.alice withPiker
         (gs, dismemberId) = S.handOne dismember withThalia
     Spec.assertBool s (S.castable S.alice dismemberId gs) "castable, by two life routes"
     let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysMana) gs dismemberId
@@ -1369,7 +1369,7 @@ dismemberBoard ::
   Int ->
   (GameState.GameState, ObjectId.ObjectId)
 dismemberBoard swamp piker dismember n =
-  let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp n)
+  let (_, withPiker) = S.addPermanent piker S.alice (S.landsInPlay swamp n)
    in S.handOne dismember withPiker
 
 -- The one Goblin Piker on the battlefield. The Piker is added before the spell is
@@ -1422,7 +1422,7 @@ phyrexianTollSpec s registry = Spec.describe s "SyntheticPhyrexianToll" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
     let inHandAt n =
-          let (_, withPiker) = S.addCreature piker S.alice (aliceAt n)
+          let (_, withPiker) = S.addPermanent piker S.alice (aliceAt n)
            in S.handOne toll withPiker
         castableAt n = let (g, tollId) = inHandAt n in S.castable S.alice tollId g
         castsAt n =
@@ -1442,7 +1442,7 @@ phyrexianTollSpec s registry = Spec.describe s "SyntheticPhyrexianToll" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
-    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+    let (_, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
         (gs, tollId) = S.handOne toll (atLife 3 withPiker)
     Spec.assertBool s (S.castable S.alice tollId gs) "castable, by the mana route alone"
     let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs tollId
@@ -1461,7 +1461,7 @@ phyrexianTollSpec s registry = Spec.describe s "SyntheticPhyrexianToll" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
-    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+    let (_, withPiker) = S.addPermanent piker S.alice (S.landsInPlay forest 1)
         (gs, tollId) = S.handOne toll (atLife 5 withPiker)
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs tollId
     Spec.assertEqWith s "the engine asked rather than deciding" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysLife]
@@ -1558,7 +1558,7 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
 -- unset.
 dragonBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 dragonBoard mountain dragon n =
-  let (dragonId, gs) = S.addCreature dragon S.alice (S.landsInPlay mountain n)
+  let (dragonId, gs) = S.addPermanent dragon S.alice (S.landsInPlay mountain n)
    in (dragonId, gs {GameState.priority = Just S.alice})
 
 -- The one Moltensteel Dragon on the battlefield -- pikerOn's shape, for the card
@@ -1618,7 +1618,7 @@ tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
   -- have said.
   Spec.it s "CR 107.4f/202.2d a hybrid Phyrexian symbol is BOTH of its colours" $ do
     tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
-    let (oid, gs) = S.addCreature tamiyo S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent tamiyo S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "green AND blue, not one or the other"
@@ -1725,7 +1725,7 @@ tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
     island <- S.printingOf s registry "Island"
     tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
     doublingSeason <- S.printingOf s registry "Doubling Season"
-    let (seasonId, board) = S.addCreature doublingSeason S.alice (mixedLands forest island 3 2)
+    let (seasonId, board) = S.addPermanent doublingSeason S.alice (mixedLands forest island 3 2)
         (gs, tamiyoId) = S.handOne tamiyo board
         (askedFirst, compleatedFirst) = castAndResolveRecording (racesCompleated True seasonId) gs tamiyoId
         (_, doubledFirst) = castAndResolveRecording (racesCompleated False seasonId) gs tamiyoId
@@ -1802,7 +1802,7 @@ sigilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
   Spec.it s "CR 107.4f/202.2d a hybrid Phyrexian symbol makes its object BOTH colours" $ do
     sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
-    let (oid, gs) = S.addCreature sigil S.alice (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent sigil S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "green AND blue, from the one symbol"
@@ -1819,8 +1819,8 @@ sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
     gyreEngineer <- S.printingOf s registry "Gyre Engineer"
     piker <- S.printingOf s registry "Goblin Piker"
     sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
-    let (_, withEngineer) = S.addCreature gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
-        (_, withPiker) = S.addCreature piker S.alice withEngineer
+    let (_, withEngineer) = S.addPermanent gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
+        (_, withPiker) = S.addPermanent piker S.alice withEngineer
         (gs, sigilId) = S.handOne sigil withPiker
         castWith half = castAndResolve (announcesBoth PhyrexianPayment.PaysMana half) gs sigilId
         (askedGreen, afterGreen) = castWith greenMana
@@ -1856,7 +1856,7 @@ sigilSpec s registry = Spec.describe s "SyntheticHybridPhyrexianSigil" $ do
   Spec.it s "CR 107.4f off no land at all, 2 life pays the whole cost" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sigil <- S.printingOf s registry "Synthetic Hybrid Phyrexian Sigil"
-    let (_, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, withPiker) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         (gs, sigilId) = S.handOne sigil withPiker
         (asked, resolved) = castAndResolve (announcesBoth PhyrexianPayment.PaysMana greenMana) gs sigilId
     Spec.assertEqWith s "CR 107.4f: 2 life" (S.lifeOf S.alice resolved) (Just 18)
@@ -1969,8 +1969,8 @@ seededPool units = Mana.addMana S.alice units (Setup.emptyGame S.bothPlayers)
 twoRedFloated :: Printing.Printing -> Printing.Printing -> GameState.GameState
 twoRedFloated snowMountain mountain =
   let base = Setup.emptyGame S.bothPlayers
-      (snowId, withSnow) = S.addCreature snowMountain S.alice base
-      (plainId, withBoth) = S.addCreature mountain S.alice withSnow
+      (snowId, withSnow) = S.addPermanent snowMountain S.alice base
+      (plainId, withBoth) = S.addPermanent mountain S.alice withSnow
    in S.runPure S.identityAnswer withBoth (Cost.tapForMana S.manaPerformer snowId *> Cost.tapForMana S.manaPerformer plainId)
 
 -- Pay `cost` out of `units`, counting the questions asked about which mana goes.
@@ -2057,7 +2057,7 @@ bergBoard s registry snowy = do
   filler <- S.printingOf s registry (if snowy then "Snow-Covered Mountain" else "Mountain")
   strider <- S.printingOf s registry "Berg Strider"
   piker <- S.printingOf s registry "Goblin Piker"
-  let (victim, board) = S.addCreature piker S.bob (S.landsFor filler S.alice 4 (S.landsInPlay island 1))
+  let (victim, board) = S.addPermanent piker S.bob (S.landsFor filler S.alice 4 (S.landsInPlay island 1))
       (gs, spellId) = S.handOne strider board
       resolved = S.runPure S.identityAnswer gs (S.cast S.alice spellId *> Stack.resolveTop *> Engine.placePendingTriggers *> Stack.resolveTop)
   pure (victim, resolved {GameState.activePlayer = S.bob})
@@ -2122,8 +2122,8 @@ forswornPaladinSpec s registry = Spec.describe s "ForswornPaladin" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     case Face.activatedAbilities (S.combinedFace paladin) of
       makeTreasure : pump : _ -> do
-        let (paladinId, g1) = S.addCreature paladin S.alice (S.landsInPlay swamp 6)
-            (victim, g2) = S.addCreature piker S.bob g1
+        let (paladinId, g1) = S.addPermanent paladin S.alice (S.landsInPlay swamp 6)
+            (victim, g2) = S.addPermanent piker S.bob g1
             armed = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice paladinId makeTreasure *> Stack.resolveTop)
             treasure = treasureIn armed
             act = Activate.activateAbility S.alice paladinId pump *> Stack.resolveTop
@@ -2152,8 +2152,8 @@ forswornPaladinSpec s registry = Spec.describe s "ForswornPaladin" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     case Face.activatedAbilities (S.combinedFace paladin) of
       makeTreasure : pump : _ -> do
-        let (paladinId, g1) = S.addCreature paladin S.alice (S.landsInPlay swamp 6)
-            (_, g2) = S.addCreature piker S.bob g1
+        let (paladinId, g1) = S.addPermanent paladin S.alice (S.landsInPlay swamp 6)
+            (_, g2) = S.addPermanent piker S.bob g1
             armed = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice paladinId makeTreasure *> Stack.resolveTop)
             treasure = treasureIn armed
             onStack = S.runPure (aimedAtSpending paladinId treasure) armed (Activate.activateAbility S.alice paladinId pump)

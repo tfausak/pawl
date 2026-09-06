@@ -414,8 +414,8 @@ endeavorBoard s registry = do
   maiden <- S.printingOf s registry "Bird Maiden"
   mauler <- S.printingOf s registry "Barkhide Mauler"
   let (held, spell) = S.handOne endeavor (S.landsInPlay plains 6)
-      (weak, withWeak) = S.addCreature maiden S.bob held
-      (strong, withBoth) = S.addCreature mauler S.bob withWeak
+      (weak, withWeak) = S.addPermanent maiden S.bob held
+      (strong, withBoth) = S.addPermanent mauler S.bob withWeak
   pure (spell, weak, strong, withBoth)
 
 -- Pins both questions the resolution asks: each die comes up the next number of

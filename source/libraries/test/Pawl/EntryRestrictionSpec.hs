@@ -94,7 +94,7 @@ exhumeCase s registry = do
       board exhume swamp buried cage =
         let place (g, ids) (printing, pid) = let (oid, g') = S.addGraveyardCard printing pid g in (g', ids <> [oid])
             (g1, graves) = List.foldl' place (S.landsInPlay swamp 4, []) buried
-            g2 = foldr (\c g -> snd (S.addCreature c S.alice g)) g1 cage
+            g2 = foldr (\c g -> snd (S.addPermanent c S.alice g)) g1 cage
             (g3, spell) = S.handOne exhume g2
          in (spell, graves, g3)
       run spell gs =
@@ -168,7 +168,7 @@ hardcastCase s registry =
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     cage <- S.printingOf s registry "Grafdigger's Cage"
-    let g1 = snd (S.addCreature cage S.alice (S.landsInPlay mountain 4))
+    let g1 = snd (S.addPermanent cage S.alice (S.landsInPlay mountain 4))
         (before, spell) = S.handOne piker g1
         after = S.runPure S.identityAnswer before (S.cast S.alice spell >> Stack.resolveTop)
     Spec.assertEqWith s "the Piker is on the battlefield" (arrivals before after) [Just (S.printingName piker)]
@@ -186,7 +186,7 @@ manifestCase s registry = do
       -- "the library is the same length" a delta rather than an emptying; the
       -- Wraith on top is a CREATURE card, which is what the Cage's filter reads.
       board summons plains piker wraith cage =
-        let g1 = foldr (\c g -> snd (S.addCreature c S.alice g)) (S.landsInPlay plains 2) cage
+        let g1 = foldr (\c g -> snd (S.addPermanent c S.alice g)) (S.landsInPlay plains 2) cage
             (g2, spell) = S.handOne summons g1
             g3 = snd (S.addLibraryCard piker S.alice g2)
             (top, g4) = S.addLibraryCard wraith S.alice g3
@@ -246,7 +246,7 @@ manifestCase s registry = do
 permanentSpellCase :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 permanentSpellCase s registry = do
   let board forest elves horizon =
-        let g1 = foldr (\c g -> snd (S.addCreature c S.alice g)) (S.landsInPlay forest 2) horizon
+        let g1 = foldr (\c g -> snd (S.addPermanent c S.alice g)) (S.landsInPlay forest 2) horizon
             (g2, spell) = S.handOne elves g1
          in (spell, g2)
       fixtures = do
@@ -295,7 +295,7 @@ tokenCase s registry = do
       -- the trigger pending; the prohibition, where one is named, is arranged
       -- beside it and takes no move of its own.
       board willow prohibition =
-        let g1 = foldr (\c g -> snd (S.addCreature c S.alice g)) (Setup.emptyGame S.bothPlayers) prohibition
+        let g1 = foldr (\c g -> snd (S.addPermanent c S.alice g)) (Setup.emptyGame S.bothPlayers) prohibition
          in snd (S.entersWithTrigger willow S.alice g1)
       settled gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       run gs = S.runPure S.identityAnswer (settled gs) Stack.resolveTop

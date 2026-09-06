@@ -549,10 +549,10 @@ weaverBoard ::
   Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 weaverBoard island weaver ainok brine raptor piker =
   let (gs0, spell) = S.handOne weaver (S.landsInPlay island 8)
-      (tracker, gs1) = S.addCreature ainok S.alice gs0
-      (elemental, gs2) = S.addCreature brine S.alice gs1
-      (third, gs3) = S.addCreature raptor S.alice gs2
-      (vanilla, gs4) = S.addCreature piker S.alice gs3
+      (tracker, gs1) = S.addPermanent ainok S.alice gs0
+      (elemental, gs2) = S.addPermanent brine S.alice gs1
+      (third, gs3) = S.addPermanent raptor S.alice gs2
+      (vanilla, gs4) = S.addPermanent piker S.alice gs3
       (after, entered) = castAndResolve weaver (Facing.faceDown FaceDownReason.Morphed) gs4 spell
    in fmap (\hidden -> (after, hidden, tracker, elemental, third, vanilla)) entered
 
@@ -561,8 +561,8 @@ weaverBoard island weaver ainok brine raptor piker =
 backslideBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 backslideBoard island backslide ainok piker =
   let (gs0, spell) = S.handOne backslide (S.landsInPlay island 2)
-      (morphling, gs1) = S.addCreature ainok S.alice gs0
-      (vanilla, gs2) = S.addCreature piker S.alice gs1
+      (morphling, gs1) = S.addPermanent ainok S.alice gs0
+      (vanilla, gs2) = S.addPermanent piker S.alice gs1
    in (gs2, spell, morphling, vanilla)
 
 -- CR 701.26a's state, written straight onto the permanent: this file is about
@@ -689,9 +689,9 @@ restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
 suspectedBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 suspectedBoard piker suspected lands =
   let (gs0, mine, _) = S.combatBoardOf [piker] []
-      (suspect, gs1) = S.addCreature suspected S.bob gs0
-      (other, gs2) = S.addCreature piker S.bob gs1
-      gs3 = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs2 lands
+      (suspect, gs1) = S.addPermanent suspected S.bob gs0
+      (other, gs2) = S.addPermanent piker S.bob gs1
+      gs3 = List.foldl' (\g p -> snd (S.addPermanent p S.bob g)) gs2 lands
       declared = S.runPure S.aggressiveAnswer (suspecting suspect gs3) (Combat.declareAttackers S.manaPerformer S.alice)
       attacker = case mine of
         a : _ -> a
@@ -911,8 +911,8 @@ cyberBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Pri
 cyberBoard island mountain cyber backslide ainok piker =
   let (gs0, spell) = S.handOne cyber (S.landsFor mountain S.alice 5 (S.landsInPlay island 4))
       (gs1, slide) = S.handOne backslide gs0
-      (victim, gs2) = S.addCreature ainok S.alice gs1
-      (bystander, gs3) = S.addCreature piker S.alice gs2
+      (victim, gs2) = S.addPermanent ainok S.alice gs1
+      (bystander, gs3) = S.addPermanent piker S.alice gs2
    in (gs3, spell, slide, victim, bystander)
 
 -- A target slot answered by FILTERING the offered set down to the named
@@ -979,7 +979,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     ainok <- S.printingOf s registry "Ainok Tracker"
     nullChamber <- S.printingOf s registry "Null Chamber"
     let (base, oid) = morphBoard mountain ainok 6
-        (chamber, withChamber) = S.addCreature nullChamber S.alice base
+        (chamber, withChamber) = S.addPermanent nullChamber S.alice base
         -- CR 614.1c's as-enters choice, written straight onto the permanent:
         -- the Chamber's own entry replacement prompts for it, and this file is
         -- about rule 708 rather than about that prompt (Pawl.PlayerEffectSpec
@@ -1399,7 +1399,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
     ainok <- S.printingOf s registry "Ainok Tracker"
     farseer <- S.printingOf s registry "Aven Farseer"
     let (base, card) = morphBoard mountain ainok 6
-        (watcher, seated) = S.addCreature farseer S.alice base
+        (watcher, seated) = S.addPermanent farseer S.alice base
         (cast, entered) = castAndResolve ainok Facing.FaceUp seated card
         settled = S.runPure S.identityAnswer cast Engine.priorityLoop
     case entered of
@@ -1492,7 +1492,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
     ainok <- S.printingOf s registry "Ainok Tracker"
     walker <- S.printingOf s registry "Pine Walker"
     let (base, card) = morphBoard mountain ainok 6
-        (watcher, seated) = S.addCreature walker S.alice base
+        (watcher, seated) = S.addPermanent walker S.alice base
         (cast, entered) = castAndResolve ainok Facing.FaceUp seated card
     case entered of
       Nothing -> Spec.assertFailure s "the ordinary cast did not reach the battlefield"
@@ -1522,9 +1522,9 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
     gift <- S.printingOf s registry "Gift of Doom"
     walker <- S.printingOf s registry "Pine Walker"
     let (gs0, card) = morphBoard swamp gift 3
-        (fodder, gs1) = S.addCreature piker S.alice gs0
-        (mine, gs2) = S.addCreature mammoth S.alice gs1
-        (watcher, gs3) = S.addCreature walker S.alice gs2
+        (fodder, gs1) = S.addPermanent piker S.alice gs0
+        (mine, gs2) = S.addPermanent mammoth S.alice gs1
+        (watcher, gs3) = S.addPermanent walker S.alice gs2
         (board, entered) = castAndResolve gift (Facing.faceDown FaceDownReason.Morphed) gs3 card
     case entered of
       Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
@@ -1556,7 +1556,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
 farseerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 farseerBoard land farseer morph who n =
   let (gs0, card) = morphBoard land morph n
-      (watcher, gs1) = S.addCreature farseer who gs0
+      (watcher, gs1) = S.addPermanent farseer who gs0
       (after, entered) = castAndResolve morph (Facing.faceDown FaceDownReason.Morphed) gs1 card
    in fmap (\permanent -> (after, watcher, permanent)) entered
 
@@ -1585,9 +1585,9 @@ giftBoard ::
   Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 giftBoard land piker mammoth gift =
   let (gs0, card) = morphBoard land gift 3
-      (fodder, gs1) = S.addCreature piker S.alice gs0
-      (mine, gs2) = S.addCreature mammoth S.alice gs1
-      (theirs, gs3) = S.addCreature piker S.bob gs2
+      (fodder, gs1) = S.addPermanent piker S.alice gs0
+      (mine, gs2) = S.addPermanent mammoth S.alice gs1
+      (theirs, gs3) = S.addPermanent piker S.bob gs2
       (after, entered) = castAndResolve gift (Facing.faceDown FaceDownReason.Morphed) gs3 card
    in fmap (\aura -> (after, fodder, mine, theirs, aura)) entered
 
@@ -1894,7 +1894,7 @@ ambushBoard s registry owned = do
   ambush <- S.printingOf s registry "Ethereal Ambush"
   thragtusk <- S.printingOf s registry "Thragtusk"
   let lands = S.landsFor island S.alice 4 (S.landsFor forest S.alice 4 (S.landsInPlay plains 4))
-      creatures = List.foldl' (\g _ -> snd (S.addCreature piker S.alice g)) lands [1 .. owned]
+      creatures = List.foldl' (\g _ -> snd (S.addPermanent piker S.alice g)) lands [1 .. owned]
       (withNet, netId) = S.handOne net creatures
       (ambushId, withAmbush) = S.addHandCard ambush S.alice withNet
       (_, g1) = S.addLibraryCard piker S.alice withAmbush
@@ -2005,7 +2005,7 @@ surpriseBoard s registry top = do
   galleon <- S.printingOf s registry "Armored Galleon"
   (manifested, entered) <- manifestedBoard s registry top 5
   let (g1, spell) = S.handOne surprise manifested
-      (bystander, g2) = S.addCreature galleon S.alice g1
+      (bystander, g2) = S.addPermanent galleon S.alice g1
   pure (g2, spell, entered, bystander)
 
 -- CR 701.62 manifest dread: rule 701.40's manifest over a card CHOSEN from a
@@ -2126,8 +2126,8 @@ enteringFaceDownSpec s registry = Spec.describe s "Entering face down" $ do
     yedora <- S.printingOf s registry "Yedora, Grave Gardener"
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (yedoraId, g1) = S.addCreature yedora S.alice (S.landsInPlay mountain 3)
-        (pikerId, before) = S.addCreature piker S.alice g1
+    let (yedoraId, g1) = S.addPermanent yedora S.alice (S.landsInPlay mountain 3)
+        (pikerId, before) = S.addPermanent piker S.alice g1
         after = S.runPure takingTheMay (S.markDamage pikerId 1 before) Engine.priorityLoop
     -- The FIXTURE first, so nothing below passes for want of a dead creature or
     -- a returned permanent: two creatures went in, the Piker died, and one new
@@ -2304,7 +2304,7 @@ faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
     let flip_ gs entered = case entered of
           Nothing -> Nothing
           Just permanent ->
-            let (watcher, g1) = S.addCreature farseer S.alice gs
+            let (watcher, g1) = S.addPermanent farseer S.alice gs
              in Just (watcher, S.runPure S.identityAnswer g1 (FaceDown.turnFaceUpByEffect permanent >> Engine.priorityLoop), permanent)
     case (flip_ sorceryBoard sorceryEntered, flip_ creatureBoard creatureEntered) of
       (Just (sorceryWatcher, sorceryAfter, sorceryPermanent), Just (creatureWatcher, creatureAfter, creaturePermanent)) -> do
@@ -2365,7 +2365,7 @@ breakOpenBoard s registry = do
   giant <- S.printingOf s registry "Hill Giant"
   piker <- S.printingOf s registry "Goblin Piker"
   let (g1, spell) = S.handOne breakOpen (S.landsInPlay mountain 2)
-      (theirs, g2) = S.addCreature giant S.bob g1
+      (theirs, g2) = S.addPermanent giant S.bob g1
       (_, g3) = S.addLibraryCard piker S.alice g2
       (_, g4) = S.addLibraryCard piker S.bob g3
       (g5, theirFaceDown) = enterFaceDown thragtusk S.bob g4
@@ -2479,8 +2479,8 @@ whispererBoard s registry faceDowns = do
   tracker <- S.printingOf s registry "Ainok Tracker"
   piker <- S.printingOf s registry "Goblin Piker"
   let (g1, spell) = S.handOne breakOpen (S.landsInPlay mountain 2)
-      (mine, g2) = S.addCreature whisperer S.alice g1
-      (_, g3) = S.addCreature giant S.bob g2
+      (mine, g2) = S.addPermanent whisperer S.alice g1
+      (_, g3) = S.addPermanent giant S.bob g2
       (_, g4) = S.addLibraryCard piker S.alice g3
       (_, g5) = S.addLibraryCard piker S.bob g4
   if faceDowns
@@ -2732,10 +2732,10 @@ disguiseSpec s registry =
           walker <- S.printingOf s registry "Dog Walker"
           let (gs, oid) = morphBoard forest walker 3
               (cast, entered) = castAndResolve walker disguised gs oid
-              (mountainOne, m1) = S.addCreature mountain S.alice cast
-              (mountainTwo, m2) = S.addCreature mountain S.alice m1
-              (plainsOne, p1) = S.addCreature plains S.alice m2
-              (plainsTwo, down) = S.addCreature plains S.alice p1
+              (mountainOne, m1) = S.addPermanent mountain S.alice cast
+              (mountainTwo, m2) = S.addPermanent mountain S.alice m1
+              (plainsOne, p1) = S.addPermanent plains S.alice m2
+              (plainsTwo, down) = S.addPermanent plains S.alice p1
               mountains = [mountainOne, mountainTwo]
               plainses = [plainsOne, plainsTwo]
           case entered of
@@ -3085,10 +3085,10 @@ shriekerBoard s registry underneath onTheManifest = do
   song <- S.printingOf s registry "Song of the Dryads"
   piker <- S.printingOf s registry "Goblin Piker"
   under <- S.printingOf s registry underneath
-  let (shriekerId, g1) = S.addCreature shrieker S.alice (S.landsInPlay forest 2)
-      (bystander, g2) = S.addCreature piker S.alice g1
+  let (shriekerId, g1) = S.addPermanent shrieker S.alice (S.landsInPlay forest 2)
+      (bystander, g2) = S.addPermanent piker S.alice g1
       (g3, entered) = enterFaceDown under S.alice g2
-      (songId, g4) = S.addCreature song S.alice g3
+      (songId, g4) = S.addPermanent song S.alice g3
       host = if onTheManifest then entered else Just bystander
       -- ToObject rather than S.attach's ToCreature: "enchant permanent" is a
       -- Pool.Permanents slot, so those are the recipients casting would have left.

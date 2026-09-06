@@ -109,7 +109,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- supplies.
 outcastBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 outcastBoard barbarianOutcast swamp swamps =
-  S.addCreature barbarianOutcast S.alice (S.landsInPlay swamp swamps)
+  S.addPermanent barbarianOutcast S.alice (S.landsInPlay swamp swamps)
 
 -- alice casts Tidal Wave off three Islands and lets it resolve.
 castWave :: Printing.Printing -> Printing.Printing -> GameState.GameState
@@ -152,7 +152,7 @@ logSpec s registry =
     -- land and impossible for a token (CR 111.1).
     Spec.it s "CR 608.2h a Moved event snapshots the object it moved" $ do
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+      let (piker, gs) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           expected = Projection.project piker gs
           after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
       case S.eventsOf after of
@@ -171,8 +171,8 @@ logSpec s registry =
     Spec.it s "CR 117.5 the trigger scan advances its watermark but keeps the record" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (_, gs) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-          (pikerId, gs1) = S.addCreature piker S.bob gs
+      let (_, gs) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+          (pikerId, gs1) = S.addPermanent piker S.bob gs
           moved = S.runPure S.identityAnswer gs1 (Event.changeZone pikerId Zone.Hand)
           scanned = snd (Engine.runGamePure S.identityAnswer moved Engine.placePendingTriggers)
       Spec.assertEqWith s "nothing left unscanned" (Event.unscannedEvents scanned) []
@@ -181,7 +181,7 @@ logSpec s registry =
     -- wrong: cleanup is still part of THIS turn.
     Spec.it s "the log and both watermarks are cleared at turn handoff" $ do
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+      let (piker, gs) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           moved = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
           after = snd (Engine.runGamePure S.identityAnswer moved Engine.handoffTurn)
       Spec.assertEqWith s "log empty" (GameState.events after) Seq.empty
@@ -191,7 +191,7 @@ logSpec s registry =
     -- BEFORE handoffTurn clears the log, or its trigger is lost outright.
     Spec.it s "advance settles before handing off, so no unscanned event is discarded" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
-      let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+      let (ripId, gs0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project ripId gs0))] gs0
           ending = gs1 {GameState.remaining = Seq.empty}
@@ -254,14 +254,14 @@ scanSpec s registry =
     Spec.it s "CR 603.6a a SelfEnters trigger does not fire on another object's entry" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (_, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-          (pikerId, gs1) = S.addCreature piker S.bob gs0
+      let (_, gs0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+          (pikerId, gs1) = S.addPermanent piker S.bob gs0
           entered = ZoneChange.MkZoneChange pikerId pikerId Zone.Stack Zone.Battlefield
           gs2 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project pikerId gs1))] gs1
       Spec.assertEqWith s "no trigger" (length (gathered gs2)) 0
     Spec.it s "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
-      let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+      let (ripId, gs0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project ripId gs0))] gs0
       case gathered gs1 of
@@ -271,7 +271,7 @@ scanSpec s registry =
         other -> Spec.assertFailure s ("expected exactly one pending trigger, got " <> show (length other))
     Spec.it s "a graveyard-bound event yields no enters trigger" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
-      let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+      let (ripId, gs0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           toGrave = ZoneChange.MkZoneChange ripId ripId Zone.Battlefield Zone.Graveyard
           gs1 = S.withEvents [GameEvent.Moved (Moved.moved toGrave (Projection.project ripId gs0))] gs0
       Spec.assertEqWith s "no triggers" (length (gathered gs1)) 0
@@ -308,8 +308,8 @@ scanSpec s registry =
     -- that same ascending order.
     Spec.it s "CR 603.6a two SelfEnters triggers emit in ascending ObjectId order" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
-      let (rip1, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
-          (rip2, gs1) = S.addCreature restInPeace S.alice gs0
+      let (rip1, gs0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+          (rip2, gs1) = S.addPermanent restInPeace S.alice gs0
           entered1 = ZoneChange.MkZoneChange rip1 rip1 Zone.Stack Zone.Battlefield
           entered2 = ZoneChange.MkZoneChange rip2 rip2 Zone.Stack Zone.Battlefield
           gs2 =
@@ -332,8 +332,8 @@ scanSpec s registry =
     -- come out in ascending ObjectId order.
     Spec.it s "CR 603.2b two StepBegins triggers from one event emit in ascending ObjectId order" $ do
       khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
-      let (ghoul1, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
-          (ghoul2, gs1) = S.addCreature khabalGhoul S.alice gs0
+      let (ghoul1, gs0) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          (ghoul2, gs1) = S.addPermanent khabalGhoul S.alice gs0
           event = GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)
           triggers = gatheredIn [LoggedEvent.MkLoggedEvent {LoggedEvent.group = EventGroup.first, LoggedEvent.event = event}] gs1
       Spec.assertBool s (ghoul1 < ghoul2) "ghoul1 has the lower id"
@@ -354,7 +354,7 @@ scanSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       ravenousRats <- S.printingOf s registry "Ravenous Rats"
       night <- S.printingOf s registry "Night of Souls' Betrayal"
-      let (_, base1) = S.addCreature night S.alice (S.landsInPlay swamp 2)
+      let (_, base1) = S.addPermanent night S.alice (S.landsInPlay swamp 2)
           (_, base2) = S.addHandCard piker S.bob base1
           (_, base3) = S.addHandCard piker S.bob base2
           (gs, spellId) = S.handOne ravenousRats base3
@@ -388,7 +388,7 @@ sacrificeSpec s registry =
   Spec.describe s "Sacrifice" $ do
     Spec.it s "CR 701.21a a sacrificed permanent goes to its owner's graveyard" $ do
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+      let (piker, gs) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
       Spec.assertEqWith s "off the battlefield" (S.creaturesInPlay S.bob after) 0
       Spec.assertEqWith s "in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
@@ -399,7 +399,7 @@ sacrificeSpec s registry =
     -- effect), so the result must land in bob's graveyard, not alice's.
     Spec.it s "CR 701.21a a sacrifice lands in the OWNER's graveyard even when a different player controls it" $ do
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+      let (piker, gs0) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           gs = S.giveControl piker S.alice gs0
           -- ALICE is the sacrificing player, because she controls it (CR
           -- 701.21a); bob merely owns it, which is what the assertions below
@@ -412,12 +412,12 @@ sacrificeSpec s registry =
     -- 702.12b's indestructible gate nor CR 701.19a's shield applies.
     Spec.it s "CR 701.21a an indestructible permanent can still be sacrificed" $ do
       darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-      let (myr, gs) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
+      let (myr, gs) = S.addPermanent darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob myr)
       Spec.assertEqWith s "gone from the battlefield" (S.creaturesInPlay S.bob after) 0
     Spec.it s "CR 701.21a sacrificing neither consults nor consumes a regeneration shield" $ do
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      let (piker, gs0) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+      let (piker, gs0) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           gs = S.addRegenShield piker gs0
           after = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
       Spec.assertEqWith s "still sacrificed" (S.creaturesInPlay S.bob after) 0
@@ -432,7 +432,7 @@ sacrificeSpec s registry =
     -- alice asking is refused outright rather than quietly honoured.
     Spec.it s "CR 701.21a a player cannot sacrifice a permanent they do not control" $ do
       pikerPrinting <- S.printingOf s registry "Goblin Piker"
-      let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+      let (piker, gs) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           byAlice = S.runPure S.identityAnswer gs (Event.sacrifice S.alice piker)
           byBob = S.runPure S.identityAnswer gs (Event.sacrifice S.bob piker)
       Spec.assertEqWith s "alice's attempt changes nothing at all" byAlice gs
@@ -442,7 +442,7 @@ sacrificeSpec s registry =
     -- CR 113.7: "this creature" is a slot read, filled at placement.
     Spec.it s "CR 113.7 a placed trigger binds its source into the reserved self slot" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
-      let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
+      let (ripId, gs0) = S.addPermanent restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project ripId gs0))] gs0
           placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
@@ -487,8 +487,8 @@ mayhemDevilSpec s registry =
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
       board devil extra =
-        let (_, withDevil) = S.addCreature devil S.alice S.threePlayerGame
-            (extraId, withExtra) = S.addCreature extra S.alice withDevil
+        let (_, withDevil) = S.addPermanent devil S.alice S.threePlayerGame
+            (extraId, withExtra) = S.addPermanent extra S.alice withDevil
          in ( extraId,
               withExtra
                 { GameState.phase = Phase.PrecombatMain,
@@ -501,7 +501,7 @@ mayhemDevilSpec s registry =
       -- seats, since a two-player board collapses "an opponent" onto the one seat
       -- that is not CR 109.5's "you".
       trackerBoard tracker victimCard owner =
-        let (_, withTracker) = S.addCreature tracker S.alice S.threePlayerGame
+        let (_, withTracker) = S.addPermanent tracker S.alice S.threePlayerGame
             (victim, withVictim) = S.addToken victimCard owner withTracker
          in ( victim,
               withVictim
@@ -674,7 +674,7 @@ stateTriggerSpec s registry =
           swamp <- S.printingOf s registry "Swamp"
           let (_, gs0) = outcastBoard barbarianOutcast swamp 0
               settledFirst = settle gs0
-              (_, gs1) = S.addCreature barbarianOutcast S.alice settledFirst
+              (_, gs1) = S.addPermanent barbarianOutcast S.alice settledFirst
               settledBoth = settle gs1
           Spec.assertEqWith s "two instances, one per source" (length (triggerIds settledBoth)) 2
         -- M-4 (review): the state trigger's Condition.holds reads the PROJECTION
@@ -689,7 +689,7 @@ stateTriggerSpec s registry =
               mountainId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
                 i : _ -> i
                 [] -> ObjectId.MkObjectId 999
-              (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
+              (_, gs1) = S.addPermanent barbarianOutcast S.alice gs0
               before = settle gs1
               withUrborg = S.withEffect mountainId (Modification.AddLandSubtype Subtype.Swamp) gs1
               after = settle withUrborg
@@ -704,8 +704,8 @@ stateTriggerSpec s registry =
           swamp <- S.printingOf s registry "Swamp"
           barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
           let gs0 = Setup.emptyGame S.bothPlayers
-              (swampId, gs1) = S.addCreature swamp S.bob gs0
-              (_, gs2) = S.addCreature barbarianOutcast S.alice gs1
+              (swampId, gs1) = S.addPermanent swamp S.bob gs0
+              (_, gs2) = S.addPermanent barbarianOutcast S.alice gs1
               before = settle gs2
               gs3 = S.giveControl swampId S.alice gs2
               after = settle gs3
@@ -799,9 +799,9 @@ outcastHackBoard s registry hacked = do
   island <- S.printingOf s registry "Island"
   magicalHack <- S.printingOf s registry "Magical Hack"
   let gs0 = Setup.emptyGame S.bothPlayers
-      (_, gs1) = S.addCreature swamp S.alice gs0
-      (_, gs2) = S.addCreature island S.bob gs1
-      (outcastId, gs3) = S.addCreature barbarianOutcast S.alice gs2
+      (_, gs1) = S.addPermanent swamp S.alice gs0
+      (_, gs2) = S.addPermanent island S.bob gs1
+      (outcastId, gs3) = S.addPermanent barbarianOutcast S.alice gs2
       (hackId, gs4) = S.addHandCard magicalHack S.bob gs3
       gs5 = gs4 {GameState.priority = Just S.bob}
       hackIt g = S.runPure (answerHackAt outcastId Subtype.Swamp Subtype.Island) g (do S.cast S.bob hackId; Stack.resolveTop)
@@ -869,9 +869,9 @@ historySpec s registry =
         Spec.it s "CR 608.2i deaths the trigger scan already passed are still counted" $ do
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
-              (p1, gs1) = S.addCreature piker S.bob gs0
-              (p2, gs2) = S.addCreature piker S.bob gs1
+          let (ghoul, gs0) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+              (p1, gs1) = S.addPermanent piker S.bob gs0
+              (p2, gs2) = S.addPermanent piker S.bob gs1
               dead = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (Event.destroy Regenerability.Regenerable [p1])) (Event.destroy Regenerability.Regenerable [p2])
               scanned = settle dead
               atEnd = resolveAll (settle (beginEndStep scanned))
@@ -883,7 +883,7 @@ historySpec s registry =
         Spec.it s "CR 111.1 a token creature that died counts, though it has no printed card" $ do
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          let (ghoul, gs0) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               (tok, gs1) = S.addToken (Printing.card piker) S.bob gs0
               dead = S.settleSba (S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable [tok]))
               atEnd = resolveAll (settle (beginEndStep dead))
@@ -891,8 +891,8 @@ historySpec s registry =
         Spec.it s "a creature that left the battlefield for HAND did not die (CR 700.4)" $ do
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
-              (p1, gs1) = S.addCreature piker S.bob gs0
+          let (ghoul, gs0) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+              (p1, gs1) = S.addPermanent piker S.bob gs0
               bounced = S.runPure S.identityAnswer gs1 (Event.changeZone p1 Zone.Hand)
               atEnd = resolveAll (settle (beginEndStep bounced))
           Spec.assertEqWith s "a bounce is not a death" (countersOn ghoul atEnd) 0
@@ -910,17 +910,17 @@ historySpec s registry =
         Spec.it s "CR 608.2i a creature that died before the Ghoul entered is still counted" $ do
           piker <- S.printingOf s registry "Goblin Piker"
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
-          let (p1, gs0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+          let (p1, gs0) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
               dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [p1])
-              (ghoul, gs1) = S.addCreature khabalGhoul S.alice (settle dead)
+              (ghoul, gs1) = S.addPermanent khabalGhoul S.alice (settle dead)
               atEnd = resolveAll (settle (beginEndStep gs1))
           Spec.assertEqWith s "one +1/+1 counter" (countersOn ghoul atEnd) 1
         -- CR 608.2i: the history's scope is ONE turn.
         Spec.it s "the count resets at turn handoff, not at the trigger scan" $ do
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
-              (p1, gs1) = S.addCreature piker S.bob gs0
+          let (ghoul, gs0) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+              (p1, gs1) = S.addPermanent piker S.bob gs0
               dead = S.runPure S.identityAnswer gs1 (Event.destroy Regenerability.Regenerable [p1])
               nextTurn = snd (Engine.runGamePure S.identityAnswer dead Engine.handoffTurn)
               atEnd = resolveAll (settle (beginEndStep nextTurn))
@@ -929,7 +929,7 @@ historySpec s registry =
         -- with the event -- Task 2's widened scan, at gameplay level.
         Spec.it s "CR 603.2b the end step's beginning is what fires it" $ do
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
-          let (_, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          let (_, gs0) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               quiet = settle gs0
               fired = settle (beginEndStep quiet)
               isTrigger oid = case Game.lookupObject oid fired of
@@ -985,8 +985,8 @@ spinesplitterSpec s registry =
         Spec.it s "CR 120.1 a counter for each OPPONENT dealt damage, not for each damage event" $ do
           spinesplitter <- S.printingOf s registry "Furious Spinesplitter"
           sentry <- S.printingOf s registry "Ogre Sentry"
-          let (spine, gs0) = S.addCreature spinesplitter S.alice S.threePlayerGame
-              (bobsSentry, base) = S.addCreature sentry S.bob gs0
+          let (spine, gs0) = S.addPermanent spinesplitter S.alice S.threePlayerGame
+              (bobsSentry, base) = S.addPermanent sentry S.bob gs0
               quiet = atEnd base
               atBob = atEnd (hit spine (Recipient.ToPlayer S.bob) 3 base)
               atBoth = atEnd (hit spine (Recipient.ToPlayer S.carol) 4 (hit spine (Recipient.ToPlayer S.bob) 3 base))
@@ -1016,8 +1016,8 @@ spinesplitterSpec s registry =
         Spec.it s "CR 608.2i the damage is THIS turn's: it resets at the handoff" $ do
           spinesplitter <- S.printingOf s registry "Furious Spinesplitter"
           sentry <- S.printingOf s registry "Ogre Sentry"
-          let (spine, gs0) = S.addCreature spinesplitter S.alice S.threePlayerGame
-              (_, base) = S.addCreature sentry S.bob gs0
+          let (spine, gs0) = S.addPermanent spinesplitter S.alice S.threePlayerGame
+              (_, base) = S.addPermanent sentry S.bob gs0
               damaged = hit spine (Recipient.ToPlayer S.carol) 4 (hit spine (Recipient.ToPlayer S.bob) 3 base)
               handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
               roundAgain = handoff (handoff (handoff damaged))
@@ -1137,7 +1137,7 @@ delayedSpec s registry =
           let (gs0, oid) = S.handOne rally (S.landsInPlay plains 1)
               armed = resolveAll (snd (Engine.runGamePure S.identityAnswer gs0 (S.cast S.alice oid)))
               firstEnd = resolveAll (settle (beginEndStep armed))
-              withCreature = snd (S.addCreature piker S.alice firstEnd)
+              withCreature = snd (S.addPermanent piker S.alice firstEnd)
               secondEnd = resolveAll (settle (beginEndStep withCreature))
           Spec.assertEqWith s "the resolution armed it" (Seq.length (GameState.delayedTriggers armed)) 1
           Spec.assertEqWith s "no life gained while the condition is false" (S.lifeOf S.alice firstEnd) (Just 20)
@@ -1245,9 +1245,9 @@ delayedSpec s registry =
         Spec.it s "CR 800.4d a departed player's delayed ability triggers, is consumed, and is not put on the stack" $ do
           tidalWave <- S.printingOf s registry "Tidal Wave"
           island <- S.printingOf s registry "Island"
-          let (_, l1) = S.addCreature island S.bob S.threePlayerGame
-              (_, l2) = S.addCreature island S.bob l1
-              (_, l3) = S.addCreature island S.bob l2
+          let (_, l1) = S.addPermanent island S.bob S.threePlayerGame
+              (_, l2) = S.addPermanent island S.bob l1
+              (_, l3) = S.addPermanent island S.bob l2
               (waveId, l4) = S.addHandCard tidalWave S.bob l3
               ready = l4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
               cast = S.runPure S.identityAnswer ready (S.cast S.bob waveId)
@@ -1281,7 +1281,7 @@ delayedSpec s registry =
           tidalWave <- S.printingOf s registry "Tidal Wave"
           island <- S.printingOf s registry "Island"
           doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
+          let (_, base) = S.addPermanent doublingSeason S.alice (S.landsInPlay island 3)
               (gs, waveId) = S.handOne tidalWave base
               ((_, armed), asked) = castUnderChoice gs waveId
               after = resolveAll (settle (beginEndStep armed))
@@ -1313,7 +1313,7 @@ delayedSpec s registry =
           tidalWave <- S.printingOf s registry "Tidal Wave"
           island <- S.printingOf s registry "Island"
           doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
+          let (_, base) = S.addPermanent doublingSeason S.alice (S.landsInPlay island 3)
               (gs, waveId) = S.handOne tidalWave base
               cast = S.runPure chooseUnmintedToken gs (S.cast S.alice waveId)
               armed = S.runPure chooseUnmintedToken cast Engine.priorityLoop
@@ -1434,7 +1434,7 @@ tokenSetSpec s registry =
           revolt <- S.printingOf s registry "Thatcher Revolt"
           mountain <- S.printingOf s registry "Mountain"
           doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addCreature doublingSeason S.alice (boardOf mountain)
+          let (_, base) = S.addPermanent doublingSeason S.alice (boardOf mountain)
               ((_, armed), asked) = castRevolt revolt base
               after = resolveAll (settle (beginEndStep armed))
           Spec.assertEqWith s "the replacement really doubled the Create" (length (humans armed)) 6
@@ -1464,7 +1464,7 @@ tokenSetSpec s registry =
           tidalWave <- S.printingOf s registry "Tidal Wave"
           island <- S.printingOf s registry "Island"
           doublingSeason <- S.printingOf s registry "Doubling Season"
-          let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
+          let (_, base) = S.addPermanent doublingSeason S.alice (S.landsInPlay island 3)
               (_, asked) = uncurry castUnderPrompts (S.handOne tidalWave base)
           Spec.assertEqWith s "one prompt, offering the two minted Walls" (fmap length asked) [2]
 
@@ -1487,7 +1487,7 @@ tokenGroupReadSpec s registry =
       -- alice casts the Skirmish off four Swamps with bob's creature the only
       -- one on the battlefield, so S.identityAnswer's lowest-legal-recipient
       -- pick is that creature and nothing else can be targeted by accident.
-      board swamp victim = S.addCreature victim S.bob (S.landsInPlay swamp 4)
+      board swamp victim = S.addPermanent victim S.bob (S.landsInPlay swamp 4)
       castSkirmish skirmish base =
         let (gs, oid) = S.handOne skirmish base
          in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
@@ -1578,8 +1578,8 @@ tokenGroupMoveSpec s registry =
       -- Elementals: one alice's own, so "them" is told from "every creature you
       -- control", and one bob's, so it is told from "every creature".
       board mountain piker rats =
-        let (pikerId, gs1) = S.addCreature piker S.alice (S.landsInPlay mountain 6)
-            (ratsId, gs2) = S.addCreature rats S.bob gs1
+        let (pikerId, gs1) = S.addPermanent piker S.alice (S.landsInPlay mountain 6)
+            (ratsId, gs2) = S.addPermanent rats S.bob gs1
          in (pikerId, ratsId, gs2)
       castLightning lightning base =
         let (gs, oid) = S.handOne lightning base
@@ -1661,14 +1661,14 @@ singleTokenSlotReadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Regis
 singleTokenSlotReadSpec s registry =
   let thopters gs = filter (\oid -> Set.member Subtype.Thopter (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
       -- alice, active, sitting in her own beginning of combat step with the
-      -- Dronesmith and a Goblin Piker both SETTLED (S.addCreature stamps
+      -- Dronesmith and a Goblin Piker both SETTLED (S.addPermanent stamps
       -- Sickness.Settled), so neither of the two creatures she already had is
       -- summoning-sick and a bug that kept EVERY creature off the menu could not
       -- hide inside assertion 2. The rest of the turn is scheduled so Engine.runStep
       -- can walk it.
       board dronesmith piker =
-        let (dronesmithId, gs1) = S.addCreature dronesmith S.alice (Setup.emptyGame S.bothPlayers)
-            (pikerId, gs2) = S.addCreature piker S.alice gs1
+        let (dronesmithId, gs1) = S.addPermanent dronesmith S.alice (Setup.emptyGame S.bothPlayers)
+            (pikerId, gs2) = S.addPermanent piker S.alice gs1
          in ( dronesmithId,
               pikerId,
               gs2
@@ -1772,7 +1772,7 @@ orderingSpec s registry =
       -- sacrifice and a step trigger are pending at the same end step.
       boardOf tidalWave khabalGhoul island =
         let (gs0, waveId) = S.handOne tidalWave (S.landsInPlay island 3)
-            (ghoul, gs1) = S.addCreature khabalGhoul S.alice gs0
+            (ghoul, gs1) = S.addPermanent khabalGhoul S.alice gs0
             cast = resolveAll (snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice waveId)))
          in (ghoul, beginEndStep cast)
       -- The source of the OTHER pending trigger: Tidal Wave's delayed ability,
@@ -1806,7 +1806,7 @@ orderingSpec s registry =
       -- 603.6a fires the watcher once per entrant.
       watcherBoard watcher land n maker =
         let (gs0, makerId) = S.handOne maker (S.landsInPlay land n)
-            (_, gs1) = S.addCreature watcher S.alice gs0
+            (_, gs1) = S.addPermanent watcher S.alice gs0
          in (gs1, makerId)
       -- Cast it, run priority out, and report how many times CR 603.3b's order
       -- was asked for along the way.
@@ -1912,8 +1912,8 @@ orderingSpec s registry =
         Spec.it s "CR 101.4/603.3b the active player's trigger is placed first (bottom of stack)" $ do
           barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
           let gs0 = Setup.emptyGame S.bothPlayers
-              (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
-              (_, gs2) = S.addCreature barbarianOutcast S.bob gs1
+              (_, gs1) = S.addPermanent barbarianOutcast S.alice gs0
+              (_, gs2) = S.addPermanent barbarianOutcast S.bob gs1
               placed = snd (Engine.runGamePure S.identityAnswer gs2 Engine.placePendingTriggers)
               controllerOf oid = fmap Object.owner (Game.lookupObject oid placed)
               stack = GameState.stack placed
@@ -1940,9 +1940,9 @@ orderingSpec s registry =
         Spec.it s "CR 101.4/603.3b APNAP orders the two remaining players' triggers starting at the active player, and a departed seat's permanent is gone with it" $ do
           barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
           let gs0 = Setup.emptyGame S.threePlayers
-              (_, gs1) = S.addCreature barbarianOutcast S.alice gs0
-              (bobsOutcast, gs2) = S.addCreature barbarianOutcast S.bob gs1
-              (_, gs3) = S.addCreature barbarianOutcast S.carol gs2
+              (_, gs1) = S.addPermanent barbarianOutcast S.alice gs0
+              (bobsOutcast, gs2) = S.addPermanent barbarianOutcast S.bob gs1
+              (_, gs3) = S.addPermanent barbarianOutcast S.carol gs2
               gone = S.departs Departure.Type.Conceded S.bob gs3
               placed = snd (Engine.runGamePure S.identityAnswer gone Engine.placePendingTriggers)
               controllerOf oid = fmap Object.owner (Game.lookupObject oid placed)
@@ -1975,9 +1975,9 @@ monarchOrderingSpec s registry =
       -- that mode is unfillable and CR 603.3c would take the trigger back off the
       -- stack -- and alice's library holds the card the monarch's draw takes.
       crownAndEndStep palaceJailer piker base =
-        let (_, gs1) = S.addCreature piker S.bob base
+        let (_, gs1) = S.addPermanent piker S.bob base
             (_, gs2) = S.addLibraryCard piker S.alice gs1
-            (jailer, gs3) = S.addCreature palaceJailer S.alice gs2
+            (jailer, gs3) = S.addPermanent palaceJailer S.alice gs2
             entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
          in beginEndStep (resolveAll (S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer gs3))] gs3))
       -- Records every ordering payload's SOURCES, in order, answering
@@ -2015,7 +2015,7 @@ monarchOrderingSpec s registry =
           palaceJailer <- S.printingOf s registry "Palace Jailer"
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          let (ghoul, base) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
           Spec.assertEqWith s "alice really holds the crown" (GameState.monarch gs) (Just S.alice)
@@ -2027,7 +2027,7 @@ monarchOrderingSpec s registry =
           palaceJailer <- S.printingOf s registry "Palace Jailer"
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          let (ghoul, base) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               placed = settleWith sourcelessFirst gs
           case GameState.stack placed of
@@ -2042,7 +2042,7 @@ monarchOrderingSpec s registry =
           palaceJailer <- S.printingOf s registry "Palace Jailer"
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (ghoul, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          let (ghoul, base) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               placed = settleWith S.identityAnswer gs
           case GameState.stack placed of
@@ -2056,7 +2056,7 @@ monarchOrderingSpec s registry =
           palaceJailer <- S.printingOf s registry "Palace Jailer"
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (_, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          let (_, base) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = crownAndEndStep palaceJailer piker base
               after = snd (Engine.runGamePure sourcelessFirst gs Engine.priorityLoop)
           Spec.assertEqWith s "alice drew the one card in her library" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
@@ -2076,7 +2076,7 @@ monarchOrderingSpec s registry =
         -- also one trigger and also asks nothing.
         Spec.it s "CR 603.3b the Ghoul's trigger alone, with no monarch, asks nothing" $ do
           khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
-          let (_, base) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
+          let (_, base) = S.addPermanent khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
               gs = beginEndStep base
               (_, asked) = State.runState (Engine.runGame recordPayloads gs Engine.settleForPriority) []
           Spec.assertEqWith s "no monarch, so no inherent trigger exists" (GameState.monarch gs) Nothing
@@ -2094,7 +2094,7 @@ interveningSpec s registry =
       zombies gs = filter (\oid -> Set.member Subtype.Zombie (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
       -- Sarcomancy enters and its ETB resolves, so a Zombie token is out.
       withZombie sarcomancy =
-        let (sarcId, gs0) = S.addCreature sarcomancy S.alice (Setup.emptyGame S.bothPlayers)
+        let (sarcId, gs0) = S.addPermanent sarcomancy S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange sarcId sarcId Zone.Stack Zone.Battlefield
             gs1 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project sarcId gs0))] gs0
          in (sarcId, resolveAll (settle gs1))
@@ -2164,7 +2164,7 @@ enchantedHostTriggerSpec s registry =
       -- 603.6a's scan reads -- Sarcomancy's fixture above with an attachment, which
       -- is what the clause is about.
       entering ray host gs0 =
-        let (rayId, gs1) = S.addCreature ray S.alice gs0
+        let (rayId, gs1) = S.addPermanent ray S.alice gs0
             attached = S.attach rayId host gs1
             entered = ZoneChange.MkZoneChange rayId rayId Zone.Stack Zone.Battlefield
          in S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project rayId attached))] attached
@@ -2172,7 +2172,7 @@ enchantedHostTriggerSpec s registry =
         Spec.it s "CR 603.4 the clause holds on a RED host, so the trigger taps it" $ do
           ray <- S.printingOf s registry "Ray of Frost"
           maiden <- S.printingOf s registry "Bird Maiden"
-          let (maidenId, board) = S.addCreature maiden S.alice (Setup.emptyGame S.bothPlayers)
+          let (maidenId, board) = S.addPermanent maiden S.alice (Setup.emptyGame S.bothPlayers)
               onStack = settle (entering ray maidenId board)
               after = resolveAll onStack
           Spec.assertEqWith s "the ability triggered" (length (GameState.stack onStack)) 1
@@ -2183,7 +2183,7 @@ enchantedHostTriggerSpec s registry =
         Spec.it s "CR 603.4 the clause fails on a WHITE host, so nothing triggers" $ do
           ray <- S.printingOf s registry "Ray of Frost"
           squire <- S.printingOf s registry "Aven Squire"
-          let (squireId, board) = S.addCreature squire S.alice (Setup.emptyGame S.bothPlayers)
+          let (squireId, board) = S.addPermanent squire S.alice (Setup.emptyGame S.bothPlayers)
               onStack = settle (entering ray squireId board)
               after = resolveAll onStack
           Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack onStack)) 0
@@ -2195,8 +2195,8 @@ enchantedHostTriggerSpec s registry =
           ray <- S.printingOf s registry "Ray of Frost"
           maiden <- S.printingOf s registry "Bird Maiden"
           squire <- S.printingOf s registry "Aven Squire"
-          let (maidenId, g1) = S.addCreature maiden S.alice (Setup.emptyGame S.bothPlayers)
-              (squireId, board) = S.addCreature squire S.alice g1
+          let (maidenId, g1) = S.addPermanent maiden S.alice (Setup.emptyGame S.bothPlayers)
+              (squireId, board) = S.addPermanent squire S.alice g1
               onStack = settle (entering ray squireId board)
               after = resolveAll onStack
           Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack onStack)) 0
@@ -2238,7 +2238,7 @@ tenRingsDrawSpec s registry =
       -- her library. The library is stocked well past the six the positive board
       -- draws, so CR 104.3c decks nobody before the assertion runs.
       board tenRings plains held =
-        let (_, gs0) = S.addCreature tenRings S.alice (Setup.emptyGame S.bothPlayers)
+        let (_, gs0) = S.addPermanent tenRings S.alice (Setup.emptyGame S.bothPlayers)
          in List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) (stockHand held plains gs0) [1 .. 20 :: Int]
    in Spec.describe s "TheTenRingsDraw" $ do
         Spec.it s "CR 603.2b/121.1 four cards in hand draws the difference, six, to reach ten" $ do
@@ -2292,7 +2292,7 @@ permanentEntersSpec s registry =
         Spec.it s "CR 603.6a whole cards: a second Soul Warden entering gains alice exactly 1 life" $ do
           plains <- S.printingOf s registry "Plains"
           soulWarden <- S.printingOf s registry "Soul Warden"
-          let (_, base) = S.addCreature soulWarden S.alice (S.landsInPlay plains 1)
+          let (_, base) = S.addPermanent soulWarden S.alice (S.landsInPlay plains 1)
               (gs, spellId) = S.handOne soulWarden base
               cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
               settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
@@ -2307,7 +2307,7 @@ permanentEntersSpec s registry =
         -- OtherEnters.
         Spec.it s "CR 603.6a including the newcomers: a permanent is checked against its own entry" $ do
           soulWarden <- S.printingOf s registry "Soul Warden"
-          let (oid, gs) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+          let (oid, gs) = S.addPermanent soulWarden S.alice (Setup.emptyGame S.bothPlayers)
           Spec.assertBool s (Event.matchesTrigger gs oid S.alice (TriggerCondition.PermanentEnters anyCreature) (enters oid)) "\"a creature enters\" admits the newcomer itself"
           Spec.assertBool s (not (Event.matchesTrigger gs oid S.alice (TriggerCondition.PermanentEnters anotherCreature) (enters oid))) "\"another creature enters\" does not"
         -- The live-reading falsifier. `enters` above hands the event a
@@ -2322,8 +2322,8 @@ permanentEntersSpec s registry =
         Spec.it s "CR 603.6b/603.10 the entrant is read live, not from the Moved event's snapshot" $ do
           soulWarden <- S.printingOf s registry "Soul Warden"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
-              (pikerId, gs1) = S.addCreature piker S.bob gs0
+          let (warden, gs0) = S.addPermanent soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, gs1) = S.addPermanent piker S.bob gs0
           Spec.assertEqWith s "no card types in the snapshot" (PC.cardTypes S.emptyCharacteristics) Set.empty
           Spec.assertBool s (Event.matchesTrigger gs1 warden S.alice (TriggerCondition.PermanentEnters anotherCreature) (enters pikerId)) "and the trigger still fires"
         -- CR 608.2h: an entrant that is already gone by the CR 117.5 boundary
@@ -2335,7 +2335,7 @@ permanentEntersSpec s registry =
         Spec.it s "CR 608.2h a creature that enters and leaves again still fires the trigger" $ do
           soulWarden <- S.printingOf s registry "Soul Warden"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+          let (warden, gs0) = S.addPermanent soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (handCard, gs1) = S.addHandCard piker S.bob gs0
               entered = S.runPure S.identityAnswer gs1 (Event.changeZone handCard Zone.Battlefield)
               newIds = fmap ZoneChange.object (filter ((==) Zone.Battlefield . ZoneChange.to) (S.zoneChangesOf entered))
@@ -2351,8 +2351,8 @@ permanentEntersSpec s registry =
         Spec.it s "CR 603.6a a noncreature permanent entering fires nothing" $ do
           soulWarden <- S.printingOf s registry "Soul Warden"
           plains <- S.printingOf s registry "Plains"
-          let (_, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
-              (landId, gs1) = S.addCreature plains S.alice gs0
+          let (_, gs0) = S.addPermanent soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+              (landId, gs1) = S.addPermanent plains S.alice gs0
               gs2 = S.withEvents [GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange landId landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1))] gs1
           Spec.assertEqWith s "no trigger" (sourcesOf gs2) []
         -- The destination half: CR 603.6a is an ENTERS-THE-BATTLEFIELD
@@ -2360,8 +2360,8 @@ permanentEntersSpec s registry =
         Spec.it s "CR 603.6a only a battlefield destination fires it" $ do
           soulWarden <- S.printingOf s registry "Soul Warden"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
-              (pikerId, gs1) = S.addCreature piker S.bob gs0
+          let (warden, gs0) = S.addPermanent soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+              (pikerId, gs1) = S.addPermanent piker S.bob gs0
               toGrave = GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange pikerId pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertBool s (not (Event.matchesTrigger gs1 warden S.alice (TriggerCondition.PermanentEnters anotherCreature) toGrave)) "a graveyard-bound move does not match"
         -- CR 603.6a: "EACH TIME an event puts one or more permanents onto the
@@ -2371,9 +2371,9 @@ permanentEntersSpec s registry =
         Spec.it s "CR 603.6a one Soul Warden fires once per entering creature" $ do
           soulWarden <- S.printingOf s registry "Soul Warden"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
-              (first, gs1) = S.addCreature piker S.bob gs0
-              (second, gs2) = S.addCreature piker S.bob gs1
+          let (warden, gs0) = S.addPermanent soulWarden S.alice (Setup.emptyGame S.bothPlayers)
+              (first, gs1) = S.addPermanent piker S.bob gs0
+              (second, gs2) = S.addPermanent piker S.bob gs1
               gs3 =
                 S.withEvents
                   [ GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange first first Zone.Stack Zone.Battlefield) (Projection.project first gs2)),
@@ -2512,7 +2512,7 @@ towershellStonehornBoard ::
   GameState.GameState
 towershellStonehornBoard towershell island plains stonehorn =
   let (base, _, _) = S.combatBoardOf [towershell] []
-      withLands = List.foldl' (\g _ -> snd (S.addCreature plains S.bob g)) base [1 :: Int .. 4]
+      withLands = List.foldl' (\g _ -> snd (S.addPermanent plains S.bob g)) base [1 :: Int .. 4]
       stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 8]
    in snd (S.addHandCard stonehorn S.bob (stock S.bob (stock S.alice withLands)))
 
@@ -2533,7 +2533,7 @@ towershellAssaultBoard ::
   (GameState.GameState, ObjectId.ObjectId)
 towershellAssaultBoard towershell mountain island assault =
   let (base, _, _) = S.combatBoardOf [towershell] []
-      withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) base [1 :: Int .. 4]
+      withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) base [1 :: Int .. 4]
       stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 8]
       (withCard, spell) = S.handOne assault (stock S.bob (stock S.alice withLands))
    in ( withCard
@@ -2594,8 +2594,8 @@ runToTurnStep turn phase answer gs0 =
 secondPlacementPassSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 secondPlacementPassSpec s registry =
   let boardOf benalia boon =
-        let (sagaId, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
-            (boonId, withBoon) = S.addCreature boon S.alice base
+        let (sagaId, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
+            (boonId, withBoon) = S.addPermanent boon S.alice base
             withCounters = S.addCounter CounterKind.Lore 2 sagaId withBoon
             ready =
               withCounters
@@ -2693,8 +2693,8 @@ chronicleWardenSpec s registry =
         Spec.it s "CR 113.7 the Warden returns the opponent's Saga and takes THAT player's life" $ do
           benalia <- S.printingOf s registry "History of Benalia"
           warden <- S.printingOf s registry "Synthetic Chronicle Warden"
-          let (sagaId, base) = S.addCreature benalia S.bob (Setup.emptyGame S.bothPlayers)
-              (_, withWarden) = S.addCreature warden S.alice base
+          let (sagaId, base) = S.addPermanent benalia S.bob (Setup.emptyGame S.bothPlayers)
+              (_, withWarden) = S.addPermanent warden S.alice base
               withCounters = S.addCounter CounterKind.Lore 2 sagaId withWarden
               ready =
                 withCounters
@@ -2777,9 +2777,9 @@ maulerSpec s registry =
       boardOf = do
         mauler <- S.printingOf s registry "Bellowing Mauler"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (maulerId, g0) = S.addCreature mauler S.alice S.threePlayerGame
-            (bobFirst, g1) = S.addCreature piker S.bob g0
-            (bobSecond, g2) = S.addCreature piker S.bob g1
+        let (maulerId, g0) = S.addPermanent mauler S.alice S.threePlayerGame
+            (bobFirst, g1) = S.addPermanent piker S.bob g0
+            (bobSecond, g2) = S.addPermanent piker S.bob g1
             -- A token COPY of the same creature: identical but for CR 111.1's
             -- tokenness, which is the one thing the cost's filter excludes.
             (carolToken, g3) = S.addToken (Printing.card piker) S.carol g2

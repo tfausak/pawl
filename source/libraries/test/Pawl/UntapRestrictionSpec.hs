@@ -79,10 +79,10 @@ webBoard s registry web = do
   seat <- S.printingOf s registry "Seat of the Synod"
   sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
   tsabosWeb <- S.printingOf s registry "Tsabo's Web"
-  let (clachanId, g0) = S.addCreature clachan S.alice (Setup.emptyGame S.bothPlayers)
-      (seatId, g1) = S.addCreature seat S.alice g0
-      (sorcererId, g2) = S.addCreature sorcerer S.alice g1
-      g3 = if web then snd (S.addCreature tsabosWeb S.alice g2) else g2
+  let (clachanId, g0) = S.addPermanent clachan S.alice (Setup.emptyGame S.bothPlayers)
+      (seatId, g1) = S.addPermanent seat S.alice g0
+      (sorcererId, g2) = S.addPermanent sorcerer S.alice g1
+      g3 = if web then snd (S.addPermanent tsabosWeb S.alice g2) else g2
       tapped = S.tapObject sorcererId (S.tapObject seatId (S.tapObject clachanId g3))
   pure (clachanId, seatId, sorcererId, tapped)
 
@@ -101,9 +101,9 @@ hunterBoard s registry atGiant = do
   hunter <- S.printingOf s registry "Elvish Hunter"
   piker <- S.printingOf s registry "Goblin Piker"
   giant <- S.printingOf s registry "Hill Giant"
-  let (hunterId, g1) = S.addCreature hunter S.alice (S.landsInPlay forest 2)
-      (pikerId, g2) = S.addCreature piker S.alice g1
-      (giantId, g3) = S.addCreature giant S.alice g2
+  let (hunterId, g1) = S.addPermanent hunter S.alice (S.landsInPlay forest 2)
+      (pikerId, g2) = S.addPermanent piker S.alice g1
+      (giantId, g3) = S.addPermanent giant S.alice g2
       board = S.tapObject giantId (S.tapObject pikerId g3)
       victim = if atGiant then giantId else pikerId
       -- The card's FIRST activated ability, off the JSON, and folded rather than
@@ -129,11 +129,11 @@ meekstoneBoard s registry stone anthem = do
   rats <- S.printingOf s registry "Typhoid Rats"
   meekstone <- S.printingOf s registry "Meekstone"
   gloriousAnthem <- S.printingOf s registry "Glorious Anthem"
-  let (giantId, g0) = S.addCreature giant S.alice (Setup.emptyGame S.bothPlayers)
-      (pikerId, g1) = S.addCreature piker S.alice g0
-      (ratsId, g2) = S.addCreature rats S.alice g1
-      g3 = if stone then snd (S.addCreature meekstone S.alice g2) else g2
-      g4 = if anthem then snd (S.addCreature gloriousAnthem S.alice g3) else g3
+  let (giantId, g0) = S.addPermanent giant S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g1) = S.addPermanent piker S.alice g0
+      (ratsId, g2) = S.addPermanent rats S.alice g1
+      g3 = if stone then snd (S.addPermanent meekstone S.alice g2) else g2
+      g4 = if anthem then snd (S.addPermanent gloriousAnthem S.alice g3) else g3
       tapped = S.tapObject ratsId (S.tapObject pikerId (S.tapObject giantId g4))
   pure (giantId, pikerId, ratsId, tapped)
 
@@ -281,9 +281,9 @@ existenceSpec s registry = Spec.describe s "Existence" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay plains 2
-        (_, withPiker) = S.addCreature piker S.alice base
+        (_, withPiker) = S.addPermanent piker S.alice base
         (fromHand, handId) = S.handOne clachan withPiker
-        (fieldId, played) = S.addCreature clachan S.alice withPiker
+        (fieldId, played) = S.addPermanent clachan S.alice withPiker
         inHand = fromHand {GameState.priority = Just S.alice}
         onField = played {GameState.priority = Just S.alice}
     Spec.assertBool s (any (activateOf handId) (Action.legalActions S.alice inHand)) "the hand's Clachan offers its reinforce ability"

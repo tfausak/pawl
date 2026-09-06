@@ -190,7 +190,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     -- all-Nothing/all-empty value.
     Spec.it s "GameEvent.Moved round-trips with its snapshot" $ do
       typhoidRats <- S.printingOf s registry "Typhoid Rats"
-      let (ratId, gs) = S.addCreature typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
+      let (ratId, gs) = S.addPermanent typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
           zc = ZoneChange.MkZoneChange ratId ratId Zone.Battlefield Zone.Graveyard
           snapshot = Projection.project ratId gs
       roundTrip s "moved" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Moved (Moved.moved zc snapshot))
@@ -202,7 +202,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     -- asserted here before the round-trip rather than left to Eq alone.
     Spec.it s "a doubled keyword survives the Moved snapshot round-trip" $ do
       stalker <- S.printingOf s registry "Branchblight Stalker"
-      let (oid, gs0) = S.addCreature stalker S.alice (Setup.emptyGame S.bothPlayers)
+      let (oid, gs0) = S.addPermanent stalker S.alice (Setup.emptyGame S.bothPlayers)
           grant ts = S.withEffectAt oid (Timestamp.MkTimestamp ts) (Modification.GainKeyword (Keyword.Toxic 1))
           snapshot = Projection.project oid (grant 101 (grant 100 gs0))
           zc = ZoneChange.MkZoneChange oid oid Zone.Battlefield Zone.Graveyard
@@ -416,7 +416,7 @@ gameStateRoundTripSpec s registry = do
   Spec.it s "the intern table survives, though only half of it is written" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, gs) = S.addCreature piker S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+    let (_, gs) = S.addPermanent piker S.alice (S.oneMountainState mountain Phase.PrecombatMain)
     Spec.assertBool s (Map.size (GameState.printings gs) >= 2) "the fixture should hold two printings"
     roundTrips "two interned printings" gs
 
@@ -427,7 +427,7 @@ gameStateRoundTripSpec s registry = do
   Spec.it s "a pending entry counter round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs0) = S.addCreature piker S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+    let (oid, gs0) = S.addPermanent piker S.alice (S.oneMountainState mountain Phase.PrecombatMain)
         gs =
           gs0
             { GameState.enteringCounters =
@@ -440,7 +440,7 @@ gameStateRoundTripSpec s registry = do
   -- driving it is more honest than hand-building a Map literal.
   Spec.it s "a non-empty outsideObjects snapshot round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let (_, gs0) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, gs0) = S.addPermanent mountain S.alice (Setup.emptyGame S.bothPlayers)
         gs = Setup.subgameStateFrom S.alice gs0
     Spec.assertBool s (not (Map.null (GameState.outsideObjects gs))) "the fixture should hold at least one outside object"
     roundTrips "a subgame's outsideObjects snapshot" gs

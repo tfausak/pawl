@@ -198,7 +198,7 @@ throneBoard island piker evangel stair undercity =
   let stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (S.landsInPlay island 25) [1 .. (8 :: Int)]
       (pikerId, g1) = S.addLibraryCard piker S.alice stocked
       (evangelId, g2) = S.addLibraryCard evangel S.alice g1
-      (stairId, g3) = S.addCreature stair S.alice g2
+      (stairId, g3) = S.addPermanent stair S.alice g2
       (dungeonId, g4) = Game.intern undercity g3
       owned p = p {Player.dungeons = Set.singleton dungeonId}
    in (stairId, pikerId, evangelId, g4 {GameState.players = Map.adjust owned S.alice (GameState.players g4)})
@@ -236,7 +236,7 @@ throneAnswer chosen p = case p of
 dungeonBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Int -> (ObjectId, GameState.GameState)
 dungeonBoard island door dungeons lands =
   let stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (S.landsInPlay island lands) [1 .. (4 :: Int)]
-      (doorId, g1) = S.addCreature door S.alice stocked
+      (doorId, g1) = S.addPermanent door S.alice stocked
       -- CR 309.2: a dungeon is recorded on the player and no object is minted for
       -- it, so its printing is interned here rather than by an object build.
       intern (ids, g) printing = let (i, g') = Game.intern printing g in (ids <> [i], g')
@@ -394,7 +394,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
     stalker <- S.printingOf s registry "Gloom Stalker"
     let (doorId, base) = dungeonBoard island door [lostMine] 30
-        (stalkerId, gs) = S.addCreature stalker S.alice base
+        (stalkerId, gs) = S.addPermanent stalker S.alice base
         -- Storeroom's "put a +1/+1 counter on target creature" is the one prompt
         -- on this path with a choice worth pinning: a counter landing on Gloom
         -- Stalker would make it 3/4 and shift both asserted life totals, so the
@@ -556,7 +556,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
     undercity <- S.printingOf s registry "Undercity"
     let (doorId, base) = dungeonBoard island door [lostMine, undercity] 12
-        (stairId, gs) = S.addCreature stair S.alice base
+        (stairId, gs) = S.addPermanent stair S.alice base
         -- payingFirstDungeon's search arms with its dungeon answer replaced. The
         -- search arms are carried over deliberately: an implementation that
         -- entered Undercity here would then run Secret Entrance's search, so the

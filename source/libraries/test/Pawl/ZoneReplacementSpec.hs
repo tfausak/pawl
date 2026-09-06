@@ -168,9 +168,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 113.6b a row stating no zone does not function from a graveyard" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, base) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, base) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         inGraveyard = snd (S.addGraveyardCard restInPeace S.bob base)
-        onBattlefield = snd (S.addCreature restInPeace S.bob base)
+        onBattlefield = snd (S.addPermanent restInPeace S.bob base)
         binned st = S.runPure S.identityAnswer st (Event.changeZone pikerId Zone.Graveyard)
     Spec.assertEqWith s "the CARD in a graveyard replaces nothing: the creature reaches its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice (binned inGraveyard))) 1
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice (binned inGraveyard))) 0
@@ -229,9 +229,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   Spec.it s "CR 113.6 a creature spell's row stating no zone does not function from the stack" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (pikerId, base) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         onStack = snd (S.spellOnStack anafenza S.alice base)
-        onBattlefield = snd (S.addCreature anafenza S.alice base)
+        onBattlefield = snd (S.addPermanent anafenza S.alice base)
         binned st = S.runPure S.identityAnswer st (Event.changeZone pikerId Zone.Graveyard)
     Spec.assertEqWith s "the SPELL replaces nothing: bob's creature reaches his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob (binned onStack))) 1
     Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.bob (binned onStack))) 0

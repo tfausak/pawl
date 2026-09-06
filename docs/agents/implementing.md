@@ -215,7 +215,7 @@ Each of these has shipped a green-but-meaningless test in this repository:
   `State.State` counting or indexing its calls, as `Pawl.CopySpec` and
   `Pawl.ManaSpec` do with `countingAnswer` --- and assert on the sequence.
 - **A fixture supplies preconditions your assertion rests on.**
-  `Pawl.Support`'s builders settle what they place (`S.addCreature` writes
+  `Pawl.Support`'s builders settle what they place (`S.addPermanent` writes
   `Sickness.Settled`), stock what they draw from, and leave what they place
   untapped. Name the precondition the behaviour needs and assert it on the
   board, or the test proves the fixture --- and a hand-built negative lacking

@@ -253,8 +253,8 @@ spec s registry = Spec.describe s "Vanguard" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     selenia <- S.printingOf s registry "Selenia"
     let place vanguard =
-          let (mine, g1) = S.addCreature piker S.alice (built mountain vanguard)
-              (theirs, g2) = S.addCreature piker S.bob g1
+          let (mine, g1) = S.addPermanent piker S.alice (built mountain vanguard)
+              (theirs, g2) = S.addPermanent piker S.bob g1
            in (mine, theirs, g2)
         (aliceCreature, bobCreature, board) = place (Just selenia)
         (aliceControl, _, control) = place Nothing
@@ -273,8 +273,8 @@ spec s registry = Spec.describe s "Vanguard" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mishra <- S.printingOf s registry "Mishra"
     let place vanguard =
-          let (mine, g1) = S.addCreature piker S.alice (built mountain vanguard)
-              (theirs, board) = S.addCreature piker S.bob g1
+          let (mine, g1) = S.addPermanent piker S.alice (built mountain vanguard)
+              (theirs, board) = S.addPermanent piker S.bob g1
               after = S.runPure S.identityAnswer board (Damage.applyDamage [hit mine (Recipient.ToPlayer S.bob) 3, hit theirs (Recipient.ToPlayer S.alice) 5])
            in (lifeLost S.bob board after, lifeLost S.alice board after)
         (bobLost, aliceLost) = place (Just mishra)
@@ -297,7 +297,7 @@ spec s registry = Spec.describe s "Vanguard" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     avatar <- S.printingOf s registry "Synthetic Pacifist Avatar"
     let place vanguard =
-          let (mine, placed) = S.addCreature piker S.alice (built mountain vanguard)
+          let (mine, placed) = S.addPermanent piker S.alice (built mountain vanguard)
            in (mine, declaringAttackers placed)
         (barred, board) = place (Just avatar)
         (free, control) = place Nothing
@@ -323,9 +323,9 @@ spec s registry = Spec.describe s "Vanguard" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     barrin <- S.printingOf s registry "Barrin"
     let place vanguard =
-          let (fodder, g1) = S.addCreature piker S.alice (built mountain vanguard)
-              (spare, g2) = S.addCreature piker S.alice g1
-              (victim, g3) = S.addCreature piker S.bob g2
+          let (fodder, g1) = S.addPermanent piker S.alice (built mountain vanguard)
+              (spare, g2) = S.addPermanent piker S.alice g1
+              (victim, g3) = S.addPermanent piker S.bob g2
            in (fodder, spare, victim, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
         (fodderId, spareId, victimId, board) = place (Just barrin)
         -- The control: the same three creatures, the same answerer, and no

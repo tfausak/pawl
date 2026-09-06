@@ -167,7 +167,7 @@ multiTargetSpec s registry = Spec.describe s "MultiTarget" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     hearts <- S.printingOf s registry "Hearts on Fire"
     let lands = S.landsInPlay mountain 2
-        (_, withCreature) = S.addCreature piker S.bob lands
+        (_, withCreature) = S.addPermanent piker S.bob lands
         castable board = let (gs, spellId) = S.handOne hearts board in S.castable S.alice spellId gs
     Spec.assertBool s (castable withCreature) "one creature is enough for one or two targets"
     Spec.assertBool s (not (castable lands)) "and no creature is not"
@@ -207,9 +207,9 @@ heartsBoard s registry = do
   rats <- S.printingOf s registry "Typhoid Rats"
   wall <- S.printingOf s registry "Wall of Stone"
   hearts <- S.printingOf s registry "Hearts on Fire"
-  let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay mountain 2)
-      (ratsId, g2) = S.addCreature rats S.bob g1
-      (wallId, g3) = S.addCreature wall S.bob g2
+  let (pikerId, g1) = S.addPermanent piker S.bob (S.landsInPlay mountain 2)
+      (ratsId, g2) = S.addPermanent rats S.bob g1
+      (wallId, g3) = S.addPermanent wall S.bob g2
       (gs, spellId) = S.handOne hearts g3
   pure (pikerId, ratsId, wallId, gs, spellId)
 
@@ -225,10 +225,10 @@ bishopBoard s registry = do
   rats <- S.printingOf s registry "Typhoid Rats"
   wall <- S.printingOf s registry "Wall of Stone"
   bishop <- S.printingOf s registry "Agent Bishop, Man in Black"
-  let (bishopId, g1) = S.addCreature bishop S.alice (Setup.emptyGame S.bothPlayers)
-      (pikerId, g2) = S.addCreature piker S.bob g1
-      (ratsId, g3) = S.addCreature rats S.bob g2
-      (wallId, g4) = S.addCreature wall S.bob g3
+  let (bishopId, g1) = S.addPermanent bishop S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addPermanent piker S.bob g1
+      (ratsId, g3) = S.addPermanent rats S.bob g2
+      (wallId, g4) = S.addPermanent wall S.bob g3
       combat = Phase.Combat CombatStep.BeginningOfCombat
       gs =
         Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan combat S.alice)) $
@@ -524,10 +524,10 @@ blightBoard s registry pid = do
   piker <- S.printingOf s registry "Goblin Piker"
   rats <- S.printingOf s registry "Typhoid Rats"
   wall <- S.printingOf s registry "Wall of Stone"
-  let (pikerId, g1) = S.addCreature piker pid (Setup.emptyGame S.bothPlayers)
-      (ratsId, g2) = S.addCreature rats pid g1
-      (wallId, g3) = S.addCreature wall pid g2
-      (gnarlbarkId, g4) = S.addCreature gnarlbark S.alice g3
+  let (pikerId, g1) = S.addPermanent piker pid (Setup.emptyGame S.bothPlayers)
+      (ratsId, g2) = S.addPermanent rats pid g1
+      (wallId, g3) = S.addPermanent wall pid g2
+      (gnarlbarkId, g4) = S.addPermanent gnarlbark S.alice g3
       g5 = snd (S.addLibraryCard swamp S.alice g4)
       endStep = Phase.Ending EndingStep.EndStep
       begun =
@@ -652,12 +652,12 @@ morcantBoard s registry pid = do
   piker <- S.printingOf s registry "Goblin Piker"
   rats <- S.printingOf s registry "Typhoid Rats"
   wall <- S.printingOf s registry "Wall of Stone"
-  let (aPiker, g1) = S.addCreature piker S.alice S.threePlayerGame
-      (aWall, g2) = S.addCreature wall S.alice g1
-      (bRats, g3) = S.addCreature rats S.bob g2
-      (bWall, g4) = S.addCreature wall S.bob g3
-      (cPiker, g5) = S.addCreature piker S.carol g4
-      (cWall, g6) = S.addCreature wall S.carol g5
+  let (aPiker, g1) = S.addPermanent piker S.alice S.threePlayerGame
+      (aWall, g2) = S.addPermanent wall S.alice g1
+      (bRats, g3) = S.addPermanent rats S.bob g2
+      (bWall, g4) = S.addPermanent wall S.bob g3
+      (cPiker, g5) = S.addPermanent piker S.carol g4
+      (cWall, g6) = S.addPermanent wall S.carol g5
       (morcantId, g7) = S.entersWithTrigger morcant pid g6
   pure (morcantId, (aPiker, aWall), (bRats, bWall), (cPiker, cWall), snd (Engine.runGamePure S.identityAnswer g7 Engine.settleForPriority))
 
@@ -732,8 +732,8 @@ blightSimultaneitySpec s registry =
         wall <- S.printingOf s registry "Wall of Stone"
         swamp <- S.printingOf s registry "Swamp"
         let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) game [1 .. 3 :: Int]
-            withCensus = snd (S.addCreature census S.alice stocked)
-            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addCreature wall pid g in (acc <> [oid], g')) ([], withCensus) opponents
+            withCensus = snd (S.addPermanent census S.alice stocked)
+            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addPermanent wall pid g in (acc <> [oid], g')) ([], withCensus) opponents
             (_, entered) = S.entersWithTrigger morcant S.alice withWalls
         pure (walls, snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
       -- Settle and resolve until the stack is empty: the Morcant's trigger puts the
@@ -841,8 +841,8 @@ perCreatureCountersSpec s registry =
         tools <- S.printingOf s registry "Wickersmith's Tools"
         morcant <- S.printingOf s registry "High Perfect Morcant"
         wall <- S.printingOf s registry "Wall of Stone"
-        let (toolsId, withTools) = S.addCreature tools S.alice game
-            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addCreature wall pid g in (acc <> [oid], g')) ([], withTools) opponents
+        let (toolsId, withTools) = S.addPermanent tools S.alice game
+            (walls, withWalls) = List.foldl' (\(acc, g) pid -> let (oid, g') = S.addPermanent wall pid g in (acc <> [oid], g')) ([], withTools) opponents
             (_, entered) = S.entersWithTrigger morcant S.alice withWalls
         pure (toolsId, walls, snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
       -- Settle and resolve until the stack is empty, blightSimultaneitySpec's copy:
@@ -889,9 +889,9 @@ perCreatureCountersSpec s registry =
           dissident <- S.printingOf s registry "Dawnhand Dissident"
           wall <- S.printingOf s registry "Wall of Stone"
           swamp <- S.printingOf s registry "Swamp"
-          let (toolsId, g1) = S.addCreature tools S.alice (Setup.emptyGame S.bothPlayers)
-              (dissidentId, g2) = S.addCreature dissident S.alice g1
-              (wallId, g3) = S.addCreature wall S.alice g2
+          let (toolsId, g1) = S.addPermanent tools S.alice (Setup.emptyGame S.bothPlayers)
+              (dissidentId, g2) = S.addPermanent dissident S.alice g1
+              (wallId, g3) = S.addPermanent wall S.alice g2
               (_, g4) = S.addGraveyardCard swamp S.bob g3
               board = g4 {GameState.priority = Just S.alice}
           activated <- case Projection.abilitiesOf dissidentId board of
@@ -990,10 +990,10 @@ sweptCountersSpec s registry =
           wall <- S.printingOf s registry "Wall of Stone"
           swamp <- S.printingOf s registry "Swamp"
           let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. 6 :: Int]
-              (_, withCensus) = S.addCreature census S.alice stocked
-              (toolsId, withTools) = S.addCreature tools S.alice withCensus
-              (aliceWalls, withAlice) = List.foldl' (\(acc, g) _ -> let (oid, g') = S.addCreature wall S.alice g in (acc <> [oid], g')) ([], withTools) [1 .. 3 :: Int]
-              (bobWall, withBob) = S.addCreature wall S.bob withAlice
+              (_, withCensus) = S.addPermanent census S.alice stocked
+              (toolsId, withTools) = S.addPermanent tools S.alice withCensus
+              (aliceWalls, withAlice) = List.foldl' (\(acc, g) _ -> let (oid, g') = S.addPermanent wall S.alice g in (acc <> [oid], g')) ([], withTools) [1 .. 3 :: Int]
+              (bobWall, withBob) = S.addPermanent wall S.bob withAlice
               (snuffersId, entered) = S.entersWithTrigger snuffers S.alice withBob
               board = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)
               after = resolveEverything board
@@ -1025,10 +1025,10 @@ sweptCountersSpec s registry =
           wilting <- S.printingOf s registry "Synthetic Twofold Wilting"
           swamp <- S.printingOf s registry "Swamp"
           let stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. 4 :: Int]
-              (_, withCensus) = S.addCreature census S.alice stocked
-              (goblin, withGoblin) = S.addCreature chariot S.alice withCensus
-              (zombie, withZombie) = S.addCreature legions S.alice withGoblin
-              withLands = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) withZombie [1 .. 3 :: Int]
+              (_, withCensus) = S.addPermanent census S.alice stocked
+              (goblin, withGoblin) = S.addPermanent chariot S.alice withCensus
+              (zombie, withZombie) = S.addPermanent legions S.alice withGoblin
+              withLands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) withZombie [1 .. 3 :: Int]
               (withSpell, spell) = S.handOne wilting withLands
               afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
               resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
@@ -1167,9 +1167,9 @@ mischiefEnters ::
   PlayerId.PlayerId ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 mischiefEnters swamp mischief piker wall rats pid =
-  let (pikerId, g1) = S.addCreature piker pid (S.landsInPlay swamp 3)
-      (wallId, g2) = S.addCreature wall pid g1
-      (ratsId, g3) = S.addCreature rats S.bob g2
+  let (pikerId, g1) = S.addPermanent piker pid (S.landsInPlay swamp 3)
+      (wallId, g2) = S.addPermanent wall pid g1
+      (ratsId, g3) = S.addPermanent rats S.bob g2
       (g4, spellId) = S.handOne mischief g3
       cast = S.runPure S.identityAnswer g4 (S.cast S.alice spellId)
    in (pikerId, wallId, ratsId, S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
@@ -1189,9 +1189,9 @@ dissidentOnBoard ::
   PlayerId.PlayerId ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 dissidentOnBoard swamp dissident piker wall pid =
-  let (dissidentId, g1) = S.addCreature dissident S.alice (Setup.emptyGame S.bothPlayers)
-      (pikerId, g2) = S.addCreature piker pid g1
-      (wallId, g3) = S.addCreature wall pid g2
+  let (dissidentId, g1) = S.addPermanent dissident S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addPermanent piker pid g1
+      (wallId, g3) = S.addPermanent wall pid g2
       (_, g4) = S.addLibraryCard swamp S.alice g3
       (_, g5) = S.addLibraryCard swamp S.alice g4
    in (dissidentId, pikerId, wallId, g5 {GameState.priority = Just S.alice})
@@ -1314,11 +1314,11 @@ supportSpec s registry = Spec.describe s "Support" $ do
     rats <- S.printingOf s registry "Typhoid Rats"
     wall <- S.printingOf s registry "Wall of Stone"
     joraga <- S.printingOf s registry "Joraga Auxiliary"
-    let (_, g0) = S.addCreature plains S.alice (S.landsInPlay forest 5)
-        (auxId, g1) = S.addCreature joraga S.alice g0
-        (pikerId, g2) = S.addCreature piker S.bob g1
-        (ratsId, g3) = S.addCreature rats S.bob g2
-        (wallId, g4) = S.addCreature wall S.bob g3
+    let (_, g0) = S.addPermanent plains S.alice (S.landsInPlay forest 5)
+        (auxId, g1) = S.addPermanent joraga S.alice g0
+        (pikerId, g2) = S.addPermanent piker S.bob g1
+        (ratsId, g3) = S.addPermanent rats S.bob g2
+        (wallId, g4) = S.addPermanent wall S.bob g3
         board = g4 {GameState.priority = Just S.alice}
         answer :: Prompt.Prompt r -> r
         answer = takingTargets 2 [auxId, pikerId, ratsId]
@@ -1349,10 +1349,10 @@ leadBoard s registry extra = do
   wall <- S.printingOf s registry "Wall of Stone"
   lead <- S.printingOf s registry "Lead by Example"
   extras <- mapM (\(name, pid) -> fmap (\p -> (p, pid)) (S.printingOf s registry name)) extra
-  let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 2)
-      (wallId, g2) = S.addCreature wall S.alice g1
-      (ratsId, g3) = S.addCreature rats S.bob g2
-      g4 = List.foldl' (\g (p, pid) -> snd (S.addCreature p pid g)) g3 extras
+  let (pikerId, g1) = S.addPermanent piker S.alice (S.landsInPlay forest 2)
+      (wallId, g2) = S.addPermanent wall S.alice g1
+      (ratsId, g3) = S.addPermanent rats S.bob g2
+      g4 = List.foldl' (\g (p, pid) -> snd (S.addPermanent p pid g)) g3 extras
       (gs, spellId) = S.handOne lead g4
   pure (pikerId, wallId, ratsId, gs, spellId)
 
@@ -1441,9 +1441,9 @@ bolsterBoard s registry = do
   rats <- S.printingOf s registry "Typhoid Rats"
   wall <- S.printingOf s registry "Wall of Stone"
   defenses <- S.printingOf s registry "Cached Defenses"
-  let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 3)
-      (ratsId, g2) = S.addCreature rats S.alice g1
-      (wallId, g3) = S.addCreature wall S.alice g2
+  let (pikerId, g1) = S.addPermanent piker S.alice (S.landsInPlay forest 3)
+      (ratsId, g2) = S.addPermanent rats S.alice g1
+      (wallId, g3) = S.addPermanent wall S.alice g2
       (gs, spellId) = S.handOne defenses g3
   pure (pikerId, ratsId, wallId, gs, spellId)
 
@@ -1461,9 +1461,9 @@ opposedBolsterBoard s registry = do
   rats <- S.printingOf s registry "Typhoid Rats"
   wall <- S.printingOf s registry "Wall of Stone"
   defenses <- S.printingOf s registry "Cached Defenses"
-  let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay forest 3)
-      (ratsId, g2) = S.addCreature rats S.bob g1
-      (wallId, g3) = S.addCreature wall S.alice g2
+  let (pikerId, g1) = S.addPermanent piker S.bob (S.landsInPlay forest 3)
+      (ratsId, g2) = S.addPermanent rats S.bob g1
+      (wallId, g3) = S.addPermanent wall S.alice g2
       (gs, spellId) = S.handOne defenses g3
   pure (pikerId, ratsId, wallId, gs, spellId)
 
@@ -1506,7 +1506,7 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     ratOut <- S.printingOf s registry "Rat Out"
-    let (victim, board) = S.addCreature piker S.bob (S.landsInPlay swamp 1)
+    let (victim, board) = S.addPermanent piker S.bob (S.landsInPlay swamp 1)
         (gs, spellId) = S.handOne ratOut board
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -1519,7 +1519,7 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     ratOut <- S.printingOf s registry "Rat Out"
-    let (victim, board) = S.addCreature piker S.bob (S.landsInPlay swamp 1)
+    let (victim, board) = S.addPermanent piker S.bob (S.landsInPlay swamp 1)
         (gs, spellId) = S.handOne ratOut board
         cast = snd (Engine.runGamePure decliningTargets gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure decliningTargets cast Stack.resolveTop)
@@ -1532,8 +1532,8 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     piker <- S.printingOf s registry "Goblin Piker"
     explosiveEntry <- S.printingOf s registry "Explosive Entry"
-    let (equipment, withArtifact) = S.addCreature bonesplitter S.bob (S.landsInPlay mountain 2)
-        (creature, board) = S.addCreature piker S.bob withArtifact
+    let (equipment, withArtifact) = S.addPermanent bonesplitter S.bob (S.landsInPlay mountain 2)
+        (creature, board) = S.addPermanent piker S.bob withArtifact
         (gs, spellId) = S.handOne explosiveEntry board
         answer = announcingOnly (SlotName.MkSlotName (Text.pack "artifact"))
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
@@ -1545,8 +1545,8 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     piker <- S.printingOf s registry "Goblin Piker"
     explosiveEntry <- S.printingOf s registry "Explosive Entry"
-    let (equipment, withArtifact) = S.addCreature bonesplitter S.bob (S.landsInPlay mountain 2)
-        (creature, board) = S.addCreature piker S.bob withArtifact
+    let (equipment, withArtifact) = S.addPermanent bonesplitter S.bob (S.landsInPlay mountain 2)
+        (creature, board) = S.addPermanent piker S.bob withArtifact
         (gs, spellId) = S.handOne explosiveEntry board
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -1562,7 +1562,7 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     bauble <- S.printingOf s registry "Conjurer's Bauble"
-    let (baubleId, placed) = S.addCreature bauble S.alice (S.landsInPlay plains 1)
+    let (baubleId, placed) = S.addPermanent bauble S.alice (S.landsInPlay plains 1)
         (_, buried) = S.addGraveyardCard piker S.alice placed
         board = (stockLibrary piker S.alice 5 buried) {GameState.priority = Just S.alice}
         activate :: (forall r. Prompt.Prompt r -> r) -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState
@@ -1642,7 +1642,7 @@ soulfireEruptionSpec s registry =
         stocked <- mapM (S.printingOf s registry) stock
         let g1 = S.landsFor mountain S.alice 9 seats
             g2 = List.foldl' (\g pr -> snd (S.addLibraryCard pr S.alice g)) g1 stocked
-            g3 = snd (S.addCreature sentry S.bob g2)
+            g3 = snd (S.addPermanent sentry S.bob g2)
             (withSpell, spell) = S.handOne soulfireEruption g3
             afterCast = S.runPure (aimingAtEveryPlayer n) withSpell (S.cast S.alice spell)
         pure (S.runPure (aimingAtEveryPlayer n) afterCast Engine.priorityLoop)
@@ -1662,9 +1662,9 @@ soulfireEruptionSpec s registry =
         stocked <- mapM (S.printingOf s registry) ["Benalish Hero", "Hill Giant"]
         let g1 = S.landsFor mountain S.alice 9 S.threePlayerGame
             g2 = List.foldl' (\g pr -> snd (S.addLibraryCard pr S.alice g)) g1 stocked
-            (wall, g3) = S.addCreature wallOfStone S.bob g2
-            (asp, g4) = S.addCreature nessianAsp S.bob g3
-            (crocodile, g5) = S.addCreature sandbarCrocodile S.carol g4
+            (wall, g3) = S.addPermanent wallOfStone S.bob g2
+            (asp, g4) = S.addPermanent nessianAsp S.bob g3
+            (crocodile, g5) = S.addPermanent sandbarCrocodile S.carol g4
             (withSpell, spell) = S.handOne soulfireEruption g5
             ((_, after), transcript) = Replay.record (soulfireOrdering (wanted wall asp crocodile) order) withSpell (S.cast S.alice spell >> Engine.priorityLoop)
         pure (S.damageOf wall after, S.damageOf asp after, S.damageOf crocodile after, transcript)
@@ -1883,7 +1883,7 @@ harnessedBoard s registry = do
   mountain <- S.printingOf s registry "Mountain"
   wall <- S.printingOf s registry "Wall of Stone"
   harnessed <- S.printingOf s registry "Harnessed Lightning"
-  let (wallId, withWall) = S.addCreature wall S.bob (S.landsInPlay mountain 2)
+  let (wallId, withWall) = S.addPermanent wall S.bob (S.landsInPlay mountain 2)
       (inHand, spellId) = S.handOne harnessed withWall
       banked = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice inHand
   pure (wallId, snd (Engine.runGamePure S.identityAnswer banked (S.cast S.alice spellId)))
@@ -1958,15 +1958,15 @@ localizedBoard s registry = do
   destruction <- S.printingOf s registry "Localized Destruction"
   let placed =
         snd
-          . S.addCreature brigade S.bob
+          . S.addPermanent brigade S.bob
           . snd
-          . S.addCreature giant S.alice
+          . S.addPermanent giant S.alice
           . snd
-          . S.addCreature evangel S.alice
+          . S.addPermanent evangel S.alice
           . snd
-          . S.addCreature miser S.alice
+          . S.addPermanent miser S.alice
           . snd
-          . S.addCreature wall S.alice
+          . S.addPermanent wall S.alice
           $ S.landsInPlay plains 5
       (inHand, spellId) = S.handOne destruction placed
       banked = S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice inHand
