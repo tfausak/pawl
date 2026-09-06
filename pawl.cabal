@@ -700,6 +700,7 @@ library codec
     Pawl.Codec.PreventionRiderSpec
     Pawl.Codec.PreventionSpec
     Pawl.Codec.PreventNextDamage
+    Pawl.Codec.PreventNextDamageInstance
     Pawl.Codec.PreventNextDamageSpec
     Pawl.Codec.PrintedReplacement
     Pawl.Codec.PrintedReplacementSpec
@@ -1777,6 +1778,7 @@ library types
     Pawl.Types.Prevention
     Pawl.Types.PreventionRider
     Pawl.Types.PreventNextDamage
+    Pawl.Types.PreventNextDamageInstance
     Pawl.Types.PrintedReplacement
     Pawl.Types.Printing
     Pawl.Types.PrintingId

@@ -105,6 +105,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       ObjectRef.ChosenPlayer
       " {\"type\":\"ChosenPlayer\"} "
+  -- The one arm here that names a seat INDIRECTLY, so unlike the three above it
+  -- carries a payload: Deflecting Palm's "that source's controller".
+  Spec.it s "Players" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.Players (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "thatDamageSource"))))
+      " {\"type\":\"Players\",\"value\":{\"type\":\"ControllerOfBound\",\"value\":\"thatDamageSource\"}} "
   -- Nullary like EachPlayer above, and for a rule rather than an economy: CR
   -- 400.2 makes a hand hidden, so this arm names only the resolving
   -- controller's own and carries neither a player nor a filter.
@@ -373,7 +381,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -388,6 +396,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
                 Codec.encode ObjectRef.codec ObjectRef.EachOpponent,
                 Codec.encode ObjectRef.codec ObjectRef.ChosenPlayer,
+                Codec.encode ObjectRef.codec (ObjectRef.Players (PlayerRef.Relative PlayerRelation.You)),
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))),
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land)) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfGraveyard (PlayerRef.Relative PlayerRelation.You)),
@@ -402,7 +411,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      23
+      24
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

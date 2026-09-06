@@ -8,10 +8,12 @@ import qualified Pawl.Types.Scaling as Scaling
 
 -- | CR 614.1a / 615.1: how a replacement or prevention effect rewrites a damage
 -- event. PreventAll cancels it outright -- CR 615.6, a prevented event never
--- happens. Two producers, and they differ only in what the pattern beside this
--- rewrite says: Fog authors one on the card and shields nobody in particular,
--- while Effect.PreventAllDamage bakes one over a named recipient (Selfless
--- Squire).
+-- happens. Its producers differ only in what the pattern and the use count
+-- beside this rewrite say: Fog authors one on the card and shields nobody in
+-- particular, Effect.PreventAllDamage bakes one over a named recipient
+-- (Selfless Squire), and Effect.PreventNextDamageInstance bakes the same rewrite
+-- with Uses.Once beside it, which is the whole of CR 615.8's "the next time"
+-- (Deflecting Palm).
 --
 -- CR 615.1a is what makes the Prevent arms below a different KIND of rewrite from
 -- the ones under them, rather than merely a different amount: an effect that uses

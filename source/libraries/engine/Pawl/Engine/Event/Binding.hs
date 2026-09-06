@@ -500,8 +500,15 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- The recipient is not bound alongside it for the arm above's reason -- the payload
   -- acts on a target it chooses, never on whoever the prevented damage was
   -- addressed to.
+  --
+  -- CR 120.1's SOURCE is, and it is the one thing this condition's payload can
+  -- name that the arm above's cannot: Deflecting Palm's "that source's
+  -- controller" points at the object that would have dealt the damage, which the
+  -- record already carries. Not bound on the DamageToPlayerPrevented arm, whose
+  -- printed sentences all speak about the recipient's side; a printing there that
+  -- named the source would want the same stamp.
   (TriggerCondition.SelfPreventsDamage _, GameEvent.DamagePrevented prevented) ->
-    Binding.setEventAmount (sum (DamagePrevented.amounts prevented)) Map.empty
+    Binding.setPreventedDamageSource (DamagePrevented.source prevented) (Binding.setEventAmount (sum (DamagePrevented.amounts prevented)) Map.empty)
   -- CR 119.9's "that much": how much life the gain was, which CR 603.2 makes part
   -- of the event that fired the trigger -- Sanguine Bond's "target opponent loses
   -- that much life". The SAME slot the prevention arm above stamps, one printed
@@ -1264,8 +1271,10 @@ eventBindingSlots cond = case cond of
   -- shape of the event that withholds it.
   TriggerCondition.DamageToPlayerPrevented _ -> Set.singleton Binding.eventAmount
   -- The same slot the arm above declares, off the same event: this condition's
-  -- payload reads "that much" too.
-  TriggerCondition.SelfPreventsDamage _ -> Set.singleton Binding.eventAmount
+  -- payload reads "that much" too. And CR 120.1's source beside it, guaranteed
+  -- for the amount's reason -- Pawl.Types.DamagePrevented carries an ObjectId
+  -- unconditionally, so no shape of the event withholds it.
+  TriggerCondition.SelfPreventsDamage _ -> Set.fromList [Binding.eventAmount, Binding.preventedDamageSource]
   -- CR 119.9's amount, guaranteed given a match for the prevention arm's reason:
   -- GameEvent.LifeGained carries a Natural unconditionally, so no shape of the
   -- event withholds it. Sanguine Bond's "that much" is what reads it.

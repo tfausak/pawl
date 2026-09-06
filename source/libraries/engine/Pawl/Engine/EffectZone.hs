@@ -94,6 +94,7 @@ zoneFunctionedFrom delayed effect = case effect of
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.EachOpponent -> Nothing
     ObjectRef.ChosenPlayer -> Nothing
+    ObjectRef.Players _ -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.TopOfLibraryUntil {} -> Nothing
     ObjectRef.TopOfGraveyard _ -> Nothing
@@ -167,6 +168,7 @@ zoneFunctionedFrom delayed effect = case effect of
   -- nothing it does can be this ability moving "the object it's on".
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing
+  Effect.PreventNextDamageInstance {} -> Nothing
   Effect.RedirectDamage {} -> Nothing
   Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
