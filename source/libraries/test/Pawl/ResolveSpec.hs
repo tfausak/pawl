@@ -2032,7 +2032,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "the reveal took the top card only (CR 701.20b moved nothing itself)"
       (namesIn Zone.Library S.bob settled)
       [nameOf "Goblin Piker", nameOf "Goblin Piker"]
-  Spec.it s "CR 201.4 the same board with the other card on top sends it to the graveyard" $ do
+  Spec.it s "CR 201.4 Petra Sphinx sends a top card its target did not name to the graveyard" $ do
     settled <- resolveSphinx s registry "Crucible of Worlds"
     let nameOf = Just . CardName.MkCardName . Text.pack
     Spec.assertEqWith

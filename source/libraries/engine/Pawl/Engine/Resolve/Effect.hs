@@ -402,10 +402,10 @@ armsReflexive source effect gs = case effect of
 
 -- The players a PlayerRef names, in CR 101.4's APNAP order -- playerRefPlayers
 -- answers in PlayerId order and says so, leaving the ordering rule to its
--- caller. Two callers ask, and for the same reason: the seats a resolution cost
--- is offered to (CR 118.12a) and the seats CR 111.2 has creating tokens. Mana
--- Leak's reference names one and Rishadan Cutpurse's names every opponent; the
--- order is only observable for the second.
+-- caller. Three callers ask, and for the same reason: the seats a resolution cost
+-- is offered to (CR 118.12a), the seats CR 111.2 has creating tokens, and the
+-- seats CR 201.4 has naming a card. Mana Leak's reference names one and Rishadan
+-- Cutpurse's names every opponent; the order is only observable for the second.
 apnapPlayersOf :: PlayerRef -> Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> [PlayerId]
 apnapPlayersOf ref legal controller gs =
   let named = playerRefPlayers legal controller gs ref
@@ -5414,8 +5414,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- every chooser's (#3316).
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> do
     gs <- State.get
-    let named = Set.fromList (playerRefPlayers legal controller gs ref)
-    Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) $ \chooser -> do
+    Monad.forM_ (apnapPlayersOf ref legal controller gs) $ \chooser -> do
       g <- State.get
       answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction)
       let stamp o = o {Object.chosenNames = Set.insert answer (Object.chosenNames o)}
