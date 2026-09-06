@@ -41,8 +41,8 @@ data CastOffer = MkCastOffer
     -- | CR 118.14's "and mana of any type can be spent to cast that spell",
     -- printed on Tinybones, the Pickpocket beside the offer itself.
     --
-    -- A THIRD rider and not a setting of the two above, for the reason
-    -- `payingInstead` is a third field: rule 118.14 widens how a cost may be PAID
+    -- A rider of its OWN and not a setting of the three above, for the reason
+    -- `payingInstead` is its own field: rule 118.14 widens how a cost may be PAID
     -- and says nothing about which cost or which face, so it is independent of
     -- both. Rule 118.14's last sentence is why it rides the offer rather than the
     -- card -- the permission is the offering effect's, so the same card cast any

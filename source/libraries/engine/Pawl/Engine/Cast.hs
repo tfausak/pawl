@@ -817,8 +817,10 @@ spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromEx
 --
 -- Either sentence alone is a permission, so AnyType wins -- rule 118.14 grants
 -- and never restricts, and two grants are not a conflict CR 101.2 has to settle.
--- No printing states both, so the join is a total function rather than a
--- behaviour a board proves.
+-- Each ARGUMENT is proved: Pawl.CastSpec's PickpocketAnyType drives the offer's
+-- and Pawl.CastRestrictionSpec's Dire Fleet Daredevil group the permission's. The
+-- case where BOTH say AnyType is a regression fence, no card in data/cards/
+-- carrying an offer over a card that also holds the permission.
 spendingWith :: ManaSpending -> PlayerId -> ObjectId -> GameState -> ManaSpending
 spendingWith offered pid oid gs = case (offered, spendingFor pid oid gs) of
   (ManaSpending.AsProduced, ManaSpending.AsProduced) -> ManaSpending.AsProduced

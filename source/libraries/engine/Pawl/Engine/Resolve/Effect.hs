@@ -788,8 +788,8 @@ slotOne slot resolving gs = do
 --      prompt so no cast is offered that the announcement would reverse.
 --
 -- Questions 3 and 4 are asked of EACH half of EACH named card separately (CR
--- 709.3a, CR 712.11c);
--- where more than one survives, CR 601.3's choice is put to the caster before
+-- 709.3a, CR 712.11c); where more than one survives, CR 601.3's choice is put to
+-- the caster before
 -- the "may" below, since CR 118.8c's excuse is a property of the spell being
 -- cast. At CastObligation.Mandatory the cast is not a decision, so
 -- Prompt.OfferedCast is elided; question 4 is what a printed "if able" comes to
@@ -867,8 +867,8 @@ offerCast named caster optionality offer = do
               fmap (Maybe.mapMaybe (proposal oid)) (faces card)
           )
           named
-  -- No survivor is no offer; one survivor is one outcome, so CR 709.3's choice
-  -- is elided there rather than asked.
+  -- No survivor is no offer; one survivor is one outcome, so CR 601.3's choice is
+  -- elided there rather than asked.
   chosen <- case offers of
     [] -> pure Nothing
     [sole] -> pure (Just sole)
