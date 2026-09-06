@@ -886,7 +886,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
                   ]
             }
         script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
-    after <- S.play s registry board script (S.priorityGame S.alice)
+    after <- S.play s registry board script S.priorityGame
     Spec.assertEqWith s "Bob at 17" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "four Mountains paid {3}{R}" (S.tappedCount S.alice after) 4
   Spec.it s "Blaze at X=0 is castable and deals nothing (the X=0 floor)" $ do

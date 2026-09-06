@@ -60,7 +60,6 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
@@ -97,7 +96,6 @@ import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ModeIndex as ModeIndex
-import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
@@ -1728,113 +1726,137 @@ runScriptOrFail s script built game = case runScript script built game of
   Left failure -> Spec.assertFailure s (renderFailure failure)
   Right result -> pure result
 
--- One bounded priority round begun with `pid` holding priority. The board does
--- not imply a priority window; naming this entry point is what starts one.
-priorityGame :: PlayerId.PlayerId -> Game.Type.Game ()
-priorityGame pid = do
-  State.modify' (\gs -> gs {GameState.priority = Just pid, GameState.passes = 0})
-  Engine.priorityLoop
+-- One bounded priority round. The board does not imply a priority window;
+-- naming this entry point is what starts one, and the loop itself hands
+-- priority to the board's active player (CR 117.3a).
+priorityGame :: Game.Type.Game ()
+priorityGame = Engine.priorityLoop
 
 answerPrompt :: Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
 answerPrompt asked = do
-  pending <- State.gets harnessAction
-  case pending of
-    Nothing -> answerTopPrompt asked
-    Just (_, _, choices)
-      | choices == noChoices -> do
-          State.modify' (\state -> state {harnessAction = Nothing})
-          answerTopPrompt asked
-    Just {}
-      | Prompt.Concede {} <- Asked.prompt asked -> answerTopPrompt asked
-    Just (key, verb, choices) -> answerActionChoice key verb choices asked
-
-answerTopPrompt :: Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
-answerTopPrompt asked =
   let prompt = Asked.prompt asked
       gs = Asked.game asked
       kind = promptKind prompt
       location = MkPromptLocation (GameState.turnNumber gs) (GameState.phase gs) (promptDecider prompt)
-   in -- Hoisted above the entry arms: a nested game (CR 729.1) is out of scope for
-      -- every verb alike, so the check belongs to the prompt and not to each arm
-      -- that answers one.
-      if not (null (Asked.enclosing asked))
-        then failHarness (MkNestedGamePrompt location kind)
-        else case prompt of
-          Prompt.ChooseAction decider _ actions ->
-            answerActionPrompt gs (Decider.unwrap decider) actions
-          -- CR 723.6: keyed on the conceding player rather than on a decider,
-          -- which this prompt does not carry.
-          Prompt.Concede pid -> do
-            let key = whenOf gs pid
-            found <- peekTimed key
-            case found of
-              Just timed
-                | entry timed == MkConcede -> case qualifier timed of
-                    Just ref -> failHarness (MkUnexpectedQualifier key kind ref)
-                    Nothing -> do
-                      popTimedAt key 0
-                      pure Concession.Concedes
-              _ -> pure Concession.Continues
-          Prompt.ChooseDefender decider _ candidates -> do
-            let key = whenOf gs (Decider.unwrap decider)
-                offers = fmap renderPlayer (NonEmpty.toList candidates)
-            onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-              MkChooseDefender pid
-                | List.elem pid candidates -> Just (pure pid)
-                | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
-              _ -> Nothing
-          Prompt.DeclareAttackers decider _ candidates -> do
-            let key = whenOf gs (Decider.unwrap decider)
-            offers <- describeAll gs candidates
-            onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-              MkAttack refs ->
-                Just $ do
-                  resolved <- mapM (resolveOffered gs key kind candidates) refs
-                  pure (Foldable.toList resolved)
-              _ -> Nothing
-          Prompt.ChooseAttackTarget decider _ source candidates -> do
-            let key = whenOf gs (Decider.unwrap decider)
-                offers = fmap (Text.pack . show) (NonEmpty.toList candidates)
-            onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
-              MkChooseAttackTarget target
-                | List.elem target candidates -> Just (pure target)
-                | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
-              _ -> Nothing
-          Prompt.DeclareBlockers decider _ blockers attackers -> do
-            let candidates = blockers <> attackers
-                key = whenOf gs (Decider.unwrap decider)
-            offers <- describeAll gs candidates
-            onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-              MkBlock blocks ->
-                Just $ do
-                  pairs <- mapM (resolveBlock gs key kind candidates) (Map.toAscList blocks)
-                  pure (Map.fromList pairs)
-              _ -> Nothing
-          Prompt.AssignCombatDamage decider _ source thresholds _ -> do
-            let key = whenOf gs (Decider.unwrap decider)
-                offered = Map.keysSet thresholds
-            offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
-            onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
-              MkAssignDamage assignment ->
-                Just $ do
-                  pairs <- mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)
-                  pure (Map.fromList pairs)
-              _ -> Nothing
-          _ -> failHarness (MkUnscheduledPrompt location kind [])
+  -- Hoisted above every arm: a nested game (CR 729.1) is out of scope for every
+  -- prompt alike, a pending action's sub-choices included.
+  if not (null (Asked.enclosing asked))
+    then failHarness (MkNestedGamePrompt location kind)
+    else do
+      pending <- State.gets harnessAction
+      case pending of
+        Just (key@(MkWhen _ _ pid), verb, choices)
+          | subChoiceFor pid prompt -> answerActionChoice key verb choices asked
+          -- Any other prompt means the action has finished. A choice it never
+          -- asked for is a script error, reported here rather than at the next
+          -- prompt that happens to want an answer.
+          | choices /= noChoices -> failHarness (MkUnusedActionChoices key verb choices)
+        Just {} -> do
+          State.modify' (\state -> state {harnessAction = Nothing})
+          answerTopPrompt location asked
+        Nothing -> answerTopPrompt location asked
+
+-- Whether `prompt` is one a cast or activation asks its decider between the
+-- ChooseAction that began it and its completion (CR 601.2b-h, CR 602.2b).
+-- Matched on the decider, so another player's prompt of the same kind is not
+-- answered from this player's pending action.
+subChoiceFor :: PlayerId.PlayerId -> Prompt.Prompt r -> Bool
+subChoiceFor pid prompt = case prompt of
+  Prompt.ChooseTargets decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseModes decider _ _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseX decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseCost decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseManaSource decider _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseExtraManaSource decider _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseManaYield decider _ _ _ -> Decider.unwrap decider == pid
+  _ -> False
+
+answerTopPrompt :: PromptLocation -> Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
+answerTopPrompt location asked =
+  let prompt = Asked.prompt asked
+      gs = Asked.game asked
+      kind = promptKind prompt
+   in case prompt of
+        Prompt.ChooseAction decider _ actions ->
+          answerActionPrompt gs (Decider.unwrap decider) actions
+        -- CR 723.6: keyed on the conceding player rather than on a decider,
+        -- which this prompt does not carry.
+        Prompt.Concede pid -> do
+          let key = whenOf gs pid
+          found <- peekTimed key
+          case found of
+            Just timed
+              | entry timed == MkConcede -> case qualifier timed of
+                  Just ref -> failHarness (MkUnexpectedQualifier key kind ref)
+                  Nothing -> do
+                    popTimedAt key 0
+                    pure Concession.Concedes
+            _ -> pure Concession.Continues
+        Prompt.ChooseDefender decider _ candidates -> do
+          let key = whenOf gs (Decider.unwrap decider)
+              offers = fmap renderPlayer (NonEmpty.toList candidates)
+          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            MkChooseDefender pid
+              | List.elem pid candidates -> Just (pure pid)
+              | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
+            _ -> Nothing
+        Prompt.DeclareAttackers decider _ candidates -> do
+          let key = whenOf gs (Decider.unwrap decider)
+          offers <- describeAll gs candidates
+          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            MkAttack refs ->
+              Just $ do
+                resolved <- mapM (resolveOffered gs key kind candidates) refs
+                pure (Foldable.toList resolved)
+            _ -> Nothing
+        Prompt.ChooseAttackTarget decider _ source candidates -> do
+          let key = whenOf gs (Decider.unwrap decider)
+              offers = fmap (Text.pack . show) (NonEmpty.toList candidates)
+          onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
+            MkChooseAttackTarget target
+              | List.elem target candidates -> Just (pure target)
+              | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
+            _ -> Nothing
+        Prompt.DeclareBlockers decider _ blockers attackers -> do
+          let candidates = blockers <> attackers
+              key = whenOf gs (Decider.unwrap decider)
+          offers <- describeAll gs candidates
+          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            MkBlock blocks ->
+              Just $ do
+                pairs <- mapM (resolveBlock gs key kind candidates) (Map.toAscList blocks)
+                pure (Map.fromList pairs)
+            _ -> Nothing
+        Prompt.AssignCombatDamage decider _ source thresholds _ -> do
+          let key = whenOf gs (Decider.unwrap decider)
+              offered = Map.keysSet thresholds
+          offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
+          onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
+            MkAssignDamage assignment ->
+              Just $ do
+                pairs <- mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)
+                pure (Map.fromList pairs)
+            _ -> Nothing
+        _ -> failHarness (MkUnscheduledPrompt location kind [])
 
 answerActionPrompt :: GameState.GameState -> PlayerId.PlayerId -> [A.Action] -> State.StateT HarnessState (Either HarnessFailure) A.Action
 answerActionPrompt gs pid actions = do
   let key = whenOf gs pid
-  found <- peekTimed key
-  case found of
+  entries <- queueAt key
+  -- The first ACTION entry at this key, not the head. An entry for a prompt the
+  -- engine elides (an attack target with one candidate, say) stays queued ahead
+  -- of the action behind it; it is reported as MkUnreachedEntries rather than
+  -- silently passing every priority at this key.
+  case List.find (isAction . entry . snd) (zip [0 ..] (Foldable.toList entries)) of
     Nothing -> pure A.Pass
-    Just timed -> case entry timed of
-      verb@MkCast {} -> takeAction key timed verb
-      verb@MkPlayLand {} -> takeAction key timed verb
-      verb@MkActivate {} -> takeAction key timed verb
-      _ -> pure A.Pass
+    Just (index, timed) -> takeAction key index timed (entry timed)
   where
-    takeAction key timed verb = case qualifier timed of
+    isAction verb = case verb of
+      MkCast {} -> True
+      MkPlayLand {} -> True
+      MkActivate {} -> True
+      _ -> False
+    takeAction key index timed verb = case qualifier timed of
       Just ref -> failHarness (MkUnexpectedQualifier key (Text.pack "ChooseAction") ref)
       Nothing -> do
         offered <- mapM (describeAction gs) actions
@@ -1843,7 +1865,7 @@ answerActionPrompt gs pid actions = do
           [] -> failHarness (MkActionNotOffered key verb offered)
           [action] -> pure action
           _ -> failHarness (MkAmbiguousAction key verb offered)
-        popTimedAt key 0
+        popTimedAt key index
         State.modify' (\state -> state {harnessAction = Just (key, verb, choicesOf verb)})
         pure chosen
 
@@ -1920,26 +1942,26 @@ answerActionChoice key verb choices asked =
                 let selected = Set.fromList resolved
                 if Natural.length selected == count
                   then do
-                    updateActionChoices key verb (\current -> current {choiceTargets = Nothing})
+                    updateActionChoices (\current -> current {choiceTargets = Nothing})
                     pure (Map.singleton slot selected)
                   else unexpected
           _ -> unexpected
         Prompt.ChooseModes _ _ _ legal selection -> case choiceModes choices of
           Just modes
-            | validModes legal selection modes -> do
-                updateActionChoices key verb (\current -> current {choiceModes = Nothing})
+            | Modal.selectionSatisfiedBy legal selection modes -> do
+                updateActionChoices (\current -> current {choiceModes = Nothing})
                 pure modes
           _ -> unexpected
         Prompt.ChooseX _ _ _ maximumX -> case choiceX choices of
           Just x
             | x <= maximumX -> do
-                updateActionChoices key verb (\current -> current {choiceX = Nothing})
+                updateActionChoices (\current -> current {choiceX = Nothing})
                 pure x
           _ -> unexpected
         Prompt.ChooseCost _ _ _ candidates -> case choiceCost choices of
           Just wanted -> case filter ((== Just wanted) . Cost.Type.mana) candidates of
             [cost] -> do
-              updateActionChoices key verb (\current -> current {choiceCost = Nothing})
+              updateActionChoices (\current -> current {choiceCost = Nothing})
               pure cost
             _ -> unexpected
           Nothing -> unexpected
@@ -1949,7 +1971,7 @@ answerActionChoice key verb choices asked =
           Seq.EmptyL -> unexpected
           wanted Seq.:< rest -> case filter ((== wanted) . ManaOption.yield) (NonEmpty.toList candidates) of
             [option] -> do
-              updateActionChoices key verb (\current -> current {choiceManaYields = rest})
+              updateActionChoices (\current -> current {choiceManaYields = rest})
               pure option
             _ -> unexpected
         _ -> unexpected
@@ -1968,24 +1990,8 @@ answerManaSource gs key verb choices kind candidates = case Seq.viewl (choiceMan
     resolved <- case wanted of
       Nothing -> pure Nothing
       Just ref -> fmap Just (resolveOffered gs key kind (NonEmpty.toList candidates) ref)
-    updateActionChoices key verb (\current -> current {choiceManaSources = rest})
+    updateActionChoices (\current -> current {choiceManaSources = rest})
     pure resolved
-
-validModes :: Set.Set ModeIndex.ModeIndex -> ModeSelection.ModeSelection -> Seq.Seq ModeIndex.ModeIndex -> Bool
-validModes legal selection modes =
-  all (`Set.member` legal) modes
-    && case selection of
-      ModeSelection.ChooseExactly count ->
-        Natural.length modes == count && distinct
-      ModeSelection.ChooseExactlyWithRepeats count ->
-        Natural.length modes == count
-      ModeSelection.ChooseBetween range ->
-        let count = Natural.length modes
-         in ChooseBetween.least range <= count
-              && count <= ChooseBetween.most range
-              && distinct
-  where
-    distinct = Seq.length modes == Set.size (Set.fromList (Foldable.toList modes))
 
 resolveTarget :: GameState.GameState -> When -> Entry -> Text.Text -> Set.Set Recipient.Recipient -> TargetRef -> State.StateT HarnessState (Either HarnessFailure) Recipient.Recipient
 resolveTarget gs key verb kind offered target = case target of
@@ -1998,19 +2004,15 @@ resolveTarget gs key verb kind offered target = case target of
       [recipient] -> pure recipient
       _ -> failHarness (MkUnexpectedActionChoice key verb kind)
 
-updateActionChoices :: When -> Entry -> (ActionChoices -> ActionChoices) -> State.StateT HarnessState (Either HarnessFailure) ()
-updateActionChoices key verb f =
+updateActionChoices :: (ActionChoices -> ActionChoices) -> State.StateT HarnessState (Either HarnessFailure) ()
+updateActionChoices f =
   State.modify' $ \state ->
-    state {harnessAction = Just (key, verb, f (choicesOfCurrent state))}
-  where
-    choicesOfCurrent state = case harnessAction state of
-      Just (_, _, current) -> current
-      Nothing -> noChoices
+    state {harnessAction = fmap (\(key, verb, choices) -> (key, verb, f choices)) (harnessAction state)}
 
 -- The require-match-pop sequence every entry arm shares: nothing at this moment
 -- is an unscheduled prompt, an entry carrying some other verb is an unexpected
--- one, and the pop that keeps guard 2 honest happens exactly once, before the
--- arm resolves anything.
+-- one, and the pop happens exactly once, before the arm resolves anything, so
+-- an entry whose moment never arrives is still reported as unreached.
 onEntry ::
   PromptLocation ->
   When ->

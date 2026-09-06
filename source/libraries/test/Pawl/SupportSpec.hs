@@ -239,6 +239,60 @@ spec s registry = Spec.describe s "Support" $ do
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right _ -> Spec.assertFailure s "the unused X was ignored"
 
+  Spec.it s "a leftover choice fails at the next prompt rather than answering it" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices = S.noChoices {S.choiceManaSources = Seq.singleton Nothing}
+        verb = S.castAction (S.aliasRef "spell") choices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+        case S.runScript script built (Game.ask prompt *> Game.ask prompt) of
+          Left (S.MkUnusedActionChoices _ failed _) ->
+            Spec.assertEqWith s "the unfinished verb" failed verb
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "the leftover mana source was carried into the next priority"
+
+  Spec.it s "another decider's sub-choice is not answered from the pending action" $ do
+    let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
+        setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        choices = S.noChoices {S.choiceX = Just 3}
+        verb = S.castAction (S.aliasRef "spell") choices
+        script = S.turn 1 [S.on S.precombatMain S.alice verb]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
+            actionPrompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+            xPrompt = Prompt.ChooseX (Decider.MkDecider S.bob) S.bob oid 9
+        case S.runScript script built (Game.ask actionPrompt *> Game.ask xPrompt) of
+          Left (S.MkUnusedActionChoices _ failed _) ->
+            Spec.assertEqWith s "the unfinished verb" failed verb
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "bob's X was answered from alice's cast"
+
+  Spec.it s "an action queued behind an unreached entry is still taken" $ do
+    let land = S.aliased "land" (S.cardSetup "Mountain")
+        setup = S.board (S.hand S.alice [land] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+        stranded = S.on S.precombatMain S.alice (S.attack [])
+        script = S.turn 1 [stranded, S.on S.precombatMain S.alice (S.playLand (S.aliasRef "land"))]
+    built <- S.buildBoardOrFail s registry setup
+    case Map.lookup (S.MkObjectAlias (Text.pack "land")) (S.builtAliases built) of
+      Nothing -> Spec.assertFailure s "the board omitted the hand alias"
+      Just oid -> do
+        let action = A.Play oid Nothing
+            prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
+        case S.runScript script built (Game.ask prompt) of
+          Left (S.MkUnreachedEntries _ _ entries) ->
+            Spec.assertEqWith s "only the stranded entry remains" entries (S.turn 1 [stranded])
+          Left failure -> Spec.assertFailure s (S.renderFailure failure)
+          Right _ -> Spec.assertFailure s "the stranded entry was consumed"
+
   Spec.it s "a scheduled defender must be offered" $ do
     let setup = S.board (S.playerSetup S.alice NonEmpty.:| [S.playerSetup S.bob, S.playerSetup S.carol]) S.alice S.beginningOfCombat
         verb = S.chooseDefender S.carol

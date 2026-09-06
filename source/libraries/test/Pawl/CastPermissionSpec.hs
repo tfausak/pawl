@@ -116,7 +116,7 @@ extraLandDropsSpec s registry =
               [ S.on S.precombatMain S.alice (S.playLand (S.aliasRef "first land")),
                 S.on S.precombatMain S.alice (S.playLand (S.aliasRef "second land"))
               ]
-      after <- S.play s registry board script (S.priorityGame S.alice)
+      after <- S.play s registry board script S.priorityGame
       Spec.assertEqWith s "the allowance is two" (PlayerEffect.landPlaysAllowed S.alice after) 2
       Spec.assertEqWith s "two Mountains landed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Mountain")) S.alice after) 2
       Spec.assertEqWith s "three are still in hand" (S.handSize S.alice after) 3
@@ -228,7 +228,8 @@ vedalkenOrrerySpec s registry =
     -- The gameplay half, driven through the priority loop rather than by calling
     -- Cast.castSpell: the script selects its named cast only when it is OFFERED,
     -- so the two runs differ in the Orrery and in nothing a test wrote by hand.
-    -- Without it alice is offered no cast at all and simply passes.
+    -- Without it alice is offered no cast at all, and the same script fails as
+    -- MkActionNotOffered rather than passing while proving nothing.
     Spec.it s "CR 601.3b the offered cast resolves and the creature enters on the opponent's turn" $ do
       let mana1 = S.aliased "first mana" (S.permanent "Mountain")
           mana2 = S.aliased "second mana" (S.permanent "Mountain")
@@ -248,12 +249,14 @@ vedalkenOrrerySpec s registry =
                     ]
               }
           script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
-      after <- S.play s registry (setup [S.permanent "Vedalken Orrery"]) script (S.priorityGame S.alice)
-      bare <- S.play s registry (setup []) Seq.empty (S.priorityGame S.alice)
+      after <- S.play s registry (setup [S.permanent "Vedalken Orrery"]) script S.priorityGame
       Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
       Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
-      Spec.assertEqWith s "and without the Orrery it never left her hand" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice bare) 0
-      Spec.assertEqWith s "which is where it still is" (S.handSize S.alice bare) 2
+      bare <- S.buildBoardOrFail s registry (setup [])
+      case S.runScript script bare S.priorityGame of
+        Left (S.MkActionNotOffered _ (S.MkCast {}) _) -> pure ()
+        Left failure -> Spec.assertFailure s (S.renderFailure failure)
+        Right _ -> Spec.assertFailure s "without the Orrery the cast was offered anyway"
 
     -- CR 702.8a's keyword is untouched: the card the Orrery let through never
     -- gained flash, and nothing was written onto it.
