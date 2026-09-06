@@ -81,6 +81,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -549,6 +550,8 @@ effectObjectRefs effect = case effect of
   -- beside this one is a PlayerRef.
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> [attacker]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
+  -- ForbidBlock's one axis again, one rule away.
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> [ref]
   -- One side only, and only when a ref names it: the Matching arm is a Filter
   -- (CR 611.2c's class), and what the attack is aimed at is a PlayerScope.
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
@@ -689,6 +692,7 @@ effectPlayerRefs effect = case effect of
   Effect.RequireAttack (RequireAttack.MkRequireAttack _ _ defender) -> [defender]
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidActivation {} -> []
   Effect.CreateEmblem {} -> []
   Effect.BecomeMonarch {} -> []
   Effect.TakeTheInitiative {} -> []
@@ -930,6 +934,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.CantBeRegenerated {} -> Map.empty
   Effect.ForbidBlock {} -> Map.empty
   Effect.ForbidAttack {} -> Map.empty
+  Effect.ForbidActivation {} -> Map.empty
   -- CR 508.1b's two sides are a PlayerRef and an ObjectRef, both reported at the
   -- head, so this arm has nothing of its own.
   Effect.RequireAttack {} -> Map.empty
@@ -1335,6 +1340,8 @@ ownSlotsAreExhaustive effect = case effect of
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) ->
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- RequireBlock's reason, one axis over.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
@@ -1505,6 +1512,7 @@ readsX = any effectReadsX
       Effect.CantBeRegenerated {} -> False
       Effect.ForbidBlock {} -> False
       Effect.ForbidAttack {} -> False
+      Effect.ForbidActivation {} -> False
       Effect.RequireAttack {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
@@ -1682,6 +1690,7 @@ boundSlots effect = case effect of
   Effect.CantBeRegenerated {} -> Set.empty
   Effect.ForbidBlock {} -> Set.empty
   Effect.ForbidAttack {} -> Set.empty
+  Effect.ForbidActivation {} -> Set.empty
   Effect.RequireAttack {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty

@@ -146,6 +146,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -560,6 +561,7 @@ objectRefPositions =
     ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "ra"]),
     ("forbid-block", Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (plantedRef "fb")), [plantedRef "fb"]),
     ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
+    ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
     ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
     ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
     ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedRef "gp") ManaSpending.AsProduced), [plantedRef "gp"]),
@@ -1089,6 +1091,7 @@ ownCounts effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationCounts duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationCounts duration
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationCounts duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationCounts duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
@@ -1390,6 +1393,7 @@ effectNestedEffects effect = case effect of
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidActivation {} -> []
   Effect.RequireAttack {} -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
@@ -1793,6 +1797,7 @@ effectReplacements effect = case effect of
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidActivation {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
@@ -2175,6 +2180,7 @@ effectMintedFaces effect = case effect of
   Effect.CantBeRegenerated {} -> []
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
+  Effect.ForbidActivation {} -> []
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
@@ -4477,6 +4483,8 @@ effectFilters effect = case effect of
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
   -- CantBeRegenerated's arm, the same one axis.
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
+  -- ForbidBlock's arm again, one rule away.
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
   -- The Named arm is CantBeRegenerated's ref; the Matching arm's class is read
   -- through a bare Filter.contextFor at
   -- Pawl.Engine.CombatRestriction.storedSubjects, so it is Unframed. The AimedAt

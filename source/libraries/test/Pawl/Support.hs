@@ -2729,6 +2729,7 @@ oneMountainState mountain ph =
           GameState.unregeneratables = [],
           GameState.blockProhibitions = [],
           GameState.attackProhibitions = [],
+          GameState.activationProhibitions = [],
           GameState.attackRequirements = [],
           GameState.ignoredAbilities = [],
           GameState.turnOrder = [alice],

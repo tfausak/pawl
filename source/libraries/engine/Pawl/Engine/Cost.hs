@@ -1639,9 +1639,9 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions gs =
         -- mana ability too. Here rather than in Mana.manaSourcesGiven, because this
         -- is what BOTH of CR 605.3a's windows consult -- sickness's position above.
         && not (Detain.detained oid gs)
-        -- CR 101.2 over CR 605.3a's permission: a printed static ability aimed
-        -- at this permanent saying its activated abilities can't be activated
-        -- (Arrest). Here for detain's reason -- this is what BOTH of CR 605.3a's
+        -- CR 101.2 over CR 605.3a's permission: an effect aimed at this
+        -- permanent saying its activated abilities can't be activated -- printed
+        -- (Arrest) or stored by a resolution (Deadlock Trap). Here for detain's reason -- this is what BOTH of CR 605.3a's
         -- windows consult -- and asked as ManaAbility, which is the only kind
         -- reaching this function. A row naming NonManaAbility is therefore no
         -- answer here, which is exactly what Realmbreaker's Grasp's "unless

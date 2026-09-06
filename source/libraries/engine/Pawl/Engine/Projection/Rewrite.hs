@@ -72,6 +72,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -663,6 +664,8 @@ rewriteEffect pairs effect = case effect of
     Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) ->
     Effect.ForbidBlock (ForbidBlock.MkForbidBlock (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) ->
+    Effect.ForbidActivation (ForbidActivation.MkForbidActivation (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
   -- CR 612.1 reaches the creatures' words on either arm -- a Named ref's Filters
   -- and a Matching class's -- and not the AimedAt: a PlayerScope prints no word
   -- a text-changing effect reaches, and the kinds are CR 506.3's list.

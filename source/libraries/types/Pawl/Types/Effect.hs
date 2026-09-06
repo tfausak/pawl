@@ -28,6 +28,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -422,6 +423,10 @@ data Effect card ability
   | -- | CR 508.1c / 613.11: install a stored attacking restriction for a
     -- duration (Netter en-Dal), ForbidBlock's twin one rule over.
     ForbidAttack ForbidAttack.ForbidAttack
+  | -- | CR 602.2 / 613.11: install a stored activation prohibition over the
+    -- permanents the ref names, for a duration (Deadlock Trap). The printed form
+    -- gathered live off a source is Pawl.Types.ActivationProhibition instead.
+    ForbidActivation ForbidActivation.ForbidActivation
   | -- | CR 114.2: the resolving controller gets an emblem with the given
     -- abilities, put into the command zone. Targetless; the abilities ride a
     -- Card so the emblem reuses the whole ability pipeline.
