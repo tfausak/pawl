@@ -72,18 +72,18 @@ data BlockRequirement = MkBlockRequirement
     -- use for.
     attacker :: Maybe Affected.Affected,
     -- | CR 509.1c's second shape -- "or that it must block if some condition is
-    -- met" -- read as CR 604.2's "as long as" clause. Enkira, Hostile
-    -- Scavenger's "as long as Enkira is equipped, it must be blocked if able".
-    -- Nothing is the ungated requirement (Lure, Prized Unicorn, Razorgrass
-    -- Screen).
+    -- met" -- read as CR 604.2's "as long as" clause. Seton's Desire's
+    -- threshold: "as long as there are seven or more cards in your graveyard,
+    -- all creatures able to block enchanted creature do so". Nothing is the
+    -- ungated requirement (Lure, Prized Unicorn, Razorgrass Screen).
     --
     -- The same field Pawl.Types.AttackRequirement and
     -- Pawl.Types.BlockPermission spell `while`, with the same polarity -- a gate
     -- that HOLDS is what puts the requirement in force -- and the opposite of
     -- Pawl.Types.CombatRestriction's "unless", where a gate that holds LIFTS the
-    -- restriction. Re-read on every look like both axes above, so an Equipment
-    -- leaving lifts the requirement at once, and the "you" inside it is CR
-    -- 109.5's: the controller of the permanent printing the sentence.
+    -- restriction. Re-read on every look like both axes above, so a graveyard
+    -- shrinking below seven lifts the requirement at once, and the "you" inside
+    -- it is CR 109.5's: the controller of the permanent printing the sentence.
     while :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

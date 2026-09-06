@@ -1526,9 +1526,9 @@ cardCounts card =
     -- is an Affected, which holds a Filter but no Count.
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AttackRequirement.while) (Face.attackRequirements card)
     -- CR 509.1c's identically worded second reading, on the other side of the
-    -- combat phase (Enkira, Hostile Scavenger counts the Equipment attached to
-    -- itself). Both of this requirement's axes are Affecteds, which hold a
-    -- Filter but no Count.
+    -- combat phase (Seton's Desire counts its controller's graveyard, the same
+    -- threshold clause). Both of this requirement's axes are Affecteds, which
+    -- hold a Filter but no Count.
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . BlockRequirement.while) (Face.blockRequirements card)
     -- CR 508.1h's counted share (Sphere of Safety's "the number of enchantments
     -- you control"), the one Count a cost to attack can hold: its subject is an
@@ -2342,18 +2342,12 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- EXEMPT TOO: a NONLEGENDARY token the instruction names -- Flock of Rabid
 -- Sheep's "create a 2\/2 green Sheep creature token named Rabid Sheep". The same
 -- half of rule 111.4 as the legendary case, but nothing in the card data marks
--- it, so this is a hand-kept list rather than a predicate. CR 111.10d's Walker
--- (Enkira, Hostile Scavenger) is the same shape one rule further on -- the name
--- comes from the predefined token's own definition rather than from the
--- instruction. CR 111.10j-r's Roles and the copy tokens of CR 111.4's own
--- Spitting Image example (named Doomed Dissenter, "not Human Token or Doomed
+-- it, so this is a hand-kept list rather than a predicate. CR 111.10's predefined
+-- tokens (111.10d's Walker, 111.10j-r's Roles) and the copy tokens of CR 111.4's
+-- own Spitting Image example (named Doomed Dissenter, "not Human Token or Doomed
 -- Dissenter Token") will each want a line here too.
 namedTokens :: Set.Set CardName.CardName
-namedTokens =
-  Set.fromList
-    [ CardName.MkCardName (Text.pack "Rabid Sheep"),
-      CardName.MkCardName (Text.pack "Walker")
-    ]
+namedTokens = Set.singleton (CardName.MkCardName (Text.pack "Rabid Sheep"))
 
 tokenNameOffends :: Face.Face Card.Type.Card -> Bool
 tokenNameOffends token
@@ -3928,8 +3922,8 @@ combatRestrictionFilters restriction = case restriction of
 
 -- ALL THREE of a blocking requirement's Filter positions -- CR 509.1c's subject
 -- axis (Razorgrass Screen), its object axis (Lure) and the CR 604.2 clause the
--- second reading of that rule rides on (Enkira, Hostile Scavenger), whose Count
--- holds a Filter. Each is optional, and an absent one contributes nothing rather
+-- second reading of that rule rides on (Seton's Desire), whose Count holds a
+-- Filter. Each is optional, and an absent one contributes nothing rather
 -- than a stand-in filter, combatRestrictionFilters' posture for its
 -- size-bounding arms.
 blockRequirementFilters :: BlockRequirement.BlockRequirement -> [(Framing, Filter.Type.Filter Keyword.Keyword)]

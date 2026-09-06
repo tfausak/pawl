@@ -166,6 +166,7 @@ instances able candidates attackers gs =
       -- "you" inside it as the source's controller, so neither the blocker nor
       -- the attacker could change the answer. The CR 612.1 rewrite is the same
       -- one both axes get, since all three clauses are printed on the source.
+      -- Proved by blockRequirementSpec's Seton's Desire cases.
       inForce source changes requirement = case BlockRequirement.while requirement of
         Nothing -> True
         Just condition ->

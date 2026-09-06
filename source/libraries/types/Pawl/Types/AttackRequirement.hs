@@ -53,7 +53,8 @@ data AttackRequirement = MkAttackRequirement
     -- printing the sentence.
     --
     -- Pawl.Types.BlockRequirement spells the twin of this field for CR 509.1c's
-    -- identically worded shape (Enkira, Hostile Scavenger).
+    -- identically worded shape, and Seton's Desire is the same threshold clause
+    -- on that side.
     while :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

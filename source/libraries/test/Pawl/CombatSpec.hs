@@ -2723,6 +2723,13 @@ luring lure mine theirs =
           let (aura, withAura) = S.addPermanent lure S.alice gs
            in (S.attach aura attacker withAura, ours, yours)
 
+-- CR 604.2's threshold gate, stocked: `n` copies of `printing` in ALICE's
+-- graveyard, alice controlling every source these cases attach. CR 109.5 is what
+-- makes that the right seat -- "your graveyard" on a static ability is the
+-- current controller's.
+filling :: Printing.Printing -> Int -> GameState.GameState -> GameState.GameState
+filling printing n gs = List.foldl' (\g _ -> snd (S.addGraveyardCard printing S.alice g)) gs [1 .. n]
+
 -- CR 509.1c, proved by Lure ("All creatures able to block enchanted creature do
 -- so") -- the pool's first blocking REQUIREMENT, and the first board on which
 -- declining to block is not a legal answer.
@@ -3022,82 +3029,82 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     Spec.assertEqWith s "an Ogre Sentry with no requirement declines, so bob takes two" (S.lifeOf S.bob unblocked) (Just 18)
     Spec.assertEqWith s "and it survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
   -- CR 509.1c's CONDITION -- "or that it must block if some condition is met" --
-  -- which every card above leaves absent. Enkira, Hostile Scavenger ({3}{B}{G}
-  -- Legendary Creature -- Human Warrior 3/3, "As long as Enkira is equipped, it
-  -- must be blocked if able." -- checked against Scryfall, 2026-09-06) gates the
-  -- requirement on CR 301.5a's "equipped", read as CR 604.2's "as long as"
-  -- clause. Bonesplitter is the Equipment, and the gate is flipped by ATTACHING
-  -- it rather than by adding it, so the two boards hold the same permanents.
+  -- which every card above leaves absent. Seton's Desire ({2}{G} Enchantment --
+  -- Aura, "Enchant creature. Enchanted creature gets +2/+2. Threshold -- As long
+  -- as there are seven or more cards in your graveyard, all creatures able to
+  -- block enchanted creature do so." -- checked against Scryfall, 2026-09-06) is
+  -- Lure's sentence behind CR 604.2's "as long as" clause, and the clause is the
+  -- one Otarian Juggernaut prints on the attacking side.
   --
-  -- Not implemented: Enkira's third line, "whenever Enkira and at least two
-  -- Zombies attack, Enkira gains indestructible until end of turn" -- CR 508.3a's
-  -- companion clause admits one matching creature and takes no count, so the
-  -- transcription omits that ability (#3303). The omission runs the card
-  -- STRICTER than printed, and no case here reaches a second combat phase or a
-  -- Zombie.
-  Spec.it s "CR 509.1c an Enkira must be blocked only while it is equipped" $ do
-    -- THE AXIS UNDER TEST, both worlds on one board pair differing in exactly the
-    -- attachment. The second assertion is what keeps the first from passing
-    -- vacuously: the Piker really is an able blocker of the unequipped Enkira, so
-    -- declining is legal because the gate is false and not because there is
-    -- nothing to block.
-    enkira <- S.printingOf s registry "Enkira, Hostile Scavenger"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
+  -- The printings that word the gate on themselves instead -- The Masamune,
+  -- Ace's Baseball Bat, Enkira, Hostile Scavenger and Frodo Baggins -- all say
+  -- "must be BLOCKED if able", which is one requirement obeyed by any single
+  -- blocker rather than one per able creature, and pawl's carrier cannot say
+  -- that (gap #3303). None of them is transcribable whatever the gate does.
+  --
+  -- The two boards differ in ONE thing, the number of cards in alice's
+  -- graveyard, and the threshold falls between them -- the pair
+  -- Pawl.CombatCostSpec's conditionalAttackRequirementSpec builds for the same
+  -- clause on the attacking side.
+  Spec.it s "CR 509.1c a threshold blocking requirement bites only once the gate holds" $ do
+    -- THE AXIS UNDER TEST. The second assertion is what keeps the first from
+    -- passing vacuously: the Piker really is an able blocker under the
+    -- threshold, so declining is legal because the gate is false and not because
+    -- there is nothing to block.
+    desire <- S.printingOf s registry "Seton's Desire"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [enkira] [piker]
+    let (gs, mine, theirs) = luring desire [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) -> do
-        let (gear, bare) = S.addPermanent bonesplitter S.alice gs
-            equipped = S.attach gear a bare
+        let under = filling piker 6 gs
+            over = filling piker 7 gs
             blocks = Map.singleton b (Set.singleton a)
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty bare) "with the Bonesplitter unattached, declining is legal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks bare) "and blocking is still legal, so the combat is live"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty equipped)) "attached, the gate holds and declining is illegal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks equipped) "blocking the equipped Enkira is legal"
-        Spec.assertEqWith s "and the ceiling counts the requirement, so the forced declaration is that block" (Combat.forcedBlockDeclaration S.bob equipped) blocks
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty under) "six cards in the graveyard: declining is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks under) "and blocking is still legal, so the combat is live"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty over)) "seven cards: the gate holds and declining is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob blocks over) "blocking the enchanted attacker is legal"
+        Spec.assertEqWith s "and the ceiling counts the requirement, so the forced declaration is that block" (Combat.forcedBlockDeclaration S.bob over) blocks
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-  Spec.it s "CR 509.1c the gate rides the SOURCE, not any attacker beside it" $ do
-    -- IsAttachedToSource is an identity test on Enkira's own attachment: a Piker
-    -- attacking beside an equipped Enkira carries no requirement, so blocking it
-    -- instead obeys nothing. Fails against a reader that answers the gate off the
-    -- board rather than off the source.
-    enkira <- S.printingOf s registry "Enkira, Hostile Scavenger"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
+  Spec.it s "CR 509.1c the gated requirement still names only the enchanted attacker" $ do
+    -- The object axis under the gate: a Piker attacking beside the enchanted one
+    -- carries no requirement, so blocking it instead obeys nothing however full
+    -- the graveyard is. Fails against a reader that lets a holding gate lure
+    -- every attacker.
+    desire <- S.printingOf s registry "Seton's Desire"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [enkira, piker] [piker]
+    let (gs, mine, theirs) = luring desire [piker, piker] [piker]
     case (mine, theirs) of
-      ([a, other], b : _) -> do
-        let (gear, bare) = S.addPermanent bonesplitter S.alice gs
-            equipped = S.attach gear a bare
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) equipped) "blocking Enkira is legal"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton other)) equipped)) "blocking the other attacker instead is illegal"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty equipped)) "and declining is illegal"
+      ([enchanted, other], b : _) -> do
+        let over = filling piker 7 gs
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton enchanted)) over) "blocking the enchanted attacker is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton other)) over)) "blocking the other attacker instead is illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty over)) "and declining is illegal"
       _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
-  Spec.it s "CR 509.1c whole cards: an equipped Enkira forces a block through a real declare blockers step" $ do
-    -- Gameplay level, under an answerer that DECLINES. The control board leaves
-    -- the same Bonesplitter unattached, so the two differ only in the gate, and
-    -- both assertions differ between them: equipped, the Piker is forced to block
-    -- a 5/3 and dies while bob takes nothing; unattached, nobody blocks, bob
-    -- takes 3 and the Piker lives.
-    enkira <- S.printingOf s registry "Enkira, Hostile Scavenger"
-    bonesplitter <- S.printingOf s registry "Bonesplitter"
+  Spec.it s "CR 509.1c whole cards: the threshold forces a block through a real declare blockers step" $ do
+    -- Gameplay level, under an answerer that DECLINES. Both boards carry the
+    -- Aura -- so its +2/+2 is on both and the 4/3 attacker is the same creature
+    -- either way -- and differ only in the graveyard, and both assertions
+    -- differ between them: over the threshold the Piker is forced to block and
+    -- dies while bob takes nothing; under it nobody blocks, bob takes 4 and the
+    -- blocker lives.
+    desire <- S.printingOf s registry "Seton's Desire"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [enkira] [piker]
+    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
         declining :: Prompt.Prompt r -> r
         declining p = case p of
           Prompt.DeclareBlockers {} -> Map.empty
           _ -> S.aggressiveAnswer p
-        (gear, bare) = S.addPermanent bonesplitter S.alice gs
-        equipped = case mine of
+        enchanted = case mine of
           -- Unreachable: the fixture has one attacking printing.
-          [] -> bare
-          a : _ -> S.attach gear a bare
-        blocked = S.settleSba (S.fightWith declining equipped)
-        unblocked = S.settleSba (S.fightWith declining bare)
-    Spec.assertEqWith s "equipped, the Piker was forced to block, so bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
-    Spec.assertEqWith s "and the blocker died to the 5/3" (S.creaturesInPlay S.bob blocked) 0
-    Spec.assertEqWith s "unattached, the gate is false and bob takes three" (S.lifeOf S.bob unblocked) (Just 17)
-    Spec.assertEqWith s "and the Piker survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
+          [] -> gs
+          a : _ -> let (aura, withAura) = S.addPermanent desire S.alice gs in S.attach aura a withAura
+        run n = S.settleSba (S.fightWith declining (filling piker n enchanted))
+        blocked = run 7
+        unblocked = run 6
+    Spec.assertEqWith s "seven cards in the graveyard: the Piker was forced to block, so bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
+    Spec.assertEqWith s "and the blocker died to the 4/3" (S.creaturesInPlay S.bob blocked) 0
+    Spec.assertEqWith s "six cards: the gate is false and bob takes four" (S.lifeOf S.bob unblocked) (Just 16)
+    Spec.assertEqWith s "and the blocker survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
 
 -- A combat board that has NOT yet declared attackers, with Curse of the Nightly
 -- Hunt on the battlefield attached to `who`. The attacking twin of `luring`, and
