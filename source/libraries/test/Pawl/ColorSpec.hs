@@ -235,25 +235,25 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
   Spec.it s "CR 202.2 a mono-black card's colour is black" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (ratsId, gs) = S.addCreature typhoidRats S.alice gs0
+        (ratsId, gs) = S.addPermanent typhoidRats S.alice gs0
     Spec.assertEq s (Projection.colorsOf ratsId gs) $ Set.singleton Color.Black
 
   Spec.it s "CR 202.2 a generic-plus-red cost is red, and generic contributes nothing" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (pikerId, gs) = S.addCreature piker S.alice gs0
+        (pikerId, gs) = S.addPermanent piker S.alice gs0
     Spec.assertEq s (Projection.colorsOf pikerId gs) $ Set.singleton Color.Red
 
   Spec.it s "CR 202.2b an object with no coloured mana symbols is colourless" $ do
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (myrId, gs) = S.addCreature darksteelMyr S.alice gs0
+        (myrId, gs) = S.addPermanent darksteelMyr S.alice gs0
     Spec.assertEq s (Projection.colorsOf myrId gs) Set.empty
 
   Spec.it s "CR 202.1b a land has no mana cost, so it is colourless" $ do
     mountain <- S.printingOf s registry "Mountain"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (mtnId, gs) = S.addCreature mountain S.alice gs0
+        (mtnId, gs) = S.addPermanent mountain S.alice gs0
     Spec.assertEq s (Projection.colorsOf mtnId gs) Set.empty
 
   Spec.it s "CR 702.114a devoid makes an object colourless despite a black mana cost" $ do
@@ -261,7 +261,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- mana cost": this card's cost is {1}{B} and it is colourless.
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (droneId, gs) = S.addCreature slaughterDrone S.alice gs0
+        (droneId, gs) = S.addPermanent slaughterDrone S.alice gs0
     Spec.assertEq s (Projection.colorsOf droneId gs) Set.empty
 
   Spec.it s "CR 105.3 a new colour REPLACES all previous colours" $ do
@@ -269,7 +269,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- black, and after the effect they are red and NOT black.
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (ratsId, board) = S.addCreature typhoidRats S.alice gs0
+        (ratsId, board) = S.addPermanent typhoidRats S.alice gs0
         gs = S.withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) board
     Spec.assertEq s (Projection.colorsOf ratsId gs) $ Set.singleton Color.Red
 
@@ -280,7 +280,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- so the drone ends up black, not colourless.
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (droneId, board) = S.addCreature slaughterDrone S.alice gs0
+        (droneId, board) = S.addPermanent slaughterDrone S.alice gs0
         gs = S.withEffect droneId (Modification.SetColor (Set.singleton Color.Black)) board
     Spec.assertEq s (Projection.colorsOf droneId gs) $ Set.singleton Color.Black
 
@@ -289,9 +289,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, withMoon) = S.addCreature badMoon S.alice gs0
-        (ratsId, withRats) = S.addCreature typhoidRats S.alice withMoon
-        (pikerId, gs) = S.addCreature piker S.alice withRats
+        (_, withMoon) = S.addPermanent badMoon S.alice gs0
+        (ratsId, withRats) = S.addPermanent typhoidRats S.alice withMoon
+        (pikerId, gs) = S.addPermanent piker S.alice withRats
     Spec.assertEqWith s "the black Rats are 2/2" (Projection.powerOf ratsId gs) $ Just 2
     Spec.assertEqWith s "the red Piker is unchanged at 2" (Projection.powerOf pikerId gs) $ Just 2
     Spec.assertEqWith s "the red Piker's toughness is unchanged at 1" (Projection.toughnessOf pikerId gs) $ Just 1
@@ -302,8 +302,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, withMoon) = S.addCreature badMoon S.alice gs0
-        (droneId, gs) = S.addCreature slaughterDrone S.alice withMoon
+        (_, withMoon) = S.addPermanent badMoon S.alice gs0
+        (droneId, gs) = S.addPermanent slaughterDrone S.alice withMoon
     Spec.assertEqWith s "power unchanged" (Projection.powerOf droneId gs) $ Just 2
     Spec.assertEqWith s "toughness unchanged" (Projection.toughnessOf droneId gs) $ Just 2
 
@@ -311,8 +311,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, withMoon) = S.addCreature badMoon S.alice gs0
-        (pikerId, board) = S.addCreature piker S.alice withMoon
+        (_, withMoon) = S.addPermanent badMoon S.alice gs0
+        (pikerId, board) = S.addPermanent piker S.alice withMoon
         gs = S.withEffect pikerId (Modification.SetColor (Set.singleton Color.Black)) board
     Spec.assertEqWith s "the now-black Piker is 3/2" (Projection.powerOf pikerId gs) $ Just 3
 
@@ -331,7 +331,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     dragonFodder <- S.printingOf s registry "Dragon Fodder"
     let base = S.landsInPlay mountain 2
-        (_, withMoon) = S.addCreature badMoon S.alice base
+        (_, withMoon) = S.addPermanent badMoon S.alice base
         (gs, spellId) = S.handOne dragonFodder withMoon
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -350,8 +350,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (ratsId, withRats) = S.addCreature typhoidRats S.alice gs0
-        (pikerId, gs) = S.addCreature piker S.alice withRats
+        (ratsId, withRats) = S.addPermanent typhoidRats S.alice gs0
+        (pikerId, gs) = S.addPermanent piker S.alice withRats
         legal = Target.legalRecipients Nothing S.noSource nonblackCreature gs
     Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) legal) "the red Piker is legal"
     Spec.assertBool s (not (Set.member (Recipient.ToCreature ratsId) legal)) "the black Rats are not"
@@ -360,7 +360,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- FALSIFIER, reader (a) half.
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (droneId, gs) = S.addCreature slaughterDrone S.alice gs0
+        (droneId, gs) = S.addPermanent slaughterDrone S.alice gs0
         legal = Target.legalRecipients Nothing S.noSource nonblackCreature gs
     Spec.assertBool s (Set.member (Recipient.ToCreature droneId) legal) "colourless is nonblack"
 
@@ -369,7 +369,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let base = S.landsInPlay swamp 2
-        (_, board) = S.addCreature slaughterDrone S.bob base
+        (_, board) = S.addPermanent slaughterDrone S.bob base
         (gs, dbId) = S.handOne doomBlade board
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -385,8 +385,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     crimsonWisps <- S.printingOf s registry "Crimson Wisps"
     let base = S.landsInPlay mountain 1
-        (_, withMoon) = S.addCreature badMoon S.alice base
-        (ratsId, board) = S.addCreature typhoidRats S.alice withMoon
+        (_, withMoon) = S.addPermanent badMoon S.alice base
+        (ratsId, board) = S.addPermanent typhoidRats S.alice withMoon
         (gs, cwId) = S.handOne crimsonWisps board
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cwId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -404,8 +404,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     aphoticWisps <- S.printingOf s registry "Aphotic Wisps"
     let base = S.landsInPlay swamp 1
-        (_, withMoon) = S.addCreature badMoon S.alice base
-        (pikerId, board) = S.addCreature piker S.alice withMoon
+        (_, withMoon) = S.addPermanent badMoon S.alice base
+        (pikerId, board) = S.addPermanent piker S.alice withMoon
         (gs, awId) = S.handOne aphoticWisps board
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice awId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -425,7 +425,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     doomBlade <- S.printingOf s registry "Doom Blade"
     aphoticWisps <- S.printingOf s registry "Aphotic Wisps"
     let base = S.landsInPlay swamp 3
-        (elvesId, board) = S.addCreature llanowarElves S.bob base
+        (elvesId, board) = S.addPermanent llanowarElves S.bob base
         (gs1, dbId) = S.handOne doomBlade board
         (gs2, awId) = S.handOne aphoticWisps gs1
         castDb = snd (Engine.runGamePure S.identityAnswer gs2 (S.cast S.alice dbId))
@@ -448,7 +448,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- of either colour the earlier one set, not just the printed colour.
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (ratsId, board) = S.addCreature typhoidRats S.alice gs0
+        (ratsId, board) = S.addPermanent typhoidRats S.alice gs0
         multi = S.withEffect ratsId (Modification.SetColor (Set.fromList [Color.Blue, Color.Black])) board
         gs = S.withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) multi
     Spec.assertEqWith s "red only, no residue of blue or black" (Projection.colorsOf ratsId gs) $ Set.singleton Color.Red
@@ -458,7 +458,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- Rats are black, and after an AddColor they are black AND blue.
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (ratsId, board) = S.addCreature typhoidRats S.alice gs0
+        (ratsId, board) = S.addPermanent typhoidRats S.alice gs0
         gs = S.withEffect ratsId (Modification.AddColor (Set.singleton Color.Blue)) board
     Spec.assertEq s (Projection.colorsOf ratsId gs) $ Set.fromList [Color.Black, Color.Blue]
 
@@ -477,8 +477,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (moonId, withMoon) = S.addCreature badMoon S.alice gs0
-        (ratsId, board) = S.addCreature typhoidRats S.alice withMoon
+        (moonId, withMoon) = S.addPermanent badMoon S.alice gs0
+        (ratsId, board) = S.addPermanent typhoidRats S.alice withMoon
         gs = S.withEffect moonId (Modification.SetColor (Set.singleton Color.Red)) board
     Spec.assertEqWith s "Bad Moon itself is now red" (Projection.colorsOf moonId gs) $ Set.singleton Color.Red
     Spec.assertEqWith s "the black Rats are still pumped to 2 power" (Projection.powerOf ratsId gs) $ Just 2
@@ -498,9 +498,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
     let base = S.landsInPlay island 1
         -- The Island pays Indigo Faerie's {U}; the Mountain pays the blast's {R}.
-        (_, withMountain) = S.addCreature mountain S.alice base
-        (faerieId, withFaerie) = S.addCreature indigoFaerie S.alice withMountain
-        (droneId, board) = S.addCreature slaughterDrone S.alice withFaerie
+        (_, withMountain) = S.addPermanent mountain S.alice base
+        (faerieId, withFaerie) = S.addPermanent indigoFaerie S.alice withMountain
+        (droneId, board) = S.addPermanent slaughterDrone S.alice withFaerie
         (gs, rebId) = S.handOne redElementalBlast board
         activated = snd (Engine.runGamePure (aimAtObject droneId) gs (Activate.activateAbility S.alice faerieId (theAbility indigoFaerie)))
         blued = snd (Engine.runGamePure (aimAtObject droneId) activated Stack.resolveTop)
@@ -531,7 +531,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- the colourless devoid produces. Seeding devoid gets this wrong (#35).
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (droneId, gs) = S.addCreature slaughterDrone S.alice gs0
+        (droneId, gs) = S.addPermanent slaughterDrone S.alice gs0
         cands = Projection.gather gs
         below = Projection.projectUpTo Layer.Color cands droneId gs
     Spec.assertEqWith s "black below layer 5" (PC.colors below) $ Set.singleton Color.Black
@@ -557,7 +557,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- trigger, which Pawl.Types.Keyword cannot name (#794).
     slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (slivId, gs) = S.addCreature slivdrazi S.alice gs0
+        (slivId, gs) = S.addPermanent slivdrazi S.alice gs0
         cands = Projection.gather gs
         below = Projection.projectUpTo Layer.Color cands slivId gs
     Spec.assertEqWith s "all five colours below layer 5" (PC.colors below) $
@@ -573,8 +573,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, withMoon) = S.addCreature badMoon S.alice gs0
-        (slivId, gs) = S.addCreature slivdrazi S.alice withMoon
+        (_, withMoon) = S.addPermanent badMoon S.alice gs0
+        (slivId, gs) = S.addPermanent slivdrazi S.alice withMoon
     Spec.assertEqWith s "power unchanged" (Projection.powerOf slivId gs) $ Just 8
     Spec.assertEqWith s "toughness unchanged" (Projection.toughnessOf slivId gs) $ Just 8
 
@@ -606,8 +606,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (inHand, psId) = S.handOne paintersServant base
         cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
         withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
-        (droneId, withDrone) = S.addCreature slaughterDrone S.alice withPainter
-        (_, gs) = S.addCreature slivdrazi S.alice withDrone
+        (droneId, withDrone) = S.addPermanent slaughterDrone S.alice withPainter
+        (_, gs) = S.addPermanent slivdrazi S.alice withDrone
     Spec.assertEqWith s "blue before Slivdrazi arrives" (Projection.colorsOf droneId withDrone) $ Set.singleton Color.Blue
     Spec.assertBool
       s
@@ -630,8 +630,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     slaughterDrone <- S.printingOf s registry "Slaughter Drone"
     slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
     let base = S.landsInPlay mountain 2
-        (droneId, withDrone) = S.addCreature slaughterDrone S.alice base
-        (_, withSliv) = S.addCreature slivdrazi S.alice withDrone
+        (droneId, withDrone) = S.addPermanent slaughterDrone S.alice base
+        (_, withSliv) = S.addPermanent slivdrazi S.alice withDrone
         (inHand, psId) = S.handOne paintersServant withSliv
         cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
         gs = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
@@ -663,8 +663,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     blessing <- S.printingOf s registry "Synthetic Colorless Blessing"
-    let (_, withMoon) = S.addCreature badMoon S.alice (S.landsInPlay island 2)
-        (ratsId, before) = S.addCreature typhoidRats S.alice withMoon
+    let (_, withMoon) = S.addPermanent badMoon S.alice (S.landsInPlay island 2)
+        (ratsId, before) = S.addPermanent typhoidRats S.alice withMoon
         after = castAtCreature ratsId blessing before
     Spec.assertEqWith s "Bad Moon pumps the black 1/1 before the spell resolves" (Projection.powerOf ratsId before) $ Just 2
     Spec.assertEqWith s "and stops once the granted devoid has cleared the black" (Projection.powerOf ratsId after) $ Just 1
@@ -692,7 +692,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- choice; the ChooseModes prompt itself is exercised by the stack test
     -- below ("CR 604.3 Red Elemental Blast counters a devoid SPELL...").
     --
-    -- CAST rather than S.addCreature, because the colour choice happens only on
+    -- CAST rather than S.addPermanent, because the colour choice happens only on
     -- the entry path (Event.runEntry): a Servant placed straight onto the
     -- battlefield has chosenColor = Nothing and its AddChosenColor adds nothing.
     mountain <- S.printingOf s registry "Mountain"
@@ -704,7 +704,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (inHand, psId) = S.handOne paintersServant base
         cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
         withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
-        (droneId, withDrone) = S.addCreature slaughterDrone S.alice withPainter
+        (droneId, withDrone) = S.addPermanent slaughterDrone S.alice withPainter
         (rebId, gs) = S.addHandCard redElementalBlast S.alice withDrone
         entered = Set.difference (GameState.battlefield withPainter) (GameState.battlefield base)
         answer :: Prompt.Prompt r -> r
@@ -848,8 +848,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     moonlace <- S.printingOf s registry "Moonlace"
     let base = S.landsInPlay island 1
-        (_, withMoon) = S.addCreature badMoon S.alice base
-        (ratsId, board) = S.addCreature typhoidRats S.alice withMoon
+        (_, withMoon) = S.addPermanent badMoon S.alice base
+        (ratsId, board) = S.addPermanent typhoidRats S.alice withMoon
         (gs, moonlaceId) = S.handOne moonlace board
         answer :: Prompt.Prompt r -> r
         answer = aimAtObject ratsId
@@ -871,9 +871,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     ersatzGnomes <- S.printingOf s registry "Ersatz Gnomes"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, withMoon) = S.addCreature badMoon S.alice gs0
-        (ratsId, withRats) = S.addCreature typhoidRats S.alice withMoon
-        (gnomesId, gs) = S.addCreature ersatzGnomes S.alice withRats
+        (_, withMoon) = S.addPermanent badMoon S.alice gs0
+        (ratsId, withRats) = S.addPermanent typhoidRats S.alice withMoon
+        (gnomesId, gs) = S.addPermanent ersatzGnomes S.alice withRats
     case abilityAt permanentAbility ersatzGnomes of
       Nothing -> Spec.assertFailure s "Ersatz Gnomes prints two activated abilities"
       Just ability -> do
@@ -895,7 +895,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     ersatzGnomes <- S.printingOf s registry "Ersatz Gnomes"
     redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (gnomesId, board) = S.addCreature ersatzGnomes S.alice gs0
+        (gnomesId, board) = S.addPermanent ersatzGnomes S.alice gs0
         (recallId, gs) = S.spellOnStack ancestralRecall S.alice board
     case abilityAt spellAbility ersatzGnomes of
       Nothing -> Spec.assertFailure s "Ersatz Gnomes prints two activated abilities"
@@ -949,9 +949,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (inHand, psId) = S.handOne paintersServant base
         cast = snd (Engine.runGamePure choosingRed inHand (S.cast S.alice psId))
         withPainter = snd (Engine.runGamePure choosingRed cast Stack.resolveTop)
-        (kothId, withKoth) = S.addCreature koth S.alice withPainter
+        (kothId, withKoth) = S.addPermanent koth S.alice withPainter
         armed = S.addCounter CounterKind.Loyalty 7 kothId withKoth
-        (tenderId, withTender) = S.addCreature forgeTender S.bob armed
+        (tenderId, withTender) = S.addPermanent forgeTender S.bob armed
     case abilityAt kothUltimate koth of
       Nothing -> Spec.assertFailure s "Koth prints three loyalty abilities"
       Just ultimate -> do
@@ -991,8 +991,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (inHand, psId) = S.handOne paintersServant base
         cast = snd (Engine.runGamePure choosingRed inHand (S.cast S.alice psId))
         withPainter = snd (Engine.runGamePure choosingRed cast Stack.resolveTop)
-        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice withPainter
-        (victimId, withVictim) = S.addCreature sorcerer S.bob withSorcerer
+        (sorcererId, withSorcerer) = S.addPermanent sorcerer S.alice withPainter
+        (victimId, withVictim) = S.addPermanent sorcerer S.bob withSorcerer
     case abilityAt pingAbility sorcerer of
       Nothing -> Spec.assertFailure s "Prodigal Sorcerer prints one activated ability"
       Just ping -> do

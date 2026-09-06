@@ -264,7 +264,11 @@ data GameState = MkGameState
     -- linked to, keyed by the exiled incarnation and written by
     -- Pawl.Engine.Resolve.Effect.applyEffectWith (rule 607.2a) and Pawl.Engine.Event's
     -- zone change funnel (rule 607.2b) as a difference over GameState.exile,
-    -- never a case over the opcode. Cleaned up by key only.
+    -- never a case over the opcode. Rule 614.14's link has a third writer,
+    -- Pawl.Engine.Event's EntryRewrite.ExileFromGraveyard arm, which names the
+    -- entering permanent outright: no diff can find it, an entry replacement
+    -- being neither an opcode's window nor a redirected move. Cleaned up by key
+    -- only.
     --
     -- Scoped to the OBJECT and not to the printed ABILITY, where rule 607.2a
     -- scopes it to the ability. The two differ only for a card with two exiling

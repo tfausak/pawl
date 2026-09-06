@@ -124,7 +124,7 @@ spec s registry = Spec.describe s "Meld" $ do
   -- ordinary activated mana ability (CR 605.1a).
   Spec.it s "CR 712.8d a meld card on the battlefield has its front face's characteristics: Hanweir Battlements taps for {C}" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
-    let (battlementsId, gs) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+    let (battlementsId, gs) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer battlementsId)
     Spec.assertEqWith
       s
@@ -140,9 +140,9 @@ spec s registry = Spec.describe s "Meld" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (battlementsId, g1) = S.addCreature battlements S.alice base
-        (_, g2) = S.addCreature mountain S.alice g1
-        (pikerId, g3) = S.addCreature piker S.alice g2
+        (battlementsId, g1) = S.addPermanent battlements S.alice base
+        (_, g2) = S.addPermanent mountain S.alice g1
+        (pikerId, g3) = S.addPermanent piker S.alice g2
         ready = g3 {GameState.priority = Just S.alice}
     case Face.activatedAbilities (S.combinedFace battlements) of
       _ : haste : _ -> do
@@ -220,7 +220,7 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (bId, g1) = S.addCreature battlements S.alice base
+        (bId, g1) = S.addPermanent battlements S.alice base
         (gId, g2) = S.addExiledCard garrison S.alice g1
         slot = SlotName.MkSlotName (Text.pack "melding")
         bound = Map.singleton slot (Set.fromList [Recipient.ToObject bId, Recipient.ToObject gId])
@@ -256,7 +256,7 @@ spec s registry = Spec.describe s "Meld" $ do
                 -- battlefield too, and only the arrival is under test.
                 [arrived] -> fmap Object.tapped (Game.lookupObject arrived after)
                 _ -> Nothing
-        withKismet = snd (S.addCreature kismet S.bob (Setup.emptyGame S.bothPlayers))
+        withKismet = snd (S.addPermanent kismet S.bob (Setup.emptyGame S.bothPlayers))
     Spec.assertEqWith s "Kismet's opponent-entry rewrite reached it" (tappedIn withKismet) (Just TapState.Tapped)
     Spec.assertEqWith s "and without Kismet the same meld enters untapped (CR 110.5b)" (tappedIn (Setup.emptyGame S.bothPlayers)) (Just TapState.Untapped)
   -- The other half of an entry, one rule over: CR 603.6a's enters-the-battlefield
@@ -268,7 +268,7 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     piker <- S.printingOf s registry "Goblin Piker"
     warden <- S.printingOf s registry "Soul Warden"
-    let base = snd (S.addCreature warden S.alice (Setup.emptyGame S.bothPlayers))
+    let base = snd (S.addPermanent warden S.alice (Setup.emptyGame S.bothPlayers))
         (_, _, after) = meldedOn base battlements garrison piker
         settled = S.runPure S.identityAnswer after (do Engine.settleForPriority; Stack.resolveTop)
     Spec.assertEqWith s "alice gained exactly 1 life" (S.lifeOf S.alice settled) (Just 21)
@@ -297,8 +297,8 @@ spec s registry = Spec.describe s "Meld" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
-    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
-        (gId, g2) = S.addCreature garrison S.alice g1
+    let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (gId, g2) = S.addPermanent garrison S.alice g1
         board = readyFor mountain g2
     case Projection.abilitiesOf bId board of
       [_, _, melding] -> do
@@ -341,8 +341,8 @@ spec s registry = Spec.describe s "Meld" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
-    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
-        (gId, g2) = S.addCreature garrison S.alice g1
+    let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (gId, g2) = S.addPermanent garrison S.alice g1
         board = readyFor mountain g2
     case Projection.abilitiesOf bId board of
       [_, _, melding] -> do
@@ -383,9 +383,9 @@ spec s registry = Spec.describe s "Meld" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
-    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
-        (firstG, g2) = S.addCreature garrison S.alice g1
-        (secondG, g3) = S.addCreature garrison S.alice g2
+    let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (firstG, g2) = S.addPermanent garrison S.alice g1
+        (secondG, g3) = S.addPermanent garrison S.alice g2
         board = readyFor mountain g3
     case Projection.abilitiesOf bId board of
       [_, _, melding] -> do
@@ -409,13 +409,13 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
     let resolvedOn extra =
-          let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+          let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
               board = readyFor mountain (extra g1)
            in case Projection.abilitiesOf bId board of
                 [_, _, melding] -> (Just bId, S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop))
                 _ -> (Nothing, board)
         borrowed g1 =
-          let (theirs, g2) = S.addCreature garrison S.bob g1
+          let (theirs, g2) = S.addPermanent garrison S.bob g1
            in S.giveControl theirs S.alice g2
         stayed (mBId, after) = (fmap (\bId -> fmap Object.zone (Game.lookupObject bId after)) mBId, S.countOnBattlefieldByName townshipName S.alice after)
     Spec.assertEqWith s "with no Garrison anywhere the land is untouched and nothing melded" (stayed (resolvedOn id)) (Just (Just Zone.Battlefield), 0)
@@ -429,7 +429,7 @@ spec s registry = Spec.describe s "Meld" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
-    let (bId, g1) = S.addCreature battlements S.alice (Setup.emptyGame S.bothPlayers)
+    let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
         (_, g2) = S.addToken (Printing.card garrison) S.alice g1
         board = readyFor mountain g2
     case Projection.abilitiesOf bId board of
@@ -460,8 +460,8 @@ spec s registry = Spec.describe s "Meld" $ do
     mountain <- S.printingOf s registry "Mountain"
     winnower <- S.printingOf s registry "Void Winnower"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, withWinnower) = S.addCreature winnower S.bob (Setup.emptyGame S.bothPlayers)
-        (pikerId, base) = S.addCreature piker S.alice withWinnower
+    let (_, withWinnower) = S.addPermanent winnower S.bob (Setup.emptyGame S.bothPlayers)
+        (pikerId, base) = S.addPermanent piker S.alice withWinnower
         (mMelded, after) = meldedThrough base battlements garrison mountain
     case mMelded of
       Just meldedId -> do
@@ -488,7 +488,7 @@ spec s registry = Spec.describe s "Meld" $ do
     island <- S.printingOf s registry "Island"
     winnower <- S.printingOf s registry "Void Winnower"
     counterpart <- S.printingOf s registry "Cackling Counterpart"
-    let base = snd (S.addCreature winnower S.bob (Setup.emptyGame S.bothPlayers))
+    let base = snd (S.addPermanent winnower S.bob (Setup.emptyGame S.bothPlayers))
         (mMelded, after) = meldedThrough base battlements garrison mountain
     case mMelded of
       Just meldedId -> do
@@ -515,8 +515,8 @@ spec s registry = Spec.describe s "Meld" $ do
     mountain <- S.printingOf s registry "Mountain"
     connoisseur <- S.printingOf s registry "Mutagen Connoisseur"
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
-    let (connoisseurId, withConnoisseur) = S.addCreature connoisseur S.alice (Setup.emptyGame S.bothPlayers)
-        (gargoyleId, base) = S.addCreature gargoyle S.alice withConnoisseur
+    let (connoisseurId, withConnoisseur) = S.addPermanent connoisseur S.alice (Setup.emptyGame S.bothPlayers)
+        (gargoyleId, base) = S.addPermanent gargoyle S.alice withConnoisseur
         (mMelded, after) = meldedThrough base battlements garrison mountain
     case mMelded of
       Just meldedId -> do
@@ -569,7 +569,7 @@ spec s registry = Spec.describe s "Meld" $ do
     case Set.toList (GameState.battlefield after) of
       [meldedId] -> do
         let turned = transforming [meldedId] after
-            (loneId, alone) = S.addCreature gargoyle S.alice (Setup.emptyGame S.bothPlayers)
+            (loneId, alone) = S.addPermanent gargoyle S.alice (Setup.emptyGame S.bothPlayers)
         Spec.assertEqWith s "CR 712.4c the melded permanent did not turn over" (Projection.namesOf meldedId turned) (Set.singleton (CardName.MkCardName (Text.pack "Thraben Gargoyle")))
         Spec.assertEqWith s "CR 712.8g nor did its 2/2 become the back face's 4/2" (S.powerToughnessOf meldedId turned) (Just (2, 2))
         Spec.assertEqWith s "nor its type line" (PC.subtypes (Projection.project meldedId turned)) (Set.singleton Subtype.Gargoyle)
@@ -611,8 +611,8 @@ spec s registry = Spec.describe s "Meld" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     connoisseur <- S.printingOf s registry "Mutagen Connoisseur"
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
-    let (connoisseurId, withConnoisseur) = S.addCreature connoisseur S.alice (Setup.emptyGame S.bothPlayers)
-        (gargoyleId, withGargoyle) = S.addCreature gargoyle S.alice withConnoisseur
+    let (connoisseurId, withConnoisseur) = S.addPermanent connoisseur S.alice (Setup.emptyGame S.bothPlayers)
+        (gargoyleId, withGargoyle) = S.addPermanent gargoyle S.alice withConnoisseur
         night = withGargoyle {GameState.daytime = Just Daytime.Night}
         (_, _, after) = meldedOn night battlements garrison tovolar
     case filter (\oid -> oid /= connoisseurId && oid /= gargoyleId) (Set.toList (GameState.battlefield after)) of
@@ -642,7 +642,7 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
     meren <- S.printingOf s registry "Meren of Clan Nel Toth"
-    let (merenId, base) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+    let (merenId, base) = S.addPermanent meren S.alice (Setup.emptyGame S.bothPlayers)
         (mMelded, board) = meldedThrough base battlements garrison mountain
     case mMelded of
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
@@ -679,8 +679,8 @@ spec s registry = Spec.describe s "Meld" $ do
     mountain <- S.printingOf s registry "Mountain"
     meren <- S.printingOf s registry "Meren of Clan Nel Toth"
     void <- S.printingOf s registry "Planar Void"
-    let (_, withMeren) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
-        (_, base) = S.addCreature void S.alice withMeren
+    let (_, withMeren) = S.addPermanent meren S.alice (Setup.emptyGame S.bothPlayers)
+        (_, base) = S.addPermanent void S.alice withMeren
         (mMelded, board) = meldedThrough base battlements garrison mountain
         bothNames = List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")]
     case mMelded of
@@ -727,7 +727,7 @@ spec s registry = Spec.describe s "Meld" $ do
     mountain <- S.printingOf s registry "Mountain"
     census <- S.printingOf s registry "Synthetic Grave Census"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (censusId, withCensus) = S.addCreature census S.alice (Setup.emptyGame S.bothPlayers)
+    let (censusId, withCensus) = S.addPermanent census S.alice (Setup.emptyGame S.bothPlayers)
         (mMelded, board) = meldedThrough withCensus battlements garrison mountain
         (tokenId, withToken) = S.addToken (Printing.card piker) S.alice board
         bothNames = List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")]
@@ -767,7 +767,7 @@ spec s registry = Spec.describe s "Meld" $ do
     garrison <- S.printingOf s registry "Hanweir Garrison"
     mountain <- S.printingOf s registry "Mountain"
     promise <- S.printingOf s registry "Promise of Tomorrow"
-    let (_, base) = S.addCreature promise S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, base) = S.addPermanent promise S.alice (Setup.emptyGame S.bothPlayers)
         (mMelded, board) = meldedThrough base battlements garrison mountain
         bothNames = List.sort [CardName.MkCardName (Text.pack "Hanweir Battlements"), CardName.MkCardName (Text.pack "Hanweir Garrison")]
     case mMelded of
@@ -818,7 +818,7 @@ spec s registry = Spec.describe s "Meld" $ do
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
     collector <- S.printingOf s registry "Pearl Collector"
-    let (collectorId, base) = S.addCreature collector S.alice (Setup.emptyGame S.bothPlayers)
+    let (collectorId, base) = S.addPermanent collector S.alice (Setup.emptyGame S.bothPlayers)
         (mMelded, meldedBoard) = meldedThrough base battlements garrison mountain
         board = (S.landsFor plains S.alice 3 meldedBoard) {GameState.priority = Just S.alice}
     case (mMelded, Face.activatedAbilities (S.combinedFace collector)) of
@@ -876,9 +876,9 @@ spec s registry = Spec.describe s "Meld" $ do
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
     collector <- S.printingOf s registry "Pearl Collector"
-    let (collectorId, base) = S.addCreature collector S.alice (Setup.emptyGame S.bothPlayers)
-        (battlementsId, g1) = S.addCreature battlements S.alice base
-        (garrisonId, g2) = S.addCreature garrison S.alice g1
+    let (collectorId, base) = S.addPermanent collector S.alice (Setup.emptyGame S.bothPlayers)
+        (battlementsId, g1) = S.addPermanent battlements S.alice base
+        (garrisonId, g2) = S.addPermanent garrison S.alice g1
         board = S.landsFor plains S.alice 3 (readyFor mountain g2)
         -- Priority handed back and everything untapped before the melding
         -- ability is activated. The Pearl Collector leg has already paid {2}{W}
@@ -1219,8 +1219,8 @@ turningOver mkEffect oids gs =
 -- the opcode, so every case reading it reads a board the game can reach.
 meldedThrough :: GameState.GameState -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (Maybe ObjectId.ObjectId, GameState.GameState)
 meldedThrough base battlements garrison mountain =
-  let (bId, g1) = S.addCreature battlements S.alice base
-      (_, g2) = S.addCreature garrison S.alice g1
+  let (bId, g1) = S.addPermanent battlements S.alice base
+      (_, g2) = S.addPermanent garrison S.alice g1
       board = readyFor mountain g2
    in case Projection.abilitiesOf bId board of
         [_, _, melding] ->

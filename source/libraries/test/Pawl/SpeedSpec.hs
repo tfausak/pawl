@@ -80,7 +80,7 @@ speedOf pid gs = fmap Player.speed (Map.lookup pid (GameState.players gs))
 raceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 raceBoard raceway swamp signInBlood filler =
   let base = S.landsInPlay swamp 2
-      (racewayId, withRaceway) = S.addCreature raceway S.alice base
+      (racewayId, withRaceway) = S.addPermanent raceway S.alice base
       stock pid g = foldr (\_ g' -> snd (S.addLibraryCard filler pid g')) g [1 .. (4 :: Int)]
       (gs, spellId) = S.handOne signInBlood (stock S.alice (stock S.bob withRaceway))
    in (gs, racewayId, spellId)
@@ -261,7 +261,7 @@ maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
   Spec.it s "CR 113.6m the same card on the battlefield offers the ability to nobody" $ do
     surveyor <- S.printingOf s registry "Loxodon Surveyor"
     swamp <- S.printingOf s registry "Swamp"
-    let (bfId, board) = S.addCreature surveyor S.alice (S.landsInPlay swamp 3)
+    let (bfId, board) = S.addPermanent surveyor S.alice (S.landsInPlay swamp 3)
         gs = atSpeed 4 S.alice (board {GameState.priority = Just S.alice})
     Spec.assertEqWith s "the projection does hand it out" (length (Projection.abilitiesOf bfId gs)) 1
     Spec.assertBool s (not (any (isActivateOf bfId) (Action.legalActions S.alice gs))) "but no activation is offered"
@@ -273,7 +273,7 @@ startYourEnginesSpec s registry = Spec.describe s "StartYourEngines" $ do
   -- having speed.
   Spec.it s "CR 704.5aa a player controlling Muraganda Raceway with no speed gets speed 1" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
-    let (_, gs) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, gs) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "before the check, nobody has speed (CR 702.179b)" (speedOf S.alice gs) (Just Nothing)
     let after = S.settleSba gs
     Spec.assertEqWith s "alice's engines started" (speedOf S.alice after) (Just (Just 1))
@@ -298,8 +298,8 @@ startYourEnginesSpec s registry = Spec.describe s "StartYourEngines" $ do
   Spec.it s "CR 305.7 a Blood Moon'd Raceway starts nobody's engines" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     bloodMoon <- S.printingOf s registry "Blood Moon"
-    let (_, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
-        (_, moonlit) = S.addCreature bloodMoon S.bob board
+    let (_, board) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
+        (_, moonlit) = S.addPermanent bloodMoon S.bob board
         after = S.settleSba moonlit
     Spec.assertEqWith s "no speed, the keyword having been stripped" (speedOf S.alice after) (Just Nothing)
 
@@ -309,7 +309,7 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   -- speed 1 the Raceway has ONE activated ability, its printed "{T}: Add {C}".
   Spec.it s "CR 702.178a below max speed the Raceway has only its unconditional mana ability" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
-    let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+    let (racewayId, board) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
         gs = S.settleSba board
     Spec.assertEqWith s "speed 1" (speedOf S.alice gs) (Just (Just 1))
     Spec.assertEqWith s "one activated ability" (length (Projection.abilitiesOf racewayId gs)) 1
@@ -326,7 +326,7 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   -- apart.
   Spec.it s "CR 702.179f a controller with no speed reads as 0, not as unanswered" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
-    let (racewayId, gs) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+    let (racewayId, gs) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "the field holds no speed at all (CR 702.179b)" (speedOf S.alice gs) (Just Nothing)
     Spec.assertEqWith s "but every reader sees 0 (CR 702.179f)" (Speed.speedOf S.alice gs) (Just 0)
     Spec.assertEqWith s "so the max speed ability is absent" (length (Projection.abilitiesOf racewayId gs)) 1
@@ -334,7 +334,7 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   -- the object HAS the granted ability, and tapping it makes two mana.
   Spec.it s "CR 702.178a at max speed the Raceway gains its second mana ability" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
-    let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+    let (racewayId, board) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
         gs = atSpeed 4 S.alice (S.settleSba board)
     Spec.assertEqWith s "two activated abilities" (length (Projection.abilitiesOf racewayId gs)) 2
     Spec.assertEqWith s "and the granted one makes two mana" (pooledBy biggestYield racewayId gs) 2
@@ -355,7 +355,7 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   Spec.it s "CR 702.178a past 4 the Raceway keeps its max speed ability" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     boost <- S.printingOf s registry "Synthetic Speed Boost"
-    let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+    let (racewayId, board) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
         (withSpell, spellId) = S.handOne boost board
         gs = atSpeed 3 S.alice (S.settleSba withSpell)
         after = castOnce S.alice spellId gs
@@ -372,7 +372,7 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   -- for.
   Spec.it s "CR 604.1 the grant is re-asked, not latched" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
-    let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+    let (racewayId, board) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
         settled = S.settleSba board
         fast = atSpeed 4 S.alice settled
         slowAgain = atSpeed 3 S.alice fast
@@ -385,8 +385,8 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   Spec.it s "CR 305.7 the strip beats the grant even at max speed" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     bloodMoon <- S.printingOf s registry "Blood Moon"
-    let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
-        (_, moonlit) = S.addCreature bloodMoon S.bob board
+    let (racewayId, board) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
+        (_, moonlit) = S.addPermanent bloodMoon S.bob board
         gs = atSpeed 4 S.alice moonlit
     Spec.assertEqWith s "no activated abilities at all" (Projection.abilitiesOf racewayId gs) []
 
@@ -413,7 +413,7 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let base = S.landsInPlay mountain 1
-        (_, withRaceway) = S.addCreature raceway S.alice base
+        (_, withRaceway) = S.addPermanent raceway S.alice base
         (gs, spellId) = S.handOne lightningBolt withRaceway
         after = castResolveSettle atBob S.alice spellId gs
     Spec.assertEqWith s "bob took three" (S.lifeOf S.bob after) (fmap (subtract 3) (S.lifeOf S.bob gs))
@@ -444,7 +444,7 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
         once = castResolveSettle atBob S.alice firstSpell gs0
         -- Two more untapped Swamps: the first casting tapped hers, and this case
         -- is about the trigger limit rather than about mana.
-        refuelled = foldr (\_ g -> snd (S.addCreature swamp S.alice g)) once [1 .. (2 :: Int)]
+        refuelled = foldr (\_ g -> snd (S.addPermanent swamp S.alice g)) once [1 .. (2 :: Int)]
         (secondSpell, withAnother) = S.addHandCard signInBlood S.alice refuelled
         twice = castResolveSettle atBob S.alice secondSpell withAnother
     Spec.assertEqWith s "bob lost four life over the two castings" (S.lifeOf S.bob twice) (fmap (subtract 4) (S.lifeOf S.bob gs0))
@@ -473,7 +473,7 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, _, _) = raceBoard raceway swamp signInBlood piker
         -- Bob's own two Swamps and his own copy, and the turn handed to him.
-        withBobsLands = foldr (\_ g -> snd (S.addCreature swamp S.bob g)) gs0 [1 .. (2 :: Int)]
+        withBobsLands = foldr (\_ g -> snd (S.addPermanent swamp S.bob g)) gs0 [1 .. (2 :: Int)]
         (bobSpell, withBobsSpell) = S.addHandCard signInBlood S.bob withBobsLands
         started = S.settleSba withBobsSpell
         bobsTurn = started {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
@@ -493,7 +493,7 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
         -- The turn handoff, which is the only thing under test here. Two more
         -- untapped Swamps rather than an untap step, so nothing but
         -- Engine.beginTurnOf stands between the two castings.
-        nextTurn = foldr (\_ g -> snd (S.addCreature swamp S.alice g)) (Engine.beginTurnOf S.alice once) [1 .. (2 :: Int)]
+        nextTurn = foldr (\_ g -> snd (S.addPermanent swamp S.alice g)) (Engine.beginTurnOf S.alice once) [1 .. (2 :: Int)]
         (secondSpell, withAnother) = S.addHandCard signInBlood S.alice nextTurn
         twice = castResolveSettle atBob S.alice secondSpell withAnother
     Spec.assertEqWith s "one increase on the first turn" (speedOf S.alice once) (Just (Just 2))
@@ -529,7 +529,7 @@ cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
   Spec.it s "CR 702.179c a card's own text raises the speed a player already has" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     boost <- S.printingOf s registry "Synthetic Speed Boost"
-    let (_, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, board) = S.addPermanent raceway S.alice (Setup.emptyGame S.bothPlayers)
         (withSpell, spellId) = S.handOne boost board
         gs = S.settleSba withSpell
         after = castOnce S.alice spellId gs
@@ -664,7 +664,7 @@ cardDecreaseSpec s registry = Spec.describe s "CardDecrease" $ do
 -- all the printed comparison asks of her.
 harrierBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 harrierBoard harrier piker =
-  let (victimId, board) = S.addCreature piker S.bob S.threePlayerGame
+  let (victimId, board) = S.addPermanent piker S.bob S.threePlayerGame
       (_, gs) = S.entersWithTrigger harrier S.alice board
    in (victimId, gs)
 

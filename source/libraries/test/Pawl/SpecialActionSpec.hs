@@ -174,7 +174,7 @@ arbiterBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 arbiterBoard forest arbiter growth =
-  let (arbiterId, gs1) = S.addCreature arbiter S.alice (S.landsInPlay forest 9)
+  let (arbiterId, gs1) = S.addPermanent arbiter S.alice (S.landsInPlay forest 9)
       (_, gs2) = S.addLibraryCard forest S.alice gs1
       (growthId, gs3) = S.addHandCard growth S.alice gs2
    in ( arbiterId,
@@ -207,10 +207,10 @@ copiedArbiterBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 copiedArbiterBoard forest shapeshifter arbiter growth =
-  let (shifterId, gs1) = S.addCreature shapeshifter S.alice (S.landsInPlay forest 9)
+  let (shifterId, gs1) = S.addPermanent shapeshifter S.alice (S.landsInPlay forest 9)
       (_, gs2) = S.addLibraryCard forest S.alice gs1
       (growthId, gs3) = S.addHandCard growth S.alice gs2
-      -- addCreature above arranges a board and fires nothing; the Arbiter is the
+      -- addPermanent above arranges a board and fires nothing; the Arbiter is the
       -- one permanent that ENTERS, which is what raises CR 707.4's trigger.
       (arbiterId, entered) = S.entersWithTrigger arbiter S.alice gs3
       stacked = snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority)
@@ -336,13 +336,13 @@ dampingBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 dampingBoard engine forest changeling growth =
-  let (engineId, gs1) = S.addCreature engine S.alice S.threePlayerGame
-      (victimId, gs2) = S.addCreature forest S.alice gs1
-      (_, gs3) = S.addCreature forest S.alice gs2
-      (_, gs4) = S.addCreature forest S.alice gs3
-      (_, gs5) = S.addCreature forest S.bob gs4
-      (_, gs6) = S.addCreature forest S.bob gs5
-      (_, gs7) = S.addCreature forest S.carol gs6
+  let (engineId, gs1) = S.addPermanent engine S.alice S.threePlayerGame
+      (victimId, gs2) = S.addPermanent forest S.alice gs1
+      (_, gs3) = S.addPermanent forest S.alice gs2
+      (_, gs4) = S.addPermanent forest S.alice gs3
+      (_, gs5) = S.addPermanent forest S.bob gs4
+      (_, gs6) = S.addPermanent forest S.bob gs5
+      (_, gs7) = S.addPermanent forest S.carol gs6
       (forestId, gs8) = S.addHandCard forest S.alice gs7
       (changelingId, gs9) = S.addHandCard changeling S.alice gs8
       (growthId, gs10) = S.addHandCard growth S.alice gs9
@@ -363,7 +363,7 @@ dampingBoard engine forest changeling growth =
 -- moves. Same turn, same phase, same hand, same Engine, same payable cost.
 bobLeading :: Printing.Printing -> GameState.GameState -> GameState.GameState
 bobLeading forest gs =
-  let add g = snd (S.addCreature forest S.bob g)
+  let add g = snd (S.addPermanent forest S.bob g)
    in add (add (add gs))
 
 -- Synthetic Warden of Divided Edicts on bob's precombat main. alice controls the
@@ -396,11 +396,11 @@ wardenBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 wardenBoard warden forest changeling growth =
-  let (wardenId, gs1) = S.addCreature warden S.alice (S.landsInPlay forest 3)
-      (victimId, gs2) = S.addCreature forest S.bob gs1
-      (_, gs3) = S.addCreature forest S.bob gs2
-      (_, gs4) = S.addCreature forest S.bob gs3
-      (_, gs5) = S.addCreature forest S.bob gs4
+  let (wardenId, gs1) = S.addPermanent warden S.alice (S.landsInPlay forest 3)
+      (victimId, gs2) = S.addPermanent forest S.bob gs1
+      (_, gs3) = S.addPermanent forest S.bob gs2
+      (_, gs4) = S.addPermanent forest S.bob gs3
+      (_, gs5) = S.addPermanent forest S.bob gs4
       (aliceForestId, gs6) = S.addHandCard forest S.alice gs5
       (bobForestId, gs7) = S.addHandCard forest S.bob gs6
       (changelingId, gs8) = S.addHandCard changeling S.bob gs7
@@ -604,7 +604,7 @@ kellanBoard ::
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 kellanBoard forest plains island piker kellan plot djinn =
   let lands = S.landsFor plains S.alice 1 (S.landsFor island S.alice 1 (S.landsInPlay forest 1))
-      (pikerId, g1) = S.addCreature piker S.alice lands
+      (pikerId, g1) = S.addPermanent piker S.alice lands
       (kellanId, g2) = S.addHandCard kellan S.alice g1
       (_, g3) = S.addHandCard plot S.alice g2
       (djinnId, g4) = S.addHandCard djinn S.alice g3
@@ -979,7 +979,7 @@ dampingEngine s registry = Spec.describe s "CR 116.2d Damping Engine" $ do
     changeling <- S.printingOf s registry "Woodland Changeling"
     growth <- S.printingOf s registry "Rampant Growth"
     let (engineId, _, forestId, _, _, aliceLeads) = dampingBoard engine forest changeling growth
-        tied = snd (S.addCreature forest S.bob (snd (S.addCreature forest S.bob aliceLeads)))
+        tied = snd (S.addPermanent forest S.bob (snd (S.addPermanent forest S.bob aliceLeads)))
         asked pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
     Spec.assertBool s (List.notElem (Action.Type.Ignore engineId theLead) (asked S.alice tied)) "alice has no lead to be affected by"
     Spec.assertBool s (List.notElem (Action.Type.Ignore engineId theLead) (asked S.bob tied)) "and neither does bob"
@@ -1084,7 +1084,7 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     let (arbiterId, _, gs) = arbiterBoard forest arbiter growth
         (_, onBobsTurn) = S.spellOnStack bolt S.bob gs
         instantSpeed = onBobsTurn {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
-        (poorId, poor) = S.addCreature arbiter S.alice (S.landsInPlay forest 1)
+        (poorId, poor) = S.addPermanent arbiter S.alice (S.landsInPlay forest 1)
         broke =
           (snd (S.addHandCard forest S.alice poor))
             { GameState.activePlayer = S.alice,
@@ -1105,7 +1105,7 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     arbiter <- S.printingOf s registry "Leonin Arbiter"
     growth <- S.printingOf s registry "Rampant Growth"
     let (arbiterId, _, gs) = arbiterBoard forest arbiter growth
-        (_, withBobsLands) = S.addCreature forest S.bob (snd (S.addCreature forest S.bob gs))
+        (_, withBobsLands) = S.addPermanent forest S.bob (snd (S.addPermanent forest S.bob gs))
         asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
     Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (asked S.alice withBobsLands)) "the Arbiter's own controller may pay"
     Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (asked S.bob withBobsLands)) "and so may bob, whose two Forests pay the {2}"
@@ -1287,11 +1287,11 @@ curseSeats ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 curseSeats curse kami piker =
-  let (kamiId, gs1) = S.addCreature kami S.alice S.threePlayerGame
-      (_, gs2) = S.addCreature piker S.alice gs1
-      (curseId, gs3) = S.addCreature curse S.bob gs2
-      (bobPikerId, gs4) = S.addCreature piker S.bob gs3
-      (_, gs5) = S.addCreature piker S.carol gs4
+  let (kamiId, gs1) = S.addPermanent kami S.alice S.threePlayerGame
+      (_, gs2) = S.addPermanent piker S.alice gs1
+      (curseId, gs3) = S.addPermanent curse S.bob gs2
+      (bobPikerId, gs4) = S.addPermanent piker S.bob gs3
+      (_, gs5) = S.addPermanent piker S.carol gs4
    in ( curseId,
         kamiId,
         bobPikerId,
@@ -1317,9 +1317,9 @@ curseCombat ::
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 curseCombat curse kami piker =
   let (gs, _, _) = S.combatBoardOf [] [piker]
-      (kamiId, gs1) = S.addCreature kami S.alice gs
-      (victimId, gs2) = S.addCreature piker S.alice gs1
-      (curseId, gs3) = S.addCreature curse S.bob gs2
+      (kamiId, gs1) = S.addPermanent kami S.alice gs
+      (victimId, gs2) = S.addPermanent piker S.alice gs1
+      (curseId, gs3) = S.addPermanent curse S.bob gs2
    in (curseId, kamiId, victimId, S.attach curseId kamiId gs3)
 
 -- CR 116.2d on the OBJECT axis: an ability aimed at a permanent rather than at a

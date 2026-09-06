@@ -261,7 +261,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, x, _, plain) = ruleOfLawBoard plains ruleOfLaw
-          onBoard = snd (S.addCreature ruleOfLaw S.alice plain)
+          onBoard = snd (S.addPermanent ruleOfLaw S.alice plain)
           cast = S.runPure S.identityAnswer onBoard (S.cast S.alice x)
       case GameState.stack cast of
         [] -> Spec.assertFailure s "expected the spell on the stack"
@@ -276,7 +276,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, z, plain) = ruleOfLawBoard plains ruleOfLaw
-          (rol, onBoard) = S.addCreature ruleOfLaw S.alice plain
+          (rol, onBoard) = S.addPermanent ruleOfLaw S.alice plain
           castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))] onBoard
           gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell VariableChoice.Announced castOne) "prohibited while it stands"
@@ -292,7 +292,7 @@ ruleOfLawSpec s registry =
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
       let base = S.landsInPlay forest 7
-          (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
+          (_, withRuleOfLaw) = S.addPermanent ruleOfLaw S.alice base
           (_, gs) = S.addLibraryCard panglacialWurm S.alice withRuleOfLaw
           castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))] gs
       -- Positive control: without it, the negative assertion below
@@ -652,7 +652,7 @@ adjustmentSpec s =
 thaliaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 thaliaBoard mountain thalia lightningBolt piker n =
   let base = S.landsInPlay mountain n
-      (_, gs1) = S.addCreature thalia S.alice base
+      (_, gs1) = S.addPermanent thalia S.alice base
       (bolt, gs2) = S.addHandCard lightningBolt S.alice gs1
       (pikerId, gs3) = S.addHandCard piker S.alice gs2
    in ( bolt,
@@ -670,8 +670,8 @@ thaliaBoard mountain thalia lightningBolt piker n =
 thaliaWith :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 thaliaWith mountain thalia lightningBolt extras n =
   let base = S.landsInPlay mountain n
-      (thaliaId, gs1) = S.addCreature thalia S.alice base
-      gs2 = List.foldl' (\g p -> snd (S.addCreature p S.alice g)) gs1 extras
+      (thaliaId, gs1) = S.addPermanent thalia S.alice base
+      gs2 = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) gs1 extras
       (bolt, gs3) = S.addHandCard lightningBolt S.alice gs2
    in ( bolt,
         thaliaId,
@@ -780,7 +780,7 @@ thaliaSpec s registry =
       panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let base = S.landsInPlay forest 7
-          (_, withThalia) = S.addCreature thalia S.alice base
+          (_, withThalia) = S.addPermanent thalia S.alice base
           (wurm, withWurm) = S.addLibraryCard panglacialWurm S.alice withThalia
           (rol, gs) = S.addHandCard ruleOfLaw S.alice withWurm
       Spec.assertEqWith
@@ -848,7 +848,7 @@ thaliaSpec s registry =
 medallionBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting lightningBolt n =
   let base = S.landsInPlay island n
-      (_, gs1) = S.addCreature sapphireMedallion S.alice base
+      (_, gs1) = S.addPermanent sapphireMedallion S.alice base
       (unsummon, gs3) = S.addHandCard unsummonPrinting S.alice gs1
       (divination, gs4) = S.addHandCard divinationPrinting S.alice gs3
       (bolt, gs5) = S.addHandCard lightningBolt S.alice gs4
@@ -866,8 +866,8 @@ medallionBoard island sapphireMedallion unsummonPrinting divinationPrinting ligh
 medallionBothBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 medallionBothBoard island sapphireMedallion thalia unsummonPrinting =
   let base = S.landsInPlay island 1
-      (_, gs1) = S.addCreature sapphireMedallion S.alice base
-      (_, gs2) = S.addCreature thalia S.alice gs1
+      (_, gs1) = S.addPermanent sapphireMedallion S.alice base
+      (_, gs2) = S.addPermanent thalia S.alice gs1
       (unsummon, gs3) = S.addHandCard unsummonPrinting S.alice gs2
    in ( unsummon,
         gs3
@@ -1034,7 +1034,7 @@ patricianGeistSpec s registry =
       geist <- S.printingOf s registry "Patrician Geist"
       thinkTwice <- S.printingOf s registry "Think Twice"
       let (yardId, handId, open) = geistBoard island thinkTwice 5
-          withGeist = snd (S.addCreature geist S.alice open)
+          withGeist = snd (S.addPermanent geist S.alice open)
           -- The Geist is itself a permanent alice controls, so only her LANDS
           -- may be counted: it enters untapped and stays that way.
           tappedAfter gs oid = S.tappedCount S.alice (S.runPure S.identityAnswer gs (S.cast S.alice oid))
@@ -1050,7 +1050,7 @@ patricianGeistSpec s registry =
       geist <- S.printingOf s registry "Patrician Geist"
       thinkTwice <- S.printingOf s registry "Think Twice"
       let (yardId, _, open) = geistBoard island thinkTwice 2
-          withGeist = snd (S.addCreature geist S.alice open)
+          withGeist = snd (S.addPermanent geist S.alice open)
       Spec.assertBool s (S.castable S.alice yardId withGeist) "castable for {1}{U} with two Islands"
       Spec.assertBool s (not (S.castable S.alice yardId open)) "and not for {2}{U} without the Geist"
 
@@ -1062,7 +1062,7 @@ patricianGeistSpec s registry =
       geist <- S.printingOf s registry "Patrician Geist"
       thinkTwice <- S.printingOf s registry "Think Twice"
       let (_, _, open) = geistBoard island thinkTwice 5
-          withGeist = snd (S.addCreature geist S.alice open)
+          withGeist = snd (S.addPermanent geist S.alice open)
           (bobYard, seated) = S.addGraveyardCard thinkTwice S.bob (S.landsFor island S.bob 5 withGeist)
           (_, stocked) = S.addLibraryCard island S.bob seated
       Spec.assertEqWith
@@ -1154,9 +1154,9 @@ humilitySpec s registry =
       humility <- S.printingOf s registry "Humility"
       opalescence <- S.printingOf s registry "Opalescence"
       let base = Setup.emptyGame S.bothPlayers
-          (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
+          (_, withRuleOfLaw) = S.addPermanent ruleOfLaw S.alice base
           withHumility = S.withHumility humility withRuleOfLaw
-          (_, withOpalescence) = S.addCreature opalescence S.alice withHumility
+          (_, withOpalescence) = S.addPermanent opalescence S.alice withHumility
           castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))]
       Spec.assertBool
         s
@@ -1175,7 +1175,7 @@ humilitySpec s registry =
 titaniasSongBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
 titaniasSongBoard island sapphireMedallion divinationPrinting titaniasSong =
   let base = S.landsInPlay island 2
-      (medallion, gs1) = S.addCreature sapphireMedallion S.alice base
+      (medallion, gs1) = S.addPermanent sapphireMedallion S.alice base
       (divination, gs2) = S.addHandCard divinationPrinting S.alice gs1
       bare =
         gs2
@@ -1183,7 +1183,7 @@ titaniasSongBoard island sapphireMedallion divinationPrinting titaniasSong =
             GameState.activePlayer = S.alice,
             GameState.priority = Just S.alice
           }
-      (_, sung) = S.addCreature titaniasSong S.bob bare
+      (_, sung) = S.addPermanent titaniasSong S.bob bare
    in (medallion, divination, bare, sung)
 
 -- Titania's Song {3}{G} Enchantment: "Each noncreature artifact loses all
@@ -1241,7 +1241,7 @@ titaniasSongSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       titaniasSong <- S.printingOf s registry "Titania's Song"
       let (bolt, _, taxed) = thaliaBoard mountain thalia lightningBolt piker 3
-          (_, sung) = S.addCreature titaniasSong S.bob taxed
+          (_, sung) = S.addPermanent titaniasSong S.bob taxed
       Spec.assertEqWith
         s
         "the printed {R} is still taxed to {1}{R}"
@@ -1256,7 +1256,7 @@ titaniasSongSpec s registry =
 edgewalkerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 edgewalkerBoard plains edgewalker piker copies n =
   let base = S.landsInPlay plains n
-      put g _ = snd (S.addCreature edgewalker S.alice g)
+      put g _ = snd (S.addPermanent edgewalker S.alice g)
       withCopies = List.foldl' put base [1 .. copies]
       (spell, gs1) = S.addHandCard edgewalker S.alice withCopies
       (pikerId, gs2) = S.addHandCard piker S.alice gs1
@@ -1362,7 +1362,7 @@ edgewalkerSpec s registry =
 phyrexianDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 phyrexianDiscountBoard forest discount cub growth copies n =
   let base = S.landsInPlay forest n
-      put g _ = snd (S.addCreature discount S.alice g)
+      put g _ = snd (S.addPermanent discount S.alice g)
       withCopies = List.foldl' put base [1 .. copies]
       (cubId, gs1) = S.addHandCard cub S.alice withCopies
       (growthId, gs2) = S.addHandCard growth S.alice gs1
@@ -1482,7 +1482,7 @@ phyrexianDiscountSpec s registry =
 snowDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 snowDiscountBoard forest discount cub piker copies n =
   let base = S.landsInPlay forest n
-      put g _ = snd (S.addCreature discount S.alice g)
+      put g _ = snd (S.addPermanent discount S.alice g)
       withCopies = List.foldl' put base [1 .. copies]
       (cubId, gs1) = S.addHandCard cub S.alice withCopies
       (pikerId, gs2) = S.addHandCard piker S.alice gs1
@@ -1608,7 +1608,7 @@ takesHalf half p = case p of
 hybridDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 hybridDiscountBoard land discount spell solRing copies n =
   let base = S.landsInPlay land n
-      put g _ = snd (S.addCreature discount S.alice g)
+      put g _ = snd (S.addPermanent discount S.alice g)
       withCopies = List.foldl' put base [1 .. copies]
       (spellId, gs1) = S.addHandCard spell S.alice withCopies
       (ringId, gs2) = S.addHandCard solRing S.alice gs1
@@ -1897,8 +1897,8 @@ textChangedEdgewalkerBoard s registry changerName swap = do
   edgewalker <- S.printingOf s registry "Edgewalker"
   zombie <- S.printingOf s registry "Whipstitched Zombie"
   changer <- S.printingOf s registry changerName
-  let (_, g1) = S.addCreature island S.alice (S.landsInPlay plains 1)
-      (walkerId, g2) = S.addCreature edgewalker S.alice g1
+  let (_, g1) = S.addPermanent island S.alice (S.landsInPlay plains 1)
+      (walkerId, g2) = S.addPermanent edgewalker S.alice g1
       (clericSpell, g3) = S.addHandCard edgewalker S.alice g2
       (zombieSpell, g4) = S.addHandCard zombie S.alice g3
       (changerId, g5) = S.addHandCard changer S.alice g4
@@ -1934,8 +1934,8 @@ takesHalfAndCost half cost p = case p of
 mixedReductionBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 mixedReductionBoard swamp edgewalker discount evangel =
   let base = S.landsInPlay swamp 2
-      (_, g1) = S.addCreature edgewalker S.alice base
-      (_, g2) = S.addCreature discount S.alice g1
+      (_, g1) = S.addPermanent edgewalker S.alice base
+      (_, g2) = S.addPermanent discount S.alice g1
       (evangelId, g3) = S.addHandCard evangel S.alice g2
    in ( evangelId,
         g3
@@ -2096,7 +2096,7 @@ textChangedEdgewalkerSpec s registry = Spec.describe s "TextChangedEdgewalker" $
 reliquaryHandOfNine :: Printing.Printing -> [Printing.Printing] -> GameState.GameState
 reliquaryHandOfNine plains extra =
   let gs0 = Setup.emptyGame S.bothPlayers
-      put g printing = snd (S.addCreature printing S.alice g)
+      put g printing = snd (S.addPermanent printing S.alice g)
       withExtra = List.foldl' put gs0 extra
       add g _ = snd (S.addHandCard plains S.alice g)
    in List.foldl' add withExtra [1 .. 9 :: Int]
@@ -2107,8 +2107,8 @@ reliquaryHandOfNine plains extra =
 zhaoHandOfNine :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [CounterKind.CounterKind Keyword.Keyword] -> GameState.GameState
 zhaoHandOfNine plains reliquaryTower zhao kinds =
   let gs0 = Setup.emptyGame S.bothPlayers
-      (_, g1) = S.addCreature reliquaryTower S.alice gs0
-      (zhaoId, g2) = S.addCreature zhao S.alice g1
+      (_, g1) = S.addPermanent reliquaryTower S.alice gs0
+      (zhaoId, g2) = S.addPermanent zhao S.alice g1
       g3 = List.foldl' (\g k -> S.addCounter k 1 zhaoId g) g2 kinds
       add g _ = snd (S.addHandCard plains S.alice g)
    in List.foldl' add g3 [1 .. 9 :: Int]
@@ -2225,7 +2225,7 @@ reliquaryTowerSpec s registry =
 ringsAndRestoration :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
 ringsAndRestoration ringsFirst plains island tenRings restoration =
   let gs0 = Setup.emptyGame S.bothPlayers
-      add printing g _ = snd (S.addCreature printing S.alice g)
+      add printing g _ = snd (S.addPermanent printing S.alice g)
       stockHand g _ = snd (S.addHandCard plains S.alice g)
       stockLibrary g _ = snd (S.addLibraryCard plains S.alice g)
       -- Seven Islands, because the sorcery costs {4}{U}{U}{U} and is CAST rather
@@ -2243,7 +2243,7 @@ ringsAndRestoration ringsFirst plains island tenRings restoration =
       frontName = CardName.MkCardName (Text.pack "Sea Gate Restoration")
       cast g = S.runPure S.identityAnswer g (Cast.castSpell S.manaPerformer S.alice spellId frontName Facing.FaceUp)
       resolve g = S.runPure S.identityAnswer g Stack.resolveTop
-      rings = S.addCreature tenRings S.alice
+      rings = S.addPermanent tenRings S.alice
    in if ringsFirst
         then let (ringsId, withRings) = rings ready in (resolve (cast withRings), ringsId)
         else let (ringsId, withRings) = rings (resolve (cast ready)) in (withRings, ringsId)
@@ -2340,7 +2340,7 @@ theTenRingsSpec s registry =
 adjustedHands :: Printing.Printing -> [Printing.Printing] -> Int -> PlayerId.PlayerId -> GameState.GameState
 adjustedHands plains extra held active =
   let gs0 = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = active}
-      put g printing = snd (S.addCreature printing S.alice g)
+      put g printing = snd (S.addPermanent printing S.alice g)
       withExtra = List.foldl' put gs0 extra
       add pid g _ = snd (S.addHandCard plains pid g)
       forAlice = List.foldl' (add S.alice) withExtra [1 .. held]
@@ -2511,7 +2511,7 @@ addPlayerEffectAt source expiry scope effect controller gs =
 -- deterministic and cached (batch-recipe.md).
 storedConditional :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 storedConditional piker =
-  let (srcId, withSrc) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+  let (srcId, withSrc) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
       conditional =
         addPlayerEffectAt
           srcId
@@ -2605,16 +2605,16 @@ silenceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> P
 silenceBoard plains silence mountain prodigalSorcerer piker =
   let gs0 = Setup.emptyGame S.bothPlayers
       -- alice: two Plains, two Silences in hand.
-      (_, gs1) = S.addCreature plains S.alice gs0
-      (_, gs2) = S.addCreature plains S.alice gs1
+      (_, gs1) = S.addPermanent plains S.alice gs0
+      (_, gs2) = S.addPermanent plains S.alice gs1
       (silenceId, gs3) = S.addHandCard silence S.alice gs2
       (silence2Id, gs4) = S.addHandCard silence S.alice gs3
       -- bob: two Mountains, a Prodigal Sorcerer (a NON-mana activated
       -- ability), a Goblin Piker in hand to cast and a Mountain in hand to
       -- play.
-      (_, gs5) = S.addCreature mountain S.bob gs4
-      (_, gs6) = S.addCreature mountain S.bob gs5
-      (_, gs7) = S.addCreature prodigalSorcerer S.bob gs6
+      (_, gs5) = S.addPermanent mountain S.bob gs4
+      (_, gs6) = S.addPermanent mountain S.bob gs5
+      (_, gs7) = S.addPermanent prodigalSorcerer S.bob gs6
       (pikerId, gs8) = S.addHandCard piker S.bob gs7
       (landId, gs9) = S.addHandCard mountain S.bob gs8
    in ( silenceId,
@@ -2638,14 +2638,14 @@ silenceBoard plains silence mountain prodigalSorcerer piker =
 threeSeatSilenceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 threeSeatSilenceBoard plains silence mountain piker =
   let gs0 = Setup.emptyGame S.threePlayers
-      (_, gs1) = S.addCreature plains S.alice gs0
-      (_, gs2) = S.addCreature plains S.alice gs1
+      (_, gs1) = S.addPermanent plains S.alice gs0
+      (_, gs2) = S.addPermanent plains S.alice gs1
       (silenceId, gs3) = S.addHandCard silence S.alice gs2
-      (_, gs4) = S.addCreature mountain S.bob gs3
-      (_, gs5) = S.addCreature mountain S.bob gs4
+      (_, gs4) = S.addPermanent mountain S.bob gs3
+      (_, gs5) = S.addPermanent mountain S.bob gs4
       (bobsPiker, gs6) = S.addHandCard piker S.bob gs5
-      (_, gs7) = S.addCreature mountain S.carol gs6
-      (_, gs8) = S.addCreature mountain S.carol gs7
+      (_, gs7) = S.addPermanent mountain S.carol gs6
+      (_, gs8) = S.addPermanent mountain S.carol gs7
       (carolsPiker, gs9) = S.addHandCard piker S.carol gs8
    in ( silenceId,
         bobsPiker,

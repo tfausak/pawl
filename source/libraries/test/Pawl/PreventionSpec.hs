@@ -127,7 +127,7 @@ counterBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] ->
 counterBoard forest battlegrowth mine theirs =
   let addAll pid ps gs =
         List.foldl'
-          (\(ids, g) p -> let (oid, g1) = S.addCreature p pid g in (ids <> [oid], g1))
+          (\(ids, g) p -> let (oid, g1) = S.addPermanent p pid g in (ids <> [oid], g1))
           ([], gs)
           ps
       (ours, gs1) = addAll S.alice mine (S.landsInPlay forest 1)
@@ -256,7 +256,7 @@ enteringAs which p = case p of
 -- nothing here is testing whether the mana was enough.
 sentryBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
 sentryBoard mountain scoundrel sentry =
-  let (_, withScoundrel) = S.addCreature scoundrel S.alice (S.landsInPlay mountain 4)
+  let (_, withScoundrel) = S.addPermanent scoundrel S.alice (S.landsInPlay mountain 4)
       (spellId, withSentry) = S.addHandCard sentry S.alice withScoundrel
    in ( withSentry
           { GameState.phase = Phase.PrecombatMain,
@@ -352,7 +352,7 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
       -- the turn off and clear the event log these cases read, and the draw step
       -- is never entered, so nothing draws from the empty library.
       atUntap printings =
-        let place g p = snd (S.addCreature p S.alice g)
+        let place g p = snd (S.addPermanent p S.alice g)
             placed = List.foldl' place (Setup.emptyGame S.bothPlayers) printings
          in placed
               { GameState.phase = untap,
@@ -381,7 +381,7 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
     sarcomancy <- S.printingOf s registry "Sarcomancy"
     eonHub <- S.printingOf s registry "Eon Hub"
     let base = atUntap [sarcomancy]
-        armed = snd (S.addCreature eonHub S.bob base)
+        armed = snd (S.addPermanent eonHub S.bob base)
         after = runTwo armed
     Spec.assertBool s (began untap after) "the untap step still began"
     Spec.assertBool s (not (began upkeep after)) "the upkeep step never began"
@@ -722,7 +722,7 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
       --
       -- Turn 2, so CR 103.8a's first-turn draw skip is out of the way.
       board plains stonehorn piker =
-        let (_, gs1) = S.addCreature piker S.bob (S.landsInPlay plains 4)
+        let (_, gs1) = S.addPermanent piker S.bob (S.landsInPlay plains 4)
             stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard plains pid h)) g [1 .. (5 :: Int)]
             (gs2, held) = S.handOne stonehorn (stock (stock gs1 S.alice) S.bob)
          in ( gs2
@@ -847,8 +847,8 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     mendingHands <- S.printingOf s registry "Mending Hands"
     let base = S.landsInPlay plains 1
-        (victim, g1) = S.addCreature pikerPrinting S.alice base
-        (attacker, g2) = S.addCreature pikerPrinting S.bob g1
+        (victim, g1) = S.addPermanent pikerPrinting S.alice base
+        (attacker, g2) = S.addPermanent pikerPrinting S.bob g1
         (g3, spellId) = S.handOne mendingHands g2
         shielded = castAndResolve (aimCreature victim) g3 spellId
         strike g = S.runPure S.identityAnswer g (Damage.applyDamage [hit attacker (Recipient.ToCreature victim) 3])
@@ -879,9 +879,9 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     mendingHands <- S.printingOf s registry "Mending Hands"
     let base = S.landsInPlay plains 1
-        (shieldedOne, g1) = S.addCreature pikerPrinting S.alice base
-        (bystander, g2) = S.addCreature pikerPrinting S.alice g1
-        (attacker, g3) = S.addCreature pikerPrinting S.bob g2
+        (shieldedOne, g1) = S.addPermanent pikerPrinting S.alice base
+        (bystander, g2) = S.addPermanent pikerPrinting S.alice g1
+        (attacker, g3) = S.addPermanent pikerPrinting S.bob g2
         (g4, spellId) = S.handOne mendingHands g3
         shielded = castAndResolve (aimCreature shieldedOne) g4 spellId
         after = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit attacker (Recipient.ToCreature bystander) 3])
@@ -902,8 +902,8 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     mendingHands <- S.printingOf s registry "Mending Hands"
     let base = S.landsInPlay plains 1
-        (big, g1) = S.addCreature pikerPrinting S.alice base
-        (small, g2) = S.addCreature pikerPrinting S.alice g1
+        (big, g1) = S.addPermanent pikerPrinting S.alice base
+        (small, g2) = S.addPermanent pikerPrinting S.alice g1
         (g3, spellId) = S.handOne mendingHands g2
         shielded = castAndResolve (aimPlayer S.bob) g3 spellId
         batch = [hit big (Recipient.ToPlayer S.bob) 5, hit small (Recipient.ToPlayer S.bob) 3]
@@ -931,8 +931,8 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     mendingHands <- S.printingOf s registry "Mending Hands"
     let base = S.landsInPlay plains 1
-        (big, g1) = S.addCreature pikerPrinting S.alice base
-        (small, g2) = S.addCreature pikerPrinting S.alice g1
+        (big, g1) = S.addPermanent pikerPrinting S.alice base
+        (small, g2) = S.addPermanent pikerPrinting S.alice g1
         (g3, spellId) = S.handOne mendingHands g2
         shielded = castAndResolve (aimPlayer S.bob) g3 spellId
         batch = [hit big (Recipient.ToPlayer S.bob) 1, hit small (Recipient.ToPlayer S.bob) 2]
@@ -961,9 +961,9 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     mendingHands <- S.printingOf s registry "Mending Hands"
     let base = Setup.emptyGame S.threePlayers
-        (_, g1) = S.addCreature plains S.alice base
-        (victim, g2) = S.addCreature pikerPrinting S.bob g1
-        (attacker, g3) = S.addCreature pikerPrinting S.carol g2
+        (_, g1) = S.addPermanent plains S.alice base
+        (victim, g2) = S.addPermanent pikerPrinting S.bob g1
+        (attacker, g3) = S.addPermanent pikerPrinting S.carol g2
         (spellId, g4) = S.addHandCard mendingHands S.alice g3
         shielded = S.runPure (aimCreature victim) g4 (S.cast S.alice spellId >> Stack.resolveTop)
         -- The one difference between the two runs.
@@ -1020,9 +1020,9 @@ healingGraceSpec s registry = Spec.describe s "Healing Grace (CR 609.7a)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     healingGrace <- S.printingOf s registry "Healing Grace"
     let base = S.landsInPlay plains 1
-        (victim, g1) = S.addCreature pikerPrinting S.alice base
-        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
-        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        (victim, g1) = S.addPermanent pikerPrinting S.alice base
+        (alpha, g2) = S.addPermanent pikerPrinting S.bob g1
+        (omega, g3) = S.addPermanent pikerPrinting S.bob g2
         (g4, spellId) = S.handOne healingGrace g3
         -- Rank-2, so the answerer is applied at each use rather than let-bound
         -- (castEach's reason above).
@@ -1052,9 +1052,9 @@ healingGraceSpec s registry = Spec.describe s "Healing Grace (CR 609.7a)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     mendingHands <- S.printingOf s registry "Mending Hands"
     let base = S.landsInPlay plains 1
-        (victim, g1) = S.addCreature pikerPrinting S.alice base
-        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
-        (_, g3) = S.addCreature pikerPrinting S.bob g2
+        (victim, g1) = S.addPermanent pikerPrinting S.alice base
+        (alpha, g2) = S.addPermanent pikerPrinting S.bob g1
+        (_, g3) = S.addPermanent pikerPrinting S.bob g2
         (g4, spellId) = S.handOne mendingHands g3
         shielded = castAndResolve (aimCreature victim) g4 spellId
         strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToCreature victim) n])
@@ -1116,9 +1116,9 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     replica <- S.printingOf s registry "Auriok Replica"
     let base = S.landsInPlay plains 1
-        (replicaId, g1) = S.addCreature replica S.alice base
-        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
-        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        (replicaId, g1) = S.addPermanent replica S.alice base
+        (alpha, g2) = S.addPermanent pikerPrinting S.bob g1
+        (omega, g3) = S.addPermanent pikerPrinting S.bob g2
         activate = Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop
         shielded = S.runPure (chooseDamageSourceOf omega) g3 activate
         strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToPlayer S.alice) n])
@@ -1146,9 +1146,9 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     replica <- S.printingOf s registry "Auriok Replica"
     let base = S.landsInPlay plains 1
-        (replicaId, g1) = S.addCreature replica S.alice base
-        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
-        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        (replicaId, g1) = S.addPermanent replica S.alice base
+        (alpha, g2) = S.addPermanent pikerPrinting S.bob g1
+        (omega, g3) = S.addPermanent pikerPrinting S.bob g2
         activate = Activate.activateAbility S.alice replicaId (theAbility replica) Monad.>> Stack.resolveTop
         shielded = S.runPure (chooseDamageSourceOf alpha) g3 activate
         strike src n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src (Recipient.ToPlayer S.alice) n])
@@ -1170,8 +1170,8 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     replica <- S.printingOf s registry "Auriok Replica"
     let base = S.landsInPlay plains 4
-        (replicaId, g1) = S.addCreature replica S.alice base
-        (decoy, g2) = S.addCreature pikerPrinting S.bob g1
+        (replicaId, g1) = S.addPermanent replica S.alice base
+        (decoy, g2) = S.addPermanent pikerPrinting S.bob g1
         (g3, cardId) = S.handOne replica g2
         -- The SPELL's own id, read off the stack rather than reused from the
         -- hand: casting is a zone change, so CR 400.7 already made the card and
@@ -1244,9 +1244,9 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     replica <- S.printingOf s registry "Auriok Replica"
     ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
     let base = S.landsInPlay plains 1
-        (fireEater, g1) = S.addCreature ghitu S.alice base
-        (replicaId, g2) = S.addCreature replica S.alice g1
-        (decoy, g3) = S.addCreature pikerPrinting S.bob g2
+        (fireEater, g1) = S.addPermanent ghitu S.alice base
+        (replicaId, g2) = S.addPermanent replica S.alice g1
+        (decoy, g3) = S.addPermanent pikerPrinting S.bob g2
         act =
           Activate.activateAbility S.alice fireEater (theAbility ghitu)
             Monad.>> Activate.activateAbility S.alice replicaId (theAbility replica)
@@ -1285,8 +1285,8 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     plains <- S.printingOf s registry "Plains"
     replica <- S.printingOf s registry "Auriok Replica"
     ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
-    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (replicaId, g2) = S.addCreature replica S.alice g1
+    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (replicaId, g2) = S.addPermanent replica S.alice g1
         g3 = S.landsFor plains S.alice 1 g2
         -- The Fire-Eater's ability alone, so its object's id can be read off the
         -- stack rather than guessed.
@@ -1345,12 +1345,12 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
     -- The Fire-Eater FIRST, so its id is the ascending pool's head and the
     -- fallback lands on it; the Piker LAST among the creatures, so Grist's CR
     -- 118.12 gate has exactly one candidate to eat.
-    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (replicaId, g2) = S.addCreature replica S.alice g1
-        (gristId, g3) = S.addCreature grist S.alice g2
+    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (replicaId, g2) = S.addPermanent replica S.alice g1
+        (gristId, g3) = S.addPermanent grist S.alice g2
         g4 = S.addCounter CounterKind.Loyalty 3 gristId g3
-        (fodder, g5) = S.addCreature pikerPrinting S.alice g4
-        (decoy, g6) = S.addCreature pikerPrinting S.bob g5
+        (fodder, g5) = S.addPermanent pikerPrinting S.alice g4
+        (decoy, g6) = S.addPermanent pikerPrinting S.bob g5
         board = S.landsFor plains S.alice 1 g6
         minusTwo = case Face.activatedAbilities (S.combinedFace grist) of
           ab : _ -> ab
@@ -1420,9 +1420,9 @@ payNoHeedSpec s registry = Spec.describe s "Pay No Heed (CR 615.1)" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     payNoHeed <- S.printingOf s registry "Pay No Heed"
     let base = S.landsInPlay plains 1
-        (victim, g1) = S.addCreature pikerPrinting S.alice base
-        (alpha, g2) = S.addCreature pikerPrinting S.bob g1
-        (omega, g3) = S.addCreature pikerPrinting S.bob g2
+        (victim, g1) = S.addPermanent pikerPrinting S.alice base
+        (alpha, g2) = S.addPermanent pikerPrinting S.bob g1
+        (omega, g3) = S.addPermanent pikerPrinting S.bob g2
         (g4, spellId) = S.handOne payNoHeed g3
         shielded = castAndResolve (chooseDamageSourceOf omega) g4 spellId
         strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
@@ -1463,12 +1463,12 @@ burrentonForgeTenderSpec s registry = Spec.describe s "Burrenton Forge-Tender (C
     forgeTender <- S.printingOf s registry "Burrenton Forge-Tender"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers
-        (tender, g1) = S.addCreature forgeTender S.alice base
+        (tender, g1) = S.addPermanent forgeTender S.alice base
         -- A WHITE permanent, and so no candidate: the second Forge-Tender is
         -- alice's own, which keeps the reading off control as well.
-        (spare, g2) = S.addCreature forgeTender S.alice g1
-        (alpha, g3) = S.addCreature pikerPrinting S.bob g2
-        (omega, g4) = S.addCreature pikerPrinting S.bob g3
+        (spare, g2) = S.addPermanent forgeTender S.alice g1
+        (alpha, g3) = S.addPermanent pikerPrinting S.bob g2
+        (omega, g4) = S.addPermanent pikerPrinting S.bob g3
         activate = Activate.activateAbility S.alice tender (theAbility forgeTender) Monad.>> Stack.resolveTop
         shieldAgainst src = S.runPure (chooseDamageSourceOf src) g4 activate
         shielded = shieldAgainst omega
@@ -1516,9 +1516,9 @@ scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
     flierPrinting <- S.printingOf s registry "Bird Maiden"
     groundPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay plains 6
-        (scarecrowId, g1) = S.addCreature scarecrow S.alice base
-        (flier, g2) = S.addCreature flierPrinting S.bob g1
-        (ground, g3) = S.addCreature groundPrinting S.bob g2
+        (scarecrowId, g1) = S.addPermanent scarecrow S.alice base
+        (flier, g2) = S.addPermanent flierPrinting S.bob g1
+        (ground, g3) = S.addPermanent groundPrinting S.bob g2
         activate = Activate.activateAbility S.alice scarecrowId (theAbility scarecrow) Monad.>> Stack.resolveTop
         shielded = S.runPure S.identityAnswer g3 activate
         strike src recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit src recipient n])
@@ -1544,8 +1544,8 @@ scarecrowSpec s registry = Spec.describe s "Scarecrow (CR 609.7b)" $ do
     scarecrow <- S.printingOf s registry "Scarecrow"
     flierPrinting <- S.printingOf s registry "Bird Maiden"
     let base = S.landsInPlay plains 6
-        (scarecrowId, g1) = S.addCreature scarecrow S.alice base
-        (flier, g2) = S.addCreature flierPrinting S.bob g1
+        (scarecrowId, g1) = S.addPermanent scarecrow S.alice base
+        (flier, g2) = S.addPermanent flierPrinting S.bob g1
         shielded = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice scarecrowId (theAbility scarecrow) Monad.>> Stack.resolveTop)
         strike recipient n g = S.runPure S.identityAnswer g (Damage.applyDamage [hit flier recipient n])
     Spec.assertEqWith s "the flier's 4 to bob lands in full" (S.lifeOf S.bob (strike (Recipient.ToPlayer S.bob) 4 shielded)) (Just 16)
@@ -1586,7 +1586,7 @@ packLeaderSpec s registry = Spec.describe s "Pack Leader (CR 611.2c)" $ do
         -- A Dog that comes under alice's control AFTER the shield resolved, which
         -- is exactly the object CR 611.2c's second sentence admits and a swept
         -- set could not.
-        (latecomer, board) = S.addCreature kinGuard S.alice atBlockers
+        (latecomer, board) = S.addPermanent kinGuard S.alice atBlockers
         hit src recipient n =
           DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Combat
         -- ONE source for every case, so each pair below differs in the recipient
@@ -1749,10 +1749,10 @@ wardingChantBoard s registry evolve = do
   sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
   piker <- S.printingOf s registry "Goblin Piker"
   let base = S.landsFor island S.alice 2 (S.landsInPlay plains 3)
-      (bobHuman, g1) = S.addCreature sorcerer S.bob base
-      (bobGoblin, g2) = S.addCreature piker S.bob g1
-      (aliceHuman, g3) = S.addCreature sorcerer S.alice g2
-      (aliceGoblin, g4) = S.addCreature piker S.alice g3
+      (bobHuman, g1) = S.addPermanent sorcerer S.bob base
+      (bobGoblin, g2) = S.addPermanent piker S.bob g1
+      (aliceHuman, g3) = S.addPermanent sorcerer S.alice g2
+      (aliceGoblin, g4) = S.addPermanent piker S.alice g3
       (chantId, g5) = S.addHandCard chant S.alice g4
       (evolutionId, g6) = S.addHandCard evolution S.alice g5
       ready =
@@ -1823,9 +1823,9 @@ communalBulwarkSpec s registry = Spec.describe s "Synthetic Communal Bulwark (CR
     piker <- S.printingOf s registry "Goblin Piker"
     tracker <- S.printingOf s registry "Ainok Tracker"
     let base = S.landsInPlay plains 2
-        (warded, g1) = S.addCreature sorcerer S.alice base
-        (unwarded, g2) = S.addCreature piker S.alice g1
-        (attacker, g3) = S.addCreature tracker S.bob g2
+        (warded, g1) = S.addPermanent sorcerer S.alice base
+        (unwarded, g2) = S.addPermanent piker S.alice g1
+        (attacker, g3) = S.addPermanent tracker S.bob g2
         (bulwarkId, g4) = S.addHandCard bulwark S.alice g3
         ready =
           g4
@@ -1917,9 +1917,9 @@ partingWardSpec s registry = Spec.describe s "Synthetic Parting Ward (CR 609.7a)
     replica <- S.printingOf s registry "Auriok Replica"
     piker <- S.printingOf s registry "Goblin Piker"
     ward <- S.printingOf s registry "Synthetic Parting Ward"
-    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (destroyed, g2) = S.addCreature piker S.bob g1
-        (replicaId, g3) = S.addCreature replica S.alice g2
+    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (destroyed, g2) = S.addPermanent piker S.bob g1
+        (replicaId, g3) = S.addPermanent replica S.alice g2
         -- Three Plains: two pay the Ward's {1}{W}, the third the Replica's {W}.
         g4 = S.landsFor plains S.alice 3 g3
         (wardId, g5) = S.addHandCard ward S.alice g4
@@ -1995,9 +1995,9 @@ selectiveMuzzleSpec s registry = Spec.describe s "Synthetic Selective Muzzle (CR
     piker <- S.printingOf s registry "Goblin Piker"
     mammoth <- S.printingOf s registry "War Mammoth"
     tracker <- S.printingOf s registry "Ainok Tracker"
-    let (muzzled, g1) = S.addCreature piker S.bob (S.landsInPlay plains 2)
-        (bystander, g2) = S.addCreature tracker S.bob g1
-        (covered, g3) = S.addCreature mammoth S.alice g2
+    let (muzzled, g1) = S.addPermanent piker S.bob (S.landsInPlay plains 2)
+        (bystander, g2) = S.addPermanent tracker S.bob g1
+        (covered, g3) = S.addPermanent mammoth S.alice g2
         (muzzleId, g4) = S.addHandCard muzzle S.alice g3
         ready =
           g4
@@ -2074,9 +2074,9 @@ healingGraceReferentSpec s registry = Spec.describe s "Healing Grace and Auriok 
     ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
     replica <- S.printingOf s registry "Auriok Replica"
     healingGrace <- S.printingOf s registry "Healing Grace"
-    let (victim, g1) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
-        (fireEater, g2) = S.addCreature ghitu S.alice g1
-        (replicaId, g3) = S.addCreature replica S.alice g2
+    let (victim, g1) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+        (fireEater, g2) = S.addPermanent ghitu S.alice g1
+        (replicaId, g3) = S.addPermanent replica S.alice g2
         -- Two Plains: one pays Healing Grace's {W}, the other the Replica's {W}.
         g4 = S.landsFor plains S.alice 2 g3
         (graceId, g5) = S.addHandCard healingGrace S.alice g4
@@ -2159,9 +2159,9 @@ galvanicBlastReferentSpec s registry = Spec.describe s "Galvanic Blast (CR 609.7
     replica <- S.printingOf s registry "Auriok Replica"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     blast <- S.printingOf s registry "Galvanic Blast"
-    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (destroyed, g2) = S.addCreature pikerPrinting S.bob g1
-        (replicaId, g3) = S.addCreature replica S.alice g2
+    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (destroyed, g2) = S.addPermanent pikerPrinting S.bob g1
+        (replicaId, g3) = S.addPermanent replica S.alice g2
         -- One Mountain for the Blast's {R}, one Plains for the Replica's {W}.
         g4 = S.landsFor mountain S.alice 1 g3
         g5 = S.landsFor plains S.alice 1 g4
@@ -2242,8 +2242,8 @@ communalBulwarkReferentSpec s registry = Spec.describe s "Synthetic Communal Bul
     bulwark <- S.printingOf s registry "Synthetic Communal Bulwark"
     healingGrace <- S.printingOf s registry "Healing Grace"
     trackerPrinting <- S.printingOf s registry "Ainok Tracker"
-    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (victim, g2) = S.addCreature trackerPrinting S.bob g1
+    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (victim, g2) = S.addPermanent trackerPrinting S.bob g1
         -- Three Plains: two pay the Bulwark's {1}{W}, the third Healing Grace's {W}.
         g3 = S.landsFor plains S.alice 3 g2
         (bulwarkId, g4) = S.addHandCard bulwark S.alice g3
@@ -2315,8 +2315,8 @@ comeBackWrongSpec s registry = Spec.describe s "Come Back Wrong and Auriok Repli
     replica <- S.printingOf s registry "Auriok Replica"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     comeBack <- S.printingOf s registry "Come Back Wrong"
-    let (departed, g1) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
-        (replicaId, g2) = S.addCreature replica S.alice g1
+    let (departed, g1) = S.addPermanent pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
+        (replicaId, g2) = S.addPermanent replica S.alice g1
         -- Three Swamps for the Sorcery's {2}{B} and two Plains for the Replica's
         -- {W}, turnTheBladeBoard's reason: the Sorcery is paid first and spends
         -- at most three lands, so a Plains survives however the payment picks.
@@ -2434,9 +2434,9 @@ turnTheBladeBoard s registry evolve = do
   piker <- S.printingOf s registry "Goblin Piker"
   jedit <- S.printingOf s registry "Jedit Ojanen"
   let base = S.landsFor island S.alice 2 (S.landsInPlay plains 3)
-      (bobHuman, g1) = S.addCreature sorcerer S.bob base
-      (bobGoblin, g2) = S.addCreature piker S.bob g1
-      (cat, g3) = S.addCreature jedit S.alice g2
+      (bobHuman, g1) = S.addPermanent sorcerer S.bob base
+      (bobGoblin, g2) = S.addPermanent piker S.bob g1
+      (cat, g3) = S.addPermanent jedit S.alice g2
       (bladeId, g4) = S.addHandCard blade S.alice g3
       (evolutionId, g5) = S.addHandCard evolution S.alice g4
       ready =
@@ -2488,9 +2488,9 @@ turnTheBladeLastKnownSpec s registry = Spec.describe s "Synthetic Turn the Blade
     ghitu <- S.printingOf s registry "Ghitu Fire-Eater"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     jedit <- S.printingOf s registry "Jedit Ojanen"
-    let (fireEater, g1) = S.addCreature ghitu S.alice (Setup.emptyGame S.bothPlayers)
-        (bobHuman, g2) = S.addCreature sorcerer S.bob g1
-        (cat, g3) = S.addCreature jedit S.alice g2
+    let (fireEater, g1) = S.addPermanent ghitu S.alice (Setup.emptyGame S.bothPlayers)
+        (bobHuman, g2) = S.addPermanent sorcerer S.bob g1
+        (cat, g3) = S.addPermanent jedit S.alice g2
         g4 = S.landsFor plains S.alice 2 g3
         (bladeId, g5) = S.addHandCard blade S.alice g4
         ready =
@@ -2571,8 +2571,8 @@ testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
     jedit <- S.printingOf s registry "Jedit Ojanen"
     testOfFaith <- S.printingOf s registry "Test of Faith"
     let base = S.landsInPlay plains 2
-        (attacker, g1) = S.addCreature pikerPrinting S.alice base
-        (blocker, g2) = S.addCreature jedit S.bob g1
+        (attacker, g1) = S.addPermanent pikerPrinting S.alice base
+        (blocker, g2) = S.addPermanent jedit S.bob g1
         (g3, spellId) = S.handOne testOfFaith g2
         shielded = castAndResolve (aimCreature attacker) g3 spellId
         after = S.runCombat S.aggressiveAnswer (atCombat shielded)
@@ -2602,8 +2602,8 @@ testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     testOfFaith <- S.printingOf s registry "Test of Faith"
     let base = S.landsInPlay plains 2
-        (victim, g1) = S.addCreature pikerPrinting S.alice base
-        (pinger, g2) = S.addCreature sorcerer S.alice g1
+        (victim, g1) = S.addPermanent pikerPrinting S.alice base
+        (pinger, g2) = S.addPermanent sorcerer S.alice g1
         (g3, spellId) = S.handOne testOfFaith g2
         shielded = castAndResolve (aimCreature victim) g3 spellId
         ping g = S.runPure (aimCreature victim) g (Activate.activateAbility S.alice pinger (theAbility sorcerer) Monad.>> Stack.resolveTop)
@@ -2697,8 +2697,8 @@ decoratedGriffinSpec s registry = Spec.describe s "Decorated Griffin (CR 510.2)"
     griffin <- S.printingOf s registry "Decorated Griffin"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let base = S.landsInPlay plains 2
-        (bird, g1) = S.addCreature griffin S.alice base
-        (pinger, g2) = S.addCreature sorcerer S.alice g1
+        (bird, g1) = S.addPermanent griffin S.alice base
+        (pinger, g2) = S.addPermanent sorcerer S.alice g1
         shielded = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice bird (theAbility griffin) Monad.>> Stack.resolveTop)
         ping g = S.runPure (aimPlayer S.alice) g (Activate.activateAbility S.alice pinger (theAbility sorcerer) Monad.>> Stack.resolveTop)
         after = ping shielded
@@ -2714,8 +2714,8 @@ decoratedGriffinSpec s registry = Spec.describe s "Decorated Griffin (CR 510.2)"
     griffin <- S.printingOf s registry "Decorated Griffin"
     jedit <- S.printingOf s registry "Jedit Ojanen"
     let base = S.landsInPlay plains 2
-        (bird, g1) = S.addCreature griffin S.alice base
-        (_, g2) = S.addCreature jedit S.bob g1
+        (bird, g1) = S.addPermanent griffin S.alice base
+        (_, g2) = S.addPermanent jedit S.bob g1
         shielded = S.runPure S.identityAnswer g2 (Activate.activateAbility S.alice bird (theAbility griffin) Monad.>> Stack.resolveTop)
         after = S.runCombat attackNoBlock (bobAttacks shielded)
         control = S.runCombat attackNoBlock (bobAttacks g2)

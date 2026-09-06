@@ -106,8 +106,8 @@ untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.
 -- happened yet, so the game still has neither designation (CR 731.1).
 tovolarBoard :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 tovolarBoard tovolar wolf wolves =
-  let (tovolarId, gs) = S.addCreature tovolar S.alice (Setup.emptyGame S.bothPlayers)
-   in (tovolarId, foldr (\_ g -> snd (S.addCreature wolf S.alice g)) gs [1 .. wolves])
+  let (tovolarId, gs) = S.addPermanent tovolar S.alice (Setup.emptyGame S.bothPlayers)
+   in (tovolarId, foldr (\_ g -> snd (S.addPermanent wolf S.alice g)) gs [1 .. wolves])
 
 -- The upkeep step of alice's turn, ActivateSpec's augurUpkeep exactly: the
 -- schedule loses its head so a runStep-driven case advances OUT of the upkeep
@@ -147,7 +147,7 @@ moonmistBoard ::
   (GameState.GameState -> GameState.GameState) ->
   (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 moonmistBoard tovolar forest moonmist extra =
-  let (tovolarId, withTovolar) = S.addCreature tovolar S.alice (S.landsInPlay forest 2)
+  let (tovolarId, withTovolar) = S.addPermanent tovolar S.alice (S.landsInPlay forest 2)
       (gs, spellId) = S.handOne moonmist (extra withTovolar)
    in (tovolarId, spellId, settle gs)
 
@@ -206,7 +206,7 @@ expertFaces gs =
 -- Expert's {4}{G}, so the cast can be paid without a decision.
 expertBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural.Natural -> (ObjectId.ObjectId, GameState.GameState)
 expertBoard tovolar forest expert spells =
-  let (_, withTovolar) = S.addCreature tovolar S.alice (S.landsInPlay forest 5)
+  let (_, withTovolar) = S.addPermanent tovolar S.alice (S.landsInPlay forest 5)
       (gs, spellId) = S.handOne expert withTovolar
    in (spellId, untapStep (afterCasting spells (settle gs)))
 
@@ -341,7 +341,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   -- with neither. The falsifier for an engine that started every game at day.
   Spec.it s "CR 731.1 a game with no daybound permanent stays neither day nor night" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "neither, before anything settles" (GameState.daytime gs) Nothing
     Spec.assertEqWith s "and neither afterwards" (GameState.daytime (settle gs)) Nothing
   -- CR 702.145d: "any time a player controls a permanent with daybound, if it's
@@ -460,10 +460,10 @@ anyNumberBoard ::
   Printing.Printing ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 anyNumberBoard tovolar ranger wolf =
-  let (tovolarId, g1) = S.addCreature tovolar S.alice (Setup.emptyGame S.bothPlayers)
-      (rangerId, g2) = S.addCreature ranger S.alice g1
-      (_, g3) = S.addCreature wolf S.alice g2
-      (bobRangerId, g4) = S.addCreature ranger S.bob g3
+  let (tovolarId, g1) = S.addPermanent tovolar S.alice (Setup.emptyGame S.bothPlayers)
+      (rangerId, g2) = S.addPermanent ranger S.alice g1
+      (_, g3) = S.addPermanent wolf S.alice g2
+      (bobRangerId, g4) = S.addPermanent ranger S.bob g3
    in (tovolarId, rangerId, bobRangerId, settle (afterOneCast g4))
 
 -- One spell cast by alice during the previous turn, written into the per-seat
@@ -542,7 +542,7 @@ untapCheckSpec s registry = Spec.describe s "UntapCheck" $ do
   -- gained a designation, and the untap step does not give it one.
   Spec.it s "CR 502.2 neither day nor night: the check does not happen" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, board) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, board) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         after = untapStep (afterCasting 0 (settle board))
     Spec.assertEqWith s "still neither" (GameState.daytime after) Nothing
   -- CR 731.2's input, taken through the rules rather than written: alice casts a

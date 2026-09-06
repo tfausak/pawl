@@ -414,7 +414,7 @@ skipSpec s registry = Spec.describe s "Skip" $ do
     ray <- S.printingOf s registry "Ray of Command"
     let (base, _, _) = S.combatBoardOf [piker] []
         -- {3}{U}, so four.
-        withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 :: Int .. 4]
+        withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) base [1 :: Int .. 4]
         (_, armed) = S.addHandCard ray S.bob withLands
         after = snd (Engine.runGamePure castingDefender armed Engine.runStep)
     Spec.assertEqWith s "the attacker really left combat" (Map.keys (Combat.Type.attackers (GameState.combat after))) []
@@ -467,9 +467,9 @@ assaultBoard ::
   Printing.Printing ->
   (GameState.GameState, ObjectId, ObjectId, ObjectId)
 assaultBoard mountain assault mine piker =
-  let (enchantment, gs1) = S.addCreature assault S.alice (S.landsInPlay mountain 5)
-      (ours, gs2) = S.addCreature mine S.alice gs1
-      (theirs, gs3) = S.addCreature piker S.bob gs2
+  let (enchantment, gs1) = S.addPermanent assault S.alice (S.landsInPlay mountain 5)
+      (ours, gs2) = S.addPermanent mine S.alice gs1
+      (theirs, gs3) = S.addPermanent piker S.bob gs2
       gs =
         (S.tapObject theirs (S.tapObject ours gs3))
           { GameState.activePlayer = S.alice,
@@ -524,7 +524,7 @@ relentlessBoard mountain assault piker =
       (attacker, bystander) = case ours of
         [a, b] -> (a, b)
         _ -> error "combatBoardOf should return two creatures"
-      withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) base [1 :: Int .. 4]
+      withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) base [1 :: Int .. 4]
       (gs, spell) = S.handOne assault (S.tapObject bystander withLands)
    in ( gs
           { GameState.activePlayer = S.alice,
@@ -547,7 +547,7 @@ throttleBoard ::
   Printing.Printing ->
   (GameState.GameState, ObjectId, ObjectId)
 throttleBoard mountain throttle piker =
-  let (attacker, gs1) = S.addCreature piker S.alice (S.landsInPlay mountain 6)
+  let (attacker, gs1) = S.addPermanent piker S.alice (S.landsInPlay mountain 6)
       (gs2, spell) = S.handOne throttle gs1
    in ( gs2
           { GameState.activePlayer = S.alice,
@@ -1088,7 +1088,7 @@ savorBoard ::
   Printing.Printing ->
   (GameState.GameState, ObjectId, ObjectId, ObjectId)
 savorBoard island savor warp piker =
-  let (bystander, withPiker) = S.addCreature piker S.alice (S.landsInPlay island 8)
+  let (bystander, withPiker) = S.addPermanent piker S.alice (S.landsInPlay island 8)
       (savorId, withSavor) = S.addHandCard savor S.alice withPiker
       (warpId, withWarp) = S.addHandCard warp S.alice withSavor
       stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
@@ -1259,8 +1259,8 @@ timeStopBoard ::
   Printing.Printing ->
   (GameState.GameState, ObjectId, ObjectId)
 timeStopBoard island mountain gnarlbark timeStop divination burst brothers =
-  let (tree, gs1) = S.addCreature gnarlbark S.alice (S.landsFor mountain S.bob 4 (S.landsInPlay island 9))
-      (shaman, gs2) = S.addCreature brothers S.bob gs1
+  let (tree, gs1) = S.addPermanent gnarlbark S.alice (S.landsFor mountain S.bob 4 (S.landsInPlay island 9))
+      (shaman, gs2) = S.addPermanent brothers S.bob gs1
       (_, gs3) = S.addHandCard timeStop S.alice gs2
       (divine, gs4) = S.addHandCard divination S.alice gs3
       (bolt, gs5) = S.addHandCard burst S.bob gs4
@@ -1381,7 +1381,7 @@ mandateBoard plains mountain piker statue mandate burst =
       attacker = case ours of
         a : _ -> a
         [] -> error "Pawl.TurnSpec: combatBoardOf should return one creature"
-      (jade, gs1) = S.addCreature statue S.alice base
+      (jade, gs1) = S.addPermanent statue S.alice base
       gs2 = S.landsFor mountain S.bob 2 (S.landsFor mountain S.alice 1 (S.landsFor plains S.alice 4 gs1))
       (spell, gs3) = S.addHandCard mandate S.alice gs2
       (hers, gs4) = S.addHandCard burst S.alice gs3
@@ -1587,7 +1587,7 @@ truncateBoard island piker wall statue fray =
       blocker = case theirs of
         b : _ -> b
         [] -> error "Pawl.TurnSpec: combatBoardOf should return one blocker"
-      (jade, gs1) = S.addCreature statue S.alice base
+      (jade, gs1) = S.addPermanent statue S.alice base
       gs2 = S.landsFor island S.alice 4 gs1
       (spell, gs3) = S.addHandCard fray S.alice gs2
       stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]

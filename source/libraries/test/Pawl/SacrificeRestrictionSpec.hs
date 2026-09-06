@@ -100,10 +100,10 @@ ownerSpec s registry = Spec.describe s "Owner" $ do
   Spec.it s "CR 108.3 whole card: Garland pumps the creature alice controls but does not own, and only it" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature garland S.alice (Setup.emptyGame S.bothPlayers)
-        (hers, g1) = S.addCreature piker S.alice g0
-        (stolen, g2) = S.addCreature piker S.bob g1
-        (his, g3) = S.addCreature piker S.bob g2
+    let (_, g0) = S.addPermanent garland S.alice (Setup.emptyGame S.bothPlayers)
+        (hers, g1) = S.addPermanent piker S.alice g0
+        (stolen, g2) = S.addPermanent piker S.bob g1
+        (his, g3) = S.addPermanent piker S.bob g2
         gs = S.giveControl stolen S.alice g3
     Spec.assertEqWith s "CR 613.4c: the stolen Piker is 4/3" (S.powerToughnessOf stolen gs) (Just (4, 3))
     Spec.assertEqWith s "alice's own Piker is untouched at 2/1" (S.powerToughnessOf hers gs) (Just (2, 1))
@@ -117,7 +117,7 @@ ownerSpec s registry = Spec.describe s "Owner" $ do
   Spec.it s "CR 111.2 a token's owner is its creator, not whoever controls it now" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g0) = S.addCreature garland S.alice (Setup.emptyGame S.bothPlayers)
+    let (_, g0) = S.addPermanent garland S.alice (Setup.emptyGame S.bothPlayers)
         (mine, g1) = S.addToken (Printing.card piker) S.alice g0
         (taken, g2) = S.addToken (Printing.card piker) S.bob g1
         gs = S.giveControl taken S.alice g2
@@ -143,10 +143,10 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     piker <- S.printingOf s registry "Goblin Piker"
     villageRites <- S.printingOf s registry "Village Rites"
-    let (stolenGarland, g0) = S.addCreature garland S.bob (S.landsInPlay swamp 1)
-        (stolenPiker, g1) = S.addCreature piker S.bob g0
+    let (stolenGarland, g0) = S.addPermanent garland S.bob (S.landsInPlay swamp 1)
+        (stolenPiker, g1) = S.addPermanent piker S.bob g0
         g2 = S.giveControl stolenPiker S.alice (S.giveControl stolenGarland S.alice g1)
-        (hers, g3) = S.addCreature piker S.alice g2
+        (hers, g3) = S.addPermanent piker S.alice g2
         -- Stocked, so the draw has something to draw and CR 104.3c does not
         -- deck alice before the assertion runs.
         (_, g4) = S.addLibraryCard swamp S.alice g3
@@ -173,11 +173,11 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     piker <- S.printingOf s registry "Goblin Piker"
     villageRites <- S.printingOf s registry "Village Rites"
-    let (stolenGarland, g0) = S.addCreature garland S.bob (S.landsInPlay swamp 1)
-        (stolenPiker, g1) = S.addCreature piker S.bob g0
+    let (stolenGarland, g0) = S.addPermanent garland S.bob (S.landsInPlay swamp 1)
+        (stolenPiker, g1) = S.addPermanent piker S.bob g0
         g2 = S.giveControl stolenPiker S.alice (S.giveControl stolenGarland S.alice g1)
         (barren, spell) = S.handOne villageRites g2
-        (hers, withHers) = S.addCreature piker S.alice barren
+        (hers, withHers) = S.addPermanent piker S.alice barren
     Spec.assertEqWith s "nothing alice controls may be sacrificed" (offered barren) []
     Spec.assertBool s (not (S.castable S.alice spell barren)) "so the cost cannot be paid"
     -- The paired positive, on the same mana: one creature alice owns is enough.
@@ -198,9 +198,9 @@ offerSpec s registry = Spec.describe s "Offer" $ do
   Spec.it s "CR 118.3 whole cards: a stolen Ghitu Fire-Eater cannot pay its own sacrifice cost" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     fireEater <- S.printingOf s registry "Ghitu Fire-Eater"
-    let (_, g0) = S.addCreature garland S.alice (Setup.emptyGame S.bothPlayers)
-        (stolen, g1) = S.addCreature fireEater S.bob g0
-        (hers, g2) = S.addCreature fireEater S.alice g1
+    let (_, g0) = S.addPermanent garland S.alice (Setup.emptyGame S.bothPlayers)
+        (stolen, g1) = S.addPermanent fireEater S.bob g0
+        (hers, g2) = S.addPermanent fireEater S.alice g1
         gs = S.giveControl stolen S.alice g2
     Spec.assertBool s (not (activatable stolen gs)) "CR 101.2: the stolen one can't sacrifice itself"
     -- The paired positive on the SAME board: the identical card, differing only
@@ -212,11 +212,11 @@ offerSpec s registry = Spec.describe s "Offer" $ do
   Spec.it s "CR 609.3 an edict against alice takes the creature she owns and leaves the ones she does not" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (source, g0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-        (stolenGarland, g1) = S.addCreature garland S.bob g0
-        (stolenPiker, g2) = S.addCreature piker S.bob g1
+    let (source, g0) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (stolenGarland, g1) = S.addPermanent garland S.bob g0
+        (stolenPiker, g2) = S.addPermanent piker S.bob g1
         g3 = S.giveControl stolenPiker S.alice (S.giveControl stolenGarland S.alice g2)
-        (hers, gs) = S.addCreature piker S.alice g3
+        (hers, gs) = S.addPermanent piker S.alice g3
         edict =
           Resolve.applyEffect
             source
@@ -249,8 +249,8 @@ instructionSpec s registry = Spec.describe s "Instruction" $ do
   Spec.it s "CR 101.2 whole cards: a stolen Lightning Skelemental is not sacrificed at end of turn" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     skelemental <- S.printingOf s registry "Lightning Skelemental"
-    let (_, g0) = S.addCreature garland S.alice (Setup.emptyGame S.bothPlayers)
-        (stolen, g1) = S.addCreature skelemental S.bob g0
+    let (_, g0) = S.addPermanent garland S.alice (Setup.emptyGame S.bothPlayers)
+        (stolen, g1) = S.addPermanent skelemental S.bob g0
         gs = S.giveControl stolen S.alice g1
         after = endStepOf gs
     Spec.assertBool s (S.onBattlefield stolen after) "CR 101.3: the instruction is ignored"
@@ -264,8 +264,8 @@ instructionSpec s registry = Spec.describe s "Instruction" $ do
   Spec.it s "CR 701.21a control: an unstolen Lightning Skelemental IS sacrificed at end of turn" $ do
     garland <- S.printingOf s registry "Garland, Royal Kidnapper"
     skelemental <- S.printingOf s registry "Lightning Skelemental"
-    let (_, g0) = S.addCreature garland S.alice (Setup.emptyGame S.bothPlayers)
-        (his, gs) = S.addCreature skelemental S.bob g0
+    let (_, g0) = S.addPermanent garland S.alice (Setup.emptyGame S.bothPlayers)
+        (his, gs) = S.addPermanent skelemental S.bob g0
         after = endStepOf gs
     Spec.assertBool s (not (S.onBattlefield his after)) "bob sacrifices his own creature"
     Spec.assertBool
@@ -297,15 +297,15 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bloodMoon <- S.printingOf s registry "Blood Moon"
-    let (garlandId, g0) = S.addCreature garland S.alice (Setup.emptyGame S.bothPlayers)
-        (stolen, g1) = S.addCreature piker S.bob g0
+    let (garlandId, g0) = S.addPermanent garland S.alice (Setup.emptyGame S.bothPlayers)
+        (stolen, g1) = S.addPermanent piker S.bob g0
         base = S.giveControl stolen S.alice g1
-        withAshaya = snd (S.addCreature ashaya S.alice base)
-        withMoon = snd (S.addCreature bloodMoon S.alice base)
+        withAshaya = snd (S.addPermanent ashaya S.alice base)
+        withMoon = snd (S.addPermanent bloodMoon S.alice base)
         -- Ashaya first, so Blood Moon's timestamp is the later one; CR 613.8a's
         -- dependency decides the order either way, and Pawl.ProjectionSpec is
         -- where that is asserted rather than assumed.
-        stripped = snd (S.addCreature bloodMoon S.alice withAshaya)
+        stripped = snd (S.addPermanent bloodMoon S.alice withAshaya)
     Spec.assertEqWith
       s
       "the stolen Piker can't be sacrificed until Ashaya and Blood Moon are both on the battlefield"

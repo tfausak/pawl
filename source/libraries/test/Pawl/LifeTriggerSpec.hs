@@ -94,8 +94,8 @@ lifeGainTriggerSpec s registry =
       -- decides who gains the life the entering creature causes. That is the only
       -- difference between the two cases below.
       wardenBoard plains pridemate soulWarden wardenOwner =
-        let (_, b0) = S.addCreature soulWarden wardenOwner (S.landsInPlay plains 1)
-            (mateId, b1) = S.addCreature pridemate S.alice b0
+        let (_, b0) = S.addPermanent soulWarden wardenOwner (S.landsInPlay plains 1)
+            (mateId, b1) = S.addPermanent pridemate S.alice b0
             (gs, spellId) = S.handOne soulWarden b1
             cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
          in (mateId, resolveAll cast)
@@ -152,8 +152,8 @@ lifeGainTriggerSpec s registry =
           pridemate <- S.printingOf s registry "Ajani's Pridemate"
           childOfNight <- S.printingOf s registry "Child of Night"
           let (gs0, mine, _) = S.combatBoardOf [childOfNight] []
-              (aliceMate, gs1) = S.addCreature pridemate S.alice gs0
-              (bobMate, gs2) = S.addCreature pridemate S.bob gs1
+              (aliceMate, gs1) = S.addPermanent pridemate S.alice gs0
+              (bobMate, gs2) = S.addPermanent pridemate S.bob gs1
           case mine of
             [] -> Spec.assertFailure s "fixture should have given alice a Child of Night"
             vampire : _ -> do
@@ -193,7 +193,7 @@ lifeGainTriggerSpec s registry =
         -- cannot pass for the wrong reason.
         Spec.it s "CR 119.9 a 0-damage lifelink event records no life gain at all" $ do
           childOfNight <- S.printingOf s registry "Child of Night"
-          let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
+          let (oid, gs0) = S.addPermanent childOfNight S.alice (Setup.emptyGame S.bothPlayers)
               evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False False 0 (Just S.alice) DamageKind.Combat
               gainsIn gs = [p | GameEvent.LifeGained (LifeChange.MkLifeChange p _) <- S.eventsOf gs]
               after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
@@ -253,8 +253,8 @@ abilitiesWhenTriggeredSpec s registry =
         pridemate <- S.printingOf s registry "Ajani's Pridemate"
         piker <- S.printingOf s registry "Goblin Piker"
         draught <- S.printingOf s registry "Synthetic Humbling Draught"
-        let (mateId, b0) = S.addCreature pridemate S.alice (S.landsInPlay plains 1)
-            (pikerId, b1) = S.addCreature piker S.alice b0
+        let (mateId, b0) = S.addPermanent pridemate S.alice (S.landsInPlay plains 1)
+            (pikerId, b1) = S.addPermanent piker S.alice b0
         pure (mateId, pikerId, S.handOne draught b1)
       drinkAt victimId (gs, spellId) =
         let cast = snd (Engine.runGamePure (aimAt victimId) gs (S.cast S.alice spellId))
@@ -314,7 +314,7 @@ lifeGainAmountSpec s registry =
           plains <- S.printingOf s registry "Plains"
           sanguineBond <- S.printingOf s registry "Sanguine Bond"
           renewedFaith <- S.printingOf s registry "Renewed Faith"
-          let (_, board) = S.addCreature sanguineBond S.alice (S.landsInPlay plains 3)
+          let (_, board) = S.addPermanent sanguineBond S.alice (S.landsInPlay plains 3)
               (gs, spellId) = S.handOne renewedFaith board
               settled = resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId)))
           Spec.assertEqWith s "alice gained exactly 6" (S.lifeOf S.alice settled) (Just 26)
@@ -325,8 +325,8 @@ lifeGainAmountSpec s registry =
         Spec.it s "CR 603.2 a gain of 2 drains 2, not the previous case's 6" $ do
           sanguineBond <- S.printingOf s registry "Sanguine Bond"
           radiantFountain <- S.printingOf s registry "Radiant Fountain"
-          let (_, withBond) = S.addCreature sanguineBond S.alice (Setup.emptyGame S.bothPlayers)
-              (fountainId, gs) = S.addCreature radiantFountain S.alice withBond
+          let (_, withBond) = S.addPermanent sanguineBond S.alice (Setup.emptyGame S.bothPlayers)
+              (fountainId, gs) = S.addPermanent radiantFountain S.alice withBond
               settled = entering fountainId gs
           Spec.assertEqWith s "alice gained exactly 2" (S.lifeOf S.alice settled) (Just 22)
           Spec.assertEqWith s "and bob lost exactly that much" (S.lifeOf S.bob settled) (Just 18)
@@ -390,9 +390,9 @@ falseCureSpec s registry =
         soulWarden <- S.printingOf s registry "Soul Warden"
         piker <- S.printingOf s registry "Goblin Piker"
         let lands = S.landsFor swamp S.alice 2 S.threePlayerGame
-            (fountainId, withFountain) = S.addCreature fountain S.bob lands
-            (_, withWarden) = S.addCreature soulWarden S.alice withFountain
-            (pikerId, withPiker) = S.addCreature piker S.carol withWarden
+            (fountainId, withFountain) = S.addPermanent fountain S.bob lands
+            (_, withWarden) = S.addPermanent soulWarden S.alice withFountain
+            (pikerId, withPiker) = S.addPermanent piker S.carol withWarden
             (spellId, withSpell) = S.addHandCard falseCure S.alice withPiker
         pure (fountainId, pikerId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
       -- The Cure armed on `base` with Centaur Peacemaker, {1}{G}{W} Creature --
@@ -406,7 +406,7 @@ falseCureSpec s registry =
         falseCure <- S.printingOf s registry "False Cure"
         peacemaker <- S.printingOf s registry "Centaur Peacemaker"
         let lands = S.landsFor swamp S.alice 2 base
-            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (peacemakerId, withPeacemaker) = S.addPermanent peacemaker S.alice lands
             (spellId, withSpell) = S.addHandCard falseCure S.alice withPeacemaker
         pure (peacemakerId, resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
    in Spec.describe s "CR 603.7 False Cure" $ do
@@ -472,7 +472,7 @@ falseCureSpec s registry =
         -- passing 16 above, the drains never having happened either.
         Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
           peacemaker <- S.printingOf s registry "Centaur Peacemaker"
-          let (peacemakerId, gs) = S.addCreature peacemaker S.alice S.threePlayerGame
+          let (peacemakerId, gs) = S.addPermanent peacemaker S.alice S.threePlayerGame
               after = entering peacemakerId gs
           Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
@@ -547,7 +547,7 @@ singularCureSpec s registry =
         cure <- S.printingOf s registry "Synthetic Singular Cure"
         peacemaker <- S.printingOf s registry "Centaur Peacemaker"
         let lands = S.landsFor swamp S.alice 2 base
-            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (peacemakerId, withPeacemaker) = S.addPermanent peacemaker S.alice lands
             (spellId, withSpell) = S.addHandCard cure S.alice withPeacemaker
         pure (peacemakerId, resolveAll 0 (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
       -- The same Cure with a LONE gain to watch: bob's Radiant Fountain (CR
@@ -557,7 +557,7 @@ singularCureSpec s registry =
         cure <- S.printingOf s registry "Synthetic Singular Cure"
         fountain <- S.printingOf s registry "Radiant Fountain"
         let lands = S.landsFor swamp S.alice 2 S.threePlayerGame
-            (fountainId, withFountain) = S.addCreature fountain S.bob lands
+            (fountainId, withFountain) = S.addPermanent fountain S.bob lands
             (spellId, withSpell) = S.addHandCard cure S.alice withFountain
         pure (fountainId, resolveAll 0 (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))))
    in Spec.describe s "CR 603.7b Synthetic Singular Cure" $ do
@@ -611,7 +611,7 @@ singularCureSpec s registry =
         -- where nobody actually gained would read as a passing 24 above.
         Spec.it s "CR 119.3 with no entry armed, each of the three seats keeps its 4" $ do
           peacemaker <- S.printingOf s registry "Centaur Peacemaker"
-          let (peacemakerId, gs) = S.addCreature peacemaker S.alice S.threePlayerGame
+          let (peacemakerId, gs) = S.addPermanent peacemaker S.alice S.threePlayerGame
               after = entering 2 peacemakerId gs
           Spec.assertEqWith s "alice is at 24" (S.lifeOf S.alice after) (Just 24)
           Spec.assertEqWith s "bob is at 24" (S.lifeOf S.bob after) (Just 24)
@@ -680,7 +680,7 @@ apnapDelayedSpec s registry =
         cure <- S.printingOf s registry "Synthetic Singular Cure"
         peacemaker <- S.printingOf s registry "Centaur Peacemaker"
         let lands = S.landsFor swamp S.bob 2 (S.landsFor swamp S.alice 2 S.threePlayerGame)
-            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (peacemakerId, withPeacemaker) = S.addPermanent peacemaker S.alice lands
             (firstSpell, withFirst) = S.addHandCard cure first withPeacemaker
             (secondSpell, withSecond) = S.addHandCard cure second withFirst
             cast = S.cast first firstSpell >> S.cast second secondSpell
@@ -731,7 +731,7 @@ apnapDelayedSpec s registry =
         -- it an empty question list above would read as a passing order.
         Spec.it s "CR 119.3 with no entry armed, nobody is asked and each seat keeps its 4" $ do
           peacemaker <- S.printingOf s registry "Centaur Peacemaker"
-          let (peacemakerId, placed) = S.addCreature peacemaker S.alice S.threePlayerGame
+          let (peacemakerId, placed) = S.addPermanent peacemaker S.alice S.threePlayerGame
               moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
               gs = S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project peacemakerId placed))] placed
           Spec.assertEqWith s "no question is raised" (asked gs) []
@@ -826,7 +826,7 @@ oneSeatDelayedSpec s registry =
         toll <- S.printingOf s registry "Synthetic Singular Toll"
         peacemaker <- S.printingOf s registry "Centaur Peacemaker"
         let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
-            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (peacemakerId, withPeacemaker) = S.addPermanent peacemaker S.alice lands
             (cureSpell, withCure) = S.addHandCard cure S.alice withPeacemaker
             (tollSpell, withToll) = S.addHandCard toll S.alice withCure
             cast = S.cast S.alice cureSpell >> S.cast S.alice tollSpell
@@ -839,7 +839,7 @@ oneSeatDelayedSpec s registry =
         cure <- S.printingOf s registry "Synthetic Singular Cure"
         peacemaker <- S.printingOf s registry "Centaur Peacemaker"
         let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
-            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (peacemakerId, withPeacemaker) = S.addPermanent peacemaker S.alice lands
             (cureSpell, withCure) = S.addHandCard cure S.alice withPeacemaker
             resolved = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer withCure (S.cast S.alice cureSpell))) Engine.priorityLoop)
             moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
@@ -953,7 +953,7 @@ communalVigilSpec s registry =
         vigil <- S.printingOf s registry "Synthetic Communal Vigil"
         entering <- S.printingOf s registry gainer
         let stocked = foldr (\_ g -> snd (S.addLibraryCard plains S.alice g)) base [1 .. 6 :: Int]
-            withVigil = snd (S.addCreature vigil S.alice stocked)
+            withVigil = snd (S.addPermanent vigil S.alice stocked)
             (_, entered) = S.entersWithTrigger entering S.alice withVigil
         pure (snd (Engine.runGamePure S.identityAnswer entered Engine.settleForPriority))
    in Spec.describe s "CR 603.2c Synthetic Communal Vigil" $ do
@@ -1084,8 +1084,8 @@ lifelinkGainEventsSpec s registry =
         pridemate <- S.printingOf s registry "Ajani's Pridemate"
         let (gs, _, _) = S.combatBoardOf ours []
             stocked = foldr (\_ g -> snd (S.addLibraryCard plains S.alice g)) gs [1 .. 6 :: Int]
-            withVigil = snd (S.addCreature vigil S.alice stocked)
-            (mate, staged) = S.addCreature pridemate S.alice withVigil
+            withVigil = snd (S.addPermanent vigil S.alice stocked)
+            (mate, staged) = S.addPermanent pridemate S.alice withVigil
         pure (mate, S.runCombat S.aggressiveAnswer staged)
       -- The same board with two Goblin Pikers, {1}{R} 2/1, in the way: they both
       -- block the one Child, which divides its 2 power one apiece -- CR 510.1c's
@@ -1100,8 +1100,8 @@ lifelinkGainEventsSpec s registry =
         pridemate <- S.printingOf s registry "Ajani's Pridemate"
         let (gs, ours, _) = S.combatBoardOf [child] [piker, piker]
             stocked = foldr (\_ g -> snd (S.addLibraryCard plains S.alice g)) gs [1 .. 6 :: Int]
-            withVigil = snd (S.addCreature vigil S.alice stocked)
-            (mate, staged) = S.addCreature pridemate S.alice withVigil
+            withVigil = snd (S.addPermanent vigil S.alice stocked)
+            (mate, staged) = S.addPermanent pridemate S.alice withVigil
         pure (mate, ours, staged)
    in Spec.describe s "CR 702.15e lifelink gains beside the combat damage bracket" $ do
         -- The proving case: two lifelink sources connect at once, and the Vigil
@@ -1341,7 +1341,7 @@ communalRelapseSpec s registry =
         spell <- S.printingOf s registry name
         peacemaker <- S.printingOf s registry "Centaur Peacemaker"
         let lands = S.landsFor swamp S.alice 2 base
-            (peacemakerId, withPeacemaker) = S.addCreature peacemaker S.alice lands
+            (peacemakerId, withPeacemaker) = S.addPermanent peacemaker S.alice lands
             (spellId, withSpell) = S.addHandCard spell S.alice withPeacemaker
             gs = resolveAll (snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId)))
             moved = ZoneChange.MkZoneChange peacemakerId peacemakerId Zone.Stack Zone.Battlefield
@@ -1427,9 +1427,9 @@ enrageSpec s registry =
           raptor <- S.printingOf s registry "Ripjaw Raptor"
           giant <- S.printingOf s registry "Hill Giant"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (raptorId, g1) = S.addCreature raptor S.alice (Setup.emptyGame S.bothPlayers)
-              (mineId, g2) = S.addCreature giant S.alice g1
-              (theirsId, g3) = S.addCreature piker S.bob g2
+          let (raptorId, g1) = S.addPermanent raptor S.alice (Setup.emptyGame S.bothPlayers)
+              (mineId, g2) = S.addPermanent giant S.alice g1
+              (theirsId, g3) = S.addPermanent piker S.bob g2
               gs = stock piker S.alice 5 g3
               atRaptor = dealing [noncombat theirsId raptorId 1] gs
               atGiant = dealing [noncombat theirsId mineId 1] gs
@@ -1502,9 +1502,9 @@ enrageSpec s registry =
           swine <- S.printingOf s registry "Coalhauler Swine"
           piker <- S.printingOf s registry "Goblin Piker"
           brigade <- S.printingOf s registry "Foriysian Brigade"
-          let (swineId, g1) = S.addCreature swine S.alice S.threePlayerGame
-              (mineId, g2) = S.addCreature brigade S.alice g1
-              (theirsId, gs) = S.addCreature piker S.bob g2
+          let (swineId, g1) = S.addPermanent swine S.alice S.threePlayerGame
+              (mineId, g2) = S.addPermanent brigade S.alice g1
+              (theirsId, gs) = S.addPermanent piker S.bob g2
               lives g = (S.lifeOf S.alice g, S.lifeOf S.bob g, S.lifeOf S.carol g)
               threeAt = dealing [noncombat theirsId swineId 3] gs
               fiveAt = dealing [noncombat theirsId swineId 5] gs
@@ -1577,9 +1577,9 @@ belltowerSphinxSpec s registry =
       -- under each of the two opponents, so the pair below differs in the damager
       -- alone.
       board sphinx piker =
-        let (sphinxId, g1) = S.addCreature sphinx S.alice S.threePlayerGame
-            (bobsId, g2) = S.addCreature piker S.bob g1
-            (carolsId, g3) = S.addCreature piker S.carol g2
+        let (sphinxId, g1) = S.addPermanent sphinx S.alice S.threePlayerGame
+            (bobsId, g2) = S.addPermanent piker S.bob g1
+            (carolsId, g3) = S.addPermanent piker S.carol g2
          in (sphinxId, bobsId, carolsId, stock piker S.alice 9 (stock piker S.bob 9 (stock piker S.carol 9 g3)))
    in Spec.describe s "CR 120.1 that source's controller" $ do
         Spec.it s "CR 120.1 the damager's controller mills, and the count is the event's amount" $ do
@@ -1658,7 +1658,7 @@ lifeLossTriggerSpec s registry =
       -- would pass however the matcher read the relation. With a library on each
       -- side the two cases differ in the target and in nothing else.
       signInBloodBoard swamp blood signInBlood =
-        let (_, withBlood) = S.addCreature blood S.alice (S.landsInPlay swamp 2)
+        let (_, withBlood) = S.addPermanent blood S.alice (S.landsInPlay swamp 2)
             stock pid gs =
               let (_, one) = S.addLibraryCard swamp pid gs
                   (_, two) = S.addLibraryCard swamp pid one
@@ -1705,7 +1705,7 @@ lifeLossTriggerSpec s registry =
           hillGiant <- S.printingOf s registry "Hill Giant"
           glistenerElf <- S.printingOf s registry "Glistener Elf"
           let (gs0, _, _) = S.combatBoardOf [hillGiant, glistenerElf] []
-              (_, gs1) = S.addCreature blood S.alice gs0
+              (_, gs1) = S.addPermanent blood S.alice gs0
               settled = resolveAll (S.fightWith S.aggressiveAnswer gs1)
           Spec.assertEqWith s "bob lost the Giant's 3 and none of the Elf's 1" (S.lifeOf S.bob settled) (Just 17)
           Spec.assertEqWith s "the Elf really connected" (S.playerCounterOf PlayerCounterKind.Poison S.bob settled) 1
@@ -1721,9 +1721,9 @@ lifeLossTriggerSpec s registry =
           case Face.activatedAbilities (S.combinedFace greed) of
             [] -> Spec.assertFailure s "Greed should carry an activated ability"
             ability : _ -> do
-              let (_, withBlood) = S.addCreature blood S.alice (Setup.emptyGame S.bothPlayers)
-                  (_, withSwamp) = S.addCreature swamp S.bob withBlood
-                  (greedId, withGreed) = S.addCreature greed S.bob withSwamp
+              let (_, withBlood) = S.addPermanent blood S.alice (Setup.emptyGame S.bothPlayers)
+                  (_, withSwamp) = S.addPermanent swamp S.bob withBlood
+                  (greedId, withGreed) = S.addPermanent greed S.bob withSwamp
                   (_, gs1) = S.addLibraryCard swamp S.bob withGreed
                   gs =
                     gs1
@@ -1796,8 +1796,8 @@ mindcrankSpec s registry =
       -- bob and carol: nothing but libraries, so neither is distinguishable from
       -- the other by anything except being targeted.
       board swamp mindcrank signInBlood =
-        let withMana = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
-            (_, withCrank) = S.addCreature mindcrank S.alice withMana
+        let withMana = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
+            (_, withCrank) = S.addPermanent mindcrank S.alice withMana
             stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard swamp pid g)) gs [1 .. (6 :: Int)]
          in S.handOne signInBlood (stock S.carol (stock S.bob (stock S.alice withCrank)))
       cases =
@@ -1878,7 +1878,7 @@ masterOfLaketownSpec s registry =
       graveyardSize pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
       board master sphinx plains island swamp =
         let withLands = S.landsFor swamp S.alice 1 (S.landsFor island S.alice 1 (S.landsFor plains S.alice 5 S.threePlayerGame))
-            (_, withMaster) = S.addCreature master S.alice withLands
+            (_, withMaster) = S.addPermanent master S.alice withLands
             stock pid g = List.foldl' (\b _ -> snd (S.addLibraryCard swamp pid b)) g [1 .. (20 :: Int)]
             stocked = List.foldl' (flip stock) withMaster [S.alice, S.bob, S.carol]
             at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
@@ -1950,7 +1950,7 @@ masterOfLaketownDeathSpec s registry =
         _ -> S.identityAnswer p
       board master mountain swamp bolt aliceBin carolBin =
         let withLand = S.landsFor mountain S.alice 1 S.threePlayerGame
-            (masterId, withMaster) = S.addCreature master S.alice withLand
+            (masterId, withMaster) = S.addPermanent master S.alice withLand
             stockLib pid g = List.foldl' (\b _ -> snd (S.addLibraryCard swamp pid b)) g [1 .. (20 :: Int)]
             stocked = List.foldl' (flip stockLib) withMaster [S.alice, S.bob, S.carol]
             bin pid n g = List.foldl' (\b _ -> snd (S.addGraveyardCard swamp pid b)) g [1 .. (n :: Int)]

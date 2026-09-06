@@ -3689,13 +3689,18 @@ entryOptionFilters option = concatMap keywordFilters (Set.toList (EntryOption.ke
 -- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
 -- card"). CR 707.5's copy choice carries a fourth, over permanents on the
 -- battlefield (Copy Enchantment's "any enchantment"). CR 707.9a's copy exception
--- carries a fifth, through the keyword it grants (a landwalk's). None of the
--- five is framed.
+-- carries a fifth, through the keyword it grants (a landwalk's). CR 614.1c's
+-- as-enters exile carries a sixth, over a CARD IN A GRAVEYARD (Living Lore's "an
+-- instant or sorcery card"). None of the six is framed.
 entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> unframed [f]
   EntryRewrite.ChooseCardName f -> unframed [f]
   EntryRewrite.RevealOrTapped f -> unframed [f]
+  -- CR 614.1c's as-enters exile carries a criterion over a CARD IN A GRAVEYARD
+  -- (Living Lore's "an instant or sorcery card"), the reveal's axis one zone over
+  -- and unframed with it.
+  EntryRewrite.ExileFromGraveyard f -> unframed [f]
   -- CR 707.5's eligible set -- Clone's "any creature", Copy Enchantment's "any
   -- enchantment" -- is a criterion over permanents on the battlefield, so it
   -- belongs in this walk. So do CR 707.9's exceptions beside it, which reach a
@@ -5702,12 +5707,12 @@ m2bCardSpec s registry = Spec.describe s "M2bCards" $ do
   let gs0 = Setup.emptyGame S.bothPlayers
   Spec.it s "the tiger has first strike through the projection" $ do
     sabretoothTiger <- S.printingOf s registry "Sabretooth Tiger"
-    let (oid, gs) = S.addCreature sabretoothTiger S.alice gs0
+    let (oid, gs) = S.addPermanent sabretoothTiger S.alice gs0
     Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike oid gs) "first strike"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike oid gs)) "not double strike"
   Spec.it s "the raptor has double strike through the projection" $ do
     ridgetopRaptor <- S.printingOf s registry "Ridgetop Raptor"
-    let (oid, gs) = S.addCreature ridgetopRaptor S.alice gs0
+    let (oid, gs) = S.addPermanent ridgetopRaptor S.alice gs0
     Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike oid gs) "double strike"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike oid gs)) "not first strike"
 

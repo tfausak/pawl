@@ -74,9 +74,9 @@ spec s registry = Spec.describe s "Adventure" $ do
     let namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
         -- An artifact on the battlefield, or Battle Display has no legal target
         -- and is gated out for a reason that has nothing to do with the layout.
-        board = snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 2))
+        board = snd (S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 2))
         (both, _) = S.handOne shieldbreaker board
-        (one, _) = S.handOne shieldbreaker (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 1)))
+        (one, _) = S.handOne shieldbreaker (snd (S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 1)))
     Spec.assertEqWith s "two Mountains: both halves" (namesOffered both) [shieldbreakerName, battleDisplayName]
     -- CR 715.3a: "only the alternative characteristics are evaluated to see if
     -- it can be cast". One Mountain pays Battle Display's {R} and cannot pay the
@@ -106,8 +106,8 @@ spec s registry = Spec.describe s "Adventure" $ do
     let namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
         -- The Bonesplitter is the Adventure's legal target, without which every
         -- absent offer below would be about targeting instead of about cost.
-        artifactAnd n = snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain n))
-        taxed n = snd (S.addCreature thalia S.alice (artifactAnd n))
+        artifactAnd n = snd (S.addPermanent bonesplitter S.alice (S.landsInPlay mountain n))
+        taxed n = snd (S.addPermanent thalia S.alice (artifactAnd n))
         offeredFrom board = namesOffered (fst (S.handOne shieldbreaker board))
     -- The control, and what keeps the empty list below from passing vacuously:
     -- the same one Mountain WITH no Thalia offers the Adventure, so its absence
@@ -125,7 +125,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    let board = snd (S.addCreature thalia S.alice (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 2))))
+    let board = snd (S.addPermanent thalia S.alice (snd (S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 2))))
         (gs, oid) = S.handOne shieldbreaker board
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
     Spec.assertEqWith s "the Adventure is on the stack" (length (GameState.stack cast)) 1
@@ -136,7 +136,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 1)
+    let (bonesplitterId, board) = S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 1)
         (gs, oid) = S.handOne shieldbreaker board
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -173,8 +173,8 @@ spec s registry = Spec.describe s "Adventure" $ do
     -- this case proves nothing: Battle Display would be gated out for having no
     -- legal target, and an engine that had forgotten CR 715.3d's "it can't be
     -- cast as an Adventure this way" entirely would still pass.
-    let (_, oneArtifact) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
-        (_, board) = S.addCreature bonesplitter S.alice oneArtifact
+    let (_, oneArtifact) = S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 3)
+        (_, board) = S.addPermanent bonesplitter S.alice oneArtifact
         (gs, oid) = S.handOne shieldbreaker board
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -201,7 +201,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let (_, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
+    let (_, board) = S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 3)
         (gs, oid) = S.handOne shieldbreaker board
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -238,7 +238,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     -- would pass against an engine that had no permission check at all. The card
     -- in hand is a Mountain, whose only action is a land drop, and the artifact
     -- is there so the Adventure half is not gated on targeting either.
-    let (withArtifact, _) = S.handOne mountain (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)))
+    let (withArtifact, _) = S.handOne mountain (snd (S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 3)))
         (exiledId, gs) = S.addExiledCard shieldbreaker S.alice withArtifact
     Spec.assertEqWith s "no permission on the card" (fmap Object.playableFromExile (Game.lookupObject exiledId gs)) (Just Nothing)
     Spec.assertBool s (not (Cast.castable S.alice exiledId shieldbreakerName Facing.FaceUp gs)) "the creature is not castable"
@@ -251,7 +251,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
+    let (bonesplitterId, board) = S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 3)
         (gs, oid) = S.handOne shieldbreaker board
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         -- The only target leaves the battlefield while the spell is on the

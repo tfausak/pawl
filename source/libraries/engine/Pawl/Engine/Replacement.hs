@@ -882,6 +882,11 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.WithKeywords _ -> True
   EntryRewrite.UnderSourceControl -> True
   EntryRewrite.SacrificeAnyNumber {} -> True
+  -- CR 614.1c states no condition of its own: "as this creature enters, exile an
+  -- instant or sorcery card from your graveyard" is unconditional. An empty
+  -- graveyard is nothing to exile rather than a row that does not apply, which CR
+  -- 101.3 settles in Pawl.Engine.Event's arm rather than here.
+  EntryRewrite.ExileFromGraveyard _ -> True
   -- CR 702.155b states no condition of its own -- a Saga with read ahead always
   -- has both intrinsic abilities -- so this admits every entry the row is
   -- collected for. CR 702.155a's turn-scoped narrowing is not a condition on the
@@ -1299,6 +1304,26 @@ sacrificeCandidates slots pid source filter_ gs =
       forbidden = SacrificeRestriction.cantBeSacrificed matching gs
    in filter (\oid -> not (Set.member oid forbidden)) matching
 
+-- CR 614.1c: the cards in this player's graveyard an as-enters exile may take,
+-- ascending -- the order Prompt.ChooseCardInGraveyard offers them in, which is
+-- what lets a test pin its answer by index (Pawl.PowerToughnessSpec's Living
+-- Lore) and what makes the transcript fallback deterministic.
+--
+-- sacrificeCandidates' shape one zone over, and the two differences are the
+-- rules': CR 701.21a's restrictions are about sacrificing and reach no card in a
+-- graveyard, and the filter is matched against the CARD's projection there (CR
+-- 400.7) rather than against a permanent's.
+--
+-- CR 614.13a's exclusion needs no clause here. A permanent entering the
+-- battlefield out of a graveyard has already been materialized on the
+-- battlefield when Pawl.Engine.Event runs this loop, so no member of the batch is
+-- in the zone this reads -- which is the rule's own example, Sutured Ghoul and
+-- Runeclaw Bear entering together out of one graveyard.
+graveyardCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+graveyardCandidates pid filter_ gs =
+  let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
+   in List.sort (filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) (Game.zoneMembers Zone.Graveyard pid gs))
+
 -- CR 614.1a / 614.1c-d: does the event's subject satisfy this replacement's
 -- Filter? Both the ENTERING object of an entry replacement and the MOVING object
 -- of a zone-change redirect, which is one question asked of one candidate --
@@ -1471,6 +1496,10 @@ bucketOfEffect re = case re of
   -- enters WITH is neither whose it is, what it copies nor which face is up.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithKeywords _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> ReplacementBucket.Other
+  -- CR 616.1e for the arm above's reason, one zone over: which card leaves a
+  -- graveyard is neither whose the permanent is, what it copies nor which face is
+  -- up.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ExileFromGraveyard _)) -> ReplacementBucket.Other
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
   -- CR 616.1e for CR 702.155b's reason: read ahead rewrites how many lore
@@ -1610,6 +1639,12 @@ readsApplier re = case re of
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> False
+  -- CR 614.1c: NO despite spending a card, for SacrificeAnyNumber's reason. The
+  -- graveyard looked at is the ENTERING object's controller's -- "your graveyard"
+  -- in an ability the permanent prints about itself -- read live off the board at
+  -- CR 614.12a's moment, and the criterion rides the effect. Two such rows would
+  -- offer the same player the same cards.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ExileFromGraveyard _)) -> False
   -- CR 702.155b: the chooser is the ENTERING Saga's controller, read live off
   -- the board for riot's reason below, and the bound is the entering Saga's own
   -- final chapter number (CR 714.2d) rather than anything the row carries -- so

@@ -323,7 +323,7 @@ bloodForBonesSpec s registry =
       -- given.
       board blood swamp victim buried =
         let mana = S.landsFor swamp S.alice 6 S.threePlayerGame
-            (_, withVictim) = S.addCreature victim S.alice mana
+            (_, withVictim) = S.addPermanent victim S.alice mana
             withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) withVictim buried
             (withSpell, spell) = S.handOne blood withGraves
          in (spell, withSpell {GameState.priority = Just S.alice})
@@ -694,7 +694,7 @@ elvishPiperSpec s registry =
       -- hand cards, in the order given.
       board piper forest mine theirs =
         let mana = S.landsFor forest S.alice 3 S.threePlayerGame
-            (piperId, withPiper) = S.addCreature piper S.alice mana
+            (piperId, withPiper) = S.addPermanent piper S.alice mana
             (withMine, mineIds) =
               List.foldl'
                 (\(g, ids) printing -> let (oid, g') = S.addHandCard printing S.alice g in (g', ids <> [oid]))
@@ -851,7 +851,7 @@ countOnLuckSpec s registry =
         countOnLuck <- S.printingOf s registry "Count on Luck"
         sentry <- S.printingOf s registry "Ogre Sentry"
         stocked <- mapM (S.printingOf s registry) stock
-        let (luckId, g1) = S.addCreature countOnLuck S.alice (Setup.emptyGame S.bothPlayers)
+        let (luckId, g1) = S.addPermanent countOnLuck S.alice (Setup.emptyGame S.bothPlayers)
             g2 = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) g1 stocked
             g3 = snd (S.addLibraryCard sentry S.bob g2)
             upkeep = Phase.Beginning BeginningStep.Upkeep
@@ -1192,12 +1192,12 @@ communeWithLavaSpec s registry =
 -- three Mountains that pay for it. The board sits at the declare attackers step
 -- like every combatBoardOf board, so the ENGINE declares the attack and the
 -- combat record every test below reads is its own, never hand-written.
--- S.addCreature is what puts the Mountains out: the "any printing, on the
+-- S.addPermanent is what puts the Mountains out: the "any printing, on the
 -- battlefield, untapped and Settled" helper its haddock says it is.
 trumpetBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
 trumpetBoard mountain trumpetBlast mine theirs =
   let (gs0, ours, yours) = S.combatBoardOf mine theirs
-      withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) gs0 [1 :: Int .. 3]
+      withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) gs0 [1 :: Int .. 3]
       (withCard, _) = S.handOne trumpetBlast withLands
    in ( -- handOne parks its state in a precombat main phase; this board is
         -- mid-combat.
@@ -1277,12 +1277,12 @@ gloriousProtectorSpec s registry =
       -- in hand. bob: one non-Angel creature. Nothing is tapped and nothing has
       -- entered this way, so the only trigger any leg places is the Protector's.
       board protector plains piker maiden sentry angel giant =
-        let g0 = List.foldl' (\g _ -> snd (S.addCreature plains S.alice g)) (Setup.emptyGame S.bothPlayers) [1 :: Int .. 4]
-            (_, g1) = S.addCreature piker S.alice g0
-            (_, g2) = S.addCreature maiden S.alice g1
-            (_, g3) = S.addCreature sentry S.alice g2
-            (_, g4) = S.addCreature angel S.alice g3
-            (_, g5) = S.addCreature giant S.bob g4
+        let g0 = List.foldl' (\g _ -> snd (S.addPermanent plains S.alice g)) (Setup.emptyGame S.bothPlayers) [1 :: Int .. 4]
+            (_, g1) = S.addPermanent piker S.alice g0
+            (_, g2) = S.addPermanent maiden S.alice g1
+            (_, g3) = S.addPermanent sentry S.alice g2
+            (_, g4) = S.addPermanent angel S.alice g3
+            (_, g5) = S.addPermanent giant S.bob g4
          in S.handOne protector g5
       -- Cast the Protector and run the priority loop out, so its enters trigger is
       -- placed and resolved under the same answerer.
@@ -1680,8 +1680,8 @@ calderaBreakerSpec s registry =
             (_, g6) = S.addLibraryCard mountain S.alice g5
             (_, g7) = S.addLibraryCard mountain S.bob g6
             (_, g8) = S.addLibraryCard mountain S.bob g7
-            (angelId, g9) = S.addCreature angel S.bob g8
-            (giantId, g10) = S.addCreature giant S.bob g9
+            (angelId, g9) = S.addPermanent angel S.bob g8
+            (giantId, g10) = S.addPermanent giant S.bob g9
             -- handOne REPLACES alice's hand, so the Mountain that proves the
             -- sweep found the library rather than the other hidden zone goes in
             -- after it.
@@ -1866,7 +1866,7 @@ trumpetBlastSpec s registry = Spec.describe s "TrumpetBlast" $ do
     case ours of
       [attacker] -> do
         let bounced = S.runPure S.identityAnswer after (Event.changeZone attacker Zone.Hand)
-            (returned, back) = S.addCreature piker S.alice bounced
+            (returned, back) = S.addPermanent piker S.alice bounced
         Spec.assertEqWith s "it was a 4/1 before it left" (Projection.powerOf attacker after) (Just 4)
         Spec.assertBool s (returned /= attacker) "what came back is a different object"
         Spec.assertEqWith s "and it is a plain 2/1" (Projection.powerOf returned back) (Just 2)
@@ -1906,10 +1906,10 @@ auraThiefSpec s registry =
         greed <- S.printingOf s registry "Greed"
         badMoon <- S.printingOf s registry "Bad Moon"
         hardenedScales <- S.printingOf s registry "Hardened Scales"
-        let (thief, g1) = S.addCreature auraThief S.alice (S.landsInPlay mountain 1)
-            (hers, g2) = S.addCreature greed S.alice g1
-            (moon, g3) = S.addCreature badMoon S.bob g2
-            (scales, g4) = S.addCreature hardenedScales S.bob g3
+        let (thief, g1) = S.addPermanent auraThief S.alice (S.landsInPlay mountain 1)
+            (hers, g2) = S.addPermanent greed S.alice g1
+            (moon, g3) = S.addPermanent badMoon S.bob g2
+            (scales, g4) = S.addPermanent hardenedScales S.bob g3
             (withBolt, spell) = S.handOne lightningBolt g4
         pure (withBolt, spell, thief, [hers], [moon, scales])
       -- Cast the Bolt, resolve it, settle (CR 704.5g destroys the damaged 2/2 and
@@ -1951,7 +1951,7 @@ auraThiefSpec s registry =
           (board, spell, _, _, theirs) <- thiefBoard
           greed <- S.printingOf s registry "Greed"
           let (_, after) = boltIt (board, spell)
-              (latecomer, later) = S.addCreature greed S.bob after
+              (latecomer, later) = S.addPermanent greed S.bob after
           Spec.assertEqWith s "the ones that were there are alice's" (fmap (`Projection.controllerOf` later) theirs) (fmap (const (Just S.alice)) theirs)
           Spec.assertEqWith s "the one that arrived afterwards is still bob's" (Projection.controllerOf latecomer later) (Just S.bob)
         -- CR 611.2a: "If no duration is stated, it lasts until the end of the
@@ -1991,9 +1991,9 @@ auraThiefSpec s registry =
           auraThief <- S.printingOf s registry "Aura Thief"
           piker <- S.printingOf s registry "Goblin Piker"
           controlMagic <- S.printingOf s registry "Control Magic"
-          let (thief, g1) = S.addCreature auraThief S.alice (S.landsInPlay mountain 1)
-              (creature, g2) = S.addCreature piker S.alice g1
-              (aura, g3) = S.addCreature controlMagic S.bob g2
+          let (thief, g1) = S.addPermanent auraThief S.alice (S.landsInPlay mountain 1)
+              (creature, g2) = S.addPermanent piker S.alice g1
+              (aura, g3) = S.addPermanent controlMagic S.bob g2
               stolen = S.attach aura creature g3
               (withBolt, spell) = S.handOne lightningBolt stolen
               (_, after) = boltIt (withBolt, spell)
@@ -2019,7 +2019,7 @@ auraThiefSpec s registry =
 -- the way in) and the finished board.
 castBaneOfProgress :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (Maybe ObjectId.ObjectId, GameState.GameState)
 castBaneOfProgress forest bane board =
-  let (withSpell, spell) = S.handOne bane (List.foldl' (\gs _ -> snd (S.addCreature forest S.alice gs)) board [1 :: Int .. 6])
+  let (withSpell, spell) = S.handOne bane (List.foldl' (\gs _ -> snd (S.addPermanent forest S.alice gs)) board [1 :: Int .. 6])
       afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
       finished = S.runPure S.identityAnswer afterCast Engine.priorityLoop
    in (namedOnBattlefield "Bane of Progress" finished, finished)
@@ -2096,7 +2096,7 @@ swiftSilenceBoard plains island swiftSilence divination piker sorcerer mMongoose
     let lands = S.landsFor island S.bob 3 (S.landsFor plains S.bob 2 (Setup.emptyGame S.bothPlayers))
         stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard divination pid g)) gs [1 :: Int .. 5]
         stocked = stock S.bob (stock S.alice lands)
-        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice stocked
+        (sorcererId, withSorcerer) = S.addPermanent sorcerer S.alice stocked
         -- CR 302.6: the Sorcerer must have settled under alice before its {T}
         -- may be activated at all.
         settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
@@ -2260,10 +2260,10 @@ glenElendraBoard island glenElendra baral piker mongoose sorcerer mCounterable =
     let lands = S.landsFor island S.bob 4 S.threePlayerGame
         stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 5]
         stocked = List.foldl' (flip stock) lands [S.alice, S.bob, S.carol]
-        (_, withBaral) = S.addCreature baral S.bob stocked
+        (_, withBaral) = S.addPermanent baral S.bob stocked
         -- CR 302.6: each Sorcerer must have settled under its own controller
         -- before its {T} may be activated at all.
-        addSorcerer pid (ids, gs) = let (oid, g) = S.addCreature sorcerer pid gs in (ids <> [(pid, oid)], g)
+        addSorcerer pid (ids, gs) = let (oid, g) = S.addPermanent sorcerer pid gs in (ids <> [(pid, oid)], g)
         (sorcerers, withSorcerers) = List.foldl' (flip addSorcerer) ([], withBaral) [S.alice, S.bob, S.carol]
         settled = List.foldl' (\g pid -> S.runPure S.identityAnswer g (Engine.settleAll pid)) withSorcerers [S.alice, S.bob, S.carol]
         (mHers, withHers) = case mCounterable of
@@ -2396,10 +2396,10 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     badMoon <- S.printingOf s registry "Bad Moon"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (myr, g1) = S.addCreature darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
-        (equipment, g2) = S.addCreature bonesplitter S.alice g1
-        (moon, g3) = S.addCreature badMoon S.bob g2
-        (bystander, board) = S.addCreature piker S.bob g3
+    let (myr, g1) = S.addPermanent darksteelMyr S.bob (Setup.emptyGame S.bothPlayers)
+        (equipment, g2) = S.addPermanent bonesplitter S.alice g1
+        (moon, g3) = S.addPermanent badMoon S.bob g2
+        (bystander, board) = S.addPermanent piker S.bob g3
         (entered, resolved) = castBaneOfProgress forest bane board
     Spec.assertBool s (Maybe.isJust entered) "Bane is on the battlefield"
     Spec.assertEqWith s "stack empty: the spell and its trigger both resolved" (length (GameState.stack resolved)) 0
@@ -2422,8 +2422,8 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     bane <- S.printingOf s registry "Bane of Progress"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     badMoon <- S.printingOf s registry "Bad Moon"
-    let (_, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
-        (_, board) = S.addCreature badMoon S.bob g1
+    let (_, g1) = S.addPermanent bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+        (_, board) = S.addPermanent badMoon S.bob g1
         (entered, resolved) = castBaneOfProgress forest bane board
     Spec.assertEqWith s "still two destroyed, so still two counters" (plusOnePlusOnesOn entered resolved) 2
   -- CR 701.19a: a regeneration shield "protects the permanent the next time it
@@ -2437,8 +2437,8 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     bane <- S.printingOf s registry "Bane of Progress"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     badMoon <- S.printingOf s registry "Bad Moon"
-    let (equipment, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
-        (moon, g2) = S.addCreature badMoon S.bob g1
+    let (equipment, g1) = S.addPermanent bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+        (moon, g2) = S.addPermanent badMoon S.bob g1
         (entered, resolved) = castBaneOfProgress forest bane (S.addRegenShield equipment g2)
     Spec.assertBool s (S.onBattlefield equipment resolved) "the shielded artifact stands"
     Spec.assertEqWith s "and CR 701.19a taps it" (fmap Object.tapped (Game.lookupObject equipment resolved)) (Just TapState.Tapped)
@@ -2451,7 +2451,7 @@ baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
     forest <- S.printingOf s registry "Forest"
     bane <- S.printingOf s registry "Bane of Progress"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (bystander, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (bystander, board) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         (entered, resolved) = castBaneOfProgress forest bane board
     Spec.assertBool s (S.onBattlefield bystander resolved) "the creature stands: it is neither an artifact nor an enchantment"
     Spec.assertEqWith s "no counters" (plusOnePlusOnesOn entered resolved) 0
@@ -2529,10 +2529,10 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     badMoon <- S.printingOf s registry "Bad Moon"
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (equipment, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.threePlayers)
-        (moon, g2) = S.addCreature badMoon S.bob g1
-        (myr, g3) = S.addCreature darksteelMyr S.carol g2
-        (bystander, board) = S.addCreature piker S.carol g3
+    let (equipment, g1) = S.addPermanent bonesplitter S.alice (Setup.emptyGame S.threePlayers)
+        (moon, g2) = S.addPermanent badMoon S.bob g1
+        (myr, g3) = S.addPermanent darksteelMyr S.carol g2
+        (bystander, board) = S.addPermanent piker S.carol g3
         (resolved, transcript) = castRampage forest rampage board
     -- The gameplay-level assertion, and FIRST: a rider keyed to the caster puts
     -- this at 0 and alice's at 2, so neither reading is vacuous here.
@@ -2566,8 +2566,8 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     rampage <- S.printingOf s registry "Rampage of the Clans"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     badMoon <- S.printingOf s registry "Bad Moon"
-    let (_, g1) = S.addCreature bonesplitter S.bob (Setup.emptyGame S.threePlayers)
-        (_, board) = S.addCreature badMoon S.bob g1
+    let (_, g1) = S.addPermanent bonesplitter S.bob (Setup.emptyGame S.threePlayers)
+        (_, board) = S.addPermanent badMoon S.bob g1
         (resolved, transcript) = castRampage forest rampage board
     Spec.assertEqWith s "both destroyed permanents were bob's, so bob makes two Centaurs" (length (centaursControlledBy S.bob resolved)) 2
     Spec.assertEqWith s "and the caster, who lost nothing, makes none" (length (centaursControlledBy S.alice resolved)) 0
@@ -2587,8 +2587,8 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     rampage <- S.printingOf s registry "Rampage of the Clans"
     bondedConstruct <- S.printingOf s registry "Bonded Construct"
     controlMagic <- S.printingOf s registry "Control Magic"
-    let (construct, g1) = S.addCreature bondedConstruct S.alice (Setup.emptyGame S.threePlayers)
-        (aura, g2) = S.addCreature controlMagic S.bob g1
+    let (construct, g1) = S.addPermanent bondedConstruct S.alice (Setup.emptyGame S.threePlayers)
+        (aura, g2) = S.addPermanent controlMagic S.bob g1
         board = S.attach aura construct g2
         (resolved, transcript) = castRampage forest rampage board
     Spec.assertEqWith s "setup: bob's Control Magic has taken alice's artifact creature" (Projection.controllerOf construct board) (Just S.bob)
@@ -2603,7 +2603,7 @@ rampageOfTheClansSpec s registry = Spec.describe s "RampageOfTheClans" $ do
     forest <- S.printingOf s registry "Forest"
     rampage <- S.printingOf s registry "Rampage of the Clans"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (bystander, board) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
+    let (bystander, board) = S.addPermanent piker S.bob (Setup.emptyGame S.threePlayers)
         (resolved, _) = castRampage forest rampage board
     Spec.assertEqWith s "no Centaur for the caster" (length (centaursControlledBy S.alice resolved)) 0
     Spec.assertEqWith s "none for bob either" (length (centaursControlledBy S.bob resolved)) 0
@@ -2627,8 +2627,8 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
     case S.spellTargetSlot plummet of
       Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
       Just theSlot -> do
-        let (flierId, gs1) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
-            (groundId, gs) = S.addCreature piker S.bob gs1
+        let (flierId, gs1) = S.addPermanent birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+            (groundId, gs) = S.addPermanent piker S.bob gs1
             legal = Target.legalRecipients Nothing S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToCreature flierId) legal) "the flier is a legal target"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature groundId) legal)) "the creature without flying is not"
@@ -2644,7 +2644,7 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
     case S.spellTargetSlot plummet of
       Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
       Just theSlot -> do
-        let (groundId, before) = S.addCreature piker S.alice (S.landsInPlay plains 3)
+        let (groundId, before) = S.addPermanent piker S.alice (S.landsInPlay plains 3)
             (withSpell, spellId) = S.handOne spontaneousFlight before
             cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
             after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -2661,7 +2661,7 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
     case S.spellTargetSlot plummet of
       Nothing -> Spec.assertFailure s "Plummet's printing carries no 'target' slot"
       Just theSlot -> do
-        let (flierId, before) = S.addCreature birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
+        let (flierId, before) = S.addPermanent birdMaiden S.bob (Setup.emptyGame S.bothPlayers)
             after = S.withHumility humility before
         Spec.assertBool s (Set.member (Recipient.ToCreature flierId) (Target.legalRecipients Nothing S.noSource theSlot before)) "legal while it flies"
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying flierId after)) "Humility took the flying"
@@ -2673,8 +2673,8 @@ plummetSpec s registry = Spec.describe s "Plummet" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     piker <- S.printingOf s registry "Goblin Piker"
     forest <- S.printingOf s registry "Forest"
-    let (flierId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 2)
-        (groundId, g2) = S.addCreature piker S.bob g1
+    let (flierId, g1) = S.addPermanent birdMaiden S.bob (S.landsInPlay forest 2)
+        (groundId, g2) = S.addPermanent piker S.bob g1
         (gs, spellId) = S.handOne plummet g2
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
@@ -2718,9 +2718,9 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     narcomoeba <- S.printingOf s registry "Narcomoeba"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (maidenId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 3)
-        (moebaId, g2) = S.addCreature narcomoeba S.alice g1
-        (pikerId, g3) = S.addCreature piker S.bob g2
+    let (maidenId, g1) = S.addPermanent birdMaiden S.bob (S.landsInPlay forest 3)
+        (moebaId, g2) = S.addPermanent narcomoeba S.alice g1
+        (pikerId, g3) = S.addPermanent piker S.bob g2
         (gs, spellId) = S.handOne gale g3
         cast = snd (Engine.runGamePure answerXTwo gs (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure answerXTwo cast Stack.resolveTop)
@@ -2743,7 +2743,7 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
     forest <- S.printingOf s registry "Forest"
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     humility <- S.printingOf s registry "Humility"
-    let (maidenId, g1) = S.addCreature birdMaiden S.bob (S.landsInPlay forest 3)
+    let (maidenId, g1) = S.addPermanent birdMaiden S.bob (S.landsInPlay forest 3)
         (gs, spellId) = S.handOne gale (S.withHumility humility g1)
         cast = snd (Engine.runGamePure answerXTwo gs (S.cast S.alice spellId))
         after = S.settleSba (snd (Engine.runGamePure answerXTwo cast Stack.resolveTop))
@@ -2791,7 +2791,7 @@ comeBackWrongSpec s registry =
           comeBackWrong <- S.printingOf s registry "Come Back Wrong"
           swamp <- S.printingOf s registry "Swamp"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (victim, board) = S.addCreature piker S.bob (S.landsInPlay swamp 3)
+          let (victim, board) = S.addPermanent piker S.bob (S.landsInPlay swamp 3)
               after = castAt comeBackWrong board
           case creaturesOnBattlefield after of
             [returned] -> do
@@ -2808,7 +2808,7 @@ comeBackWrongSpec s registry =
           comeBackWrong <- S.printingOf s registry "Come Back Wrong"
           swamp <- S.printingOf s registry "Swamp"
           piker <- S.printingOf s registry "Goblin Piker"
-          let (_, board) = S.addCreature piker S.bob (S.landsInPlay swamp 3)
+          let (_, board) = S.addPermanent piker S.bob (S.landsInPlay swamp 3)
               armed = castAt comeBackWrong board
               after = resolveAll (settle (beginEndStep armed))
           Spec.assertEqWith s "one creature was on the battlefield to sacrifice" (length (creaturesOnBattlefield armed)) 1
@@ -2826,8 +2826,8 @@ comeBackWrongSpec s registry =
           swamp <- S.printingOf s registry "Swamp"
           piker <- S.printingOf s registry "Goblin Piker"
           restInPeace <- S.printingOf s registry "Rest in Peace"
-          let (victim, g1) = S.addCreature piker S.bob (S.landsInPlay swamp 3)
-              (_, board) = S.addCreature restInPeace S.alice g1
+          let (victim, g1) = S.addPermanent piker S.bob (S.landsInPlay swamp 3)
+              (_, board) = S.addPermanent restInPeace S.alice g1
               after = castAt comeBackWrong board
           Spec.assertEqWith s "no creature came back" (creaturesOnBattlefield after) []
           Spec.assertBool s (not (S.onBattlefield victim after)) "the creature was still destroyed"
@@ -2888,11 +2888,11 @@ apocalypseChimeSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       storm <- S.printingOf s registry "Aether Storm"
       inquisitors <- S.printingOf s registry "Serra Inquisitors"
-      let (chimeId, g1) = S.addCreature chime S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
-          (pikerId, g2) = S.addCreature piker S.alice g1
-          (stormId, g3) = S.addCreature storm S.alice g2
+      let (chimeId, g1) = S.addPermanent chime S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
+          (pikerId, g2) = S.addPermanent piker S.alice g1
+          (stormId, g3) = S.addPermanent storm S.alice g2
           (tokenId, g4) = S.addToken (Printing.card inquisitors) S.bob (S.addRegenShield stormId g3)
-          (carolsId, g5) = S.addCreature inquisitors S.carol g4
+          (carolsId, g5) = S.addPermanent inquisitors S.carol g4
           board = g5 {GameState.priority = Just S.alice}
       case soleActivatedAbility chime of
         Nothing -> Spec.assertFailure s "Apocalypse Chime should print exactly one activated ability"
@@ -2947,12 +2947,12 @@ golgothianSylexSpec s registry =
       workshop <- S.printingOf s registry "Mishra's Workshop"
       ornithopter <- S.printingOf s registry "Ornithopter"
       soldier <- S.printingOf s registry "Yotian Soldier"
-      let (sylexId, g1) = S.addCreature sylex S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
-          (thopterId, g2) = S.addCreature ornithopter S.alice g1
-          (pikerId, g3) = S.addCreature piker S.alice g2
-          (trackerId, g4) = S.addCreature tracker S.bob g3
-          (shopId, g5) = S.addCreature workshop S.bob g4
-          (soldierId, g6) = S.addCreature soldier S.carol (S.addCounter (CounterKind.Keyword Keyword.Indestructible) 1 shopId g5)
+      let (sylexId, g1) = S.addPermanent sylex S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
+          (thopterId, g2) = S.addPermanent ornithopter S.alice g1
+          (pikerId, g3) = S.addPermanent piker S.alice g2
+          (trackerId, g4) = S.addPermanent tracker S.bob g3
+          (shopId, g5) = S.addPermanent workshop S.bob g4
+          (soldierId, g6) = S.addPermanent soldier S.carol (S.addCounter (CounterKind.Keyword Keyword.Indestructible) 1 shopId g5)
           (tokenId, g7) = S.addToken (Printing.card ornithopter) S.carol g6
           board =
             g7

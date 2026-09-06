@@ -298,7 +298,7 @@ cleanupSpec s registry = Spec.describe s "DropAtCleanup" $ do
   Spec.it s "CR 514.2 the same sweep drops an AtCleanup floating replacement" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (oid, gs1) = S.addCreature piker S.alice gs0
+        (oid, gs1) = S.addPermanent piker S.alice gs0
         shielded = S.addRegenShield oid gs1
         after = Expiry.dropAtCleanup shielded
     Spec.assertEqWith s "one shield before" (length (GameState.replacements shielded)) 1
@@ -332,8 +332,8 @@ holdsYouControlSource you source gs =
 board :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 board piker warMammoth =
   let gs0 = Setup.emptyGame S.bothPlayers
-      (srcId, gs1) = S.addCreature piker S.alice gs0
-      (targetId, gs2) = S.addCreature warMammoth S.bob gs1
+      (srcId, gs1) = S.addPermanent piker S.alice gs0
+      (targetId, gs2) = S.addPermanent warMammoth S.bob gs1
    in (srcId, targetId, whileEffect srcId targetId S.alice gs2)
 
 conditionalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -413,8 +413,8 @@ masterThiefResolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
 masterThiefBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 masterThiefBoard darksteelMyr masterThief =
   let gs0 = Setup.emptyGame S.bothPlayers
-      (myrId, gs1) = S.addCreature darksteelMyr S.bob gs0
-      (thiefId, gs2) = S.addCreature masterThief S.alice gs1
+      (myrId, gs1) = S.addPermanent darksteelMyr S.bob gs0
+      (thiefId, gs2) = S.addPermanent masterThief S.alice gs1
       entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
       gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thiefId gs2))] gs2
    in (thiefId, myrId, gs3)
@@ -427,8 +427,8 @@ masterThiefBoard darksteelMyr masterThief =
 -- distinguishable at three seats.
 masterThiefThreeWay :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 masterThiefThreeWay darksteelMyr masterThief =
-  let (myrId, gs1) = S.addCreature darksteelMyr S.bob S.threePlayerGame
-      (thiefId, gs2) = S.addCreature masterThief S.alice gs1
+  let (myrId, gs1) = S.addPermanent darksteelMyr S.bob S.threePlayerGame
+      (thiefId, gs2) = S.addPermanent masterThief S.alice gs1
       entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
       gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project thiefId gs2))] gs2
    in (thiefId, myrId, masterThiefResolveAll (masterThiefSettle gs3))
@@ -599,14 +599,14 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
     Spec.assertEqWith s "bob did not draw on alice's end step" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
   Spec.it s "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
+    let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
         dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing DamageKind.Combat
         began = S.withEvents [GameEvent.DamageDealt dmg] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "bob took the crown" (GameState.monarch after) (Just S.bob)
   Spec.it s "CR 725.2 noncombat damage to the monarch does not hand over the crown" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (bobCreature, gs0) = S.addCreature piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
+    let (bobCreature, gs0) = S.addPermanent piker S.bob (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
         dmg = DamageEvent.MkDamageEvent bobCreature (Recipient.ToPlayer S.alice) 2 False False False 0 Nothing DamageKind.Noncombat
         began = S.withEvents [GameEvent.DamageDealt dmg] gs0
         after = monarchResolveAll (monarchSettle began)
@@ -615,8 +615,8 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     palaceJailer <- S.printingOf s registry "Palace Jailer"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (victim, gs1) = S.addCreature piker S.bob gs0
-        (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
+        (victim, gs1) = S.addPermanent piker S.bob gs0
+        (jailer, gs2) = S.addPermanent palaceJailer S.alice gs1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
         gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer gs2))] gs2
         afterEtb = monarchResolveAll (monarchSettle gs3)
@@ -653,8 +653,8 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
     --     so the prisoner returns as part of the same departure.
     piker <- S.printingOf s registry "Goblin Piker"
     palaceJailer <- S.printingOf s registry "Palace Jailer"
-    let (victim, gs1) = S.addCreature piker S.bob S.threePlayerGame
-        (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
+    let (victim, gs1) = S.addPermanent piker S.bob S.threePlayerGame
+        (jailer, gs2) = S.addPermanent palaceJailer S.alice gs1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
         gs3 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project jailer gs2))] gs2
         afterEtb = monarchResolveAll (monarchSettle (gs3 {GameState.activePlayer = S.carol}))
@@ -696,9 +696,9 @@ garlandPlan p = case p of
 -- but nothing settled.
 garlandBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 garlandBoard piker garland =
-  let (carols, gs1) = S.addCreature piker S.carol S.threePlayerGame
-      (bobs, gs2) = S.addCreature piker S.bob gs1
-      (entrant, gs3) = S.addCreature garland S.alice gs2
+  let (carols, gs1) = S.addPermanent piker S.carol S.threePlayerGame
+      (bobs, gs2) = S.addPermanent piker S.bob gs1
+      (entrant, gs3) = S.addPermanent garland S.alice gs2
       entered = ZoneChange.MkZoneChange entrant entrant Zone.Stack Zone.Battlefield
    in (bobs, carols, S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project entrant gs3))] gs3)
 
@@ -805,8 +805,8 @@ hagResolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
 hagBoardWith :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 hagBoardWith hag printing =
   let gs0 = Setup.emptyGame S.bothPlayers
-      (_, gs1) = S.addCreature hag S.alice gs0
-      (victimId, gs2) = S.addCreature printing S.bob gs1
+      (_, gs1) = S.addPermanent hag S.alice gs0
+      (victimId, gs2) = S.addPermanent printing S.bob gs1
    in (victimId, hagResolveAll (hagSettle (hagBeginUpkeep gs2)))
 
 -- Hag of Inner Weakness {2}{B} Creature -- Hag Warlock 2/2: "At the beginning of
@@ -866,8 +866,8 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     hag <- S.printingOf s registry "Hag of Inner Weakness"
     warMammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (hagId, gs1) = S.addCreature hag S.alice gs0
-        (mammoth, gs2) = S.addCreature warMammoth S.bob gs1
+        (hagId, gs1) = S.addPermanent hag S.alice gs0
+        (mammoth, gs2) = S.addPermanent warMammoth S.bob gs1
         -- The trigger is on the stack with its target already chosen.
         staged = hagSettle (hagBeginUpkeep gs2)
         -- Bob answers it by killing the Hag before it resolves.
@@ -883,8 +883,8 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     hag <- S.printingOf s registry "Hag of Inner Weakness"
     warMammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, gs1) = S.addCreature hag S.alice gs0
-        (mammoth, gs2) = S.addCreature warMammoth S.bob gs1
+        (_, gs1) = S.addPermanent hag S.alice gs0
+        (mammoth, gs2) = S.addPermanent warMammoth S.bob gs1
         staged = hagSettle (hagBeginUpkeep gs2)
         targetGone = S.runPure S.identityAnswer staged (Event.destroy Regenerability.Regenerable [mammoth])
         resolved = hagResolveAll targetGone
@@ -902,9 +902,9 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (hagId, gs1) = S.addCreature hag S.alice gs0
-        (_, gs2) = S.addCreature piker S.alice gs1
-        (mammoth, gs3) = S.addCreature warMammoth S.bob gs2
+        (hagId, gs1) = S.addPermanent hag S.alice gs0
+        (_, gs2) = S.addPermanent piker S.alice gs1
+        (mammoth, gs3) = S.addPermanent warMammoth S.bob gs2
         -- Only bob's Mammoth is "a creature an opponent controls" for alice,
         -- so the CR 603.3d target choice is forced.
         staged = hagSettle (hagBeginUpkeep gs3)
@@ -943,10 +943,10 @@ restOfTurnFromDeclareAttackers =
 jadeBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 jadeBoard statue mountain theirs =
   let gs0 = Setup.emptyGame S.bothPlayers
-      (statueId, gs1) = S.addCreature statue S.alice gs0
-      (_, gs2) = S.addCreature mountain S.alice gs1
-      (_, gs3) = S.addCreature mountain S.alice gs2
-      addAll (ids, g) p = let (oid, g1) = S.addCreature p S.bob g in (ids <> [oid], g1)
+      (statueId, gs1) = S.addPermanent statue S.alice gs0
+      (_, gs2) = S.addPermanent mountain S.alice gs1
+      (_, gs3) = S.addPermanent mountain S.alice gs2
+      addAll (ids, g) p = let (oid, g1) = S.addPermanent p S.bob g in (ids <> [oid], g1)
       (theirIds, gs4) = List.foldl' addAll ([], gs3) theirs
    in ( statueId,
         theirIds,
@@ -1054,7 +1054,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     mountain <- S.printingOf s registry "Mountain"
     let staged expiry =
           let gs0 = Setup.emptyGame S.bothPlayers
-              (mtn, gs1) = S.addCreature mountain S.alice gs0
+              (mtn, gs1) = S.addPermanent mountain S.alice gs0
               floated = S.runPure S.identityAnswer gs1 (Cost.tapForMana S.manaPerformer mtn)
            in S.addPlayerEffect
                 expiry
@@ -1242,8 +1242,8 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
     jadeStatue <- S.printingOf s registry "Jade Statue"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     let base = S.landsInPlay plains 5
-        (songId, g1) = S.addCreature titaniasSong S.alice base
-        (axeId, g2) = S.addCreature bonesplitter S.alice g1
+        (songId, g1) = S.addPermanent titaniasSong S.alice base
+        (axeId, g2) = S.addPermanent bonesplitter S.alice g1
         (staged, spellId) = S.handOne angelicEdict g2
         cast = S.runPure (aimAtObject songId) staged (S.cast S.alice spellId)
         exiled = S.settleSba (S.runPure (aimAtObject songId) cast Stack.resolveTop)
@@ -1252,7 +1252,7 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
         -- activated ability, so an implementation that carried the Song's live
         -- "each noncreature artifact" filter forward would show up here twice
         -- over -- as a 4/4 creature, and as one with no abilities.
-        (statueId, withStatue) = S.addCreature jadeStatue S.alice exiled
+        (statueId, withStatue) = S.addPermanent jadeStatue S.alice exiled
         toCleanup =
           withStatue
             { GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
@@ -1290,8 +1290,8 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     let base = S.landsInPlay plains 5
-        (humilityId, g1) = S.addCreature humility S.alice base
-        (birdId, g2) = S.addCreature birdMaiden S.alice g1
+        (humilityId, g1) = S.addPermanent humility S.alice base
+        (birdId, g2) = S.addPermanent birdMaiden S.alice g1
         (staged, spellId) = S.handOne angelicEdict g2
         cast = S.runPure (aimAtObject humilityId) staged (S.cast S.alice spellId)
         exiled = S.settleSba (S.runPure (aimAtObject humilityId) cast Stack.resolveTop)
@@ -1324,8 +1324,8 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
     jadeStatue <- S.printingOf s registry "Jade Statue"
     copyEnchantment <- S.printingOf s registry "Copy Enchantment"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
-    let (songId, g1) = S.addCreature titaniasSong S.alice (S.landsInPlay plains 12)
-        (axeId, g2) = S.addCreature bonesplitter S.alice g1
+    let (songId, g1) = S.addPermanent titaniasSong S.alice (S.landsInPlay plains 12)
+        (axeId, g2) = S.addPermanent bonesplitter S.alice g1
         (_, g3) = S.spellOnStack copyEnchantment S.alice g2
         copied = S.settleSba (S.runPure (copyingNamed songId) g3 Stack.resolveTop)
     case Set.toList (Set.difference (GameState.battlefield copied) (GameState.battlefield g2)) of
@@ -1333,7 +1333,7 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
         let (g4, edict1) = S.handOne angelicEdict copied
             cast1 = S.runPure (aimAtObject songId) g4 (S.cast S.alice edict1)
             originalGone = S.settleSba (S.runPure (aimAtObject songId) cast1 Stack.resolveTop)
-            (statueId, withStatue) = S.addCreature jadeStatue S.alice originalGone
+            (statueId, withStatue) = S.addPermanent jadeStatue S.alice originalGone
             (g5, edict2) = S.handOne angelicEdict withStatue
             cast2 = S.runPure (aimAtObject copyId) g5 (S.cast S.alice edict2)
             copyGone = S.settleSba (S.runPure (aimAtObject copyId) cast2 Stack.resolveTop)
@@ -1512,9 +1512,9 @@ dovinBoard = dovinBoardAimedAt const
 -- does not admit without a second board.
 dovinBoardAimedAt :: (ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId) -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 dovinBoardAimedAt pick plains piker warMammoth dovin =
-  let (shielded, gs1) = S.addCreature piker S.bob (S.landsInPlay plains 3)
-      (control, gs2) = S.addCreature warMammoth S.bob gs1
-      (attacker, gs3) = S.addCreature piker S.alice gs2
+  let (shielded, gs1) = S.addPermanent piker S.bob (S.landsInPlay plains 3)
+      (control, gs2) = S.addPermanent warMammoth S.bob gs1
+      (attacker, gs3) = S.addPermanent piker S.alice gs2
       (gs4, handId) = S.handOne dovin gs3
       cast = S.runPure S.identityAnswer gs4 (do S.cast S.alice handId; Stack.resolveTop)
       -- CR 400.7 mints a new object as the spell moves, so the planeswalker is
@@ -1700,9 +1700,9 @@ isWhile expiry = case expiry of
 -- instead, which is where chapter I is read.
 spiderBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 spiderBoard island piker warMammoth spider =
-  let (sagaId, gs1) = S.addCreature spider S.alice (Setup.emptyGame S.bothPlayers)
-      (shielded, gs2) = S.addCreature piker S.bob gs1
-      (control, gs3) = S.addCreature warMammoth S.bob gs2
+  let (sagaId, gs1) = S.addPermanent spider S.alice (Setup.emptyGame S.bothPlayers)
+      (shielded, gs2) = S.addPermanent piker S.bob gs1
+      (control, gs3) = S.addPermanent warMammoth S.bob gs2
       stocked = stockLibrary island gs3
       withCounter = S.addCounter CounterKind.Lore 1 sagaId stocked
    in (sagaId, shielded, control, advanceSaga (aimedAtObject shielded) withCounter)
@@ -1761,7 +1761,7 @@ oldFatSpiderSpec s registry = Spec.describe s "OldFatSpiderCantSeeMe" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
     spider <- S.printingOf s registry "Old Fat Spider Can't See Me"
-    let (mine, gs1) = S.addCreature piker S.alice (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers))
+    let (mine, gs1) = S.addPermanent piker S.alice (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers))
         (gs2, handId) = S.handOne spider (stockLibrary island gs1)
         cast = S.runPure S.identityAnswer gs2 (do S.cast S.alice handId; Stack.resolveTop)
         granted = S.runPure (aimedAtObject mine) cast Engine.priorityLoop
@@ -1890,9 +1890,9 @@ perpetualSpec s registry = Spec.describe s "Perpetual" $ do
     collector <- S.printingOf s registry "Pearl Collector"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     plains <- S.printingOf s registry "Plains"
-    let (collectorId, g0) = S.addCreature collector S.alice (Setup.emptyGame S.bothPlayers)
-        (mineId, g1) = S.addCreature sorcerer S.alice g0
-        (controlId, g2) = S.addCreature sorcerer S.alice g1
+    let (collectorId, g0) = S.addPermanent collector S.alice (Setup.emptyGame S.bothPlayers)
+        (mineId, g1) = S.addPermanent sorcerer S.alice g0
+        (controlId, g2) = S.addPermanent sorcerer S.alice g1
         g3 = S.landsFor plains S.alice 3 g2
         ready = (lifelinkUnder Expiry.Type.Never controlId g3) {GameState.priority = Just S.alice}
     case Face.activatedAbilities (S.combinedFace collector) of

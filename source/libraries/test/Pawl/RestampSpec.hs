@@ -124,9 +124,9 @@ bulwarkBoard s registry = do
   hunter <- S.printingOf s registry "Synthetic Bulwark Hunter"
   watcher <- S.printingOf s registry "Synthetic Bulwark Watcher"
   wall <- S.printingOf s registry "Wall of Stone"
-  let (watcherId, g1) = S.addCreature watcher S.bob (Setup.emptyGame S.bothPlayers)
-      (hunterId, g2) = S.addCreature hunter S.alice g1
-      (wallId, g3) = S.addCreature wall S.alice g2
+  let (watcherId, g1) = S.addPermanent watcher S.bob (Setup.emptyGame S.bothPlayers)
+      (hunterId, g2) = S.addPermanent hunter S.alice g1
+      (wallId, g3) = S.addPermanent wall S.alice g2
   pure (S.runPure S.identityAnswer g3 Engine.settleForPriority, hunterId, watcherId, wallId)
 
 -- CR 502.2's day/night check in the untap step, off a board whose previous turn
@@ -161,9 +161,9 @@ rampartBoard s registry both = do
   wall <- S.printingOf s registry "Wall of Stone"
   moonmist <- S.printingOf s registry "Moonmist"
   forest <- S.printingOf s registry "Forest"
-  let (wardenId, g1) = S.addCreature warden S.alice (S.landsInPlay forest 2)
-      (keeperId, g2) = S.addCreature keeper S.alice (if both then g1 else S.landsInPlay forest 2)
-      (wallId, g3) = S.addCreature wall S.alice g2
+  let (wardenId, g1) = S.addPermanent warden S.alice (S.landsInPlay forest 2)
+      (keeperId, g2) = S.addPermanent keeper S.alice (if both then g1 else S.landsInPlay forest 2)
+      (wallId, g3) = S.addPermanent wall S.alice g2
       (g4, _) = S.handOne moonmist g3
   pure (g4, wardenId, keeperId, wallId)
 

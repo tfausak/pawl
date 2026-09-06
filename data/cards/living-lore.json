@@ -1,0 +1,78 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "AgainstCardsExiledWith",
+        "value": {
+          "type": "ManaValue"
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Living Lore",
+      "power": {
+        "type": "Star"
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "ExileFromGraveyard",
+                "value": {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Instant"
+                      }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Sorcery"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Avatar"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

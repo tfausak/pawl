@@ -2178,11 +2178,14 @@ apply batch candidate event =
       -- token copies, one supply of three Forests. `many` counts what was
       -- CHOSEN, so paying any later than this leaves five 3/3s instead of one.
       --
-      -- The argument rests on every entry cost in the pool being "any number",
-      -- which is never unpayable. An entry cost whose amount is fixed by the
-      -- choice and CAN be unpayable (Frankenstein's Monster's X) would need the
-      -- forward check the rule literally describes; no EntryRewrite arm carries
-      -- one (#1395).
+      -- The argument rests on no entry cost in the pool being able to come up
+      -- short. This one is "any number", which is never unpayable; the exile
+      -- beside it (EntryRewrite.ExileFromGraveyard) names one card and does as
+      -- much as it can where the graveyard holds none (CR 101.3), which is not a
+      -- payment that failed. An entry cost whose amount is fixed by the choice
+      -- and CAN be unpayable (Frankenstein's Monster's X) would need the forward
+      -- check the rule literally describes; no EntryRewrite arm carries one
+      -- (#1395).
       EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber criterion kind) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -2229,6 +2232,57 @@ apply batch candidate event =
               let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
             Monad.mapM_ (\k -> addEnteringCounters oid k many) kind
+            pure (Just event)
+      -- CR 614.1c: "as this creature enters, exile an instant or sorcery card from
+      -- your graveyard" (Living Lore). The arm above one zone over -- what it
+      -- spends is a card in a graveyard rather than a permanent on the
+      -- battlefield -- and CR 614.12b's combined budget across a batch falls out
+      -- here for the same reason, the choice being made and paid inside the entry
+      -- loop before the next member of the batch runs its own (CR 614.13b).
+      --
+      -- MANDATORY, and so unlike the two "or tapped" arms there is no declining
+      -- half: the card prints no "may". An empty offer exiles nothing (CR 101.3),
+      -- which is not a failure -- rule 607.3's pile is then empty and a Living
+      -- Lore that found no card is 0/0.
+      --
+      -- CR 614.14 is the link, filed here rather than by
+      -- Resolve.recordExiledWith's diff, which watches a resolving effect's window
+      -- and no effect is resolving: this is a replacement effect applying, which
+      -- is the rule's own "a direct result of the replacement event caused by the
+      -- first [ability]". The ARRIVALS are filed, never the graveyard id, since CR
+      -- 400.7 mints a new object as the card changes zones.
+      EntryRewrite.ExileFromGraveyard filter_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arms above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so controllerOf
+          -- falls back to its owner. Exiles nothing rather than guessing whose
+          -- graveyard "your graveyard" means.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            -- The graveyard is read HERE, at CR 614.12a's moment, for
+            -- RevealOrTapped's reason: an entry replacement applied before this
+            -- one can have moved a card (CR 614.13).
+            let offered = Replacement.graveyardCandidates controller filter_ gs
+            chosen <- case NonEmpty.nonEmpty offered of
+              -- Where the rules leave nothing to ask, don't prompt: with no
+              -- candidate nothing is exiled, and with ONE the instruction names
+              -- that card -- a forced selection rather than options a player
+              -- could tell apart, which is ObjectRef.ChosenCardInGraveyard's own
+              -- elision (CR 101.3).
+              Nothing -> pure Nothing
+              Just (only NonEmpty.:| []) -> pure (Just only)
+              Just candidates -> do
+                answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor controller gs) controller oid candidates)
+                -- FILTERED, NOT TRUSTED (#222): an answer naming a card that was
+                -- never offered would otherwise exile a card the printed
+                -- criterion excludes.
+                pure (Just (if List.elem answer offered then answer else NonEmpty.head candidates))
+            Monad.forM_ chosen $ \card -> do
+              arrivals <- changeZoneReturning card Zone.Exile
+              State.modify' $ \gs2 ->
+                gs2 {GameState.exiledWith = foldr (\arrival -> Map.insert arrival oid) (GameState.exiledWith gs2) arrivals}
             pure (Just event)
       -- CR 702.155b / 714.3b: read ahead's two intrinsic abilities, applied as
       -- one rewrite -- choose a number between one and this Saga's final chapter

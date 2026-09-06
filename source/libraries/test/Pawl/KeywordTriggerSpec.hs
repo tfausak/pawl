@@ -65,7 +65,7 @@ poisonousSpec s registry =
       -- than cast: the cast path is proved once, by the whole-card test below.
       hang printing n host gs =
         foldl
-          (\g _ -> let (aura, g1) = S.addCreature printing S.alice g in S.attach aura host g1)
+          (\g _ -> let (aura, g1) = S.addPermanent printing S.alice g in S.attach aura host g1)
           gs
           (replicate n ())
       -- alice attacks with one `attacking` creature wearing `n` copies of the
@@ -194,7 +194,7 @@ poisonousSpec s registry =
           case S.combatBoardOf [piker] [] of
             (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
             (gs0, attacker : _, _) -> do
-              let withSwamps = foldl (\g _ -> snd (S.addCreature swamp S.alice g)) gs0 (replicate 4 ())
+              let withSwamps = foldl (\g _ -> snd (S.addPermanent swamp S.alice g)) gs0 (replicate 4 ())
                   (spellId, inHand) = S.addHandCard initiation S.alice withSwamps
                   cast = S.runPure S.aggressiveAnswer inHand {GameState.priority = Just S.alice} (S.cast S.alice spellId)
                   resolved = S.runPure S.aggressiveAnswer cast Stack.resolveTop
@@ -587,9 +587,9 @@ prowessSpec s registry =
   let -- alice bears the Swiftspear and has four Mountains, bob four as well, so
       -- a negative never fails for want of mana; carol is the third seat.
       board mountain swiftspear =
-        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addPermanent mountain pid g')) g [1 .. (n :: Int)]
             withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
-            (spearId, withSpear) = S.addCreature swiftspear S.alice withLands
+            (spearId, withSpear) = S.addPermanent swiftspear S.alice withLands
          in ( spearId,
               withSpear
                 { GameState.phase = Phase.PrecombatMain,
@@ -1258,7 +1258,7 @@ creatureBecomesBlockedByAtLeastSpec s registry =
         (gs0, ours, yours) <- board mine theirs
         forest <- S.printingOf s registry "Forest"
         foliage <- S.printingOf s registry "Flash Foliage"
-        let lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 (replicate (3 * copies) ())
+        let lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 (replicate (3 * copies) ())
             stocked = List.foldl' (\g _ -> snd (S.addLibraryCard forest S.bob (snd (S.addHandCard foliage S.bob g)))) lands (replicate copies ())
         pure (stocked, ours, yours)
       -- foliageBoard with a Doubling Season on the DEFENDING seat, which is the
@@ -1269,7 +1269,7 @@ creatureBecomesBlockedByAtLeastSpec s registry =
       doublingFoliageBoard mine theirs = do
         (gs0, ours, yours) <- foliageBoard 1 mine theirs
         season <- S.printingOf s registry "Doubling Season"
-        pure (snd (S.addCreature season S.bob gs0), ours, yours)
+        pure (snd (S.addPermanent season S.bob gs0), ours, yours)
       -- The attack declared and the game handed over AT the declare blockers
       -- step. S.runToStep stops when the phase first matches, which is BEFORE CR
       -- 509.1's turn-based action, so the declaration is still ahead of the
@@ -1357,7 +1357,7 @@ creatureBecomesBlockedByAtLeastSpec s registry =
         -- whom an attacked planeswalker resolves to. The firing board with a Jace
         -- added and the attack aimed at him, and nothing else changed.
         --
-        -- Jace Beleren is stocked with loyalty by hand: S.addCreature puts a
+        -- Jace Beleren is stocked with loyalty by hand: S.addPermanent puts a
         -- printing onto the battlefield with no counters, and CR 704.5i would
         -- take a loyalty-0 planeswalker away before attackers are declared.
         Spec.it s "CR 508.1b attacking an opponent's planeswalker is not attacking the opponent" $ do
@@ -1674,7 +1674,7 @@ selfBecomesBlockedSpec s registry =
             ([prey], [piker]) -> do
               -- Three Forests for Flash Foliage's {2}{G} and one card left in
               -- bob's library so its draw is not a CR 104.3c loss.
-              let lands = List.foldl' (\g _ -> snd (S.addCreature forest S.bob g)) gs0 (replicate 3 ())
+              let lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 (replicate 3 ())
                   gs = snd (S.addLibraryCard forest S.bob (snd (S.addHandCard foliage S.bob lands)))
                   -- Handed over AT the declare blockers step, which is before
                   -- CR 509.1's turn-based action: `casting` below is what

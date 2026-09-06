@@ -1120,6 +1120,7 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.WithKeywords _ -> ([], [])
   EntryRewrite.UnderSourceControl -> ([], [])
   EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [])
+  EntryRewrite.ExileFromGraveyard filter_ -> ([filter_], [])
   EntryRewrite.Riot -> ([], [])
   EntryRewrite.ReadAhead -> ([], [])
   EntryRewrite.Unleash -> ([], [])

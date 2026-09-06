@@ -97,7 +97,7 @@ gateSpec s registry = Spec.describe s "Gate" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (pikerOid, gs1) = S.addCreature piker S.bob gs0
+        (pikerOid, gs1) = S.addPermanent piker S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
         cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
@@ -109,7 +109,7 @@ gateSpec s registry = Spec.describe s "Gate" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (creatureId, gs1) = S.addCreature piker S.alice gs0
+        (creatureId, gs1) = S.addPermanent piker S.alice gs0
         sick = gs1 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) creatureId (GameState.objects gs1)}
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 2) (Recipient.ToCreature creatureId)
@@ -122,7 +122,7 @@ gateSpec s registry = Spec.describe s "Gate" $ do
     mountain <- S.printingOf s registry "Mountain"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (wallId, gs1) = S.addCreature wallOfStone S.bob gs0
+        (wallId, gs1) = S.addPermanent wallOfStone S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature wallId)
         cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
@@ -142,7 +142,7 @@ falsifierSpec s registry = Spec.describe s "Falsifier" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (_, gs1) = S.addCreature piker S.bob gs0
+        (_, gs1) = S.addPermanent piker S.bob gs0
     Spec.assertBool s (S.castable S.alice oid gs1) "castable"
     Spec.assertEqWith
       s
@@ -159,7 +159,7 @@ onlyChosenModeSpec s registry = Spec.describe s "OnlyChosenModeTargets" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (pikerOid, gs1) = S.addCreature piker S.bob gs0
+        (pikerOid, gs1) = S.addPermanent piker S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
         cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
@@ -180,7 +180,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, oid) = S.handOne chaosCharm (S.landsInPlay mountain 1)
-        (pikerOid, gs1) = S.addCreature piker S.bob gs0
+        (pikerOid, gs1) = S.addPermanent piker S.bob gs0
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToCreature pikerOid)
         cast = snd (Engine.runGamePure answer gs1 (S.cast S.alice oid))
@@ -276,8 +276,8 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
     case Face.activatedAbilities (S.combinedFace syntheticModalActivated) of
       [ability] ->
         let gs0 = S.landsInPlay mountain 1
-            (srcId, gs1) = S.addCreature syntheticModalActivated S.alice gs0
-            (victimId, gs2) = S.addCreature piker S.bob gs1
+            (srcId, gs1) = S.addPermanent syntheticModalActivated S.alice gs0
+            (victimId, gs2) = S.addPermanent piker S.bob gs1
             answer :: Prompt.Prompt r -> r
             answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature victimId)
             activated = snd (Engine.runGamePure answer gs2 (Activate.activateAbility S.alice srcId ability))
@@ -296,8 +296,8 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
     case Face.activatedAbilities (S.combinedFace syntheticModalActivated) of
       [ability] ->
         let gs0 = S.landsInPlay mountain 1
-            (srcId, gs1) = S.addCreature syntheticModalActivated S.alice gs0
-            (victimId, gs2) = S.addCreature piker S.bob gs1
+            (srcId, gs1) = S.addPermanent syntheticModalActivated S.alice gs0
+            (victimId, gs2) = S.addPermanent piker S.bob gs1
             answer :: Prompt.Prompt r -> r
             answer = chooseModeAt (ModeIndex.MkModeIndex 0) (Recipient.ToCreature victimId)
             activated = snd (Engine.runGamePure answer gs2 (Activate.activateAbility S.alice srcId ability))
@@ -315,7 +315,7 @@ activationModalSpec s registry = Spec.describe s "M4h activation modal (CR 602.2
 -- Cast.castSpell does for a spell. Gated by Aether Channeler (a {2}{U} 3/3 Human
 -- Wizard whose ETB is ChooseExactly 1 over: create a 1/1 flying Bird, return
 -- ANOTHER nonland permanent to hand, or draw a card). Aether Channeler enters
--- via S.addCreature and the SelfEnters trigger is fed to Engine.placePendingTriggers
+-- via S.addPermanent and the SelfEnters trigger is fed to Engine.placePendingTriggers
 -- through S.entersWithTrigger's hand-built enters event (the same shape
 -- EventSpec uses), then the placed ability resolves off the stack.
 triggerModalOf :: Printing.Printing -> Maybe (ModalT.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
@@ -347,7 +347,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
     aetherChanneler <- S.printingOf s registry "Aether Channeler"
     piker <- S.printingOf s registry "Goblin Piker"
     let (_, gs1) = S.entersWithTrigger aetherChanneler S.alice (Setup.emptyGame S.bothPlayers)
-        (victimId, gs2) = S.addCreature piker S.bob gs1
+        (victimId, gs2) = S.addPermanent piker S.bob gs1
         answer :: Prompt.Prompt r -> r
         answer = chooseModeAt (ModeIndex.MkModeIndex 1) (Recipient.ToObject victimId)
         placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)
@@ -416,7 +416,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
     smtPrinting <- S.printingOf s registry "Synthetic Modal Trigger"
     mountain <- S.printingOf s registry "Mountain"
     let gs0 = S.landsInPlay mountain 2
-        (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
+        (smtId, gs1) = S.addPermanent smtPrinting S.alice gs0
         entered = ZoneChange.MkZoneChange smtId smtId Zone.Stack Zone.Battlefield
         gs2 = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project smtId gs1))] gs1
         answer :: Prompt.Prompt r -> r
@@ -469,7 +469,7 @@ chooseTwo idxs picks p = case p of
 -- Goblin Piker on the battlefield.
 crypticBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 crypticBoard island crypticCommand piker =
-  let (pikerId, gs1) = S.addCreature piker S.bob (S.landsInPlay island 4)
+  let (pikerId, gs1) = S.addPermanent piker S.bob (S.landsInPlay island 4)
       (gs, spellId) = S.handOne crypticCommand gs1
    in (gs, spellId, pikerId)
 
@@ -566,8 +566,8 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
-        (wallId, withWall) = S.addCreature wallOfStone S.bob board
-        (mineId, gs) = S.addCreature piker S.alice withWall
+        (wallId, withWall) = S.addPermanent wallOfStone S.bob board
+        (mineId, gs) = S.addPermanent piker S.alice withWall
         answer :: Prompt.Prompt r -> r
         answer = chooseTwo (fmap ModeIndex.MkModeIndex [1, 2]) [(permanentSlot, Recipient.ToObject pikerId)]
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
@@ -639,7 +639,7 @@ creatureSlot = SlotName.MkSlotName (Text.pack "creature")
 -- unfillable: nothing to reanimate, no creature spell to counter.
 ojutaiBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
 ojutaiBoard island plains ojutaisCommand =
-  let (_, gs1) = S.addCreature plains S.alice (S.landsInPlay island 3)
+  let (_, gs1) = S.addPermanent plains S.alice (S.landsInPlay island 3)
    in S.handOne ojutaisCommand gs1
 
 -- CR 601.2b/700.2: the OTHER side of Cryptic Command's group above -- a "choose
@@ -838,8 +838,8 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (board, spellId) = confluenceBoard island mysticConfluence piker 10
-        (pikerId, withPiker) = S.addCreature piker S.bob board
-        (wallId, gs) = S.addCreature wallOfStone S.bob withPiker
+        (pikerId, withPiker) = S.addPermanent piker S.bob board
+        (wallId, gs) = S.addPermanent wallOfStone S.bob withPiker
         -- Mode 1's printed slot is "creature"; its second instance fills
         -- Modal.instanceSlot's derived name. The answer aims the two at two
         -- different creatures by name, and refuses to answer a set that does not
@@ -867,8 +867,8 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (board, spellId) = confluenceBoard island mysticConfluence piker 10
-        (pikerId, withPiker) = S.addCreature piker S.bob board
-        (_, gs) = S.addCreature wallOfStone S.bob withPiker
+        (pikerId, withPiker) = S.addPermanent piker S.bob board
+        (_, gs) = S.addPermanent wallOfStone S.bob withPiker
         modal = Face.spell (S.combinedFace mysticConfluence)
         twiceBounced = Seq.fromList [bounceMode, bounceMode, drawMode]
     Spec.assertEqWith
@@ -998,7 +998,7 @@ destroyLand = ModeIndex.MkModeIndex 1
 -- could otherwise be answered with.
 vandalizeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 vandalizeBoard mountain vandalize forest =
-  let (forestId, gs1) = S.addCreature forest S.bob (S.landsInPlay mountain 5)
+  let (forestId, gs1) = S.addPermanent forest S.bob (S.landsInPlay mountain 5)
       (gs, spellId) = S.handOne vandalize gs1
    in (gs, spellId, forestId)
 
@@ -1061,7 +1061,7 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
     forest <- S.printingOf s registry "Forest"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (board, spellId, forestId) = vandalizeBoard mountain vandalize forest
-        (boneId, gs) = S.addCreature bonesplitter S.bob board
+        (boneId, gs) = S.addPermanent bonesplitter S.bob board
         answer :: Prompt.Prompt r -> r
         answer = insistOneOrBoth [destroyArtifact] boneId forestId
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
@@ -1079,7 +1079,7 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
     forest <- S.printingOf s registry "Forest"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (board, spellId, forestId) = vandalizeBoard mountain vandalize forest
-        (boneId, gs) = S.addCreature bonesplitter S.bob board
+        (boneId, gs) = S.addPermanent bonesplitter S.bob board
         answer :: Prompt.Prompt r -> r
         answer = insistOneOrBoth [destroyArtifact, destroyLand] boneId forestId
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
@@ -1096,7 +1096,7 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
     forest <- S.printingOf s registry "Forest"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (board, spellId, _) = vandalizeBoard mountain vandalize forest
-        (_, gs) = S.addCreature bonesplitter S.bob board
+        (_, gs) = S.addPermanent bonesplitter S.bob board
         answer :: Prompt.Prompt r -> r
         answer p = case p of
           Prompt.ChooseModes {} -> Seq.empty
@@ -1117,7 +1117,7 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
     forest <- S.printingOf s registry "Forest"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (board, spellId, _) = vandalizeBoard mountain vandalize forest
-        (_, gs) = S.addCreature bonesplitter S.bob board
+        (_, gs) = S.addPermanent bonesplitter S.bob board
         answer :: Prompt.Prompt r -> r
         answer p = case p of
           Prompt.ChooseModes {} -> Seq.replicate 2 destroyArtifact
@@ -1136,9 +1136,9 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
     birdsOfParadise <- S.printingOf s registry "Birds of Paradise"
     vandalize <- S.printingOf s registry "Vandalize"
     forest <- S.printingOf s registry "Forest"
-    let birds = List.foldl' (\gs _ -> snd (S.addCreature birdsOfParadise S.alice gs)) (Setup.emptyGame S.bothPlayers) [1 .. 5 :: Int]
+    let birds = List.foldl' (\gs _ -> snd (S.addPermanent birdsOfParadise S.alice gs)) (Setup.emptyGame S.bothPlayers) [1 .. 5 :: Int]
         (noModes, spellId) = S.handOne vandalize birds
-        (_, oneMode) = S.addCreature forest S.bob noModes
+        (_, oneMode) = S.addPermanent forest S.bob noModes
     Spec.assertBool s (not (S.castable S.alice spellId noModes)) "no artifact and no land: no mode is choosable, so the spell is uncastable"
     Spec.assertBool s (S.castable S.alice spellId oneMode) "a land on the battlefield makes one mode choosable, which 'one or both' accepts"
 

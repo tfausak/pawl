@@ -217,7 +217,7 @@ sharedVictimBoard s registry victims = do
   altar <- S.printingOf s registry "Ashnod's Altar"
   tower <- S.printingOf s registry "Phyrexian Tower"
   piker <- S.printingOf s registry "Goblin Piker"
-  pure (foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : tower : replicate victims piker))
+  pure (foldr (\p gs -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : tower : replicate victims piker))
 
 -- Whether alice could pay {n} off this board.
 paysGeneric :: Natural -> GameState.GameState -> Bool
@@ -233,7 +233,7 @@ paysGeneric n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [M
 --
 -- Goblin Piker makes no mana, so every mana on these boards comes through a Drum.
 -- What separates the halves of each case is ONE Piker and nothing else. Neither
--- Drum is a creature, so CR 302.6 gates nothing here and S.addCreature settles
+-- Drum is a creature, so CR 302.6 gates nothing here and S.addPermanent settles
 -- every permanent besides.
 sharedTapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sharedTapSpec s registry = Spec.describe s "Two tapping costs over one creature" $ do
@@ -286,7 +286,7 @@ sharedTapBoard s registry creatures = do
 --
 -- The Drum's own {T} claims too, on a pool of one -- itself -- that no other
 -- claim meets, so it neither pays nor blocks. What separates the halves of each
--- case is ONE Elves and nothing else. S.addCreature settles what it places, so CR
+-- case is ONE Elves and nothing else. S.addPermanent settles what it places, so CR
 -- 302.6 does not gate the Elves' own {T}; the "one Elves makes one" positive is
 -- what would fail if it did.
 selfTapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -367,7 +367,7 @@ crewedBatterySpec s registry = Spec.describe s "A threshold tap and a counted ta
 
 -- Alice's Synthetic Crewed Battery and `creatures` Goblin Pikers. What separates
 -- the halves of each case above is ONE Piker and nothing else; the Battery is no
--- creature, so CR 302.6 gates nothing and S.addCreature settles the Pikers.
+-- creature, so CR 302.6 gates nothing and S.addPermanent settles the Pikers.
 crewedBatteryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
 crewedBatteryBoard s registry creatures = do
   battery <- S.printingOf s registry "Synthetic Crewed Battery"
@@ -487,8 +487,8 @@ chromaticSpec s registry = Spec.describe s "Chromatic Sphere and Chromatic Star"
 chromaticBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 chromaticBoard artifact forest =
   let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
-      (artifactId, g1) = S.addCreature artifact S.alice base
-      (_, g2) = S.addCreature forest S.alice g1
+      (artifactId, g1) = S.addPermanent artifact S.alice base
+      (_, g2) = S.addPermanent forest S.alice g1
       stocked = foldr (\p gs -> snd (S.addLibraryCard p S.alice gs)) g2 (replicate 3 forest)
    in (artifactId, stocked)
 
@@ -598,8 +598,8 @@ millikinSpec s registry = Spec.describe s "Millikin" $ do
 millikinBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 millikinBoard millikin solRing =
   let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
-      (millikinId, g1) = S.addCreature millikin S.alice base
-      (solRingId, g2) = S.addCreature solRing S.alice g1
+      (millikinId, g1) = S.addPermanent millikin S.alice base
+      (solRingId, g2) = S.addPermanent solRing S.alice g1
       stocked = foldr (\p gs -> snd (S.addLibraryCard p S.alice gs)) g2 (replicate 3 solRing)
    in (millikinId, solRingId, stocked)
 
@@ -666,13 +666,13 @@ burningTreeResolved bte pid =
    in (handId, snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop))
 
 -- The same board with the Emissary ARRANGED onto the battlefield instead of
--- entering (S.addCreature emits no event), so nothing triggers and no mana is
+-- entering (S.addPermanent emits no event), so nothing triggers and no mana is
 -- added. Everything else -- seats, phase, priority, the copy in hand, the empty
 -- stack -- is burningTreeResolved's.
 burningTreeArranged :: Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
 burningTreeArranged bte pid =
   let (base, handId) = S.handOne bte (Setup.emptyGame S.bothPlayers)
-   in (handId, snd (S.addCreature bte pid base))
+   in (handId, snd (S.addPermanent bte pid base))
 
 -- One green mana with no production tags, plainRed's twin: what the Emissary's
 -- trigger adds alongside it.
@@ -863,7 +863,7 @@ shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
 -- mana on the board is what the trigger added.
 shizukoUpkeep :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState
 shizukoUpkeep shizuko upkeep =
-  let (_, board) = S.addCreature shizuko S.alice S.threePlayerGame
+  let (_, board) = S.addPermanent shizuko S.alice S.threePlayerGame
       began =
         S.withEvents
           [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) upkeep)]
@@ -879,7 +879,7 @@ shizukoUpkeep shizuko upkeep =
 -- otherwise advance back into the step it just ran.
 shizukoStep :: Printing.Printing -> PlayerId.PlayerId -> Phase.Phase -> GameState.GameState
 shizukoStep shizuko active phase =
-  let (_, board) = S.addCreature shizuko S.alice S.threePlayerGame
+  let (_, board) = S.addPermanent shizuko S.alice S.threePlayerGame
    in board
         { GameState.activePlayer = active,
           GameState.phase = phase,
@@ -1193,7 +1193,7 @@ geosurgeSpec s registry = Spec.describe s "Geosurge" $ do
     star <- S.printingOf s registry "Chromatic Star"
     traveler <- S.printingOf s registry "Doomed Traveler"
     let after = snd (geosurgeBoards geosurge mountain)
-        withStar = snd (S.addCreature star S.alice after)
+        withStar = snd (S.addPermanent star S.alice after)
         casts gs =
           let (travelerId, held) = S.addHandCard traveler S.alice gs
            in S.castable S.alice travelerId held
@@ -1333,7 +1333,7 @@ lastingSpringSpec s registry = Spec.describe s "Synthetic Lasting Spring" $ do
 -- otherwise advance back into the step it just ran.
 tappedAtUpkeep :: Printing.Printing -> GameState.GameState
 tappedAtUpkeep printing =
-  let (oid, board) = S.addCreature printing S.alice (Setup.emptyGame S.bothPlayers)
+  let (oid, board) = S.addPermanent printing S.alice (Setup.emptyGame S.bothPlayers)
       upkeep =
         board
           { GameState.phase = Phase.Beginning BeginningStep.Upkeep,
@@ -1388,8 +1388,8 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     recall <- S.printingOf s registry "Ancestral Recall"
     solRing <- S.printingOf s registry "Sol Ring"
-    let (hawkerId, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
-        (equipId, g2) = S.addCreature bonesplitter S.alice g1
+    let (hawkerId, g1) = S.addPermanent hawker S.alice (Setup.emptyGame S.bothPlayers)
+        (equipId, g2) = S.addPermanent bonesplitter S.alice g1
     -- From the PROJECTION: Bonesplitter declares CR 702.6a's keyword and prints
     -- no activated ability of its own.
     case Projection.abilitiesOf equipId g2 of
@@ -1437,8 +1437,8 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     recall <- S.printingOf s registry "Ancestral Recall"
     solRing <- S.printingOf s registry "Sol Ring"
     island <- S.printingOf s registry "Island"
-    let (hawkerId, g1) = S.addCreature hawker S.alice (S.landsInPlay island 1)
-        (equipId, g2) = S.addCreature bonesplitter S.alice g1
+    let (hawkerId, g1) = S.addPermanent hawker S.alice (S.landsInPlay island 1)
+        (equipId, g2) = S.addPermanent bonesplitter S.alice g1
     case Projection.abilitiesOf equipId g2 of
       [] -> Spec.assertFailure s "Bonesplitter should offer rule 702.6a's minted equip ability"
       equipAbility : _ -> do
@@ -1469,9 +1469,9 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     star <- S.printingOf s registry "Chromatic Star"
     greed <- S.printingOf s registry "Greed"
     island <- S.printingOf s registry "Island"
-    let (_, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g2) = S.addCreature star S.alice g1
-        (greedId, board) = S.addCreature greed S.alice g2
+    let (_, g1) = S.addPermanent hawker S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent star S.alice g1
+        (greedId, board) = S.addPermanent greed S.alice g2
         drawable gs = any (\ability -> Activate.activatable S.alice greedId ability gs) (Projection.abilitiesOf greedId gs)
     Spec.assertBool s (drawable board) "CR 106.6 the Hawker's {C} buys the Star, whose mana pays Greed's {B}"
     Spec.assertBool s (drawable (S.landsFor island S.alice 1 board)) "one untapped Island pays that same {1}, so the board is otherwise fine"
@@ -1492,8 +1492,8 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     star <- S.printingOf s registry "Chromatic Star"
     traveler <- S.printingOf s registry "Doomed Traveler"
     island <- S.printingOf s registry "Island"
-    let (_, g1) = S.addCreature hawker S.alice (Setup.emptyGame S.bothPlayers)
-        (_, board) = S.addCreature star S.alice g1
+    let (_, g1) = S.addPermanent hawker S.alice (Setup.emptyGame S.bothPlayers)
+        (_, board) = S.addPermanent star S.alice g1
         -- S.handOne rather than S.addHandCard: it is what puts the board in a
         -- MAIN PHASE with priority, which the creature spell's sorcery timing
         -- needs (CR 601.3a).
@@ -1645,7 +1645,7 @@ delightedHalflingSpec s registry = Spec.describe s "Delighted Halfling" $ do
     island <- S.printingOf s registry "Island"
     tinybones <- S.printingOf s registry "Tinybones Joins Up"
     cancel <- S.printingOf s registry "Cancel"
-    let withHalfling = snd (S.addCreature halfling S.alice (Setup.emptyGame S.bothPlayers))
+    let withHalfling = snd (S.addPermanent halfling S.alice (Setup.emptyGame S.bothPlayers))
         (_, offHalfling) = counteredWith blackYield tinybones cancel island withHalfling
         (_, offSwamp) = counteredWith S.identityAnswer tinybones cancel island (S.landsInPlay swamp 1)
     Spec.assertEqWith s "CR 106.6 the Halfling's mana casts the legendary spell and its rider stops the Cancel" (S.countOnBattlefieldByName (S.printingName tinybones) S.alice offHalfling) 1
@@ -1660,7 +1660,7 @@ delightedHalflingSpec s registry = Spec.describe s "Delighted Halfling" $ do
     halfling <- S.printingOf s registry "Delighted Halfling"
     tinybones <- S.printingOf s registry "Tinybones Joins Up"
     bolt <- S.printingOf s registry "Lightning Bolt"
-    let withHalfling = snd (S.addCreature halfling S.alice (Setup.emptyGame S.bothPlayers))
+    let withHalfling = snd (S.addPermanent halfling S.alice (Setup.emptyGame S.bothPlayers))
         (g1, tinybonesId) = S.handOne tinybones withHalfling
         (boltId, board) = S.addHandCard bolt S.alice g1
     Spec.assertBool s (S.castable S.alice tinybonesId board) "the legendary spell is castable off the Halfling"
@@ -1815,7 +1815,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     elf <- S.printingOf s registry "Llanowar Elves"
     splitter <- S.printingOf s registry "Bonesplitter"
     let (elves, plain) = elfBoard elf 3
-        (weapon, armed) = S.addCreature splitter S.alice plain
+        (weapon, armed) = S.addPermanent splitter S.alice plain
         board = S.attach weapon (NonEmpty.head elves) armed
         (offers, paid, after) = greenWindow board
     Spec.assertEqWith s "asked once, with the equipped Elf beside the two that are alike" (fmap length offers) [2]
@@ -1840,7 +1840,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     elf <- S.printingOf s registry "Llanowar Elves"
     betrayal <- S.printingOf s registry "Betrayal"
     let (elves, plain) = elfBoard elf 3
-        (aura, enchanted) = S.addCreature betrayal S.bob plain
+        (aura, enchanted) = S.addPermanent betrayal S.bob plain
         board = S.attach aura (NonEmpty.head elves) enchanted
         (offers, paid, after) = greenWindow board
     Spec.assertEqWith s "asked once, with the enchanted Elf beside the two that are alike" (fmap length offers) [2]
@@ -1882,7 +1882,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     forest <- S.printingOf s registry "Forest"
     growth <- S.printingOf s registry "Giant Growth"
     let (elves, plain) = elfBoard elf 3
-        (land, wooded) = S.addCreature forest S.alice plain
+        (land, wooded) = S.addPermanent forest S.alice plain
         (board, spell) = S.handOne growth wooded
         aimed = NonEmpty.head elves
         casting :: Prompt.Prompt r -> r
@@ -1909,7 +1909,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     elf <- S.printingOf s registry "Llanowar Elves"
     splitter <- S.printingOf s registry "Bonesplitter"
     let (elves, plain) = elfBoard elf 3
-        (weapon, armed) = S.addCreature splitter S.alice plain
+        (weapon, armed) = S.addPermanent splitter S.alice plain
         board = S.withEffect weapon (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) armed
         (offers, paid, after) = greenWindow board
     Spec.assertEqWith s "asked once, with all three Elves on offer" (fmap length offers) [3]
@@ -1930,7 +1930,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     piker <- S.printingOf s registry "Goblin Piker"
     hunter <- S.printingOf s registry "Blind Hunter"
     let (elves, plain) = elfBoard elf 3
-        (pikerId, withPiker) = S.addCreature piker S.bob plain
+        (pikerId, withPiker) = S.addPermanent piker S.bob plain
         (hunterId, exiled) = S.addExiledCard hunter S.bob withPiker
         board = haunts hunterId pikerId exiled
         (offers, paid, after) = greenWindow board
@@ -1948,7 +1948,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     piker <- S.printingOf s registry "Goblin Piker"
     hunter <- S.printingOf s registry "Blind Hunter"
     let (elves, plain) = elfBoard elf 3
-        (_, withPiker) = S.addCreature piker S.bob plain
+        (_, withPiker) = S.addPermanent piker S.bob plain
         (hunterId, exiled) = S.addExiledCard hunter S.bob withPiker
         board = haunts hunterId (NonEmpty.head elves) exiled
         (offers, paid, after) = greenWindow board
@@ -1966,10 +1966,10 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
 -- Alice's `n` copies of one printing, and their ids in the order they arrived.
 elfBoard :: Printing.Printing -> Int -> (NonEmpty.NonEmpty ObjectId.ObjectId, GameState.GameState)
 elfBoard printing n =
-  let (first, placed) = S.addCreature printing S.alice (Setup.emptyGame S.bothPlayers)
+  let (first, placed) = S.addPermanent printing S.alice (Setup.emptyGame S.bothPlayers)
       (rest, final) =
         List.foldl'
-          (\(oids, gs) _ -> let (oid, next) = S.addCreature printing S.alice gs in (oids <> [oid], next))
+          (\(oids, gs) _ -> let (oid, next) = S.addPermanent printing S.alice gs in (oids <> [oid], next))
           ([], placed)
           (replicate (n - 1) ())
    in (first NonEmpty.:| rest, final)
@@ -2020,7 +2020,7 @@ oneSymbol symbol = ManaCost.MkManaCost [symbol]
 dawnBoards :: Printing.Printing -> [ManaUnit.ManaUnit] -> (GameState.GameState, GameState.GameState)
 dawnBoards dawn units =
   let seated = Mana.setPool S.alice (Mana.Type.MkMana units) (Setup.emptyGame S.bothPlayers)
-   in (snd (S.addCreature dawn S.alice seated), seated)
+   in (snd (S.addPermanent dawn S.alice seated), seated)
 
 -- Can this player pay this cost on this board? The payABILITY half; the cases
 -- that also drive a payment say so.

@@ -24,12 +24,13 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- Parametric in the EFFECT, for the reason Pawl.Types.DamageR gives: RunEffects
 -- below carries a card's effects, and neither module may name the other.
 --
--- SacrificeAnyNumber is the one constructor whose choice COSTS something, and
--- CR 614.12b's combined budget across permanents entering simultaneously holds
--- for it without a budget being carried anywhere: the choice is paid for inside
--- the entry loop that made it, so the next member of the batch cannot choose
--- what an earlier one already spent (CR 614.13b). Pawl.Engine.Event's arm
--- states the argument in full and names the board that proves it.
+-- SacrificeAnyNumber and ExileFromGraveyard are the constructors whose choice
+-- SPENDS something, and CR 614.12b's combined budget across permanents entering
+-- simultaneously holds for both without a budget being carried anywhere: the
+-- choice is paid for inside the entry loop that made it, so the next member of
+-- the batch cannot choose what an earlier one already spent (CR 614.13b).
+-- Pawl.Engine.Event's SacrificeAnyNumber arm states the argument in full and
+-- names the board that proves it.
 data EntryRewrite effect
   = -- | CR 707.5 / 614.1c / Clone, Vesuva: "you may have this permanent enter as a
     -- copy of ...", the payload carrying which permanents the printed noun phrase
@@ -99,6 +100,16 @@ data EntryRewrite effect
     -- Not implemented: CR 702.82a's devour, which is this shape with a
     -- per-permanent multiplier (#877).
     SacrificeAnyNumber SacrificeAnyNumber.SacrificeAnyNumber
+  | -- | CR 614.1c / 614.13a / Living Lore: exile one card matching the Filter out
+    -- of the entering permanent's controller's graveyard as it enters. CR 614.14
+    -- links the exiled card to the entering permanent, so a
+    -- Quantity.AgainstCardsExiledWith on the same card reads it back.
+    --
+    -- Not implemented: any number rather than one -- Sutured Ghoul's "exile any
+    -- number of creature cards from your graveyard" -- and another player's
+    -- graveyard, which Dermotaxi's "exile a creature card from a graveyard"
+    -- prints (#3293).
+    ExileFromGraveyard (Filter.Filter Keyword.Keyword)
   | -- | CR 702.136a via CR 614.1c: riot, minted from the projection rather than
     -- written by a card.
     Riot

@@ -96,8 +96,8 @@ beastToken = CardName.MkCardName (Text.pack "Beast Token")
 -- CR 104.3c cannot end the game before the departure under test.
 stolenTowershellBoard :: GameState.GameState -> Printing -> Printing -> Printing -> GameState.GameState
 stolenTowershellBoard base towershell controlMagic island =
-  let (turtle, g1) = S.addCreature towershell S.bob base
-      (aura, g2) = S.addCreature controlMagic S.alice g1
+  let (turtle, g1) = S.addPermanent towershell S.bob base
+      (aura, g2) = S.addPermanent controlMagic S.alice g1
       g3 = S.attach aura turtle g2
       stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 12]
    in List.foldl' stock g3 (GameState.turnOrder g3)
@@ -255,7 +255,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- departure) and the note on what the card omits.
   Spec.it s "CR 725.4 the crown skips a seat that can't become the monarch" $ do
     jared <- S.printingOf s registry "Jared Carthalion, True Heir"
-    let (jaredId, gs1) = S.addCreature jared S.alice S.threePlayerGame
+    let (jaredId, gs1) = S.addPermanent jared S.alice S.threePlayerGame
         board = entersResolved jaredId gs1
         gone = S.departs Departure.Type.Conceded S.bob board
     Spec.assertEqWith s "alice is the active player" (GameState.activePlayer board) S.alice
@@ -275,8 +275,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- Jared restricts its OWN controller, so carol and dave are untouched by either.
   Spec.it s "CR 725.4 the walk itself skips a still-playing seat that can't become the monarch" $ do
     jared <- S.printingOf s registry "Jared Carthalion, True Heir"
-    let (alicesJared, gs1) = S.addCreature jared S.alice S.fourPlayerGame
-        (bobsJared, gs2) = S.addCreature jared S.bob gs1
+    let (alicesJared, gs1) = S.addPermanent jared S.alice S.fourPlayerGame
+        (bobsJared, gs2) = S.addPermanent jared S.bob gs1
         board = entersResolved bobsJared (entersResolved alicesJared gs2)
         gone = S.departs Departure.Type.Conceded S.carol (S.withMonarch S.carol board)
     Spec.assertEqWith s "alice is the active player" (GameState.activePlayer board) S.alice
@@ -307,12 +307,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 800.4a a departing player's objects leave the game, from every zone that can hold one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
-    let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
+    let (onField, g1) = S.addPermanent piker S.bob S.threePlayerGame
         (inHand, g2) = S.addHandCard mountain S.bob g1
         (inLibrary, g3) = S.addLibraryCard mountain S.bob g2
         (inGraveyard, g4) = S.addGraveyardCard mountain S.bob g3
         (onStack, g5) = S.spellOnStack piker S.bob g4
-        (aliceKeeps, g6) = S.addCreature piker S.alice g5
+        (aliceKeeps, g6) = S.addPermanent piker S.alice g5
         gone = S.departs Departure.Type.Conceded S.bob g6
     Spec.assertEqWith s "bob's battlefield permanent is gone" (Game.lookupObject onField gone) Nothing
     Spec.assertEqWith s "bob's hand card is gone" (Game.lookupObject inHand gone) Nothing
@@ -358,8 +358,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 800.4a/611.2a a lingering static-ability effect is handed over when its owner leaves the game" $ do
     song <- S.printingOf s registry "Titania's Song"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let (axeId, g1) = S.addCreature bonesplitter S.alice S.threePlayerGame
-        (songId, before) = S.addCreature song S.bob g1
+    let (axeId, g1) = S.addPermanent bonesplitter S.alice S.threePlayerGame
+        (songId, before) = S.addPermanent song S.bob g1
         gone = S.departs Departure.Type.Conceded S.bob before
     -- Without these the rest says nothing: the Song has to have been animating
     -- the Bonesplitter before bob left.
@@ -389,8 +389,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 604.2 an ordinary static ability does NOT linger past the departure that removed it" $ do
     humility <- S.printingOf s registry "Humility"
     birdMaiden <- S.printingOf s registry "Bird Maiden"
-    let (birdId, g1) = S.addCreature birdMaiden S.alice S.threePlayerGame
-        (humilityId, before) = S.addCreature humility S.bob g1
+    let (birdId, g1) = S.addPermanent birdMaiden S.alice S.threePlayerGame
+        (humilityId, before) = S.addPermanent humility S.bob g1
         gone = S.departs Departure.Type.Conceded S.bob before
     Spec.assertEqWith s "CR 613 Humility makes the Maiden a 1/1" (S.powerToughnessOf birdId before) (Just (1, 1))
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying birdId before)) "with no flying"
@@ -410,8 +410,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 800.1 two seats: the same concede leaves the Song on the battlefield, so nothing is handed over" $ do
     song <- S.printingOf s registry "Titania's Song"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let (axeId, g1) = S.addCreature bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
-        (songId, before) = S.addCreature song S.bob g1
+    let (axeId, g1) = S.addPermanent bonesplitter S.alice (Setup.emptyGame S.bothPlayers)
+        (songId, before) = S.addPermanent song S.bob g1
         gone = S.departs Departure.Type.Conceded S.bob before
     Spec.assertEqWith s "the seam says CR 800.4a does not run" (Departure.continuesAfterDeparture before) False
     Spec.assertBool s (S.onBattlefield songId gone) "so bob's Song is still on the battlefield"
@@ -420,14 +420,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
 
   Spec.it s "CR 510.4 a departing player's id is dropped from the struckFirst snapshot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
+    let (onField, g1) = S.addPermanent piker S.bob S.threePlayerGame
         snapshotted = g1 {GameState.combat = (GameState.combat g1) {Combat.Type.struckFirst = Just (Set.singleton onField)}}
         gone = S.departs Departure.Type.Conceded S.bob snapshotted
     Spec.assertEqWith s "bob's id is pruned from the CR 510.4 first-strike snapshot" (Combat.Type.struckFirst (GameState.combat gone)) (Just Set.empty)
 
   Spec.it s "CR 725 an exiledUntilMonarch entry KEYED on the departing player's own object is dropped" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (onField, g1) = S.addCreature piker S.bob S.threePlayerGame
+    let (onField, g1) = S.addPermanent piker S.bob S.threePlayerGame
         exiled = g1 {GameState.exiledUntilMonarch = Map.singleton onField (MonarchWatch.MkMonarchWatch {MonarchWatch.controller = S.alice, MonarchWatch.due = False})}
         gone = S.departs Departure.Type.Conceded S.bob exiled
     Spec.assertEqWith s "the entry keyed on bob's own (now-gone) object is dropped" (GameState.exiledUntilMonarch gone) Map.empty
@@ -440,8 +440,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- gone id out at damage ASSIGNMENT time rather than here.
   Spec.it s "CR 509.1h a blocked attacker stays blocked when its blocker's OWNER departs" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (attacker, g1) = S.addCreature piker S.alice S.threePlayerGame
-        (blocker, g2) = S.addCreature piker S.bob g1
+    let (attacker, g1) = S.addPermanent piker S.alice S.threePlayerGame
+        (blocker, g2) = S.addPermanent piker S.bob g1
         combat =
           (GameState.combat g2)
             { Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.bob),
@@ -463,8 +463,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     -- the loser's cards left the game, funnelBack would have nothing to
     -- return and they would be destroyed.
     piker <- S.printingOf s registry "Goblin Piker"
-    let (onField, twoSeats) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
-        (alsoOnField, threeSeats) = S.addCreature piker S.bob (Setup.emptyGame S.threePlayers)
+    let (onField, twoSeats) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (alsoOnField, threeSeats) = S.addPermanent piker S.bob (Setup.emptyGame S.threePlayers)
         twoGone = S.departs Departure.Type.Conceded S.bob twoSeats
         threeGone = S.departs Departure.Type.Conceded S.bob threeSeats
     Spec.assertEqWith s "two seats: bob's Piker stays in the game" (fmap Object.owner (Game.lookupObject onField twoGone)) (Just S.bob)
@@ -493,16 +493,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 800.4a nothing in the game is owned or controlled by a player who has left it" $ do
     -- The postcondition CR 800.4a's four clauses exist to guarantee, on a
     -- board that reaches all of them: bob owns two permanents (a Goblin
-    -- Piker and a Mindslaver, both added via S.addCreature) and a spell on
+    -- Piker and a Mindslaver, both added via S.addPermanent) and a spell on
     -- the stack; he has also stolen control of alice's Darksteel Myr, a
     -- permanent she still owns, with a stored SetController.
     piker <- S.printingOf s registry "Goblin Piker"
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
     mindslaver <- S.printingOf s registry "Mindslaver"
-    let (bobsPiker, g1) = S.addCreature piker S.bob S.threePlayerGame
-        (aliceMyr, g2) = S.addCreature darksteelMyr S.alice g1
+    let (bobsPiker, g1) = S.addPermanent piker S.bob S.threePlayerGame
+        (aliceMyr, g2) = S.addPermanent darksteelMyr S.alice g1
         (bobsSpell, g3) = S.spellOnStack piker S.bob g2
-        (bobsSlaver, g4) = S.addCreature mindslaver S.bob g3
+        (bobsSlaver, g4) = S.addPermanent mindslaver S.bob g3
         g5 = S.giveControl aliceMyr S.bob g4
         gone = S.departs Departure.Type.Conceded S.bob g5
         ownedBy who = Map.keys (Map.filter (\obj -> Object.owner obj == who) (GameState.objects gone))
@@ -524,8 +524,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 800.4a: a departing player's own Control Magic leaves with her and releases the creature" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
-    let (creature, withCreature) = S.addCreature piker S.bob S.threePlayerGame
-        (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+    let (creature, withCreature) = S.addPermanent piker S.bob S.threePlayerGame
+        (aura, withAura) = S.addPermanent controlMagic S.alice withCreature
         attached = S.attach aura creature withAura
         after = S.departs Departure.Type.Conceded S.alice attached
     Spec.assertEqWith s "alice controlled it before she left" (Projection.controllerOf creature attached) (Just S.alice)
@@ -546,8 +546,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 800.4a: a departing player's stolen Control Magic reverts to its owner, taking the creature with it" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     controlMagic <- S.printingOf s registry "Control Magic"
-    let (creature, withCreature) = S.addCreature piker S.carol S.threePlayerGame
-        (aura, withAura) = S.addCreature controlMagic S.alice withCreature
+    let (creature, withCreature) = S.addPermanent piker S.carol S.threePlayerGame
+        (aura, withAura) = S.addPermanent controlMagic S.alice withCreature
         attached = S.attach aura creature withAura
         stolen = S.giveControl aura S.bob attached
         after = S.departs Departure.Type.Conceded S.bob stolen
@@ -624,7 +624,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     shredder <- S.printingOf s registry "Super Shredder"
     let board = stolenTowershellBoard S.threePlayerGame towershell controlMagic island
         returned = runToTurnStep 4 (Phase.Combat CombatStep.DeclareBlockers) board
-        (shredderId, watching) = S.addCreature shredder S.carol returned
+        (shredderId, watching) = S.addPermanent shredder S.carol returned
         after = S.runPure S.identityAnswer watching (Departure.leaveGame Departure.Type.Conceded S.alice)
         settled = resolveTriggers after
     Spec.assertEqWith s "carol's Shredder is a 1/1 with no counters before alice leaves" (Projection.powerOf shredderId watching, fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId watching)) (Just 1, Just Nothing)
@@ -688,8 +688,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   Spec.it s "CR 800.4a/603.6c a permanent leaving the game with its owner is a departure a bystander sees" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     shredder <- S.printingOf s registry "Super Shredder"
-    let (pikerId, withPiker) = S.addCreature piker S.alice S.threePlayerGame
-        (shredderId, board) = S.addCreature shredder S.carol withPiker
+    let (pikerId, withPiker) = S.addPermanent piker S.alice S.threePlayerGame
+        (shredderId, board) = S.addPermanent shredder S.carol withPiker
         after = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.alice)
         settled = resolveTriggers after
     Spec.assertEqWith s "carol's Shredder is a 1/1 while alice's Piker is on the battlefield" (Projection.powerOf shredderId board) (Just 1)
@@ -759,7 +759,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- What fires is the ability GameState.lastKnown says it had.
   Spec.it s "CR 603.6c a phased-in permanent leaving the game with its owner triggers its leaves-the-battlefield ability" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
-    let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame
+    let (tusk, g1) = S.addPermanent thragtusk S.bob S.threePlayerGame
         board = S.giveControl tusk S.carol (S.addCounter CounterKind.PlusOnePlusOne 1 tusk g1)
         gone = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob)
         after = resolveTriggers gone
@@ -791,7 +791,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- proved on the card in Pawl.PhasingSpec.
   Spec.it s "CR 702.26k a PHASED-OUT permanent leaves the game with its owner and triggers nothing" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
-    let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame
+    let (tusk, g1) = S.addPermanent thragtusk S.bob S.threePlayerGame
         board = S.giveControl tusk S.carol (S.addCounter CounterKind.PlusOnePlusOne 1 tusk g1)
         phased = Phasing.phaseOut (PhasedOut.Directly S.carol) tusk board
         gone = S.runPure S.identityAnswer phased (Departure.leaveGame Departure.Type.Conceded S.bob)
@@ -808,7 +808,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- would hand back its owner, bob.
   Spec.it s "CR 608.2h a departure files last known information under the id the object had" $ do
     thragtusk <- S.printingOf s registry "Thragtusk"
-    let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame
+    let (tusk, g1) = S.addPermanent thragtusk S.bob S.threePlayerGame
         board = S.giveControl tusk S.carol (S.addCounter CounterKind.PlusOnePlusOne 1 tusk g1)
         gone = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob)
     Spec.assertEqWith s "nothing is filed while it is still in the game" (Map.lookup tusk (GameState.lastKnown board)) Nothing
@@ -908,8 +908,8 @@ blossomDepartureBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bo
 blossomDepartureBoard s registry lent = do
   bitterblossom <- S.printingOf s registry "Bitterblossom"
   soulWarden <- S.printingOf s registry "Soul Warden"
-  let (_, g1) = S.addCreature bitterblossom S.bob S.threePlayerGame
-      (wardenId, g2) = S.addCreature soulWarden S.carol g1
+  let (_, g1) = S.addPermanent bitterblossom S.bob S.threePlayerGame
+      (wardenId, g2) = S.addPermanent soulWarden S.carol g1
       borrowed = if lent then S.giveControl wardenId S.bob g2 else g2
       upkeep = Phase.Beginning BeginningStep.Upkeep
       dying =

@@ -204,10 +204,10 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         -- 303.1 would leave it in hand for the whole combat phase, and the Orrery's
         -- CR 601.3b permission carries CR 702.8a's window -- any time you could
         -- cast an instant -- so it is castable once the block has been declared.
-        let (_, gs1) = S.addCreature forest S.alice gs0
-            (_, gs2) = S.addCreature forest S.alice gs1
-            (_, gs3) = S.addCreature forest S.alice gs2
-            (_, gs4) = S.addCreature orrery S.alice gs3
+        let (_, gs1) = S.addPermanent forest S.alice gs0
+            (_, gs2) = S.addPermanent forest S.alice gs1
+            (_, gs3) = S.addPermanent forest S.alice gs2
+            (_, gs4) = S.addPermanent orrery S.alice gs3
             (_, gs) = S.addHandCard song S.alice gs4
         -- The same fixture pins the leg above takes, for the same reason.
         Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf jaceId gs)) "CR 205.1b: the Coating made Jace an artifact"
@@ -915,7 +915,7 @@ stolenJaceLandwalkBoard s registry bolted defendersLand ownersLand = do
   let (gs0, ours, yours, hers) = S.threePlayerCombat [bogWraith, mountain] [piker, bobs] [jace, carols]
   case (ours, yours, hers) of
     (wraith : _, blocker : _, jaceId : _) -> do
-      let (confiscateId, gs1) = S.addCreature confiscate S.bob gs0
+      let (confiscateId, gs1) = S.addPermanent confiscate S.bob gs0
           (boltId, gs2) = S.addHandCard bolt S.alice gs1
           gs3 = S.addCounter CounterKind.Loyalty 3 jaceId (S.attachTo confiscateId (Recipient.ToObject jaceId) gs2)
           board =
@@ -1058,7 +1058,7 @@ stolenByBobJaceBoard s registry bobsLand carolsLand = do
   let (gs0, ours, yours, hers) = S.threePlayerCombat [bogWraith] [piker, bobs] [jace, carols, bonesplitter, piker]
   case (ours, yours, hers) of
     ([wraith], [bobsBlocker, _], [jaceId, _, splitter, carolsBlocker]) -> do
-      let (auraId, gs1) = S.addCreature confiscate S.carol (S.landsFor island S.bob 3 gs0)
+      let (auraId, gs1) = S.addPermanent confiscate S.carol (S.landsFor island S.bob 3 gs0)
           gs2 = S.addCounter CounterKind.Loyalty 5 jaceId (S.attachTo auraId (Recipient.ToObject splitter) gs1)
           (spell, gs3) = S.addHandCard graft S.bob gs2
           settled = S.runPure S.identityAnswer gs3 (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
@@ -1275,10 +1275,10 @@ soulSnareBoard s registry = do
   let (gs0, ours, _, hers) = S.threePlayerCombat [piker] [plains] [jace, plains]
   case (ours, hers) of
     ([pikerId], jaceId : _) -> do
-      let (confiscateId, gs1) = S.addCreature confiscate S.bob gs0
+      let (confiscateId, gs1) = S.addPermanent confiscate S.bob gs0
           gs2 = S.addCounter CounterKind.Loyalty 5 jaceId (S.attachTo confiscateId (Recipient.ToObject jaceId) gs1)
-          (bobSnare, gs3) = S.addCreature snare S.bob gs2
-          (carolSnare, gs4) = S.addCreature snare S.carol gs3
+          (bobSnare, gs3) = S.addPermanent snare S.bob gs2
+          (carolSnare, gs4) = S.addPermanent snare S.carol gs3
       pure (gs4, pikerId, jaceId, bobSnare, carolSnare)
     _ -> Spec.assertFailure s "fixture should have one Piker and one Jace"
 
@@ -1616,7 +1616,7 @@ graftBoard s registry auraName = do
   case (ours, theirs) of
     ([pikerId, aliceSnare], [jaceId, bobSnare, host, spare]) -> do
       let gs1 = S.landsFor plains S.bob 3 (S.landsFor plains S.alice 2 (S.landsFor island S.alice 3 gs0))
-          (auraId, gs2) = S.addCreature aura S.bob gs1
+          (auraId, gs2) = S.addPermanent aura S.bob gs1
           gs3 = S.addCounter CounterKind.Loyalty 5 jaceId (S.attachTo auraId (Recipient.ToObject host) gs2)
           (spell, gs4) = S.addHandCard graft S.alice gs3
       pure

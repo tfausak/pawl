@@ -92,8 +92,8 @@ undetainedBoard s registry name = do
 
 twins :: Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 twins printing =
-  let (victim, g1) = S.addCreature printing S.bob S.threePlayerGame
-      (control, g2) = S.addCreature printing S.bob g1
+  let (victim, g1) = S.addPermanent printing S.bob S.threePlayerGame
+      (control, g2) = S.addPermanent printing S.bob g1
    in (victim, control, g2)
 
 arrested :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)

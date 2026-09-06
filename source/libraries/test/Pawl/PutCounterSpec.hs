@@ -104,10 +104,10 @@ putCountersFromSpec s registry = Spec.describe s "CR 122.8 putting the counters 
         swamp <- S.printingOf s registry "Swamp"
         apprentice <- S.printingOf s registry "Iron Apprentice"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (apprenticeId, g1) = S.addCreature apprentice S.alice (S.landsInPlay swamp 1)
-            (_, g2) = S.addCreature piker S.alice g1
-            (takerId, g3) = S.addCreature piker S.alice g2
-            (_, g4) = S.addCreature piker S.bob g3
+        let (apprenticeId, g1) = S.addPermanent apprentice S.alice (S.landsInPlay swamp 1)
+            (_, g2) = S.addPermanent piker S.alice g1
+            (takerId, g3) = S.addPermanent piker S.alice g2
+            (_, g4) = S.addPermanent piker S.bob g3
             -- CR 104.3c: nothing here draws or advances a turn, and a stocked
             -- library keeps it that way if a later fixture change does.
             stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 .. 5 :: Int]
@@ -201,12 +201,12 @@ resourcefulDefenseSpec s registry = Spec.describe s "CR 122.8 putting the counte
         swamp <- S.printingOf s registry "Swamp"
         defense <- S.printingOf s registry "Resourceful Defense"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (_, g1) = S.addCreature defense S.alice (S.landsInPlay swamp 1)
-            (pikerVictimId, g2) = S.addCreature piker S.alice g1
-            (landVictimId, g3) = S.addCreature swamp S.alice g2
-            (takerId, g4) = S.addCreature piker S.alice g3
-            (decoyId, g5) = S.addCreature piker S.alice g4
-            (_, g6) = S.addCreature piker S.bob g5
+        let (_, g1) = S.addPermanent defense S.alice (S.landsInPlay swamp 1)
+            (pikerVictimId, g2) = S.addPermanent piker S.alice g1
+            (landVictimId, g3) = S.addPermanent swamp S.alice g2
+            (takerId, g4) = S.addPermanent piker S.alice g3
+            (decoyId, g5) = S.addPermanent piker S.alice g4
+            (_, g6) = S.addPermanent piker S.bob g5
             -- CR 104.3c: nothing here draws or advances a turn, and a stocked
             -- library keeps it that way if a later fixture change does.
             stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g6 [1 .. 5 :: Int]
@@ -302,10 +302,10 @@ selflessPoliceCaptainSpec s registry = Spec.describe s "CR 122.8 putting only th
         swamp <- S.printingOf s registry "Swamp"
         captain <- S.printingOf s registry "Selfless Police Captain"
         piker <- S.printingOf s registry "Goblin Piker"
-        let (captainId, g1) = S.addCreature captain S.alice (S.landsInPlay swamp 1)
-            (_, g2) = S.addCreature piker S.alice g1
-            (takerId, g3) = S.addCreature piker S.alice g2
-            (_, g4) = S.addCreature piker S.bob g3
+        let (captainId, g1) = S.addPermanent captain S.alice (S.landsInPlay swamp 1)
+            (_, g2) = S.addPermanent piker S.alice g1
+            (takerId, g3) = S.addPermanent piker S.alice g2
+            (_, g4) = S.addPermanent piker S.bob g3
             -- CR 104.3c: nothing here draws or advances a turn, and a stocked
             -- library keeps it that way if a later fixture change does.
             stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 .. 5 :: Int]

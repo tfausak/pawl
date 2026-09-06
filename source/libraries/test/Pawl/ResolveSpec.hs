@@ -145,7 +145,7 @@ targetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 targetSpec s registry = Spec.describe s "Target" $ do
   Spec.it s "CR 115.4 AnyTarget offers every creature and every playing player" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "creature and both players"
@@ -163,7 +163,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     -- explicitly, which is what makes this testable: the effect is asked to
     -- resolve on behalf of a player who is no longer in the game.
     darksteelMyr <- S.printingOf s registry "Darksteel Myr"
-    let (myr, board) = S.addCreature darksteelMyr S.carol S.threePlayerGame
+    let (myr, board) = S.addPermanent darksteelMyr S.carol S.threePlayerGame
         gone = S.departs Departure.Type.Conceded S.bob board
         slot = SlotName.MkSlotName (Text.pack "target")
         after =
@@ -190,7 +190,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     Spec.assertEqWith s "and takes control" (Projection.controllerOf myr control) (Just S.bob)
   Spec.it s "CR 608.2b a creature that left its zone is no longer legal" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
     Spec.assertBool s (Target.stillLegal Nothing Map.empty S.noSource (Recipient.ToCreature oid) (TargetSlot.required Pool.AnyTarget Nothing) gs) "legal while fielded"
     Spec.assertBool s (not (Target.stillLegal Nothing Map.empty S.noSource (Recipient.ToCreature oid) (TargetSlot.required Pool.AnyTarget Nothing) gone)) "illegal once moved"
@@ -204,7 +204,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
       (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
   Spec.it s "CR 115.4 CreatureTarget offers creatures but no players" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith
       s
       "just the creature"
@@ -217,13 +217,13 @@ targetSpec s registry = Spec.describe s "Target" $ do
       "nothing to target"
   Spec.it s "CR 608.2b a creature that left is no longer a legal CreatureTarget" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (oid, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (oid, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         gone = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Graveyard)
     Spec.assertBool s (Target.stillLegal Nothing Map.empty S.noSource (Recipient.ToCreature oid) (TargetSlot.required Pool.Creatures Nothing) gs) "legal while fielded"
     Spec.assertBool s (not (Target.stillLegal Nothing Map.empty S.noSource (Recipient.ToCreature oid) (TargetSlot.required Pool.Creatures Nothing) gone)) "illegal once moved"
   Spec.it s "CR 115 SpellOrPermanentTarget offers battlefield permanents and stack spells" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (permId, gs) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (permId, gs) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
     Spec.assertBool
       s
       (Set.member (Recipient.ToObject permId) (Target.legalRecipients Nothing S.noSource (TargetSlot.required Pool.SpellsAndPermanents Nothing) gs))
@@ -231,7 +231,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
   Spec.it s "CR 115 SpellTarget offers a stack spell but not a battlefield permanent" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
-    let (permId, base) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+    let (permId, base) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
         (spellId, gs) = S.spellOnStack lightningBolt S.alice base
         legal = Target.legalRecipients Nothing S.noSource (TargetSlot.required Pool.Spells Nothing) gs
     Spec.assertBool s (Set.member (Recipient.ToObject spellId) legal) "the stack spell is a legal target"
@@ -254,8 +254,8 @@ targetSpec s registry = Spec.describe s "Target" $ do
   Spec.it s "CR 115.1a / 700.2c \"target Wall\" offers a Wall creature but not a non-Wall creature" $ do
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (wallId, base) = S.addCreature wallOfStone S.bob (Setup.emptyGame S.bothPlayers)
-        (pikerId, gs) = S.addCreature piker S.alice base
+    let (wallId, base) = S.addPermanent wallOfStone S.bob (Setup.emptyGame S.bothPlayers)
+        (pikerId, gs) = S.addPermanent piker S.alice base
         slot = SlotName.MkSlotName (Text.pack "target")
         legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing False Map.empty S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
     Spec.assertBool s (Set.member (Recipient.ToCreature wallId) legal) "the Wall is legal"
@@ -270,9 +270,9 @@ targetSpec s registry = Spec.describe s "Target" $ do
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bloodMoon <- S.printingOf s registry "Blood Moon"
-    let (wallId, g1) = S.addCreature wallOfStone S.alice (Setup.emptyGame S.bothPlayers)
-        (_, g2) = S.addCreature ashaya S.alice g1
-        (_, gs) = S.addCreature bloodMoon S.alice g2
+    let (wallId, g1) = S.addPermanent wallOfStone S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent ashaya S.alice g1
+        (_, gs) = S.addPermanent bloodMoon S.alice g2
         slot = SlotName.MkSlotName (Text.pack "target")
         legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing False Map.empty S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
     Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf wallId gs)) "it really is a Mountain"
@@ -292,8 +292,8 @@ targetSpec s registry = Spec.describe s "Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     warMammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (mine, gs1) = S.addCreature piker S.alice gs0
-        (theirs, gs2) = S.addCreature warMammoth S.bob gs1
+        (mine, gs1) = S.addPermanent piker S.alice gs0
+        (theirs, gs2) = S.addPermanent warMammoth S.bob gs1
         legal = Target.legalRecipients (Just S.alice) mine (TargetSlot.required Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs2
     Spec.assertEqWith s "only the opponent's creature" legal (Set.singleton (Recipient.ToCreature theirs))
     Spec.assertBool s (not (Set.member (Recipient.ToCreature mine) legal)) "not the source's controller's own"
@@ -303,7 +303,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
   -- is a real set rather than the only other player.
   Spec.it s "CR 115.1 a Players pool narrowed by IsPlayer Opponent excludes the source's controller" $ do
     ravenousRats <- S.printingOf s registry "Ravenous Rats"
-    let (src, gs) = S.addCreature ravenousRats S.alice (Setup.emptyGame S.threePlayers)
+    let (src, gs) = S.addPermanent ravenousRats S.alice (Setup.emptyGame S.threePlayers)
         theSlot = TargetSlot.required Pool.Players (Just (Filter.Type.IsPlayer PlayerRelation.Opponent))
         legal = Target.legalRecipients (Just S.alice) src theSlot gs
     Spec.assertEqWith
@@ -315,7 +315,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
   -- the JSON carries rather than one hand-built in the test.
   Spec.it s "CR 115.1 Ravenous Rats' entry trigger may only target an opponent" $ do
     ravenousRats <- S.printingOf s registry "Ravenous Rats"
-    let (src, gs) = S.addCreature ravenousRats S.bob (Setup.emptyGame S.threePlayers)
+    let (src, gs) = S.addPermanent ravenousRats S.bob (Setup.emptyGame S.threePlayers)
         -- The slot lives on the ENTRY TRIGGER, not the spell, so
         -- Card.allTargetSlots (which covers the spell and the enchant slot)
         -- is the wrong door -- read the ability the card actually prints.
@@ -357,9 +357,9 @@ targetSpec s registry = Spec.describe s "Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     warMammoth <- S.printingOf s registry "War Mammoth"
     let gs0 = Setup.emptyGame S.threePlayers
-        (mine, gs1) = S.addCreature piker S.alice gs0
-        (bobs, gs2) = S.addCreature warMammoth S.bob gs1
-        (carols, gs3) = S.addCreature piker S.carol gs2
+        (mine, gs1) = S.addPermanent piker S.alice gs0
+        (bobs, gs2) = S.addPermanent warMammoth S.bob gs1
+        (carols, gs3) = S.addPermanent piker S.carol gs2
         legal = Target.legalRecipients (Just S.alice) mine (TargetSlot.required Pool.Creatures (Just (Filter.Type.ControlledBy PlayerRelation.Opponent))) gs3
     Spec.assertEqWith
       s
@@ -371,9 +371,9 @@ targetSpec s registry = Spec.describe s "Target" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (mine, gs1) = S.addCreature piker S.alice gs0
-        (theirs, gs2) = S.addCreature warMammoth S.bob gs1
-        (alsoTheirs, gs3) = S.addCreature typhoidRats S.bob gs2
+        (mine, gs1) = S.addPermanent piker S.alice gs0
+        (theirs, gs2) = S.addPermanent warMammoth S.bob gs1
+        (alsoTheirs, gs3) = S.addPermanent typhoidRats S.bob gs2
         -- alice steals one of bob's creatures: it stops being "a creature an
         -- opponent controls" for alice's source, and becomes one for bob's.
         stolen = S.giveControl theirs S.alice gs3
@@ -395,8 +395,8 @@ targetSpec s registry = Spec.describe s "Target" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
-        (plainOid, gs) = S.addCreature piker S.alice gs1
+        (blackOid, gs1) = S.addPermanent typhoidRats S.bob gs0
+        (plainOid, gs) = S.addPermanent piker S.alice gs1
         theSlot = TargetSlot.required Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
         legal = Target.legalRecipients Nothing S.noSource theSlot gs
     Spec.assertBool s (not (Set.member (Recipient.ToCreature blackOid) legal)) "black creature illegal"
@@ -405,8 +405,8 @@ targetSpec s registry = Spec.describe s "Target" $ do
     typhoidRats <- S.printingOf s registry "Typhoid Rats"
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
-        (plainOid, gs) = S.addCreature piker S.alice gs1
+        (blackOid, gs1) = S.addPermanent typhoidRats S.bob gs0
+        (plainOid, gs) = S.addPermanent piker S.alice gs1
         theSlot = TargetSlot.required Pool.Creatures Nothing
         expectedAllCreatures = Set.fromList [Recipient.ToCreature blackOid, Recipient.ToCreature plainOid]
     Spec.assertEqWith s "all creatures legal" (Target.legalRecipients Nothing S.noSource theSlot gs) expectedAllCreatures
@@ -418,8 +418,8 @@ targetSpec s registry = Spec.describe s "Target" $ do
   Spec.it s "another target creature excludes the source (CR 601.2c)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (srcId, gs1) = S.addCreature piker S.alice gs0
-        (otherId, gs) = S.addCreature piker S.alice gs1
+        (srcId, gs1) = S.addPermanent piker S.alice gs0
+        (otherId, gs) = S.addPermanent piker S.alice gs1
         slot = SlotName.MkSlotName (Text.pack "target")
         slots = Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.Not Filter.Type.IsSource)))
     Spec.assertEqWith
@@ -432,7 +432,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
   Spec.it s "a slot without Not IsSource still admits the source (CR 115.4)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (srcId, gs) = S.addCreature piker S.alice gs0
+        (srcId, gs) = S.addPermanent piker S.alice gs0
         slot = SlotName.MkSlotName (Text.pack "target")
         slots = Map.singleton slot (TargetSlot.required Pool.Creatures Nothing)
     Spec.assertEqWith
@@ -455,9 +455,9 @@ targetSpec s registry = Spec.describe s "Target" $ do
       Nothing -> Spec.assertFailure s "Terror's printing carries no 'target' slot"
       Just theSlot -> do
         let gs0 = Setup.emptyGame S.bothPlayers
-            (blackOid, gs1) = S.addCreature typhoidRats S.bob gs0
-            (artifactOid, gs2) = S.addCreature darksteelMyr S.bob gs1
-            (plainOid, gs) = S.addCreature piker S.alice gs2
+            (blackOid, gs1) = S.addPermanent typhoidRats S.bob gs0
+            (artifactOid, gs2) = S.addPermanent darksteelMyr S.bob gs1
+            (plainOid, gs) = S.addPermanent piker S.alice gs2
             legal = Target.legalRecipients Nothing S.noSource theSlot gs
         Spec.assertBool s (not (Set.member (Recipient.ToCreature blackOid) legal)) "black creature illegal"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature artifactOid) legal)) "artifact creature illegal"
@@ -469,7 +469,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
       Nothing -> Spec.assertFailure s "Reprisal's printing carries no 'target' slot"
       Just theSlot -> do
         let gs0 = Setup.emptyGame S.bothPlayers
-            (smallOid, gs) = S.addCreature piker S.bob gs0 -- power 2, {1}{R}
+            (smallOid, gs) = S.addPermanent piker S.bob gs0 -- power 2, {1}{R}
             legalBefore = Target.legalRecipients Nothing S.noSource theSlot gs
             pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0))) gs
             legalAfter = Target.legalRecipients Nothing S.noSource theSlot pumped
@@ -501,7 +501,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let base = S.landsInPlay mountain 1
-        (_target, gs0) = S.addCreature piker S.bob base
+        (_target, gs0) = S.addPermanent piker S.bob base
         (gs1, spellId) = S.handOne lightningBolt gs0
         cast = snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice spellId))
         -- resolveTop applies the damage but does NOT run SBAs, so the event persists.
@@ -644,8 +644,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     forest <- S.printingOf s registry "Forest"
     boil <- S.printingOf s registry "Boil"
     let base = Setup.emptyGame S.bothPlayers
-        (islandId, g1) = S.addCreature island S.alice base
-        (forestId, g2) = S.addCreature forest S.alice g1
+        (islandId, g1) = S.addPermanent island S.alice base
+        (forestId, g2) = S.addPermanent forest S.alice g1
         (boilPrintingId, g2b) = Game.intern boil g2
         (boilId, g3) = Game.freshObjectId g2b
         boilObj =
@@ -715,7 +715,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
-        (nonbasicId, g1) = S.addCreature urborg S.alice base
+        (nonbasicId, g1) = S.addPermanent urborg S.alice base
         (bloodMoonPrintingId, g1b) = Game.intern bloodMoon g1
         (bloodMoonSpellId, g2) = Game.freshObjectId g1b
         bmObj =
@@ -778,7 +778,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "hack carried over: nonbasic land is Island" (Projection.subtypesOf nonbasicId after) (Set.singleton Subtype.Island)
   Spec.it s "CR 608.2n a resolving ability deals its damage and ceases" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
-    let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
+    let (srcId, g0) = S.addPermanent prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         ability = case Face.activatedAbilities (S.combinedFace prodigalSorcerer) of
           ab : _ -> ab
           [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
@@ -1156,7 +1156,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     favor <- S.printingOf s registry "Fertilid's Favor"
-    let withLands = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) S.threePlayerGame [1 .. (4 :: Int)]
+    let withLands = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) S.threePlayerGame [1 .. (4 :: Int)]
         (aliceCard, g1) = S.addLibraryCard mountain S.alice withLands
         (bobCard, g2) = S.addLibraryCard mountain S.bob g1
         (_, g3) = S.addLibraryCard mountain S.carol g2
@@ -2003,7 +2003,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
     let g0 = Setup.emptyGame S.bothPlayers
-        (ripId, g1) = S.addCreature restInPeace S.alice g0
+        (ripId, g1) = S.addPermanent restInPeace S.alice g0
         (deadId, g2) = S.addLibraryCard piker S.bob g1
         -- move the Piker into bob's graveyard
         g3 = S.runPure S.identityAnswer g2 (Event.changeZone deadId Zone.Graveyard)
@@ -2084,7 +2084,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 723.1: Mindslaver's ability installs pending control, promoted next turn" $ do
     mindslaver <- S.printingOf s registry "Mindslaver"
     let g0 = Setup.emptyGame S.bothPlayers
-        (srcId, g1) = S.addCreature mindslaver S.alice g0
+        (srcId, g1) = S.addPermanent mindslaver S.alice g0
         slot = SlotName.MkSlotName (Text.pack "target")
         ability =
           ActivatedAbility.MkActivatedAbility
@@ -2180,7 +2180,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         -- change (Event.changeZone), so the post-restart check is ownership-
         -- based (SetupSpec's CR 727.2 test uses the same idiom), not a
         -- lookup by this specific pre-restart id.
-        (aliceId, g1) = S.addCreature mountain S.alice g0
+        (aliceId, g1) = S.addPermanent mountain S.alice g0
         -- bob owns 8 cards (enough for a full opening hand, no CR 727.3 loss).
         g2 = addMany mountain 8 S.bob g1
         g3 = addMany mountain 7 S.alice g2
@@ -2322,7 +2322,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     fog <- S.printingOf s registry "Fog"
     let base = S.landsInPlay forest 1
-        (victim, gs0) = S.addCreature piker S.bob base
+        (victim, gs0) = S.addPermanent piker S.bob base
         (gs1, fogId) = S.handOne fog gs0
         cast = snd (Engine.runGamePure S.identityAnswer gs1 (S.cast S.alice fogId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -2408,9 +2408,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     skred <- S.printingOf s registry "Skred"
     let gs0 = S.landsInPlay snowMountain 2
-        gs1 = snd (S.addCreature mountain S.alice (snd (S.addCreature mountain S.alice gs0)))
-        gs2 = snd (S.addCreature snowMountain S.bob gs1)
-        (wall, gs3) = S.addCreature wallOfStone S.bob gs2
+        gs1 = snd (S.addPermanent mountain S.alice (snd (S.addPermanent mountain S.alice gs0)))
+        gs2 = snd (S.addPermanent snowMountain S.bob gs1)
+        (wall, gs3) = S.addPermanent wallOfStone S.bob gs2
         (spellId, gs4) = S.addHandCard skred S.alice gs3
         cast = snd (Engine.runGamePure (atCreature wall) gs4 (S.cast S.alice spellId))
         after = snd (Engine.runGamePure (atCreature wall) cast Stack.resolveTop)
@@ -2429,7 +2429,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- from passing vacuously.
   Spec.it s "CR 608.2h a modification that cannot be frozen is not stored at all" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (pikerId, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+    let (pikerId, gs) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
         slot = SlotName.MkSlotName (Text.pack "target")
         store m =
           S.runPure S.identityAnswer gs $
@@ -2468,7 +2468,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     rushOfBlood <- S.printingOf s registry "Rush of Blood"
     -- Exactly three Mountains, the minimum that pays {2}{R}, so no spare mana
     -- can pay for a second read.
-    let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay mountain 3)
+    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsInPlay mountain 3)
         (gs, spellId) = S.handOne rushOfBlood withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
@@ -2485,7 +2485,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
 -- pool of owned cards). replicate n () avoids a list comprehension (CLAUDE.md).
 addMany :: Printing.Printing -> Int -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 addMany mountain n pid gs =
-  List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
+  List.foldl' (\g _ -> snd (S.addPermanent mountain pid g)) gs (replicate n ())
 
 -- Build a Mindslaver-shaped ControlPlayerNextTurn ability owned by `controller`,
 -- targeting `target`, put it on the stack, and resolve it. Returns the resulting
@@ -2493,7 +2493,7 @@ addMany mountain n pid gs =
 -- installs pendingControl[target] = MkDecider controller.
 installControlBy :: Printing.Printing -> PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 installControlBy mindslaver controller target gs0 =
-  let (srcId, gs1) = S.addCreature mindslaver controller gs0
+  let (srcId, gs1) = S.addPermanent mindslaver controller gs0
       slot = SlotName.MkSlotName (Text.pack "target")
       ability =
         ActivatedAbility.MkActivatedAbility
@@ -2670,8 +2670,8 @@ bifurcateBoard s registry = do
   piker <- S.printingOf s registry "Goblin Piker"
   giant <- S.printingOf s registry "Hill Giant"
   bifurcate <- S.printingOf s registry "Bifurcate"
-  let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 4)
-      (giantId, g2) = S.addCreature giant S.alice g1
+  let (pikerId, g1) = S.addPermanent piker S.alice (S.landsInPlay forest 4)
+      (giantId, g2) = S.addPermanent giant S.alice g1
       (mountainId, g3) = S.addLibraryCard mountain S.alice g2
       (libraryGiant, g4) = S.addLibraryCard giant S.alice g3
       (libraryPiker, g5) = S.addLibraryCard piker S.alice g4
@@ -2858,7 +2858,7 @@ twiddleBoard s registry startTapped = do
   island <- S.printingOf s registry "Island"
   twiddle <- S.printingOf s registry "Twiddle"
   piker <- S.printingOf s registry "Goblin Piker"
-  let (pikerId, withPiker) = S.addCreature piker S.bob (S.landsInPlay island 2)
+  let (pikerId, withPiker) = S.addPermanent piker S.bob (S.landsInPlay island 2)
       placed = if startTapped then S.tapObject pikerId withPiker else withPiker
       (gs, twiddleId) = S.handOne twiddle placed
   pure (gs, twiddleId, pikerId)
@@ -2910,8 +2910,8 @@ kamiBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (Gam
 kamiBoard s registry startTapped = do
   kami <- S.printingOf s registry "Teardrop Kami"
   piker <- S.printingOf s registry "Goblin Piker"
-  let (kamiId, g0) = S.addCreature kami S.alice (Setup.emptyGame S.bothPlayers)
-      (pikerId, g1) = S.addCreature piker S.bob g0
+  let (kamiId, g0) = S.addPermanent kami S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g1) = S.addPermanent piker S.bob g0
       placed = if startTapped then S.tapObject pikerId g1 else g1
   pure (placed {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace kami)), kamiId, pikerId)
 
@@ -3010,7 +3010,7 @@ moogleBoard s registry graveyardNames = do
 withArbiter :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> MoogleBoard -> m MoogleBoard
 withArbiter s registry board = do
   arbiter <- S.printingOf s registry "Leonin Arbiter"
-  pure board {moogleState = snd (S.addCreature arbiter S.bob (moogleState board))}
+  pure board {moogleState = snd (S.addPermanent arbiter S.bob (moogleState board))}
 
 -- Ashiok, Dream Render's board for Fertilid's Favor -- "{3}{G} Instant. Target
 -- player searches their library for a basic land card, puts it onto the
@@ -3039,8 +3039,8 @@ favorBoard s registry caster = do
   ashiok <- S.printingOf s registry "Ashiok, Dream Render"
   favor <- S.printingOf s registry "Fertilid's Favor"
   let g1 = S.landsFor forest S.bob 4 (S.landsInPlay forest 4)
-      (ashiokId, g2) = S.addCreature ashiok S.alice g1
-      -- CR 306.5b's printed loyalty, which S.addCreature does not place: a
+      (ashiokId, g2) = S.addPermanent ashiok S.alice g1
+      -- CR 306.5b's printed loyalty, which S.addPermanent does not place: a
       -- planeswalker at zero loyalty is gone to CR 704.5i before the search, and
       -- the prohibition with it.
       g3 = S.addCounter CounterKind.Loyalty 5 ashiokId g2
@@ -3083,7 +3083,7 @@ ashiokExtractBoard s registry = do
   ashiok <- S.printingOf s registry "Ashiok, Dream Render"
   extract <- S.printingOf s registry "Extract"
   let g1 = S.landsFor island S.bob 1 (Setup.emptyGame S.bothPlayers)
-      (ashiokId, g2) = S.addCreature ashiok S.alice g1
+      (ashiokId, g2) = S.addPermanent ashiok S.alice g1
       g3 = S.addCounter CounterKind.Loyalty 5 ashiokId g2
       (crucibleId, g4) = S.addLibraryCard crucible S.alice g3
       (extractId, g5) = S.addHandCard extract S.bob g4
@@ -3598,7 +3598,7 @@ wormsSpec s registry =
         let g0 = S.landsFor swamp S.alice 3 S.threePlayerGame
             g1 = S.landsFor forest S.bob 3 g0
             g2 = S.landsFor mountain S.carol carolLands g1
-            (wormsId, g3) = S.addCreature worms S.alice g2
+            (wormsId, g3) = S.addPermanent worms S.alice g2
         pure (wormsId, settle (beginUpkeep g3))
    in Spec.describe s "CR 608.2d an either-or announced by each player" $ do
         Spec.it s "CR 118.12 the seat that announced the sacrifice pays it, and the enchantment is destroyed" $ do
