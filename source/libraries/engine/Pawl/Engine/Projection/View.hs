@@ -541,7 +541,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- knows what is being moved.
       Filter.canHostSubject = False,
       -- CR 701.3a's other side: filled only by Resolve's Effect.Search arm, the
-      -- one place that knows which host the instruction fixed. Overlaid onto this
+      -- one place that can resolve Pawl.Types.Search.subject to the host the
+      -- instruction fixed. Overlaid onto this
       -- builder's result rather than passed in, so a search pays for it only when
       -- its filter names the atom.
       Filter.canAttachToSubject = False,

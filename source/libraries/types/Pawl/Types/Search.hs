@@ -6,6 +6,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
 
 -- | CR 701.23's search: who looks, whose zones are looked through, how many
@@ -86,6 +87,25 @@ data Search = MkSearch
     -- count itself -- over which this flag is unobservable, both readings
     -- landing in CR 701.23b's branch.
     upTo :: Bool,
-    destination :: SearchDestination.SearchDestination
+    destination :: SearchDestination.SearchDestination,
+    -- | The object this one instruction fixes for CR 701.3a -- the "it" in
+    -- Auratouched Mage's "an Aura card that could enchant it" and the "that
+    -- creature" in Sovereigns of Lost Alara's -- named as a slot the resolution
+    -- has bound, or 'Nothing' for the ability's own source, which is what every
+    -- card saying "it" of itself means.
+    --
+    -- ONE field for both halves of the sentence, read by
+    -- Filter.CanAttachToSubject in `filter` and by the attaching arms of
+    -- `destination` alike: a card prints one "that creature" and says it twice,
+    -- so a search whose filter asked after one object and whose destination
+    -- attached to another would be a card nobody printed.
+    --
+    -- A Maybe rather than a PlayerRef-shaped ref type: CR 701.3a's host is one
+    -- OBJECT, and the two things a printed search can mean by it are its own
+    -- source (CR 113.7) and a slot its trigger or an earlier clause bound (CR
+    -- 608.2c). A slot naming no object, or more than one, leaves the question
+    -- unanswerable, which Pawl.Engine.Filter.slotOneObject reports as Nothing and
+    -- the arm reads as a search that finds nothing.
+    subject :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

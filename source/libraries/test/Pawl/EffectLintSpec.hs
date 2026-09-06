@@ -212,7 +212,7 @@ ownQuantities effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationQuantities duration <> Projection.quantitiesOf modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
-  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _) -> Maybe.maybeToList quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.ChooseCardName _ -> []
