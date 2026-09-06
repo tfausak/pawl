@@ -2641,8 +2641,10 @@ horrorPrintedPower oid gs = fmap Power.unwrap (Game.faceOf oid gs >>= Face.power
 
 phyrexianRebirthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phyrexianRebirthSpec s registry = Spec.describe s "PhyrexianRebirth" $ do
-  -- The proving case for #2813: a token whose printed box is a Quantity.InSlot
-  -- naming an amount an EARLIER effect of the same resolution bound.
+  -- The case that PROVES a token's printed box may be a Quantity.InSlot naming
+  -- an amount an EARLIER effect of the same resolution bound, which
+  -- Resolve.bakeTokenCharacteristics reads against the resolution rather than
+  -- against the token.
   --
   -- Every other reading gives a different number here, which is the whole point
   -- of the board: 4 for the swept set, 1 for the caster's own creatures, 2 and 1
@@ -2683,8 +2685,9 @@ phyrexianRebirthSpec s registry = Spec.describe s "PhyrexianRebirth" $ do
         horrors = fmap (\oid -> S.powerToughnessOf oid resolved) (S.tokensOf resolved)
     Spec.assertEqWith s "a 2/2 Horror: two creatures were destroyed" horrors [Just (2, 2)]
     Spec.assertBool s (S.onBattlefield carolMyr resolved) "CR 702.12b carol's indestructible Myr stands here too"
-  -- CR 208.2a with CR 111.3: the sweep destroys nothing, so the slot is bound to
-  -- 0 and the token is a 0/0 that CR 704.5f puts away at once. The Myr is what
+  -- CR 111.3 with a bound zero: the sweep destroys nothing, so Destroy binds 0
+  -- and the token is a 0/0 that CR 704.5f puts away at once -- a real answer
+  -- rather than CR 208.2a's undeterminable one. The Myr is what
   -- makes the sweep non-empty in every other sense, so this is a case about the
   -- COUNT and not about an empty board.
   Spec.it s "CR 704.5f destroying nothing mints a 0/0 Horror, which dies" $ do
@@ -2703,8 +2706,8 @@ phyrexianRebirthSpec s registry = Spec.describe s "PhyrexianRebirth" $ do
   --
   -- Off the printed card and not a planted effect: the whole face's reads are
   -- asserted, so the entry can only have come from the token's box. The
-  -- Destroy that binds it reports nothing here -- CR 121.1's bind is a
-  -- definition, reported by boundSlots -- which is why the two halves of the
+  -- Destroy that binds it reports nothing here -- a bind is a definition, and
+  -- boundSlots is what reports those -- which is why the two halves of the
   -- lint's subtraction are asserted together.
   Spec.it s "CR 111.3 the token's printed box reports its slot read, and the Destroy defines it" $ do
     rebirth <- S.cardOf s registry "Phyrexian Rebirth"
