@@ -39,8 +39,8 @@ data ZoneScope
     -- of Glory's "its controller reveals their hand", where the slot holds the
     -- creature the spell targeted rather than a player. Read through last known
     -- information, since the clause naming the player generally moved the object
-    -- first and CR 108.4 leaves a card outside the battlefield with no
-    -- controller at all; Pawl.Types.PlayerRef.ControllerOfBound is the same read
-    -- one type over.
+    -- first and CR 108.4 leaves a card that is neither permanent nor spell with
+    -- no controller at all; Pawl.Types.PlayerRef.ControllerOfBound is the same
+    -- read one type over.
     ControllerOfBound SlotName.SlotName
   deriving (Eq, Ord, Show)

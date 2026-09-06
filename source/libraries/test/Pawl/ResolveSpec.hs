@@ -2717,8 +2717,8 @@ gloryBoard s registry = do
   birgi <- S.printingOf s registry "Birgi, God of Storytelling"
   piker <- S.printingOf s registry "Goblin Piker"
   glory <- S.printingOf s registry "Hour of Glory"
-  let (godId, g1) = S.addCreature birgi S.bob (S.landsInPlay swamp 4)
-      (pikerId, g2) = S.addCreature piker S.bob g1
+  let (godId, g1) = S.addPermanent birgi S.bob (S.landsInPlay swamp 4)
+      (pikerId, g2) = S.addPermanent piker S.bob g1
       (handGod, g3) = S.addHandCard birgi S.bob g2
       (handPiker, g4) = S.addHandCard piker S.bob g3
       (gs, spellId) = S.handOne glory g4

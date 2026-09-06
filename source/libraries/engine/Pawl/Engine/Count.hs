@@ -172,13 +172,20 @@ findableAfterMove gs oid = case Game.lookupObject oid gs of
   -- reads is CR 608.2h's last known information, since the departed id has no
   -- object left to read.
   --
+  -- A departure into a hidden zone is refused here, which is narrower than CR
+  -- 608.2h alone would be: that rule answers with last known information
+  -- wherever the object went, while CR 400.7j grants the find only into a public
+  -- one. The arrival arm below takes the same posture, and no printing in the
+  -- pool reads a slot whose object this resolution put into a hand.
+  --
   -- Nothing when nothing arrived: CR 111.7's token, whose exile leaves nothing
   -- for this to find, keeps the False it had.
   Nothing -> any (arrivedFindable gs) (arrivalsOf gs oid)
-  Just object -> not (Game.isHiddenZone (Object.zone object)) || revealedArriving gs oid
+  Just _ -> arrivedFindable gs oid
 
--- The arm above's public-zone question about an id that IS live, split out so
--- the departed side asks it of the arrival rather than repeating it.
+-- The arm above's public-zone question about an id that IS live, asked directly
+-- of a binding that holds the arrival and through arrivalsOf of one that holds
+-- the departure, so the two roads cannot answer differently.
 arrivedFindable :: GameState -> ObjectId -> Bool
 arrivedFindable gs oid = case Game.lookupObject oid gs of
   Nothing -> False

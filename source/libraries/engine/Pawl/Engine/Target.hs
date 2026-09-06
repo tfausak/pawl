@@ -978,19 +978,19 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 --       - CR 608.2b re-checks a spell whose slots are FILLED, so Resolve passes
 --         the chosen targets and the union is over the one player named.
 --
---   * ControllerOfBound is the arm above's read turned CR 108.4's way -- Hour of
---     Glory's "its controller" -- and the one arm that needs the GameState: the
---     slot holds an OBJECT, and whose it is comes from
---     Projection.controllerWithLastKnown, so CR 608.2h answers for a permanent
---     the same resolution has already moved. Folded over the whole set for the
---     arm above's reason, so CR 601.2c's not-yet-announced moment gets the
---     superset and CR 608.2b's re-check the one object.
---
 --     A slot holding an object rather than a player contributes nothing, the
 --     same empty answer ObjectRef gives for a slot holding a player. A slot that
 --     is itself InSlot-scoped is answerable but not usefully so: legalSets fills
 --     `bindings` from a pass that gave it no bindings of its own, so it holds
 --     nothing and this is empty -- which terminates rather than recurring.
+--
+--   * ControllerOfBound is the arm above's read turned CR 108.4's way -- Hour of
+--     Glory's "its controller" -- and the one arm that needs the GameState: the
+--     slot holds an OBJECT, which the arm above passes over, and whose it is
+--     comes from Projection.controllerWithLastKnown, so CR 608.2h answers for a
+--     permanent the same resolution has already moved. Folded over the whole set
+--     for the arm above's reason, so CR 601.2c's not-yet-announced moment gets
+--     the superset and CR 608.2b's re-check the one object.
 graveyardRecipients :: Filter.Context -> Map SlotName (Set Recipient) -> ZoneScope.ZoneScope -> GameState -> Set Recipient
 graveyardRecipients context bindings scope gs =
   graveyardsOf (zoneScopePlayers (Filter.perspective context) bindings scope gs) gs

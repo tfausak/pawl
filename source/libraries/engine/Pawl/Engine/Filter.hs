@@ -922,9 +922,9 @@ data Context = MkContext
     -- where a target slot's Filter is matched, and
     -- Pawl.Engine.Resolve.Slots.effectContext, which is what all but one of a
     -- resolution's positions go through (Bifurcate's search filter, Hour of
-    -- Glory's hand sweep). The one that
-    -- does not is slotObjects' Attach.hostsFor above, and is its elision rather
-    -- than this field's: a caller building a bare contextFor has neither map.
+    -- Glory's hand sweep). The one that does not is slotObjects' Attach.hostsFor
+    -- above, and is its elision rather than this field's: a caller building a
+    -- bare contextFor has neither map.
     --
     -- Separate from `slotObjects` above rather than derived from it, and that is
     -- the same division sourcePower makes against `source`: an id is not a name
