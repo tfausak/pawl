@@ -999,7 +999,7 @@ viewOfSnapshot mController isToken counters snapshot =
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
               )
           )
-          || Subtype.intrinsicManaAbility (PC.cardTypes snapshot) (PC.subtypes snapshot),
+          || Subtype.intrinsicManaAbilityOf snapshot,
       -- CR 702.184c off the snapshot, which carries the field: the marker
       -- outlives the object exactly as a keyword or a P/T does.
       Filter.grantsStationToughness = PC.grantsStationToughness snapshot

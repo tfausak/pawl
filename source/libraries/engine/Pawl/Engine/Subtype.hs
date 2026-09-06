@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 
@@ -55,13 +56,11 @@ subtypeMana subtype = case subtype of
 -- type AND a basic land type", so a Dryad Arbor that stopped being a land would
 -- lose it and a creature named for a basic land type never had it.
 --
--- THE ONE READER of this question for every view builder there is --
--- Pawl.Engine.Projection.View's viewOfCard and viewOfCharacteristics and
--- Pawl.Engine.Count.viewOfSnapshot. They are three answers to CR 602.1's
--- question about one object, and Filter.HasActivatedAbility must not depend on
--- which of them a caller happened to build; Pawl.ProjectionSpec's "CR 305.6 /
--- 602.1 a Mountain has an activated ability in every view builder" is what holds
--- the three together.
+-- THE PRINTED question, asked by Pawl.Engine.Projection.View's viewOfCard, which
+-- describes a card with no object to project and so no layer 6 to consult.
+-- Every projected reader goes through intrinsicManaAbilityOf below instead;
+-- Pawl.ProjectionSpec's "CR 305.6 / 602.1 a Mountain has an activated ability in
+-- every view builder" is what holds the three builders to one answer.
 --
 -- Not a list of abilities: what the intrinsic ability DOES is
 -- Pawl.Engine.Mana.manaRoutesOfGiven's business, which reads `subtypeMana` below
@@ -70,6 +69,21 @@ intrinsicManaAbility :: Set.Set CardType.CardType -> Set.Set Subtype.Subtype -> 
 intrinsicManaAbility cardTypes subtypes =
   Set.member CardType.Land cardTypes
     && any (Maybe.isJust . subtypeMana) (Set.toList subtypes)
+
+-- | The same CR 305.6 question asked of a PROJECTED object: rule 305.6's ability
+-- is an ability of the land, so CR 613.1f's layer-6 "loses all abilities" takes
+-- it with the printed ones and a Dryad Arbor under Humility taps for nothing.
+--
+-- THE ONE READER of that for every projected view there is --
+-- Pawl.Engine.Projection.View's viewOfCharacteristics, Pawl.Engine.Count's
+-- viewOfSnapshot and Pawl.Engine.Mana.manaRoutesOfGiven -- so that
+-- Filter.HasActivatedAbility and the mana route cannot disagree about one
+-- object. CR 305.7's layer-4 strip needs no clause here: it rewrites `subtypes`,
+-- which this reads.
+intrinsicManaAbilityOf :: PC.ProjectedCharacteristics -> Bool
+intrinsicManaAbilityOf pc =
+  not (PC.lostAllAbilities pc)
+    && intrinsicManaAbility (PC.cardTypes pc) (PC.subtypes pc)
 
 -- | CR 205.3i
 isLandType :: Subtype.Subtype -> Bool
