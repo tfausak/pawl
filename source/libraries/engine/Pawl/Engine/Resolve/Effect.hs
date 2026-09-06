@@ -1434,7 +1434,11 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
 -- applyEffectWith recurses. Then RESTRICTED to what is still in exile, so the
 -- map cannot grow over a game.
 --
--- What insertWith ALSO keeps is CR 607.2b's link, which Pawl.Engine.Event files
+-- What insertWith ALSO keeps is CR 614.14's link, which Pawl.Engine.Event's
+-- EntryRewrite.ExileFromGraveyard arm files as the entry replacement applies --
+-- inside this window, since the permanent enters as a spell resolves, and the
+-- card belongs to the entering permanent rather than to that spell (Living
+-- Lore). It keeps CR 607.2b's link the same way, which Pawl.Engine.Event files
 -- at the move itself: a card this window saw arrive because somebody else's
 -- replacement effect redirected it there was not put in exile by an instruction
 -- in the resolving ability, so 607.2a does not claim it and this diff must not

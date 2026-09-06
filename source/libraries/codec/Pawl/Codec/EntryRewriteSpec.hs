@@ -261,6 +261,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing))
       " {\"type\":\"SacrificeAnyNumber\",\"value\":{\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Forest\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsTapped\"}}]},\"kind\":null}} "
+  -- CR 614.1c / 614.14: an as-enters exile out of the controller's own graveyard,
+  -- carrying the criterion the exiled card must match -- Living Lore's "an
+  -- instant or sorcery card".
+  Spec.it s "ExileFromGraveyard (Living Lore)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.ExileFromGraveyard (Filter.Or [Filter.HasCardType CardType.Instant, Filter.HasCardType CardType.Sorcery]))
+      " {\"type\":\"ExileFromGraveyard\",\"value\":{\"type\":\"Or\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Instant\"}},{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}}]}} "
   -- CR 614.1c: the rewrite that runs an effect -- Monstrous War-Leech's "mill
   -- four cards". Its "if it was kicked" is NOT here: that clause rides
   -- Pawl.Types.PrintedReplacement one level up (CR 604.2).

@@ -23,12 +23,15 @@
 -- and CR 107.1a's rounding -- both directions in one modification (Aspect of
 -- Wolf), and a CDA halving a maximum folded over the PLAYERS (Malignus), and CR
 -- 607.2a's linked exile pile read from a static ability, where there is no
--- resolution slot to aim at (Phyrexian Ingester).
+-- resolution slot to aim at (Phyrexian Ingester), and CR 614.14's linked pile,
+-- filled by an as-enters exile out of a graveyard and read by a CDA (Living
+-- Lore).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
 
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
@@ -634,6 +637,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   fortifyingDraughtSpec s registry
   bioplasmSpec s registry
   ingesterSpec s registry
+  livingLoreSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -2106,3 +2110,78 @@ ingesterSpec s registry = Spec.describe s "Phyrexian Ingester" $ do
     Spec.assertEqWith s "still the printed 3/3" (S.powerToughnessOf ingesterId after) (Just (3, 3))
     Spec.assertEqWith s "the Asp never left the battlefield" (S.onBattlefield aspId after) True
     Spec.assertEqWith s "and the unlinked card is still in exile" (length (exiledNamed "Russet Wolves" after)) 1
+
+-- The cards in alice's graveyard with this printed name. Graveyards are indexed
+-- by OWNER (CR 108.3), which is who Pawl.Support puts a card there for.
+graveyardNamed :: String -> GameState.GameState -> [ObjectId.ObjectId]
+graveyardNamed name gs = filter matches (Game.zoneMembers Zone.Graveyard S.alice gs)
+  where
+    matches oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+
+-- Answer the as-enters exile with the SECOND card offered, pinned by index so a
+-- broken offer cannot be repaired by an answerer that searches for the card the
+-- assertion wants. The offer ascends by ObjectId, which is the order the fixture
+-- put the cards in the graveyard in.
+picksSecondCard :: Prompt.Prompt r -> r
+picksSecondCard p = case p of
+  Prompt.ChooseCardInGraveyard _ _ _ offered -> case offered of
+    _ NonEmpty.:| (second : _) -> second
+    only NonEmpty.:| [] -> only
+  _ -> S.identityAnswer p
+
+-- Living Lore ({3}{U} Creature -- Avatar, printed */*), text: "As this creature
+-- enters, exile an instant or sorcery card from your graveyard." / "Living
+-- Lore's power and toughness are each equal to the exiled card's mana value."
+-- Oracle text verified against Scryfall 2026-09-05.
+--
+-- The first card whose entry replacement SPENDS A CARD IN A GRAVEYARD
+-- (EntryRewrite.ExileFromGraveyard), and the first whose CDA reads CR 614.14's
+-- link -- Phyrexian Ingester's pile above is filled by a triggered ability
+-- instead (CR 607.2a), so the two prove the two halves of rule 607.2.
+--
+-- Not implemented: Living Lore's third ability, "whenever this creature deals
+-- combat damage, you may sacrifice it. If you do, you may cast the exiled card
+-- without paying its mana cost" -- no trigger condition matches combat damage
+-- dealt to anything rather than to a player (#3294). Pawl's card is STRICTER
+-- than printed.
+livingLoreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+livingLoreSpec s registry = Spec.describe s "Living Lore" $ do
+  -- THE PROVING CASE. Two instants of DIFFERENT mana values sit in the graveyard
+  -- under a creature card the printed criterion excludes, so the assertion names
+  -- which card was exiled rather than only that some card was: a filter that let
+  -- the creature through would shift the pinned index onto the Lightning Bolt and
+  -- make this a 1/1. An unlinked Amnesia sits in exile as the control on the
+  -- RELATION -- a read that swept the exile zone would answer 10/10.
+  Spec.it s "CR 614.1c/614.14 the exiled card's mana value is the Avatar's power and toughness" $ do
+    livingLore <- S.printingOf s registry "Living Lore"
+    island <- S.printingOf s registry "Island"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    judgment <- S.printingOf s registry "Day of Judgment"
+    elf <- S.printingOf s registry "Glistener Elf"
+    amnesia <- S.printingOf s registry "Amnesia"
+    let withElf = snd (S.addGraveyardCard elf S.alice (S.landsInPlay island 4))
+        withBolt = snd (S.addGraveyardCard bolt S.alice withElf)
+        withJudgment = snd (S.addGraveyardCard judgment S.alice withBolt)
+        board = snd (S.addExiledCard amnesia S.alice withJudgment)
+        (gs, held) = S.handOne livingLore board
+        after = S.runPure picksSecondCard gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+    case newestNamed "Living Lore" after of
+      Nothing -> Spec.assertFailure s "Living Lore did not reach the battlefield"
+      Just loreId -> do
+        Spec.assertEqWith s "4/4, the exiled Day of Judgment's mana value" (S.powerToughnessOf loreId after) (Just (4, 4))
+        Spec.assertEqWith s "the Day of Judgment is the card in exile" (length (exiledNamed "Day of Judgment" after)) 1
+        -- ONE card, not every matching one: the Bolt the choice passed over is
+        -- still in the graveyard, which a rewrite exiling the whole offer would
+        -- have emptied (and read as a 5/5).
+        Spec.assertEqWith s "the Lightning Bolt it passed over is still in the graveyard" (length (graveyardNamed "Lightning Bolt" after)) 1
+        Spec.assertEqWith s "and the creature card the criterion excludes never moved" (length (graveyardNamed "Glistener Elf" after)) 1
+  -- The pair's other half, differing in exactly one thing: the same board with an
+  -- empty graveyard. CR 101.3 exiles nothing, rule 607.3's pile is empty, and CR
+  -- 704.5f buries the 0/0 -- a Living Lore that kept a blank P/T would still be
+  -- standing.
+  Spec.it s "CR 704.5f with no card to exile it is a 0/0 that dies" $ do
+    livingLore <- S.printingOf s registry "Living Lore"
+    island <- S.printingOf s registry "Island"
+    let (gs, held) = S.handOne livingLore (S.landsInPlay island 4)
+        after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the 0/0 Living Lore is gone" (newestNamed "Living Lore" after) Nothing
