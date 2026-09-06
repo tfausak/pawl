@@ -525,8 +525,8 @@ aimingSomewhere slotReading aimable family loyalty pid srcId gs payable =
   --
   -- CR 606.2's kind is the CALLER's, because this gate is handed a cost rather
   -- than an ability: Cost.loyaltyKindOf reads it off the same printed cost the
-  -- caller is measuring, which is what lets Carth the Lion's addition reach a
-  -- planeswalker's loyalty ability and spare a granted ability beside it.
+  -- caller is measuring, so Carth the Lion's addition is totalled in here only
+  -- for an ability whose own cost carries a loyalty symbol.
   let gather aimedAt = Cost.activationAdjustments aimedAt family AbilityKind.NonManaAbility loyalty pid srcId gs
       candidates = Set.unions (concatMap Map.elems aimable)
       blind = gather Set.empty

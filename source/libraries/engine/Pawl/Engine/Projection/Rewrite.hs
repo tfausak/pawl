@@ -331,9 +331,9 @@ rewritePlayerEffect pairs effect = case effect of
   -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
   -- reading of CR 612.2 carried to a component that is added to a cost rather
   -- than printed in one. The scale beside them names a COLOUR, which CR 612.2's
-  -- subtype pairs cannot reach.
-  -- The loyalty criterion beside them names CR 606.2's classification, which CR
-  -- 612.2's subtype pairs cannot reach either.
+  -- subtype pairs cannot reach, and neither can they reach the loyalty criterion
+  -- the activation arm carries beside it: CR 606.2's classification is not a
+  -- word on the card.
   PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f loyalty components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) loyalty (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)

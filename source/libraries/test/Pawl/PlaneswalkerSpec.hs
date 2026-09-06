@@ -794,10 +794,13 @@ taxedBoard island jace carth realm =
       withCarth = snd (S.addPermanent carth S.alice board)
    in (jaceId, snd (S.addPermanent realm S.alice withCarth))
 
--- CR 601.2g's source window, pinned to one permanent by id -- Pawl.ManaSpec's
--- `prefersSource`. Pinned rather than searched, because both untapped sources
--- offer the same colours and an answerer that picked a legal one would find
--- Carth again after a mutation and pass on his loyalty instead of Jace's.
+-- CR 601.2g's source window and CR 105.4's colour, both pinned -- Pawl.ManaSpec's
+-- `prefersSource`, plus the yield the cost needs.
+--
+-- Pinned rather than searched: both untapped sources offer the same five
+-- colours, so an answerer taking any legal one could tap Carth instead, and
+-- Carth is not a permanent Carth's own filter matches -- the {R} would be paid
+-- with no counter added on any implementation, mutated or not.
 tappingFor :: ObjectId.ObjectId -> ManaType.ManaType -> Prompt.Prompt r -> r
 tappingFor wanted wantedType p = case p of
   Prompt.ChooseManaSource _ _ candidates ->
