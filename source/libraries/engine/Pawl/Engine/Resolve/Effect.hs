@@ -214,6 +214,7 @@ import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -3112,8 +3113,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 pure (matchingFromAmong legal resolving controller source gs filter_ members)
               -- Not implemented: a card moved at random out of a hand, CR 701.9b's
               -- random discard. Nothing moves it here, so a card writing the ref
-              -- under this opcode names no object; the count and that rule's other
-              -- exception need a design call (#1733).
+              -- under this opcode names no object; that rule's other exception --
+              -- a discard another player chooses -- needs a design call (#1733).
               ObjectRef.RandomCardInHand _ -> pure []
               -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
               -- you control", announced while the effect is applied and so asked
@@ -3541,9 +3542,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.Reveal (Reveal.MkReveal ref mSlot) -> do
     gs <- State.get
     -- Show one card, and name it if the card asked for a name. bindSlot and NOT
-    -- bindObjectsSlot: this arm names one card per seat, so there is no group to
-    -- bind, and the single shape is the one every reader sees -- slotOne included,
-    -- where Filter.IsBound reads either.
+    -- bindObjectsSlot: the single shape is the one every reader sees -- slotOne
+    -- included, where Filter.IsBound reads either. Used by the ChosenCardFromAmong
+    -- arm alone, which is where that write-once-per-card shape is elided (#2859);
+    -- the random arm below binds the whole group it named in one write.
     let showOne pid oid = do
           Event.reveal RevealCause.Ordinary pid oid
           Monad.forM_ mSlot $ \slot -> State.modify' (bindSlot resolving slot oid)
@@ -3554,20 +3556,42 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- naming a card never offered falls back to the head of the offer. Game.ask
       -- and not Game.choose, since randomness is not CR 104.4b's optional action.
       --
-      -- Elided at one card and skipped at none (CR 101.3, CR 609.3). Candidates are
-      -- the hand as CR 608.2c reaches it in the zone's own order (CR 402.3), seats
-      -- from handChoosers so the asks run in CR 608.2e's APNAP order. ONE card per
-      -- SEAT, so a ref naming several writes the slot once each.
-      ObjectRef.RandomCardInHand player ->
-        Monad.forM_ (handChoosers legal controller gs player) $ \pid ->
-          case Game.zoneMembers Zone.Hand pid gs of
-            [] -> pure ()
-            [only] -> showOne pid only
-            first : second : more -> do
-              let offered = first NonEmpty.:| (second : more)
-              answer <- Game.ask (Prompt.RandomObject offered)
-              showOne pid $
-                if List.elem answer (NonEmpty.toList offered) then answer else first
+      -- Elided at one candidate and skipped at none (CR 101.3, CR 609.3).
+      -- Candidates are the hand as CR 608.2c reaches it in the zone's own order (CR
+      -- 402.3) narrowed by the ref's own Filter, and the seats come from
+      -- handChoosers so the asks run in CR 608.2e's APNAP order.
+      --
+      -- The count names DISTINCT cards -- Fall's "two cards at random" is two cards
+      -- and not two picks that may coincide -- so each card named is dropped from
+      -- the candidates before the next ask. CR 609.3 caps the run at the hand's
+      -- matching size.
+      ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player filter_ count) -> do
+        let viewOf = effectViewOf source legal gs
+            context = effectContext gs controller source legal (slotBindings resolving gs)
+            wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
+            pick remaining candidates =
+              if remaining <= (0 :: Natural)
+                then pure []
+                else case candidates of
+                  [] -> pure []
+                  [only] -> pure [only]
+                  first : second : more -> do
+                    answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
+                    let named = if List.elem answer candidates then answer else first
+                    rest <- pick (remaining - 1) (filter (/= named) candidates)
+                    pure (named : rest)
+        -- Every card named across every seat, so the binding below sees one group
+        -- rather than one write per seat -- Fall reads it back with an
+        -- EachCardFromAmong, which a per-seat single binding would answer with the
+        -- last card alone.
+        picked <-
+          fmap concat . Monad.mapM (\pid -> fmap (fmap ((,) pid)) (pick wanted (handCardsOf context gs pid filter_))) $
+            handChoosers legal controller gs player
+        Monad.mapM_ (uncurry (Event.reveal RevealCause.Ordinary)) picked
+        Monad.forM_ mSlot $ \slot -> case fmap snd picked of
+          [] -> pure ()
+          [only] -> State.modify' (bindSlot resolving slot only)
+          several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
       -- CR 608.2d's "from among them", the ONE choice the printed "reveal ... and
       -- put it into your hand" makes: chooseCardFromAmong asks it, this arm shows
       -- what it named (CR 701.20a), and mSlot below is what a later clause moves

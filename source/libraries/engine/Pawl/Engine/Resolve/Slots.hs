@@ -117,6 +117,7 @@ import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -335,8 +336,8 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- the ref reads every member of the group to match them.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
   -- The seats whose hands randomness reads are ChosenCardInHand's, and reported
-  -- where that arm's are.
-  ObjectRef.RandomCardInHand _ -> Map.empty
+  -- where that arm's are; the COUNT is TopOfLibrary's read, for its reason.
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ _ count) -> quantitySlots count
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
@@ -380,7 +381,10 @@ objectRefQuantities ref = case ref of
   -- Literal, which reads no slot, so dropping this leaves the suite green.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> [count]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
-  ObjectRef.RandomCardInHand _ -> []
+  -- How many cards randomness names out of each hand -- Fall's printed two. A
+  -- REGRESSION FENCE for the arm above's reason: every count in the pool is a
+  -- Literal, which reads no slot.
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand _ _ count) -> [count]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
@@ -418,7 +422,7 @@ objectRefPlayerRefs ref = case ref of
   -- one -- Pawl.Types.Chooser's BoundInSlot note says the same of its own.
   ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser) -> [chooser]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
-  ObjectRef.RandomCardInHand player -> [player]
+  ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ _) -> [player]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
