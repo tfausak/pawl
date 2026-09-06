@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Dungeon as Dungeon
+import qualified Pawl.Engine.Earthbend as Earthbend
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -134,6 +135,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
+import qualified Pawl.Types.Earthbend as Earthbend.Type
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
@@ -6062,6 +6064,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- replacements get their opportunity.
           Monad.when (n > 0) . Monad.void $
             Event.putCounters (CounterCause.ByEffect controller) bolstered CounterKind.PlusOnePlusOne (Integer.toNaturalSaturating n)
+  -- CR 701.66a: "earthbend N" -- the whole keyword action, whose three
+  -- instructions Pawl.Engine.Earthbend writes as Effects and this arm runs
+  -- through the SAME executor a card's own instructions run through. Nothing
+  -- here reads which effects those are.
+  --
+  -- TARGETS, alone among the rule 701 arms: rule 701.66a says "target land you
+  -- control", so the card declares the slot and CR 608.2b has already narrowed
+  -- `legal` by the time this runs. An illegal or unfilled slot leaves `lands`
+  -- empty and the ObjectRef sweeps inside the instructions empty too, so the
+  -- whole action is a no-op rather than a partial one.
+  --
+  -- THE SWEEP IS REPEATED, once per instruction, where CR 608.2f would enumerate
+  -- once. Indistinguishable here and only here: rule 701.66a names ONE target,
+  -- and no instruction in the list moves it, changes who controls it or changes
+  -- whether it is a land, so every sweep answers the same id.
+  --
+  -- The land is bound under Binding.earthbentLand BEFORE the arming opcode and
+  -- after the counters, which is CR 608.2c's written order plus CR 603.7c: the
+  -- delayed ability captures the resolving object's whole environment, and this
+  -- is the slot its condition names.
+  Effect.Earthbend earthbend -> do
+    gs <- State.get
+    let lands = objectRefObjects legal resolving controller source gs (Earthbend.Type.ref earthbend)
+    Monad.forM_ (Earthbend.instructions earthbend) (applyEffectWith runSubgame resolving source controller legal chosen)
+    Monad.forM_ lands $ \land -> do
+      State.modify' (bindEarthbentLand resolving land)
+      applyEffectWith runSubgame resolving source controller legal chosen Earthbend.arm
   -- CR 701.47a: the resolving controller amasses; the keyword action is
   -- Pawl.Engine.Amass.amass's, and this arm evaluates only the printed N.
   --
@@ -6508,6 +6537,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = TakeExtraTurn.skips takeExtraTurn}
         pushRound ts = List.foldl' (\acc pid -> entry pid : acc) ts takers
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts _ -> pushRound ts) (GameState.extraTurns g) [1 .. turns]})
+
+-- CR 603.7c: stamp the land an earthbend animated onto the resolving object, so
+-- the environment the arming opcode captures next carries it. Pawl.Engine.Earthbend's
+-- delayed ability names Binding.earthbentLand and nothing else can supply it: the
+-- ability is engine text and cannot know what a card called its own target slot.
+--
+-- Written as a TARGET binding because Binding.objectSlots -- what the condition
+-- reads -- is the targets field. Not a target in CR 115.10a's sense: the choice
+-- was made by the spell or ability that earthbent, and CR 608.2b re-checked it
+-- before this arm ran.
+bindEarthbentLand :: ObjectId -> ObjectId -> GameState -> GameState
+bindEarthbentLand resolving land gs =
+  let put obj = obj {Object.bindings = Map.insert Binding.earthbentLand (Binding.toObject land) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put resolving (GameState.objects gs)}
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).

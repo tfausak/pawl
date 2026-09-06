@@ -65,6 +65,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
+import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -415,6 +416,9 @@ rewriteEffect pairs effect = case effect of
   Effect.Amass (Amass.MkAmass quantity subtype) ->
     Effect.Amass (Amass.MkAmass (rewriteQuantity pairs quantity) (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
   Effect.Blight x -> Effect.Blight (rewritePlayerQuantity pairs x)
+  -- CR 612 reaches the count and the ObjectRef's own filters; rule 701.66a
+  -- names no subtype word.
+  Effect.Earthbend (Earthbend.MkEarthbend quantity ref) -> Effect.Earthbend (Earthbend.MkEarthbend (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref))
   Effect.TemptWithTheRing -> effect
   -- CR 612.2's gate, and this arm is where it bites rather than where it is
   -- restated: the payload IS a subtype word (CR 701.49d's quality), but a pair
@@ -1344,6 +1348,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 603.7's slot name is card data but not card TEXT, so no CR 612.1 swap
   -- reaches it; what the slot holds is read off the projection instead.
   TriggerCondition.LoseControlOfBound _ -> condition
+  -- Rule 701.66a's slot name is engine text, not card text, so no CR 612.1 swap
+  -- reaches it either.
+  TriggerCondition.BoundDiesOrIsExiled _ -> condition
   TriggerCondition.RoomEntered _ -> condition
   TriggerCondition.PlayerScries _ -> condition
   TriggerCondition.RingTemptsPlayer _ -> condition

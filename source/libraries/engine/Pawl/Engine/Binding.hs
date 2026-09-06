@@ -435,6 +435,20 @@ manaSource = SlotName.MkSlotName (Text.pack "thatManaSource")
 departedPermanent :: SlotName
 departedPermanent = SlotName.MkSlotName (Text.pack "thatDepartedPermanent")
 
+-- CR 701.66a: the reserved slot under which the land an earthbend animated is
+-- bound -- "that land", the subject of the delayed ability rule 701.66a creates.
+-- Stamped by Pawl.Engine.Resolve.Effect's Earthbend arm onto the resolving
+-- object, so CR 603.7c's captured environment carries it and the delayed
+-- ability's TriggerCondition.BoundDiesOrIsExiled can name it.
+--
+-- Reserved rather than the card's own target slot name, because the delayed
+-- ability lives in the engine (rule 701 being the rulebook's) and so cannot know
+-- what a card called its slot. Not a target of the delayed ability (CR 115.10a):
+-- the target was chosen by the spell or ability that earthbent, and nothing
+-- re-checks it at CR 608.2b.
+earthbentLand :: SlotName
+earthbentLand = SlotName.MkSlotName (Text.pack "thatEarthbentLand")
+
 -- CR 601.2i: the reserved slot under which a cast trigger's WATCHED SPELL is
 -- bound -- the printed "it" in Presence of the Master's "whenever a player casts
 -- an enchantment spell, counter it", and "that spell" wherever a card spells the
