@@ -226,6 +226,7 @@ library codec
     Pawl.Codec.CharacteristicPTSpec
     Pawl.Codec.ChooseBetween
     Pawl.Codec.ChooseBetweenSpec
+    Pawl.Codec.ChooseCardName
     Pawl.Codec.ChoosePlayer
     Pawl.Codec.ChoosePlayerSpec
     Pawl.Codec.Chooser
@@ -1494,6 +1495,7 @@ library types
     Pawl.Types.ChangeText
     Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
+    Pawl.Types.ChooseCardName
     Pawl.Types.ChoosePlayer
     Pawl.Types.Chooser
     Pawl.Types.ChosenCardFromAmong

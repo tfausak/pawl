@@ -27,6 +27,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.CoinReading as CoinReading
@@ -1699,15 +1700,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       " {\"type\":\"Proliferate\"} "
-  -- CR 201.4a's restriction on which names may be chosen, and nothing else: rule
-  -- 109.5 fixes the chooser and rule 201.4 the count.
+  -- CR 201.4's chooser and CR 201.4a's restriction on which names they may
+  -- choose. Rule 201.4 fixes the count, so there is no third key.
   Spec.it s "ChooseCardName" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChooseCardName (Filter.Not (Filter.HasCardType CardType.Land)))
-      " {\"type\":\"ChooseCardName\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}} "
+      (Effect.ChooseCardName (ChooseCardName.MkChooseCardName (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land))))
+      " {\"type\":\"ChooseCardName\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"restriction\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   -- CR 400.11c: the filter and CR 701.20a's reveal, Burning Wish's "reveal a
   -- sorcery card". Everything else about the sentence is the rule's -- the pool is
   -- the resolving controller's own (CR 108.3b) and the destination their hand.

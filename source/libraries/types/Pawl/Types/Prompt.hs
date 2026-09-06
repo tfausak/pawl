@@ -334,9 +334,9 @@ data Prompt r where
   -- | CR 105.4 / 106.3: which mana a resolving object adds when the type it
   -- names is not settled, from Pawl.Engine.Mana.producedTypes.
   ChooseManaType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaType.ManaType -> Prompt ManaType.ManaType
-  -- | CR 201.4 / 614.1c: the card name a player chooses as an object enters;
-  -- the Filter is CR 201.4a's restriction, and the PlayerId is the chooser,
-  -- asked in APNAP order.
+  -- | CR 201.4: the card name a player chooses, as an object enters (CR 614.1c)
+  -- or as a resolution instructs (CR 608.2c); the Filter is CR 201.4a's
+  -- restriction, and the PlayerId is the chooser, asked in APNAP order.
   --
   -- No candidate list: rule 201.4's offer is every card in the Oracle card
   -- reference, which is not a set the engine holds. The answer is judged on the

@@ -26,8 +26,16 @@
                   {
                     "type": "ChooseCardName",
                     "value": {
-                      "type": "And",
-                      "value": []
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "restriction": {
+                        "type": "And",
+                        "value": []
+                      }
                     }
                   }
                 ]
