@@ -64,6 +64,7 @@ import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Codec.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Codec.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Codec.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Codec.PutCounters as PutCounters
 import qualified Pawl.Codec.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Codec.Quantity as Quantity
@@ -146,6 +147,7 @@ codec cardCodec abilityCodec =
       Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
       Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage (\x -> case x of Effect.PreventNextDamage y -> Just y; _ -> Nothing),
       Arm.payload "PreventAllDamage" preventAllCodec Effect.PreventAllDamage (\x -> case x of Effect.PreventAllDamage y -> Just y; _ -> Nothing),
+      Arm.payload "PreventNextDamageInstance" PreventNextDamageInstance.codec Effect.PreventNextDamageInstance (\x -> case x of Effect.PreventNextDamageInstance y -> Just y; _ -> Nothing),
       Arm.payload "RedirectDamage" RedirectDamage.codec Effect.RedirectDamage (\x -> case x of Effect.RedirectDamage y -> Just y; _ -> Nothing),
       Arm.payload "PutCounters" PutCounters.codec Effect.PutCounters (\x -> case x of Effect.PutCounters y -> Just y; _ -> Nothing),
       Arm.payload "MoveCounters" MoveCounters.codec Effect.MoveCounters (\x -> case x of Effect.MoveCounters y -> Just y; _ -> Nothing),

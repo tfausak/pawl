@@ -2406,6 +2406,54 @@ samiteMinistrationSpec s registry = Spec.describe s "Samite Ministration (CR 615
     Spec.assertEqWith s "the 3 was prevented and came back as life" (S.lifeOf S.alice after) (Just 23)
     Spec.assertEqWith s "one trigger was gathered" (length (GameState.stack dealt)) 1
 
+-- CR 615.8's shield, the one between CR 615.3's unbounded prevention and CR
+-- 615.7's counted one -- Deflecting Palm ({R}{W} Instant, "The next time a
+-- source of your choice would deal damage to you this turn, prevent that
+-- damage. If damage is prevented this way, Deflecting Palm deals that much
+-- damage to that source's controller").
+--
+-- THREE SEATS and TWO SOURCES, because two of the three things under test
+-- cannot be told apart at fewer. The reflected damage goes to "that source's
+-- controller", and at two seats that seat is the only opponent there is; the
+-- shield watches ONE chosen source (CR 609.7a), and with one source on the
+-- board a shield watching every source behaves identically. bob's Cabal
+-- Evangel and carol's Giant Spider are the two, and the shield names the
+-- Spider.
+--
+-- TWO BATCHES from that one source, which is the whole of CR 615.8: the first
+-- instance goes whatever its size, and "any subsequent instances of damage that
+-- would be dealt by that source are dealt normally". A CR 615.3 shield
+-- transcription prevents the second too; a CR 615.7 shield of any amount below
+-- 7 leaves part of the first standing.
+--
+-- Distinct amounts throughout -- the Spider's 7 then 4, the Evangel's 2 -- so
+-- no life total below is reachable two ways: 20 - 2 - 4 is 14, 20 - 7 is 13, and
+-- the unbounded reading's 20 - 2 is 18 beside a 20 - 7 - 7 of 6.
+deflectingPalmSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deflectingPalmSpec s registry = Spec.describe s "Deflecting Palm (CR 615.8 / 615.13)" $ do
+  Spec.it s "CR 615.8 / 609.7a the shield eats one whole instance from the source it named, and the reflection hits that source's controller" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    evangelPrinting <- S.printingOf s registry "Cabal Evangel"
+    spiderPrinting <- S.printingOf s registry "Giant Spider"
+    palm <- S.printingOf s registry "Deflecting Palm"
+    let base = S.landsFor mountain S.alice 1 (S.landsFor plains S.alice 1 S.threePlayerGame)
+        (evangel, g1) = S.addPermanent evangelPrinting S.bob base
+        (spider, g2) = S.addPermanent spiderPrinting S.carol g1
+        (g3, spellId) = S.handOne palm g2
+        hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing DamageKind.Noncombat
+        shielded = castAndResolve (nameDamageSource spider) g3 spellId
+        (firstBatch, reflected) = strikeAndSettleWith (nameDamageSource spider) shielded [hit evangel 2, hit spider 7]
+        after = snd (strikeAndSettleWith (nameDamageSource spider) reflected [hit spider 4])
+    Spec.assertEqWith s "setup: the shield names carol's Spider" (shieldedSource shielded) (Just spider)
+    Spec.assertEqWith s "setup: every seat starts at 20" (fmap (`S.lifeOf` g3) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
+    -- The gameplay assertions, ahead of every proxy.
+    Spec.assertEqWith s "CR 615.8 the Spider's whole first 7 was prevented, bob's 2 got through, and the Spider's next 4 was dealt normally" (S.lifeOf S.alice after) (Just 14)
+    Spec.assertEqWith s "CR 615.13 / 108.4 the 7 came back once, at the controller of the source the shield NAMED" (S.lifeOf S.carol after) (Just 13)
+    Spec.assertEqWith s "CR 609.7a and never at the other source's controller" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "one trigger was gathered" (length (GameState.stack firstBatch)) 1
+    Spec.assertEqWith s "and the shield is gone once it has prevented an instance" (GameState.replacements reflected) []
+
 -- alice is mid-combat attacking with `mine`; bob defends holding `spells` and
 -- `lands` untapped Plains that pay for them. Sits at the declare attackers step
 -- like every combatBoardOf board, so the ENGINE declares the attack and the
@@ -3289,6 +3337,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   selflessSquireSpec s registry
   phyrexianVindicatorSpec s registry
   samiteMinistrationSpec s registry
+  deflectingPalmSpec s registry
   turnTheTablesSpec s registry
   oraclesAttendantsSpec s registry
   caromSpec s registry

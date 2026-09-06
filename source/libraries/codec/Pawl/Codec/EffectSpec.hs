@@ -112,6 +112,7 @@ import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity
@@ -848,6 +849,24 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       " {\"type\":\"PreventNextDamage\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"kind\":{\"type\":\"Combat\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"quantity\":{\"type\":\"Literal\",\"value\":3},\"riders\":[{\"type\":\"PutCounters\",\"value\":{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"quantity\":{\"type\":\"InSlot\",\"value\":\"thatMuch\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}}]}} "
+  -- CR 615.8: the third shield, whose chosenSource is defaulted to the trivial
+  -- predicate here (Deflecting Palm's "a source of your choice") and so elided.
+  Spec.it s "PreventNextDamageInstance" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Filter.And [])))
+      " {\"type\":\"PreventNextDamageInstance\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"you\"}}} "
+  -- The same shield with a NARROWED chosen source written out, which is what
+  -- proves the defaulted key decodes: CR 609.7a's choice held to a property.
+  Spec.it s "PreventNextDamageInstance with a narrowed chosen source" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"PreventNextDamageInstance\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"chosenSource\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- CR 608.2f: Soulfire Eruption's per-object body, the other nesting of an
   -- effect inside an effect -- a DealDamage reading the mana value of the card
   -- an earlier body instruction exiled for THIS member.

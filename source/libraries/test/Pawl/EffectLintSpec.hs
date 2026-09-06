@@ -134,6 +134,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PutCounters as PutCounters
@@ -261,6 +262,7 @@ ownQuantities effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity _) -> quantity : durationQuantities duration
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ _) -> durationQuantities duration
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _) -> durationQuantities duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> Maybe.maybeToList amount <> durationQuantities duration
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
     fmap (\(Power.MkPower quantity) -> quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
@@ -493,8 +495,9 @@ phasePatternOffends replacement = case replacement of
 -- unbounded one -- is for Resolve's prevention arms to write, CR 609.7a's chosen
 -- SOURCE beside it likewise, and CR 615.7's remaining amount rides the same
 -- carrier. A card says "a source of your choice" through the chosenSource of
--- Effect.PreventNextDamage, Effect.PreventAllDamage or Effect.RedirectDamage,
--- which is a Filter and names nothing. CR 122.1c's pair is engine-only for a
+-- Effect.PreventNextDamage, Effect.PreventAllDamage,
+-- Effect.PreventNextDamageInstance or Effect.RedirectDamage, which is a Filter
+-- and names nothing. CR 122.1c's pair is engine-only for a
 -- different reason: a RULE creates it off a permanent's counters, so a card
 -- printing either half would be claiming an ability no rule gives it.
 --
@@ -716,11 +719,10 @@ isDamageR replacement = case replacement of
 shieldNamingNothingOffends :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 shieldNamingNothingOffends effect = case effect of
   -- CR 615.7's counted shield has no source-only spelling to admit here: no
-  -- printing counts an amount down while naming only a source. The recipient-less
-  -- printings that name one -- Pilgrim of Justice, Penance -- are CR 615.8's
-  -- "the next time ... would deal damage", a rewrite
-  -- pawl does not have (gap #3206), and this arm is what keeps one out of the
-  -- corpus meanwhile.
+  -- printing counts an amount down while naming only a source. The printings
+  -- that name one -- Pilgrim of Justice, Penance, Deflecting Palm -- are CR
+  -- 615.8's "the next time ... would deal damage", which is
+  -- Effect.PreventNextDamageInstance's arm below and not this one.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref whatRecipient whoRecipient _ _ _) ->
     Maybe.isNothing ref && Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient
   -- `direction` IS read here, because it decides whether `whatRecipient` can
@@ -744,6 +746,12 @@ shieldNamingNothingOffends effect = case effect of
   -- Harm's Way describes it -- and one saying neither installs nothing.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from whatRecipient whoRecipient _ _) ->
     Maybe.isNothing from && Maybe.isNothing whatRecipient && Maybe.isNothing whoRecipient
+  -- CR 615.8's shield can never offend, and that is the type's doing rather than
+  -- this lint's: its ref and its chosen source are both required fields, so
+  -- there is no shape of it that names neither end. An arm rather than the
+  -- fallthrough below, so a card data change that made either optional lands
+  -- here.
+  Effect.PreventNextDamageInstance {} -> False
   _ -> False
 
 -- The non-vacuity half of that lint, isPhaseR's shape.
@@ -751,6 +759,7 @@ isPreventionShield :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbilit
 isPreventionShield effect = case effect of
   Effect.PreventNextDamage {} -> True
   Effect.PreventAllDamage {} -> True
+  Effect.PreventNextDamageInstance {} -> True
   Effect.RedirectDamage {} -> True
   _ -> False
 
@@ -1020,6 +1029,8 @@ chooserRef ref = case ref of
   ObjectRef.EachPlayer -> False
   ObjectRef.EachOpponent -> False
   ObjectRef.ChosenPlayer -> False
+  -- Nor is an indirection to a seat: every PlayerRef arm is a read.
+  ObjectRef.Players _ -> False
   ObjectRef.TopOfLibrary {} -> False
   ObjectRef.TopOfLibraryUntil {} -> False
   ObjectRef.TopOfGraveyard {} -> False
@@ -1138,6 +1149,7 @@ effectObjectRefs effect = case effect of
   Effect.SkipNextPhase {} -> []
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ ref _ _ _ _ _) -> read_ (Maybe.maybeToList ref)
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance _ ref _) -> read_ [ref]
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ srcRef _ _ destRef _) -> read_ (Maybe.maybeToList srcRef <> [destRef])
   -- A READ and not an ask: CR 708.2's turning-over takes no choice of its own, and
   -- this arm never reaches the Game monad, so an AnyNumberMatching ref written
@@ -1530,6 +1542,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachOpponent -> False
           -- Names a player and so moves no object at all, the arm above's answer.
           ObjectRef.ChosenPlayer -> False
+          ObjectRef.Players _ -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> case depth of
             Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
             _ -> False

@@ -218,6 +218,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -1071,6 +1072,8 @@ ownCounts effect = case effect of
   -- card's Counts -- the same recursion Create takes into a minted token.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ _ _ _ _ _ rider) -> durationCounts duration <> concatMap effectCounts rider
+  -- No quantity and no rider on CR 615.8's shield, so its duration is all of it.
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration _ _) -> durationCounts duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ amount _ _ _ _ _) -> durationCounts duration <> foldMap quantityCounts amount
   -- CR 708.2's listed characteristics are card data, so the listed power and
   -- toughness are walked for the reason Create's minted face is. The listed type
@@ -1318,6 +1321,8 @@ effectNestedEffects effect = case effect of
   -- Faith's counters, Inkshield's Inklings.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ riders) -> Foldable.toList riders
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ riders) -> Foldable.toList riders
+  -- CR 615.8's shield carries no rider at all.
+  Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> Foldable.toList body
   Effect.Create {} -> []
@@ -1794,6 +1799,7 @@ effectReplacements effect = case effect of
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
+  Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectReplacements body
   Effect.RedirectDamage {} -> []
@@ -2177,6 +2183,7 @@ effectMintedFaces effect = case effect of
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
+  Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectMintedFaces body
   Effect.RedirectDamage {} -> []
@@ -2871,6 +2878,9 @@ objectRefFilters ref = case ref of
   -- Stuffy Doll's "the chosen player" holds none either: the seat was named by a
   -- choice made on entry, never by characteristics.
   ObjectRef.ChosenPlayer -> []
+  -- Nor does an indirection to a seat: a PlayerRef names players by relation, by
+  -- slot or through CR 108.4's controller, never by characteristics.
+  ObjectRef.Players _ -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it states
   -- no Filter of its own, and its PlayerRef names players. Its DEPTH is a
   -- Quantity, which reaches one through a Count -- "the top X cards" where X is
@@ -4530,6 +4540,10 @@ effectFilters effect = case effect of
   -- damage's own source, not against this card's frame.
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage duration _ ref whatRecipient _ chosenSource whatSource rider) ->
     frame Unframed (durationFilters duration) <> unframed (Maybe.maybeToList chosenSource <> Maybe.maybeToList whatRecipient <> [whatSource]) <> frame SourceHostFramed (foldMap objectRefFilters ref) <> concatMap effectFilters rider
+  -- The two arms above's reads over the fields CR 615.8's shield carries, and
+  -- CR 609.7a's chosen source is UNFRAMED there for their reason.
+  Effect.PreventNextDamageInstance (PreventNextDamageInstance.MkPreventNextDamageInstance duration ref chosenSource) ->
+    frame Unframed (durationFilters duration) <> unframed [chosenSource] <> frame SourceHostFramed (objectRefFilters ref)
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   -- CR 609.7a's chosen source and the recipient description are UNFRAMED, for
   -- the reason the two prevention arms above give.
