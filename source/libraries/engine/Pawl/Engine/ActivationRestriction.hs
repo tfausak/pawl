@@ -66,9 +66,11 @@ import Pawl.Types.PlayerId (PlayerId)
 --
 -- THE ABILITY rides along beside its restrictions because CR 602.5b's counted
 -- rider is about the ability and not only about the object: OnlyOnce asks which
--- ability of this source has been spent, and the source may hold two.
--- Pawl.Engine.Activate has it; CR 605.3a's mana window does not, and that arm
--- says what Nothing costs there.
+-- ability of this source has been spent, and the source may hold two. Both
+-- callers have one -- Pawl.Engine.Activate off the ability it is activating, and
+-- CR 605.3a's mana window off Pawl.Types.ManaOption, which carries it for this.
+-- Nothing is CR 305.6's intrinsic route, which is printed on no card and prints
+-- no rider, so no arm here can be asked of it.
 restrictionsOk :: PlayerId -> ObjectId -> Maybe (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> [ActivationRestriction.ActivationRestriction] -> GameState -> Bool
 restrictionsOk pid srcId ability restrictions gs = all (restrictionMet pid srcId ability gs) restrictions
 
@@ -154,12 +156,12 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- an object, and Activate.activatable has already required this one to be
   -- somewhere it offers abilities from.
   --
-  -- Not implemented: the rider on a MANA ability (CR 605.3a). That window is
-  -- handed a route rather than an ability -- Pawl.Engine.Mana.manaRoutesOfGiven's
-  -- tuple, carried through Pawl.Types.ManaOption -- so `ability` is Nothing there
-  -- and the clause answers False, which never offers the route. Loot, the
-  -- Pathfinder's "Exhaust -- {G}, {T}: Add three mana of any one color" is the
-  -- printing, and it runs STRICTER than printed rather than weaker (#3305).
+  -- CR 605.3a's mana window asks this too, off the ability
+  -- Pawl.Engine.Mana.manaRoutesOfGiven carries onto the route -- Loot, the
+  -- Pathfinder's "{G}, {T}: Add three mana of any one color", which
+  -- Pawl.ManaSpec's Loot group proves. Nothing is CR 305.6's intrinsic route
+  -- alone, which prints no rider, so the answer below is unreachable rather than
+  -- a claim about one.
   ActivationRestriction.OnlyOnce -> case ability of
     Nothing -> False
     Just this -> case Game.lookupObject srcId gs of
