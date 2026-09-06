@@ -83,6 +83,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastObligation as CastObligation
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -4562,7 +4563,19 @@ effectFilters effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
-  Effect.OfferCast offer -> frame SourceHostFramed (objectRefFilters (OfferCast.ref offer))
+  -- Both halves the opcode can hold a Filter in: the reference, and CR 118.9's
+  -- stated alternative cost. The cost half is SlotlessCostFramed for
+  -- payGateFilters' reason -- Cast.castSpellWith announces `applied` with no slot
+  -- bindings behind it, so a Filter written there could not read a slot.
+  --
+  -- The cost half is a FENCE rather than a proved rejection: it puts three more
+  -- cases in the sweep (Synthetic Woodland Bargainer's "sacrifice a Forest"), and
+  -- all three pass, so neutralising it shrinks the suite without reddening it. It
+  -- is here so the card that writes a filter this lint would reject cannot escape
+  -- through the one Filter position the opcode's own arm did not report.
+  Effect.OfferCast offer ->
+    frame SourceHostFramed (objectRefFilters (OfferCast.ref offer))
+      <> slotlessCost (foldMap costFilters (CastOffer.payingInstead (OfferCast.offer offer)))
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
   -- take them out of the lint without failing anything.

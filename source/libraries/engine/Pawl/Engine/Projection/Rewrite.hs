@@ -27,6 +27,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastFromZone as CastFromZone
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -721,11 +722,25 @@ rewriteEffect pairs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect
-  -- The ObjectRef alone: rule 612 swaps words in a card's TEXT, and a Filter the
-  -- reference carries is card text (GrantPlayFromExile's arm below). The caster is
-  -- a PlayerRef and the riders are CR 118.9's and CR 712.11a's, neither of which
-  -- is a word rule 612 can name.
-  Effect.OfferCast offer -> Effect.OfferCast offer {OfferCast.ref = rewriteObjectRef pairs (OfferCast.ref offer)}
+  -- TWO places, and both descend. A Filter the ObjectRef carries is card text
+  -- (GrantPlayFromExile's arm below); so is CR 118.9's STATED alternative cost,
+  -- which is a whole Cost and not a flag, printed in the same text box rule 612
+  -- reaches -- Filter.rewriteCost's own reading, and the reason
+  -- ActivatedAbility.cost and PayGate.cost descend through it.
+  --
+  -- The rest name no word a subtype pair could reach: the caster is a PlayerRef,
+  -- `transformed` is CR 712.11a's Bool, `withoutPayingManaCost` is CR 118.9's
+  -- other wording and states no cost of its own, and `spending` is CR 118.14's
+  -- ManaSpending, which speaks of mana types rather than of subtypes.
+  Effect.OfferCast oc ->
+    Effect.OfferCast
+      oc
+        { OfferCast.ref = rewriteObjectRef pairs (OfferCast.ref oc),
+          OfferCast.offer =
+            (OfferCast.offer oc)
+              { CastOffer.payingInstead = fmap (Filter.rewriteCost pairs) (CastOffer.payingInstead (OfferCast.offer oc))
+              }
+        }
   Effect.GrantPlayFromExile grant ->
     Effect.GrantPlayFromExile
       grant
