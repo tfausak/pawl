@@ -91,6 +91,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -295,6 +296,7 @@ ownQuantities effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationQuantities duration
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration _) -> durationQuantities duration
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration _) -> durationQuantities duration
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) -> durationQuantities duration
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration _ _) -> durationQuantities duration
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationQuantities duration
   Effect.CreateEmblem _ -> []
@@ -1176,6 +1178,7 @@ effectObjectRefs effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> read_ [blocker, attacker]
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> read_ [ref]
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> read_ [ref]
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> read_ [ref]
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
     RestrictedCreatures.Named ref -> read_ [ref]
     RestrictedCreatures.Matching _ -> []

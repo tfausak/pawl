@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
@@ -188,6 +189,7 @@ dropAtCleanup gs =
       keepUnregeneratable active = survives (ActiveUnregeneratable.expiry active)
       keepBlockProhibition active = survives (ActiveBlockProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
+      keepActivationProhibition active = survives (ActiveActivationProhibition.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       -- CR 116.2d: an ignore is stored "for a duration" like every carrier
       -- above, and every printed one says until end of turn -- so Leonin Arbiter
@@ -202,6 +204,7 @@ dropAtCleanup gs =
           GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
           GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
+          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
           GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
@@ -247,6 +250,7 @@ sweepConditional = do
       keepUnregeneratable active = survives (ActiveUnregeneratable.source active) (ActiveUnregeneratable.expiry active)
       keepBlockProhibition active = survives (ActiveBlockProhibition.source active) (ActiveBlockProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.source active) (ActiveAttackProhibition.expiry active)
+      keepActivationProhibition active = survives (ActiveActivationProhibition.source active) (ActiveActivationProhibition.expiry active)
       keepDelayed entry = maybe True (survives (DelayedTrigger.source entry)) (DelayedTrigger.expiry entry)
       keptEffects = filter keepEffect (GameState.continuousEffects gs)
       keptReplacements = filter keepReplacement (GameState.replacements gs)
@@ -256,6 +260,7 @@ sweepConditional = do
       keptUnregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs)
       keptBlockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs)
       keptAttackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs)
+      keptActivationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs)
       keptDelayed = Seq.filter keepDelayed (GameState.delayedTriggers gs)
       keepIgnored ignored = survives (IgnoredAbility.source ignored) (IgnoredAbility.expiry ignored)
       keptIgnored = filter keepIgnored (GameState.ignoredAbilities gs)
@@ -270,6 +275,7 @@ sweepConditional = do
           || length keptUnregeneratables /= length (GameState.unregeneratables gs)
           || length keptBlockProhibitions /= length (GameState.blockProhibitions gs)
           || length keptAttackProhibitions /= length (GameState.attackProhibitions gs)
+          || length keptActivationProhibitions /= length (GameState.activationProhibitions gs)
           || Seq.length keptDelayed /= Seq.length (GameState.delayedTriggers gs)
           || length keptIgnored /= length (GameState.ignoredAbilities gs)
           -- Omitting this term would be silent: settleForPriority would not run
@@ -287,6 +293,7 @@ sweepConditional = do
           GameState.unregeneratables = keptUnregeneratables,
           GameState.blockProhibitions = keptBlockProhibitions,
           GameState.attackProhibitions = keptAttackProhibitions,
+          GameState.activationProhibitions = keptActivationProhibitions,
           GameState.ignoredAbilities = keptIgnored,
           GameState.delayedTriggers = keptDelayed,
           GameState.objects = keptObjects
@@ -390,6 +397,7 @@ dropAtTurnOf pid gs =
       keepUnregeneratable active = survives (ActiveUnregeneratable.expiry active)
       keepBlockProhibition active = survives (ActiveBlockProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
+      keepActivationProhibition active = survives (ActiveActivationProhibition.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       keepIgnored = survives . IgnoredAbility.expiry
    in gs
@@ -401,6 +409,7 @@ dropAtTurnOf pid gs =
           GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
           GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
+          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
           GameState.objects = clearedGoads pid (clearedDetentions pid (clearedPermissions (survives . ExilePlayPermission.expiry) gs))
@@ -442,6 +451,7 @@ dropAtEndOf ending gs =
       keepUnregeneratable active = survives (ActiveUnregeneratable.expiry active)
       keepBlockProhibition active = survives (ActiveBlockProhibition.expiry active)
       keepAttackProhibition active = survives (ActiveAttackProhibition.expiry active)
+      keepActivationProhibition active = survives (ActiveActivationProhibition.expiry active)
       keepDelayed = maybe True survives . DelayedTrigger.expiry
       keepIgnored = survives . IgnoredAbility.expiry
    in gs
@@ -453,6 +463,7 @@ dropAtEndOf ending gs =
           GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
           GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
+          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
           GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
@@ -496,6 +507,7 @@ sourcedExpiries gs =
     <> fmap (\x -> (ActiveUnregeneratable.source x, ActiveUnregeneratable.expiry x)) (GameState.unregeneratables gs)
     <> fmap (\x -> (ActiveBlockProhibition.source x, ActiveBlockProhibition.expiry x)) (GameState.blockProhibitions gs)
     <> fmap (\x -> (ActiveAttackProhibition.source x, ActiveAttackProhibition.expiry x)) (GameState.attackProhibitions gs)
+    <> fmap (\x -> (ActiveActivationProhibition.source x, ActiveActivationProhibition.expiry x)) (GameState.activationProhibitions gs)
     <> fmap (\x -> (IgnoredAbility.source x, IgnoredAbility.expiry x)) (GameState.ignoredAbilities gs)
     <> Maybe.mapMaybe (\x -> fmap ((,) (DelayedTrigger.source x)) (DelayedTrigger.expiry x)) (Foldable.toList (GameState.delayedTriggers gs))
     <> Maybe.mapMaybe (fmap (\p -> (ExilePlayPermission.source p, ExilePlayPermission.expiry p)) . Object.playableFromExile) (Map.elems (GameState.objects gs))
@@ -531,6 +543,7 @@ dropWhenPaidBy oid gs =
       keepUnregeneratable x = survives (ActiveUnregeneratable.source x) (ActiveUnregeneratable.expiry x)
       keepBlockProhibition x = survives (ActiveBlockProhibition.source x) (ActiveBlockProhibition.expiry x)
       keepAttackProhibition x = survives (ActiveAttackProhibition.source x) (ActiveAttackProhibition.expiry x)
+      keepActivationProhibition x = survives (ActiveActivationProhibition.source x) (ActiveActivationProhibition.expiry x)
       keepIgnored x = survives (IgnoredAbility.source x) (IgnoredAbility.expiry x)
       keepDelayed x = maybe True (survives (DelayedTrigger.source x)) (DelayedTrigger.expiry x)
       keepPermission x = survives (ExilePlayPermission.source x) (ExilePlayPermission.expiry x)
@@ -543,6 +556,7 @@ dropWhenPaidBy oid gs =
           GameState.unregeneratables = filter keepUnregeneratable (GameState.unregeneratables gs),
           GameState.blockProhibitions = filter keepBlockProhibition (GameState.blockProhibitions gs),
           GameState.attackProhibitions = filter keepAttackProhibition (GameState.attackProhibitions gs),
+          GameState.activationProhibitions = filter keepActivationProhibition (GameState.activationProhibitions gs),
           GameState.ignoredAbilities = filter keepIgnored (GameState.ignoredAbilities gs),
           GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
           GameState.objects = clearedPermissions keepPermission gs

@@ -66,6 +66,7 @@ import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
@@ -150,6 +151,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import Pawl.Types.Game (Game)
@@ -4811,6 +4813,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               | object <- objects
               ]
          in gs1 {GameState.blockProhibitions = stored <> GameState.blockProhibitions gs1}
+  Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) ->
+    -- CR 602.2 / 611.1: store one prohibition per permanent the ref names.
+    -- ForbidBlock above is the model and every one of its arguments carries over:
+    -- the ref is enumerated ONCE, for the CR 608.2f simultaneity objectRefObjects
+    -- buys, and an illegal slot (CR 608.2b) stores nothing, which is Deadlock
+    -- Trap's fizzle.
+    --
+    -- Nothing is written onto the permanent itself, and nothing is projected: CR
+    -- 613.11 keeps a prohibition on an activation out of the layers, so the row
+    -- is read at Pawl.Engine.ActivationProhibition.cantActivate and never by a
+    -- projection.
+    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let objects = objectRefObjects legal resolving controller source gs ref
+            (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              [ ActiveActivationProhibition.MkActiveActivationProhibition
+                  { ActiveActivationProhibition.source = source,
+                    ActiveActivationProhibition.timestamp = ts,
+                    ActiveActivationProhibition.expiry = expiry,
+                    ActiveActivationProhibition.object = object
+                  }
+              | object <- objects
+              ]
+         in gs1 {GameState.activationProhibitions = stored <> GameState.activationProhibitions gs1}
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected aimedAt) ->
     -- CR 508.1c / 611.1: store one restriction per permanent a Named ref names,
     -- or ONE row for a Matching class. ForbidBlock above is the model for the

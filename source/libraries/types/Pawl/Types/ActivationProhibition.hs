@@ -34,9 +34,10 @@ import qualified Pawl.Types.Affected as Affected
 -- Object.detainedUntil. This is the printed sentence AIMED AT AN OBJECT, which
 -- neither of those can say.
 --
--- Not implemented: the STORED counterpart, a prohibition a resolution puts on a
--- permanent for a duration -- Deadlock Trap's "this turn", Dovin Baan's "until
--- your next turn" (#3278).
+-- The STORED counterpart -- a prohibition a resolution puts on a permanent for a
+-- duration, Deadlock Trap's "this turn" -- is Pawl.Types.ForbidActivation and
+-- the Pawl.Types.ActiveActivationProhibition rows it leaves; both roads meet at
+-- Pawl.Engine.ActivationProhibition.cantActivate.
 --
 -- Gathered LIVE from the battlefield on every activation window and never
 -- captured, the posture every sibling carrier takes: an Arrest that left the

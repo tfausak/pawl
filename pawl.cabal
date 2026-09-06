@@ -97,6 +97,8 @@ library codec
     Pawl.Codec.ActivationRestrictionSpec
     Pawl.Codec.Activator
     Pawl.Codec.ActivatorSpec
+    Pawl.Codec.ActiveActivationProhibition
+    Pawl.Codec.ActiveActivationProhibitionSpec
     Pawl.Codec.ActiveAttackProhibition
     Pawl.Codec.ActiveAttackProhibitionSpec
     Pawl.Codec.ActiveAttackRequirement
@@ -452,6 +454,8 @@ library codec
     Pawl.Codec.FlipCoinSpec
     Pawl.Codec.FloatingCandidate
     Pawl.Codec.FloatingCandidateSpec
+    Pawl.Codec.ForbidActivation
+    Pawl.Codec.ForbidActivationSpec
     Pawl.Codec.ForbidAttack
     Pawl.Codec.ForbidAttackSpec
     Pawl.Codec.ForbidBlock
@@ -1419,6 +1423,7 @@ library types
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
     Pawl.Types.Activator
+    Pawl.Types.ActiveActivationProhibition
     Pawl.Types.ActiveAttackProhibition
     Pawl.Types.ActiveAttackRequirement
     Pawl.Types.ActiveBlockProhibition
@@ -1615,6 +1620,7 @@ library types
     Pawl.Types.Filter
     Pawl.Types.FlipCoin
     Pawl.Types.FloatingCandidate
+    Pawl.Types.ForbidActivation
     Pawl.Types.ForbidAttack
     Pawl.Types.ForbidBlock
     Pawl.Types.ForEach
