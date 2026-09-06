@@ -2909,9 +2909,10 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
   Spec.it s "CR 509.1c a Gaea's Protector nobody is able to block requires nothing" $ do
     -- The "if able" of "must be blocked if able", on the clause CR 509.1a
     -- states first: a tapped creature is never a candidate, so the group has no
-    -- member and raises the maximum by nothing. Fails against an
-    -- implementation that keeps an unobeyable group at weight zero, which would
-    -- make EVERY declaration illegal rather than none.
+    -- member and raises the maximum by nothing. A REGRESSION FENCE rather than
+    -- a proof -- the mechanism is the `candidates` list every requirement above
+    -- is already narrowed by -- and the pair of boards is here because the
+    -- group is a new reader of it.
     gaeasProtector <- S.printingOf s registry "Gaea's Protector"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = attacking [gaeasProtector] [piker]
@@ -3354,12 +3355,13 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
     -- one of them, where Curse of the Nightly Hunt beside it is one per
     -- creature and obeyed only by attacking with all of them.
     --
-    -- THREE SEATS, and both of them are load-bearing. bob prints the Seeker;
-    -- alice is the opponent declaring attackers, and carol is the second
-    -- opponent, whose Piker matches the Seeker's subject clause and could
-    -- attack on HER turn. CR 508.1a's candidates are the ACTIVE player's, so
-    -- carol's creature is outside the group and cannot obey alice's
-    -- requirement -- which is what the vacuous board below asserts.
+    -- THREE SEATS, because "each opponent" collapses onto one in a two-player
+    -- game. bob prints the Seeker; alice is the opponent declaring attackers,
+    -- and carol is the second opponent, whose Piker matches the Seeker's
+    -- subject clause and could attack on HER turn. CR 508.1a's candidates are
+    -- the ACTIVE player's, so carol's creature is outside the group and cannot
+    -- obey alice's requirement -- which is what the vacuous board below
+    -- asserts, carol's Piker being untouched between the two.
     --
     -- TWO creatures for alice, and that is what tells the arities apart: the
     -- per-creature reading makes attacking with exactly one of them illegal,
