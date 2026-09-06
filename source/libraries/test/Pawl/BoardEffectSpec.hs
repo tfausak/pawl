@@ -3272,8 +3272,13 @@ golgothianSylexSpec s registry =
 --     own second sentence off.
 --   * NONTOKEN versus every permanent (CR 111.1). carol's token is built from
 --     the same Kird Ape card, so its name matches too.
---   * ITS controller versus the ability's. The Kird Ape is bob's, and CR
---     701.21a's second sentence would refuse an EffectController reading.
+--   * ITS controller versus the ability's. The Kird Ape is bob's, so CR
+--     701.21a's second sentence would refuse an EffectController reading -- and
+--     that reading does not merely fail an assertion, it HANGS: the sweep leaves
+--     the Ape standing, the condition holds, and CR 603.3c re-triggers on the
+--     next settle pass forever, which is the non-termination
+--     Pawl.Engine.Event.Trigger.stateTriggers documents. Golgothian Sylex is
+--     where the sacrificer axis is proved instead.
 --   * A LISTED name versus every permanent. alice's Goblin Piker is not on the
 --     list.
 cityInABottleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
