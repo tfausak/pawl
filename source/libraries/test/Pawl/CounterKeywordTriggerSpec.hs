@@ -1166,9 +1166,9 @@ piaNalaarSpec s registry =
 
 -- Pia's end-step trigger, driven to its answer: alice's end step begins, the
 -- trigger is put on the stack, and it resolves with `n` paid to
--- Prompt.ChoosePaidEnergy. The prompt is answered by INDEX-free amount rather
--- than by S.identityAnswer, which would pick whatever the prompt's default is
--- and could not tell the two cases below apart.
+-- Prompt.ChoosePaidEnergy. The amount is PINNED rather than left to
+-- S.identityAnswer, which answers the same way on both boards below and so
+-- could not tell paying three from declining.
 payAtEndStep :: Natural -> GameState.GameState -> GameState.GameState
 payAtEndStep n gs =
   let endStep = Phase.Ending EndingStep.EndStep

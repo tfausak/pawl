@@ -2632,8 +2632,8 @@ castRebirth plains rebirth board =
   let (withSpell, spell) = S.handOne rebirth (S.landsFor plains S.alice 6 board)
    in S.settleSba (S.runPure S.identityAnswer withSpell (S.cast S.alice spell >> Engine.priorityLoop))
 
--- The Horror's printed power AS TEXT (CR 111.3), which is where CR 111.4's "set
--- when it is created" is observable: a stamped literal cannot be re-read, and
+-- The Horror's printed power AS TEXT, which is CR 111.3's "this becomes the
+-- token's text" made observable: a stamped literal cannot be re-read, and
 -- the spell that bound the count is in a graveyard under a fresh id by now
 -- (CR 400.7), so a box left standing would answer nothing at all.
 horrorPrintedPower :: ObjectId.ObjectId -> GameState.GameState -> Maybe Quantity.Quantity
@@ -2661,7 +2661,7 @@ phyrexianRebirthSpec s registry = Spec.describe s "PhyrexianRebirth" $ do
         resolved = castRebirth plains rebirth board
         horrors = fmap (\oid -> S.powerToughnessOf oid resolved) (S.tokensOf resolved)
     Spec.assertEqWith s "a 3/3 Horror: three creatures were destroyed, four were swept, one was alice's" horrors [Just (3, 3)]
-    Spec.assertEqWith s "CR 111.4 and 3 is its printed power, stamped as text at the mint" (fmap (`horrorPrintedPower` resolved) (S.tokensOf resolved)) [Just (Quantity.Literal 3)]
+    Spec.assertEqWith s "CR 111.3 and 3 is its printed power, stamped as text at the mint" (fmap (`horrorPrintedPower` resolved) (S.tokensOf resolved)) [Just (Quantity.Literal 3)]
     Spec.assertBool s (not (S.onBattlefield alicePiker resolved)) "alice's Piker died"
     Spec.assertBool s (not (S.onBattlefield bobPiker resolved)) "bob's Piker died"
     Spec.assertBool s (not (S.onBattlefield bobEvangel resolved)) "bob's Evangel died"
@@ -2697,9 +2697,9 @@ phyrexianRebirthSpec s registry = Spec.describe s "PhyrexianRebirth" $ do
     Spec.assertBool s (S.onBattlefield carolMyr resolved) "and the indestructible Myr is all that is left"
   -- The STATIC-ANALYSIS half. The gameplay cases above pass whatever the walkers
   -- answer, because Pawl.Engine.Resolve.Effect.bakeTokenCharacteristics evaluates
-  -- the box whether or not anything reported it -- so only this case says that CR
-  -- 603.3b's dataflow lint can SEE the read, which is what stops a token box from
-  -- naming a slot nothing binds.
+  -- the box whether or not anything reported it -- so only this case says that
+  -- CR 603.3b's dataflow lint can SEE the read, which is what stops a token box
+  -- from naming a slot nothing binds.
   --
   -- Off the printed card and not a planted effect: the whole face's reads are
   -- asserted, so the entry can only have come from the token's box. The

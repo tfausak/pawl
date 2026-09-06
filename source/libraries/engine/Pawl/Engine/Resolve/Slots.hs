@@ -227,14 +227,15 @@ riderQuantities = Map.elems . EntryRiders.counters
 -- face, and nothing else. CR 111.3 makes the value the effect defines part of
 -- the token's text, and Pawl.Engine.Resolve.Effect.bakeTokenCharacteristics is
 -- where that happens -- against the RESOLUTION's own object, context and slots,
--- so a box naming a slot is this effect speaking and the three walkers below
--- have to report it (Phyrexian Rebirth's "where X is the number of creatures
--- destroyed this way").
+-- so a box naming a slot is this effect speaking and all three walkers below
+-- (slotsOf, ownSlotsAreExhaustive, readsX) have to report it -- Phyrexian
+-- Rebirth's "where X is the number of creatures destroyed this way".
 --
 -- P/T is the whole of it because it is the whole of what bakeTokenCharacteristics
 -- evaluates; every other Quantity on the token's card is literal text, read at
--- the TOKEN's own resolution in its own (empty) bindings. The two walk together:
--- widening one without the other is what makes a slot read invisible here.
+-- the TOKEN's own resolution in its own (empty) bindings. So this function and
+-- that one have to widen together: a box baked here but not reported would be a
+-- slot read the CR 603.3b dataflow lint cannot see.
 tokenBoxQuantities :: Card.Type.Card -> [Quantity.Type.Quantity]
 tokenBoxQuantities card =
   foldMap
