@@ -3384,6 +3384,16 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] boundAt)) "declining to attack is illegal"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] boundAt) "and attacking with both is legal too, the maximum being one"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] vacuousAt) "with nothing able to attack, declining is legal again"
+        -- The other reader of the ceiling, and the one an interpreter that
+        -- repeats a rewound declaration lands on: the witness declaration keeps
+        -- the pinned announcement the group's maximum was measured through, so
+        -- it names ONE of the two Pikers rather than both or neither.
+        let offered = Combat.legalAttackers S.alice boundAt
+        Spec.assertEqWith
+          s
+          "and the forced declaration names one of them"
+          (length (Combat.forcedAttackDeclaration (Combat.attackCeiling offered boundAt) offered))
+          1
       _ -> Spec.assertFailure s "fixture should have two creatures for alice"
   Spec.it s "CR 508.1d whole cards: a Curse forces an attack through a real declare attackers step" $ do
     -- The gameplay-level case, run through Engine.runStep -- the priority loop
