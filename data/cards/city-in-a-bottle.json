@@ -1,0 +1,1385 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "City in a Bottle",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantCastMatching",
+            "value": {
+              "type": "Or",
+              "value": [
+                {
+                  "type": "HasName",
+                  "value": "Abu Ja'far"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Aladdin"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Aladdin's Lamp"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Aladdin's Ring"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ali Baba"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ali from Cairo"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Army of Allah"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Bazaar of Baghdad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Bird Maiden"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Bottle of Suleiman"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Brass Man"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Camel"
+                },
+                {
+                  "type": "HasName",
+                  "value": "City in a Bottle"
+                },
+                {
+                  "type": "HasName",
+                  "value": "City of Brass"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Cuombajj Witches"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Cyclone"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Dancing Scimitar"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Dandân"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Desert"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Desert Nomads"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Desert Twister"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Diamond Valley"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Drop of Honey"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ebony Horse"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Elephant Graveyard"
+                },
+                {
+                  "type": "HasName",
+                  "value": "El-Hajjâj"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Erg Raiders"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Erhnam Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Eye for an Eye"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Fishliver Oil"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Flying Carpet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Flying Men"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ghazbán Ogre"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Giant Tortoise"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Guardian Beast"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Hasran Ogress"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Hurr Jackal"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ifh-Bíff Efreet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Island Fish Jasconius"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Island of Wak-Wak"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jandor's Ring"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jandor's Saddlebags"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jeweled Bird"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jihad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Junún Efreet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Juzám Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Khabál Ghoul"
+                },
+                {
+                  "type": "HasName",
+                  "value": "King Suleiman"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Kird Ape"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Library of Alexandria"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Magnetic Mountain"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Merchant Ship"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Metamorphosis"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Mijae Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Moorish Cavalry"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Nafs Asp"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Oasis"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Old Man of the Sea"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Oubliette"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Piety"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Pyramids"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Repentant Blacksmith"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ring of Ma'rûf"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Rukh Egg"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sandals of Abdallah"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sandstorm"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Serendib Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Serendib Efreet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Shahrazad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sindbad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Singing Tree"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sorceress Queen"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Stone-Throwing Devils"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Unstable Mutation"
+                },
+                {
+                  "type": "HasName",
+                  "value": "War Elephant"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Wyluli Wolf"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ydwen Efreet"
+                }
+              ]
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        },
+        {
+          "effect": {
+            "type": "CantPlayLands",
+            "value": {
+              "type": "Or",
+              "value": [
+                {
+                  "type": "HasName",
+                  "value": "Abu Ja'far"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Aladdin"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Aladdin's Lamp"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Aladdin's Ring"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ali Baba"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ali from Cairo"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Army of Allah"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Bazaar of Baghdad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Bird Maiden"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Bottle of Suleiman"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Brass Man"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Camel"
+                },
+                {
+                  "type": "HasName",
+                  "value": "City in a Bottle"
+                },
+                {
+                  "type": "HasName",
+                  "value": "City of Brass"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Cuombajj Witches"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Cyclone"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Dancing Scimitar"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Dandân"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Desert"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Desert Nomads"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Desert Twister"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Diamond Valley"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Drop of Honey"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ebony Horse"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Elephant Graveyard"
+                },
+                {
+                  "type": "HasName",
+                  "value": "El-Hajjâj"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Erg Raiders"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Erhnam Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Eye for an Eye"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Fishliver Oil"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Flying Carpet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Flying Men"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ghazbán Ogre"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Giant Tortoise"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Guardian Beast"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Hasran Ogress"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Hurr Jackal"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ifh-Bíff Efreet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Island Fish Jasconius"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Island of Wak-Wak"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jandor's Ring"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jandor's Saddlebags"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jeweled Bird"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Jihad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Junún Efreet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Juzám Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Khabál Ghoul"
+                },
+                {
+                  "type": "HasName",
+                  "value": "King Suleiman"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Kird Ape"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Library of Alexandria"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Magnetic Mountain"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Merchant Ship"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Metamorphosis"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Mijae Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Moorish Cavalry"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Nafs Asp"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Oasis"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Old Man of the Sea"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Oubliette"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Piety"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Pyramids"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Repentant Blacksmith"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ring of Ma'rûf"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Rukh Egg"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sandals of Abdallah"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sandstorm"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Serendib Djinn"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Serendib Efreet"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Shahrazad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sindbad"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Singing Tree"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Sorceress Queen"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Stone-Throwing Devils"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Unstable Mutation"
+                },
+                {
+                  "type": "HasName",
+                  "value": "War Elephant"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Wyluli Wolf"
+                },
+                {
+                  "type": "HasName",
+                  "value": "Ydwen Efreet"
+                }
+              ]
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StateIs",
+            "value": {
+              "type": "Compares",
+              "value": {
+                "comparison": {
+                  "type": "AtLeast"
+                },
+                "measured": {
+                  "type": "Count",
+                  "value": {
+                    "aggregation": {
+                      "type": "Members"
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsToken"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsSource"
+                          }
+                        },
+                        {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasName",
+                              "value": "Abu Ja'far"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Aladdin"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Aladdin's Lamp"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Aladdin's Ring"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Ali Baba"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Ali from Cairo"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Army of Allah"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Bazaar of Baghdad"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Bird Maiden"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Bottle of Suleiman"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Brass Man"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Camel"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "City in a Bottle"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "City of Brass"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Cuombajj Witches"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Cyclone"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Dancing Scimitar"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Dandân"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Desert"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Desert Nomads"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Desert Twister"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Diamond Valley"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Drop of Honey"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Ebony Horse"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Elephant Graveyard"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "El-Hajjâj"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Erg Raiders"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Erhnam Djinn"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Eye for an Eye"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Fishliver Oil"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Flying Carpet"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Flying Men"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Ghazbán Ogre"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Giant Tortoise"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Guardian Beast"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Hasran Ogress"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Hurr Jackal"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Ifh-Bíff Efreet"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Island Fish Jasconius"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Island of Wak-Wak"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Jandor's Ring"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Jandor's Saddlebags"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Jeweled Bird"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Jihad"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Junún Efreet"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Juzám Djinn"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Khabál Ghoul"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "King Suleiman"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Kird Ape"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Library of Alexandria"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Magnetic Mountain"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Merchant Ship"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Metamorphosis"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Mijae Djinn"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Moorish Cavalry"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Nafs Asp"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Oasis"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Old Man of the Sea"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Oubliette"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Piety"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Pyramids"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Repentant Blacksmith"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Ring of Ma'rûf"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Rukh Egg"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Sandals of Abdallah"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Sandstorm"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Serendib Djinn"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Serendib Efreet"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Shahrazad"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Sindbad"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Singing Tree"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Sorceress Queen"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Stone-Throwing Devils"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Unstable Mutation"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "War Elephant"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Wyluli Wolf"
+                            },
+                            {
+                              "type": "HasName",
+                              "value": "Ydwen Efreet"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "scope": {
+                      "type": "InZone",
+                      "value": {
+                        "player": {
+                          "type": "EachPlayer"
+                        },
+                        "zone": {
+                          "type": "Battlefield"
+                        }
+                      }
+                    }
+                  }
+                },
+                "threshold": {
+                  "type": "Literal",
+                  "value": 1
+                }
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": {
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsToken"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsSource"
+                                  }
+                                },
+                                {
+                                  "type": "Or",
+                                  "value": [
+                                    {
+                                      "type": "HasName",
+                                      "value": "Abu Ja'far"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Aladdin"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Aladdin's Lamp"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Aladdin's Ring"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ali Baba"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ali from Cairo"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Army of Allah"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Bazaar of Baghdad"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Bird Maiden"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Bottle of Suleiman"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Brass Man"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Camel"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "City in a Bottle"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "City of Brass"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Cuombajj Witches"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Cyclone"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Dancing Scimitar"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Dandân"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Desert"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Desert Nomads"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Desert Twister"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Diamond Valley"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Drop of Honey"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ebony Horse"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Elephant Graveyard"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "El-Hajjâj"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Erg Raiders"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Erhnam Djinn"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Eye for an Eye"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Fishliver Oil"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Flying Carpet"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Flying Men"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ghazbán Ogre"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Giant Tortoise"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Guardian Beast"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Hasran Ogress"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Hurr Jackal"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ifh-Bíff Efreet"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Island Fish Jasconius"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Island of Wak-Wak"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Jandor's Ring"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Jandor's Saddlebags"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Jeweled Bird"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Jihad"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Junún Efreet"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Juzám Djinn"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Khabál Ghoul"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "King Suleiman"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Kird Ape"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Library of Alexandria"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Magnetic Mountain"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Merchant Ship"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Metamorphosis"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Mijae Djinn"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Moorish Cavalry"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Nafs Asp"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Oasis"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Old Man of the Sea"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Oubliette"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Piety"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Pyramids"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Repentant Blacksmith"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ring of Ma'rûf"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Rukh Egg"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Sandals of Abdallah"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Sandstorm"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Serendib Djinn"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Serendib Efreet"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Shahrazad"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Sindbad"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Singing Tree"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Sorceress Queen"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Stone-Throwing Devils"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Unstable Mutation"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "War Elephant"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Wyluli Wolf"
+                                    },
+                                    {
+                                      "type": "HasName",
+                                      "value": "Ydwen Efreet"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "sacrificer": {
+                            "type": "PermanentController"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

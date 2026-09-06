@@ -11,7 +11,11 @@
       "playerAbilities": [
         {
           "effect": {
-            "type": "CantPlayLands"
+            "type": "CantPlayLands",
+            "value": {
+              "type": "And",
+              "value": []
+            }
           },
           "name": "the lead",
           "scope": {

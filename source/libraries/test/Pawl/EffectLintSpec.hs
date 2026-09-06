@@ -863,7 +863,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CastOnlyAtSorcerySpeed -> False
-  PlayerEffect.CantPlayLands -> False
+  PlayerEffect.CantPlayLands _ -> False
   PlayerEffect.CastFrom _ -> False
   PlayerEffect.PlayLandsFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -922,7 +922,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CastOnlyAtSorcerySpeed -> False
-  PlayerEffect.CantPlayLands -> False
+  PlayerEffect.CantPlayLands _ -> False
   PlayerEffect.CastFrom _ -> False
   PlayerEffect.PlayLandsFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False

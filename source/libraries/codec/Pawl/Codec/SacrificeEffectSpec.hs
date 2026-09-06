@@ -13,7 +13,8 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.SacrificeEffect" $ do
   -- CR 701.21a's ordinary form, which every card in the pool but Golgothian
-  -- Sylex prints: the sacrificer is the default, so no key is written.
+  -- Sylex and City in a Bottle prints: the sacrificer is the default, so no key
+  -- is written.
   Spec.it s "the effect's controller writes no sacrificer" $
     Common.assertCodec
       s

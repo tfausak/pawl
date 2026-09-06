@@ -342,6 +342,8 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
+  -- CR 305.1's play-side prohibition, narrowed by the same kind of Filter.
+  PlayerEffect.CantPlayLands f -> PlayerEffect.CantPlayLands (Filter.rewrite pairs f)
   PlayerEffect.CastFrom grant -> PlayerEffect.CastFrom grant {CastFromZone.matching = Filter.rewrite pairs (CastFromZone.matching grant)}
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
   -- The rest name no word a subtype pair could reach. The two chosen-name arms
@@ -370,7 +372,6 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.HasProtectionFromChosenName -> effect
   PlayerEffect.CantBecomeMonarch -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
-  PlayerEffect.CantPlayLands -> effect
   PlayerEffect.PlayLandsFrom _ -> effect
   -- A counter KIND is not a word CR 612.2's subtype pairs could reach either.
   PlayerEffect.CantGetCounters _ -> effect
@@ -438,9 +439,10 @@ rewriteEffect pairs effect = case effect of
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried mPermanents)
   -- CR 612.1: the ref may carry a Filter of printed card text, so a text-changer
   -- reaches it exactly as Destroy's above. A REGRESSION FENCE rather than a
-  -- proven behaviour: Golgothian Sylex is the only card whose sacrifice carries a
-  -- Filter at all, and CR 206.3b's names are not words CR 612.2's two families
-  -- can swap, so mutating this line reddens nothing.
+  -- proven behaviour: Golgothian Sylex and City in a Bottle are the only cards
+  -- whose sacrifice carries a Filter at all, and CR 206.3a/b's names are not
+  -- words CR 612.2's two families can swap, so mutating this line reddens
+  -- nothing.
   Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer) -> Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect (rewriteObjectRef pairs ref) sacrificer)
   -- CR 612.1: the ref carries a Filter of printed card text, so a text-changer
   -- reaches it exactly as Destroy's above. The listed characteristics hold no word
