@@ -301,6 +301,7 @@ manaProduced effect = case effect of
   Effect.CantBeRegenerated {} -> Nothing
   Effect.ForbidBlock {} -> Nothing
   Effect.ForbidAttack {} -> Nothing
+  Effect.ForbidActivation {} -> Nothing
   Effect.RequireAttack {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
@@ -503,6 +504,7 @@ movesLibraryCard effect = case effect of
   Effect.CantBeRegenerated {} -> False
   Effect.ForbidBlock {} -> False
   Effect.ForbidAttack {} -> False
+  Effect.ForbidActivation {} -> False
   Effect.RequireAttack {} -> False
   Effect.CreateEmblem {} -> False
   Effect.Designate (Designate.MkDesignate _ _) -> False

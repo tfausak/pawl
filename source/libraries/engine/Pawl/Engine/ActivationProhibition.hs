@@ -4,8 +4,10 @@
 -- Pawl.Engine.CombatRestriction, Pawl.Engine.SacrificeRestriction and its
 -- siblings). None is a layer, and Pawl.Engine.Projection sees none of them.
 --
--- The only reader of Pawl.Types.ActivationProhibition. Every caller asks for one
--- permanent's answer and never learns which card produced it.
+-- The only reader of Pawl.Types.ActivationProhibition, the PRINTED carrier, and
+-- of GameState.activationProhibitions, the STORED rows a resolution leaves
+-- behind (Pawl.Types.ActiveActivationProhibition). Every caller asks for one
+-- permanent's answer and never learns which card produced it, or by which road.
 --
 -- TWO places ask, and both are needed, exactly as Pawl.Engine.Detain's header
 -- lays out for rule 701.35a's third clause: pawl has no single "may this
@@ -33,6 +35,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
+import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -84,7 +87,8 @@ gathered gs =
 
 -- CR 602.2 with CR 101.2: which of `candidates` an effect in force right now
 -- says can't have an activated ability of this CR 605.1a kind activated. Arrest,
--- Realmbreaker's Grasp and Volrath's Curse are the pool's printings.
+-- Realmbreaker's Grasp and Volrath's Curse are the pool's printed rows; Deadlock
+-- Trap's is the stored one.
 --
 -- A set of ids and not a per-candidate predicate, for the reason
 -- Pawl.Engine.CombatRestriction.restricted gives: a caller narrowing a whole
@@ -115,7 +119,17 @@ cantActivate asked candidates gs =
               (\candidate -> named pcs grants source changes prohibition candidate gs && not (IgnoredAbility.ignoredForSubject candidate source (ActivationProhibition.name prohibition) gs))
               candidates
           else []
-   in Set.fromList (concatMap fromProhibition (gathered gs))
+      -- CR 611.2a / 613.11: the STORED rows a resolution left behind, unioned in
+      -- the way Pawl.Engine.CombatRestriction unions GameState.blockProhibitions
+      -- into `cantBlock` -- so neither gate learns which road a prohibition took.
+      --
+      -- EVERY CR 605.1a kind, unlike a printed row: Pawl.Types.ForbidActivation
+      -- carries no kind, both printings of the sentence naming every activated
+      -- ability. And no CR 116.2d filter: a stored row carries no name for a
+      -- payment to refer to, which Pawl.Types.ActiveActivationProhibition argues
+      -- is exact rather than a shortcut.
+      storedSubjects = Set.fromList (fmap ActiveActivationProhibition.object (GameState.activationProhibitions gs))
+   in Set.fromList (concatMap fromProhibition (gathered gs)) <> Set.intersection storedSubjects (Set.fromList candidates)
 
 -- CR 116.2d's WHO on this carrier: the permanents that `source`'s ability named
 -- `name` forbids activations on right now. Unioned with

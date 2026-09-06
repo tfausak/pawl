@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
@@ -170,6 +171,9 @@ data GameState = MkGameState
     -- | CR 508.1c / 611.1: stored attacking restrictions from resolutions, each
     -- with an expiry; printed ones are re-derived live.
     attackProhibitions :: [ActiveAttackProhibition.ActiveAttackProhibition],
+    -- | CR 602.2 / 611.1: stored activation prohibitions from resolutions, each
+    -- with an expiry; printed ones are re-derived live.
+    activationProhibitions :: [ActiveActivationProhibition.ActiveActivationProhibition],
     -- | CR 116.2d: the ignores players have paid for, each with an expiry, read
     -- by Pawl.Engine.PlayerEffect.applying.
     ignoredAbilities :: [IgnoredAbility.IgnoredAbility],

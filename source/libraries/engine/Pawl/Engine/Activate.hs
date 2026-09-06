@@ -650,10 +650,11 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- same conjunct for CR 605.3a's windows, exactly as sickness below and the
         -- printed rider two lines down are asked in both places.
         && not (Detain.detained srcId gs)
-        -- CR 101.2 over CR 602.2's permission: a printed static ability aimed at
-        -- this permanent saying its activated abilities can't be activated
-        -- (Arrest). Beside detain because it is the same clause from card data
-        -- rather than from the rulebook, and it owes the second gate for detain's
+        -- CR 101.2 over CR 602.2's permission: an effect aimed at this permanent
+        -- saying its activated abilities can't be activated -- printed (Arrest)
+        -- or stored by a resolution for a duration (Deadlock Trap), which one
+        -- answer covers. Beside detain because it is the same clause from card
+        -- data rather than from the rulebook, and it owes the second gate for detain's
         -- reason: Cost.manaActivations carries it for CR 605.3a's windows.
         --
         -- Asked as NonManaAbility, which the mana conjunct above has already

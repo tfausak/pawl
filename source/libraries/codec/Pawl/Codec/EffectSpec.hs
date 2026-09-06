@@ -70,6 +70,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
@@ -1492,6 +1493,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       codec
       (Effect.ForbidBlock (ForbidBlock.MkForbidBlock Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
       " {\"type\":\"ForbidBlock\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
+  Spec.it s "ForbidActivation" $
+    Common.assertCodec
+      s
+      codec
+      (Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      " {\"type\":\"ForbidActivation\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
   Spec.it s "ForbidAttack" $
     Common.assertCodec
       s
