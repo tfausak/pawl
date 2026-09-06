@@ -8,6 +8,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SearchDestination as SearchDestination
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -36,6 +37,10 @@ codec = Fields.object $ do
   -- written gets.
   upTo <- Fields.defaulted "upTo" False Common.boolean Search.upTo
   destination <- Fields.required "destination" SearchDestination.codec Search.destination
+  -- Defaulted rather than required: an absent key is a card whose "it" is its own
+  -- source, which is every card file already written and the reading CR 113.7
+  -- gives a search that names no slot.
+  subject <- Fields.defaulted "subject" Nothing (Common.maybe SlotName.codec) Search.subject
   pure
     Search.MkSearch
       { Search.searcher = searcher,
@@ -44,5 +49,6 @@ codec = Fields.object $ do
         Search.quantity = quantity,
         Search.filter = filter_,
         Search.upTo = upTo,
-        Search.destination = destination
+        Search.destination = destination,
+        Search.subject = subject
       }

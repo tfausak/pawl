@@ -1,10 +1,15 @@
 {
   "faces": [
     {
+      "keywords": [
+        {
+          "type": "Exalted"
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 5
+          "value": 4
         },
         {
           "type": "OfType",
@@ -14,21 +19,36 @@
               "type": "White"
             }
           }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         }
       ],
-      "name": "Auratouched Mage",
+      "name": "Sovereigns of Lost Alara",
       "power": {
         "type": "Literal",
-        "value": 3
+        "value": 4
       },
       "toughness": {
         "type": "Literal",
-        "value": 3
+        "value": 5
       },
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfEnters"
+            "type": "CreatureAttacksAlone",
+            "value": {
+              "type": "ControlledBy",
+              "value": {
+                "type": "You"
+              }
+            }
           },
           "modal": {
             "modes": [
@@ -40,7 +60,7 @@
                         "type": "Search",
                         "value": {
                           "destination": {
-                            "type": "BattlefieldAttachedOrHand"
+                            "type": "BattlefieldAttached"
                           },
                           "filter": {
                             "type": "And",
@@ -71,10 +91,14 @@
                             "value": {
                               "type": "You"
                             }
-                          }
+                          },
+                          "subject": "thatAttackingCreature"
                         }
                       }
-                    ]
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
                   }
                 ]
               }
@@ -85,10 +109,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Human"
-          },
-          {
-            "type": "Wizard"
+            "type": "Spirit"
           }
         ],
         "types": [
