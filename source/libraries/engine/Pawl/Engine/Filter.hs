@@ -1061,10 +1061,10 @@ data Context = MkContext
     -- CR 201.4: the names the SOURCE has chosen, for the one atom that compares a
     -- candidate's against them (HasChosenName, Ancient Vendetta). Supplied by the
     -- caller for slotNames' reason -- this module holds no game state and cannot
-    -- read an object's chosen names -- and by THREE callers:
-    -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its Effect.Mill tally,
-    -- the two positions a CARD may write the atom in (CR 608.2c's choice during a
-    -- resolution -- Ancient Vendetta's search, Predict's tally), and
+    -- read an object's chosen names -- and by TWO callers:
+    -- Pawl.Engine.Resolve.Slots.effectContext, which every position of a
+    -- resolution goes through (CR 608.2c's choice during a resolution -- Ancient
+    -- Vendetta's search, Predict's tally, Petra Sphinx's revealed card), and
     -- Pawl.Engine.Replacement.candidateContext, where the atom is written by rule
     -- 702.16e's MINTED player-protection shield rather than by card data (CR
     -- 614.1c's as-enters choice, Runed Halo).
@@ -1081,14 +1081,15 @@ data Context = MkContext
     --
     -- EMPTY in contextFor below and so in contextWithSlots and
     -- contextComparingPower too, so the atom is
-    -- vacuously False in every position but those three -- an empty
+    -- vacuously False in every position but those two -- an empty
     -- intersection, which is this atom's arm answering rather than a posture the
     -- record enforces; slotControllers' atom answers True on ITS unfilled read.
     -- What keeps a card out of those positions
-    -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
-    -- filter or a mill's tally", the sweep sourcePower's, slotNames' and
+    -- is Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside an admitted
+    -- position", the sweep sourcePower's, slotNames' and
     -- sourceAttachedTo's siblings each have -- a fence over CARD data, which the
-    -- replacement filler above is not.
+    -- replacement filler above is not. That lint is an ALLOWLIST narrower than
+    -- what this field now answers, since effectContext fills it everywhere.
     sourceChosenNames :: Set.Set CardName.CardName,
     -- CR 702.16k: the player chosen (CR 614.1c) by the permanent whose
     -- PROTECTION ability wrote the filter being matched, for the one atom that
@@ -1140,12 +1141,11 @@ data Context = MkContext
 -- no honest player to substitute.
 --
 -- CR 201.4's chosen-name atom is a further one a CARD may write (Ancient
--- Vendetta, Predict), and it reads the empty set here in every position but the
--- three that supply it -- Pawl.Engine.Resolve.Effect's Effect.Search arm and its
--- Effect.Mill tally, each building its context from effectContext and then
--- overlaying sourceChosenNames, and Pawl.Engine.Replacement.candidateContext,
--- which does the same for a minted row. See that field above for the lint that
--- keeps a card to the first two.
+-- Vendetta, Predict, Petra Sphinx), and it reads the empty set here in every
+-- position but the two that supply it -- Pawl.Engine.Resolve.Slots.effectContext,
+-- which every position of a resolution goes through, and
+-- Pawl.Engine.Replacement.candidateContext, which fills it for a minted row. See
+-- that field above for the lint that keeps a card to a subset of the first.
 --
 -- CR 702.16k's chosen-player atom (True-Name Nemesis) is a further one a CARD may
 -- write, and it reads the Nothing here in every position but the four rule 702.16

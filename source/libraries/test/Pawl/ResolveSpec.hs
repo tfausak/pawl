@@ -2002,6 +2002,50 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "bob milled the top card of his library, and only it"
       (namesIn Zone.Graveyard S.bob settled)
       [nameOf "Crucible of Worlds"]
+  -- Petra Sphinx -- "{T}: Target player chooses a card name, then reveals the top
+  -- card of their library. If that card has the chosen name, that player puts it
+  -- into their hand. If it doesn't, the player puts it into their graveyard." The
+  -- whole-card proof of BOTH halves the card needs: CR 201.4's chooser is a
+  -- target slot rather than CR 109.5's "you", see #2233, and CR 201.4's atom is
+  -- asked about a REVEALED card rather than inside a search, see #2992 -- an
+  -- ObjectRef's own filter, matched through Resolve.Slots.objectRefObjects in the
+  -- resolution's own context.
+  --
+  -- A PAIR of boards differing in exactly ONE thing: bob's library holds the same
+  -- three cards in both and only the TOP one differs. The answerer names by
+  -- CHOOSER -- Chromatic Star if bob is asked, Crucible of Worlds otherwise -- so
+  -- an engine that asked alice instead flips BOTH boards' outcomes rather than
+  -- neither. An atom that cannot see the chosen name sends the card to the
+  -- graveyard on both; one that admits everything sends it to the hand on both.
+  Spec.it s "CR 201.4/701.20a whole card: Petra Sphinx matches the name its target chose against the card it revealed" $ do
+    settled <- resolveSphinx s registry "Chromatic Star"
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    -- The gameplay assertion, and first.
+    Spec.assertEqWith
+      s
+      "the revealed card carried the name bob chose, so it went to his hand"
+      (namesIn Zone.Hand S.bob settled)
+      [nameOf "Chromatic Star"]
+    Spec.assertEqWith s "and his graveyard is empty" (namesIn Zone.Graveyard S.bob settled) []
+    Spec.assertEqWith
+      s
+      "the reveal took the top card only (CR 701.20b moved nothing itself)"
+      (namesIn Zone.Library S.bob settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
+  Spec.it s "CR 201.4 the same board with the other card on top sends it to the graveyard" $ do
+    settled <- resolveSphinx s registry "Crucible of Worlds"
+    let nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "the revealed card did not carry the name bob chose, so it went to his graveyard"
+      (namesIn Zone.Graveyard S.bob settled)
+      [nameOf "Crucible of Worlds"]
+    Spec.assertEqWith s "and his hand is empty" (namesIn Zone.Hand S.bob settled) []
+    Spec.assertEqWith
+      s
+      "and the rest of the library is untouched"
+      (namesIn Zone.Library S.bob settled)
+      [nameOf "Goblin Piker", nameOf "Goblin Piker"]
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3188,6 +3232,42 @@ resolvePredict :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] 
 resolvePredict s registry top = do
   (gs, spellId) <- predictBoard s registry top
   pure (S.runPure predictAnswer gs (S.cast S.alice spellId >> Stack.resolveTop))
+
+-- atBobAnswer with CR 201.4's name read off the CHOOSER the prompt names. Bob is
+-- the seat the card targets, so an engine that asked alice -- CR 109.5's "you" --
+-- takes the other branch, and the pair of boards below turns on which name came
+-- back. A pure answerer can tell these two prompts apart because
+-- Prompt.ChooseCardName carries the chooser.
+sphinxAnswer :: Prompt.Prompt r -> r
+sphinxAnswer p = case p of
+  Prompt.ChooseCardName _ chooser _ _ ->
+    CardName.MkCardName (Text.pack (if chooser == S.bob then "Chromatic Star" else "Crucible of Worlds"))
+  _ -> atBobAnswer p
+
+-- Alice's Petra Sphinx over bob's three-card library, `top` on top of it. The two
+-- fillers are what keep the library assertion from being vacuous -- a one-card
+-- library empties whichever way the comparison goes -- and keep bob off CR
+-- 104.3c.
+sphinxBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (GameState.GameState, Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), ObjectId.ObjectId)
+sphinxBoard s registry top = do
+  sphinx <- S.printingOf s registry "Petra Sphinx"
+  piker <- S.printingOf s registry "Goblin Piker"
+  card <- S.printingOf s registry top
+  -- Added last is on top, S.addLibraryCard's order and predictBoard's reason.
+  let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
+      (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
+      g1 = foldl (flip stock) g0 [piker, piker, card]
+  pure (g1 {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)), sphinxId)
+
+-- One activation and resolution, the narrowest path that shows the comparison.
+-- The ability is read off the PRINTING rather than conjured, so what is proved is
+-- the card in data/cards/.
+resolveSphinx :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m GameState.GameState
+resolveSphinx s registry top = do
+  (gs, ability, sphinxId) <- sphinxBoard s registry top
+  case ability of
+    Nothing -> pure gs
+    Just a -> pure (S.runPure sphinxAnswer gs (Activate.activateAbility S.alice sphinxId a >> Stack.resolveTop))
 
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be

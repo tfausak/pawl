@@ -8,6 +8,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
@@ -25,7 +26,6 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Fight as Fight
-import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
@@ -34,7 +34,6 @@ import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
@@ -515,15 +514,13 @@ data Effect card ability
     -- counter, then give each one additional counter of each kind it already
     -- has. Choose, not target, so the set is picked on resolution.
     Proliferate
-  | -- | CR 201.4 via CR 608.2c: the resolving controller chooses a card name,
-    -- written to Object.chosenNames on the resolving object (Ancient Vendetta).
-    -- The Filter is CR 201.4a's restriction, carried to the prompt for the
-    -- answerer to obey; Pawl.Interpreter.policingCardNames is what judges the
-    -- answer, the engine being unable to resolve a name at all.
-    --
-    -- Not implemented: a chooser other than CR 109.5's "you" -- Petra Sphinx's
-    -- "target player chooses a card name" (#2233).
-    ChooseCardName (Filter.Filter Keyword.Keyword)
+  | -- | CR 201.4 via CR 608.2c: the players the payload's PlayerRef names each
+    -- choose a card name, written to Object.chosenNames on the resolving object
+    -- (Ancient Vendetta, Petra Sphinx). The Filter is CR 201.4a's restriction,
+    -- carried to the prompt for the answerer to obey;
+    -- Pawl.Interpreter.policingCardNames is what judges the answer, the engine
+    -- being unable to resolve a name at all.
+    ChooseCardName ChooseCardName.ChooseCardName
   | -- | CR 701.39a: "bolster N" -- choose a creature the resolving controller
     -- controls with the least toughness, or tied for least, then put that many
     -- +1\/+1 counters on it. Choose, not target.

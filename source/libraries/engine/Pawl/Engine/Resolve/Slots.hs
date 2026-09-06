@@ -36,6 +36,7 @@ import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -736,7 +737,7 @@ effectPlayerRefs effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.Proliferate -> []
-  Effect.ChooseCardName {} -> []
+  Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref _) -> [ref]
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
   Effect.Blight (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
@@ -802,9 +803,11 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
       (maybe Map.empty oneSlot subject)
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
-  -- CR 201.4's name is not an object, so the choice binds no slot and the
-  -- restriction Filter names none either -- a Filter reads a slot only through
-  -- Filter.boundSlots, and no card writes one of those atoms here.
+  -- CR 201.4's name is not an object, so the choice binds no slot of its own and
+  -- the restriction Filter names none either -- a Filter reads a slot only
+  -- through Filter.boundSlots, and no card writes one of those atoms here. The
+  -- CHOOSER's slot is effectPlayerRefs' half, joined at the head above (Petra
+  -- Sphinx's "target player").
   Effect.ChooseCardName _ -> Map.empty
   -- No slot: the card comes from outside the game, where CR 400.11c lets nothing
   -- target and so nothing was announced (CR 601.2c).
@@ -2187,6 +2190,13 @@ slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bin
 -- resolution's positions exactly as it is at a target slot's
 -- (Pawl.Engine.Target.slotContext). A THUNK, as it is there: one projection per
 -- bound object, paid for only by a filter naming the atom.
+--
+-- CR 201.4's CHOSEN names ride the same read, and this is their only filler on
+-- the resolution side -- the search filter's and the mill tally's alike, which
+-- each overlaid the field for themselves until Petra Sphinx wanted it at an
+-- ObjectRef's own filter too, see #2992. Pawl.Engine.Replacement.candidateContext is
+-- the one other filler, for a minted row. What holds a CARD to the positions
+-- this fills is Pawl.CardSpec's framing lint, not this function.
 effectContext :: GameState -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName Binding.Type.Binding -> Filter.Context
 effectContext gs controller source legal bindings =
   let objects = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf bindings)
@@ -2212,7 +2222,14 @@ effectContext gs controller source legal bindings =
           -- finds nothing for every ability. Keening Stone's "that player's
           -- graveyard" proves the activated road and Price of Knowledge's "that
           -- player's hand" the triggered one (Pawl.CountSpec).
-          Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) legal
+          Filter.slotPlayers = fmap (Set.fromList . Maybe.mapMaybe Recipient.playerOf . Set.toList) legal,
+          -- CR 201.4's names off the SOURCE (CR 113.7), read LIVE for the group
+          -- half's reason: CR 608.2c has the clauses carried out in order, so the
+          -- name an earlier clause chose is part of the state a later one is read
+          -- against -- Petra Sphinx's "if that card has the chosen name" over the
+          -- card its own reveal bound. CR 608.2h's last-known reader is inside
+          -- chosenNamesOf, for the source that has already left (Conjurer's Ban).
+          Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs
         }
 
 -- The ONE object each of a resolution's TARGET slots names, shared by

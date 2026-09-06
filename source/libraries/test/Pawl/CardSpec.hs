@@ -85,6 +85,7 @@ import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -608,6 +609,7 @@ playerRefPositions =
     ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
     ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
     ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
+    ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
     ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue), [plantedPlayer "oc-caster"]),
     -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
     -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
@@ -4009,12 +4011,12 @@ blockPermissionFilters permission =
 --     Resolve.Slots.effectContext, which fills the names. Not SourceHostFramed,
 --     which the arm's siblings carry, because that arm overlays no
 --     Filter.Context.sourceAttachedTo.
---   * MillTallyFramed -- CR 701.17's mill tally filter, the second position a
+--   * MillTallyFramed -- CR 701.17's mill tally filter, one of the positions a
 --     card may write CR 201.4's Filter.HasChosenName in (Predict): the
---     Effect.Mill arm overlays Filter.Context.sourceChosenNames onto the
---     resolution's own context, as the search arm does. Not SearchFramed, whose
---     other promise -- a view filling Filter.View.canAttachToSubject -- it does
---     not keep.
+--     Effect.Mill arm reads the resolution's own context, which fills
+--     Filter.Context.sourceChosenNames, as the search arm does. Not SearchFramed,
+--     whose other promise -- a view filling Filter.View.canAttachToSubject -- it
+--     does not keep.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -4137,9 +4139,9 @@ data Framing
     MintedTargetSlot
   | -- | CR 701.17's mill TALLY filter -- the one position whose evaluator counts
     -- CARDS a resolution has just moved rather than candidates it is choosing
-    -- among, and the second position a CARD may write CR 201.4's chosen name in:
+    -- among, and one of the positions a CARD may write CR 201.4's chosen name in:
     -- Pawl.Engine.Resolve.Effect's Effect.Mill arm builds its context through
-    -- Resolve.Slots.effectContext and overlays Filter.Context.sourceChosenNames,
+    -- Resolve.Slots.effectContext, which fills Filter.Context.sourceChosenNames,
     -- exactly as the Effect.Search arm does (Predict, see #2141).
     --
     -- Not SearchFramed, whose other promise this position does not keep:
@@ -4366,7 +4368,7 @@ effectFilters effect = case effect of
   -- (Pawl.Engine.Projection.View.viewOfCard) exactly as CR 400.11c's filter does.
   -- No candidate here is an object in the game either, the named card being one
   -- the reference has rather than one on the board.
-  Effect.ChooseCardName restriction -> outsideTheGameFramed [restriction]
+  Effect.ChooseCardName (ChooseCardName.MkChooseCardName _ restriction) -> outsideTheGameFramed [restriction]
   -- THE one wish-framed position. CR 400.11c's filter is matched against a
   -- PRINTED FACE (Pawl.Engine.Projection.View.viewOfCard) rather than against an
   -- object any of the other framings' evaluators project, which is what makes
@@ -4564,9 +4566,13 @@ effectFilters effect = case effect of
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
   -- Both halves the opcode can hold a Filter in: the reference, and CR 118.9's
-  -- stated alternative cost. The cost half is SlotlessCostFramed for
-  -- payGateFilters' reason -- Cast.castSpellWith announces `applied` with no slot
-  -- bindings behind it, so a Filter written there could not read a slot.
+  -- stated alternative cost. The cost half is SlotlessCostFramed, and NOT because
+  -- the announcement has no slots: CR 608.2g sends the offered cast through rule
+  -- 601.2a-i, so Cast.castSpellWith stamps rule 601.2c's targets before Cost.pay
+  -- reads them through Cost.announcedSlots -- which is why alternativeCostFilters
+  -- calls a PRINTED rule 118.9 alternative Unframed. The slots that are there
+  -- belong to the OFFERED card's namespace, and this Filter is the OFFERING
+  -- card's text, so no name it could write names one of them.
   --
   -- The cost half is a FENCE rather than a proved rejection: it puts three more
   -- cases in the sweep (Synthetic Woodland Bargainer's "sacrifice a Forest"), and

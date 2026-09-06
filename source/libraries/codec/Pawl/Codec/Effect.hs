@@ -21,6 +21,7 @@ import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.ChangeText as ChangeText
+import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.Conjure as Conjure
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
@@ -38,7 +39,6 @@ import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Fight as Fight
-import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.FlipCoin as FlipCoin
 import qualified Pawl.Codec.ForEach as ForEach
 import qualified Pawl.Codec.ForbidActivation as ForbidActivation
@@ -47,7 +47,6 @@ import qualified Pawl.Codec.ForbidBlock as ForbidBlock
 import qualified Pawl.Codec.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.InitiativeTarget as InitiativeTarget
-import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LookAt as LookAt
 import qualified Pawl.Codec.ManaAddition as ManaAddition
 import qualified Pawl.Codec.Meld as Meld
@@ -100,7 +99,7 @@ codec cardCodec abilityCodec =
       Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,
-      Arm.payload "ChooseCardName" (Filter.codec Keyword.codec) Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseCardName" ChooseCardName.codec Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
       Arm.payload "FromOutsideTheGame" FromOutsideTheGame.codec Effect.FromOutsideTheGame (\x -> case x of Effect.FromOutsideTheGame y -> Just y; _ -> Nothing),
       Arm.nullary "ExileThisSpell" Effect.ExileThisSpell,
       Arm.payload "Bolster" Quantity.codec Effect.Bolster (\x -> case x of Effect.Bolster y -> Just y; _ -> Nothing),

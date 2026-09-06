@@ -30,6 +30,7 @@ import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -400,7 +401,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Proliferate -> effect
   -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
   -- rewrites it exactly as it rewrites a search's filter above.
-  Effect.ChooseCardName restriction -> Effect.ChooseCardName (Filter.rewrite pairs restriction)
+  Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref (Filter.rewrite pairs restriction))
   -- CR 612.1 again: "a sorcery card you own from outside the game" is printed
   -- card text like the search's filter above, so a text-changer reaches it the
   -- same way. A REGRESSION FENCE rather than a proven behaviour -- no card in

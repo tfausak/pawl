@@ -93,6 +93,7 @@ import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -2100,10 +2101,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- context would have answered False for on every card in the library.
     -- Pawl.ResolveSpec's Bifurcate cases are what prove it.
     --
-    -- A FUNCTION of the board rather than a value, sourceChosenNames' reason
-    -- below, and the slots come with it: CR 608.2c has the clauses carried out in
-    -- order, so a slot an earlier clause of this same resolution bound is read
-    -- here rather than as it stood when the arm was entered.
+    -- A FUNCTION of the board rather than a value, so the slots come with it: CR
+    -- 608.2c has the clauses carried out in order, so a slot an earlier clause of
+    -- this same resolution bound is read here rather than as it stood when the
+    -- arm was entered.
     --
     -- CR 109.5's "you" is the resolving controller, which effectContext supplies
     -- as the perspective; a search filter in the pool names no player, so no
@@ -2134,15 +2135,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- No recursion to bound: this is called from a resolution rather than from
     -- inside a CR 613 fold, so the projections that question reaches start fresh.
     --
-    -- CR 201.4: the ONE field the context does fill is the SOURCE's chosen names,
-    -- which is what Filter.HasChosenName reads (Ancient Vendetta's "cards with
-    -- that name"). A function of the board rather than a value, so the read is
-    -- LIVE: CR 608.2c has the controller follow the instructions in order, and the
-    -- clause that chose the name is an earlier one of this same resolution. A
-    -- context built once when the arm was entered would have been the stale read.
-    -- Pawl.CardSpec's "CR 201.4 no card asks HasChosenName outside a search's
-    -- filter" is what keeps the atom to this position, the one that answers.
-    let searchContext g = (effectContext g controller source legal (slotBindings resolving g)) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) g}
+    -- CR 201.4's chosen names ride along with the slots, effectContext filling
+    -- them for every position of a resolution alike (Ancient Vendetta's "cards
+    -- with that name"). A function of the board rather than a value for the same
+    -- reason the slots are: the clause that chose the name is an earlier one of
+    -- this same resolution.
+    let searchContext g = effectContext g controller source legal (slotBindings resolving g)
         subjectOf g = maybe (Just source) (\slot -> Filter.slotOneObject slot (searchContext g)) subject
         viewOfCandidate g oid =
           (Projection.viewOfObject oid g)
@@ -3560,7 +3558,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- across every miller, as no Quantity has a per-player reader.
     Monad.forM_ mTally $ \tally -> do
       gs' <- State.get
-      let tallyContext = (effectContext gs' controller source legal (slotBindings resolving gs')) {Filter.sourceChosenNames = PlayerEffect.chosenNamesOf (Just source) gs'}
+      let tallyContext = effectContext gs' controller source legal (slotBindings resolving gs')
           viewOfMilled = Projection.viewsOf gs
           counted oid = Filter.matches tallyContext (viewOfMilled oid) (MillTally.filter tally)
       State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
@@ -5379,11 +5377,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- ONE call per kind per permanent inside it, which is CR 614.16's own unit.
     Monad.unless (Map.null tally) . Event.simultaneously . Monad.forM_ targets $ \target ->
       Monad.forM_ (Map.toList tally) (uncurry (Event.putCounters (CounterCause.ByEffect controller) target))
-  -- CR 201.4 via CR 608.2c: the resolving controller names a card, and the name
-  -- is stamped on the SOURCE so a later clause of the same resolution can read it
-  -- (Ancient Vendetta). Object.chosenNames is the same store CR 614.1c's
-  -- as-enters twin writes (Pawl.Engine.Event's EntryRewrite.ChooseCardNames arm),
-  -- and Pawl.Engine.Filter's HasChosenName is the one reader on the match side.
+  -- CR 201.4 via CR 608.2c: the players the PlayerRef names each name a card,
+  -- and the names are stamped on the SOURCE so a later clause of the same
+  -- resolution can read them (Ancient Vendetta, Petra Sphinx).
+  -- Object.chosenNames is the same store CR 614.1c's as-enters twin writes
+  -- (Pawl.Engine.Event's EntryRewrite.ChooseCardNames arm), and
+  -- Pawl.Engine.Filter's HasChosenName is the one reader on the match side.
+  --
+  -- APNAP (CR 101.4) over the named players, the order the entry twin's own loop
+  -- takes: who is asked first is public information, so it is a fact about the
+  -- rules rather than about PlayerId's Ord.
   --
   -- CHOOSE, not target: no CR 608.2b legality to re-check, and the prompt is
   -- raised unconditionally because CR 201.4's offer is every card in the Oracle
@@ -5403,13 +5406,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- twice, so the two readings agree on the pool.
   --
   -- Written to the SOURCE and not to `resolving`: Pawl.Engine.PlayerEffect
-  -- .chosenNamesOf and the search arm's context both ask about a source (CR
+  -- .chosenNamesOf and the resolution's own context both ask about a source (CR
   -- 113.7), and for a spell the two ids are the same object anyway.
-  Effect.ChooseCardName restriction -> do
+  --
+  -- Not implemented: SEVERAL choosers' names kept apart. They union into the one
+  -- set on the source, so Conundrum Sphinx's "the name they chose" would read
+  -- every chooser's (#3316).
+  Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> do
     gs <- State.get
-    answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller source restriction)
-    let stamp o = o {Object.chosenNames = Set.insert answer (Object.chosenNames o)}
-    State.modify' $ \g -> g {GameState.objects = Map.adjust stamp source (GameState.objects g)}
+    let named = Set.fromList (playerRefPlayers legal controller gs ref)
+    Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) $ \chooser -> do
+      g <- State.get
+      answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction)
+      let stamp o = o {Object.chosenNames = Set.insert answer (Object.chosenNames o)}
+      State.modify' $ \g' -> g' {GameState.objects = Map.adjust stamp source (GameState.objects g')}
   -- CR 400.11c: the resolving controller reveals a card they own from outside the
   -- game matching the filter and puts it into their hand -- Burning Wish.
   --
