@@ -2238,7 +2238,10 @@ apply batch candidate event =
       -- spends is a card in a graveyard rather than a permanent on the
       -- battlefield -- and CR 614.12b's combined budget across a batch falls out
       -- here for the same reason, the choice being made and paid inside the entry
-      -- loop before the next member of the batch runs its own (CR 614.13b).
+      -- loop before the next member of the batch runs its own (CR 614.13b). Only
+      -- CR 614.13b: rule 614.13a's exclusion of a card entering beside this one is
+      -- the half that does not fall out, and Replacement.graveyardCandidates is
+      -- where that is recorded.
       --
       -- MANDATORY, and so unlike the two "or tapped" arms there is no declining
       -- half: the card prints no "may". An empty offer exiles nothing (CR 101.3),

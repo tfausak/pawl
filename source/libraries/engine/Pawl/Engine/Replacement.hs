@@ -1314,11 +1314,20 @@ sacrificeCandidates slots pid source filter_ gs =
 -- graveyard, and the filter is matched against the CARD's projection there (CR
 -- 400.7) rather than against a permanent's.
 --
--- CR 614.13a's exclusion needs no clause here. A permanent entering the
--- battlefield out of a graveyard has already been materialized on the
--- battlefield when Pawl.Engine.Event runs this loop, so no member of the batch is
--- in the zone this reads -- which is the rule's own example, Sutured Ghoul and
--- Runeclaw Bear entering together out of one graveyard.
+-- Not implemented: CR 614.13a's "or any other object entering the battlefield at
+-- the same time", whose own example is a graveyard read -- Sutured Ghoul and
+-- Runeclaw Bear entering together out of one graveyard. A batch bound for the
+-- battlefield is moved one member at a time (Pawl.Engine.Resolve.Effect's
+-- MoveToZone folds moveOne, each member's runEntry finishing before the next
+-- departs), so the members still to come are sitting in the graveyard this reads
+-- and are offered. The `batch` set the entry loop carries does not name them: it
+-- holds the siblings that have already ARRIVED, whose CR 400.7 incarnations are
+-- on the battlefield, which is why sacrificeCandidates' guard has nothing to do
+-- here and no guard of that shape would fix it. Excluding them means threading
+-- the move's remaining targets into the entry loop, and that lands with the
+-- widening (#3293) -- unobservable until then, an instant or sorcery card being
+-- the only thing this offer matches today and CR 110.1 keeping one off the
+-- battlefield.
 graveyardCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 graveyardCandidates pid filter_ gs =
   let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
