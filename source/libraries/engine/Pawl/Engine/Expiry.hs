@@ -154,7 +154,7 @@ follows expiry = case expiry of
 -- the next projection revert -- nothing is explicitly undone.
 --
 -- A turn whose ENDING PHASE was skipped never reaches the cleanup step's
--- turn-based actions, and Engine.endTurnDurations runs this there anyway: CR
+-- turn-based actions, and Engine.cleanupSecondAction runs this there anyway: CR
 -- 611.2a ends the duration when the turn ends, whether or not the step that
 -- normally sweeps it happened.
 dropAtCleanup :: GameState -> GameState
