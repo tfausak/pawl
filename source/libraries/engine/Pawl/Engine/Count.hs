@@ -964,6 +964,9 @@ viewOfSnapshot mController isToken counters snapshot =
       -- the moment of an event.
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
+      -- CR 701.37c's X rides the designation, so a past event records none --
+      -- `designations` above, same sentence.
+      Filter.designationValues = Map.empty,
       -- CR 716.2b: a designation too, which a ProjectedCharacteristics does not
       -- carry and never could, so a past event records none -- `designations`
       -- above, same sentence.

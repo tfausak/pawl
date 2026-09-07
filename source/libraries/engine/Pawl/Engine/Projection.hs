@@ -2780,6 +2780,7 @@ quantityReads q = case q of
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.ObjectCountersOfAnyKind -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
+  Quantity.Type.DesignationValue _ -> Set.empty
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.TimesKickedWith _ -> Set.empty
