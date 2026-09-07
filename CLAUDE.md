@@ -262,9 +262,9 @@ to agents as written. What it doesn't say:
     function's callers, and say in the PR body which paths you drove and which
     you did not.
 
-5.  Closing #N means moving every census row that cites it. #875, #876 and #877
+5.  Closing #N means moving every census row that cites it. #876 and #877
     annotate implemented rows with the issue numbers of what those rows still
-    don't do, and nothing checks the three bodies against anything. Read them
+    don't do, and nothing checks the two bodies against anything. Read them
     for the issue number before opening the PR, and edit the row in the same
     PR; landing a capability a census tracks means that same edit.
 

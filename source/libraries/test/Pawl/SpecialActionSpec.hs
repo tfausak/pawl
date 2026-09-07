@@ -8,7 +8,7 @@
 -- discardableCards and Pawl.Engine.Ignore's ignorable with the actions they
 -- offer, and Pawl.Engine.Engine's arms for them. CR 116.3 -- "if a player takes
 -- a special action, that player receives priority afterward" -- is asserted here
--- ONCE for the whole family (#875); the CR 116.2b, CR 116.2d and CR 116.2m arms
+-- ONCE for the whole family, see #875; the CR 116.2b, CR 116.2d and CR 116.2m arms
 -- retain priority the same way and are not separately re-asserted.
 --
 -- CR 116.2k's plot (Djinn of Fool's Fall) and CR 116.2h's foretell (Augury
