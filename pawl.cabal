@@ -432,6 +432,8 @@ library codec
     Pawl.Codec.ExileHauntingSpec
     Pawl.Codec.ExilePlayPermission
     Pawl.Codec.ExilePlayPermissionSpec
+    Pawl.Codec.Expansion
+    Pawl.Codec.ExpansionSpec
     Pawl.Codec.Expiry
     Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
@@ -1622,6 +1624,7 @@ library types
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
     Pawl.Types.ExilePlayPermission
+    Pawl.Types.Expansion
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
     Pawl.Types.ExtraTurn

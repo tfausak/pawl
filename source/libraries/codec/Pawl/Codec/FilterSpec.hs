@@ -11,6 +11,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -59,6 +60,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.HasName (CardName.MkCardName (Text.pack "The Underworld Cookbook")))
       " {\"type\":\"HasName\",\"value\":\"The Underworld Cookbook\"} "
+  Spec.it s "HasNameOriginallyPrintedIn" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.HasNameOriginallyPrintedIn (Expansion.UnsafeMkExpansion (Text.pack "ARN")))
+      " {\"type\":\"HasNameOriginallyPrintedIn\",\"value\":\"ARN\"} "
   Spec.it s "HasKeyword" $
     Common.assertCodec
       s

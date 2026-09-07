@@ -6,6 +6,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -37,6 +38,16 @@ data Filter keyword
     -- doors unlocked each show two names at once. The printed name, never a
     -- chosen one, which is HasChosenName below.
     HasName CardName.CardName
+  | -- | CR 206.3: one of the object's names is a name that rule says was
+    -- originally printed in this expansion -- City in a Bottle's "with a name
+    -- originally printed in the Arabian Nights expansion".
+    --
+    -- HasName's membership test against a set the RULE defines rather than a
+    -- literal the card gives, so a reprint matches, a copy or a name change can
+    -- change the answer, and an object showing several names matches on any one
+    -- of them. Pawl.Types.Expansion.catalog is the set; an expansion it does not
+    -- name cannot reach this atom, Pawl.Codec.Expansion.make refusing the code.
+    HasNameOriginallyPrintedIn Expansion.Expansion
   | -- | CR 702.1: the object HAS this keyword ability. Membership of the WRITTEN
     -- instance, so `HasKeyword (Toxic 2)` asks about toxic 2 specifically and
     -- Quagmire's swampwalk does not reach islandwalk; HasKeywordFamily below is

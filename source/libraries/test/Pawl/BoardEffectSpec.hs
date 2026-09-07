@@ -3253,11 +3253,12 @@ comeBackWrongSpec s registry =
 -- expansion. They can't be regenerated." (name, cost, type line and Oracle text
 -- checked against api.scryfall.com, 2026-09-02.)
 --
--- CR 206.3 is what makes this ordinary card data rather than a question about
--- sets: the errata reads "a name originally printed in", and CR 206.3c prints
--- the whole list of names. A name is a characteristic (CR 109.3) and an
--- expansion is not, so the list rides Filter.Or over Filter.HasName and the
--- engine never learns what Homelands was.
+-- CR 206.3 is what makes this a name question rather than a question about
+-- sets: the errata reads "a name originally printed in", and CR 206.3c DEFINES
+-- the list of names. The card names the expansion symbolically --
+-- Filter.HasNameOriginallyPrintedIn "HML" -- and the rule's own list is
+-- Pawl.Types.Expansion.catalog, so a name is still a characteristic (CR 109.3)
+-- and the card still enumerates nothing.
 --
 -- The board tells apart the readings a wrong list or a dropped conjunct takes:
 --
@@ -3307,8 +3308,9 @@ apocalypseChimeSpec s registry =
 -- controller." (name, cost, type line and Oracle text checked against
 -- api.scryfall.com, 2026-09-03.)
 --
--- CR 206.3b prints the whole name list, so the sweep is Apocalypse Chime's
--- Filter.Or of Filter.HasName. What is new is the OPCODE: CR 701.21a as an
+-- CR 206.3b defines the name list, so the sweep is Apocalypse Chime's
+-- Filter.HasNameOriginallyPrintedIn one expansion over. What is new is the
+-- OPCODE: CR 701.21a as an
 -- EachMatching rather than a bound slot, and CR 701.21a's "its controller" as
 -- Sacrificer.PermanentController, so each match is sacrificed by whoever
 -- controls it rather than by the player who activated the ability.
@@ -3380,7 +3382,7 @@ golgothianSylexSpec s registry =
 -- cost, type line and Oracle text checked against api.scryfall.com, 2026-09-06.)
 --
 -- CR 603.8's state trigger, whose condition is a Count over CR 206.3a's name
--- list and whose effect is Golgothian Sylex's sweep: an EachMatching over the
+-- set and whose effect is Golgothian Sylex's sweep: an EachMatching over the
 -- same Filter, sacrificed by Sacrificer.PermanentController.
 --
 -- The board tells apart the readings a wrong Filter takes:

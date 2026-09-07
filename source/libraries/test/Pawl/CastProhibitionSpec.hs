@@ -1972,8 +1972,8 @@ conjurersBanSpec s registry =
 -- expansion." (name, cost, type line and Oracle text checked against
 -- api.scryfall.com, 2026-09-06.)
 --
--- CR 206.3a prints the whole name list, so both halves are an Or of
--- Filter.HasName; what is new is the PLAY half. CR 305.1 makes playing a land a
+-- CR 206.3a defines the name list, so both halves are one
+-- Filter.HasNameOriginallyPrintedIn; what is new is the PLAY half. CR 305.1 makes playing a land a
 -- special action that never uses the stack, so the cast-side prohibition beside
 -- it reaches no land however its Filter reads -- which is why
 -- PlayerEffect.CantPlayLands now carries a Filter of its own and

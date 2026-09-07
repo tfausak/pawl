@@ -2255,6 +2255,9 @@ filterReads f = case f of
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
   -- Reads no aspect: no Modification writes CR 201.1's names.
   Filter.Type.HasName _ -> Set.empty
+  -- HasName's answer, for HasName's reason: the rule's side of CR 206.3 is a
+  -- constant, and the candidate's side is a name.
+  Filter.Type.HasNameOriginallyPrintedIn _ -> Set.empty
   -- CR 613.1f: layer 6 adds and removes abilities.
   Filter.Type.HasKeyword _ -> Set.singleton Keywords
   -- The same aspect, read one step coarser.
@@ -2527,6 +2530,7 @@ filterReadsPeers f = case f of
   Filter.Type.HasColor _ -> False
   Filter.Type.HasSubtype _ -> False
   Filter.Type.HasName _ -> False
+  Filter.Type.HasNameOriginallyPrintedIn _ -> False
   Filter.Type.HasKeyword _ -> False
   Filter.Type.HasKeywordFamily _ -> False
   Filter.Type.PowerAtLeast _ -> False

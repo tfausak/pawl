@@ -16,6 +16,7 @@ import qualified Pawl.Types.Cycling as Cycling
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -781,6 +782,55 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       let noController = blackCreature {Filter.controller = Nothing}
       Spec.assertBool s (not (Filter.matches (controlledBy [0]) noController (Filter.Type.SameControllerAsBound slot))) "no candidate controller"
       Spec.assertBool s (not (Filter.matches (controlledBy [0]) aPlayer (Filter.Type.SameControllerAsBound slot))) "player"
+
+  -- CR 206.3: the candidate's names against the set that rule DEFINES for an
+  -- expansion, which is what City in a Bottle, Golgothian Sylex and Apocalypse
+  -- Chime each ask. One listed and one unlisted name per expansion, so a catalog
+  -- keyed to the wrong list is visible here rather than only at gameplay level.
+  Spec.describe s "HasNameOriginallyPrintedIn" $ do
+    let called ns = blackCreature {Filter.names = Set.fromList (fmap (CardName.MkCardName . Text.pack) ns)}
+        expansion c = Filter.Type.HasNameOriginallyPrintedIn (Expansion.UnsafeMkExpansion (Text.pack c))
+        listedIn c n = Filter.matches self (called [n]) (expansion c)
+    -- Each unlisted name is a name ANOTHER of the three lists holds, so an arm
+    -- answering off the wrong expansion matches where it must not.
+    Spec.it s "CR 206.3a Arabian Nights" $ do
+      Spec.assertBool s (listedIn "ARN" "Bazaar of Baghdad") "a listed name"
+      Spec.assertBool s (not (listedIn "ARN" "Ivory Tower")) "an Antiquities name"
+
+    Spec.it s "CR 206.3b Antiquities" $ do
+      Spec.assertBool s (listedIn "ATQ" "Ivory Tower") "a listed name"
+      Spec.assertBool s (not (listedIn "ATQ" "Memory Lapse")) "a Homelands name"
+
+    Spec.it s "CR 206.3c Homelands" $ do
+      Spec.assertBool s (listedIn "HML" "Memory Lapse") "a listed name"
+      Spec.assertBool s (not (listedIn "HML" "Bazaar of Baghdad")) "an Arabian Nights name"
+
+    -- CR 709.4a's membership at the candidate's end, HasName's own reading: a
+    -- split card off the stack shows two names, and having one that is listed is
+    -- having a name originally printed in the expansion. The unlisted half is
+    -- first, so an implementation reading only one name reads the wrong one.
+    Spec.it s "CR 709.4a matches an object showing a listed name among others" $
+      Spec.assertBool s (Filter.matches self (called ["Wax", "Memory Lapse"]) (expansion "HML")) "one of two names"
+
+    -- CR 708.2a: a face-down object has no name at all, so it is in no list.
+    Spec.it s "a nameless candidate is vacuously false" $
+      Spec.assertBool s (not (Filter.matches self blackCreature (expansion "HML"))) "no names"
+
+    -- The unreachable arm, kept honest: Pawl.Codec.Expansion.make refuses a code
+    -- the catalog does not name, so nothing in the corpus reaches this. It is a
+    -- regression fence rather than a proven behaviour -- the assertion above it
+    -- is what a card exercises.
+    Spec.it s "CR 206.3 a code the rule does not name matches nothing" $
+      Spec.assertBool s (not (Filter.matches self (called ["Memory Lapse"]) (expansion "LEA"))) "no catalog entry"
+
+    -- The lists as CR 206.3a-c print them, counted so that a name dropped from
+    -- Pawl.Types.Expansion.catalog reddens something. Each list names exactly one
+    -- card that refers to it, which is the rule's own first sentence.
+    Spec.it s "CR 206.3a-c the catalog holds each rule's whole list" $ do
+      let sized c n = fmap Set.size (Expansion.names (Expansion.UnsafeMkExpansion (Text.pack c))) == Just n
+      Spec.assertBool s (sized "ARN" 77) "CR 206.3a"
+      Spec.assertBool s (sized "ATQ" 85) "CR 206.3b"
+      Spec.assertBool s (sized "HML" 115) "CR 206.3c"
 
   -- CR 201.4: what the SOURCE named, against what the candidate is called. The
   -- two sides are set intersection, so CR 201.4g's interchangeable names and CR
