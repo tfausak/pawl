@@ -3521,9 +3521,9 @@ exileTriggeredAbilitiesOf keywords = case suspend keywords of
 -- counter from it."
 --
 -- TurnScope.ControllersTurn is rule 702.62a's "YOUR upkeep" (CR 603.3a), which
--- for a card in exile is its OWNER's: CR 108.4 gives such a card no controller,
--- and Pawl.Engine.Event.Trigger's exile scan hands the owner over as the
--- ability's controller.
+-- for a card in exile is its OWNER's: CR 108.4 gives such a card no controller
+-- and CR 108.4a substitutes the owner, which is what
+-- Pawl.Engine.Event.Trigger's exile scan hands over.
 --
 -- THE INTERVENING "IF" is CR 702.62b's definition of suspended read down to the
 -- one conjunct this board can move: the card is in exile and has suspend by

@@ -94,9 +94,8 @@ data KeywordFamily
     Bloodthirst
   | -- | CR 702.62a: suspend N--[cost]. The family CR 701.56a's time travel names
     -- -- "suspended cards you own in exile with one or more time counters on
-    -- them" -- as against
-    -- suspend 1--{R}; no card in the pool asks yet, and it is owed at the keyword
-    -- rather than at the first asker.
+    -- them" -- as against suspend 1--{R}; no card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
     Suspend
   | -- | CR 702.63a: vanishing N.
     Vanishing

@@ -101,8 +101,8 @@ suspendable pid gs = filter (\oid -> canSuspend pid oid gs) (Game.zoneMembers Zo
 -- THE COUNTERS go on THROUGH THE FUNNEL after the move, not as CR 614's entry
 -- riders: that door's `counters` field is CR 122.6's "as it enters THE
 -- BATTLEFIELD", and this move names exile. Event.putCounters is the single
--- counter-placement seam, so a "whenever a counter is put on" watcher sees these
--- as it sees any other, and CR 614.16's multipliers are asked once.
+-- counter-placement seam, so these counters go on the one road every other
+-- placement takes rather than a second one written here.
 --
 -- Unobservable as two steps rather than one, which is what rule 702.62a's "exile
 -- it WITH N time counters on it" asks for: CR 116.1 gives no player priority
