@@ -1694,7 +1694,10 @@ copyOnStackOf source = case source of
   Source.OfSpellCopy pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
   -- CR 722.3c's copy is a spell once cast, so copying it is CR 707.10's ordinary
   -- case and the result is a copy of a SPELL -- the arm above's answer, off this
-  -- copy's own printing (CR 707.2's copiable values).
+  -- copy's own printing (CR 707.2's copiable values). That is also CR 722.3d's
+  -- "if a prepare spell is copied, the copy is also a prepare spell", in the only
+  -- reading pawl can observe; Pawl.PreparationSpec's "CR 722.3d Twincast copies
+  -- the cast Jump and the copy is a Jump of its own" is what proves it.
   Source.OfCardCopy pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
   Source.OfAbility a -> Just (Source.OfAbility a, StackObjectKind.Ability)
   Source.OfTrigger t -> Just (Source.OfTrigger t, StackObjectKind.Ability)

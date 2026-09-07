@@ -12,6 +12,7 @@ import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Codec.BecameAttached as BecameAttached
 import qualified Pawl.Codec.BecameAttacked as BecameAttacked
 import qualified Pawl.Codec.BecameBlocking as BecameBlocking
+import qualified Pawl.Codec.BecameCrewed as BecameCrewed
 import qualified Pawl.Codec.BecameDesignated as BecameDesignated
 import qualified Pawl.Codec.BecameTarget as BecameTarget
 import qualified Pawl.Codec.BecameUnattached as BecameUnattached
@@ -83,7 +84,7 @@ codec =
       Arm.payload "Mutated" ObjectId.codec GameEvent.Mutated (\x -> case x of GameEvent.Mutated y -> Just y; _ -> Nothing),
       Arm.payload "Mentored" Mentored.codec GameEvent.Mentored (\x -> case x of GameEvent.Mentored y -> Just y; _ -> Nothing),
       Arm.payload "Trained" ObjectId.codec GameEvent.Trained (\x -> case x of GameEvent.Trained y -> Just y; _ -> Nothing),
-      Arm.payload "BecameCrewed" ObjectId.codec GameEvent.BecameCrewed (\x -> case x of GameEvent.BecameCrewed y -> Just y; _ -> Nothing),
+      Arm.payload "BecameCrewed" BecameCrewed.codec GameEvent.BecameCrewed (\x -> case x of GameEvent.BecameCrewed y -> Just y; _ -> Nothing),
       Arm.payload "PermanentSacrificed" PermanentWasSacrificed.codec GameEvent.PermanentSacrificed (\x -> case x of GameEvent.PermanentSacrificed y -> Just y; _ -> Nothing),
       Arm.payload "AbilityTriggered" AbilityTriggered.codec GameEvent.AbilityTriggered (\x -> case x of GameEvent.AbilityTriggered y -> Just y; _ -> Nothing),
       Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged (\x -> case x of GameEvent.ControlChanged y -> Just y; _ -> Nothing),

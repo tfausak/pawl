@@ -6765,6 +6765,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfTrains -> False
   -- Rule 702.122e names a crew ability RESOLVING, the same first-pass event.
   TriggerCondition.SelfBecomesCrewed -> False
+  -- Rule 702.122b's crewer side rides the same event, so the same answer.
+  TriggerCondition.SelfCrewsVehicle -> False
   -- CR 700.4's zone change is a first-pass event too, and not an ability
   -- triggering.
   TriggerCondition.AttachedCreatureDies -> False
@@ -6904,6 +6906,9 @@ controllerTurnScoped cond = case cond of
   -- Rule 702.122e names no turn either: a Vehicle may be crewed at instant speed
   -- on any player's turn, CR 702.122a's cost carrying no timing clause.
   TriggerCondition.SelfBecomesCrewed -> False
+  -- Rule 702.122b names no turn for the crewer's side either, and for that
+  -- arm's reason: the cost it watches is the same one.
+  TriggerCondition.SelfCrewsVehicle -> False
   -- CR 701.21a says nothing about whose turn it is, and neither does the printed
   -- "whenever an opponent sacrifices an artifact" -- the relation names a seat,
   -- not a turn.

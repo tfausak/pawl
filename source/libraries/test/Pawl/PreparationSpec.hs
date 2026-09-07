@@ -28,11 +28,14 @@
 -- with the haste that lets it attack the turn it arrives -- and Reality Ripple is
 -- CR 702.26b's.
 --
--- Not implemented: CR 722.3c's "or phases in prepared" branch, so a permanent
--- that phases out prepared and back in mints no second copy, and CR 722.3d's "if
--- a prepare spell is copied, the copy is also a prepare spell" -- both #868's,
--- which this slice narrows rather than closes. CR 722.5's alternative name is
--- #679's.
+-- CR 722.3c's "or phases in prepared" branch has its own board: Reality Ripple
+-- takes the prepared Aviator away and alice's next untap step brings it back
+-- (CR 702.26a), and Twincast is CR 722.3d's -- a copy of the cast Jump, re-aimed
+-- under CR 707.10c at Russet Wolves, which is the second creature only that case
+-- needs. Rule 722.3d's second sentence is not observable: no card in data/cards/
+-- refers to a spell cast as a prepare spell.
+--
+-- CR 722.5's alternative name is #679's.
 module Pawl.PreparationSpec where
 
 import qualified Control.Monad as Monad
@@ -59,6 +62,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Designation as Designation
@@ -67,6 +71,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -226,6 +232,35 @@ rippleDuel =
     S.alice
     S.beginningOfCombat
 
+-- CR 722.3d's board: the proving board with Russet Wolves as a SECOND creature
+-- for the Twincast copy to be aimed at, and Twincast itself in alice's hand. Five
+-- Islands where Jump's {U} and Twincast's {U}{U} come to three, so neither cast
+-- can fail for mana.
+--
+-- The Wolves is vanilla and never attacks, so "the Wolves is flying" means the
+-- copy of the prepare spell resolved and nothing else.
+twincastDuel :: S.Board
+twincastDuel =
+  S.board
+    ( ( S.battlefield
+          S.alice
+          [ S.settled "aviator" "Encouraging Aviator",
+            S.settled "piker" "Goblin Piker",
+            S.settled "wolves" "Russet Wolves",
+            S.permanent "Island",
+            S.permanent "Island",
+            S.permanent "Island",
+            S.permanent "Island",
+            S.permanent "Island"
+          ]
+      )
+        { S.setupHand = Seq.fromList [S.aliased "twincast" (S.cardSetup "Twincast")]
+        }
+        NonEmpty.:| [S.battlefield S.bob []]
+    )
+    S.alice
+    S.beginningOfCombat
+
 -- The exile copy minted FOR this permanent, by id. Keyed to the permanent rather
 -- than to a count, so a board carrying two prepared permanents can name either.
 copyFor :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
@@ -235,6 +270,29 @@ copyFor permanentId gs =
     Just obj <- [Game.lookupObject oid gs],
     Object.preparedCopyOf obj == Just permanentId
   ]
+
+-- Pin one recipient by FILTERING the offered set, never by building one (#222):
+-- CR 608.2b re-reads what was chosen, and a hand-built recipient naming the same
+-- object is a different one that the re-read drops with no error. Pawl.CopySpec's
+-- `pinTarget` is the same answerer, and reaches CR 707.10c's re-target prompt as
+-- well as a cast's own.
+pinRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
+pinRecipient recipient p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (Set.filter (== recipient) . snd) asked
+  _ -> S.identityAnswer p
+
+topOfStack :: GameState.GameState -> Maybe ObjectId.ObjectId
+topOfStack = Maybe.listToMaybe . GameState.stack
+
+-- CR 502's untap step, run for `pid`: Pawl.PhasingSpec's helper of the same name
+-- and shape, since CR 702.26a's phase-in is a turn-based action of that step and
+-- there is no shorter road to it.
+untapStep :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+untapStep pid gs =
+  S.runPure
+    S.identityAnswer
+    gs {GameState.activePlayer = pid}
+    (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
 aliasOrFail :: (Monad m) => Spec.Spec m n -> S.BuiltBoard -> String -> m ObjectId.ObjectId
 aliasOrFail s built name = case Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built) of
@@ -423,3 +481,75 @@ spec s registry = Spec.describe s "Preparation" $ do
     Spec.assertEqWith s "CR 704.5e: the copy has ceased to exist" (prepareCopies phased) []
     Spec.assertEqWith s "and exile is empty" (Foldable.toList (GameState.exile phased)) []
     Spec.assertBool s (notElem jumpName (namesOffered phased)) "so no Jump is offered any more"
+  -- CR 722.3c's SECOND trigger: "as a permanent with a prepare spell gains the
+  -- prepared designation or PHASES IN PREPARED, its controller creates a copy of
+  -- that object in exile". The case above takes the prepared Aviator away and CR
+  -- 704.5e ends its copy; alice's next untap step brings the same permanent back
+  -- still carrying the designation (CR 702.26a, and CR 702.26d touches no
+  -- designation), so the rule mints a fresh copy that is castable like the first.
+  --
+  -- Empty exile between the two is the control, and what makes this a claim about
+  -- the phase-in rather than about the first copy: without it a copy found
+  -- afterwards could be one that never left.
+  --
+  -- The falsifier is minting nothing, which is what the first two slices did: the
+  -- Aviator came back prepared with no copy in exile and no Jump to cast ever
+  -- again, since CR 722.3a refuses a designation the permanent already has.
+  Spec.it s "CR 722.3c the Aviator phases in prepared and mints a fresh Jump copy" $ do
+    built <- S.buildBoardOrFail s registry rippleDuel
+    aviatorId <- aliasOrFail s built "aviator"
+    pikerId <- aliasOrFail s built "piker"
+    rippleId <- aliasOrFail s built "ripple"
+    (_, attacked) <- S.runScriptOrFail s attackScript built S.combatGame
+    let phased = S.runPure (rippleAt aviatorId) attacked (S.cast S.alice rippleId *> Stack.resolveTop *> Sba.checkStateBasedActions)
+    Spec.assertEqWith s "the first copy is gone before the return" (prepareCopies phased) []
+    let back = untapStep S.alice phased
+    -- Without the first two a mint that never ran could be a Ripple that never
+    -- wore off; without the third the flying below could be flying the Piker
+    -- already had.
+    Spec.assertEqWith s "CR 702.26a: the Aviator is back on the battlefield, still prepared, and the Piker has no flying" (Set.member aviatorId (GameState.battlefield back), isPrepared aviatorId back, Projection.hasKeyword Keyword.Flying pikerId back) (True, True, False)
+    case copyFor aviatorId back of
+      [copyId] -> do
+        let resolved = S.runPure (jumpAt pikerId) back (Cast.castSpell S.manaPerformer S.alice copyId jumpName Facing.FaceUp *> Stack.resolveTop)
+        -- THE gameplay assertion, first so no proxy can absorb a mutation: the
+        -- copy minted on the phase-in was cast and did what Jump says.
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId resolved) "CR 722.3c: the copy minted on phasing in gives the Piker flying"
+      other -> Spec.assertFailure s ("expected exactly one copy for the returning Aviator, got " <> show (length other))
+  -- CR 722.3d: "if a prepare spell is copied, the copy is also a prepare spell."
+  -- Twincast copies the cast Jump, CR 707.10c lets the copy be re-aimed, and the
+  -- copy resolves as Jump does -- which is the whole of what a prepare spell IS
+  -- in pawl, its alternative characteristics having become the exiled copy's
+  -- normal ones (CR 722.3c). Rule 722.3d's second sentence has no observer: no
+  -- card in data/cards/ refers to a spell cast as a prepare spell, so nothing can
+  -- tell a copy that is one from a copy that is not.
+  --
+  -- The Wolves and the Piker are two creatures so the copy and the original can
+  -- be told apart: the copy resolves first, aimed at the Wolves, while the
+  -- original is still on the stack aimed at the Piker.
+  Spec.it s "CR 722.3d Twincast copies the cast Jump and the copy is a Jump of its own" $ do
+    built <- S.buildBoardOrFail s registry twincastDuel
+    aviatorId <- aliasOrFail s built "aviator"
+    pikerId <- aliasOrFail s built "piker"
+    wolvesId <- aliasOrFail s built "wolves"
+    twincastId <- aliasOrFail s built "twincast"
+    (_, attacked) <- S.runScriptOrFail s attackScript built S.combatGame
+    case copyFor aviatorId attacked of
+      [copyId] -> do
+        let castJump = S.runPure (pinRecipient (Recipient.ToCreature pikerId)) attacked (Cast.castSpell S.manaPerformer S.alice copyId jumpName Facing.FaceUp)
+        case topOfStack castJump of
+          Nothing -> Spec.assertFailure s "the cast copy did not reach the stack"
+          Just jumpSpell -> do
+            let castTwincast = S.runPure (pinRecipient (Recipient.ToObject jumpSpell)) castJump (S.cast S.alice twincastId)
+                -- Twincast resolves, and CR 707.10c's prompt aims its copy at the
+                -- Wolves instead.
+                copied = S.runPure (pinRecipient (Recipient.ToCreature wolvesId)) castTwincast (Stack.resolveTop *> Engine.settleForPriority)
+                copyResolved = S.runPure S.identityAnswer copied (Stack.resolveTop *> Engine.settleForPriority)
+            -- THE gameplay assertion, first so no proxy can absorb a mutation:
+            -- the COPY resolved as a Jump of its own, at its own target, while
+            -- the original is still on the stack aimed at the Piker.
+            Spec.assertEqWith s "CR 722.3d: the copy of the prepare spell gives the Wolves flying, and only the Wolves" (Projection.hasKeyword Keyword.Flying wolvesId copyResolved, Projection.hasKeyword Keyword.Flying pikerId copyResolved) (True, False)
+            -- And the original is intact: resolving it too gives the Piker
+            -- flying, so the copy did not consume it.
+            let bothResolved = S.runPure S.identityAnswer copyResolved (Stack.resolveTop *> Engine.settleForPriority)
+            Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId bothResolved) "CR 707.10: the original Jump still resolves at the Piker"
+      other -> Spec.assertFailure s ("expected exactly one copy for the Aviator, got " <> show (length other))
