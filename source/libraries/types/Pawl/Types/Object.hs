@@ -596,9 +596,9 @@ newIncarnation object =
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move CR 718.4
       -- keeps it across, `bestowed` above's route.
       prototyped = False,
-      -- CR 702.27a's record is written back by nothing: rule 702.27a's hand is
-      -- where the move this clears at ENDS, so the card that arrives there is a
-      -- new object that was never bought back.
+      -- CR 702.27a's record is written back by nothing: the move it replaces ENDS
+      -- in the hand, so the card that arrives there is a new object that was
+      -- never bought back.
       boughtBack = False,
       -- CR 601.2b's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
