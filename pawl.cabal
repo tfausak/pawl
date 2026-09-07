@@ -1029,6 +1029,7 @@ library engine
     Pawl.Engine.Phasing
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot
+    Pawl.Engine.Prepare
     Pawl.Engine.Projection
     Pawl.Engine.Projection.Rewrite
     Pawl.Engine.Projection.View
@@ -1399,6 +1400,7 @@ library test
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
+    Pawl.PreparationSpec
     Pawl.PreventionSpec
     Pawl.ProjectionSpec
     Pawl.PrototypeSpec

@@ -19,6 +19,7 @@ import qualified Pawl.Codec.Facing as Facing
 import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Mana as Mana
+import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.RoomIndex as RoomIndex
@@ -114,6 +115,7 @@ codec = Fields.object $ do
   playableFromExile <- Fields.defaulted "playableFromExile" Nothing (Common.maybe ExilePlayPermission.codec) Object.playableFromExile
   plotted <- Fields.defaulted "plotted" Nothing (Common.maybe Common.natural) Object.plotted
   foretold <- Fields.defaulted "foretold" Nothing (Common.maybe Common.natural) Object.foretold
+  preparedCopyOf <- Fields.defaulted "preparedCopyOf" Nothing (Common.maybe ObjectId.codec) Object.preparedCopyOf
   ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
   protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
   ventureRoom <- Fields.defaulted "ventureRoom" Nothing (Common.maybe RoomIndex.codec) Object.ventureRoom
@@ -162,6 +164,7 @@ codec = Fields.object $ do
         Object.playableFromExile = playableFromExile,
         Object.plotted = plotted,
         Object.foretold = foretold,
+        Object.preparedCopyOf = preparedCopyOf,
         Object.ringBearerFor = ringBearerFor,
         Object.protector = protector,
         Object.ventureRoom = ventureRoom,

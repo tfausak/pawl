@@ -225,6 +225,15 @@ combinedFaces card = case Card.layout card of
   -- omen card has only its normal characteristics." So the same expression the
   -- Adventure arm above takes, for the same reason.
   Layout.Omen -> pure (NonEmpty.head (Card.faces card))
+  -- CR 722.4 is CR 715.4's and CR 720.4's sentence with their exception taken
+  -- out: "in every zone, a preparation card has only its normal
+  -- characteristics" -- no carve-out for the stack, because CR 722.3 never
+  -- lets the inset half be cast in the first place. So the same expression
+  -- the two arms above take, and here it is the WHOLE answer rather than the
+  -- zone-dependent half of one: the alternative characteristics are reached
+  -- only by the copy CR 722.3c mints, which is a different object with a
+  -- printing of its own (Pawl.Engine.Prepare.mintOnDesignated).
+  Layout.Preparation -> pure (NonEmpty.head (Card.faces card))
   -- CR 712.8a: "While a double-faced card is outside the game or in a zone other
   -- than the battlefield or stack, it has only the characteristics of its front
   -- face", and CR 712.8d says the same of a permanent showing that face. The
@@ -306,11 +315,54 @@ flippedFace card = case Card.layout card of
           }
   Layout.Adventure -> Nothing
   Layout.Omen -> Nothing
+  -- CR 710.1's flip frame and CR 722.1's inset frame are different printings
+  -- of different rules: a preparation card's alternative characteristics are
+  -- a SPELL's (CR 722.2), never a permanent's, so no status of the permanent
+  -- reaches them.
+  Layout.Preparation -> Nothing
   Layout.Transforming -> Nothing
   Layout.ModalDoubleFaced -> Nothing
   Layout.Meld -> Nothing
   where
     normal = NonEmpty.head (Card.faces card)
+
+-- CR 722.2a's PREPARE SPELL: the inset frame of a preparation card, whose text
+-- "defines alternative characteristics that the object may have while it's a
+-- spell" (CR 722.2). Nothing for every other layout, and for a preparation card
+-- printed with no second face -- which Pawl.CardSpec's two-face lint rules out of
+-- the corpus, so the arm is a total function's tail rather than a case a card can
+-- reach.
+--
+-- UNMODIFIED, where flippedFace above keeps two of the normal half's
+-- characteristics: CR 722.3c says the copy "has only the characteristics of that
+-- permanent's prepare spell, ignoring other exceptions to the copying process
+-- that apply to that permanent", so there is nothing of the normal half to carry
+-- over and nothing of the permanent's own state either. CR 710.1c is what makes
+-- the flip case different, and it has no counterpart here.
+--
+-- The FIRST alternative half, and one is enough for CR 722.1's reason and
+-- flippedFace's: the inset frame is one set of characteristics.
+-- docs/design.md section 2.11's rule against baking arity in is what makes this a
+-- `tail` rather than a pair.
+--
+-- A read of the CARD and not of an object, which is CR 722.2b: "the existence and
+-- values of these alternative characteristics are part of the object's copiable
+-- values". Pawl.Engine.Prepare is the one caller, and it asks at the moment CR
+-- 722.3c mints.
+prepareFace :: Card.Card -> Maybe (Face.Face Card.Card)
+prepareFace card = case Card.layout card of
+  Layout.Normal -> Nothing
+  Layout.Split -> Nothing
+  Layout.Room -> Nothing
+  Layout.Flip -> Nothing
+  Layout.Adventure -> Nothing
+  Layout.Omen -> Nothing
+  Layout.Preparation -> case NonEmpty.tail (Card.faces card) of
+    [] -> Nothing
+    alternative : _ -> Just alternative
+  Layout.Transforming -> Nothing
+  Layout.ModalDoubleFaced -> Nothing
+  Layout.Meld -> Nothing
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
@@ -636,6 +688,16 @@ castableFaces card = case Card.layout card of
   -- with a permission attached, so there is no exiled incarnation for a later cast
   -- to be excluded from (Pawl.Engine.Resolve.finishSpell).
   Layout.Omen -> NonEmpty.toList (Card.faces card)
+  -- CR 722.3: "Preparation cards can't be cast using the alternative
+  -- characteristics found within their inset frames. Rather, these
+  -- characteristics are used to define characteristics of copies which may be
+  -- cast." Flip's expression, and the sentence right after Adventure's and
+  -- Omen's opposite one: the two arms above offer both halves because CR
+  -- 715.3 and CR 720.3 give the caster a choice, and this rule gives none.
+  -- The inset half is reached only as the copy CR 722.3c mints, which is its
+  -- own object with its own one-faced printing and so comes back through the
+  -- Normal arm above.
+  Layout.Preparation -> [NonEmpty.head (Card.faces card)]
   -- CR 712.11: "A double-faced spell is cast with its front face up by default.
   -- The front face always, and the BACK face as a second option exactly when the
   -- front prints CR 702.162a's more than meets the eye -- "you may cast this card
@@ -864,6 +926,12 @@ landFaces card =
         -- a land face -- CR 720.2's inset frame holds a spell -- so the filter
         -- below drops the pair either way.
         Layout.Omen -> byDefault
+        -- CR 722.4 leaves a preparation card in a hand showing only its normal
+        -- characteristics, as CR 715.4 and CR 720.4 do their layouts, so the default
+        -- view is what a player would play as a land. No preparation card prints a
+        -- land face -- CR 722.2's inset frame holds a spell -- so the filter below
+        -- drops the pair either way.
+        Layout.Preparation -> byDefault
         -- CR 712.8a again, and CR 712.12 names the MODAL kind alone: a nonmodal
         -- double-faced card in a hand is only its front face, so a back face that
         -- is a land is not something its controller may elect to play. Westvale
@@ -904,6 +972,7 @@ staysWhenPutOntoBattlefield card = case Card.layout card of
   Layout.Flip -> False
   Layout.Adventure -> False
   Layout.Omen -> False
+  Layout.Preparation -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> not (isPermanent (NonEmpty.head (Card.faces card)))
   -- CR 712.14b is written about a modal double-faced card and reaches no other
@@ -963,6 +1032,11 @@ backFace card =
         Layout.Flip -> Nothing
         Layout.Adventure -> Nothing
         Layout.Omen -> Nothing
+        -- CR 722.1's two-part frame is printed on one side, so CR 712.1 does not
+        -- count a preparation card among the double-faced cards and CR 712.14a's
+        -- "a card that isn't a double-faced card ... stays in its current zone" is
+        -- the answer, as it is for a Room and a flip card above.
+        Layout.Preparation -> Nothing
         Layout.Transforming -> successor
         -- The SAME answer, because CR 712.11a says "a double-faced card" and CR
         -- 712.1 counts the modal kind among them: a card cast "transformed" is
@@ -1054,6 +1128,11 @@ turnedOver mName card = case Card.layout card of
   Layout.Flip -> Nothing
   Layout.Adventure -> Nothing
   Layout.Omen -> Nothing
+  -- CR 701.27c / 712.9 again: a preparation card is not represented by a
+  -- double-faced card, so an instruction to transform one does nothing.
+  -- Becoming prepared is not a turn either -- CR 722.3b makes it a
+  -- designation, which Pawl.Engine.Prepare writes.
+  Layout.Preparation -> Nothing
   Layout.Transforming -> nextFace mName card
   Layout.ModalDoubleFaced -> nextFace mName card
   -- CR 712.4c: "Unlike other double-faced cards, meld cards cannot be transformed
@@ -1127,6 +1206,10 @@ enteringFace card shown = case Card.layout card of
   -- Omen never becomes a permanent at all -- CR 720.3d shuffles it into its
   -- owner's library as it resolves -- so no chosen face survives the move.
   Layout.Omen -> Nothing
+  -- CR 722.4 gives a preparation card only its normal characteristics in every
+  -- zone, and only the normal half was ever castable (castableFaces above), so
+  -- there is no half for this move to carry.
+  Layout.Preparation -> Nothing
   -- CR 712.11 casts one with its front face up, so for an ordinary cast `shown`
   -- IS the front face and CR 712.8a would resolve Nothing to that same face. The
   -- two answers part where CR 712.11a's cast does put a back face on the stack.
@@ -1189,6 +1272,7 @@ manaCostFace card live = case Card.layout card of
   Layout.Flip -> live
   Layout.Adventure -> live
   Layout.Omen -> live
+  Layout.Preparation -> live
   Layout.Transforming -> NonEmpty.head (Card.faces card)
   -- The live face, and NOT the front one: CR 712.8e's mana-value exception is
   -- written about a nonmodal double-faced permanent alone, and CR 712.8f states
@@ -1241,6 +1325,7 @@ showsBackFace card mName = case Card.layout card of
   Layout.Flip -> False
   Layout.Adventure -> False
   Layout.Omen -> False
+  Layout.Preparation -> False
   Layout.Transforming ->
     case mName >>= \name -> List.findIndex ((== name) . Face.name) (NonEmpty.toList (Card.faces card)) of
       Nothing -> False
@@ -1273,6 +1358,10 @@ hasSharedTypeLine card = case Card.layout card of
   Layout.Flip -> False
   Layout.Adventure -> False
   Layout.Omen -> False
+  -- CR 722.1's inset frame is not CR 709.5's shared type line, for the reason
+  -- CR 715.1's and CR 720.1's are not: the inset half prints a type line of its
+  -- own, and CR 722.4 keeps it out of every zone's reading of the card.
+  Layout.Preparation -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> False
   -- CR 709.5's shared type line belongs to a split card, and CR 712.1 counts a
