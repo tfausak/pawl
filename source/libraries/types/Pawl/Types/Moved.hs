@@ -19,7 +19,7 @@ data Moved = MkMoved
     -- Empty for every move but a melded permanent's departure, which is what
     -- makes `change` alone the whole answer for an ordinary one; `moved` below
     -- is the constructor that says so. CR 730.3 restates the rule for a merged
-    -- permanent (#874), so the field is the shared carrier rather than meld's.
+    -- permanent, so the field is the shared carrier rather than meld's.
     --
     -- A FIELD ON THE EVENT and not the only announcement: rule 712.21's first
     -- clause makes the DEPARTURE one event, so a "whenever a creature dies"

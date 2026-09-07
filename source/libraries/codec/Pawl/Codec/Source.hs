@@ -7,6 +7,7 @@ import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.Codec.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Source as Source
 
 codec :: Codec.Codec Source.Source
@@ -14,6 +15,7 @@ codec =
   Arm.tagged
     [ Arm.payload "OfCard" PrintingId.codec Source.OfCard (\x -> case x of Source.OfCard y -> Just y; _ -> Nothing),
       Arm.payload "OfMeld" MeldSource.codec Source.OfMeld (\x -> case x of Source.OfMeld y -> Just y; _ -> Nothing),
+      Arm.payload "OfMerge" (Common.nonEmpty PrintingId.codec) Source.OfMerge (\x -> case x of Source.OfMerge y -> Just y; _ -> Nothing),
       Arm.payload "OfToken" PrintingId.codec Source.OfToken (\x -> case x of Source.OfToken y -> Just y; _ -> Nothing),
       Arm.payload "OfAbility" ActivatedAbilitySource.codec Source.OfAbility (\x -> case x of Source.OfAbility y -> Just y; _ -> Nothing),
       Arm.payload "OfTrigger" TriggeredAbilitySource.codec Source.OfTrigger (\x -> case x of Source.OfTrigger y -> Just y; _ -> Nothing),

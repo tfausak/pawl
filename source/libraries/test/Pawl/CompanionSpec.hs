@@ -33,6 +33,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
@@ -135,7 +136,7 @@ startingDeck s registry = Spec.describe s "CR 103.2a the starting deck" $ do
   Spec.it s "CR 702.139b counts the commander, which never reached the library" $ do
     (zirda, aliceDeck, _) <- decks s registry
     birds <- S.printingOf s registry "Birds of Paradise"
-    let commanderDeck = aliceDeck {Deck.commander = Just birds}
+    let commanderDeck = aliceDeck {Deck.commander = Set.singleton birds}
         gs = setup S.identityAnswer commanderDeck aliceDeck
         idOf printing = Map.lookup printing (GameState.printingIds gs)
         recorded = startingDeckOf S.alice gs

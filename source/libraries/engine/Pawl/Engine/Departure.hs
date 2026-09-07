@@ -491,6 +491,9 @@ nonCardStackObjectsCease pid gs =
           -- stack not represented by cards" does not reach it. It is never on the
           -- stack anyway (CR 701.42a).
           Source.OfMeld _ -> False
+          -- CR 730.2: represented by the cards its components are, and never on
+          -- the stack, so rule 800.4a does not reach it either.
+          Source.OfMerge _ -> False
           Source.OfToken _ -> True
           Source.OfAbility _ -> True
           Source.OfTrigger _ -> True

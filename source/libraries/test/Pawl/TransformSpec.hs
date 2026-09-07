@@ -679,7 +679,8 @@ transformedBoard tovolar wolf connoisseur gargoyle =
 -- the board that reaches one: "CR 701.27g a melded permanent is not a
 -- transformed permanent" puts this same Connoisseur beside a melded Hanweir and
 -- a Thraben Gargoyle, and counts the Gargoyle alone. The rule's other half, a
--- MERGED permanent, is still unreachable (#874).
+-- MERGED permanent, takes the same Game.componentsOf read and has no board of
+-- its own: no printing in data/cards/ is both a mutate target and double-faced.
 transformedPermanentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 transformedPermanentSpec s registry = Spec.describe s "TransformedPermanent" $ do
   -- CR 701.27g's positive: a double-faced permanent on the battlefield with its

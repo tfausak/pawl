@@ -402,6 +402,29 @@ data Object = MkObject
     -- later (CR 702.26i), which Pawl.PhasingSpec's "CR 702.103g a bestowed Aura
     -- that phases in unattached is a creature again" proves.
     bestowed :: Bool,
+    -- | CR 702.140a: is this SPELL a mutating creature spell? Stamped by
+    -- Pawl.Engine.Cast at CR 601.2b once the announcement settles on the
+    -- candidate rule 702.140a offers, and read by the mutate target slot
+    -- (Pawl.Engine.Card.mutateSlotMapGiven) at CR 601.2c's choice, at CR
+    -- 608.2b's re-check and at CR 702.140b/702.140c's fork in
+    -- Pawl.Engine.Stack.
+    --
+    -- A Bool, `bestowed` above's shape: the cost itself lives on the card, in
+    -- Pawl.Types.Keyword's Mutate arm, and nothing past the announcement reads
+    -- it back.
+    --
+    -- SPELL-ONLY, where `bestowed` survives the stack-to-battlefield move: rule
+    -- 702.140a's ability functions "while the spell with mutate is on the
+    -- stack", and CR 702.140c leaves no permanent for it to be true of -- a
+    -- mutating creature spell that merges never enters the battlefield, and one
+    -- whose target was illegal ceased to be a mutating creature spell first (CR
+    -- 702.140b). So CR 400.7's new incarnation clears it like every other
+    -- per-incarnation field.
+    --
+    -- One-way, and cleared where CR 702.140b's "ceases to be a mutating creature
+    -- spell" happens (Pawl.Engine.Stack.resolveCardBacked), which is
+    -- `bestowed`'s CR 702.103e clear line for line.
+    mutating :: Bool,
     -- | CR 718.3: was this object cast as a PROTOTYPED spell? Stamped by
     -- Pawl.Engine.Cast at CR 601.2b once the announcement settles on the
     -- candidate CR 702.160a offers, and read by
@@ -643,6 +666,10 @@ newIncarnation object =
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move that
       -- keeps it, `kicked` above's route.
       bestowed = False,
+      -- CR 702.140a's record is written back by nothing: rule 702.140a's ability
+      -- functions only while the spell is on the stack, and CR 702.140c leaves
+      -- no permanent for it to be true of.
+      mutating = False,
       -- CR 718.3's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move CR 718.4
       -- keeps it across, `bestowed` above's route.

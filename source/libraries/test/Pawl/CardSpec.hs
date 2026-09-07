@@ -825,6 +825,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
   TriggerCondition.PermanentBecomesDesignated {} -> []
   TriggerCondition.SelfEvolves -> []
+  TriggerCondition.SelfMutates -> []
   -- CR 702.134c's is nullary too, so it holds no Quantity.
   TriggerCondition.AttachedCreatureMentors -> []
   -- CR 700.4's is nullary as well, for the same reason.
@@ -2532,6 +2533,10 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
   -- flashback's may.
   Keyword.Bestow cost -> costFilters cost
+  -- CR 702.140a: the mutate cost, bestow's shape. The target slot rule 702.140a
+  -- adds is the RULE's (Pawl.Engine.Keyword.mutateTarget) rather than a payload
+  -- here, so nothing else on this arm reaches a Filter.
+  Keyword.Mutate cost -> costFilters cost
   -- CR 702.162a: the more than meets the eye cost, whose components may hold a
   -- Filter exactly as flashback's and bestow's may.
   Keyword.MoreThanMeetsTheEye cost -> costFilters cost
@@ -2578,6 +2583,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.118b names no quality either: the comparison is against the skulking
   -- creature's own power, written into the rule rather than into the keyword.
   Keyword.Skulk -> []
+  -- CR 702.124h names no quality either: it is read before the game begins, by
+  -- Pawl.Engine.Commander.designations, and mints no Filter at all.
+  Keyword.Partner -> []
   -- CR 702.121a names no quality: the bonus is computed from the combat record
   -- by the ability Pawl.Engine.Keyword mints, not from anything the card prints.
   Keyword.Melee -> []
@@ -3200,6 +3208,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated _ f) -> unframed [f]
   TriggerCondition.SelfEvolves -> []
+  TriggerCondition.SelfMutates -> []
   -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
   -- permanent rather than a class of them, and "a creature" narrows by nothing.
   TriggerCondition.AttachedCreatureMentors -> []
@@ -3497,6 +3506,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentTurnedFaceUp _ -> []
   TriggerCondition.PermanentBecomesDesignated _ -> []
   TriggerCondition.SelfEvolves -> []
+  TriggerCondition.SelfMutates -> []
   TriggerCondition.AttachedCreatureMentors -> []
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfBecomesCrewed -> []

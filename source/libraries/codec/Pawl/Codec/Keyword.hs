@@ -121,6 +121,7 @@ codec =
       Arm.nullary "Melee" Keyword.Melee,
       Arm.payload "Crew" Common.natural Keyword.Crew (\x -> case x of Keyword.Crew y -> Just y; _ -> Nothing),
       Arm.payload "Fabricate" Common.natural Keyword.Fabricate (\x -> case x of Keyword.Fabricate y -> Just y; _ -> Nothing),
+      Arm.nullary "Partner" Keyword.Partner,
       Arm.nullary "Riot" Keyword.Riot,
       Arm.nullary "Unleash" Keyword.Unleash,
       Arm.nullary "Daybound" Keyword.Daybound,
@@ -139,5 +140,6 @@ codec =
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
       Arm.nullary "Exert" Keyword.Exert,
       Arm.payload "Bestow" (Cost.codec codec) Keyword.Bestow (\x -> case x of Keyword.Bestow y -> Just y; _ -> Nothing),
-      Arm.nullary "Station" Keyword.Station
+      Arm.nullary "Station" Keyword.Station,
+      Arm.payload "Mutate" (Cost.codec codec) Keyword.Mutate (\x -> case x of Keyword.Mutate y -> Just y; _ -> Nothing)
     ]

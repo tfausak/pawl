@@ -1387,6 +1387,7 @@ library test
     Pawl.ModalSpec
     Pawl.MoveCounterSpec
     Pawl.MulliganSpec
+    Pawl.MutateSpec
     Pawl.OmenSpec
     Pawl.OutsideTheGameSpec
     Pawl.PhasingSpec
@@ -1742,6 +1743,7 @@ library types
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer
+    Pawl.Types.MutateSide
     Pawl.Types.Object
     Pawl.Types.ObjectId
     Pawl.Types.ObjectRef

@@ -778,6 +778,7 @@ activateAbility pid srcId ability = do
             Object.designationValues = Map.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,

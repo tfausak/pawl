@@ -321,6 +321,15 @@ data Keyword
   | -- | 702.123a: fabricate N -- when this permanent enters, you may put N +1/+1
     -- counters on it, and if you don't, create N 1/1 Servo tokens.
     Fabricate Natural.Natural
+  | -- | 702.124h: "You may designate two legendary cards as your commander
+    -- rather than one if each of them has partner." A deck-construction ability
+    -- that functions before the game begins (CR 702.124a), read by
+    -- Pawl.Engine.Commander.designations.
+    --
+    -- Not implemented: CR 702.124i's partner—[text], CR 702.124j's partner with
+    -- [name], CR 702.124k's choose a Background and CR 702.124m's Doctor's
+    -- companion, which CR 702.124f keeps distinct from this one (#939).
+    Partner
   | -- | 702.127a: three static abilities in one word -- cast this half from your
     -- graveyard, never from anywhere else, and exile it as it leaves the stack.
     Aftermath
@@ -435,6 +444,12 @@ data Keyword
     -- CR 702.184c's substitution of another characteristic is
     -- Quantity.StationMeasure's own arm, not a payload here.
     Station
+  | -- | 702.140a: "mutate [cost]" -- "you may pay [cost] rather than pay this
+    -- spell's mana cost. If you do, it becomes a mutating creature spell and
+    -- targets a non-Human creature with the same owner as this spell". The
+    -- target slot and CR 730's merge are minted from this constructor rather
+    -- than printed.
+    Mutate (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

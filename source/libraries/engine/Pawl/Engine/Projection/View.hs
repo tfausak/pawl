@@ -6,6 +6,7 @@ module Pawl.Engine.Projection.View where
 
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -65,6 +66,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Printing as Printing
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prototype as Prototype
@@ -612,7 +614,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- second is that "an object represented by more than one card, such as a
       -- melded or merged permanent, is never considered a transformed permanent,
       -- even if it has components that are back face up", which Game.componentsOf
-      -- answers for a melded permanent and will answer for a merged one (#874).
+      -- answers for a melded permanent and for a merged one alike.
       --
       -- That conjunct is LOAD-BEARING, and the first exclusion does not stand in
       -- for it. A melded permanent is stamped Object.face = Nothing
@@ -895,7 +897,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     -- so that CR 718.5's "remain the same" is visible as the default: everything
     -- the seed builds is the printed value, and withPrototype below rewrites exactly
     -- the four characteristics rule 718.3b names.
-    withPrototype oid gs face $
+    withMergedAbilities oid gs . withPrototype oid gs face $
       -- The seed predates every layer, so it can describe no object: every view is
       -- Nothing. That silences the printed box's board-reading shapes only where
       -- they go through this view at all -- Pawl.Engine.Count.evaluate reads a
@@ -1040,6 +1042,65 @@ withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupO
         PC.colors = Set.union (Face.colorIndicator face) (manaCostColors (Just (Prototype.cost frame)))
       }
   _ -> pc
+
+-- CR 702.140e: "a mutated permanent has all abilities of each card and token
+-- that represents it. Its other characteristics are derived from the topmost
+-- card or token." The second sentence is CR 730.2a and needs nothing here --
+-- Game.cardOfSource already resolves a merged permanent through its topmost
+-- component -- so this adds exactly what the FIRST sentence does: the abilities
+-- of every OTHER component, appended to the topmost one's.
+--
+-- IN THE SEED, withPrototype's position, and CR 613.2a is why rather than
+-- convenience: layer 1a is "copiable effects ... including changes to an
+-- object's characteristics determined by merging an object with a permanent",
+-- and CR 613.2c makes what layer 1 leaves the object's copiable values -- which
+-- is exactly the record Pawl.Engine.Event.copiedSnapshot freezes. CR 730.2a says
+-- the same from mutate's side ("this is a copiable effect"). Inside CR 613's
+-- fold rather than after it, so a later effect removing all abilities (CR
+-- 613.1f) still empties what this contributed.
+--
+-- The TIMESTAMP rule 730.2a names is the permanent's own -- CR 730.2b keeps it
+-- the same object and CR 730.2c keeps every continuous effect that applied to it
+-- applying -- so nothing here mints one. Read the other way round, a merge that
+-- gave the permanent a NEW timestamp would reorder every layered effect already
+-- on it, which is the very thing rule 730.2c forbids.
+--
+-- Every component but the head, and the head is skipped rather than added twice:
+-- `face` above already carries its abilities, and the keyword map counts
+-- multiplicity (CR 702.1), so a doubled entry would make one instance read as
+-- two.
+--
+-- Not implemented: a component whose own face is not the whole of what it
+-- represents -- CR 730.2e through 730.2h's face-down and flip components (#874).
+-- Each component's abilities are read off its combined face, which is what an
+-- ordinary card in the pool has.
+withMergedAbilities :: ObjectId -> GameState -> ProjectedCharacteristics -> ProjectedCharacteristics
+withMergedAbilities oid gs pc = case fmap Object.source (Game.lookupObject oid gs) of
+  Just (Source.OfMerge components) ->
+    let under = Maybe.mapMaybe (\pid -> fmap (Card.combined . Printing.card) (Game.printingOf pid gs)) (NonEmpty.tail components)
+     in List.foldl' addAbilitiesOf pc under
+  _ -> pc
+
+-- One component's abilities folded into the record, withMergedAbilities' helper.
+-- The eight fields a Face contributes abilities through, and no other: CR 702.140e
+-- says "all abilities" and CR 730.2a keeps every OTHER characteristic the topmost
+-- component's, so a field this touched that is not an ability would break the
+-- second sentence.
+addAbilitiesOf :: ProjectedCharacteristics -> Face.Face Card.Type.Card -> ProjectedCharacteristics
+addAbilitiesOf pc face =
+  pc
+    { -- CR 702.1: a keyword IS an ability, and the map counts instances, so a
+      -- component printing a keyword the topmost one also prints contributes a
+      -- second instance (CR 702.1b's redundancy is then the layer fold's).
+      PC.keywords = Map.unionWith (+) (PC.keywords pc) (Map.fromSet (const 1) (Face.keywords face)),
+      PC.staticAbilities = PC.staticAbilities pc <> Face.staticAbilities face,
+      PC.playerAbilities = PC.playerAbilities pc <> Face.playerAbilities face,
+      PC.specialActions = PC.specialActions pc <> Face.specialActions face,
+      PC.activatedAbilities = PC.activatedAbilities pc <> Face.activatedAbilities face,
+      PC.replacementEffects = PC.replacementEffects pc <> Face.replacementEffects face,
+      PC.triggeredAbilities = PC.triggeredAbilities pc <> Face.triggeredAbilities face,
+      PC.enchant = PC.enchant pc <> Face.enchant face
+    }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
 -- coloured symbols and its colour indicator. No devoid here: CR 702.114a makes it
@@ -1209,7 +1270,11 @@ targetsOfStackObject gs obj
       let bindings = Object.bindings obj
           chosen = Binding.modesOf bindings
           ofModal = Map.keysSet . Modal.modesTargetSlots chosen
-          ofFace face = Set.insert Card.enchantSlot (Map.keysSet (Card.modesTargetSlots chosen face))
+          -- CR 303.4a's enchant slot and CR 702.140a's mutate slot are declared
+          -- unconditionally: both are named by a RULE rather than by the face,
+          -- so a face read cannot see them, and the restriction below drops
+          -- either where the spell never filled it.
+          ofFace face = Set.insert Card.mutateSlot (Set.insert Card.enchantSlot (Map.keysSet (Card.modesTargetSlots chosen face)))
           declared = case Object.source obj of
             Source.OfCard _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
             Source.OfSpellCopy _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
@@ -1217,6 +1282,7 @@ targetsOfStackObject gs obj
             Source.OfTrigger src -> ofModal (TriggeredAbility.modal (TriggeredAbilitySource.ability src))
             Source.OfInherentTrigger src -> ofModal (TriggeredAbility.modal (InherentTriggerSource.ability src))
             Source.OfMeld _ -> Set.empty
+            Source.OfMerge _ -> Set.empty
             Source.OfToken _ -> Set.empty
             Source.OfEmblem _ -> Set.empty
        in Set.unions (Map.elems (Map.restrictKeys (Binding.targetsOf bindings) declared))

@@ -1936,6 +1936,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Horsemanship -> keyword
   Keyword.Type.Skulk -> keyword
   Keyword.Type.Melee -> keyword
+  -- CR 702.124h names no colour, type or quality CR 612.2 could swap.
+  Keyword.Type.Partner -> keyword
   -- CR 702.23a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Rampage _ -> keyword
   Keyword.Type.Aftermath -> keyword
@@ -1965,6 +1967,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.MoreThanMeetsTheEye cost -> Keyword.Type.MoreThanMeetsTheEye (rewriteCost pairs cost)
   -- CR 702.103a states its cost as part of the keyword too.
   Keyword.Type.Bestow cost -> Keyword.Type.Bestow (rewriteCost pairs cost)
+  Keyword.Type.Mutate cost -> Keyword.Type.Mutate (rewriteCost pairs cost)
   Keyword.Type.Fear -> keyword
   Keyword.Type.Intimidate -> keyword
   Keyword.Type.Morph (Morph.MkMorph cost variant) -> Keyword.Type.Morph (Morph.MkMorph (rewriteCost pairs cost) variant)
