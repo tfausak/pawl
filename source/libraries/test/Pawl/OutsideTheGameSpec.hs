@@ -300,7 +300,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     let deck =
           Deck.MkDeck
             { Deck.cards = Map.empty,
-              Deck.commander = Nothing,
+              Deck.commander = Set.empty,
               Deck.vanguard = Nothing,
               Deck.dungeons = Set.empty,
               Deck.sideboard = Map.fromList [(signInBlood, 2), (dragon, 1)]

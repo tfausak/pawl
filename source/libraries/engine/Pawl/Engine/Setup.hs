@@ -74,9 +74,9 @@ import qualified Pawl.Types.Zone as Zone
 -- variant selection for the two to disagree with (#175).
 --
 -- Parametric in the designation because it reaches this two ways -- as the
--- Deck's Printing when a game is built, and as the Player's PrintingId when one
+-- Deck's Printings when a game is built, and as the Player's PrintingIds when one
 -- is restarted (CR 727) -- and rule 903.7 turns on WHETHER a commander was
--- designated, never on which card it is.
+-- designated, never on which card it is or, under CR 702.124a, how many.
 --
 -- CR 902.4's life modifier is the `modifier` addend rather than a fourth branch:
 -- rule 902.4 modifies rule 103.4's twenty rather than replacing it, and the
@@ -84,21 +84,25 @@ import qualified Pawl.Types.Zone as Zone
 -- deck brings a vanguard card, so a nonzero modifier only ever meets the
 -- `otherwise` branch. Written as an addend anyway, because that is what rule
 -- 902.4 says of whatever the starting total is.
-startingLife :: GameSettings.GameSettings -> Int -> Maybe a -> Integer -> Integer
+startingLife :: (Foldable f) => GameSettings.GameSettings -> Int -> f a -> Integer -> Integer
 startingLife settings seats commander modifier = modifier + base
   where
     base :: Integer
     base
       | GameSettings.brawl settings = if seats > 2 then 30 else 25
-      | Maybe.isJust commander = 40
+      | not (null commander) = 40
       | otherwise = 20
 
 -- How many cards this deck holds, CR 903.5a's commander included: rule 903.5a
 -- counts the deck at exactly 100 cards "including its commander", so the card
--- that starts in the command zone is still one of the deck's cards. Every
+-- that starts in the command zone is still one of the deck's cards. CR 702.124b
+-- says the same of a partner deck's two, so every designation counts. Every
 -- non-Commander deck has no commander and so is unaffected.
+--
+-- Counts what the deck NAMED and not what Pawl.Engine.Commander.designations
+-- allows: rule 903.5a is about the cards the player brought.
 deckSize :: Deck.Deck -> Natural
-deckSize deck = sum (Map.elems (Deck.cards deck)) + maybe 0 (const 1) (Deck.commander deck)
+deckSize deck = sum (Map.elems (Deck.cards deck)) + Natural.length (Deck.commander deck)
 
 -- Pair every player with one deck, for a symmetric (mirror) matchup.
 mirror :: Deck.Deck -> NonEmpty.NonEmpty PlayerId -> NonEmpty.NonEmpty (PlayerId, Deck.Deck)
@@ -141,8 +145,8 @@ emptyGame order =
               -- your engines!, which is a state-based action and so cannot have
               -- happened before the game began.
               Player.speed = Nothing,
-              Player.commander = Nothing,
-              Player.commanderCasts = 0,
+              Player.commander = Set.empty,
+              Player.commanderCasts = Map.empty,
               -- CR 903.10a counts "over the course of the game", and no
               -- commander has dealt anybody anything in one that has not
               -- started.
@@ -358,27 +362,32 @@ createDeck pid deck = do
   cardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.cards deck))
   Monad.forM_ cardIds $ \(printingId, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
-  -- One intern, and the id goes to BOTH the object and the designation below --
-  -- which is why Commander.isCommander's comparison holds without leaning on
-  -- Game.intern's idempotence. That idempotence is what keeps a malformed deck
-  -- listing its commander among its cards too (CR 903.5b forbids it; #940 means
-  -- pawl does not enforce it) down to one entry.
-  commanderId <- Monad.mapM (State.state . Game.intern) (Deck.commander deck)
-  Monad.forM_ commanderId $ \printingId -> do
+  -- Game.intern is idempotent, which is what makes Commander.isCommander's
+  -- comparison hold: the id below goes to the object and to the designation
+  -- alike, and a malformed deck listing its commander among its cards too (CR
+  -- 903.5b forbids it; #940 means pawl does not enforce it) stays one entry.
+  --
+  -- Interned for every card the deck NAMED, because CR 702.139b counts each of
+  -- them in `starting` below even when CR 702.124h refuses the designation.
+  commanderIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Deck.commander deck))
+  -- CR 903.6 / CR 702.124b: "both commanders begin the game in the command
+  -- zone". Which cards those are is Commander.designations' judgement, not this
+  -- deck's claim -- rule 702.124h admits a second commander only when both have
+  -- partner, and an inadmissible pair designates neither.
+  designatedIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Commander.designations deck))
+  Monad.forM_ designatedIds $ \printingId -> do
     Monad.void (createInCommandZone pid printingId)
     State.modify' (Commander.designate pid printingId)
   -- CR 103.2a / CR 702.139b: the starting deck, recorded once and never rewritten
   -- -- rule 103.2a names a moment before the game begins, and by the time a
   -- companion's condition could be asked again the opening hands have been drawn.
   --
-  -- Deck.cards PLUS the commander, which is rule 702.139b's second sentence: "in a
+  -- Deck.cards PLUS every commander, which is rule 702.139b's second sentence: "in a
   -- Commander game, this is also before you've set aside your commander". The
   -- sideboard interned above is not among them, which is rule 103.2a's first
   -- sentence; nor is the vanguard or a dungeon, neither of which CR 902.3 or CR
   -- 309.2 puts in the deck to begin with.
-  let starting = case commanderId of
-        Nothing -> Map.fromListWith (+) cardIds
-        Just printingId -> Map.insertWith (+) printingId 1 (Map.fromListWith (+) cardIds)
+  let starting = foldr (\printingId -> Map.insertWith (+) printingId 1) (Map.fromListWith (+) cardIds) commanderIds
   State.modify' $ \gs ->
     gs
       { GameState.players =
@@ -621,7 +630,7 @@ resetPlayers settings seats lifeModifier players =
               -- is deliberately NOT reset beside it: rule 903.3's designation is
               -- made from the deck before the game begins and the restart reuses
               -- the same decks, so the same card is still the commander.
-              Player.commanderCasts = 0,
+              Player.commanderCasts = Map.empty,
               -- CR 903.10a counts "over the course of the game", and CR 727.1
               -- makes the restarted one a new game, so the tally starts over
               -- with the tax.

@@ -321,6 +321,15 @@ data Keyword
   | -- | 702.123a: fabricate N -- when this permanent enters, you may put N +1/+1
     -- counters on it, and if you don't, create N 1/1 Servo tokens.
     Fabricate Natural.Natural
+  | -- | 702.124h: "You may designate two legendary cards as your commander
+    -- rather than one if each of them has partner." A deck-construction ability
+    -- that functions before the game begins (CR 702.124a), read by
+    -- Pawl.Engine.Commander.designations.
+    --
+    -- Not implemented: CR 702.124i's partner—[text], CR 702.124j's partner with
+    -- [name], CR 702.124k's choose a Background and CR 702.124m's Doctor's
+    -- companion, which CR 702.124f keeps distinct from this one (#939).
+    Partner
   | -- | 702.127a: three static abilities in one word -- cast this half from your
     -- graveyard, never from anywhere else, and exile it as it leaves the stack.
     Aftermath

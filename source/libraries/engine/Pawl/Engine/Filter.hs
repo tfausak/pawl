@@ -1921,6 +1921,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Horsemanship -> keyword
   Keyword.Type.Skulk -> keyword
   Keyword.Type.Melee -> keyword
+  -- CR 702.124h names no colour, type or quality CR 612.2 could swap.
+  Keyword.Type.Partner -> keyword
   -- CR 702.23a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Rampage _ -> keyword
   Keyword.Type.Aftermath -> keyword

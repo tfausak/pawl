@@ -2381,7 +2381,13 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
                           -- Counted for the CASTER, who by
                           -- Commander.canCastFromCommandZone is also the owner:
                           -- rule 903.8 lets nobody else cast it from there.
-                          Monad.when (castFrom == Just Zone.Command) (State.modify' (Commander.recordCast pid))
+                          --
+                          -- Counted against `sid`, the spell CR 601.2a moved to
+                          -- the stack: rule 903.8's "each previous time they cast
+                          -- IT" is per commander (CR 702.124d), and the printing
+                          -- the designation names rides Source.OfCard across CR
+                          -- 400.7's fresh id.
+                          Monad.when (castFrom == Just Zone.Command) (State.modify' (Commander.recordCast pid sid))
 
 -- CR 702.34a's SECOND static ability -- exile this card instead of putting it
 -- anywhere else any time it would leave the stack -- installed onto the spell's
