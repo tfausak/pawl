@@ -6,7 +6,6 @@ module Pawl.Engine.Projection.View where
 
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -66,7 +65,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Power as Power
-import qualified Pawl.Types.Printing as Printing
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prototype as Prototype
@@ -694,6 +692,13 @@ countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 -- snapshot when it has one, the printed base otherwise. Base-or-snapshot only, so
 -- counters, pumps, control and ability grants are never part of a copiable value.
 -- Not a recursion: a copy of a copy stored resolved values when it was stamped.
+--
+-- CR 730.2a's merge arrives on the SAME arm as a copy, and deliberately: the two
+-- share layer 1a (CR 613.2a), Pawl.Engine.Event.merge stamps the record
+-- withMergedAbilities below builds, and whichever of them stamped LAST is what
+-- CR 613.7's timestamp order leaves. So no reader has to know that a merged
+-- permanent is one, and an earlier copy effect on the target cannot outrank the
+-- merge -- which is exactly what it did before #3371.
 copiableCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> snapshot
@@ -891,7 +896,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     -- so that CR 718.5's "remain the same" is visible as the default: everything
     -- the seed builds is the printed value, and withPrototype below rewrites exactly
     -- the four characteristics rule 718.3b names.
-    withMergedAbilities oid gs . withPrototype oid gs face $
+    withPrototype oid gs face $
       -- The seed predates every layer, so it can describe no object: every view is
       -- Nothing. That silences the printed box's board-reading shapes only where
       -- they go through this view at all -- Pawl.Engine.Count.evaluate reads a
@@ -1037,63 +1042,63 @@ withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupO
       }
   _ -> pc
 
--- CR 702.140e: "a mutated permanent has all abilities of each card and token
--- that represents it. Its other characteristics are derived from the topmost
--- card or token." The second sentence is CR 730.2a and needs nothing here --
--- Game.cardOfSource already resolves a merged permanent through its topmost
--- component -- so this adds exactly what the FIRST sentence does: the abilities
--- of every OTHER component, appended to the topmost one's.
+-- CR 702.140e / 730.2a: the copiable values a MERGE leaves -- rule 730.2a's
+-- "only the characteristics of its topmost component" as the base, plus rule
+-- 702.140e's "all abilities of each card and token that represents it" folded in
+-- from the other side. `base` is the topmost side's record and `donor` the
+-- other's; which is which is CR 702.140c's over-or-under choice, made by
+-- Pawl.Engine.Event.merge, the one caller.
 --
--- IN THE SEED, withPrototype's position, and CR 613.2a is why rather than
--- convenience: layer 1a is "copiable effects ... including changes to an
--- object's characteristics determined by merging an object with a permanent",
--- and CR 613.2c makes what layer 1 leaves the object's copiable values -- which
--- is exactly the record Pawl.Engine.Event.copiedSnapshot freezes. CR 730.2a says
--- the same from mutate's side ("this is a copiable effect"). Inside CR 613's
--- fold rather than after it, so a later effect removing all abilities (CR
--- 613.1f) still empties what this contributed.
+-- OVER RECORDS rather than over printed faces, which is the whole of the fix for
+-- the defect this replaced, see #3371: each side contributes what LAYER 1a had
+-- already left it, so a component that was itself a copy contributes the copy's
+-- rules text (CR 707.2a) and a component that was itself merged contributes its
+-- own merged values. Read off the printed faces instead, a merge under a Clone
+-- would take Clone's own 0/0 box and its copy ability.
 --
--- The TIMESTAMP rule 730.2a names is the permanent's own -- CR 730.2b keeps it
--- the same object and CR 730.2c keeps every continuous effect that applied to it
--- applying -- so nothing here mints one. Read the other way round, a merge that
--- gave the permanent a NEW timestamp would reorder every layered effect already
--- on it, which is the very thing rule 730.2c forbids.
+-- CR 613.2a is why the result is STAMPED at the merge rather than derived on
+-- every projection: layer 1a holds copy effects and merges together, CR 613.7
+-- orders them by timestamp, and CR 730.2a fixes this one's timestamp at "the
+-- time the objects merged". Freezing what layer 1a said at that moment is CR
+-- 707.2c's own posture for the copy effects it shares the sublayer with
+-- ("determined only at the time that effect first starts to apply"), and it is
+-- what makes an EARLIER copy effect on the target lose to the merge instead of
+-- silently replacing it. A LATER copy effect still wins, by re-stamping.
 --
--- Every component but the head, and the head is skipped rather than added twice:
--- `face` above already carries its abilities, and the keyword map counts
--- multiplicity (CR 702.1), so a doubled entry would make one instance read as
--- two.
+-- The permanent's TIMESTAMP is untouched: CR 730.2b keeps it the same object and
+-- CR 730.2c keeps every continuous effect that applied to it applying, so a
+-- merge that minted a new one would reorder every layer already on it.
 --
--- Not implemented: a component whose own face is not the whole of what it
+-- The eight ability fields and no other. PC.characteristicPT is deliberately NOT
+-- among them although CR 604.3 makes a CDA an ability: rule 730.2a keeps the
+-- POWER AND TOUGHNESS characteristic the topmost component's, so a donor CDA
+-- that set the box would override the very sentence this function's base
+-- implements. No card in data/cards/ prints a CDA box on a creature a mutate
+-- spell can target, so nothing tells the two readings apart today.
+--
+-- Not implemented: a component whose own record is not the whole of what it
 -- represents -- CR 730.2e through 730.2h's face-down and flip components (#874).
--- Each component's abilities are read off its combined face, which is what an
--- ordinary card in the pool has.
-withMergedAbilities :: ObjectId -> GameState -> ProjectedCharacteristics -> ProjectedCharacteristics
-withMergedAbilities oid gs pc = case fmap Object.source (Game.lookupObject oid gs) of
-  Just (Source.OfMerge components) ->
-    let under = Maybe.mapMaybe (\pid -> fmap (Card.combined . Printing.card) (Game.printingOf pid gs)) (NonEmpty.tail components)
-     in List.foldl' addAbilitiesOf pc under
-  _ -> pc
-
--- One component's abilities folded into the record, withMergedAbilities' helper.
--- The eight fields a Face contributes abilities through, and no other: CR 702.140e
--- says "all abilities" and CR 730.2a keeps every OTHER characteristic the topmost
--- component's, so a field this touched that is not an ability would break the
--- second sentence.
-addAbilitiesOf :: ProjectedCharacteristics -> Face.Face Card.Type.Card -> ProjectedCharacteristics
-addAbilitiesOf pc face =
-  pc
+--
+-- Not implemented: the twelve ability families this record has no field for --
+-- combat, attack, block, untap, entry, sacrifice, counter, attach and
+-- activation restrictions, requirements, costs and permissions -- which their
+-- gatherers read off Game.faceOf, so a mutated permanent has only its topmost
+-- component's. Delayed abilities are read topmost-only too, through
+-- Game.delayedAbilitiesOf (#3373).
+withMergedAbilities :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
+withMergedAbilities donor base =
+  base
     { -- CR 702.1: a keyword IS an ability, and the map counts instances, so a
-      -- component printing a keyword the topmost one also prints contributes a
+      -- component carrying a keyword the topmost one also has contributes a
       -- second instance (CR 702.1b's redundancy is then the layer fold's).
-      PC.keywords = Map.unionWith (+) (PC.keywords pc) (Map.fromSet (const 1) (Face.keywords face)),
-      PC.staticAbilities = PC.staticAbilities pc <> Face.staticAbilities face,
-      PC.playerAbilities = PC.playerAbilities pc <> Face.playerAbilities face,
-      PC.specialActions = PC.specialActions pc <> Face.specialActions face,
-      PC.activatedAbilities = PC.activatedAbilities pc <> Face.activatedAbilities face,
-      PC.replacementEffects = PC.replacementEffects pc <> Face.replacementEffects face,
-      PC.triggeredAbilities = PC.triggeredAbilities pc <> Face.triggeredAbilities face,
-      PC.enchant = PC.enchant pc <> Face.enchant face
+      PC.keywords = Map.unionWith (+) (PC.keywords base) (PC.keywords donor),
+      PC.staticAbilities = PC.staticAbilities base <> PC.staticAbilities donor,
+      PC.playerAbilities = PC.playerAbilities base <> PC.playerAbilities donor,
+      PC.specialActions = PC.specialActions base <> PC.specialActions donor,
+      PC.activatedAbilities = PC.activatedAbilities base <> PC.activatedAbilities donor,
+      PC.replacementEffects = PC.replacementEffects base <> PC.replacementEffects donor,
+      PC.triggeredAbilities = PC.triggeredAbilities base <> PC.triggeredAbilities donor,
+      PC.enchant = PC.enchant base <> PC.enchant donor
     }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's

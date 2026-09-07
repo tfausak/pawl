@@ -1577,7 +1577,9 @@ enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 -- CR 702.140a: the slot a mutating creature spell's required target is bound
 -- under, enchantSlot's shape above and for its reasons -- a genuine target in
 -- the ordinary namespace, held collision-free by the same CardSpec lint that no
--- mode declares this name.
+-- mode declares this name. Pawl.CardSpec's "the lint itself catches two modes
+-- declaring one slot name" is where that lint is held to it, on a spell mode
+-- misauthored onto this very name.
 mutateSlot :: SlotName
 mutateSlot = SlotName.MkSlotName (Text.pack "mutate")
 
