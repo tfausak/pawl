@@ -171,6 +171,9 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   Just (Source.OfTrigger _) -> Nothing
   Just (Source.OfEmblem pid) -> printingOf pid gs
   Just (Source.OfSpellCopy pid) -> printingOf pid gs
+  -- CR 722.3c: the printing Pawl.Engine.Prepare interned for the prepare
+  -- spell's characteristics, which is this copy's whole card.
+  Just (Source.OfCardCopy pid) -> printingOf pid gs
   Just (Source.OfInherentTrigger _) -> Nothing
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
@@ -459,6 +462,10 @@ cardOfSource gs mSource = case mSource of
     -- takes the same posture, and its comment says why the pair must move
     -- together.
     Source.OfSpellCopy pid -> cardOfPrinting pid gs
+    -- CR 722.3c's "those characteristics become the copy's normal
+    -- characteristics": the interned one-faced printing IS the copy's card, so
+    -- unlike OfSpellCopy above there is no snapshot layered over it.
+    Source.OfCardCopy pid -> cardOfPrinting pid gs
     Source.OfInherentTrigger _ -> Nothing
 
 cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
@@ -495,6 +502,7 @@ componentsOf source = case source of
   Source.OfTrigger _ -> Seq.empty
   Source.OfEmblem _ -> Seq.empty
   Source.OfSpellCopy _ -> Seq.empty
+  Source.OfCardCopy _ -> Seq.empty
   Source.OfInherentTrigger _ -> Seq.empty
 
 -- `cardOf` for a member of a HAND. An emblem answers Nothing where `cardOf`
@@ -817,6 +825,7 @@ meldComponentsOf source = case source of
   Source.OfTrigger _ -> Seq.empty
   Source.OfEmblem _ -> Seq.empty
   Source.OfSpellCopy _ -> Seq.empty
+  Source.OfCardCopy _ -> Seq.empty
   Source.OfInherentTrigger _ -> Seq.empty
 
 -- CR 202.3c's "the front faces of each card that represents it", one card at a
@@ -1123,6 +1132,12 @@ isSpell oid gs = case lookupObject oid gs of
       -- definition would otherwise exclude. What makes a Counterspell able to
       -- counter one, and a Twincast able to copy it again.
       Source.OfSpellCopy _ -> True
+      -- CR 722.3c calls it one: "that permanent loses the prepared designation at
+      -- the time the SPELL becomes cast". So a cast prepare copy is a spell for
+      -- the same reason CR 112.1a's copy of a spell is -- rule 112.1's
+      -- card-on-the-stack definition would exclude both -- and a Counterspell
+      -- reaches it.
+      Source.OfCardCopy _ -> True
       Source.OfInherentTrigger _ -> False
 
 -- CR 113.9: is this object an activated or triggered ability on the stack? The
@@ -1155,6 +1170,7 @@ isAbility oid gs = case lookupObject oid gs of
       -- for it: the two are not complements, and a copy of a spell is no more an
       -- ability than the spell it copies.
       Source.OfSpellCopy _ -> False
+      Source.OfCardCopy _ -> False
       Source.OfInherentTrigger _ -> True
 
 -- CR 113.3b: is this object an ACTIVATED ability on the stack? isAbility above
@@ -1182,6 +1198,7 @@ isActivatedAbility oid gs = case lookupObject oid gs of
       Source.OfToken _ -> False
       Source.OfEmblem _ -> False
       Source.OfSpellCopy _ -> False
+      Source.OfCardCopy _ -> False
 
 -- CR 114.5: is this object an emblem -- "neither a card nor a permanent"? Asks
 -- the object's KIND off Object.source, isToken's posture, and never its zone:
@@ -1199,6 +1216,7 @@ isEmblem oid gs = case lookupObject oid gs of
     Source.OfAbility _ -> False
     Source.OfTrigger _ -> False
     Source.OfSpellCopy _ -> False
+    Source.OfCardCopy _ -> False
     Source.OfInherentTrigger _ -> False
 
 -- CR 113.7: the object an ability on the stack came from -- the one whose
@@ -1221,6 +1239,7 @@ abilitySourceOf oid gs = case lookupObject oid gs of
         Source.OfToken _ -> Nothing
         Source.OfEmblem _ -> Nothing
         Source.OfSpellCopy _ -> Nothing
+        Source.OfCardCopy _ -> Nothing
 
 -- CR 110.5: a permanent's tapped/untapped status. CR 110.5d gives status only
 -- to a permanent, so an unknown id -- and a card outside the battlefield -- is
@@ -1260,6 +1279,10 @@ sourceIsToken source = case source of
   -- Pawl.Engine.Event's zone-change funnel rewrites its Source as it arrives on
   -- the battlefield -- and until then it is a spell.
   Source.OfSpellCopy _ -> False
+  -- CR 111.3 is about an effect that CREATES a token; CR 722.3c creates a copy
+  -- of a card instead, and says so. Nothing rewrites it into a token either --
+  -- CR 707.10f is written about a copy of a permanent SPELL.
+  Source.OfCardCopy _ -> False
   Source.OfInherentTrigger _ -> False
 
 -- CR 111.8: a token that has LEFT the battlefield -- one waiting for the state-

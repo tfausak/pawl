@@ -8,6 +8,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Recipient as Recipient
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -32,6 +33,9 @@ defaultWhatSource = Filter.And []
 -- `whatRecipient` and `whoRecipient` beside them are the authored halves and
 -- need no such lint: they DESCRIBE the recipient -- by characteristic, or by CR
 -- 109.5's relation to the row's controller -- rather than naming one.
+-- `boundRecipient` is authored too, and is the one way a card reaches
+-- `whichRecipient` at all: it names a SLOT (CR 601.2c), which Resolve bakes into
+-- the recipient that slot was filled with.
 codec :: Codec.Codec DamagePattern.DamagePattern
 codec = Fields.object $ do
   whichKind <- Fields.defaulted "whichKind" Nothing (Common.maybe DamageKind.codec) DamagePattern.whichKind
@@ -40,6 +44,7 @@ codec = Fields.object $ do
   whoRecipient <- Fields.defaulted "whoRecipient" Nothing (Common.maybe PlayerRelation.codec) DamagePattern.whoRecipient
   whichRecipient <- Fields.defaulted "whichRecipient" Nothing (Common.maybe Recipient.codec) DamagePattern.whichRecipient
   whichSource <- Fields.defaulted "whichSource" Nothing (Common.maybe ObjectId.codec) DamagePattern.whichSource
+  boundRecipient <- Fields.defaulted "boundRecipient" Nothing (Common.maybe SlotName.codec) DamagePattern.boundRecipient
   pure
     DamagePattern.MkDamagePattern
       { DamagePattern.whichKind = whichKind,
@@ -47,5 +52,6 @@ codec = Fields.object $ do
         DamagePattern.whatRecipient = whatRecipient,
         DamagePattern.whoRecipient = whoRecipient,
         DamagePattern.whichRecipient = whichRecipient,
-        DamagePattern.whichSource = whichSource
+        DamagePattern.whichSource = whichSource,
+        DamagePattern.boundRecipient = boundRecipient
       }

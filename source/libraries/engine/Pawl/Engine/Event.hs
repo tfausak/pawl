@@ -730,6 +730,7 @@ mintCard pid under printingId dest position gs =
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -920,6 +921,7 @@ createEmblem pid card = do
                 Object.playableFromExile = Nothing,
                 Object.plotted = Nothing,
                 Object.foretold = Nothing,
+                Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
                 Object.protector = Nothing,
                 Object.ventureRoom = Nothing,
@@ -5159,9 +5161,10 @@ carryOver carrying oldId newId = case carrying of
 --
 -- PlayerEffect.DamageCantBePrevented and its CR 614.9 twin carry the same
 -- pattern type and are left alone: neither sentence is a prevention effect, so
--- CR 400.7c does not speak to them, and Pawl.CardSpec's engineOnlyOffends keeps
--- card data off that field anyway, so no row of either can name an object at
--- all. Lava Burst's Filter.IsSource is the other half of the same field and is
+-- CR 400.7c does not speak to them. Whippoorwill's stored prohibition does name
+-- an object -- DamagePattern.whichRecipient, baked from a slot -- and it is a
+-- RECIPIENT, which the paragraph above says a permanent spell can never be.
+-- Lava Burst's Filter.IsSource is the other half of the same field and is
 -- not re-keyed either -- it names a SORCERY spell, which becomes no permanent.
 rewatch :: ObjectId -> ObjectId -> ActiveReplacement.ActiveReplacement -> ActiveReplacement.ActiveReplacement
 rewatch oldId newId row = case ActiveReplacement.effect row of
@@ -5893,6 +5896,7 @@ createTokens controller card copy n tapped entering = do
                       Object.playableFromExile = Nothing,
                       Object.plotted = Nothing,
                       Object.foretold = Nothing,
+                      Object.preparedCopyOf = Nothing,
                       Object.ringBearerFor = Nothing,
                       Object.protector = Nothing,
                       Object.ventureRoom = Nothing,
@@ -6084,6 +6088,7 @@ meld controller victims resultCard = do
                 Object.playableFromExile = Nothing,
                 Object.plotted = Nothing,
                 Object.foretold = Nothing,
+                Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
                 Object.protector = Nothing,
                 Object.ventureRoom = Nothing,
@@ -6307,6 +6312,10 @@ mergeComponents source = case source of
   Source.OfTrigger _ -> Nothing
   Source.OfEmblem _ -> Nothing
   Source.OfSpellCopy _ -> Nothing
+  -- CR 722.3c's copy is never on the battlefield to be merged INTO, and CR
+  -- 702.140c's mutating spell is a creature spell rather than a copy of a card,
+  -- so no road reaches this arm.
+  Source.OfCardCopy _ -> Nothing
   Source.OfInherentTrigger _ -> Nothing
 
 -- `merge` above's refusal, asked BEFORE its side is chosen: CR 702.140c's

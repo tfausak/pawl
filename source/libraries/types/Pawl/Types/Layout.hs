@@ -96,6 +96,30 @@ data Layout
     -- an Adventure's on the left too; either way position is a printing fact and
     -- Pawl.Types.Card.faces' order is what says which is which.
     Omen
+  | -- | CR 722.1: a card with "a two-part card frame, with a smaller frame inset
+    -- within their text box", whose inset text -- CR 722.2a's "prepare spell" --
+    -- defines ALTERNATIVE characteristics the object may have while it is a
+    -- spell (CR 722.2). The frame Adventure and Omen above print, and the one
+    -- sentence that makes it a third arm rather than a reading of either is CR
+    -- 722.3: "preparation cards can't be cast using the alternative
+    -- characteristics found within their inset frames". Where CR 715.3 and CR
+    -- 720.3 offer the inset half at cast time, this layout never does; the half
+    -- is reached only through the COPY CR 722.3c mints in exile, which
+    -- Pawl.Engine.Prepare creates and Pawl.Engine.Card.prepareFace supplies the
+    -- characteristics of.
+    --
+    -- CR 722.4 is the second separation and is stricter than either sibling:
+    -- "in every zone, a preparation card has only its normal characteristics",
+    -- where CR 715.4 and CR 720.4 both carve the stack out. So every layout case
+    -- in Pawl.Engine.Card answers for this arm the way it answers for Flip --
+    -- the head face and nothing else -- and castableFaces in particular offers
+    -- only the normal half.
+    --
+    -- FIRST face normal, the rest alternative -- the positional reading Adventure
+    -- above takes. CR 722.2 puts the inset frame on the right and the card's own
+    -- on the left, which is a printing fact Pawl.Types.Card.faces' order stands
+    -- in for.
+    Preparation
   | -- | CR 712.2: a NONMODAL double-faced card -- one Magic card face on each
     -- side, with an ability on one or both faces that turns the card over. The
     -- constructor keeps the name CR 712.1 records as the older one for the same
