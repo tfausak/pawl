@@ -655,6 +655,51 @@ halvesCardOf obj card = case Binding.copyOf (Object.bindings obj) of
   Just snapshot -> PC.halves snapshot
   Nothing -> if Card.hasSharedTypeLine card then Just card else Nothing
 
+-- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
+-- when the object is copying something, and its own printed card's otherwise.
+-- halvesCardOf above's shape, and the rule states the same thing rule 709.5b
+-- does: "the existence and values of these alternative characteristics are part
+-- of the object's copiable values". So having a prepare spell is a question about
+-- an object's COPIABLE values and not about the card printed underneath it, and a
+-- Clone that entered as a copy of a preparation card has one.
+--
+-- CR 722.3c's "ignoring other exceptions to the copying process that apply to
+-- that permanent" does NOT license reading the printed card instead. That clause
+-- is about CR 707.9's riders -- a copy effect that says "except it's a 1/1" --
+-- being disregarded when the prepare copy is minted; rule 722.2b's own sentence
+-- is untouched by it, and Pawl.PreparationSpec's "CR 722.2b a Clone of the
+-- Aviator becomes prepared and mints a Jump copy" is what proves the difference.
+--
+-- A snapshot with no prepare spell ends the question rather than falling back to
+-- the printed card, halvesCardOf's reason: CR 707.2 leaves a copy with the copied
+-- object's values, so a preparation card that became a copy of a Grizzly Bears
+-- has stopped having an inset frame.
+prepareCardOf :: Object.Object -> Card -> Maybe (Face Card)
+prepareCardOf obj card = case Binding.copyOf (Object.bindings obj) of
+  Just snapshot -> PC.prepare snapshot
+  Nothing -> Card.prepareFace card
+
+-- prepareCardOf above for a caller that holds only the id, and the value
+-- Pawl.Engine.Projection.View.baseCharacteristics seeds
+-- ProjectedCharacteristics.prepare from -- so a copy of a copy of a preparation
+-- card goes on carrying the inset frame.
+--
+-- FACE UP only, halvesOf's fork below and for its reason: CR 708.2 leaves a
+-- face-down permanent only the characteristics its allower listed, so it has no
+-- prepare spell however its card is printed.
+--
+-- Every zone, halvesOf's scope: CR 722.2a says "a card, spell, or permanent that
+-- has a prepare spell", and CR 722.2b copies the alternative characteristics'
+-- existence without naming a zone.
+prepareSpellOf :: ObjectId -> GameState -> Maybe (Face Card)
+prepareSpellOf oid gs = do
+  obj <- lookupObject oid gs
+  case Object.facing obj of
+    Facing.FaceDown _ -> Nothing
+    Facing.FaceUp -> do
+      card <- cardOf oid gs
+      prepareCardOf obj card
+
 -- halvesCardOf above for a caller that holds only the id, and the value
 -- Pawl.Engine.Projection.View.baseCharacteristics seeds
 -- ProjectedCharacteristics.halves from -- so a copy of a copy of a Room goes on

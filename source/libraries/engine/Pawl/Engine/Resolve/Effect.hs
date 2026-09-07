@@ -1619,15 +1619,45 @@ recordExilePile before gs =
 -- A COPY OF A SPELL is exiled with the cards, and rule 724.1b's second sentence
 -- is why it may be: CR 704.5e removes it at the next check, which is the same
 -- pass CR 704.5d makes for a token. Ceasing it here instead would be the same end
--- state reached without the zone change the rule asks for.
+-- state reached without the zone change the rule asks for. CR 707.10a's other
+-- copy -- CR 722.3c's cast copy of a card -- takes the same arm for the same two
+-- sentences.
+--
+-- TOTAL over every Source arm rather than three and a wildcard, because rule
+-- 724.1b's first sentence is about EVERY object on the stack: a new kind of
+-- stack object owes this list a line, and `_` swallowed one once already
+-- (Source.OfCardCopy, added by #3377 and answered wrongly until #3379).
 exileOrCease :: ObjectId -> Game ()
 exileOrCease oid = do
   gs <- State.get
+  let cease :: Game ()
+      cease = State.modify' (Game.cease oid)
   case fmap Object.source (Game.lookupObject oid gs) of
     Just (Source.OfCard _) -> Event.changeZone oid Zone.Exile
     Just (Source.OfToken _) -> Event.changeZone oid Zone.Exile
     Just (Source.OfSpellCopy _) -> Event.changeZone oid Zone.Exile
-    _ -> State.modify' (Game.cease oid)
+    -- A REGRESSION FENCE rather than a proven behaviour: ceasing the copy in
+    -- place reaches the same end state, since CR 724.1c's check would remove it
+    -- from exile anyway (CR 704.5e), and no card in data/cards/ watches an object
+    -- entering exile in a way that could tell the two apart -- mutating this arm
+    -- to `cease` leaves the suite green. It is written the rule's way because CR
+    -- 724.1b says "exile every object on the stack", not because a test pays for
+    -- it.
+    Just (Source.OfCardCopy _) -> Event.changeZone oid Zone.Exile
+    -- Not represented by a card, so rule 724.1b's second sentence would remove
+    -- them at CR 724.1c's check anyway; Game.cease is CR 608.2n's own mechanism
+    -- for the three ability kinds and reaches the same end state one step
+    -- earlier.
+    Just (Source.OfAbility _) -> cease
+    Just (Source.OfTrigger _) -> cease
+    Just (Source.OfInherentTrigger _) -> cease
+    -- CR 701.42a puts a melded permanent onto the battlefield, CR 730.2 leaves a
+    -- merged one there, and CR 114.1 keeps an emblem in the command zone, so none
+    -- of the three is ever on the stack for rule 724.1b to reach.
+    Just (Source.OfMeld _) -> cease
+    Just (Source.OfMerge _) -> cease
+    Just (Source.OfEmblem _) -> cease
+    Nothing -> cease
 
 -- CR 707.10: what a copy of this object's Source would be, and which of CR
 -- 707.10's nouns the copy is, or Nothing when the object is neither a spell nor
