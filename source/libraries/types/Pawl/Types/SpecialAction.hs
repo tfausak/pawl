@@ -18,7 +18,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- CR 116.2a's land play to every player, so it needs no printed permission; CR
 -- 116.2f, CR 116.2g, CR 116.2h and CR 116.2k are granted by KEYWORDS (suspend,
 -- companion, foretell, plot), so they belong to Pawl.Types.Keyword rather than
--- here whenever those land; and CR 116.2c's permission is created by a
+-- here; and CR 116.2c's permission is created by a
 -- RESOLUTION rather than printed, so it rides the stored effect it ends (Pawl.Types.Expiry's WhenPaid)
 -- rather than a face's text; see #875.
 data SpecialAction

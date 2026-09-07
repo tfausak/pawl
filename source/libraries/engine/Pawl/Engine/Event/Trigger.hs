@@ -1260,9 +1260,18 @@ eventTriggers events gs =
       -- Not implemented: a card exiled FACE DOWN is scanned here like any other,
       -- so its printed abilities are offered where CR 406.3a leaves it none
       -- (#1479).
+      --
+      -- The KEYWORD-MINTED abilities join the printed ones and are NOT filtered
+      -- by `functionsIn`, which is the whole difference between the two halves
+      -- of this list: CR 702.62a states the zone itself -- "the second and third
+      -- are triggered abilities that FUNCTION IN THE EXILE ZONE" -- so rule
+      -- 113.6's default has already been overridden by the rule that mints them,
+      -- and asking again would only re-derive it from a condition (an upkeep)
+      -- that says nothing about exile. Pawl.Engine.Keyword.exileTriggeredAbilitiesOf
+      -- is what decides which keywords reach this, and suspend is the only one.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) of
+          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> Keyword.exileTriggeredAbilitiesOf (Face.keywords face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing

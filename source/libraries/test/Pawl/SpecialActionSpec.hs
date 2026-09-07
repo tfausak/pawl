@@ -16,6 +16,11 @@
 -- 116.2 states -- any priority, the owner's own turn, and sorcery speed -- are
 -- what the groups' offer cases tell apart.
 --
+-- CR 116.2f's suspend (Rift Bolt) is here too, on its own board: its window is a
+-- FOURTH shape -- the card's own castability, which is what CR 116.2f states
+-- instead of a phase -- and CR 702.62's other two abilities ride the same board,
+-- since the countdown and the free play are what the exile was for.
+--
 -- CR 702.170c's OTHER route to a plotted card -- an effect rather than the
 -- special action (Kellan Joins Up, Pawl.Types.Effect's MakePlotted) -- is here
 -- for the same reason: it lands on Pawl.Engine.Plot.becomePlotted beside CR
@@ -66,6 +71,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Facing as Facing
@@ -140,6 +146,7 @@ isPlay action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
+  Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
@@ -275,6 +282,7 @@ playing wanted action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
+  Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
@@ -292,6 +300,7 @@ casting wanted action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
+  Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
@@ -933,6 +942,153 @@ foretelling s registry = Spec.describe s "CR 116.2h Augury Raven" $ do
       Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
       Spec.assertEqWith s "and all four Islands are tapped: {2} for the action, {1}{U} for the cast" (S.tappedCount S.alice resolved) 4
 
+-- Rift Bolt (TSP 165) {2}{R} Sorcery, "Rift Bolt deals 3 damage to any target. /
+-- Suspend 1--{R}" -- checked against Scryfall, 2026-09-07. CR 702.62's three
+-- abilities end to end: CR 116.2f's special action, the upkeep countdown, and
+-- the free play when the last time counter leaves.
+--
+-- ONE MOUNTAIN and nothing else, which is what makes every case below
+-- discriminating. {R} pays the suspend cost exactly, and {2}{R} is a mana more
+-- than the board can ever produce -- so the free play at the end is observed
+-- rather than inferred, and the Mountain being UNTAPPED after it is "no mana was
+-- spent" read off the board.
+--
+-- THE DOOMED TRAVELER is the negative control for the offer: a hand card with no
+-- suspend, so an implementation offering the action for every hand card fails.
+--
+-- THE LIBRARIES are stocked because the fixture advances two whole turns and CR
+-- 104.3c would otherwise deck a player before the countdown finishes.
+riftBoltBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+riftBoltBoard mountain bolt traveler =
+  let (boltId, gs1) = S.addHandCard bolt S.alice (S.landsInPlay mountain 1)
+      (travelerId, gs2) = S.addHandCard traveler S.alice gs1
+      stocked = List.foldl' (\g pid -> List.foldl' (\h _ -> snd (S.addLibraryCard traveler pid h)) g [1 :: Int .. 8]) gs2 [S.alice, S.bob]
+   in ( boltId,
+        travelerId,
+        stocked
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Takes the suspend action the moment it is offered and passes on every other
+-- priority; accepts CR 608.2g's offered cast; and aims the Bolt at bob, PICKED
+-- OUT OF THE OFFERED SET rather than built, so a recipient the engine did not
+-- offer cannot pass for a target (CR 608.2b).
+--
+-- Stateless, and it need not be: once the card is exiled its hand id is in no
+-- action, so the first branch stops matching on its own.
+suspendAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+suspendAnswer oid p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    if List.elem (Action.Type.Suspend oid) actions then Action.Type.Suspend oid else Action.Type.Pass
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (== Recipient.ToPlayer S.bob) (Set.toList recipients))) slots
+  _ -> S.identityAnswer p
+
+-- Run whole steps until the board reaches `stop`, or the game ends. Bounded so a
+-- bug cannot loop forever; Pawl.TurnSpec's runTurn is the same shape one turn
+-- wide.
+runUntil :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState -> Bool) -> GameState.GameState -> GameState.GameState
+runUntil answer stop gs0 =
+  let go n g =
+        if n <= (0 :: Int) || stop g || Maybe.isJust (GameState.result g)
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 64 gs0
+
+-- The one exiled card on the board, soleExile's reading above.
+soleExileOf :: GameState.GameState -> Maybe ObjectId.ObjectId
+soleExileOf gs = case Set.toList (GameState.exile gs) of
+  [oid] -> Just oid
+  _ -> Nothing
+
+suspending :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+suspending s registry = Spec.describe s "CR 116.2f Rift Bolt" $ do
+  -- CR 116.2f's window is the CARD'S OWN CASTABILITY -- "only if they could
+  -- begin to cast that card by putting it onto the stack" -- so a sorcery with
+  -- suspend is offered at sorcery speed and nowhere else, and a card without the
+  -- keyword is never offered at all.
+  Spec.it s "the action is offered only for a card with suspend, and only where the card could be cast" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Rift Bolt"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (boltId, travelerId, gs) = riftBoltBoard mountain bolt traveler
+        actions = Action.legalActions S.alice gs
+        opponentsTurn = gs {GameState.activePlayer = S.bob}
+    Spec.assertBool s (List.elem (Action.Type.Suspend boltId) actions) "the Bolt may be suspended"
+    Spec.assertBool s (List.notElem (Action.Type.Suspend travelerId) actions) "the Doomed Traveler may not"
+    Spec.assertBool s (List.notElem (Action.Type.Suspend boltId) (Action.legalActions S.alice opponentsTurn)) "and not on an opponent's turn, where the sorcery could not be cast"
+  -- CR 702.62c: "while determining if you could begin to cast a card with
+  -- suspend, take into consideration any effects that would PROHIBIT that card
+  -- from being cast." The pair is one board with a prohibition on it and the same
+  -- board without -- same mana, same phase, same hand.
+  Spec.it s "CR 702.62c a cast prohibition takes the action away" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Rift Bolt"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    silence <- S.printingOf s registry "Silence"
+    plains <- S.printingOf s registry "Plains"
+    let (boltId, _, gs) = riftBoltBoard mountain bolt traveler
+        -- BOB's Silence, whose "your opponents can't cast spells this turn"
+        -- names alice, on bob's own Plains so the pair differs in nothing alice
+        -- controls.
+        (silenceId, withSilence) = S.addHandCard silence S.bob (S.landsFor plains S.bob 1 gs)
+        silenced = S.runPure S.identityAnswer withSilence (S.cast S.bob silenceId >> Stack.resolveTop)
+    Spec.assertBool s (List.elem (Action.Type.Suspend boltId) (Action.legalActions S.alice withSilence)) "the control: with the Silence still in bob's hand, the action is offered"
+    Spec.assertBool s (List.notElem (Action.Type.Suspend boltId) (Action.legalActions S.alice silenced)) "and with it resolved it is not"
+  -- The whole rule, driven: the action is taken, the counter ticks down on
+  -- alice's next upkeep, and the Bolt is cast that same upkeep for nothing.
+  Spec.it s "CR 702.62 the card is exiled with a time counter, ticks down at the next upkeep, and is cast free" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Rift Bolt"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (boltId, _, gs) = riftBoltBoard mountain bolt traveler
+        suspended = snd (Engine.runGamePure (suspendAnswer boltId) gs Engine.priorityLoop)
+        startTurn = GameState.turnNumber suspended
+        -- CR 702.62a's countdown runs at the OWNER's upkeep, which in a two-seat
+        -- game is two turns on: bob's, then alice's.
+        stop g = GameState.turnNumber g > startTurn + 1 && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
+        after = runUntil (suspendAnswer boltId) stop suspended
+    -- CR 702.62a: "exile it with N time counters on it", exactly one for
+    -- suspend 1, and CR 702.62b is what makes that the definition of suspended.
+    Spec.assertEqWith
+      s
+      "the Bolt is exiled with exactly one time counter"
+      (soleExileOf suspended >>= \oid -> fmap (Map.lookup CounterKind.Time . Object.counters) (Game.lookupObject oid suspended))
+      (Just (Just 1))
+    Spec.assertEqWith s "and the Mountain paid {R} for it" (S.tappedCount S.alice suspended) 1
+    -- CR 702.62a's second ability, then its third. bob's life is what the free
+    -- cast produced: 3 damage from a Bolt nothing on this board could pay
+    -- {2}{R} for.
+    Spec.assertEqWith s "bob has taken the Bolt's 3" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "on alice's own next turn, not bob's" (GameState.turnNumber after) (startTurn + 2)
+    Spec.assertEqWith s "the time counter is gone with the card, which is in the graveyard (CR 608.2n)" (length (GameState.exile after)) 0
+    -- "For free" read off the board rather than inferred: the untap step gave
+    -- the Mountain back, and the cast left it untapped.
+    Spec.assertEqWith s "and no mana was spent -- the Mountain is still untapped" (S.tappedCount S.alice after) 0
+  -- CR 702.62b: "a card is suspended if it's in the exile zone, has suspend, and
+  -- has a TIME COUNTER on it." The pair is the same exiled Bolt with its counter
+  -- removed and nothing else moved.
+  Spec.it s "CR 702.62b a card with no time counters left is not suspended, and no upkeep reaches it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Rift Bolt"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (boltId, _, gs) = riftBoltBoard mountain bolt traveler
+        suspended = snd (Engine.runGamePure (suspendAnswer boltId) gs Engine.priorityLoop)
+        drained = suspended {GameState.objects = Map.map (\o -> o {Object.counters = Map.empty}) (GameState.objects suspended)}
+        startTurn = GameState.turnNumber suspended
+        stop g = GameState.turnNumber g > startTurn + 1 && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
+        after = runUntil (suspendAnswer boltId) stop drained
+    Spec.assertEqWith s "bob takes nothing: no counter to remove, so nothing watches its removal" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and the Bolt is still sitting in exile" (length (GameState.exile after)) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
@@ -943,6 +1099,7 @@ spec s registry = do
   plotting s registry
   makePlotted s registry
   foretelling s registry
+  suspending s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and how
@@ -1264,6 +1421,7 @@ activating wanted action = case action of
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
   Action.Type.Foretell _ -> False
+  Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False

@@ -123,6 +123,7 @@ import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Suspend as Suspend
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
@@ -191,6 +192,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Soulshift n -> List.genericReplicate count (soulshift n)
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> List.genericReplicate count haunt
+  -- Rule 702.62a's two triggered abilities function in the EXILE zone, so
+  -- exileTriggeredAbilitiesOf mints them and this roster stays empty.
+  Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   -- Rule 702.63a states three abilities, the first of them a replacement effect
   -- rather than a trigger, so two land here.
@@ -387,6 +391,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
+  -- CR 702.62a states no activated ability, in the hand or anywhere else.
+  Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -621,6 +627,8 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
+  -- CR 702.62a states no activated ability on the battlefield either.
+  Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1099,6 +1107,9 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
+  -- CR 702.62a's free play is the third ability's OfferCast rather than a
+  -- standing permission, so nothing is granted from a zone here.
+  Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1449,6 +1460,22 @@ buybackCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
+-- CR 702.62a: the suspend ability this card prints -- the N and the cost of CR
+-- 116.2f's special action together -- or Nothing when the card has no suspend.
+--
+-- BOTH FIELDS at once, where plotCost below answers a cost alone: rule 702.62a's
+-- N is what the exile puts on the card, and Pawl.Engine.Suspend needs the two in
+-- the same breath.
+--
+-- A wildcard, and ONE ability per card (the ascending-least), morphCost's shape.
+-- No printing has two.
+suspend :: Set Keyword -> Maybe (Suspend.Suspend Keyword)
+suspend keywords =
+  let abilityOf keyword = case keyword of
+        Keyword.Suspend ability -> Just ability
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe abilityOf (Set.toAscList keywords))
+
 -- CR 702.170a: what CR 116.2k's special action costs, or Nothing when the card has
 -- no plot.
 --
@@ -1739,6 +1766,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- (Pawl.Engine.Event) for the same reason the condition is not read here.
   Keyword.Bloodthirst n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.Bloodthirst n)))
   Keyword.Haunt -> []
+  -- The time counters ride the special action's entry riders
+  -- (Pawl.Engine.Suspend.riders), where vanishing's need a replacement effect:
+  -- rule 702.62a exiles the card itself, and nothing is entering the
+  -- battlefield for CR 614 to rewrite.
+  Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1931,6 +1963,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
+  -- CR 702.62a says nothing about combat.
+  Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -2098,6 +2132,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
+  -- CR 702.62a says nothing about attaching.
+  Keyword.Suspend _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -2269,6 +2305,8 @@ familyOf keyword = case keyword of
   Keyword.Menace -> Nothing
   Keyword.Renown _ -> Just KeywordFamily.Renown
   Keyword.Changeling -> Nothing
+  -- CR 701.56a's time travel is what would name the family.
+  Keyword.Suspend _ -> Just KeywordFamily.Suspend
   Keyword.SplitSecond -> Nothing
   Keyword.Devoid -> Nothing
   Keyword.Ingest -> Nothing
@@ -3456,6 +3494,119 @@ miracleCost keywords =
 -- hand.
 printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
 printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
+
+-- CR 702.62a's SECOND and THIRD abilities, "the second and third are triggered
+-- abilities that function in the exile zone" -- the roster the exile scan in
+-- Pawl.Engine.Event.Trigger mints, `printedTriggeredAbilitiesOf`'s sibling one
+-- zone over.
+--
+-- UNGATED BY CR 113.6, which is the whole reason it is its own function: rule
+-- 702.62a states the zone itself, so the exile scan takes this list without
+-- asking `functionsIn` -- where the same scan does ask it of the card's PRINTED
+-- abilities, which state no zone.
+--
+-- Ordered as rule 702.62a prints them, which is also the order they fire in:
+-- the upkeep removal takes the last counter off, and the free play watches that
+-- removal. Vanishing's pair one rule over has the same two shapes.
+--
+-- A SET rather than a count-carrying Map, `printedTriggeredAbilitiesOf`'s
+-- reading: a printed keyword set holds one instance of each, and rule 702.62
+-- states no per-instance clause for a card printing two.
+exileTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+exileTriggeredAbilitiesOf keywords = case suspend keywords of
+  Nothing -> []
+  Just _ -> [suspendUpkeep, suspendLastCounter]
+
+-- "At the beginning of your upkeep, if this card is suspended, remove a time
+-- counter from it."
+--
+-- TurnScope.ControllersTurn is rule 702.62a's "YOUR upkeep" (CR 603.3a), which
+-- for a card in exile is its OWNER's: CR 108.4 gives such a card no controller
+-- and CR 108.4a substitutes the owner, which is what
+-- Pawl.Engine.Event.Trigger's exile scan hands over.
+--
+-- THE INTERVENING "IF" is CR 702.62b's definition of suspended read down to the
+-- one conjunct this board can move: the card is in exile and has suspend by
+-- construction -- the exile scan found it there, carrying the keyword -- so what
+-- is left is the time counter, and CR 603.4 then keeps the ability off the stack
+-- on an upkeep after the countdown is over. Vanishing's condition exactly.
+--
+-- ONE counter per instance, vanishing's reading: rule 702.62a removes a single
+-- one.
+suspendUpkeep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+suspendUpkeep =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Just suspendedNow,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+  where
+    effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource)
+
+-- CR 702.62b's "a card is suspended", named because rule 702.62a's intervening
+-- "if" is that definition and nothing else. Two of its three conjuncts are true
+-- by construction where this is read -- the exile scan found the card in exile,
+-- carrying the keyword -- so the counter is the whole of what a board can move.
+--
+-- A REGRESSION FENCE rather than a proved line, vanishingUpkeep's CR 608.2a note
+-- one rule over: an upkeep that resolves with the counters already gone removes
+-- nothing and raises no event for the last-counter ability to watch, so dropping
+-- this leaves Pawl.SpecialActionSpec's Rift Bolt group green. It is written
+-- because CR 603.4 states it.
+suspendedNow :: Condition.Condition
+suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))
+
+-- "When the last time counter is removed from this card, if it's exiled, you may
+-- play it without paying its mana cost if able."
+--
+-- Watches the REMOVAL and not the count, vanishingLastCounter's reading: a card
+-- exiled with no time counters at all has nothing to trigger, which is CR
+-- 702.62b read from the other side.
+--
+-- ONE MANDATORY clause: the "you may" governs the PLAY alone, which is
+-- Prompt.OfferedCast's own question (CR 608.2g), miracle's argument. Marking the
+-- clause optional would raise a second prompt for one printed "may".
+--
+-- CastOffer.withoutPayingManaCost is CR 118.9's alternative cost, which CR
+-- 702.62d routes through rules 601.2b and 601.2f-h -- the same field the plotted
+-- card's cast is priced with in Pawl.Engine.Cost.
+--
+-- CAST and not rule 702.62a's wider "PLAY it", which for a land with suspend
+-- would be a land play: Scryfall `keyword:suspend t:land`, 2026-09-07, no hit --
+-- a land with suspend is the card that would tell the two apart. Rule 702.62a's
+-- "if it's exiled" is likewise not stated as an intervening "if"; the condition
+-- is the removal of a counter from an exiled card, which is what CR 400.7 leaves
+-- reachable.
+--
+-- Not implemented: rule 702.62a's last sentence, the haste a creature spell cast
+-- this way gains until its caster loses control of it -- Durkwood Baloth
+-- ({4}{G}{G} Creature, "Suspend 5--{G}") is the card that needs it (#3355).
+suspendLastCounter :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+suspendLastCounter =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
+    }
+  where
+    effect =
+      Effect.OfferCast
+        OfferCast.MkOfferCast
+          { OfferCast.ref = ObjectRef.InSlot Binding.triggerSource,
+            -- Rule 702.62a's "YOU may play it": the card's owner, who is this
+            -- trigger's controller, and a "may".
+            OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+            OfferCast.optionality = CastObligation.Optional,
+            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
+          }
 
 -- CR 702.63a's SECOND and THIRD abilities, the first being mintedReplacementsFor's
 -- -- so vanishing's rule text spans both mints. Ordered as rule 702.63a prints

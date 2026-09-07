@@ -39,7 +39,7 @@ data CounterKindFamily
     Lore
   | -- | CR 122.1g: Pawl.Types.CounterKind.Defense.
     Defense
-  | -- | CR 702.63a: Pawl.Types.CounterKind.Time.
+  | -- | CR 702.62a / 702.63a: Pawl.Types.CounterKind.Time.
     Time
   | -- | CR 702.32a: Pawl.Types.CounterKind.Fade.
     Fade
