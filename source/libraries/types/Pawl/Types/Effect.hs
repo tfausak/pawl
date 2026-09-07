@@ -11,6 +11,7 @@ import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
@@ -130,6 +131,13 @@ data Effect card ability
   | -- | CR 723.1: you control target player during that player's next turn
     -- (Mindslaver).
     ControlPlayerNextTurn SlotName.SlotName
+  | -- | CR 723.2: you control the slot's player until this object finishes
+    -- resolving (Word of Command).
+    --
+    -- Not implemented: rule 723.2's other half of that card -- control re-taken
+    -- while the spell the controlled player was made to cast resolves, which is
+    -- a second span keyed to a different object (#3347).
+    ControlPlayerThisResolution ControlPlayer.ControlPlayer
   | -- | CR 701.8 / 702.12b: destroy the permanents the ObjectRef names, through
     -- the CR 616.1 loop so a regeneration shield (CR 701.19a) can catch it; the
     -- Regenerability is CR 701.19c's rider.

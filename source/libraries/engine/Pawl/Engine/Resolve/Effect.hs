@@ -108,6 +108,8 @@ import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.ControlDuration as ControlDuration
+import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
@@ -201,6 +203,7 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -1372,6 +1375,38 @@ fromAmongMembers legal resolving chosen slot = do
   pure $ case bound of
     Just objects -> objects
     Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
+
+-- CR 402.3 with a CR 608.2d choice: each hand the reference names is offered to
+-- its OWN owner (a hand's cards are that player's alone), who picks one card
+-- matching the filter. The candidates are read as the instruction is reached (CR
+-- 608.2c), the asks run in APNAP order (CR 608.2e, CR 101.4) through
+-- handChoosers, and the answer is FILTERED rather than trusted. Elided at one
+-- card and skipped at none (CR 101.3, CR 609.3).
+--
+-- The ONE asking read of ObjectRef.ChosenCardInHand, shared by Effect.MoveToZone's
+-- gather and by Effect.LookAt, so the two cannot ask differently. Every other
+-- position reads the ref through the pure Slots.objectRefObjects, which answers
+-- [] for it -- Pawl.EffectLintSpec's "no effect asks for a chosen card where
+-- nothing can ask" is what stops a card writing one there.
+chooseCardsInHand ::
+  ObjectId ->
+  ObjectId ->
+  PlayerId ->
+  Map.Map SlotName (Set Recipient) ->
+  ChosenCardInHand.ChosenCardInHand ->
+  Game [ObjectId]
+chooseCardsInHand resolving source controller legal (ChosenCardInHand.MkChosenCardInHand player filter_) = do
+  gs <- State.get
+  let context = effectContext gs controller source legal (slotBindings resolving gs)
+      ask asked candidates = case candidates of
+        [] -> pure []
+        [only] -> pure [only]
+        first : second : more -> do
+          let offered = first NonEmpty.:| (second : more)
+          answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
+          pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+  fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf context gs pid filter_)) $
+    handChoosers legal controller gs player
 
 -- The printed "from among them", a CR 608.2d choice: the candidates are the
 -- members of a GROUP an earlier clause of this resolution bound rather than a
@@ -2730,6 +2765,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
+  -- CR 723.2: control that takes hold NOW and lapses when this object finishes
+  -- resolving, which Pawl.Engine.Stack.resolveTopWith is what performs -- the
+  -- one place that knows a resolution has ended.
+  --
+  -- Written into the live GameState.control rather than scheduled, which is the
+  -- whole difference from the arm above: rule 723.1b's control waits for a turn,
+  -- and this one is spent inside the resolution that installed it. Map.insert
+  -- overwrites, which is rule 723.1a's answer for either kind.
+  Effect.ControlPlayerThisResolution (ControlPlayer.MkControlPlayer slot landsOnly) ->
+    State.modify' $ \gs ->
+      case legalOne slot legal of
+        Just (Recipient.ToPlayer target) ->
+          gs
+            { GameState.control =
+                Map.insert
+                  target
+                  PlayerControl.MkPlayerControl
+                    { PlayerControl.decider = Decider.MkDecider controller,
+                      PlayerControl.duration = ControlDuration.UntilResolutionEnds,
+                      PlayerControl.manaFromLandsOnly = landsOnly
+                    }
+                  (GameState.control gs)
+            }
+        -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+        _ -> gs
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> do
     gs <- State.get
     -- CR 701.8: destroy them through the single funnel -- indestructible (CR
@@ -3133,24 +3193,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- The arm above over the hidden zone CR 400.2 makes a hand: what it
               -- says about when the candidates are read (CR 608.2c), about the asks
               -- running in APNAP order (CR 608.2e, CR 101.4) and about the answer
-              -- being filtered rather than trusted holds unchanged.
-              --
-              -- What the hidden zone changes is WHO may be asked: CR 402.3 gives a
-              -- hand's cards to its owner alone, so each seat is offered its OWN hand
-              -- and no other. Narrowing the offer by filter is the card's own words
-              -- saying which cards were ever legal answers (CR 608.2d). Elided at one
-              -- card and skipped at none (CR 101.3, CR 609.3).
-              ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player filter_) -> do
-                gs <- State.get
-                let ask asked candidates = case candidates of
-                      [] -> pure []
-                      [only] -> pure [only]
-                      first : second : more -> do
-                        let offered = first NonEmpty.:| (second : more)
-                        answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
-                        pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-                fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf (chooseContext gs) gs pid filter_)) $
-                  handChoosers legal controller gs player
+              -- being filtered rather than trusted holds unchanged. What the hidden
+              -- zone changes is WHO may be asked, and chooseCardsInHand is where
+              -- CR 402.3's answer to that lives -- shared with Effect.LookAt, so
+              -- the two positions cannot ask differently.
+              ObjectRef.ChosenCardInHand chosenInHand -> chooseCardsInHand resolving source controller legal chosenInHand
               -- The printed "from among them", a CR 608.2d choice, asked by
               -- chooseCardFromAmong -- which is where the rule lives, this opcode
               -- and CR 701.20a's reveal being the two that ask it. The candidates
@@ -3687,13 +3734,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [only] -> State.modify' (bindSlot resolving slot only)
           several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.LookAt (LookAt.MkLookAt ref slot) -> do
-    gs <- State.get
     -- CR 608.2c: the cards are named as this instruction is reached, and CR 701.20b
     -- (via rule 701.20e) leaves every one where it is -- so this whole arm is the
-    -- binding, and an empty library binds nothing. No prompt and no event: rule
-    -- 701.20e shows the cards to one player, which pawl has no way to do (#1412),
-    -- and a public GameEvent.Revealed would be a different rule (CR 701.20a).
-    case objectRefObjects legal resolving controller source gs ref of
+    -- binding, and an empty library binds nothing. No event: a public
+    -- GameEvent.Revealed would be a different rule (CR 701.20a).
+    --
+    -- Not implemented: rule 701.20e shows the cards to one player, and pawl has
+    -- no per-player view to show them in (#1412), so WHO looks is not carried.
+    --
+    -- The one PROMPT this arm raises is CR 608.2d's, not rule 701.20e's: Word of
+    -- Command's "look at target opponent's hand and CHOOSE a card from it" names
+    -- the hand and picks one, which is chooseCardsInHand's ask. Every other ref
+    -- is the pure read.
+    named <- case ref of
+      ObjectRef.ChosenCardInHand chosenInHand -> chooseCardsInHand resolving source controller legal chosenInHand
+      _ -> do
+        gs <- State.get
+        pure (objectRefObjects legal resolving controller source gs ref)
+    case named of
       [] -> pure ()
       -- One card takes the SINGLE binding, which every reader sees; several take
       -- the group, which Filter.IsBound reads as CR 701.20e's "among them".

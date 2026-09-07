@@ -40,6 +40,7 @@ import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.Printing as Printing
@@ -238,12 +239,15 @@ data GameState = MkGameState
     -- about the same key.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
-    -- controlled; last created wins (CR 723.1a), promoted to activeControl at
+    -- controlled; last created wins (CR 723.1a), promoted into `control` at
     -- that player's turn (CR 723.1b).
     pendingControl :: Map.Map PlayerId.PlayerId Decider.Decider,
-    -- | CR 723.1 / 723.3: the decider controlling the active player this turn,
-    -- overwritten at every turn start.
-    activeControl :: Maybe Decider.Decider,
+    -- | CR 723: who is being controlled right now, keyed by the controlled
+    -- player. Keyed rather than a single slot for the active player because CR
+    -- 723.2's control is not the active player's and does not last a turn
+    -- (see #881); each row carries its own lifetime, and CR 723.3 is why a row
+    -- says nothing about who the active player is.
+    control :: Map.Map PlayerId.PlayerId PlayerControl.PlayerControl,
     -- | CR 725.1 / 725.3: the monarch, a single game-wide designation.
     monarch :: Maybe PlayerId.PlayerId,
     -- | CR 726.1 / 726.3: the initiative, the monarch's sibling designation.

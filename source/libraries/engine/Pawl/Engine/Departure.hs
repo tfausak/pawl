@@ -37,6 +37,7 @@ import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ReplacementBucket as ReplacementBucket
 import Pawl.Types.Result (Result)
@@ -326,7 +327,8 @@ objectsLeaveWith pid gs =
 --   * a stored layer-2 SetController continuous effect (Master Thief, Act of
 --     Treason -- both in the pool). Projection.givesControlTo makes the match, so
 --     the case on Modification stays where it belongs.
---   * GameState.activeControl -- this turn's Decider (CR 723.1/723.3).
+--   * GameState.control -- a live Decider, whether it holds for this turn (CR
+--     723.1) or for one resolution (CR 723.2).
 --   * GameState.pendingControl -- a Decider scheduled for a later turn
 --     (CR 723.1b). CR 800.4b says the same thing one step later, at
 --     Engine.beginTurnOf's promotion; neither is the other's spare.
@@ -396,9 +398,7 @@ controlEffectsEnd pid gs =
         Decider.MkDecider d -> d == pid
    in gs
         { GameState.continuousEffects = filter (not . Projection.givesControlTo pid) (GameState.continuousEffects gs),
-          GameState.activeControl = case GameState.activeControl gs of
-            Just decider -> if heldBy decider then Nothing else Just decider
-            Nothing -> Nothing,
+          GameState.control = Map.filter (not . heldBy . PlayerControl.decider) (GameState.control gs),
           GameState.pendingControl = Map.filter (not . heldBy) (GameState.pendingControl gs),
           GameState.replacements = filter (not . givesControlOnEntryTo pid) (GameState.replacements gs)
         }

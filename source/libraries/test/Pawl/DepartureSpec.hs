@@ -474,7 +474,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- CR 800.4a: "any effects which give that player control of any objects or
   -- players end." Mindslaver's opcode is Effect.ControlPlayerNextTurn, whose
   -- effect lives in GameState.pendingControl until the controlled player's
-  -- turn begins (CR 723.1b) and in GameState.activeControl during it
+  -- turn begins (CR 723.1b) and in GameState.control during it
   -- (CR 723.1/723.3). Both are effects giving the departing player control of
   -- a PLAYER, so both end.
   Spec.it s "CR 800.4a a Mindslaver controller departing releases their victim, pending and active alike" $ do
@@ -482,13 +482,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         duringTurn =
           S.threePlayerGame
             { GameState.activePlayer = S.carol,
-              GameState.activeControl = Just (Decider.MkDecider S.bob)
+              GameState.control = S.turnControl S.bob S.carol
             }
         pendingGone = S.departs Departure.Type.Conceded S.bob pending
         activeGone = S.departs Departure.Type.Conceded S.bob duringTurn
     Spec.assertEqWith s "the scheduled control is gone" (GameState.pendingControl pendingGone) Map.empty
-    Spec.assertEqWith s "the live control is gone" (GameState.activeControl activeGone) Nothing
-    Spec.assertEqWith s "and a control held by someone still playing is untouched" (GameState.activeControl (S.departs Departure.Type.Conceded S.bob (duringTurn {GameState.activeControl = Just (Decider.MkDecider S.alice)}))) (Just (Decider.MkDecider S.alice))
+    Spec.assertEqWith s "the live control is gone" (GameState.control activeGone) Map.empty
+    Spec.assertEqWith s "and a control held by someone still playing is untouched" (GameState.control (S.departs Departure.Type.Conceded S.bob (duringTurn {GameState.control = S.turnControl S.alice S.carol}))) (S.turnControl S.alice S.carol)
 
   Spec.it s "CR 800.4a nothing in the game is owned or controlled by a player who has left it" $ do
     -- The postcondition CR 800.4a's four clauses exist to guarantee, on a

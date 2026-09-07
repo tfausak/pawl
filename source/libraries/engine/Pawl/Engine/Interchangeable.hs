@@ -96,7 +96,8 @@ representatives pcs gs candidates =
 --   * The zones and GameState.objects hold every object symmetrically, and what
 --     one object says about another is namedByAnother's question.
 --   * GameState.players, GameState.manaPool, GameState.pendingControl,
---     GameState.activeControl (a Decider is a PlayerId), GameState.monarch,
+--     GameState.control (keyed by a player, and a PlayerControl names a Decider,
+--     a lifetime and rule 723.7's restriction -- no object), GameState.monarch,
 --     GameState.initiative, GameState.drewFromEmpty,
 --     GameState.extraTurns and the per-player counters (landsPlayed,
 --     drawsThisTurn, spellsCastLastTurn, castsLastTurn) are keyed by or valued
