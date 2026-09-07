@@ -70,6 +70,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -833,6 +834,48 @@ specialActionsOf oid gs = case copiableSnapshotOf oid gs of
   -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
   Nothing -> foldMap Face.specialActions (Game.faceOf oid gs)
 
+-- CR 613.11: the twelve rule-affecting ability families this object's copiable
+-- rules text gives it -- its copy snapshot's when it has one, its printed face's
+-- otherwise. specialActionsOf above in every respect, and split out for the same
+-- two structural reasons.
+--
+-- THE reader for all twelve gatherer modules (Pawl.Engine.CombatRestriction and
+-- its eleven siblings), which is what makes the two rules it settles settle once:
+-- CR 707.2a, so a permanent that became a copy of Silent Arbiter limits attackers
+-- and its own printed face is never consulted, and CR 702.140e with CR 730.2a, so
+-- a merged permanent answers with every component's -- Pawl.Engine.Event.merge
+-- having folded them into the snapshot at the merge's timestamp, which is why the
+-- components' printed faces are not walked here. A component that was itself a
+-- copy therefore contributes what it was a copy OF, which is what rule 730.2a's
+-- "copiable" asks for and what a per-component face walk would have got wrong.
+--
+-- Pawl.MutateSpec's "CR 702.140e a Silent Arbiter under a Cubwarden still holds
+-- alice to one attacker" is what proves the merged read.
+ruleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
+ruleAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
+  Just snapshot -> PC.ruleAbilities snapshot
+  -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
+  Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
+
+-- The twelve lists a printed face declares. Its own function so that the seed
+-- above and ruleAbilitiesOf's fallback cannot drift on what a face contributes.
+ruleAbilitiesOfFace :: Face.Face Card.Type.Card -> RuleAbilities.RuleAbilities
+ruleAbilitiesOfFace face =
+  RuleAbilities.MkRuleAbilities
+    { RuleAbilities.activationProhibitions = Face.activationProhibitions face,
+      RuleAbilities.attachRestrictions = Face.attachRestrictions face,
+      RuleAbilities.attackCosts = Face.attackCosts face,
+      RuleAbilities.attackRequirements = Face.attackRequirements face,
+      RuleAbilities.blockCosts = Face.blockCosts face,
+      RuleAbilities.blockPermissions = Face.blockPermissions face,
+      RuleAbilities.blockRequirements = Face.blockRequirements face,
+      RuleAbilities.combatRestrictions = Face.combatRestrictions face,
+      RuleAbilities.counterRestrictions = Face.counterRestrictions face,
+      RuleAbilities.entryRestrictions = Face.entryRestrictions face,
+      RuleAbilities.sacrificeRestrictions = Face.sacrificeRestrictions face,
+      RuleAbilities.untapRestrictions = Face.untapRestrictions face
+    }
+
 -- CR 208.2 / 604.3: the card's characteristic-defining P/T, with the printed star
 -- resolved to what the CDA counts. Nothing unless the card declares a CDA *and*
 -- has a printed power and toughness box (CR 208.1) for the star to sit in.
@@ -887,6 +930,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.replacementEffects = [],
         PC.triggeredAbilities = [],
         PC.enchant = [],
+        -- CR 613.11: no card behind the object, so none of the twelve families
+        -- either.
+        PC.ruleAbilities = mempty,
         PC.lostAllAbilities = False,
         PC.subtypeWordChanges = [],
         PC.textChangedKeywords = Map.empty,
@@ -985,6 +1031,12 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- seed. Read off `face`, so CR 708.2a's face-down substitution leaves
               -- a face-down permanent with none.
               PC.enchant = Face.enchant face,
+              -- CR 613.11: the twelve families CR 613.11 applies after the layer
+              -- system, off `face` for enchant's reason -- and copiable for
+              -- enchant's reason too, which is what carries them to a copy and,
+              -- through withMergedAbilities below, to a merged permanent's other
+              -- components (CR 702.140e).
+              PC.ruleAbilities = ruleAbilitiesOfFace face,
               -- CR 613.1's starting point, before layer 6 has run:
               -- applyModification's LoseAllAbilities arm is the only writer.
               PC.lostAllAbilities = False,
@@ -1082,22 +1134,15 @@ withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupO
 -- CR 730.2c keeps every continuous effect that applied to it applying, so a
 -- merge that minted a new one would reorder every layer already on it.
 --
--- The eight ability fields and no other. PC.characteristicPT is deliberately NOT
--- among them although CR 604.3 makes a CDA an ability: rule 730.2a keeps the
--- POWER AND TOUGHNESS characteristic the topmost component's, so a donor CDA
--- that set the box would override the very sentence this function's base
--- implements. No card in data/cards/ prints a CDA box on a creature a mutate
--- spell can target, so nothing tells the two readings apart today.
+-- The ability fields and no other. PC.characteristicPT is deliberately NOT among
+-- them although CR 604.3 makes a CDA an ability: rule 730.2a keeps the POWER AND
+-- TOUGHNESS characteristic the topmost component's, so a donor CDA that set the
+-- box would override the very sentence this function's base implements. No card
+-- in data/cards/ prints a CDA box on a creature a mutate spell can target, so
+-- nothing tells the two readings apart today.
 --
 -- Not implemented: a component whose own record is not the whole of what it
 -- represents -- CR 730.2e through 730.2h's face-down and flip components (#874).
---
--- Not implemented: the twelve ability families this record has no field for --
--- combat, attack, block, untap, entry, sacrifice, counter, attach and
--- activation restrictions, requirements, costs and permissions -- which their
--- gatherers read off Game.faceOf, so a mutated permanent has only its topmost
--- component's. Delayed abilities are read topmost-only too, through
--- Game.delayedAbilitiesOf (#3373).
 withMergedAbilities :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 withMergedAbilities donor base =
   base
@@ -1111,7 +1156,11 @@ withMergedAbilities donor base =
       PC.activatedAbilities = PC.activatedAbilities base <> PC.activatedAbilities donor,
       PC.replacementEffects = PC.replacementEffects base <> PC.replacementEffects donor,
       PC.triggeredAbilities = PC.triggeredAbilities base <> PC.triggeredAbilities donor,
-      PC.enchant = PC.enchant base <> PC.enchant donor
+      PC.enchant = PC.enchant base <> PC.enchant donor,
+      -- CR 613.11's twelve families, whose Semigroup is the same concatenation
+      -- the eight fields above are written out with; Pawl.Types.RuleAbilities
+      -- carries it so a thirteenth family cannot be added and left out here.
+      PC.ruleAbilities = PC.ruleAbilities base <> PC.ruleAbilities donor
     }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's

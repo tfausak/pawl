@@ -7,6 +7,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CardSpec as CardSpec
 import qualified Pawl.Codec.FaceSpec as FaceSpec
 import qualified Pawl.Codec.ProjectedCharacteristics as PC
+import qualified Pawl.Codec.RuleAbilitiesSpec as RuleAbilitiesSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
@@ -67,6 +68,10 @@ testCharacteristics =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],
       PC.enchant = [TargetSlot.required Pool.Creatures Nothing],
+      -- Pawl.Codec.RuleAbilitiesSpec's own fixture, which is where the twelve
+      -- keys inside it are checked; here the case is only that the bundle rides
+      -- one key of this record's own object.
+      PC.ruleAbilities = RuleAbilitiesSpec.testRuleAbilities,
       -- True rather than the default, so an arm that dropped the field would not
       -- round trip to the same JSON.
       PC.lostAllAbilities = True,
@@ -99,6 +104,9 @@ testCharacteristicsJson =
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
+    <> "\"ruleAbilities\":"
+    <> RuleAbilitiesSpec.testRuleAbilitiesJson
+    <> ","
     <> "\"lostAllAbilities\":true,"
     <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}],"
     <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}],"
@@ -131,6 +139,7 @@ minimalCharacteristics =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
       PC.enchant = [],
+      PC.ruleAbilities = mempty,
       PC.lostAllAbilities = False,
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,

@@ -20,6 +20,7 @@ import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Codec.RuleAbilities as RuleAbilities
 import qualified Pawl.Codec.SpecialAction as SpecialAction
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.Subtype as Subtype
@@ -55,6 +56,7 @@ codec = Fields.object $ do
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec Card.codec (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.triggeredAbilities
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) PC.enchant
+  ruleAbilities <- Fields.defaulted "ruleAbilities" mempty RuleAbilities.codec PC.ruleAbilities
   lostAllAbilities <- Fields.defaulted "lostAllAbilities" False Common.boolean PC.lostAllAbilities
   subtypeWordChanges <- Fields.defaulted "subtypeWordChanges" [] (Common.list ChangeSubtypeWord.codec) PC.subtypeWordChanges
   textChangedKeywords <- Fields.defaulted "textChangedKeywords" Map.empty (Common.multiset Keyword.codec) PC.textChangedKeywords
@@ -84,6 +86,7 @@ codec = Fields.object $ do
         PC.replacementEffects = replacementEffects,
         PC.triggeredAbilities = triggeredAbilities,
         PC.enchant = enchant,
+        PC.ruleAbilities = ruleAbilities,
         PC.lostAllAbilities = lostAllAbilities,
         PC.subtypeWordChanges = subtypeWordChanges,
         PC.textChangedKeywords = textChangedKeywords,
