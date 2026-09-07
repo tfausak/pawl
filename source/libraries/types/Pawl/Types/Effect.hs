@@ -1,5 +1,6 @@
 module Pawl.Types.Effect where
 
+import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -43,6 +44,7 @@ import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveCounters as MoveCounters
+import qualified Pawl.Types.MoveMana as MoveMana
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
@@ -117,6 +119,12 @@ data Effect card ability
     -- clauses, and ignores the recipient (#1673); everything else resolves
     -- through Resolve.applyEffect, which reads the whole record.
     AddMana ManaAddition.ManaAddition
+  | -- | CR 605.3: each player the payload names activates a mana ability of each
+    -- permanent they control that its filter matches (Drain Power).
+    ActivateManaAbilities ActivateManaAbilities.ActivateManaAbilities
+  | -- | CR 106.13: the players one reference names lose all their unspent mana,
+    -- and the players the other names add the mana lost this way, as whole units.
+    MoveMana MoveMana.MoveMana
   | -- | CR 701.23: the players Search.searcher names each search the
     -- Search.zones of each player Search.owner names for cards matching
     -- Search.filter, put them where Search.destination says, then shuffle any

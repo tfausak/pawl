@@ -518,6 +518,31 @@ addMana pid units gs =
   let Mana.MkMana existing = Game.poolOf pid gs
    in setPool pid (Mana.MkMana (existing <> units)) gs
 
+-- CR 106.13: the losing players' pools empty and every unit they held is put into
+-- each gaining player's pool -- Drain Power's "that player loses all unspent mana
+-- and you add the mana lost this way", which rule 106.13 names as the only card
+-- that does it.
+--
+-- WHOLE ManaUnits, which is the rule's second sentence: "which permanents,
+-- spells, and\/or abilities produced that mana are unchanged, as are any
+-- restrictions or additional effects associated with any of that mana." Nothing
+-- is re-derived, so the CR 106.3 production tags, the CR 106.4 retention and both
+-- of CR 106.6's clauses arrive as they left. Counting the types and adding that
+-- much mana instead would launder all four; Pawl.ManaSpec's snow assertion is
+-- what proves it does not.
+--
+-- EMPTY FIRST, then add, which is how CR 106.13's parenthetical -- "note that
+-- these may be the same player" -- comes out as a no-op rather than a doubling.
+--
+-- Every gainer receives the whole batch. No card writes more than one of either
+-- side (rule 106.13 closes the category at one card), so nothing reaches the
+-- reading where that would mint mana.
+moveMana :: [PlayerId] -> [PlayerId] -> GameState -> GameState
+moveMana losers gainers gs =
+  let moved = concatMap (\pid -> unitsOf (Game.poolOf pid gs)) losers
+      emptied = List.foldl' (\g pid -> setPool pid (Mana.MkMana []) g) gs losers
+   in List.foldl' (\g pid -> addMana pid moved g) emptied gainers
+
 -- CR 500.5: as a step or phase ends, any unspent mana left in a player's mana
 -- pool empties -- a turn-based action that does not use the stack (CR 703.4q).
 -- CR 106.4 supplies the wording every card that stops it is templated on: the

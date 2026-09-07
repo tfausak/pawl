@@ -13,6 +13,7 @@
 module Pawl.Codec.Effect where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Codec.AffectPlayers as AffectPlayers
 import qualified Pawl.Codec.Amass as Amass
 import qualified Pawl.Codec.ArmDelayedTrigger as ArmDelayedTrigger
@@ -56,6 +57,7 @@ import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.ModifyTarget as ModifyTarget
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import qualified Pawl.Codec.MoveCounters as MoveCounters
+import qualified Pawl.Codec.MoveMana as MoveMana
 import qualified Pawl.Codec.MoveToZone as MoveToZone
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.OfferCast as OfferCast
@@ -99,6 +101,8 @@ codec cardCodec abilityCodec =
       Arm.payload "ModifyTarget" (ModifyTarget.codec abilityCodec) Effect.ModifyTarget (\x -> case x of Effect.ModifyTarget y -> Just y; _ -> Nothing),
       Arm.payload "ChangeText" ChangeText.codec Effect.ChangeText (\x -> case x of Effect.ChangeText y -> Just y; _ -> Nothing),
       Arm.payload "AddMana" ManaAddition.codec Effect.AddMana (\x -> case x of Effect.AddMana y -> Just y; _ -> Nothing),
+      Arm.payload "ActivateManaAbilities" ActivateManaAbilities.codec Effect.ActivateManaAbilities (\x -> case x of Effect.ActivateManaAbilities y -> Just y; _ -> Nothing),
+      Arm.payload "MoveMana" MoveMana.codec Effect.MoveMana (\x -> case x of Effect.MoveMana y -> Just y; _ -> Nothing),
       Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,

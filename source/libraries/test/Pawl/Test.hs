@@ -23,6 +23,7 @@ import qualified Pawl.ClassSpec
 import qualified Pawl.Codec.AbilityKindSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.AbilityTriggeredSpec
+import qualified Pawl.Codec.ActivateManaAbilitiesSpec
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationProhibitionSpec
@@ -278,6 +279,7 @@ import qualified Pawl.Codec.MorphSpec
 import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveCountersSpec
 import qualified Pawl.Codec.MoveDurationSpec
+import qualified Pawl.Codec.MoveManaSpec
 import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.MovedBetweenSpec
 import qualified Pawl.Codec.MovedKindsSpec
@@ -650,6 +652,7 @@ spec s registry = do
   Pawl.Codec.ActiveUnregeneratableSpec.spec s
   Pawl.Codec.AddActivationCostSpec.spec s
   Pawl.Codec.AddSpellCostSpec.spec s
+  Pawl.Codec.ActivateManaAbilitiesSpec.spec s
   Pawl.Codec.AffectPlayersSpec.spec s
   Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
@@ -945,6 +948,7 @@ spec s registry = do
   Pawl.Codec.ProductionTagSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.MoveCountersSpec.spec s
+  Pawl.Codec.MoveManaSpec.spec s
   Pawl.Codec.MovedKindsSpec.spec s
   Pawl.Codec.PrototypeSpec.spec s
   Pawl.Codec.PutCountersFromSpec.spec s

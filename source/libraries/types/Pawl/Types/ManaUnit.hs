@@ -33,7 +33,9 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 -- mana: Pawl.Engine.Mana.manaOptionsOfGiven for a mana ability paid inline (CR
 -- 605.3b), and Pawl.Engine.Resolve's Effect.AddMana arm for an ability that
 -- resolves off the stack (CR 605.1b). Both read them from the same decider,
--- Pawl.Engine.Mana.productionTagsGiven.
+-- Pawl.Engine.Mana.productionTagsGiven. CR 106.13's transfer stamps nothing: it
+-- moves whole units between pools (Pawl.Engine.Mana.moveMana), which is how that
+-- rule's second sentence keeps every field below unchanged.
 data ManaUnit = MkManaUnit
   { manaType :: ManaType.ManaType,
     tags :: Set.Set ProductionTag.ProductionTag,
