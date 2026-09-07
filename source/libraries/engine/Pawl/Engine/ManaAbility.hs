@@ -218,6 +218,16 @@ costMovesLibraryCard component = case component of
 manaProduced :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe ManaAddition.ManaAddition
 manaProduced effect = case effect of
   Effect.AddMana addition -> Just addition
+  -- The mana comes from the abilities this makes a player activate, each of
+  -- which is its own CR 605.1a ability with its own AddMana; this instruction
+  -- adds none. CR 605.1a's first criterion excludes it from being a mana
+  -- ability anyway, Drain Power's sentence naming a target player.
+  Effect.ActivateManaAbilities {} -> Nothing
+  -- Mana reaches a pool without an instruction that ADDS it (CR 106.13), so
+  -- there is no ManaAddition to answer with and nothing for the CR 605.3b
+  -- payment path to stamp. Rule 106.13 closes the category at one card, and
+  -- that card is a sorcery, so no ability can be classified by this arm.
+  Effect.MoveMana {} -> Nothing
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.Fight {} -> Nothing
   Effect.ModifyTarget {} -> Nothing
@@ -398,6 +408,8 @@ movesLibraryCard effect = case effect of
   -- question the ref asks above.
   Effect.Meld (Meld.MkMeld ref _) -> refReachesLibrary ref
   Effect.AddMana _ -> False
+  Effect.ActivateManaAbilities {} -> False
+  Effect.MoveMana {} -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
   Effect.Fight {} -> False
   Effect.ModifyTarget {} -> False

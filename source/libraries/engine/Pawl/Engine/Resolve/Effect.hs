@@ -66,6 +66,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
+import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
@@ -190,6 +191,7 @@ import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveDuration as MoveDuration.Type
+import qualified Pawl.Types.MoveMana as MoveMana
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
@@ -2173,7 +2175,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 608.2b: an illegal target is not affected by this part, and CR 608.2d's
     -- announcement belongs to an effect that IS applied, so nothing is asked.
     _ -> pure ()
-  -- The second place mana reaches a pool (CR 106.3). An ACTIVATED mana ability is
+  -- The second place mana is PRODUCED into a pool (CR 106.3) -- the MoveMana arm
+  -- below puts mana in one without producing any. An ACTIVATED mana ability is
   -- applied by Cost.tapForMana and never resolves (CR 605.3b), and CR 605.4a's
   -- triggered one reaches this arm through performTriggeredManaAbility rather
   -- than off the stack; what resolves here in the ordinary way is a triggered
@@ -2246,6 +2249,50 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ManaUnit.rider = rider
                       }
               State.modify' (Mana.addMana pid (replicate howMany unit))
+  -- CR 608.2c's instruction, carried out by somebody other than this spell's
+  -- controller: Drain Power's first sentence has the TARGETED player activate a
+  -- mana ability of each of their lands. Each activation then runs by CR 605.3,
+  -- and CR 602.2 is what makes every choice in it that player's -- only an
+  -- object's controller can activate its activated ability.
+  --
+  -- Through Cost.tapForMana, the funnel EVERY activation goes through, so this
+  -- road cannot come apart from the payment one: WHICH mana ability and which
+  -- colour are asked of the permanent's controller (Prompt.ChooseManaYield's
+  -- decider), the ability's own cost is paid by that player, CR 605.3b keeps it
+  -- off the stack, CR 405.6c's other effects run inline and CR 605.4a's triggered
+  -- mana abilities are applied where they stand. The engine picks none of it.
+  --
+  -- WHICH permanents: the ones each actor CONTROLS matching the filter, which is
+  -- where "they control" lives -- the filter itself is read in the SPELL's
+  -- context, where CR 109.5's "you" is its controller and not the actor
+  -- (Pawl.Types.ActivateManaAbilities' haddock). Frozen before the first
+  -- activation, so a land that pays for another's ability by sacrificing itself
+  -- does not shorten the list mid-sweep; a permanent gone by the time its turn
+  -- comes simply offers nothing.
+  --
+  -- Not implemented: the ORDER the actor activates them in, which is theirs (CR
+  -- 605.3a says when they may, not in which order) and is taken here as
+  -- battlefieldMatching's, ascending. Observable wherever one land's mana pays
+  -- for another's ability -- Cabal Coffers after the Swamps (#3378).
+  Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> do
+    gs0 <- State.get
+    let matching = battlefieldMatching legal resolving controller source gs0 filter_
+        theirs pid = filter (\oid -> Projection.controllerOf oid gs0 == Just pid) matching
+    -- CR 101.4's APNAP order over several actors, apnapPlayersOf's own
+    -- intersection; Drain Power names one.
+    Monad.forM_ (apnapPlayersOf ref legal controller gs0) $ \pid ->
+      Monad.mapM_ (Cost.tapForMana performManaAbility) (theirs pid)
+  -- CR 106.13: one player loses all their unspent mana and another adds "the mana
+  -- lost this way". WHOLE UNITS cross (Mana.moveMana), which is the rule's second
+  -- sentence -- what produced the mana, its CR 106.4 retention and both of CR
+  -- 106.6's clauses are unchanged because nothing is re-derived.
+  --
+  -- The parenthetical -- "these may be the same player" -- falls out of the order
+  -- Mana.moveMana writes in: the pools empty first, so a card naming one player
+  -- on both sides nets the mana once.
+  Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
+    gs <- State.get
+    State.modify' (Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs))
   Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded

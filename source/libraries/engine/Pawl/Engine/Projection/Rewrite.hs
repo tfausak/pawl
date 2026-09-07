@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Subtype as Subtype
+import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
@@ -403,6 +404,8 @@ rewriteEffect pairs effect = case effect of
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
     Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
   Effect.AddMana _ -> effect
+  Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref (Filter.rewrite pairs filter_))
+  Effect.MoveMana _ -> effect
   Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect

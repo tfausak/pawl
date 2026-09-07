@@ -91,6 +91,8 @@ library codec
     Pawl.Codec.ActivatedAbilitySource
     Pawl.Codec.ActivatedAbilitySourceSpec
     Pawl.Codec.ActivatedAbilitySpec
+    Pawl.Codec.ActivateManaAbilities
+    Pawl.Codec.ActivateManaAbilitiesSpec
     Pawl.Codec.ActivationProhibition
     Pawl.Codec.ActivationProhibitionSpec
     Pawl.Codec.ActivationRestriction
@@ -612,6 +614,8 @@ library codec
     Pawl.Codec.MovedSpec
     Pawl.Codec.MoveDuration
     Pawl.Codec.MoveDurationSpec
+    Pawl.Codec.MoveMana
+    Pawl.Codec.MoveManaSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
     Pawl.Codec.Object
@@ -1451,6 +1455,7 @@ library types
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivatedAbilitySource
+    Pawl.Types.ActivateManaAbilities
     Pawl.Types.ActivationProhibition
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
@@ -1744,6 +1749,7 @@ library types
     Pawl.Types.MovedBetween
     Pawl.Types.MovedKinds
     Pawl.Types.MoveDuration
+    Pawl.Types.MoveMana
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer

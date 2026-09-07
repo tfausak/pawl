@@ -50,6 +50,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
@@ -1006,6 +1007,8 @@ ownCounts effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
+  Effect.ActivateManaAbilities _ -> []
+  Effect.MoveMana _ -> []
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
   -- "up to two" -- so its Counts are reachable from here. A search stating no
   -- count (Mana Severance) has none to reach.
@@ -1349,6 +1352,8 @@ effectNestedEffects effect = case effect of
   Effect.DealDamage {} -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana {} -> []
+  Effect.ActivateManaAbilities {} -> []
+  Effect.MoveMana {} -> []
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
@@ -1773,6 +1778,8 @@ effectReplacements effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
+  Effect.ActivateManaAbilities _ -> []
+  Effect.MoveMana _ -> []
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
@@ -2166,6 +2173,8 @@ effectMintedFaces effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
+  Effect.ActivateManaAbilities _ -> []
+  Effect.MoveMana _ -> []
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
@@ -4530,6 +4539,11 @@ effectFilters effect = case effect of
   Effect.Venture {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed [f] <> frame Unframed (quantityFilters quantity)
+  -- Unframed, PlayerSacrifices' answer and for its reason: the filter names
+  -- permanents on the battlefield, judged by the ordinary projection.
+  Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities _ f) -> unframed [f]
+  -- No filter: CR 106.13 moves a pool, and a pool is not a set of objects.
+  Effect.MoveMana _ -> []
   -- CR 727.5's exemption is an ObjectRef like every other, and Karn Liberated's
   -- "all non-Aura permanent cards exiled with Karn" states characteristics in it
   -- -- so an empty list here took a Filter a card author writes out of the lint.

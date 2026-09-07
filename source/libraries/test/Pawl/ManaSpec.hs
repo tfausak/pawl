@@ -56,6 +56,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DealDamage as DealDamage
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
@@ -89,6 +90,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
@@ -3110,6 +3112,119 @@ sicken oid gs =
     { GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)
     }
 
+-- CR 106.13's card. Drain Power is the only printing that moves mana from one
+-- player's pool to another, and rule 106.13 says so in as many words, so this
+-- group is the whole of what exercises Effect.MoveMana and
+-- Effect.ActivateManaAbilities.
+--
+-- THREE SEATS, so "that player" and "you" cannot collapse and a third pool is
+-- there to prove the transfer takes only the one the spell named.
+drainPowerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
+  -- The whole sentence at once: bob activates a mana ability of each of his
+  -- three lands -- choosing Bayou's colour himself -- and then loses that mana
+  -- to alice, units and all.
+  Spec.it s "CR 106.13 the pool crosses whole, and its production tags with it" $ do
+    drainPower <- S.printingOf s registry "Drain Power"
+    island <- S.printingOf s registry "Island"
+    bayou <- S.printingOf s registry "Bayou"
+    snowCoveredMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let (gs, spellId) = drainPowerBoard drainPower island bayou snowCoveredMountain forest
+        ((_, cast), askedCasting) = State.runState (Engine.runGame (aimedAt S.bob Color.Black) gs (S.cast S.alice spellId)) []
+        ((_, after), asked) = State.runState (Engine.runGame (aimedAt S.bob Color.Black) cast Stack.resolveTop) []
+        ((_, green), _) = State.runState (Engine.runGame (aimedAt S.bob Color.Green) cast Stack.resolveTop) []
+    -- The fixture, asserted rather than assumed: a cast that cannot be paid for
+    -- fails silently, and every assertion below would then be about a board
+    -- where nothing happened.
+    Spec.assertEqWith s "the spell left alice's hand" (S.handSize S.alice cast) 0
+    Spec.assertEqWith s "alice spent her {U}{U} paying for it" (poolTypes S.alice cast) []
+    Spec.assertEqWith s "and nothing was asked of anyone but alice as she cast it" (filter (/= S.alice) askedCasting) []
+    -- CR 605.3 and CR 106.13 together: bob's three lands produced, and every
+    -- unit reached alice with the type bob's own answer settled.
+    Spec.assertEqWith s "CR 106.13 alice holds what bob's lands made" (poolTypes S.alice after) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
+    -- The discriminating half of that: the SAME board with the other answer to
+    -- Bayou's prompt puts the other colour in alice's pool, so the colour is the
+    -- answer's and not the engine's.
+    Spec.assertEqWith s "CR 105.4 the other answer to Bayou sends green instead" (poolTypes S.alice green) [ManaType.Colored Color.Green, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
+    -- CR 106.13's second sentence, which is why whole ManaUnits cross: a
+    -- transfer that re-added plain mana of the same types would leave alice
+    -- holding red mana no snow permanent produced, and CR 107.4h's {S} reads
+    -- exactly this.
+    Spec.assertEqWith s "CR 106.13 the snow mana keeps its production tag" (fmap ManaUnit.tags (poolUnitsOf S.alice after)) [Set.empty, Set.singleton ProductionTag.Snow, Set.empty]
+    Spec.assertEqWith s "CR 106.13 bob loses all of it" (poolTypes S.bob after) []
+    Spec.assertEqWith s "and carol, whom the spell did not name, keeps hers" (poolTypes S.carol after) [ManaType.Colored Color.White]
+    -- CR 602.2: WHICH mana ability of Bayou is bob's choice -- only an object's
+    -- controller activates its activated ability -- so the one prompt
+    -- the resolution raises is his. Bayou is the only one of the three lands that
+    -- offers two, which is why the list is one long.
+    Spec.assertEqWith s "CR 602.2 the choice of ability is the targeted player's" asked [S.bob]
+  -- CR 106.13's parenthetical: "note that these may be the same player".
+  Spec.it s "CR 106.13 a self-targeted transfer nets the mana once" $ do
+    drainPower <- S.printingOf s registry "Drain Power"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    let base = Mana.addMana S.alice [unitOf (ManaType.Colored Color.White)] (S.landsFor forest S.alice 1 (S.landsFor island S.alice 2 S.threePlayerGame))
+        (gs, spellId) = S.handOne drainPower base
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+        after = S.runPure S.identityAnswer cast Stack.resolveTop
+    -- The fixture: the two Islands paid for the spell, leaving the {W} that was
+    -- already floating and the untapped Forest.
+    Spec.assertEqWith s "the spell left alice's hand" (S.handSize S.alice cast) 0
+    Spec.assertEqWith s "her floating {W} survived the payment" (poolTypes S.alice cast) [ManaType.Colored Color.White]
+    -- ONCE: the Forest's {G} joins the {W} and the transfer onto herself empties
+    -- the pool before it adds, so neither unit is doubled. The tapped Islands
+    -- offer nothing, which is CR 609.3's "as much as possible".
+    Spec.assertEqWith s "CR 106.13 the pool is what it held, not twice that" (poolTypes S.alice after) [ManaType.Colored Color.White, ManaType.Colored Color.Green]
+
+-- alice holds Drain Power and two Islands to pay for it; bob controls the three
+-- lands the spell will make him tap -- a Bayou (two mana abilities, so its colour
+-- is a real choice), a Snow-Covered Mountain (a production tag alice cannot make
+-- herself) and a Forest; carol holds a floating {W} nothing should touch.
+--
+-- The lands are added in that order, so bob's pool comes out in it: Bayou's
+-- answer, then the snow red, then the green.
+drainPowerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+drainPowerBoard drainPower island bayou snowCoveredMountain forest =
+  S.handOne
+    drainPower
+    ( Mana.addMana
+        S.carol
+        [unitOf (ManaType.Colored Color.White)]
+        (S.landsFor island S.alice 2 (S.landsFor forest S.bob 1 (S.landsFor snowCoveredMountain S.bob 1 (S.landsFor bayou S.bob 1 S.threePlayerGame))))
+    )
+
+-- One ordinary unit of a type, for a pool a fixture floats mana into directly.
+unitOf :: ManaType.ManaType -> ManaUnit.ManaUnit
+unitOf manaType =
+  ManaUnit.MkManaUnit
+    { ManaUnit.manaType = manaType,
+      ManaUnit.tags = Set.empty,
+      ManaUnit.retention = ManaRetention.Ordinary,
+      ManaUnit.restriction = Nothing,
+      ManaUnit.rider = Nothing
+    }
+
+-- Targets `victim`, takes `color` wherever a mana yield offers it, and records
+-- the PLAYER each yield prompt was asked of.
+--
+-- Stateful rather than pure because the identity of the player asked is the
+-- subject: a pure answerer could report which colour came back but never who
+-- chose it.
+aimedAt :: PlayerId.PlayerId -> Color.Color -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+aimedAt victim color p = case p of
+  Prompt.ChooseManaYield decider _ _ _ -> do
+    State.modify' (<> [Decider.unwrap decider])
+    pure (prefersColor color p)
+  Prompt.ChooseTargets _ _ _ offered -> pure (S.preferring (== Recipient.ToPlayer victim) offered)
+  _ -> pure (S.identityAnswer p)
+
+-- The units of any player's pool -- poolUnits' twin for the two pools a CR
+-- 106.13 transfer has.
+poolUnitsOf :: PlayerId.PlayerId -> GameState.GameState -> [ManaUnit.ManaUnit]
+poolUnitsOf pid gs = case Game.poolOf pid gs of
+  Mana.Type.MkMana units -> units
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
@@ -3139,6 +3254,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   activationAdjustmentSpec s registry
   wildGrowthSpec s registry
   autumnWillowSpec s registry
+  drainPowerSpec s registry
 
 -- The units of Alice's pool, so a test can look at a mana's TAGS and not only at
 -- its type -- which is the whole of what CR 107.4h reads.
