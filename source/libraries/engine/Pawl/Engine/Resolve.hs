@@ -998,8 +998,8 @@ resolveAbilityWith runSubgame abilId srcId ability = do
       --
       -- Read off ActivatedAbility.keyword, the stamp Keyword.mintedBy writes, so
       -- this is a case on a rule-702 KEYWORD and not on an effect's identity.
-      -- The source is the Vehicle (CR 113.7a), which is what rule 702.122e's
-      -- "[this Vehicle]" names.
+      -- The source is the Vehicle -- CR 113.7's "the object whose ability was
+      -- activated" -- which is what rule 702.122e's "[this Vehicle]" names.
       case ActivatedAbility.keyword ability of
         Just (Keyword.Crew _) -> State.modify' (Event.recordEvent (GameEvent.BecameCrewed srcId))
         _ -> pure ()
