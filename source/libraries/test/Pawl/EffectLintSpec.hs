@@ -2496,7 +2496,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace (any idleTokenRowOffends . cardReplacementEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: Doubling Season, Queen Allenal of
-    -- Ruadach and Quina, Qu Gourmet are the cards that print a token row.
+    -- Ruadach, Quina, Qu Gourmet and Case of the Pilfered Proof print token
+    -- rows.
     Spec.assertBool s (any (anyFace (any isTokenR . cardReplacementEffects) . Printing.card) ps) "the pool has a card printing a token replacement"
     Spec.assertEqWith s "and every one of them scales or appends" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against Queen Allenal rather than a card

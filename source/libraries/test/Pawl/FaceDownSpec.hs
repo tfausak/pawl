@@ -2583,9 +2583,10 @@ tappedAmong oids gs = length (filter (\oid -> fmap Object.tapped (Game.lookupObj
 --
 -- Defenestrated Phantom is the card, {4}{W}{W} Creature -- Spirit 4/3, "Flying /
 -- Disguise {4}{W}", transcribed whole. Chosen as the pool's plainest disguise
--- creature: MKM's others carry investigate or something that happens as they are
--- turned face up -- Bubble Smuggler's CR 614.1e counter clause, at the end of this
--- group, is one -- either of which would put a second observable event beside the
+-- creature: MKM's others carry investigate, a trigger of their own (Basilica
+-- Stalker's combat damage clause) or something that happens as they are turned
+-- face up -- Bubble Smuggler's CR 614.1e counter clause, at the end of this
+-- group, is one -- any of which would put a second observable event beside the
 -- one these cases read. Its
 -- printed values differ from CR 702.168b's listing on every axis the rule names
 -- -- 4/3 against the 2/2, a Spirit against no subtypes, flying against ward {2},

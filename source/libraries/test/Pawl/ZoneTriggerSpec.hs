@@ -2565,6 +2565,11 @@ everyTriggerCondition =
     -- Event.eventBindingSlots turns on. A union would claim `became` here and the
     -- pin below would catch it.
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
+    -- Case of the Pilfered Proof's own pair, and the other side of that call:
+    -- both branches bind `became`, so the intersection is NON-EMPTY and the pin
+    -- below is what says eventBindings fills it for each branch's event in turn.
+    -- The empty pair alone would leave the AnyOf arm free to stamp nothing.
+    TriggerCondition.AnyOf [TriggerCondition.PermanentEnters (Filter.Type.And []), TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And [])],
     TriggerCondition.SelfTurnedFaceUp,
     TriggerCondition.SelfTransformedInto (CardName.MkCardName (Text.pack "Blightsower Thallid")),
     TriggerCondition.PermanentTransforms (Filter.Type.And []),
