@@ -843,9 +843,17 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.supertypes = Set.empty,
         PC.keywords = Map.empty,
         PC.colors = Set.empty,
-        -- No card, so no mana cost to read -- which is not CR 202.3a's 0 (#674).
+        -- CR 202.1 reads a mana cost off a card, and there is none to read.
         PC.manaCost = Nothing,
-        PC.manaValue = Nothing,
+        -- CR 202.3a all the same: CR 109.1 makes an ability on the stack an
+        -- OBJECT, and an object with no mana cost has mana value 0 -- neither of
+        -- that rule's two exceptions (a nonmodal double-faced back face, a melded
+        -- permanent) is an object with no card behind it. CR 603.3's "no other
+        -- characteristics" does not take it back: CR 109.3 lists mana COST as a
+        -- characteristic and not mana value, which rule 202.3 derives from it.
+        -- Pawl.CounterspellSpec's Synthetic Weigh the Trigger group is what
+        -- proves the number.
+        PC.manaValue = Just 0,
         PC.power = Nothing,
         PC.toughness = Nothing,
         PC.loyalty = Nothing,
@@ -906,8 +914,10 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- face-down face has no mana cost (so CR 202.3a's 0). SUMMED because CR
             -- 202.3c gives a melded permanent "the combined mana cost of the front
             -- faces of each card that represents it"; every other object answers
-            -- with one face, whose sum is itself. No face at all is an object with
-            -- no card behind it, which is Nothing rather than CR 202.3a's 0 (#674).
+            -- with one face, whose sum is itself. An object with no card behind it
+            -- never arrives here -- Game.faceOf answers Nothing for it and the arm
+            -- above carries CR 202.3a's 0 -- so an empty Seq here is a printing the
+            -- game does not know (Game.frontFaceOfPrinting), which is Nothing.
             PC.manaValue = case Game.manaCostFacesOf oid gs of
               faces | Seq.null faces -> Nothing
               faces -> Just (sum (fmap Quantity.manaValueOf faces)),
