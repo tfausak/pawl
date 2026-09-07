@@ -2841,6 +2841,17 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         offenders = filter (offends . Printing.card) ps
     Spec.assertBool s (any ((== Layout.Flip) . Card.Type.layout . Printing.card) ps) "the pool has a flip card to lint"
     Spec.assertEqWith s "every flip card has two halves" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 722.1 with CR 722.2: a preparation card's frame has the card's own text
+  -- box and one inset frame, so it prints exactly two faces. The flip lint's
+  -- sentence one layout over, and it does the same job: it is what makes
+  -- Pawl.Engine.Card.prepareFace's empty-tail arm unreachable, where a one-faced
+  -- preparation card would become prepared and mint nothing.
+  Spec.it s "CR 722.1 a preparation card prints exactly two faces" $ do
+    ps <- S.allPrintings s
+    let offends card = Card.Type.layout card == Layout.Preparation && length (Card.Type.faces card) /= 2
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertBool s (any ((== Layout.Preparation) . Card.Type.layout . Printing.card) ps) "the pool has a preparation card to lint"
+    Spec.assertEqWith s "every preparation card has two halves" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against a hand-built offender rather than a
   -- card file: a card that repeats a face name must not be loadable.
   Spec.it s "the lint itself catches a card that repeats a face name" $ do

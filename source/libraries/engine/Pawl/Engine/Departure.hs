@@ -498,6 +498,11 @@ nonCardStackObjectsCease pid gs =
           -- CR 112.1a: a copy of a spell has no card associated with it, so CR
           -- 800.4a reaches it along with the rest.
           Source.OfSpellCopy _ -> True
+          -- CR 707.10a's copy of a CARD is no more represented by a card than a
+          -- copy of a spell is, so CR 800.4a reaches it too once CR 722.3c's
+          -- permission has put it on the stack. Before that it sits in exile,
+          -- where the zone filter this feeds never looks.
+          Source.OfCardCopy _ -> True
           Source.OfInherentTrigger _ -> True
       theirs oid = Projection.controllerOf oid gs == Just pid && notACard oid
       cease g oid = case Game.lookupObject oid g of

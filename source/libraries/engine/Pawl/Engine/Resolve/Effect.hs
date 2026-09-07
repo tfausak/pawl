@@ -48,6 +48,7 @@ import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
+import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -559,6 +560,7 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
       Source.OfToken _ -> Nothing
       Source.OfEmblem _ -> Nothing
       Source.OfSpellCopy _ -> Nothing
+      Source.OfCardCopy _ -> Nothing
       Source.OfInherentTrigger _ -> Nothing
 
 -- The cards in the named graveyards matching the filter, for
@@ -1244,6 +1246,7 @@ sourceObjectOf src = case src of
   Source.OfTrigger t -> [TriggeredAbilitySource.source t]
   Source.OfEmblem _ -> []
   Source.OfSpellCopy _ -> []
+  Source.OfCardCopy _ -> []
   Source.OfInherentTrigger _ -> []
 
 -- Every object a binding environment names, both shapes: the one object a target
@@ -1621,6 +1624,10 @@ copyOnStackOf :: Source.Source -> Maybe (Source.Source, StackObjectKind.StackObj
 copyOnStackOf source = case source of
   Source.OfCard pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
   Source.OfSpellCopy pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
+  -- CR 722.3c's copy is a spell once cast, so copying it is CR 707.10's ordinary
+  -- case and the result is a copy of a SPELL -- the arm above's answer, off this
+  -- copy's own printing (CR 707.2's copiable values).
+  Source.OfCardCopy pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
   Source.OfAbility a -> Just (Source.OfAbility a, StackObjectKind.Ability)
   Source.OfTrigger t -> Just (Source.OfTrigger t, StackObjectKind.Ability)
   -- CR 725.2's sourceless triggered ability is a triggered ability all the same,
@@ -1683,6 +1690,7 @@ stackTargetSlots obj oid gs =
         Source.OfInherentTrigger t -> Modal.modesTargetSlots chosen (baked (TriggeredAbility.modal (InherentTriggerSource.ability t)))
         Source.OfCard _ -> fromFace
         Source.OfSpellCopy _ -> fromFace
+        Source.OfCardCopy _ -> fromFace
         Source.OfMeld _ -> fromFace
         Source.OfToken _ -> fromFace
         Source.OfEmblem _ -> fromFace
@@ -5151,16 +5159,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- player recipient, an illegal slot (CR 608.2b) and an id naming no object all
   -- write nothing. CR 701.60c's menace and can't-block are read off
   -- Object.designations live.
+  --
+  -- Pawl.Engine.Prepare.mayGain is CR 722.3a's own precondition beside the
+  -- transition guard -- "a permanent can't gain this designation unless it has a
+  -- prepare spell" -- and mintOnDesignated is CR 722.3c's copy, run in the same
+  -- breath as the write because the rule says "AS a permanent ... gains the
+  -- prepared designation". Both are keyed on WHICH designation and neither asks
+  -- which card; see that module.
   Effect.Designate (Designate.MkDesignate designation slot) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           gs <- State.get
-          Monad.when (maybe False (not . Set.member designation . Object.designations) (Game.lookupObject target gs)) $ do
+          Monad.when (maybe False (not . Set.member designation . Object.designations) (Game.lookupObject target gs) && Prepare.mayGain designation target gs) $ do
             State.modify'
               (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.insert designation (Object.designations o)}) target (GameState.objects g)})
             State.modify' (Event.recordEvent (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated designation target)))
+            Prepare.mintOnDesignated designation target
       _ -> pure ()
   -- CR 716.2a: "This Class's level becomes N." A state write on the slot's
   -- permanent, not a CR 613 modification -- CR 716.2b makes a level a designation,

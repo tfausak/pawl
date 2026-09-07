@@ -304,6 +304,7 @@ humilityTimestamp humility gs =
           Source.OfTrigger _ -> False
           Source.OfEmblem _ -> False
           Source.OfSpellCopy _ -> False
+          Source.OfCardCopy _ -> False
           Source.OfInherentTrigger _ -> False
       hums = filter isHum (Set.toList (GameState.battlefield gs))
       stampOf oid = fmap Object.timestamp (Game.lookupObject oid gs)

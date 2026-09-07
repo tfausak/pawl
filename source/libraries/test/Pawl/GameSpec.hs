@@ -200,6 +200,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.playableFromExile = Nothing,
               Object.plotted = Nothing,
               Object.foretold = Nothing,
+              Object.preparedCopyOf = Nothing,
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.ventureRoom = Nothing,
@@ -2350,6 +2351,7 @@ handBobBolt lightningBolt gs =
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -2386,6 +2388,9 @@ namedIs wanted gs mo =
           Source.OfTrigger _ -> False
           Source.OfEmblem _ -> False
           Source.OfSpellCopy printingId -> named printingId
+          -- CR 722.3c's copy has a name of its own, the prepare spell's, which is
+          -- the one face of the printing the mint interned.
+          Source.OfCardCopy printingId -> named printingId
           Source.OfInherentTrigger _ -> False
         Nothing -> False
 
@@ -2783,6 +2788,7 @@ restartOnStack mountain =
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,

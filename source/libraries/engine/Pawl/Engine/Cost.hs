@@ -207,7 +207,31 @@ candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]
   Just obj -> case Object.source obj of
-    Source.OfCard printingId -> case Game.cardOfPrinting printingId gs of
+    Source.OfCard printingId -> costsOfPrinting obj printingId
+    -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
+    -- the stack, so it is never announced and there is no cost to offer for it.
+    Source.OfMeld _ -> []
+    Source.OfToken _ -> []
+    Source.OfAbility _ -> []
+    Source.OfTrigger _ -> []
+    Source.OfEmblem _ -> []
+    -- CR 707.10: "a copy of a spell isn't cast", so it is never announced and
+    -- there is no cost to offer for it.
+    Source.OfSpellCopy _ -> []
+    -- CR 722.3c's copy is CAST -- "the prepared permanent's controller may cast
+    -- the copy" -- so CR 601.2 announces it like any other spell and it is priced
+    -- exactly as the card-backed arm above prices a card, off the one-faced
+    -- printing Pawl.Engine.Prepare interned for the prepare spell's
+    -- characteristics.
+    Source.OfCardCopy printingId -> costsOfPrinting obj printingId
+    Source.OfInherentTrigger _ -> []
+  where
+    -- The card-backed body the two printing-carrying arms above share. CR 601.2
+    -- is why they share it rather than the copy getting a price of its own: a
+    -- cast copy goes through that rule's steps like any other spell, so every
+    -- alternative cost, every additional cost and every zone clause below reads
+    -- the same for both.
+    costsOfPrinting obj printingId = case Game.cardOfPrinting printingId gs of
       -- Unreachable: a PrintingId is minted only by Game.intern, which inserts.
       Nothing -> []
       Just card ->
@@ -375,17 +399,6 @@ candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
                 fmap untagged (printed : alternatives)
                   <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs]
               _ -> fmap untagged (printed : alternatives)
-    -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
-    -- the stack, so it is never announced and there is no cost to offer for it.
-    Source.OfMeld _ -> []
-    Source.OfToken _ -> []
-    Source.OfAbility _ -> []
-    Source.OfTrigger _ -> []
-    Source.OfEmblem _ -> []
-    -- CR 707.10: "a copy of a spell isn't cast", so it is never announced and
-    -- there is no cost to offer for it.
-    Source.OfSpellCopy _ -> []
-    Source.OfInherentTrigger _ -> []
 
 -- CR 601.2f: the mana or alternative cost, plus additional costs and increases,
 -- minus reductions. `cost` arrives with X already substituted (CR 601.2b precedes

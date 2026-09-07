@@ -88,6 +88,16 @@ spec s = Spec.describe s "Pawl.Codec.Source" $ do
       Source.codec
       (Source.OfSpellCopy (PrintingId.MkPrintingId 7))
       " {\"type\":\"OfSpellCopy\",\"value\":7} "
+  -- CR 707.10a's other copy, CR 722.3c's copy of a card: the same payload again,
+  -- and a DIFFERENT tag from OfSpellCopy above -- the two zones CR 704.5e gives
+  -- them are why an arm that wrote the other's tag would be a bug rather than a
+  -- synonym.
+  Spec.it s "OfCardCopy" $
+    Common.assertCodec
+      s
+      Source.codec
+      (Source.OfCardCopy (PrintingId.MkPrintingId 8))
+      " {\"type\":\"OfCardCopy\",\"value\":8} "
   -- CR 725.2 / CR 702.179d: the same ability as OfTrigger above, under a
   -- controller instead of a source id. The two arms differ only there, so an
   -- arm writing the other's tag would still have to write the other's key.

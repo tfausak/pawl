@@ -17,6 +17,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
@@ -261,6 +262,30 @@ data Object = MkObject
     -- face down, but CR 702.143d makes a card foretold that was already in exile
     -- face up, so neither field implies the other.
     foretold :: Maybe Natural.Natural,
+    -- | CR 722.3c: this exiled object is the copy that rule minted, naming the
+    -- PREPARED PERMANENT it was minted for. Nothing for everything else, which is
+    -- every object in the game but one per prepared permanent.
+    --
+    -- One field answering the four questions rule 722.3c asks, which is why it is
+    -- an ObjectId rather than a Bool. "This copy remains in exile for as long as
+    -- the prepared permanent remains on the battlefield and has the prepared
+    -- designation" needs the permanent to look at, and Pawl.Engine.Sba looks
+    -- there; "the prepared permanent's controller may cast the copy" needs the
+    -- CONTROLLER, which CR 109.4 lets change, so Pawl.Engine.Cast reads it live
+    -- off the named permanent rather than off a stored seat; and "that permanent
+    -- loses the prepared designation at the time the spell becomes cast (see rule
+    -- 601.2i)" needs the permanent again, which Pawl.Engine.Cast reads one step
+    -- ahead of CR 601.2a's move.
+    --
+    -- NOT the other direction. A `preparedCopy` on the permanent would have to be
+    -- kept in step with a copy the state-based action can remove, where this
+    -- direction has one writer -- Pawl.Engine.Prepare.prepare, at the mint -- and
+    -- every reader scans exile for it (Pawl.Engine.Prepare.copyOf).
+    --
+    -- Per-incarnation: cleared by newIncarnation (CR 400.7). That clear is CR
+    -- 601.2i's other half -- the copy stops being a prepared copy the moment it
+    -- is cast -- so nothing has to unset it.
+    preparedCopyOf :: Maybe ObjectId.ObjectId,
     -- | CR 701.54b: the Ring-bearer designation, as the player it was made for.
     -- On the object, that rule making it "a designation a permanent can have",
     -- where GameState.monarch is one designation naming a player.
@@ -333,7 +358,8 @@ data Object = MkObject
     -- from the half that was cast every time the permanent enters.
     unlockedHalves :: Set.Set CardName.CardName,
     -- | Every designation this permanent has: CR 702.112b's renowned, CR 701.37b's
-    -- monstrous, CR 701.60b's suspected and CR 719.3b's solved, which
+    -- monstrous, CR 701.60b's suspected, CR 719.3b's solved and CR 722.3b's
+    -- prepared, which
     -- Pawl.Types.Designation holds as one type because those rules word the mark
     -- identically. A Set where ringBearerFor above is a Maybe PlayerId, none of
     -- those rules naming a player.
@@ -347,6 +373,11 @@ data Object = MkObject
     -- the permanent menace and "this creature can't block" for as long as it is
     -- suspected, both read off this set live rather than stamped, so nothing has
     -- to be unwound when Effect.Unsuspect deletes the member (CR 701.60a).
+    --
+    -- Prepared is the second such member: CR 722.3c keeps a copy of the permanent
+    -- in exile "for as long as the prepared permanent remains on the battlefield
+    -- and has the prepared designation", which Pawl.Engine.Sba reads off this set
+    -- live for the same reason.
     designations :: Set.Set Designation.Designation,
     -- | CR 702.33d: how many times did this SPELL's controller declare each of
     -- its kicker costs? Stamped by Pawl.Engine.Cast at CR 601.2b onto the stack
@@ -615,6 +646,7 @@ newIncarnation object =
       playableFromExile = Nothing,
       plotted = Nothing,
       foretold = Nothing,
+      preparedCopyOf = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,
       ventureRoom = Nothing,

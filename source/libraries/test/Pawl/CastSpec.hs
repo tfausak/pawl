@@ -252,6 +252,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
             Source.OfSpellCopy _ -> Spec.assertFailure s "expected a card source"
+            Source.OfCardCopy _ -> Spec.assertFailure s "expected a card source"
             Source.OfInherentTrigger _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "resolving conserves objects" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -363,6 +364,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
             Source.OfEmblem _ -> Spec.assertFailure s "expected a card source"
             Source.OfSpellCopy _ -> Spec.assertFailure s "expected a card source"
+            Source.OfCardCopy _ -> Spec.assertFailure s "expected a card source"
             Source.OfInherentTrigger _ -> Spec.assertFailure s "expected a card source"
   Spec.it s "CR 117.1a a Bolt is castable outside a main phase" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -700,6 +702,7 @@ handInPlay printing board =
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -3421,6 +3424,9 @@ nameOnStack wanted gs oid = case Game.lookupObject oid gs of
     -- CR 112.1a: a copy of a spell has a name, the copied spell's, and the same
     -- read finds it. No caller reaches one today.
     Source.OfSpellCopy _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
+    -- CR 722.3c's copy the same way: the one face of its own printing is what
+    -- Game.faceOf resolves to. No caller reaches one today.
+    Source.OfCardCopy _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
     Source.OfInherentTrigger _ -> False
   Nothing -> False
 

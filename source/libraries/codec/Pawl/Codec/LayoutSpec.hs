@@ -51,6 +51,13 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       Layout.codec
       Layout.Omen
       " {\"type\":\"Omen\"} "
+  -- CR 722.1.
+  Spec.it s "Preparation" $
+    Common.assertCodec
+      s
+      Layout.codec
+      Layout.Preparation
+      " {\"type\":\"Preparation\"} "
   -- CR 712.2.
   Spec.it s "Transforming" $
     Common.assertCodec

@@ -1,10 +1,11 @@
 module Pawl.Types.Designation where
 
 -- | A designation A PERMANENT can have and nothing else about it: CR 702.112b's
--- renowned, CR 701.37b's monstrous, CR 701.60b's suspected and CR 719.3b's
--- solved. Every one of those rules words the mark the same way -- only a
--- permanent can have it, it is "neither an ability nor part of the permanent's
--- copiable values", and it lasts until the permanent leaves the battlefield --
+-- renowned, CR 701.37b's monstrous, CR 701.60b's suspected, CR 719.3b's solved
+-- and CR 722.3b's prepared. Every one of those rules words the mark the same
+-- way -- only a permanent can have it, it is "neither an ability nor part of the
+-- permanent's copiable values", and it lasts until the permanent leaves the
+-- battlefield --
 -- so they are one payload rather than a field, an opcode and a read atom apiece
 -- (Pawl.Types.Object's `designations`, Effect.Designate,
 -- Quantity.HasDesignation, Filter.HasDesignation).
@@ -44,6 +45,9 @@ module Pawl.Types.Designation where
 -- lets `Suspected` alone END before the permanent leaves the battlefield, which
 -- is why Effect.Unsuspect is its own opcode rather than a designation-parameterised
 -- inverse of Effect.Designate -- no rule takes renowned, monstrous or solved away.
+-- `Prepared` is `Suspected`'s shape in both respects, and one more besides: CR
+-- 722.3c makes GAINING it mint an object, which is why Pawl.Engine.Prepare owns
+-- that write.
 data Designation
   = -- | CR 702.112b: renowned, the marker rule 702.112a's renown ability sets.
     Renowned
@@ -57,4 +61,17 @@ data Designation
     -- CR 719.3c's "Solved --" ability is gated on. Renowned's shape: set by a
     -- trigger of the permanent's own, and with no remover.
     Solved
+  | -- | CR 722.3b: prepared, which CR 722.3a's "becomes prepared" instruction
+    -- sets and which CR 722.3b takes away again -- Suspected's shape rather than
+    -- Renowned's, and the only other mark here that a rule removes.
+    --
+    -- Two clauses of CR 722.3a are gates the other marks have no counterpart for,
+    -- and Pawl.Engine.Prepare holds both: "a permanent can't gain this
+    -- designation unless it has a prepare spell", and it may not gain one it
+    -- already has -- which is Effect.Designate's standing transition guard.
+    -- Gaining it is not only a write, either: CR 722.3c mints a copy of the
+    -- permanent in exile at the same moment, which is why this constructor's
+    -- write goes through Pawl.Engine.Prepare.prepare rather than the bare
+    -- set-insert the other three take.
+    Prepared
   deriving (Bounded, Enum, Eq, Ord, Show)

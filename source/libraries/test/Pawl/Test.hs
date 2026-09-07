@@ -533,6 +533,7 @@ import qualified Pawl.PlaneswalkerCombatSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
+import qualified Pawl.PreparationSpec
 import qualified Pawl.PreventionSpec
 import qualified Pawl.ProjectionSpec
 import qualified Pawl.PrototypeSpec
@@ -1152,6 +1153,7 @@ spec s registry = do
   Pawl.CastProhibitionSpec.spec s registry
   Pawl.CastPermissionSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
+  Pawl.PreparationSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry
   Pawl.PrototypeSpec.spec s registry
   Pawl.RadSpec.spec s registry
