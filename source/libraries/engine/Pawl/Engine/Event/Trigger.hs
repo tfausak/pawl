@@ -146,6 +146,7 @@ movedOf event = case event of
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
+  GameEvent.BecameCrewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
@@ -329,6 +330,9 @@ looksBack condition = case condition of
   -- Nor here, and by the same sentence: rule 702.149a's counter goes on an
   -- attacking creature, which CR 506.4 has removed from combat if it left.
   TriggerCondition.SelfTrains -> False
+  -- Nor here: rule 702.122e's Vehicle is on the battlefield when its own crew
+  -- ability resolves, so there is no departure to look back past.
+  TriggerCondition.SelfBecomesCrewed -> False
   -- Entries, not departures (CR 603.6a). The rule's own CR 603.6a checks "all
   -- permanents on the battlefield (including the newcomers)" AFTER the event.
   TriggerCondition.SelfEnters -> False
@@ -517,6 +521,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfEvolves -> False
   TriggerCondition.AttachedCreatureMentors -> False
   TriggerCondition.SelfTrains -> False
+  TriggerCondition.SelfBecomesCrewed -> False
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
   TriggerCondition.StepBegins {} -> False
@@ -898,6 +903,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
+        GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -1094,6 +1100,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
+        GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -1306,6 +1313,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
+        GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -1444,6 +1452,7 @@ eventTriggers events gs =
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
+        GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -1895,6 +1904,9 @@ zonesTriggeredFrom cond = case cond of
   -- exception -- for a condition that cannot trigger from there at all -- does not
   -- apply.
   TriggerCondition.SelfTrains -> battlefield
+  -- The same default: CR 702.122a's ability is a Vehicle permanent's, so its
+  -- bearer is on the battlefield and CR 113.6k's exception does not apply.
+  TriggerCondition.SelfBecomesCrewed -> battlefield
   -- CR 113.6's default: an ability of a permanent functions only while that
   -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
   -- condition that CANNOT trigger from the battlefield, and this one plainly can
@@ -2324,6 +2336,10 @@ stateTriggers gs
               -- that resolution put is a counter like any other, so the board
               -- afterwards says nothing about which creature trained.
               TriggerCondition.SelfTrains -> False
+              -- CR 702.122e likewise fires on a resolution, and the board
+              -- afterwards -- an animated Vehicle -- is CR 702.122a's effect
+              -- rather than a record of the crewing.
+              TriggerCondition.SelfBecomesCrewed -> False
               -- CR 701.21a is a game ACTION, so this is an event trigger too: it
               -- fires on the moment the permanent is sacrificed, and the board
               -- afterwards holds no state a read could recover.
