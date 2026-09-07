@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -549,6 +550,20 @@ stampKicked paid sid gs =
   gs
     { GameState.objects =
         Map.adjust (\o -> o {Object.kicked = paid}) sid (GameState.objects gs)
+    }
+
+-- CR 702.27a's designation, written onto the spell's own stack incarnation: "if
+-- the buyback cost was paid". Read back by Pawl.Engine.Resolve.finishSpell, which
+-- is the one place CR 608.2n's destination is decided.
+--
+-- stampKicked's shape above in every respect: an idempotent write of a field no
+-- layer computes, one direction only, rule 702.27a giving no way to unpay the
+-- cost and CR 400.7 ending the record with the incarnation.
+stampBoughtBack :: ObjectId -> GameState -> GameState
+stampBoughtBack sid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.boughtBack = True}) sid (GameState.objects gs)
     }
 
 -- CR 702.103b: "as a spell cast bestowed is put onto the stack, it becomes an
@@ -1859,6 +1874,39 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
       -- payment. A cast that fails after this point rewinds to `before`, which
       -- takes the stamp with it along with the spell.
       Monad.unless (Map.null kicked) (State.modify' (stampKicked kicked sid))
+      -- CR 702.27a: buyback, asked after the kicker and before the cost, the
+      -- variable and the targets -- CR 601.2b's place for an additional cost's
+      -- announcement, kicker's reason exactly, rule 702.27a bundling nothing else
+      -- into the question the way rule 702.42a bundles a mode choice.
+      --
+      -- The choice is never made for them: the offer is skipped only where the
+      -- card has no buyback or where no candidate can pay for it, and where there
+      -- IS a route both answers go to the player.
+      --
+      -- Offered against the candidates the entwine and the kicker announcements
+      -- have already loaded, so a player who has announced one additional cost is
+      -- asked about this one only if the two together are payable (CR 601.2f's one
+      -- total). Blast from the Past prints buyback beside kicker and flashback, so
+      -- the composition is a printing rather than only the rule.
+      --
+      -- Carried as the additional Cost itself rather than as a flag, entwine's
+      -- reason: the candidate costs below and the CR 702.27a stamp read one value.
+      let buybackAffordable extra =
+            any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments kicked candidate) extra)) entwinedCandidates
+      boughtBack <- case Keyword.buybackCost (Face.keywords face) of
+        Nothing -> pure Nothing
+        Just extra
+          | buybackAffordable extra -> do
+              decision <- Game.choose (Prompt.ChooseBuyback decider pid sid extra)
+              pure $ case decision of
+                BuybackDecision.BuysBack -> Just extra
+                BuybackDecision.Declines -> Nothing
+          | otherwise -> pure Nothing
+      -- CR 702.27a's second static ability reads the DECLARATION, as rule 702.33d's
+      -- designation does, so the stamp lands here and not at CR 601.2h's payment. A
+      -- cast that fails after this point rewinds to `before`, which takes the stamp
+      -- with it along with the spell.
+      Monad.when (Maybe.isJust boughtBack) (State.modify' (stampBoughtBack sid))
       -- CR 702.33a's additional cost is payable ONCE, where rule 702.33c's
       -- multikicker states no limit. An answer past a stated limit is text the card
       -- does not have, so it rejects the cast below rather than being clamped --
@@ -1868,6 +1916,8 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
               (\(cost, limit) -> maybe False (Map.findWithDefault 0 cost kicked >) limit)
               kickerOffers
           withKicker = withKickerPayments kicked
+          -- CR 702.27a's cost is additional too, so it rides the same fold.
+          withBuyback candidate = maybe candidate (Cost.plus candidate) boughtBack
           -- The announced additional costs are folded into each candidate's
           -- COST and never into its keyword: CR 702.33a's kicker and CR
           -- 702.42a's entwine are paid ON TOP of whichever candidate was
@@ -1883,7 +1933,7 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
           payableCandidates =
             filter
               (\candidate -> payableCost spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
-              (fmap (\candidate -> candidate {CandidateCost.cost = withKicker (withEntwine (CandidateCost.cost candidate))}) candidateCosts)
+              (fmap (\candidate -> candidate {CandidateCost.cost = withBuyback (withKicker (withEntwine (CandidateCost.cost candidate)))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
       if null payable || overKickerLimit
         then reject

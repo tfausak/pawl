@@ -273,6 +273,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
+  -- CR 702.27a states two STATIC abilities, so neither is minted here.
+  Keyword.Buyback _ -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Changeling -> []
@@ -378,6 +380,8 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
+  -- CR 702.27a states no activated ability, in the hand or anywhere else.
+  Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
@@ -608,6 +612,9 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
+  -- CR 702.27a functions while the spell is on the stack, and states no
+  -- activated ability there or on the battlefield.
+  Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
@@ -1082,6 +1089,9 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Kicker _ -> []
   Keyword.Multikicker _ -> []
   Keyword.Entwine _ -> []
+  -- CR 702.27a's "as you cast this spell" is kicker's shape above: an additional
+  -- cost announced at CR 601.2b, never a permission to cast.
+  Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
@@ -1397,6 +1407,24 @@ entwineCosts keywords =
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
+-- CR 702.27a: the ADDITIONAL cost this card's controller may pay as they cast
+-- it to have the spell go to their hand rather than to their graveyard, or
+-- Nothing when the card has no buyback. Offered at CR 601.2b and added to
+-- whichever candidate cost was announced (CR 601.2f).
+--
+-- A Maybe where kickerCosts above is a list, morphCost's shape: rule 702.27a
+-- states one cost and one payment of it, and Scryfall kw:buyback, 2026-09-07,
+-- has no printing with two -- a card printing "Buyback [cost 1]" and "Buyback
+-- [cost 2]" the way Sunscape Battlemage prints two kickers would refute this and
+-- would want kickerCosts' list. First in ascending Set order, morphCost's tie
+-- break, which no printing reaches.
+buybackCost :: Set Keyword -> Maybe (Cost Keyword)
+buybackCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Buyback cost -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
 -- CR 702.170a: what CR 116.2k's special action costs, or Nothing when the card has
 -- no plot.
 --
@@ -1669,6 +1697,12 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
+  -- CR 702.27a's SECOND static ability is a replacement effect (CR 614.1a), and
+  -- it is still not one of these: "as it resolves" scopes it to CR 608.2n's own
+  -- move, which no Pawl.Types.ZoneChangeR pattern can say, so a row minted here
+  -- would also catch a countered or fizzled spell. Pawl.Engine.Resolve.finishSpell
+  -- is where that one move is decided instead.
+  Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
   -- CR 702.54a's ONE static ability, vanishing's row with rule 702.54a's condition
@@ -1866,6 +1900,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
+  -- CR 702.27a says nothing about combat.
+  Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
@@ -2030,6 +2066,8 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
   Keyword.Entwine _ -> []
+  -- CR 702.27a says nothing about attaching.
+  Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
   Keyword.Bloodthirst _ -> []
@@ -2135,6 +2173,7 @@ familyOf keyword = case keyword of
   Keyword.Bestow _ -> Just KeywordFamily.Bestow
   Keyword.Morph {} -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
+  Keyword.Buyback _ -> Just KeywordFamily.Buyback
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
   Keyword.Soulshift _ -> Just KeywordFamily.Soulshift
   Keyword.Bloodthirst _ -> Just KeywordFamily.Bloodthirst

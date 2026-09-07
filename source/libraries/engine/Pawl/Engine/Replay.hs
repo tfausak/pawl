@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Asked as Asked
+import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
@@ -105,6 +106,7 @@ encode p answer = case p of
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
+  Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
   Prompt.ReturnCommander {} -> Response.ReturnedCommander answer
   Prompt.ChooseLibraryEnd {} -> Response.ChoseLibraryEnd answer
   Prompt.ArrangeLibraryArrivals {} -> Response.ArrangedLibraryArrivals answer
@@ -494,6 +496,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseKicker {} -> case response of
     Response.AnnouncedKicker decision -> Just decision
+    _ -> Nothing
+  Prompt.ChooseBuyback {} -> case response of
+    Response.AnnouncedBuyback decision -> Just decision
     _ -> Nothing
   Prompt.ReturnCommander {} -> case response of
     Response.ReturnedCommander decision -> Just decision
@@ -932,6 +937,9 @@ defaultAnswer p = case p of
   -- costs no mana -- entwine's reason above, word for word. Zero is the decline,
   -- and it is CR 702.33c's multikicker answer too.
   Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision 0
+  -- CR 702.27a: buyback is a "may" too, so declining is always legal and costs no
+  -- mana -- entwine's reason above.
+  Prompt.ChooseBuyback {} -> BuybackDecision.Declines
   -- CR 903.9a is a "may", so leaving the commander where it is is always legal
   -- and is the answer that changes nothing.
   Prompt.ReturnCommander {} -> CommandZoneDecision.Leaves
