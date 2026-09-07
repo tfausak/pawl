@@ -425,27 +425,46 @@ affordableX mCeiling spending pid oid gs cost = Cost.greatestPayableX mCeiling (
 -- CR 118.8a: "Any number of additional costs may be applied to a spell as it's
 -- being cast", summed into the total by CR 601.2f. So a card printing two entwine
 -- abilities is asked ONE question at the combined price, and Nothing here means
--- it has no entwine at all.
+-- the list was empty -- no entwine, or no escalate, at all.
 --
--- The SUM and not a choice, which is what separates this from flashback: rule
+-- The SUM and not a choice, which is what separates these from flashback: rule
 -- 702.34a's cost is alternative, and CR 118.9a allows only one of those per
 -- spell, so Pawl.Engine.Cost.costsFor offers each flashback cost as a candidate
--- of its own. Nothing in rule 702.42 makes entwine costs exclusive.
+-- of its own. Nothing in rule 702.42 or rule 702.120 makes their costs exclusive.
 --
 -- Left-associated in ascending Set order, which is only a spelling: Cost.plus
 -- concatenates the mana parts and appends the components, so the total is the
 -- same however it is nested.
-entwineTotal :: [Cost Keyword] -> Maybe (Cost Keyword)
-entwineTotal costs = case costs of
+costTotal :: [Cost Keyword] -> Maybe (Cost Keyword)
+costTotal costs = case costs of
   [] -> Nothing
   cost : rest -> Just (List.foldl' Cost.plus cost rest)
+
+-- CR 702.120a: the additional cost this modal spell's escalate abilities levy for
+-- a selection of `chosen` modes -- every escalate cost the card prints, taken
+-- once for each mode chosen BEYOND THE FIRST -- or Nothing when there is nothing
+-- extra to pay.
+--
+-- Not a question. Rule 702.120a states no "may": once the modes are chosen the
+-- cost is owed, so this is folded into the candidate costs rather than announced,
+-- and CR 601.2f-h is where the player's only remaining freedom lives.
+--
+-- The mode count comes from the answer to CR 601.2b's mode choice and never from
+-- the card's ModeSelection: "Choose one or both" over two modes costs the extra
+-- once or not at all, and which it is is the player's answer.
+--
+-- Zero and one mode both answer Nothing, and Natural subtraction is why that is
+-- written as a guard: `chosen - 1` at chosen = 0 underflows.
+escalateTotal :: [Cost Keyword] -> Natural -> Maybe (Cost Keyword)
+escalateTotal costs chosen =
+  costTotal (concat (List.genericReplicate (if chosen <= 1 then 0 else chosen - 1) costs))
 
 -- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
 -- this modal spell's modes, or Nothing when entwining is not on offer at all.
 --
 -- Three conditions, and each is a different rule:
 --
---   1. The card HAS entwine, at entwineTotal's combined price above. CR 702.42a
+--   1. The card HAS entwine, at costTotal's combined price above. CR 702.42a
 --      is a static ability of the spell itself, so it is read off the card's
 --      printed keywords and not through the CR 613 projection of the stack
 --      object CR 601.2a has already made. Game.faceOf, because the half being
@@ -476,7 +495,7 @@ entwineOffer :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameSt
 entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
   Just face -> do
-    cost <- entwineTotal (Keyword.entwineCosts (Face.keywords face))
+    cost <- costTotal (Keyword.entwineCosts (Face.keywords face))
     let modal = Face.spell face
         legal = Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
@@ -1874,8 +1893,25 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
       -- added to every candidate BEFORE the payability filter, so the routes
       -- offered are the ones that can actually pay it -- and CR 118.9d is what
       -- makes it apply to an alternative cost as readily as to the printed one.
-      let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
-          entwinedCandidates = fmap withEntwine candidates
+      -- CR 702.120a: escalate, levied HERE -- after the mode choice, because the
+      -- number of modes chosen is what it is a function of, and before CR 601.2f's
+      -- total, which it is one of the "additional costs" of (rule 702.120a's own
+      -- last sentence sends it through rules 601.2f-h).
+      --
+      -- No prompt, unlike entwine and kicker: rule 702.120a says "you pay", not
+      -- "you may pay", so once the modes are announced there is nothing left to
+      -- ask. Where the rules leave nothing to ask, don't prompt.
+      --
+      -- Nothing narrows the mode prompt by what the extra cost is affordable at.
+      -- CR 601.2b puts the mode choice ahead of the cost, so a player may choose
+      -- both modes and then find the total unpayable; the filter below drops every
+      -- candidate, and the cast rewinds under CR 601.2e to the moment before it
+      -- was proposed, leaving the spell castable again for fewer modes. That is
+      -- rule 601.2e's own process, not a divergence from it.
+      let escalated = escalateTotal (Keyword.escalateCosts (Face.keywords face)) (Natural.length chosenModes)
+          withEscalate candidate = maybe candidate (Cost.plus candidate) escalated
+          withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
+          announcedCandidates = fmap (withEscalate . withEntwine) candidates
           -- CR 702.33a/b/c's costs, each with the number of times its own rule lets
           -- it be paid, read ONCE off the half being cast: the announcement below
           -- and the limit it is judged against are the same list.
@@ -1889,14 +1925,14 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
       -- cost the card prints and skips one only where there is no payable route,
       -- and where there IS one, every answer goes to the player.
       --
-      -- Offered against the ENTWINED candidates, so a player who has already
-      -- announced one additional cost is asked about this one only if the two
-      -- together are payable (CR 601.2f's one total). No card carries both, and the
+      -- Offered against the ENTWINED and ESCALATED candidates, so a player already
+      -- owing one additional cost is asked about this one only if they are payable
+      -- together (CR 601.2f's one total). No card carries two of the three, and the
       -- composition is the rule rather than a guess about the pool.
       --
       -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
-      kicked <- announceKickers spending pid sid entwinedCandidates kickerOffers gs
+      kicked <- announceKickers spending pid sid announcedCandidates kickerOffers gs
       -- Not implemented: CR 702.33g's targets, which a spell whose kicked-only
       -- clause names a slot of its own should be asked for only on a kicked cast
       -- (#2833). No card in data/cards/ prints that shape -- Burst Lightning's two
@@ -1918,16 +1954,16 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
       -- card has no buyback or where no candidate can pay for it, and where there
       -- IS a route both answers go to the player.
       --
-      -- Offered against the candidates the entwine and the kicker announcements
-      -- have already loaded, so a player who has announced one additional cost is
-      -- asked about this one only if the two together are payable (CR 601.2f's one
-      -- total). Blast from the Past prints buyback beside kicker and flashback, so
-      -- the composition is a printing rather than only the rule.
+      -- Offered against the candidates the entwine, escalate and kicker
+      -- announcements have already loaded, so a player who already owes one
+      -- additional cost is asked about this one only if they are payable together
+      -- (CR 601.2f's one total). Blast from the Past prints buyback beside kicker
+      -- and flashback, so the composition is a printing rather than only the rule.
       --
       -- Carried as the additional Cost itself rather than as a flag, entwine's
       -- reason: the candidate costs below and the CR 702.27a stamp read one value.
       let buybackAffordable extra =
-            any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments kicked candidate) extra)) entwinedCandidates
+            any (\candidate -> payableCost spending pid sid gs (Cost.plus (withKickerPayments kicked candidate) extra)) announcedCandidates
       boughtBack <- case Keyword.buybackCost (Face.keywords face) of
         Nothing -> pure Nothing
         Just extra
@@ -1953,12 +1989,12 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
           withKicker = withKickerPayments kicked
           -- CR 702.27a's cost is additional too, so it rides the same fold.
           withBuyback candidate = maybe candidate (Cost.plus candidate) boughtBack
-          -- The announced additional costs are folded into each candidate's
-          -- COST and never into its keyword: CR 702.33a's kicker and CR
-          -- 702.42a's entwine are paid ON TOP of whichever candidate was
-          -- chosen, so a kicked flashback cast is still the flashback cost
-          -- being paid (CR 118.9d sends an additional cost through an
-          -- alternative one unchanged).
+          -- The additional costs are folded into each candidate's COST and
+          -- never into its keyword: CR 702.33a's kicker, CR 702.42a's entwine,
+          -- CR 702.27a's buyback and CR 702.120a's escalate are paid ON TOP of
+          -- whichever candidate was chosen, so a kicked flashback cast is still
+          -- the flashback cost being paid (CR 118.9d sends an additional cost
+          -- through an alternative one unchanged).
           --
           -- CR 702.103d again, and CR 118.9d with it: each candidate is priced
           -- against the board its own choice produces, so CR 601.2f's
@@ -1968,7 +2004,7 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
           payableCandidates =
             filter
               (\candidate -> payableCost spending pid sid (proposedFor sid (CandidateCost.keyword candidate) gs) (CandidateCost.cost candidate))
-              (fmap (\candidate -> candidate {CandidateCost.cost = withBuyback (withKicker (withEntwine (CandidateCost.cost candidate)))}) candidateCosts)
+              (fmap (\candidate -> candidate {CandidateCost.cost = withBuyback (withKicker (withEscalate (withEntwine (CandidateCost.cost candidate))))}) candidateCosts)
           payable = fmap CandidateCost.cost payableCandidates
       if null payable || overKickerLimit
         then reject

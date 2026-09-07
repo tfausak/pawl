@@ -120,6 +120,8 @@ data KeywordFamily
     Outlast
   | -- | CR 702.112a: renown N.
     Renown
+  | -- | CR 702.120a: escalate [cost].
+    Escalate
   | -- | CR 702.122a: crew N.
     Crew
   | -- | CR 702.123a: fabricate N.

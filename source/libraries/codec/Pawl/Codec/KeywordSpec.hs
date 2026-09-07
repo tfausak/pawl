@@ -503,6 +503,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (entwine 1)
       " {\"type\":\"Entwine\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (entwine 1) /= Codec.encode Keyword.codec (flashbackOf 1)) "entwine {1} is not flashback {1}"
+  -- CR 702.120a's payload is a whole Cost too, and it must not share Entwine's
+  -- tag: entwine widens the selection and charges once, escalate charges per
+  -- extra mode.
+  Spec.it s "Escalate carries its cost, and is not Entwine" $ do
+    let escalate n = Keyword.Escalate (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        entwineOf n = Keyword.Entwine (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (escalate 2)
+      " {\"type\":\"Escalate\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (escalate 2) /= Codec.encode Keyword.codec (entwineOf 2)) "escalate {2} is not entwine {2}"
   -- CR 702.27a's payload is a whole Cost too, and it must not share Kicker's
   -- tag: both are additional costs announced at CR 601.2b, and only buyback's
   -- payment changes where CR 608.2n sends the spell.

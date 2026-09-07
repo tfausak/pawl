@@ -285,6 +285,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
+  Keyword.Escalate _ -> []
   Keyword.Riot -> []
   Keyword.Unleash -> []
   Keyword.Daybound -> []
@@ -412,6 +413,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
+  Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
@@ -648,6 +650,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
+  Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
@@ -1128,6 +1131,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
+  Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
@@ -1415,6 +1419,26 @@ entwineCosts :: Set Keyword -> [Cost Keyword]
 entwineCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Entwine cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.120a: every ADDITIONAL cost this card charges for each mode chosen
+-- beyond the first, in ascending Set order, and empty when it has no escalate.
+-- Levied at CR 601.2b, once the modes are chosen, and added to whichever
+-- candidate cost was announced (CR 601.2f-h).
+--
+-- A LIST, entwineCosts' shape and for its reason: rule 702.120 states no limit on
+-- how many escalate abilities an object has, and escalate's cost is ADDITIONAL
+-- rather than alternative, so CR 118.8a's "any number of additional costs may be
+-- applied" makes two of them a SUM rather than a choice. The summing is
+-- Pawl.Engine.Cast.escalateTotal's, entwineCosts' arrangement exactly.
+--
+-- A wildcard rather than an exhaustive case, entwineCosts' reason: this asks
+-- about ONE named constructor rather than classifying every keyword.
+escalateCosts :: Set Keyword -> [Cost Keyword]
+escalateCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Escalate cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
@@ -1768,6 +1792,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
+  Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
@@ -1959,6 +1984,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
+  Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
@@ -2127,6 +2153,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
+  Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.CumulativeUpkeep _ -> []
@@ -2284,6 +2311,7 @@ familyOf keyword = case keyword of
   Keyword.Devoid -> Nothing
   Keyword.Ingest -> Nothing
   Keyword.Skulk -> Nothing
+  Keyword.Escalate _ -> Just KeywordFamily.Escalate
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing
   Keyword.JumpStart -> Nothing
