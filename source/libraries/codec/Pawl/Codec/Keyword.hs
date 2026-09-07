@@ -54,6 +54,7 @@ codec =
       Arm.payload "CumulativeUpkeep" (Cost.codec codec) Keyword.CumulativeUpkeep (\x -> case x of Keyword.CumulativeUpkeep y -> Just y; _ -> Nothing),
       Arm.nullary "Flanking" Keyword.Flanking,
       Arm.nullary "Phasing" Keyword.Phasing,
+      Arm.payload "Buyback" (Cost.codec codec) Keyword.Buyback (\x -> case x of Keyword.Buyback y -> Just y; _ -> Nothing),
       Arm.nullary "Shadow" Keyword.Shadow,
       Arm.nullary "Horsemanship" Keyword.Horsemanship,
       Arm.nullary "Aftermath" Keyword.Aftermath,

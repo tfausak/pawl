@@ -398,20 +398,28 @@ resolveSpellWith runSubgame oid = do
                     (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode)))
                 finishSpell oid face effectController
 
--- CR 608.2n / 715.3d / 720.3d: where the spell goes as the last part of its
--- resolution -- its owner's graveyard, unless it was cast as an Adventure, when
--- its controller exiles it and CR 715.3d's permission to play it goes onto the
--- exiled card, or as an Omen, when its controller shuffles it into its OWNER's
--- library instead.
+-- CR 608.2n / 702.27a / 715.3d / 720.3d: where the spell goes as the last part of
+-- its resolution -- its owner's graveyard, unless its buyback cost was paid, when
+-- it goes to its owner's hand instead, or it was cast as an Adventure, when its
+-- controller exiles it and CR 715.3d's permission to play it goes onto the exiled
+-- card, or as an Omen, when its controller shuffles it into its OWNER's library
+-- instead.
 --
 -- Reached only from the RESOLVING path: a fizzled spell does not resolve (CR
 -- 608.2b), so CR 715.3d's "as it resolves" never applies to it. Written onto the
 -- id the move RETURNS, since CR 400.7 mints a fresh incarnation in exile.
 --
--- Both riders are keyed on the CHOSEN FACE's spell type (CR 205.3k) rather than
--- on the card's layout, because the question is which set of characteristics is
--- resolving rather than which card printed them -- a classification either way,
--- never an effect's identity.
+-- The Adventure and Omen riders are keyed on the CHOSEN FACE's spell type (CR
+-- 205.3k) rather than on the card's layout, because the question is which set of
+-- characteristics is resolving rather than which card printed them -- a
+-- classification either way, never an effect's identity. Buyback's is keyed on the
+-- record CR 601.2b's announcement wrote (Pawl.Engine.Cast.stampBoughtBack), which
+-- is rule 702.27a's own "if the buyback cost was paid".
+--
+-- All three replace the same event, so CR 616.1 would have the spell's controller
+-- order them; the arms are ordered arbitrarily instead, and no printing carries
+-- two -- buyback appears on instants and sorceries printed as such, where CR
+-- 715.3d's and CR 720.3d's riders belong to a creature card's other half.
 finishSpell :: ObjectId -> Face.Face Card.Type.Card -> PlayerId -> Game ()
 finishSpell oid face controller
   -- CR 720.3d: "As an Omen spell resolves, its controller shuffles it into its
@@ -424,7 +432,14 @@ finishSpell oid face controller
       owner <- State.gets (fmap Object.owner . Game.lookupObject oid)
       Event.changeZone oid Zone.Library
       Monad.forM_ owner Event.shuffleLibrary
-  | not (Card.isAdventure face) = Event.changeZone oid Zone.Graveyard
+  | not (Card.isAdventure face) = do
+      -- CR 702.27a: "if the buyback cost was paid, put this spell into its owner's
+      -- hand instead of into that player's graveyard as it resolves". Reached only
+      -- here, which is the whole of "as it resolves": a countered or fizzled spell
+      -- never gets this far (CR 701.6a, CR 608.2b), and rule 702.27a leaves both of
+      -- those in the graveyard.
+      bought <- State.gets (maybe False Object.boughtBack . Game.lookupObject oid)
+      Event.changeZone oid (if bought then Zone.Hand else Zone.Graveyard)
   | otherwise = do
       exiled <- Event.changeZoneReturning oid Zone.Exile
       Monad.forM_ exiled $ \newId ->

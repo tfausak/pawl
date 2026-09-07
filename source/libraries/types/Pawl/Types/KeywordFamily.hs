@@ -62,6 +62,9 @@ data KeywordFamily
     -- no card in the pool asks yet, and it is owed at the keyword rather than at
     -- the first asker.
     CumulativeUpkeep
+  | -- | CR 702.27a: buyback [cost]. No card in the pool asks yet, and it is owed
+    -- at the keyword rather than at the first asker.
+    Buyback
   | -- | CR 702.29a: cycling [cost], and CR 702.29e's typecycling.
     Cycling
   | -- | CR 702.32a: fading N.

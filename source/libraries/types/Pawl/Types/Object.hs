@@ -378,6 +378,22 @@ data Object = MkObject
     -- (Pawl.Engine.Event.changeZoneAttaching, `bestowed`'s line) and no other,
     -- CR 400.7's new incarnation taking it everywhere else.
     prototyped :: Bool,
+    -- | CR 702.27a: was this SPELL's buyback cost paid? Stamped by
+    -- Pawl.Engine.Cast at CR 601.2b onto the stack incarnation, and read by
+    -- Pawl.Engine.Resolve.finishSpell, which is rule 702.27a's "put this spell
+    -- into its owner's hand instead of into that player's graveyard as it
+    -- resolves".
+    --
+    -- A Bool where `kicked` above is a map keyed by cost: rule 702.27a states ONE
+    -- cost and one payment of it, and nothing reads back WHICH cost was paid --
+    -- the whole of the payoff is the destination. Stored rather than projected,
+    -- since it records a choice rather than a characteristic.
+    --
+    -- Per-incarnation with no exception at all, where `kicked` has CR 400.7d's:
+    -- rule 702.27a's ability is spent on the one move it replaces, and only an
+    -- instant or a sorcery can carry buyback, so there is no permanent to
+    -- reference it afterwards. Nothing carries it across a zone change.
+    boughtBack :: Bool,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they
     -- would pay 2 life for. CR 702.150a's compleated is the one reader, through
@@ -580,6 +596,10 @@ newIncarnation object =
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move CR 718.4
       -- keeps it across, `bestowed` above's route.
       prototyped = False,
+      -- CR 702.27a's record is written back by nothing: rule 702.27a's hand is
+      -- where the move this clears at ENDS, so the card that arrives there is a
+      -- new object that was never bought back.
+      boughtBack = False,
       -- CR 601.2b's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
       phyrexianLifePaid = 0,

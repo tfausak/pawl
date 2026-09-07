@@ -30,6 +30,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Protection
       " {\"type\":\"Protection\"} "
 
+  Spec.it s "Buyback" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Buyback
+      " {\"type\":\"Buyback\"} "
+
   Spec.it s "Cycling" $
     Common.assertCodec
       s

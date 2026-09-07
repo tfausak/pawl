@@ -6,6 +6,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
@@ -557,6 +558,10 @@ data Response
   | -- | CR 702.33a / 601.2b: whether a caster declared the intention to pay a
     -- spell's kicker cost, which is CR 702.33d's "that spell has been kicked".
     AnnouncedKicker KickerDecision.KickerDecision
+  | -- | CR 702.27a / 601.2b: whether a caster declared the intention to pay a
+    -- spell's buyback cost, which is what rule 702.27a's second static ability
+    -- reads as the spell resolves.
+    AnnouncedBuyback BuybackDecision.BuybackDecision
   | -- | CR 903.9a's answer: whether the commander goes to the command zone.
     ReturnedCommander CommandZoneDecision.CommandZoneDecision
   | -- | CR 401.2's answer: the end of their library an owner picked for one card.

@@ -733,6 +733,7 @@ mintCard pid under printingId dest position gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -919,6 +920,7 @@ createEmblem pid card = do
                 Object.kicked = Map.empty,
                 Object.bestowed = False,
                 Object.prototyped = False,
+                Object.boughtBack = False,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,
@@ -4574,6 +4576,10 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- countered on its way to a graveyard becomes a card, and a
                     -- card is in neither zone rule 718.4 excepts.
                     Object.prototyped = Object.prototyped obj && dest == Zone.Battlefield,
+                    -- CR 702.27a's record crosses NO move: the ability is spent
+                    -- on the one destination it replaces, and only an instant or a
+                    -- sorcery can carry buyback, so no permanent can reference it.
+                    Object.boughtBack = False,
                     -- CR 400.7d a third time, and rule 702.150a is the ability
                     -- that references it: how many of the spell's Phyrexian mana
                     -- symbols were announced to be paid with life (CR 601.2b).
@@ -5871,6 +5877,7 @@ createTokens controller card copy n tapped entering = do
                       Object.kicked = Map.empty,
                       Object.bestowed = False,
                       Object.prototyped = False,
+                      Object.boughtBack = False,
                       Object.phyrexianLifePaid = 0,
                       Object.manaSpent = Mana.MkMana [],
                       Object.announcedX = Nothing,
@@ -6058,6 +6065,7 @@ meld controller victims resultCard = do
                 Object.kicked = Map.empty,
                 Object.bestowed = False,
                 Object.prototyped = False,
+                Object.boughtBack = False,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,

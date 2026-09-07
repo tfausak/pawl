@@ -190,7 +190,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- printed all the same: rule 702.27a's buyback is "put this spell into its
   -- owner's hand instead of into that player's graveyard as it resolves" and
   -- says in so many words that it functions while the spell is on the stack.
-  -- pawl has no buyback.
+  -- pawl's buyback (Elvish Fury) does not reach this walk: rule 702.27a's "as it
+  -- resolves" scopes the rewrite to CR 608.2n's own move, so it is decided in
+  -- Pawl.Engine.Resolve.finishSpell rather than gathered as a printed row.
   --
   -- CR 608.2n's trip to the graveyard is the observer, driven through a real cast
   -- and a real resolution rather than the zone-change funnel: the card has to be
