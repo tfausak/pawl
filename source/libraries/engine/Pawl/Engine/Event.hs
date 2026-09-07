@@ -732,6 +732,7 @@ mintCard pid under printingId dest position gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.prototyped = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -917,6 +918,7 @@ createEmblem pid card = do
                 Object.designations = Set.empty,
                 Object.kicked = Map.empty,
                 Object.bestowed = False,
+                Object.prototyped = False,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,
@@ -4559,6 +4561,19 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- states rather than implies: what a bestowed spell becomes
                     -- anywhere else is a card, and a card is no bestowed Aura.
                     Object.bestowed = Object.bestowed obj && dest == Zone.Battlefield,
+                    -- CR 718.4: "in every zone except the stack or the
+                    -- battlefield ... a prototype card has only its normal
+                    -- characteristics". This move is the stack-to-battlefield
+                    -- half of that sentence, so the record crosses it and
+                    -- nothing else; every other departure ends the incarnation
+                    -- (CR 400.7) and CR 718.4 wants the normal characteristics
+                    -- back.
+                    --
+                    -- BATTLEFIELD ONLY, `bestowed`'s gate above and for the same
+                    -- kind of reason the rule states outright: a prototyped spell
+                    -- countered on its way to a graveyard becomes a card, and a
+                    -- card is in neither zone rule 718.4 excepts.
+                    Object.prototyped = Object.prototyped obj && dest == Zone.Battlefield,
                     -- CR 400.7d a third time, and rule 702.150a is the ability
                     -- that references it: how many of the spell's Phyrexian mana
                     -- symbols were announced to be paid with life (CR 601.2b).
@@ -5855,6 +5870,7 @@ createTokens controller card copy n tapped entering = do
                       Object.designations = Set.empty,
                       Object.kicked = Map.empty,
                       Object.bestowed = False,
+                      Object.prototyped = False,
                       Object.phyrexianLifePaid = 0,
                       Object.manaSpent = Mana.MkMana [],
                       Object.announcedX = Nothing,
@@ -6041,6 +6057,7 @@ meld controller victims resultCard = do
                 Object.designations = Set.empty,
                 Object.kicked = Map.empty,
                 Object.bestowed = False,
+                Object.prototyped = False,
                 Object.phyrexianLifePaid = 0,
                 Object.manaSpent = Mana.MkMana [],
                 Object.announcedX = Nothing,

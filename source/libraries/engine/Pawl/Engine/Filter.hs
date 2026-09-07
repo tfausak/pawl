@@ -2035,6 +2035,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.147a names no word CR 612.2 can swap: "end of combat" is the rules'
   -- own step and the ability it arms is written in Pawl.Engine.Keyword.
   Keyword.Type.Decayed -> keyword
+  -- CR 718.1's inset frame is a mana cost and a printed box: no word for CR
+  -- 612.1 to change.
+  Keyword.Type.Prototype _ -> keyword
   Keyword.Type.Toxic _ -> keyword
   -- CR 702.168a states a cost, so rewriteCost reaches it as morph's does. The
   -- ward {2} rule 702.168b lists is NOT reached from here: that keyword is on the

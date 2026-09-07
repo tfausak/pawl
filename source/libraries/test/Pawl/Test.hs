@@ -331,6 +331,7 @@ import qualified Pawl.Codec.PrintingIdSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProductionTagSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
+import qualified Pawl.Codec.PrototypeSpec
 import qualified Pawl.Codec.PutCountersFromSpec
 import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
@@ -529,6 +530,7 @@ import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.PreventionSpec
 import qualified Pawl.ProjectionSpec
+import qualified Pawl.PrototypeSpec
 import qualified Pawl.PutCounterSpec
 import qualified Pawl.RadSpec
 import qualified Pawl.Registry as Registry
@@ -933,6 +935,7 @@ spec s registry = do
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.MoveCountersSpec.spec s
   Pawl.Codec.MovedKindsSpec.spec s
+  Pawl.Codec.PrototypeSpec.spec s
   Pawl.Codec.PutCountersFromSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
@@ -1140,6 +1143,7 @@ spec s registry = do
   Pawl.CastPermissionSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry
+  Pawl.PrototypeSpec.spec s registry
   Pawl.RadSpec.spec s registry
   Pawl.RegistrySpec.spec s
   -- CR 616.1's termination guards, where a regression hangs rather than fails.
