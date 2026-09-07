@@ -126,9 +126,9 @@ data PlayerEffect
     -- source and kind limbs against each other. Pawl.CardSpec lints the pool
     -- for a narrowed PlayerScope, which is what makes
     -- Pawl.Engine.PlayerEffect.unpreventable's board-wide fold exact.
-    --
-    -- Not implemented: Whippoorwill's recipient limb has no site to bake a
-    -- recipient into this pattern (#845).
+    -- Whippoorwill's "that creature" aims the pattern at the recipient its own
+    -- resolution chose, which Pawl.PreventionSpec's Whippoorwill case proves is
+    -- narrower than the board.
     DamageCantBePrevented DamagePattern.DamagePattern
   | -- | CR 614.9 / 613.11 / Lava Burst: damage matching the pattern can't be dealt
     -- instead to another permanent or player -- the redirection twin of the arm

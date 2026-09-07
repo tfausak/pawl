@@ -349,7 +349,8 @@ collect sources floating =
                     DamagePattern.whatRecipient = Nothing,
                     DamagePattern.whoRecipient = Nothing,
                     DamagePattern.whichRecipient = Just (Recipient.ToPlayer pid),
-                    DamagePattern.whichSource = Nothing
+                    DamagePattern.whichSource = Nothing,
+                    DamagePattern.boundRecipient = Nothing
                   },
               DamageR.rewrite = DamageRewrite.PreventAll,
               DamageR.riders = Seq.empty

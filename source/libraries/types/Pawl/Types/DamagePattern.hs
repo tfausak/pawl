@@ -6,13 +6,16 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | CR 614.1a / 615.1: which damage events a replacement or prevention
--- intercepts -- both, since this type is shared. Fog's prevention is
+-- intercepts -- both, since this type is shared. The examples below name the
+-- first six fields, every one of them a shield or a replacement and so carrying
+-- Nothing in the seventh: Fog's prevention is
 -- (Just Combat, And [], Nothing, Nothing, Nothing, Nothing); Furnace of Rath's
 -- replacement is (Nothing, And [], Nothing, Nothing, Nothing, Nothing); Mending
 -- Hands' shield is (Nothing, And [], Nothing, Nothing, Just the chosen
--- recipient, Nothing); Healing Grace's adds the chosen SOURCE in the last field,
+-- recipient, Nothing); Healing Grace's adds the chosen SOURCE in the sixth field,
 -- and Dovin, Hand of Control's by-direction names that field and no recipient;
 -- Stormwild Capridor's is (Just Noncombat, And [], Just IsSource, Nothing,
 -- Nothing, Nothing). Nothing means any kind.
@@ -49,6 +52,12 @@ import qualified Pawl.Types.Recipient as Recipient
 -- Pawl.Engine.Replacement.collect mints naming the protected seat, since a
 -- PlayerRelation would have to be read against a perspective this row's CR 109.5
 -- "you" is not.
+--
+-- The remaining producer is not a shield at all: CR 615.12's stored prohibition
+-- and its CR 614.9 twin carry this same pattern, and Resolve's Effect.AffectPlayers
+-- arm bakes `boundRecipient` below into this field as it stores one --
+-- Whippoorwill's "damage that would be dealt to THAT CREATURE this turn can't be
+-- prevented".
 --
 -- `whatRecipient` is the CARD-PRINTED half of that same question, and the two
 -- are not one field: `whichRecipient` names an id the engine baked, where this
@@ -103,12 +112,26 @@ import qualified Pawl.Types.Recipient as Recipient
 -- Not fixed for the row's life: CR 400.7c and CR 609.7a's last sentence follow a
 -- chosen PERMANENT SPELL onto the battlefield, so Pawl.Engine.Event.carryOver
 -- re-keys this field to the permanent the spell became.
+--
+-- `boundRecipient` is the AUTHORED half of `whichRecipient`, and the two never
+-- stand together: a card cannot name an ObjectId, but it can name the SLOT its
+-- own resolution filled (CR 601.2c), which is Whippoorwill's "that creature".
+-- Pawl.Engine.Resolve.Effect's Effect.AffectPlayers arm reads the slot, writes
+-- the recipient it named into `whichRecipient` and clears this field, exactly as
+-- AffectedPlayers.Named beside it turns a slot into a seat -- so nothing
+-- downstream of that arm ever reads a slot, and CR 608.2b's unfilled or illegal
+-- slot stores no effect at all.
+--
+-- Only the CR 615.12 / 614.9 prohibitions can carry it. A prevention shield's
+-- pattern is built by Pawl.Engine.Resolve.Effect.installDamageRow, which has
+-- already baked its recipient and writes Nothing here.
 data DamagePattern = MkDamagePattern
   { whichKind :: Maybe DamageKind.DamageKind,
     whatSource :: Filter.Filter Keyword.Keyword,
     whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
     whoRecipient :: Maybe PlayerRelation.PlayerRelation,
     whichRecipient :: Maybe Recipient.Recipient,
-    whichSource :: Maybe ObjectId.ObjectId
+    whichSource :: Maybe ObjectId.ObjectId,
+    boundRecipient :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

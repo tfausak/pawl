@@ -2183,7 +2183,7 @@ blastShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.Acti
 blastShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
-        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing Nothing Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty),
+        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing Nothing Nothing Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,

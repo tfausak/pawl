@@ -328,7 +328,7 @@ damageSpec s registry =
           (victim, gs0) = S.addPermanent piker S.alice base
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
                 ActiveReplacement.source = victim,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
@@ -350,7 +350,7 @@ damageSpec s registry =
       let base = Setup.emptyGame S.bothPlayers
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
                 ActiveReplacement.source = ObjectId.MkObjectId 900,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
@@ -586,7 +586,7 @@ toxicSpec s registry =
       let (oid, gs0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
                 ActiveReplacement.source = oid,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
@@ -716,7 +716,7 @@ lifelinkSpec s registry =
       let (oid, gs0) = S.addPermanent childOfNight S.alice (Setup.emptyGame S.bothPlayers)
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
                 ActiveReplacement.source = oid,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
@@ -2980,7 +2980,7 @@ fightSpec s registry = Spec.describe s "Fight (CR 701.14)" $ do
     (base, spell, mine, theirs) <- preyBoard s registry
     let shield =
           ActiveReplacement.MkActiveReplacement
-            { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
+            { ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing Nothing Nothing Nothing Nothing) DamageRewrite.PreventAll Seq.empty),
               ActiveReplacement.source = theirs,
               ActiveReplacement.controller = S.alice,
               ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,

@@ -998,7 +998,10 @@ installDamageRow players slots controller source duration kind rewrite uses ride
                     -- one, baked for the recipient's reason -- both were
                     -- fixed when this effect was created and card data can
                     -- name neither.
-                    DamagePattern.whichSource = fmap snd sourceChoice
+                    DamagePattern.whichSource = fmap snd sourceChoice,
+                    -- A shield's recipient is already baked, one field up, so
+                    -- the slot that would name one has nothing left to say.
+                    DamagePattern.boundRecipient = Nothing
                   }
                 rewrite
                 -- CR 615.5's rider on this carrier is the snapshotted one
@@ -1058,6 +1061,30 @@ installDamageRow players slots controller source duration kind rewrite uses ride
         -- carriers, so it contributes no third half.
         namedSlots = Map.keysSet (replacementRowSlots re) <> foldMap (Map.keysSet . PreventionRider.targets) rider
      in g1 {GameState.replacements = active : GameState.replacements g1}
+
+-- CR 601.2c / 615.12: the same bake one carrier over. A stored CR 615.12 or CR
+-- 614.9 prohibition narrows the damage event by a DamagePattern too, and a card
+-- that aims its sentence at the recipient its own resolution chose
+-- (Whippoorwill's "that creature") writes the SLOT in
+-- DamagePattern.boundRecipient; this reads the slot and writes the recipient it
+-- named into DamagePattern.whichRecipient, which is what every reader of the
+-- pattern already asks about (Pawl.Engine.Replacement.matchesDamagePattern).
+--
+-- ONE PATTERN PER RECIPIENT rather than a set, PreventNextDamage's split for its
+-- reason, and an EMPTY answer where the slot named nobody -- CR 608.2b's illegal
+-- or unfilled target, which stores no continuous effect at all. A pattern naming
+-- no slot is returned unchanged, which is every producer but this one.
+--
+-- Through Damage.damageRecipient so the baked id is tagged the way the damage
+-- event will tag it (CR 120.1a); a slot holding something that can take no damage
+-- drops out, and with it the effect.
+bakeDamagePatternRecipient :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> DamagePattern.DamagePattern -> [DamagePattern.DamagePattern]
+bakeDamagePatternRecipient legal resolving controller source gs pattern_ = case DamagePattern.boundRecipient pattern_ of
+  Nothing -> [pattern_]
+  Just slot ->
+    fmap
+      (\recipient -> pattern_ {DamagePattern.whichRecipient = Just recipient, DamagePattern.boundRecipient = Nothing})
+      (Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs (ObjectRef.InSlot slot)))
 
 -- CR 609.7a: choose the SOURCE a prevention or redirection effect names, and
 -- answer the pair installDamageRow bakes -- the printed properties beside the id
@@ -4906,8 +4933,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
             -- for a slot naming nobody: the reference is left standing and reads
             -- as naming nobody, rather than falling back to some other seat.
-            bakedEffect = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
-            install g scope =
+            withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
+            -- CR 601.2c / 608.2b again, one payload over: a DamagePattern's
+            -- `boundRecipient` names the slot this resolution filled, and the
+            -- recipient it named is written into `whichRecipient` here --
+            -- Whippoorwill's "damage that would be dealt to THAT CREATURE this
+            -- turn can't be prevented". The slot dies with the resolution, so
+            -- nothing later could read it; installDamageRow bakes a shield's
+            -- recipient at the same moment and for the same reason.
+            --
+            -- Through the LIST applicative, so a slot naming several recipients
+            -- stores one effect apiece and a slot naming none stores nothing at
+            -- all, which is rule 608.2b's answer for an illegal target. A
+            -- pattern naming no slot yields exactly one effect, unchanged.
+            bakedEffects = PlayerEffect.overDamagePatterns (bakeDamagePatternRecipient legal resolving controller source gs) withPlayers
+            install g (scope, bakedEffect) =
               let (ts, g1) = Game.freshTimestamp g
                   active =
                     ActivePlayerEffect.MkActivePlayerEffect
@@ -4919,7 +4959,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         ActivePlayerEffect.effect = bakedEffect
                       }
                in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
-         in List.foldl' install gs baked
+         in List.foldl' install gs ((,) <$> baked <*> bakedEffects)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blockerRef attackerRef) ->
     -- CR 509.1c / 613.11: store one requirement per (blocker, attacker) pair the
     -- two refs name, rule 509.1c counting requirements PER CREATURE. Both sets are
