@@ -70,6 +70,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
@@ -2817,6 +2818,87 @@ squelchSpec s registry = Spec.describe s "Squelch" $ do
         Spec.assertEqWith s "bob's graveyard is empty: an ability ceases rather than moving" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
         Spec.assertBool s (Set.member flashId (GameState.battlefield after)) "and Aether Flash itself is untouched"
 
+-- THE PROVING TEST for CR 202.3a's 0 on an ability on the stack. Synthetic Weigh
+-- the Trigger ({1}{U} Instant, "Counter target activated or triggered ability
+-- with mana value 2 or less", data/cards/synthetic-weigh-the-trigger.json) is
+-- Stifle's Pool.Abilities slot with a Filter.ManaValueAtMost on it and nothing
+-- else, so the bound is the only thing standing between the spell and its
+-- target. Synthetic because no printing bounds the mana value of an ability on
+-- the stack: Scryfall o:"ability with mana value" and o:"ability with converted
+-- mana cost" return nothing, and every hit of o:/abilit.*mana value/
+-- (2026-09-06) bounds a card or a permanent instead.
+--
+-- CR 109.1 makes the ability an object; CR 202.3a gives an object with no mana
+-- cost a mana value of 0. Aether Flash's own {2}{R}{R} is the discriminating
+-- pair: an implementation reading the SOURCE permanent's mana value answers 4
+-- and refuses the target, and one reading no mana value at all -- what
+-- Pawl.Engine.Projection.View.baseCharacteristics answered before -- refuses it
+-- too.
+--
+-- The Piker surviving is stifleSpec's own observation, one card over: Aether
+-- Flash's 2 damage kills the 2/1 in Pawl.TriggerSpec, so a live Piker with no
+-- damage marked is rule 701.6a's "none of its effects occur".
+weighTheTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+weighTheTriggerSpec s registry = Spec.describe s "Synthetic Weigh the Trigger" $ do
+  Spec.it s "CR 202.3a a triggered ability has mana value 0, so 'mana value 2 or less' counters it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    aetherFlash <- S.printingOf s registry "Aether Flash"
+    piker <- S.printingOf s registry "Goblin Piker"
+    weigh <- S.printingOf s registry "Synthetic Weigh the Trigger"
+    let (flashId, withFlash) = S.addPermanent aetherFlash S.alice (Setup.emptyGame S.bothPlayers)
+        withMountains = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withFlash [1 .. (2 :: Int)]
+        withIslands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withMountains [1 .. (2 :: Int)]
+        (weighId, withWeigh) = S.addHandCard weigh S.bob withIslands
+        (pikerId, gs) = S.addHandCard piker S.alice withWeigh
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice pikerId)
+        -- The Piker resolves and enters; CR 603.3 then puts Aether Flash's
+        -- trigger on the stack the next time a player would receive priority.
+        entered = S.runPure S.identityAnswer cast Stack.resolveTop
+        placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+        weighed = S.runPure S.identityAnswer placed (S.cast S.bob weighId)
+        countered = S.runPure S.identityAnswer weighed Stack.resolveTop
+        after = S.runPure S.identityAnswer countered Engine.settleForPriority
+    Spec.assertEqWith s "the trigger is the only thing on the stack before the Weigh" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "the Piker survived: the trigger never resolved (CR 701.6a)" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (S.eventsOf after))) []
+    -- The number itself, pinned against the two wrong answers: Nothing, and the
+    -- source permanent's 4.
+    case filter (`Game.isAbility` placed) (GameState.stack placed) of
+      [abilityId] -> do
+        Spec.assertEqWith s "CR 202.3a: the ability on the stack has mana value 0" (PC.manaValue (Projection.project abilityId placed)) (Just 0)
+        Spec.assertEqWith s "and not its source's, which Aether Flash's {2}{R}{R} makes 4" (PC.manaValue (Projection.project flashId placed)) (Just 4)
+      _ -> Spec.assertFailure s "expected exactly one ability on the stack"
+    -- Supporting: the Weigh really was cast and really did counter, CR 608.2n's
+    -- cease for the ability and CR 701.6a's graveyard for the spell that did it.
+    Spec.assertEqWith s "the Weigh went on the stack over the trigger" (length (GameState.stack weighed)) 2
+    Spec.assertEqWith s "and the stack is empty afterwards" (GameState.stack after) []
+    Spec.assertEqWith s "alice's graveyard is empty: the trigger ceased rather than moving" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "bob's holds the spent Weigh alone" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertBool s (Set.member flashId (GameState.battlefield after)) "and Aether Flash itself is untouched"
+  -- The negative, and what it does NOT prove: the same Aether Flash sitting on
+  -- the stack as a SPELL is no target for the Weigh, but CR 113.9 is what
+  -- refuses it -- Pool.Abilities and Pool.Spells are disjoint (Pawl.TargetSpec)
+  -- -- rather than the mana value, which at 4 would fail the bound as well. It
+  -- is a fence against the pool widening, not evidence about the filter.
+  Spec.it s "CR 113.9 a spell of mana value 4 on the stack is no target for it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    aetherFlash <- S.printingOf s registry "Aether Flash"
+    weigh <- S.printingOf s registry "Synthetic Weigh the Trigger"
+    let withMountains = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. (4 :: Int)]
+        withIslands = List.foldl' (\g _ -> snd (S.addPermanent island S.bob g)) withMountains [1 .. (2 :: Int)]
+        (weighId, withWeigh) = S.addHandCard weigh S.bob withIslands
+        (flashId, gs) = S.addHandCard aetherFlash S.alice withWeigh
+        onStack = S.runPure S.identityAnswer gs (S.cast S.alice flashId)
+        attempted = S.runPure S.identityAnswer onStack (S.cast S.bob weighId)
+    Spec.assertEqWith s "the Aether Flash spell is on the stack" (fmap (`Game.isAbility` onStack) (GameState.stack onStack)) [False]
+    -- The spell object, not the hand card `flashId` names: CR 601.2a moves the
+    -- card to the stack, which is a new object.
+    Spec.assertEqWith s "CR 202.3: its mana value is 4, over the bound in any case" (fmap (\oid -> PC.manaValue (Projection.project oid onStack)) (GameState.stack onStack)) [Just 4]
+    Spec.assertEqWith s "the Weigh could not be cast: the stack is unchanged" (GameState.stack attempted) (GameState.stack onStack)
+    Spec.assertEqWith s "and it is still in bob's hand" (S.handSize S.bob attempted) 1
+
 -- CR 113.7 through CR 701.6a and back: Green Slime ({2}{G} Creature -- Ooze,
 -- flash, "When this creature enters, counter target activated or triggered
 -- ability from an artifact or enchantment source. If a permanent's ability is
@@ -3069,4 +3151,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   artificialEvolutionSpec s registry
   stifleSpec s registry
   squelchSpec s registry
+  weighTheTriggerSpec s registry
   greenSlimeSpec s registry

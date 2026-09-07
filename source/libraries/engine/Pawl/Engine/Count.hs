@@ -844,9 +844,10 @@ viewOfSnapshot mController isToken counters snapshot =
       -- ProjectedCharacteristics records a mana value, so this reads what the
       -- object's was AT THE EVENT rather than throwing the question away.
       --
-      -- Nothing means that object had no card behind it, exactly as it does
-      -- live. Not implemented there: CR 202.3a's 0 for an ability on the stack
-      -- (#674).
+      -- Nothing means the snapshot recorded no mana value, which no projection
+      -- writes: CR 202.3a gives even an object with no card behind it a 0
+      -- (Projection.View.baseCharacteristics), so a Nothing here is a
+      -- hand-built ProjectedCharacteristics rather than a rule's answer.
       Filter.manaValue = PC.manaValue snapshot,
       Filter.controller = mController,
       -- CR 108.3: an owner is read off an OBJECT, and a ProjectedCharacteristics

@@ -716,8 +716,9 @@ faceUpFaceOf oid gs = do
 -- 712.8g says the same as a sum of the front faces' mana values). So the answer
 -- is the faces a mana cost is read off and the caller adds them up; every other
 -- object answers with exactly one, and an object with no card behind it answers
--- with none -- which is not CR 202.3a's 0 (#674), the distinction the old Maybe
--- carried and the emptiness carries now.
+-- with none. That emptiness is not CR 202.3a's 0: the rule's answer for an
+-- ability on the stack is settled by Pawl.Engine.Projection.View's own no-face
+-- arm, which this function is never asked for.
 --
 -- CR 708.2a's "no mana cost" wins over CR 712.8e, and the rules leave no room
 -- for it not to: a face-down permanent's characteristics are the listed ones and

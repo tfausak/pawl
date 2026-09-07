@@ -115,9 +115,9 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- give.
     --
     -- Carried, not folded: no Modification writes a mana cost, so no layer
-    -- touches this after the seed. Nothing means "no object to ask" -- an ability
-    -- on the stack has no card and so no mana value at all, which is a different
-    -- claim from CR 202.3a's 0 (#674).
+    -- touches this after the seed. Nothing means "no object to ask": every object
+    -- has an answer, an ability on the stack included, since CR 202.3a gives one
+    -- with no mana cost a mana value of 0.
     manaValue :: Maybe Integer,
     power :: Maybe Integer,
     toughness :: Maybe Integer,
