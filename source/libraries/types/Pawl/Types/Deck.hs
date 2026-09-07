@@ -24,14 +24,24 @@ import qualified Pawl.Types.Printing as Printing
 -- second copy in the deck. Pawl.Engine.Setup.createDeck reads the two fields into
 -- the two zones.
 --
--- ONE commander, not a set: CR 903.3 designates one card per deck, and the
--- partner and background rules that let a deck have two (CR 702.124, CR 702.124k)
--- have no producer here (#939).
+-- A SET and not one card: CR 903.3 designates one legendary card per deck, and
+-- CR 702.124a's partner abilities let it designate two instead. Which pairs are
+-- legal is CR 702.124's business rather than this field's --
+-- Pawl.Engine.Commander.designations is the reader that judges it.
 data Deck = MkDeck
   { cards :: Map.Map Printing.Printing Natural.Natural,
-    -- | CR 903.3: the card designated as this deck's commander, which CR 903.6
-    -- starts in the command zone.
-    commander :: Maybe Printing.Printing,
+    -- | CR 903.3 \/ CR 702.124a: the cards designated as this deck's commanders,
+    -- which CR 903.6 and CR 702.124b start in the command zone. Empty for every
+    -- deck but a Commander deck's.
+    --
+    -- A Set and not `cards`' multiset: CR 903.5b gives every card in the deck
+    -- but a basic land a different English name, and CR 903.3 designates a
+    -- legendary one, so two designations are two distinct printings.
+    --
+    -- Not implemented: CR 702.124k's Background, CR 702.124i's partner—[text],
+    -- CR 702.124j's partner with [name], CR 702.124m's Doctor's companion, and
+    -- CR 903.3a's "this card can be your commander" (#939).
+    commander :: Set.Set Printing.Printing,
     -- | CR 902.3: the vanguard card this player brings, which CR 313.2 keeps in
     -- the command zone for the whole game.
     --
@@ -42,7 +52,7 @@ data Deck = MkDeck
     -- deal it into a hand. Nothing but a Vanguard game sets it, so `Nothing` is
     -- every other format.
     --
-    -- ONE, like the commander and unlike the dungeons: CR 902.1 gives each player
+    -- ONE, unlike the commander and the dungeons: CR 902.1 gives each player
     -- "one face-up vanguard card".
     vanguard :: Maybe Printing.Printing,
     -- | CR 309.2: the dungeon cards this player owns from OUTSIDE the game, which
@@ -55,7 +65,7 @@ data Deck = MkDeck
     -- them on the player and mints no object; Pawl.Engine.Dungeon.venture is what
     -- brings one into the game.
     --
-    -- SEVERAL, unlike the commander, because CR 309.2a says "a dungeon card they
+    -- SEVERAL, unbounded unlike the commander's two, because CR 309.2a says "a dungeon card they
     -- own" out of however many they brought and CR 701.49a therefore asks them to
     -- choose. CR 309.3's limit of one is on the COMMAND ZONE and is enforced by
     -- Pawl.Engine.Dungeon.inDungeon, not here: this field is the supply outside the
@@ -92,4 +102,4 @@ data Deck = MkDeck
 -- format but Commander and Vanguard, every game nobody ventures in, and every
 -- game nobody wishes in.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Nothing, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty}
+fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty}

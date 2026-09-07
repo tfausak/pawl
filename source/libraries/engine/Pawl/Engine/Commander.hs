@@ -1,4 +1,4 @@
--- | CR 903, the Commander variant, as far as one commander in the command zone
+-- | CR 903, the Commander variant, as far as a commander in the command zone
 -- reaches it: CR 903.3's designation, CR 903.6's starting zone, CR 903.8's cost
 -- increase, CR 903.9's replacement sending a commander back to the command zone
 -- instead of anywhere else, and CR 903.10a's twenty-one-damage loss.
@@ -21,7 +21,8 @@
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
---   * Two commanders via partner or a background (#939).
+--   * CR 702.124's partner limbs other than CR 702.124h's plain one, and CR
+--     903.3a's "this card can be your commander" (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
 module Pawl.Engine.Commander where
 
@@ -33,8 +34,11 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -48,16 +52,50 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- | CR 903.3: record which card this player designated as their commander.
--- Called once per player by Pawl.Engine.Setup.createDeck, from the Deck.
+-- | CR 903.3 \/ CR 702.124: the cards this deck may designate as its
+-- commanders. One designation is rule 903.3's; two are rule 702.124h's, and
+-- only when EACH of them has partner -- "you can have two commanders if both
+-- have partner".
+--
+-- Read off the FRONT FACE's printed keywords rather than through the
+-- projection, which is CR 702.124a: a partner ability "modifies the rules for
+-- deck construction ... and functions before the game begins", so there is no
+-- object for a continuous effect to have touched yet. Pawl.Engine.Vanguard reads
+-- rule 902.4's card the same way and for the same reason.
+--
+-- More than two is empty for CR 702.124g: "no partner ability or combination of
+-- partner abilities can ever let a player have more than two commanders".
+--
+-- Empty is also what an ILLEGAL pair gets, which is the closest pawl can come to
+-- rejecting the deck: nothing validates a deck (#940) and Pawl.Engine.Setup has
+-- no channel to refuse one, so a pair rule 702.124h does not allow designates
+-- neither card and starts no commander in the command zone.
+--
+-- Not implemented: CR 702.124i's partner—[text], CR 702.124j's partner with
+-- [name], CR 702.124k's Background and CR 702.124m's Doctor's companion, each of
+-- which admits a different pair; and CR 903.3a's "this card can be your
+-- commander" (#939).
+designations :: Deck.Deck -> Set.Set Printing.Printing
+designations deck =
+  let named = Deck.commander deck
+      hasPartner printing = Set.member Keyword.Partner (Face.keywords (Card.frontFace (Printing.card printing)))
+   in case Set.toList named of
+        [] -> named
+        [_] -> named
+        [_, _] | all hasPartner named -> named
+        _ -> Set.empty
+
+-- | CR 903.3: record which cards this player designated as their commanders.
+-- Called once per designation by Pawl.Engine.Setup.createDeck, from the Deck.
 designate :: PlayerId -> PrintingId.PrintingId -> GameState -> GameState
 designate pid printingId gs =
-  gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just printingId}) pid (GameState.players gs)}
+  gs {GameState.players = Map.adjust (\p -> p {Player.commander = Set.insert printingId (Player.commander p)}) pid (GameState.players gs)}
 
 -- | CR 903.3: is this object its owner's commander?
 --
@@ -88,19 +126,22 @@ isCommander oid gs = Maybe.isJust (commanderPrintingOf oid gs)
 --
 -- What this answers FOR a melded permanent is the component card, which is
 -- exactly what CR 903.9c's procedure needs to single out -- see
--- `commandZoneComponent`. Every other reader wants the Bool: rule 903.10a's
--- tally (`commanderOwnerOf`) counts a melded commander's combat damage, and rule
--- 903.8's cast permission cannot be reached by one, since no melded permanent is
--- ever in the command zone to be cast from.
+-- `commandZoneComponent`. Rule 903.10a's tally is keyed by that same answer, so
+-- a melded commander's combat damage lands under the card that is the
+-- commander; rule 903.8's cast permission wants only the Bool, and cannot be
+-- reached by a melded permanent at all, since none is ever in the command zone
+-- to be cast from.
 commanderPrintingOf :: ObjectId -> GameState -> Maybe PrintingId.PrintingId
 commanderPrintingOf oid gs = do
   obj <- Game.lookupObject oid gs
-  designated <- Player.commander =<< Map.lookup (Object.owner obj) (GameState.players gs)
+  designated <- fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs))
   let cards = case Object.source obj of
         Source.OfCard printingId -> Seq.singleton printingId
         source -> Game.componentsOf source
-  Monad.guard (elem designated cards)
-  pure designated
+  -- CR 702.124e: with two designations this answers WHICH of them this object
+  -- is, and no object can be both -- rule 903.5b's singleton deck gives each
+  -- designation a distinct printing.
+  Foldable.find (\printingId -> Set.member printingId designated) cards
 
 -- | CR 903.9c: the one card of a melded or merged permanent that goes to the
 -- command zone when its owner accepts CR 903.9b's offer -- "the card that
@@ -116,18 +157,6 @@ commandZoneComponent oid gs = do
   Monad.guard (not (Seq.null (Game.componentsOf (Object.source obj))))
   commanderPrintingOf oid gs
 
--- | CR 903.10a's key: the owner of the commander that dealt this damage, or
--- Nothing when the source was not a commander at all.
---
--- The OWNER and not the object, for `isCommander`'s reason: rule 903.3's
--- designation survives CR 400.7's fresh incarnations and Player.commander is
--- one printing per player, so the owner names exactly one commander (#939 is
--- the partner/background widening).
-commanderOwnerOf :: ObjectId -> GameState -> Maybe PlayerId
-commanderOwnerOf oid gs
-  | isCommander oid gs = fmap Object.owner (Game.lookupObject oid gs)
-  | otherwise = Nothing
-
 -- | CR 903.10a / CR 704.6c: "a player who's been dealt 21 or more combat damage
 -- by the same commander over the course of the game loses the game". The
 -- predicate Pawl.Engine.Sba.losesNow reads, kept here for the reason this
@@ -137,7 +166,10 @@ commanderOwnerOf oid gs
 --
 -- The MAXIMUM over the tally and never its sum, which is the whole of "by the
 -- SAME commander": two commanders that between them dealt 24 have killed
--- nobody.
+-- nobody. Player.commanderDamage is keyed per commander (CR 702.124d), so that
+-- holds of a partner deck's pair as much as of two opponents'.
+-- Pawl.CommanderSpec's "CR 702.124d two partners dealing eleven each kill
+-- nobody" is the proof.
 --
 -- ">= 21" and not "== 21", because rule 903.10a says "21 or more" and one
 -- damage event can carry the difference on its own.
@@ -179,7 +211,11 @@ tax pid oid gs
   -- ACTIVATED ability off the tax, since Pawl.Engine.Cost.total is asked about
   -- those too and a commander on the battlefield is not in the command zone.
   | not (Set.member oid (GameState.command gs)) = 0
-  | otherwise = 2 * castCount pid gs
+  -- CR 702.124d: "when casting a commander with partner, ignore how many times
+  -- your other commander has been cast", so the count is the one kept against
+  -- THIS designation. `commanderPrintingOf` cannot be Nothing past the guard
+  -- above, which is `isCommander`.
+  | otherwise = 2 * maybe 0 (\printingId -> castCount pid printingId gs) (commanderPrintingOf oid gs)
 
 -- | CR 903.8's permission half: may this player cast this object from the command
 -- zone? Only its OWNER may, and only if it is their commander -- rule 903.8 says
@@ -189,9 +225,12 @@ canCastFromCommandZone :: PlayerId -> ObjectId -> GameState -> Bool
 canCastFromCommandZone pid oid gs =
   isCommander oid gs && fmap Object.owner (Game.lookupObject oid gs) == Just pid
 
--- | CR 903.8's "each previous time they cast it from the command zone this game".
-castCount :: PlayerId -> GameState -> Natural
-castCount pid gs = maybe 0 Player.commanderCasts (Map.lookup pid (GameState.players gs))
+-- | CR 903.8's "each previous time they cast IT from the command zone this
+-- game", asked of one designation: CR 702.124d has a partner deck's other
+-- commander ignore this one's casts.
+castCount :: PlayerId -> PrintingId.PrintingId -> GameState -> Natural
+castCount pid printingId gs =
+  maybe 0 (Map.findWithDefault 0 printingId . Player.commanderCasts) (Map.lookup pid (GameState.players gs))
 
 -- | CR 903.8's tax as a function on ONE candidate cost: add {2} per previous cast
 -- to its mana part, or leave it alone when there is no tax to add.
@@ -298,9 +337,20 @@ commandZoneOffer zc gs
 -- Pawl.Engine.Cast only when the spell left the COMMAND ZONE -- a commander cast
 -- from a hand or a graveyard makes no later cast dearer, which is what rule
 -- 903.8's "from the command zone" restricts.
-recordCast :: PlayerId -> GameState -> GameState
-recordCast pid gs =
-  gs
-    { GameState.players =
-        Map.adjust (\p -> p {Player.commanderCasts = Player.commanderCasts p + 1}) pid (GameState.players gs)
-    }
+--
+-- Counted against THIS commander (CR 702.124d), which is why it takes an object
+-- rather than the player alone. The object is the SPELL on the stack, CR 601.2a
+-- having already moved the card there: rule 903.3's designation is a printing,
+-- and Source.OfCard carries it across CR 400.7's fresh incarnation, so the spell
+-- answers `commanderPrintingOf` exactly as the card in the command zone did.
+--
+-- Does nothing when the object is not a commander, which its one caller has
+-- already ruled out by the zone it was cast from.
+recordCast :: PlayerId -> ObjectId -> GameState -> GameState
+recordCast pid oid gs = case commanderPrintingOf oid gs of
+  Nothing -> gs
+  Just printingId ->
+    gs
+      { GameState.players =
+          Map.adjust (\p -> p {Player.commanderCasts = Map.insertWith (+) printingId 1 (Player.commanderCasts p)}) pid (GameState.players gs)
+      }

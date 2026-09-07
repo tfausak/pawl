@@ -6,7 +6,6 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.Codec.Status as Status
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -20,9 +19,10 @@ import qualified Pawl.Types.Status as Status.Type
 -- and an absent one the same to a card, but the map really can hold one once an
 -- effect has taken the last counter off, and the round trip has to keep it.
 --
--- `commanderDamage` is keyed by a PlayerId, a Natural newtype, so it takes
--- 'Common.naturalMap' -- a JSON object keyed by the decimal seat, which is what
--- Pawl.Codec.Combat writes for the same key type.
+-- `commanderCasts` and `commanderDamage` are keyed by a PrintingId, a Natural
+-- newtype, so both take 'Common.naturalMap' -- a JSON object keyed by the
+-- decimal id, which is what Pawl.Codec.Combat writes for that shape of key. CR
+-- 702.124d is why both are keyed per commander rather than per player.
 --
 -- `speed` is 'Fields.required' over 'Common.maybe' rather than defaulted to 0,
 -- because CR 702.179b makes the absence a THIRD state: CR 704.5aa fires on a
@@ -35,9 +35,9 @@ codec = Fields.object $ do
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset PlayerCounterKind.codec) Player.counters
   ringTemptations <- Fields.defaulted "ringTemptations" 0 Common.natural Player.ringTemptations
   speed <- Fields.required "speed" (Common.maybe Common.natural) Player.speed
-  commander <- Fields.defaulted "commander" Nothing (Common.maybe PrintingId.codec) Player.commander
-  commanderCasts <- Fields.defaulted "commanderCasts" 0 Common.natural Player.commanderCasts
-  commanderDamage <- Fields.defaulted "commanderDamage" Map.empty (Common.naturalMap PlayerId.codec Common.natural) Player.commanderDamage
+  commander <- Fields.defaulted "commander" Set.empty (Common.set PrintingId.codec) Player.commander
+  commanderCasts <- Fields.defaulted "commanderCasts" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.commanderCasts
+  commanderDamage <- Fields.defaulted "commanderDamage" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.commanderDamage
   dungeons <- Fields.defaulted "dungeons" Set.empty (Common.set PrintingId.codec) Player.dungeons
   outsideTheGame <- Fields.defaulted "outsideTheGame" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.outsideTheGame
   completedDungeons <- Fields.defaulted "completedDungeons" 0 Common.natural Player.completedDungeons

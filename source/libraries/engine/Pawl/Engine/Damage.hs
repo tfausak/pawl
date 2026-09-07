@@ -1033,7 +1033,8 @@ processDamage events = do
         -- same reason.
         Recipient.ToPlayer _ -> g
       -- CR 903.10a: the running tally of COMBAT damage each commander has dealt
-      -- each player, kept under the commander's OWNER (Player.commanderDamage).
+      -- each player, kept under the commander itself (Player.commanderDamage) --
+      -- CR 702.124d counts a partner deck's two separately.
       --
       -- A pass of its own rather than a line inside markOne, for the lifelink
       -- gain pass's reason: the tally is not one of CR 120.3's results at all --
@@ -1058,13 +1059,13 @@ processDamage events = do
       tallyOne g ev = case DamageEvent.target ev of
         Recipient.ToPlayer pid
           | DamageEvent.kind ev == DamageKind.Combat ->
-              case Commander.commanderOwnerOf (DamageEvent.source ev) board of
+              case Commander.commanderPrintingOf (DamageEvent.source ev) board of
                 Nothing -> g
-                Just owner ->
+                Just printingId ->
                   let count player =
                         player
                           { Player.commanderDamage =
-                              Map.insertWith (+) owner (DamageEvent.amount ev) (Player.commanderDamage player)
+                              Map.insertWith (+) printingId (DamageEvent.amount ev) (Player.commanderDamage player)
                           }
                    in g {GameState.players = Map.adjust count pid (GameState.players g)}
         _ -> g
