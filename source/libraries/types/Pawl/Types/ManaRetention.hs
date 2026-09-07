@@ -32,9 +32,9 @@ data ManaRetention
   = -- | CR 500.5: the mana empties with the rest of the pool as the step or
     -- phase ends.
     Ordinary
-  | -- | CR 514.2: the mana survives every step and phase end until the cleanup
-    -- step, where the retention itself ends (Pawl.Engine.Mana.endManaRetention)
-    -- and that same step's own CR 500.5 sweep then takes the mana.
+  | -- | CR 514.2: the mana survives every step and phase end until the turn ends,
+    -- where the retention itself ends (Pawl.Engine.Mana.endManaRetention) and the
+    -- CR 500.5 sweep at the next boundary then takes the mana.
     UntilEndOfTurn
   | -- | CR 500.5a, repeated by CR 511.2: the mana survives every step end of the
     -- combat phase, and the retention ends as that PHASE ends -- not at the

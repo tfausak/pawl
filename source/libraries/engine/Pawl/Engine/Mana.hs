@@ -562,9 +562,14 @@ emptyManaPools gs =
 
 -- CR 514.2: "all 'until end of turn' and 'this turn' effects end", during the
 -- cleanup step. A unit's retention is such an effect, so it ends here -- and the
--- mana itself does NOT: this only clears the duration, and the cleanup step's
--- own CR 500.5 sweep at the step's END is what then takes the mana. Engine.hs
--- calls this beside Damage.removeAllDamage, which is CR 514.2's other half.
+-- mana itself does NOT: this only clears the duration, and the CR 500.5 sweep at
+-- the next step or phase END is what then takes the mana.
+--
+-- TWO callers, both in Engine.hs and both pairing this with
+-- Expiry.dropAtCleanup: the cleanup step's turn-based actions, where
+-- Damage.removeAllDamage is beside them as CR 514.2's other half, and
+-- Engine.endTurnDurations, where CR 614.10a leaves that half out because the
+-- step it is scheduled for did not happen.
 --
 -- Here rather than in Pawl.Engine.Expiry, which sweeps the carriers keyed by a
 -- Pawl.Types.Expiry: a mana unit carries none, and the pool is this module's.

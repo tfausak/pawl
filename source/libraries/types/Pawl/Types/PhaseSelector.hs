@@ -19,7 +19,8 @@ import qualified Pawl.Types.Phase as Phase
 -- window has exactly ONE spelling and no reader owes two cases for it.
 --
 -- Vocabulary on a finished axis: CR 500.1 fixes the set at three, so all three
--- are here though only the combat one has a producer in the pool.
+-- are here though the beginning phase has no producer in the pool. Stonehorn
+-- Dignitary writes CombatPhase and Synthetic Curfew Bell writes EndingPhase.
 data PhaseSelector
   = Step Phase.Phase
   | BeginningPhase
