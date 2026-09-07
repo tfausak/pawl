@@ -348,6 +348,22 @@ data Object = MkObject
     -- suspected, both read off this set live rather than stamped, so nothing has
     -- to be unwound when Effect.Unsuspect deletes the member (CR 701.60a).
     designations :: Set.Set Designation.Designation,
+    -- | CR 701.37c: the value of X this permanent became monstrous with, so that
+    -- "other abilities of that permanent may also refer to X" have something to
+    -- read. Absent for a mark set with no number, which is every one of them but
+    -- a "Monstrosity X".
+    --
+    -- KEYED BY THE DESIGNATION, `kicked` below's shape, rather than a
+    -- Maybe Natural named for monstrosity: Effect.Designate is parameterised by
+    -- WHICH mark (Pawl.Types.Designation's own argument), so the writer records
+    -- the number the same way whatever the mark is, and Quantity.DesignationValue
+    -- reads a key back. A separate field from `designations` above rather than a
+    -- Map replacing it: CR 701.60c reads membership live and Effect.Unsuspect
+    -- deletes a member, neither of which wants a payload.
+    --
+    -- Per-incarnation, `designations` above's route and each rule's own "until it
+    -- leaves the battlefield".
+    designationValues :: Map.Map Designation.Designation Natural.Natural,
     -- | CR 702.33d: how many times did this SPELL's controller declare each of
     -- its kicker costs? Stamped by Pawl.Engine.Cast at CR 601.2b onto the stack
     -- incarnation, and empty for a spell that was not kicked.
@@ -644,6 +660,7 @@ newIncarnation object =
       classLevel = Nothing,
       unlockedHalves = Set.empty,
       designations = Set.empty,
+      designationValues = Map.empty,
       kicked = Map.empty,
       -- CR 702.103b's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move that

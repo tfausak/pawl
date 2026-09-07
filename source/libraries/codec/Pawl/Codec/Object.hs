@@ -33,6 +33,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind.Type
+import qualified Pawl.Types.Designation as Designation.Type
 import qualified Pawl.Types.Facing as Facing.Type
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Mana as Mana.Type
@@ -45,6 +46,15 @@ import qualified Pawl.Types.Timestamp as Timestamp.Type
 -- 'counterTimestamp' below's reason -- the value is a count the wire states
 -- rather than a repeat it could spell -- and possibly EMPTY, since that is every
 -- object no kicker was announced for.
+-- | CR 701.37c's X for one designation. A pair per mark through
+-- 'Common.keyedList', 'kickerPayment' below's shape and for its reason: the key
+-- is structured, so it cannot be an object key.
+designationValue :: Codec.Codec (Designation.Type.Designation, Natural.Natural)
+designationValue = Fields.object $ do
+  designation <- Fields.required "designation" Designation.codec fst
+  value <- Fields.required "value" Common.natural snd
+  pure (designation, value)
+
 kickerPayment :: Codec.Codec (Cost.Type.Cost Keyword.Type.Keyword, Natural.Natural)
 kickerPayment = Fields.object $ do
   cost <- Fields.required "cost" (Cost.codec Keyword.codec) fst
@@ -110,6 +120,7 @@ codec = Fields.object $ do
   classLevel <- Fields.defaulted "classLevel" Nothing (Common.maybe ClassLevel.codec) Object.classLevel
   unlockedHalves <- Fields.defaulted "unlockedHalves" Set.empty (Common.set CardName.codec) Object.unlockedHalves
   designations <- Fields.defaulted "designations" Set.empty (Common.set Designation.codec) Object.designations
+  designationValues <- Fields.defaulted "designationValues" Map.empty (Common.keyedList designationValue) Object.designationValues
   kicked <- Fields.defaulted "kicked" Map.empty (Common.keyedList kickerPayment) Object.kicked
   bestowed <- Fields.defaulted "bestowed" False Common.boolean Object.bestowed
   mutating <- Fields.defaulted "mutating" False Common.boolean Object.mutating
@@ -157,6 +168,7 @@ codec = Fields.object $ do
         Object.classLevel = classLevel,
         Object.unlockedHalves = unlockedHalves,
         Object.designations = designations,
+        Object.designationValues = designationValues,
         Object.kicked = kicked,
         Object.bestowed = bestowed,
         Object.mutating = mutating,

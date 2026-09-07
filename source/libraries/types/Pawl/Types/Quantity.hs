@@ -90,6 +90,10 @@ data Quantity
   | -- | 1 if the object this quantity is evaluated against has that
     -- designation, else 0 -- CR 702.112a's "if it isn't renowned".
     HasDesignation Designation.Designation
+  | -- | CR 701.37c: the value the object this quantity is evaluated against
+    -- became designated with -- "monstrosity X", read back by another ability of
+    -- the same permanent. A mark set with no number reads 0.
+    DesignationValue Designation.Designation
   | -- | CR 716.2b: the level of the object this quantity is evaluated against;
     -- no level reads 1 (CR 716.2d, Pawl.Types.ClassLevel.defaulted).
     ClassLevel

@@ -9,6 +9,11 @@ module Pawl.Types.Designation where
 -- (Pawl.Types.Object's `designations`, Effect.Designate,
 -- Quantity.HasDesignation, Filter.HasDesignation).
 --
+-- CR 701.37c's X rides alongside rather than inside: Object.designationValues
+-- keys a number by which mark set it, and Quantity.DesignationValue reads one
+-- back. Only "monstrosity X" writes one, so it is a second field and not a
+-- payload on this type.
+--
 -- A payload and not a constructor apiece, by Pawl.Types.Scaling's argument:
 -- what separates renown from monstrosity is WHICH mark, which is a value.
 --
@@ -30,8 +35,10 @@ module Pawl.Types.Designation where
 --
 -- * CR 716.2b's level is a NUMBER -- "a level is a designation that any permanent
 --   can have" -- so it is Object.classLevel, a Maybe Pawl.Types.ClassLevel, read
---   by Quantity.ClassLevel. A constructor here could only say whether a permanent
---   has some level, which is not what CR 716.2a's "level N or greater" asks.
+--   by Quantity.ClassLevel. A constructor here plus a designationValues entry
+--   could not answer CR 716.2a's "level N or greater" either: CR 716.2d gives a
+--   permanent that was never levelled a level of 1, where a mark nobody set has
+--   no value at all.
 --
 -- Membership here says the mark is STORED and READ alike; it does not say the
 -- marks are interchangeable, and two places deliberately keep them apart. What

@@ -1026,8 +1026,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.BecomeMonarch target -> monarchTargetSlots target
   -- CR 726.1 names no target slot at all: neither InitiativeTarget arm reads one.
   Effect.TakeTheInitiative _ -> Map.empty
-  -- A READ: the slot names the permanent gaining the designation.
-  Effect.Designate (Designate.MkDesignate _ slot) -> oneSlot slot
+  -- A READ: the slot names the permanent gaining the designation. CR 701.37c's
+  -- X is an AMOUNT the same resolution may have bound, Effect.Create's count
+  -- posture, so its own slots are joined in.
+  Effect.Designate (Designate.MkDesignate _ slot value) -> joinTwo (oneSlot slot) (joinSlots (fmap quantitySlots (Foldable.toList value)))
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> oneSlot slot
   Effect.Unsuspect _ -> Map.empty
   -- A READ, Designate's: the slot names the permanent whose half is locked or
@@ -1445,7 +1447,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TakeTheInitiative InitiativeTarget.TheController -> True
   -- CR 726.2 reads Binding.triggerSource, Effect.BecomeMonarch ControllerOfSource's answer.
   Effect.TakeTheInitiative InitiativeTarget.ControllerOfSource -> False
-  Effect.Designate (Designate.MkDesignate _ _) -> True
+  Effect.Designate (Designate.MkDesignate _ _ value) -> all Quantity.slotsAreExhaustive value
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> True
   Effect.Unsuspect _ -> True
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> True
@@ -1615,7 +1617,7 @@ readsX = any effectReadsX
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.TakeTheInitiative {} -> False
-      Effect.Designate (Designate.MkDesignate _ _) -> False
+      Effect.Designate (Designate.MkDesignate _ _ value) -> any Quantity.readsX value
       Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> False
       Effect.Unsuspect _ -> False
       Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> False
@@ -1802,7 +1804,7 @@ boundSlots effect = case effect of
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.TakeTheInitiative {} -> Set.empty
-  Effect.Designate (Designate.MkDesignate _ _) -> Set.empty
+  Effect.Designate (Designate.MkDesignate {}) -> Set.empty
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> Set.empty
   Effect.Unsuspect _ -> Set.empty
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> Set.empty

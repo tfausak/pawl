@@ -24,6 +24,7 @@
 module Pawl.MutateSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -44,6 +45,9 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CounterCause as CounterCause
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -183,6 +187,120 @@ spec s registry = Spec.describe s "Mutate" $ do
     -- The proxy, after them: the target really is a Human on the board that
     -- resolved, which is the whole of rule 702.140b's condition.
     Spec.assertBool s (Set.member Subtype.Human (Projection.subtypesOf host turned)) "setup: the target was a Human when the spell began resolving"
+  -- CR 730.2a's timestamp sentence, which is the one board it is observable on:
+  -- the merge and the copy effect already on the target share layer 1a (CR
+  -- 613.2a) and CR 613.7 orders them by timestamp, so the merge -- timestamped
+  -- at the merge, always later -- wins. A merge that let the stamped copy
+  -- snapshot stand answers every OTHER case in this group correctly and differs
+  -- here and only here; see #3371.
+  --
+  -- The Clone is a copy of Falcon Abomination, so the fold is also read over
+  -- RECORDS rather than over printed faces: flying is in the copy's rules text
+  -- and nowhere on the Clone card, and Clone's own 0\/0 box and copy ability are
+  -- what a printed-face fold would have contributed instead.
+  Spec.it s "CR 730.2a/613.2a the merge outranks a copy effect already on the target" $ do
+    plains <- S.printingOf s registry "Plains"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    clone <- S.printingOf s registry "Clone"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let (original, withFalcon) = S.addPermanent falcon S.alice (Setup.emptyGame S.bothPlayers)
+        (_, staged) = S.spellOnStack clone S.alice withFalcon
+        copied = S.runPure (copying original) staged (Stack.resolveTop >> Engine.settleForPriority)
+    case cloneOn copied of
+      Nothing -> Spec.assertFailure s "the Clone should have entered as a copy of Falcon Abomination"
+      Just host -> do
+        let (board, spellId) = S.handOne cubwarden (S.landsFor plains S.alice 4 copied)
+            after = merging MutateSide.Over host board spellId
+        -- The PROJECTION's name, not Game.cardOf's: a copy effect rewrites no
+        -- Source, so the card behind this object is the Clone before the merge
+        -- and Cubwarden after it whichever layer-1a effect won. CR 709.4a's
+        -- projected set is the read that tells them apart.
+        Spec.assertEqWith s "CR 730.2a the merged permanent is named Cubwarden, not the copied Falcon Abomination" (Projection.namesOf host after) (Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")))
+        Spec.assertEqWith
+          s
+          "CR 702.140d and the mutate trigger the copy snapshot was hiding fired, making two Cats"
+          (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Cat Token")) S.alice after)
+          2
+        Spec.assertEqWith s "CR 730.2a with Cubwarden's box rather than Clone's 0\\/0" (S.powerToughnessOf host after) (Just (3, 5))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying host after) "CR 702.140e and flying, which only the COPY under it has -- the Clone card prints none"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink host after) "and lifelink from the topmost component"
+        -- The proxies, after the behaviours: the target really was a copy of
+        -- Falcon Abomination when the spell merged with it, and it really is the
+        -- Clone rather than the original.
+        Spec.assertEqWith s "setup: the target projected the name Falcon Abomination before the merge" (Projection.namesOf host board) (Set.singleton (CardName.MkCardName (Text.pack "Falcon Abomination")))
+        Spec.assertBool s (host /= original) "setup: and it is the Clone, not the creature it copied"
+        Spec.assertEqWith s "setup: the copied original is untouched" (Projection.namesOf original after) (Set.singleton (CardName.MkCardName (Text.pack "Falcon Abomination")))
+  -- CR 702.140e read by the gatherer rather than by the projection: a static
+  -- ability under the topmost component has to reach Projection.permanentParts,
+  -- which walks Projection.View.staticAbilitiesOf and not the seed record. Lord
+  -- of Atlantis is the producer -- "other Merfolk get +1\/+1 and have
+  -- islandwalk" -- and Merfolk Seer, which prints neither, is what reads it
+  -- back; see #3371.
+  Spec.it s "CR 702.140e a static ability under the topmost component still applies" $ do
+    plains <- S.printingOf s registry "Plains"
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    seer <- S.printingOf s registry "Merfolk Seer"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let (host, withLord) = S.addPermanent lord S.alice (Setup.emptyGame S.bothPlayers)
+        (other, base) = S.addPermanent seer S.alice withLord
+        (board, spellId) = S.handOne cubwarden (S.landsFor plains S.alice 4 base)
+        after = merging MutateSide.Over host board spellId
+    Spec.assertEqWith s "CR 702.140e the other Merfolk is still 3/3" (S.powerToughnessOf other after) (Just (3, 3))
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Island)) other after) "CR 702.140e and still has islandwalk"
+    -- The BEFORE half of the pair, after the behaviour: the buff was there to
+    -- lose, so the two assertions above are about the merge keeping it rather
+    -- than about a board that never had it.
+    Spec.assertEqWith s "setup: the other Merfolk was 3/3 before the merge" (S.powerToughnessOf other board) (Just (3, 3))
+    Spec.assertEqWith s "setup: and the merged permanent is Cubwarden, so the ability is not its own printed one" (fmap S.nameOf (Game.cardOf host after)) (Just (CardName.MkCardName (Text.pack "Cubwarden")))
+    Spec.assertBool s (not (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Island)) host after)) "setup: and the merged permanent is no Merfolk, so it does not buff itself"
+  -- CR 702.140e again, through the OTHER reader family the seed record does not
+  -- feed: Projection.replacementsAffecting's copiable short-circuit. Corpsejack
+  -- Menace is the producer -- "if one or more +1/+1 counters would be put on a
+  -- creature you control, twice that many are put instead"; see #3371.
+  Spec.it s "CR 702.140e a replacement effect under the topmost component still applies" $ do
+    plains <- S.printingOf s registry "Plains"
+    menace <- S.printingOf s registry "Corpsejack Menace"
+    seer <- S.printingOf s registry "Merfolk Seer"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let (host, withMenace) = S.addPermanent menace S.alice (Setup.emptyGame S.bothPlayers)
+        (other, base) = S.addPermanent seer S.alice withMenace
+        (board, spellId) = S.handOne cubwarden (S.landsFor plains S.alice 4 base)
+        after = merging MutateSide.Over host board spellId
+        counted gs = S.runPure S.identityAnswer gs (Monad.void (Event.putCounters (CounterCause.ByEffect S.alice) other CounterKind.PlusOnePlusOne 1))
+        countersOn gs = Map.lookup CounterKind.PlusOnePlusOne (maybe Map.empty Object.counters (Game.lookupObject other gs))
+    Spec.assertEqWith s "CR 702.140e one +1/+1 counter is still doubled after the merge" (countersOn (counted after)) (Just 2)
+    -- The BEFORE half of the pair, after the behaviour.
+    Spec.assertEqWith s "setup: it was doubled before the merge too" (countersOn (counted board)) (Just 2)
+    Spec.assertEqWith s "setup: and the merged permanent is Cubwarden, which prints no replacement effect" (fmap S.nameOf (Game.cardOf host after)) (Just (CardName.MkCardName (Text.pack "Cubwarden")))
+  -- CR 702.140c's choice is only put to a player where it decides something. A
+  -- token target is one the merge refuses (#874), so the side would be answered
+  -- and then thrown away -- an elided rule showing up as a real decision. A pair
+  -- of boards differing in exactly one thing: whether the creature the spell
+  -- targets is a token; see #3371.
+  Spec.it s "CR 702.140c a merge the engine will refuse asks for no side" $ do
+    plains <- S.printingOf s registry "Plains"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let base = S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers)
+        (cardTarget, withCard) = S.addPermanent falcon S.alice base
+        (tokenTarget, withToken) = S.addToken (Printing.card falcon) S.alice base
+        counting :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+        counting host p = case p of
+          Prompt.ChooseMutateSide {} -> do
+            State.modify' (+ 1)
+            pure MutateSide.Over
+          _ -> pure (mutatingAt MutateSide.Over host p)
+        asks host gs =
+          let (board, spellId) = S.handOne cubwarden gs
+              cast = S.runPure (mutatingAt MutateSide.Over host) board (S.cast S.alice spellId)
+           in State.execState (Engine.runGame (counting host) cast (Monad.replicateM_ 6 (Engine.settleForPriority >> Stack.resolveTop))) 0
+    Spec.assertEqWith s "CR 702.140c a token target the merge refuses is asked no side" (asks tokenTarget withToken) 0
+    Spec.assertEqWith s "while a card target is asked exactly one" (asks cardTarget withCard) 1
+    -- The proxies, after the pair: the token really was a legal target of the
+    -- spell, so the 0 above is the refusal and not an unfillable slot.
+    Spec.assertBool s (Projection.isCreatureOf tokenTarget withToken) "setup: the token is a creature"
+    Spec.assertEqWith s "setup: which alice owns, and which is no Human" (fmap Object.owner (Game.lookupObject tokenTarget withToken)) (Just S.alice)
+    Spec.assertBool s (not (Set.member Subtype.Human (Projection.subtypesOf tokenTarget withToken))) "setup: and is no Human"
   -- CR 730.3, which is CR 712.21 restated for a merged permanent and which
   -- Pawl.Engine.Game.componentsOf answers for both. One permanent leaves and two
   -- cards arrive.
@@ -238,6 +356,23 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: the rejected one alice owns is a Human" (Projection.subtypesOf humanId board) (Set.fromList [Subtype.Cleric, Subtype.Human])
     Spec.assertEqWith s "setup: and the other is a creature bob owns" (fmap Object.owner (Game.lookupObject theirsId board)) (Just S.bob)
     Spec.assertEqWith s "setup: which is a creature all the same" (Projection.subtypesOf theirsId board) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+
+-- CR 614.12a's as-enters copy choice answered with `victim`, PINNED to that id
+-- rather than searched for, so a mutation cannot be repaired by an answerer that
+-- finds another eligible creature.
+copying :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+copying victim p = case p of
+  Prompt.ChooseCopyTarget _ _ _ offered -> List.find (== victim) offered
+  _ -> S.identityAnswer p
+
+-- The Clone permanent, found by the printing behind it rather than by the name
+-- it now shows: a copy of Falcon Abomination answers Game.cardOf with the copied
+-- card, so a name search would find the original instead.
+cloneOn :: GameState.GameState -> Maybe ObjectId.ObjectId
+cloneOn gs =
+  List.find
+    (\oid -> fmap (S.nameOf . Printing.card) (Game.printingOfObject oid gs) == Just (CardName.MkCardName (Text.pack "Clone")))
+    (Game.zoneMembers Zone.Battlefield S.alice gs)
 
 -- The board every case above starts from: four Plains, one Falcon Abomination
 -- settled on the battlefield, and Cubwarden in alice's hand. Four white mana is

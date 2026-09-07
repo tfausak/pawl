@@ -408,6 +408,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- Power and ObjectCounters have it: an object nobody designated is not renowned,
   -- which is an answer.
   Quantity.HasDesignation d -> fmap (\view -> if Set.member d (Filter.designations view) then 1 else 0) mView
+  -- CR 701.37c: the value X had as the permanent became monstrous, read back by
+  -- another ability of that same permanent -- HasDesignation's arm above with the
+  -- number in place of the 0/1. A mark set with no number reads 0, which is what
+  -- every designation but a "Monstrosity X" is.
+  Quantity.DesignationValue d -> fmap (toInteger . Map.findWithDefault 0 d . Filter.designationValues) mView
   -- CR 716.2d is applied HERE and nowhere else: a permanent with no level reads
   -- as level 1 for every rule and effect that asks, so the default belongs at the
   -- one read rather than in the field Filter.classLevel reports.
@@ -953,6 +958,7 @@ objectSlots quantity = case quantity of
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
+  Quantity.DesignationValue _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
@@ -1173,6 +1179,7 @@ readsX quantity = case quantity of
   Quantity.ObjectCounters _ -> False
   Quantity.ObjectCountersOfAnyKind -> False
   Quantity.HasDesignation _ -> False
+  Quantity.DesignationValue _ -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
