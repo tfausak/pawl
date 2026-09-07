@@ -253,6 +253,7 @@ enter pid quality = do
                 Object.zone = Zone.Command,
                 Object.tapped = TapState.Untapped,
                 Object.facing = Facing.FaceUp,
+                Object.flipped = False,
                 Object.exiledFaceDown = False,
                 Object.damage = 0,
                 Object.sickness = Sickness.Settled pid,

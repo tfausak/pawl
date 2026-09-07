@@ -38,6 +38,8 @@ import qualified Pawl.Types.Scaling as Scaling
 -- Scale is Furnace of Rath's "double that damage ... instead", reusing
 -- Pawl.Types.Scaling rather than a Double arm -- the difference between doubling
 -- and tripling is a number, and CounterR and TokenR speak the same vocabulary.
+-- Tok-Tok, Volcano Born's "that much damage plus 1 ... instead" is the same arm
+-- with Scaling's AddMore, which is why the reuse was worth having.
 --
 -- Redirect is CR 614.9's redirection effect (Turn the Tables): the event's
 -- RECIPIENT is replaced and nothing else is. A rule-614 replacement, not a rule

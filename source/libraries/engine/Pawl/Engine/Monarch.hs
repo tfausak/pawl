@@ -190,6 +190,7 @@ placeInherent pending = do
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
+            Object.flipped = False,
             Object.exiledFaceDown = False,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,

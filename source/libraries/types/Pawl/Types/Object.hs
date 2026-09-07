@@ -64,6 +64,33 @@ data Object = MkObject
     -- controlled by another player" -- Object.source still holds the printing
     -- (#1412).
     facing :: Facing.Facing,
+    -- | CR 110.5: flipped or unflipped, another of that rule's status
+    -- categories, beside `tapped` and `facing` above. CR 710.2 is what it does: "once a permanent is
+    -- flipped, its normal name, text box, type line, power, and toughness don't
+    -- apply and the alternative versions of those characteristics apply
+    -- instead", which Pawl.Engine.Card.flippedFace supplies and
+    -- Pawl.Engine.Game.resolveFaceFor substitutes at the seam every
+    -- characteristic read starts from -- `facing` above's road, and for its
+    -- reason: CR 110.5a makes status not a characteristic, so this is no CR 613
+    -- layer.
+    --
+    -- A Bool and not a face name, though Object.face below already points a
+    -- permanent at one half. CR 710.1c is why: "a flip card's color and mana cost
+    -- don't change if the permanent is flipped", so the flipped read keeps two of
+    -- the front half's characteristics and a field naming the alternative half
+    -- would be read as the whole answer. Which half it is, is fixed by the layout
+    -- anyway (CR 710.1b's bottom half), so there is nothing for a name to choose.
+    --
+    -- ONE WAY (CR 710.4): nothing writes False here. Per-incarnation all the
+    -- same, which is the rest of that rule -- "if a flipped permanent leaves the
+    -- battlefield, it retains no memory of its status" -- so newIncarnation
+    -- clears it and no move writes it back.
+    --
+    -- Takes NO new timestamp when it is set, unlike `facing` and Object.face: CR
+    -- 613.7 lists a new timestamp for a permanent that turns face up or down
+    -- (613.7f) and for one that transforms or converts (613.7g), and names no
+    -- such rule for flipping.
+    flipped :: Bool,
     -- | CR 406.3: this card was "exiled face down", which CR 110.5d says in as
     -- many words has no correlation to `facing` above. What it does is CR 406.4's
     -- first half: Pawl.Engine.Target offers the card itself only to a player
@@ -562,6 +589,12 @@ newIncarnation object =
       -- CR 110.5b for a battlefield entry, CR 708.9 for a departure from one;
       -- Event.changeZoneFaceDown is the "otherwise".
       facing = Facing.FaceUp,
+      -- CR 710.4: "if a flipped permanent leaves the battlefield, it retains no
+      -- memory of its status", which is CR 110.5b's default said one status
+      -- category over. Written back by nothing: the alternative characteristics
+      -- belong to the permanent that flipped, and CR 400.7's new object is not
+      -- that permanent.
+      flipped = False,
       -- CR 406.3: exiled cards are kept face up by default, and every other zone
       -- is face up outright. Event.changeZoneEntering is the "otherwise".
       exiledFaceDown = False,

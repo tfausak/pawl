@@ -30,6 +30,13 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       Layout.codec
       Layout.Room
       " {\"type\":\"Room\"} "
+  -- CR 710.1.
+  Spec.it s "Flip" $
+    Common.assertCodec
+      s
+      Layout.codec
+      Layout.Flip
+      " {\"type\":\"Flip\"} "
   -- CR 715.1.
   Spec.it s "Adventure" $
     Common.assertCodec
@@ -67,11 +74,12 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       " {\"type\":\"Meld\"} "
   -- CR 709-722 names a dozen more layouts, most of which have not landed. A
   -- file naming one must fail loudly rather than fall back to Normal, which
-  -- would silently play a flip card (CR 710) as its unflipped half.
+  -- would silently play a leveler card (CR 711) as a creature with none of its
+  -- levels.
   Spec.it s "a layout that has not landed is rejected" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"Flip\"} ") >>= Codec.decode Layout.codec))
+      (Either.isLeft (Common.parse (Text.pack " {\"type\":\"Leveler\"} ") >>= Codec.decode Layout.codec))
       "expected an unknown layout tag to fail to decode"
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the

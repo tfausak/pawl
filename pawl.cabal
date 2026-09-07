@@ -1368,6 +1368,7 @@ library test
     Pawl.FaceDownSpec
     Pawl.FilterPositionLintSpec
     Pawl.FilterSpec
+    Pawl.FlipSpec
     Pawl.GameSpec
     Pawl.GoadSpec
     Pawl.InitiativeSpec

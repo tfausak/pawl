@@ -187,6 +187,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.DoesNotUntapNext _ -> Nothing
   Effect.Transform _ -> Nothing
   Effect.Convert _ -> Nothing
+  Effect.Flip _ -> Nothing
   -- CR 113.6m asks which zone an ability functions FROM by where the object it is
   -- on moves. A meld moves the cards the ability NAMED, and the melding ability's
   -- own source is one of them only because an earlier instruction exiled it --

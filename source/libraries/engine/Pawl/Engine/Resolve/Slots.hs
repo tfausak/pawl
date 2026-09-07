@@ -578,6 +578,7 @@ effectObjectRefs effect = case effect of
   Effect.DoesNotUntapNext ref -> [ref]
   Effect.Transform ref -> [ref]
   Effect.Convert ref -> [ref]
+  Effect.Flip ref -> [ref]
   -- The components; the combined face beside them is card data, not a ref.
   Effect.Meld (Meld.MkMeld objects _) -> [objects]
   Effect.PhaseOut ref -> [ref]
@@ -723,6 +724,7 @@ effectPlayerRefs effect = case effect of
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
   Effect.Convert {} -> []
+  Effect.Flip {} -> []
   Effect.Meld {} -> []
   Effect.PhaseOut {} -> []
   Effect.TurnFaceDown {} -> []
@@ -992,6 +994,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.DoesNotUntapNext _ -> Map.empty
   Effect.Transform _ -> Map.empty
   Effect.Convert _ -> Map.empty
+  Effect.Flip _ -> Map.empty
   -- The combined back face is literal card data and names no slot.
   Effect.Meld {} -> Map.empty
   Effect.PhaseOut _ -> Map.empty
@@ -1392,6 +1395,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.DoesNotUntapNext _ -> True
   Effect.Transform _ -> True
   Effect.Convert _ -> True
+  Effect.Flip _ -> True
   -- The combined face is interned with EMPTY bindings, CreateEmblem's reason, so
   -- its text is literal.
   Effect.Meld _ -> True
@@ -1584,6 +1588,7 @@ readsX = any effectReadsX
       Effect.DoesNotUntapNext _ -> False
       Effect.Transform _ -> False
       Effect.Convert _ -> False
+      Effect.Flip _ -> False
       Effect.Meld _ -> False
       Effect.PhaseOut _ -> False
       Effect.AddPhases _ -> False
@@ -1768,6 +1773,7 @@ boundSlots effect = case effect of
   Effect.DoesNotUntapNext _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.Convert _ -> Set.empty
+  Effect.Flip _ -> Set.empty
   -- CR 701.42a's melded permanent is bound to nothing: no printing names it later
   -- in its own instruction list.
   Effect.Meld _ -> Set.empty
