@@ -762,8 +762,18 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
 -- none is a Saga, a planeswalker or a battle, and none grants a CR 116.2
 -- permission (Scryfall `t:room`, 2026-09-05), so nothing can redden if they are
 -- left behind again.
+--
+-- FACE DOWN answers Nothing before either of those questions is asked, so all
+-- seven readers fall through to the printed read and Game.faceOf hands them
+-- Card.faceDownFace. CR 613.2b orders layer 1b after layer 1a, so CR 708.2's
+-- listed characteristics replace what a copy effect stamped rather than losing to
+-- it -- Game.halvesOf's and Game.prepareSpellOf's fork, one field over, and here
+-- rather than in any one reader because a per-reader fork is what this accessor
+-- exists to prevent. The stamp itself rides through untouched, which is what CR
+-- 708.8 reverts to.
 copiableSnapshotOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
 copiableSnapshotOf oid gs
+  | maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs) = Nothing
   | derivesFromCopiedHalves oid gs = Nothing
   | otherwise = stampedSnapshotOf oid gs
 
