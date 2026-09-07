@@ -5159,9 +5159,10 @@ carryOver carrying oldId newId = case carrying of
 --
 -- PlayerEffect.DamageCantBePrevented and its CR 614.9 twin carry the same
 -- pattern type and are left alone: neither sentence is a prevention effect, so
--- CR 400.7c does not speak to them, and Pawl.CardSpec's engineOnlyOffends keeps
--- card data off that field anyway, so no row of either can name an object at
--- all. Lava Burst's Filter.IsSource is the other half of the same field and is
+-- CR 400.7c does not speak to them. Whippoorwill's stored prohibition does name
+-- an object -- DamagePattern.whichRecipient, baked from a slot -- and it is a
+-- RECIPIENT, which the paragraph above says a permanent spell can never be.
+-- Lava Burst's Filter.IsSource is the other half of the same field and is
 -- not re-keyed either -- it names a SORCERY spell, which becomes no permanent.
 rewatch :: ObjectId -> ObjectId -> ActiveReplacement.ActiveReplacement -> ActiveReplacement.ActiveReplacement
 rewatch oldId newId row = case ActiveReplacement.effect row of

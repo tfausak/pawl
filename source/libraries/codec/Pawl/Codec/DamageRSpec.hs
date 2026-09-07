@@ -28,7 +28,8 @@ spec s = Spec.describe s "Pawl.Codec.DamageR" $ do
                   DamagePattern.whatRecipient = Nothing,
                   DamagePattern.whoRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
-                  DamagePattern.whichSource = Nothing
+                  DamagePattern.whichSource = Nothing,
+                  DamagePattern.boundRecipient = Nothing
                 },
             DamageR.rewrite = DamageRewrite.PreventAll,
             DamageR.riders = Seq.empty

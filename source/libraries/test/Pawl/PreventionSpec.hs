@@ -80,6 +80,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -2747,6 +2748,144 @@ aimCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
+-- CR 615.12's prohibition AIMED at one recipient, whose only printing is
+-- Whippoorwill ({G} Creature -- Bird: "{G}{G}, {T}: Target creature can't be
+-- regenerated this turn. Damage that would be dealt to that creature this turn
+-- can't be prevented or dealt instead to another permanent or player. When the
+-- creature dies this turn, exile the creature." -- Oracle verified on Scryfall
+-- 2026-09-07).
+--
+-- "That creature" is the recipient the ability's own resolution TARGETED (CR
+-- 601.2c / 115.4), so the card writes DamagePattern.boundRecipient -- a slot --
+-- and Pawl.Engine.Resolve.Effect bakes it into DamagePattern.whichRecipient as
+-- the effect is stored. Every other producer of this effect in data/cards/ says
+-- it of its own source (Lava Burst) or of nobody in particular (Spider-Punk),
+-- so this is the pool's only board where the clause has to reach one creature
+-- and stop.
+--
+-- Not implemented: the card's third sentence, a CR 603.7 delayed trigger
+-- watching the bound creature's death, which wants a trigger condition the tree
+-- does not have (#3375). pawl's Whippoorwill is stricter than printed by
+-- exactly that clause -- the exile is a benefit to the ability's controller, so
+-- the omission costs them rather than the creature's controller.
+whippoorwillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+whippoorwillSpec s registry = Spec.describe s "Whippoorwill (CR 615.12)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      -- alice's board: the Bird, the creature its ability will name, a bystander
+      -- beside it, and one Mending Hands shield on EACH of the two. Two shields
+      -- rather than one is the whole discrimination: a clause that baked no
+      -- recipient is board-wide, so it would defeat the bystander's shield too.
+      -- bob's Piker is the source, so nothing about the strike depends on the
+      -- seat that installed the prohibition.
+      shieldedPair plains forest pikerPrinting mendingHands whippoorwill =
+        let base = S.landsFor forest S.alice 2 (S.landsInPlay plains 2)
+            (bird, g1) = S.addPermanent whippoorwill S.alice base
+            (named, g2) = S.addPermanent pikerPrinting S.alice g1
+            (bystander, g3) = S.addPermanent pikerPrinting S.alice g2
+            (attacker, g4) = S.addPermanent pikerPrinting S.bob g3
+            (g5, firstShield) = S.handOne mendingHands g4
+            half = castAndResolve (aimCreature named) g5 firstShield
+            (g6, secondShield) = S.handOne mendingHands half
+            shielded = castAndResolve (aimCreature bystander) g6 secondShield
+         in (shielded, bird, named, bystander, attacker)
+  -- THE PROVING CASE. The named creature's 3 lands in full and the bystander's 2
+  -- is prevented whole, off ONE board -- so neither reading can pass by
+  -- installing no prohibition or no shield.
+  Spec.it s "CR 615.12 the clause reaches the creature the resolution named, and no other" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    whippoorwill <- S.printingOf s registry "Whippoorwill"
+    let (shielded, bird, named, bystander, attacker) = shieldedPair plains forest pikerPrinting mendingHands whippoorwill
+        aimed = S.runPure (aimCreature named) shielded (Activate.activateAbility S.alice bird (theAbility whippoorwill) Monad.>> Stack.resolveTop)
+        after = S.runPure S.identityAnswer aimed (Damage.applyDamage [hit attacker (Recipient.ToCreature named) 3, hit attacker (Recipient.ToCreature bystander) 2])
+    Spec.assertEqWith s "the named creature's 3 cannot be prevented and is marked in full" (S.damageOf named after) (Just 3)
+    Spec.assertEqWith s "the bystander the clause does not name keeps its shield, so its 2 is prevented whole" (S.damageOf bystander after) (Just 0)
+    -- The setup these two rest on, read after them so neither can absorb a
+    -- mutation aimed at the bake.
+    Spec.assertEqWith s "setup: both creatures were shielded before the ability resolved" (length (GameState.replacements shielded)) 2
+    Spec.assertEqWith s "setup: the ability stored its two prohibitions" (length (GameState.playerEffects aimed)) 2
+  -- CR 611.2c / 514.2: "this turn" is the effect's duration and nothing else
+  -- ends it, so the clause is gone by bob's turn and a fresh shield on the same
+  -- creature works again. The discriminating twin of the case above, one turn
+  -- later, on the same fixture.
+  Spec.it s "CR 611.2c the clause is gone on the next turn, so a fresh shield prevents the same damage" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    whippoorwill <- S.printingOf s registry "Whippoorwill"
+    let (shielded, bird, named, _, attacker) = shieldedPair plains forest pikerPrinting mendingHands whippoorwill
+        -- Both libraries stocked, so the draw steps this case runs through never
+        -- reach CR 704.5b and decide the game before the assertion.
+        stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard plains pid h)) g [1 .. (5 :: Int)]
+        aimed = S.runPure (aimCreature named) (stock (stock shielded S.alice) S.bob) (Activate.activateAbility S.alice bird (theAbility whippoorwill) Monad.>> Stack.resolveTop)
+        bobsTurn = nextTurn quiet aimed
+        -- One untapped Plains added on bob's turn: alice's own lands are still
+        -- tapped from her turn, and CR 502.3 untaps only the active player's.
+        (g1, freshShield) = S.handOne mendingHands (S.landsFor plains S.alice 1 bobsTurn)
+        reshielded = castAndResolve (aimCreature named) g1 freshShield
+        after = S.runPure S.identityAnswer reshielded (Damage.applyDamage [hit attacker (Recipient.ToCreature named) 3])
+    Spec.assertEqWith s "the fresh shield prevents the 3 whole, the prohibition having expired" (S.damageOf named after) (Just 0)
+    Spec.assertEqWith s "setup: the fresh shield really was installed" (length (GameState.replacements reshielded)) 1
+    Spec.assertEqWith s "setup: the turn really did hand off" (GameState.turnNumber bobsTurn /= GameState.turnNumber aimed) True
+    Spec.assertEqWith s "setup: no prohibition survived the cleanup" (GameState.playerEffects bobsTurn) []
+  -- CR 614.9, the sentence's other half: the same clause forbids the damage
+  -- being "dealt instead to another permanent or player", which pawl spells as
+  -- the DamageCantBeRedirected twin carrying the same baked recipient. Carom
+  -- ({1}{W} Instant: "The next 1 damage that would be dealt to target creature
+  -- this turn is dealt to another target creature instead. Draw a card") is the
+  -- pool's redirection aimed at one creature, so the two boards differ in
+  -- exactly one thing -- whether the Bird's ability resolved -- and in nothing
+  -- else.
+  Spec.it s "CR 614.9 the named creature's damage cannot be redirected away from it either" $ do
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    carom <- S.printingOf s registry "Carom"
+    whippoorwill <- S.printingOf s registry "Whippoorwill"
+    let base = S.landsFor forest S.alice 2 (S.landsInPlay plains 2)
+        (bird, g1) = S.addPermanent whippoorwill S.alice base
+        (named, g2) = S.addPermanent pikerPrinting S.alice g1
+        (sink, g3) = S.addPermanent pikerPrinting S.alice g2
+        (attacker, g4) = S.addPermanent pikerPrinting S.bob g3
+        -- One library card, for Carom's own draw.
+        (_, g5) = S.addLibraryCard plains S.alice g4
+        (g6, caromId) = S.handOne carom g5
+        redirected = castAndResolve (aimFromTo named sink) g6 caromId
+        aimed = S.runPure (aimCreature named) redirected (Activate.activateAbility S.alice bird (theAbility whippoorwill) Monad.>> Stack.resolveTop)
+        strike g = S.runPure S.identityAnswer g (Damage.applyDamage [hit attacker (Recipient.ToCreature named) 1])
+        control = strike redirected
+        after = strike aimed
+    Spec.assertEqWith s "the named creature keeps its 1, the redirection being forbidden" (S.damageOf named after) (Just 1)
+    Spec.assertEqWith s "and nothing reached the destination the redirection named" (S.damageOf sink after) (Just 0)
+    -- The control, one activation away: without the clause the same 1 is
+    -- redirected, so neither assertion above can pass by installing no
+    -- redirection at all.
+    Spec.assertEqWith s "control: without the ability the 1 lands on the destination" (S.damageOf sink control) (Just 1)
+    Spec.assertEqWith s "control: and the named creature takes none of it" (S.damageOf named control) (Just 0)
+
+-- Aim a two-slot spell by FILTERING each offered set rather than building a
+-- recipient: CR 608.2b re-reads the choice at resolution, so a recipient the
+-- engine never offered would be dropped there with no error. Carom's "to" slot
+-- is the destination and every other slot is the source.
+aimFromTo :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimFromTo from to p = case p of
+  Prompt.ChooseTargets _ _ _ slots ->
+    let wanted slot = if slot == SlotName.MkSlotName (Text.pack "to") then to else from
+     in Map.mapWithKey (\slot (_, legal) -> Set.filter ((== Just (wanted slot)) . Recipient.objectOf) legal) slots
+  _ -> S.identityAnswer p
+
+-- Run a turn without a fight: nobody attacks and nobody blocks, so the only
+-- damage in these cases is the batch the assertion builds.
+quiet :: Prompt.Prompt r -> r
+quiet p = case p of
+  Prompt.DeclareAttackers {} -> []
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   stepSkipSpec s registry
@@ -2771,3 +2910,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   turnTheBladeLastKnownSpec s registry
   testOfFaithSpec s registry
   decoratedGriffinSpec s registry
+  whippoorwillSpec s registry

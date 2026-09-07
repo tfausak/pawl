@@ -31,6 +31,7 @@ import qualified Data.Text as Text
 import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect.Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Resolve.Effect as Resolve
@@ -890,9 +891,11 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 -- `whatRecipient`, and no printing in the pool writes `whoRecipient` on THIS
 -- carrier.
 --
--- Not implemented: no resolution bakes a recipient into THIS pattern, the way
--- Resolve's prevention arms bake one into a shield's, so the field has no
--- producer on either side yet (#845).
+-- `boundRecipient` is how Whippoorwill says it and is NOT swept: it names a SLOT,
+-- which is printed text's own way of pointing at a target, and
+-- Pawl.Engine.Resolve.Effect turns it into `whichRecipient` as the effect is
+-- stored. So the field this lint guards still has exactly one writer, and it is
+-- the engine.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
 unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
@@ -953,7 +956,8 @@ anyDamage =
       DamagePattern.whatRecipient = Nothing,
       DamagePattern.whoRecipient = Nothing,
       DamagePattern.whichRecipient = Nothing,
-      DamagePattern.whichSource = Nothing
+      DamagePattern.whichSource = Nothing,
+      DamagePattern.boundRecipient = Nothing
     }
 
 -- Every (scope, player effect) pair a card authors, on BOTH of the carriers
@@ -2707,6 +2711,27 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- Frenzied Baloth's axis, which is authorable and must stay so: narrowing by
     -- KIND is not what this lint bans.
     Spec.assertBool s (not (offends (over kind))) "narrowing the same clause to combat damage is accepted"
+  -- The authored half's own limit, and the one the lint above does not state: a
+  -- PRINTED static ability has no slots at all (see printedPlayerScope), so a
+  -- DamagePattern.boundRecipient on one would name something nothing ever fills
+  -- and the clause would quietly cover every recipient. Only the STORED carrier
+  -- can carry it, which is Whippoorwill's.
+  --
+  -- Read through Pawl.Engine.PlayerEffect.boundRecipientSlots rather than by
+  -- casing here, so a future arm carrying a DamagePattern is swept by this lint
+  -- the moment that traversal grows an arm for it.
+  --
+  -- That the slot a stored clause names is DECLARED by its own ability is a
+  -- different lint and not restated here: Resolve.slotsOf reports the read, and
+  -- the dataflow sweep over that report is what rejects a dangling name.
+  Spec.it s "no printed static ability names a recipient slot on CR 615.12's damage pattern" $ do
+    ps <- S.allPrintings s
+    let printedSlots = concatMap (overFaces (concatMap (PlayerEffect.Engine.boundRecipientSlots . PlayerStaticAbility.effect) . Face.playerAbilities) . Printing.card) ps
+        storedSlots = concatMap (overFaces (concatMap (PlayerEffect.Engine.boundRecipientSlots . snd) . Maybe.mapMaybe storedPlayerScope . cardResolutionEffects) . Printing.card) ps
+    -- The non-vacuity guard: Whippoorwill really does write one, on the carrier
+    -- that can read it.
+    Spec.assertBool s (elem (SlotName.MkSlotName (Text.pack "target")) storedSlots) "Whippoorwill's stored clause names its target slot"
+    Spec.assertEqWith s "a static ability has no slot to name" printedSlots []
   -- CR 205.1 and CR 114.3, which is one biconditional read across the two kinds
   -- of face a corpus file holds. A card's type line "contains the card's card
   -- type(s)", which Pawl.Codec.TypeLine reads as at least one; CR 205.2c says
