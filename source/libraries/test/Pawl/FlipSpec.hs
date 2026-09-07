@@ -1,3 +1,6 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- Covers CR 710 flip cards end to end: Pawl.Types.Layout's Flip arm and the two
 -- Pawl.Engine.Card functions that read it (CR 710.2's normal view through
 -- `combined`, CR 710.1b/710.1c's alternative view through `flippedFace`),
@@ -15,16 +18,24 @@
 -- two halves disagree about every characteristic CR 710.2 swaps while agreeing
 -- about the two CR 710.1c withholds.
 --
+-- Also CR 603.2's recipient half: Akki's trigger names an OPPONENT, which the
+-- card spells as TriggerCondition.SelfDealsCombatDamageToPlayer's Opponent
+-- relation. CR 614.9's redirection is what tells that apart from "a player" --
+-- see the Harm's Way pair at the end.
+--
 -- Not implemented: Akki's printed trigger is "whenever this creature deals
--- damage to an opponent", and the card carries
--- TriggerCondition.SelfDealsCombatDamageToPlayer, so noncombat damage it deals
--- to a player does not flip it (#3363). Nor CR 710.5's alternative name, which is
--- #679's, nor a merged permanent containing a flipped flip card (CR 730.2h),
--- which is #874's.
+-- damage to an opponent", and the card carries the COMBAT-damage condition, so
+-- noncombat damage it deals to an opponent does not flip it (#3363). Nor CR
+-- 710.5's alternative name, which is #679's, nor a merged permanent containing a
+-- flipped flip card (CR 730.2h), which is #874's, nor whether a permanent that
+-- COPIED a flip card may flip at all (#3366).
 module Pawl.FlipSpec where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -33,6 +44,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -44,6 +56,8 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
@@ -99,6 +113,41 @@ isLegendary oid gs =
     (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing)
     (Projection.viewOfObject oid gs)
     (Filter.Type.HasSupertype Supertype.Legendary)
+
+-- Aim Harm's Way at alice and choose `src` as CR 609.7a's source -- the answerer
+-- Pawl.DamageReplacementSpec's harmsWaySpec uses, pointed the other way. FILTERED
+-- out of the offered set rather than built, so a recipient the engine never
+-- offered cannot be smuggled in (#222).
+harmsWayAtAlice :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+harmsWayAtAlice src p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.alice) . snd) sets
+  Prompt.ChooseDamageSource _ _ _ candidates ->
+    Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== src) (NonEmpty.toList candidates))
+  _ -> S.identityAnswer p
+
+-- The CR 614.9 pair: alice's Akki attacking bob, with and without a resolved
+-- Harm's Way redirecting Akki's combat damage onto alice. The two boards differ
+-- in exactly one thing -- whether bob's instant resolved -- and everything else,
+-- Harm's Way in bob's hand and the Plains that pays for it included, is on both.
+--
+-- Built on S.combatBoardOf rather than through Pawl.Support's script harness,
+-- which has no vocabulary for CR 609.7a's source choice: bob's instant is cast
+-- and resolved at the declare-attackers board, and combat is then run whole, so
+-- CR 510.2's damage, CR 603.3's trigger placement and CR 608's resolution all
+-- still happen inside the engine.
+redirectPair :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+redirectPair s registry = do
+  akki <- S.printingOf s registry "Akki Lavarunner"
+  plains <- S.printingOf s registry "Plains"
+  harmsWay <- S.printingOf s registry "Harm's Way"
+  let (base, mine, _) = S.combatBoardOf [akki] []
+      g1 = S.landsFor plains S.bob 1 base
+      (harmsWayId, ready) = S.addHandCard harmsWay S.bob g1
+      cast gs akkiId = S.runPure (harmsWayAtAlice akkiId) (gs {GameState.priority = Just S.bob}) (S.cast S.bob harmsWayId *> Stack.resolveTop)
+      fight = S.runCombat (S.attackTo S.bob)
+  case mine of
+    [akkiId] -> pure (akkiId, fight ready, fight (cast ready akkiId))
+    _ -> Spec.assertFailure s "the fixture should have exactly one attacker"
 
 -- alice's Akki alone against bob, with combat about to start. Nothing else is on
 -- the battlefield, so the only thing that can deal bob combat damage is the
@@ -193,3 +242,24 @@ spec s registry = Spec.describe s "Flip" $ do
                 Spec.assertBool s (not (isLegendary returnedId returned)) "so a legendary pump no longer reaches it"
               other -> Spec.assertFailure s ("expected one permanent back, got " <> show (length other))
           other -> Spec.assertFailure s ("expected one card in hand, got " <> show (length other))
+  -- CR 603.2: the trigger fires on the event its printed condition names, and
+  -- Akki's names an OPPONENT. CR 614.9's redirection is what tells that apart
+  -- from "a player": Harm's Way "is dealt to any target instead" replaces the
+  -- damage event's recipient and nothing else, so bob can make Akki's combat
+  -- damage land on alice -- Akki's own controller, and no opponent of hers.
+  --
+  -- A PAIR of boards differing in exactly one thing, whether bob's instant
+  -- resolved. The control is what keeps the negative honest: on the same board
+  -- with the redirect never cast, the same attack does flip Akki, so the
+  -- no-flip below is the recipient and not a combat that failed to happen.
+  Spec.it s "CR 603.2 Harm's Way sends Akki's combat damage to alice, and Akki does not flip" $ do
+    (oid, plain, redirected) <- redirectPair s registry
+    -- The control first, so a board that never fought is caught here.
+    Spec.assertEqWith s "control: bob took the 1 and Akki flipped" (halfReadings oid plain) alternativeHalf
+    Spec.assertEqWith s "control: bob is the one who lost life" (S.lifeOf S.bob plain, S.lifeOf S.alice plain) (Just 19, Just 20)
+    -- THE gameplay assertion: same attack, recipient moved, no flip.
+    Spec.assertEqWith s "CR 603.2: the damage went to alice, so Akki is still Akki" (halfReadings oid redirected) normalHalf
+    Spec.assertEqWith s "and the status was never set" (fmap Object.flipped (Game.lookupObject oid redirected)) (Just False)
+    -- The proxy, after the behaviour: the redirect really moved the event, so
+    -- the negative is not a combat that failed to deal damage.
+    Spec.assertEqWith s "CR 614.9: alice took the 1 and bob took none" (S.lifeOf S.bob redirected, S.lifeOf S.alice redirected) (Just 20, Just 19)

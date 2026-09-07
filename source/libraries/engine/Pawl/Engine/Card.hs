@@ -277,9 +277,10 @@ combinedFaces card = case Card.layout card of
 -- external effects will still apply", because every layer runs on top of whatever
 -- this seam answers with.
 --
--- Not implemented: CR 707.2's "status ... [is] not copied", so a permanent that
--- copies a flipped one acquires the alternative characteristics rather than the
--- normal ones (#3364).
+-- The substitution is also where a copy of a flipped permanent goes wrong, which
+-- is cited at the two readers that spend it --
+-- Pawl.Engine.Projection.View.copiableCharacteristics and
+-- Pawl.Engine.Event.copiedSnapshot (#3364).
 --
 -- The FIRST alternative half, and CR 710.1b is why one is enough: the bottom half
 -- of the frame is one set of characteristics. docs/design.md section 2.11's rule

@@ -905,6 +905,11 @@ flipPermanent oid gs
 -- A layout classification and never which card it is, `turnsTo` above's posture:
 -- the closed half asks whether the object has a second set of characteristics CR
 -- 710.1b reaches, and the card data carries the ability that asks for the flip.
+--
+-- Read off the object's OWN printed card (`cardOf`), not off a copy snapshot, so
+-- a permanent that copied an unflipped flip card carries the flip trigger and
+-- can never flip. Whether the rules allow such a copy to flip at all is a
+-- question the CR does not settle (#3366).
 flipsOver :: ObjectId -> GameState -> Bool
 flipsOver oid gs =
   Set.member oid (GameState.battlefield gs)

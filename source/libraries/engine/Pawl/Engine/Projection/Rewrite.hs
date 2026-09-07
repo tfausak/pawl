@@ -1315,7 +1315,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope fromZone ordinal)
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins {} -> condition
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> condition
   TriggerCondition.SelfIsDealtDamage -> condition
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDealCombatDamageToPlayer f -> TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.rewrite pairs f)

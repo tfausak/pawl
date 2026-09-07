@@ -2342,7 +2342,10 @@ familyOf keyword = case keyword of
 poisonous :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 poisonous n =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
+    { -- A PLAYER and not an opponent: rules 702.70a, 702.112a and 702.115a all
+      -- word their trigger "deals combat damage to a player", where Akki
+      -- Lavarunner and Questing Beast print "to an opponent".
+      TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -2374,7 +2377,10 @@ poisonous n =
 ingest :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 ingest =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
+    { -- A PLAYER and not an opponent: rules 702.70a, 702.112a and 702.115a all
+      -- word their trigger "deals combat damage to a player", where Akki
+      -- Lavarunner and Questing Beast print "to an opponent".
+      TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -3015,7 +3021,10 @@ provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 renown :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 renown n =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
+    { -- A PLAYER and not an opponent: rules 702.70a, 702.112a and 702.115a all
+      -- word their trigger "deals combat damage to a player", where Akki
+      -- Lavarunner and Questing Beast print "to an opponent".
+      TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
