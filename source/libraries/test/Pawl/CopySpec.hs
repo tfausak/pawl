@@ -49,6 +49,11 @@
 -- triggered ability on the stack, copied by Lithoform Engine
 -- (copyAbilityOnStackSpec), where CR 707.10b keeps the original's source.
 --
+-- And CR 613.2b's ordering of the two halves of layer 1, where a permanent is
+-- both a copy and face down: CR 708.2's listed characteristics win over what the
+-- copy effect stamped, read off an attack declaration a copied Silent Arbiter
+-- would otherwise bound and off the projected 2/2 (faceDownCopySpec).
+--
 -- And CR 707.10d's and CR 707.10e's answers whole, end to end: Zada, Hedron
 -- Grinder's one copy per candidate (zadaSpec) and Ivy, Gleeful Spellthief's one
 -- copy on a stated new target (ivySpec), the second of which is where "the copy
@@ -200,6 +205,17 @@ declineCopy p = case p of
 targeting :: ObjectId -> Prompt.Prompt r -> r
 targeting victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
+  _ -> S.identityAnswer p
+
+-- `targeting` answered by FILTERING the offered set down to the named permanent
+-- instead of building a Recipient: the pool decides which constructor the offer
+-- wears, and a hand-built one of another shape is a different recipient that CR
+-- 608.2b's re-read at resolution drops silently.
+aimByFiltering :: ObjectId -> Prompt.Prompt r -> r
+aimByFiltering oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter ((== Just oid) . Recipient.objectOf) offered) sets
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   _ -> S.identityAnswer p
@@ -2828,3 +2844,91 @@ leylineOfResonanceSpec s registry =
         Spec.assertEqWith s "CR 115.1 alice's Spider is one creature she controls, so the copy exiled the Berserkers too" (standing ownRun) (False, False, True)
         Spec.assertEqWith s "CR 115.1 bob's Piker is not, so no copy was made and both of alice's creatures stand" (standing othersRun) (True, True, False)
         Spec.assertBool s (spiderId /= berserkersId && berserkersId /= pikerId) "the three creatures are distinct objects"
+
+-- CR 613.2b: layer 1b (face-down) applies after layer 1a (copy effects), so CR
+-- 708.2's listed characteristics replace what a copy effect stamped rather than
+-- being replaced by it. A permanent that is both a copy and face down therefore
+-- has no name and no abilities, and its copy stamp rides underneath for CR 708.8
+-- to revert to.
+--
+-- Silent Arbiter ({4} Artifact Creature -- Construct 1/5, "No more than one
+-- creature can attack each combat. No more than one creature can block each
+-- combat") is the card, and its attack bound is what makes the rule readable off
+-- a DECLARATION: that bound is one of CR 613.11's twelve rule-affecting families,
+-- which Projection.ruleAbilitiesOf gathers off the copiable snapshot and no other
+-- read reaches. Cyber Conversion ({U}{U} Instant, "Turn target creature face
+-- down. It's a 2/2 Cyberman artifact creature") is the turner, chosen over
+-- Ixidron because it names ONE creature: the two Goblin Pikers that carry the
+-- declaration must stay face up, or their own facing would be a second thing the
+-- pair of boards differs in.
+--
+-- THE PRINTED ARBITER IS DESTROYED before either leg runs. The bound is global
+-- (Pawl.CombatEffectSpec's BoundedDeclaration group proves that), so an Arbiter
+-- left standing would hold alice to one attacker whatever the Clone answered.
+faceDownCopyBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (GameState.GameState, ObjectId, ObjectId, ObjectId, ObjectId)
+faceDownCopyBoard island arbiter clone piker cyber =
+  let gs0 = S.landsFor island S.bob 2 (Setup.emptyGame S.bothPlayers)
+      (arbiterId, gs1) = S.addPermanent arbiter S.alice gs0
+      (one, gs2) = S.addPermanent piker S.alice gs1
+      (two, gs3) = S.addPermanent piker S.alice gs2
+      (_, staged) = S.spellOnStack clone S.alice gs3
+      resolved = resolveAndSettle (copyNamed arbiterId) staged
+      killed = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [arbiterId])
+      (withSpell, spell) = S.handOne cyber killed
+   in fmap (\cloneId -> (withSpell, spell, cloneId, one, two)) (cloneOnBattlefield killed)
+
+faceDownCopySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  -- THE PROVING TEST for the twelve rule-affecting families, read through
+  -- Pawl.Engine.CombatRestriction off Projection.ruleAbilitiesOf.
+  --
+  -- THE PAIR: one board, one spell, and the only difference is whether bob's
+  -- Conversion resolved. The single-Piker declaration is asserted legal on BOTH
+  -- legs, so the refusal on the face-up leg is the bound talking rather than
+  -- summoning sickness, a tap or a missing defender.
+  Spec.it s "CR 708.2 a face-down copy of Silent Arbiter no longer bounds the attack" $ do
+    island <- S.printingOf s registry "Island"
+    arbiter <- S.printingOf s registry "Silent Arbiter"
+    clone <- S.printingOf s registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    case faceDownCopyBoard island arbiter clone piker cyber of
+      Nothing -> Spec.assertFailure s "the Clone should be on the battlefield as a copy of the Arbiter"
+      Just (board, spell, cloneId, one, two) -> do
+        let down = intoCombat (S.runPure (aimByFiltering cloneId) board (S.cast S.bob spell >> Stack.resolveTop))
+            up = intoCombat board
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [one, two] down) "CR 708.2 the face-down copy has no abilities, so both Pikers attack"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [one, two] up)) "CR 707.2a face up, the same copy holds alice to one attacker"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [one] down) "CR 508.1a one Piker attacks on the face-down board"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [one] up) "and on the face-up board too, so the refusal above is the bound"
+        -- The proxies, after the behaviours.
+        Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject cloneId down)) "setup: the Conversion turned the copy face down"
+        Spec.assertEqWith s "setup: and it is still face up on the other leg" (fmap Object.facing (Game.lookupObject cloneId up)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "setup: the printed Arbiter is gone, so the bound on the face-up board is the copy's" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.alice up) 0
+        Spec.assertBool s (Maybe.isJust (Binding.copyOf . Object.bindings =<< Game.lookupObject cloneId down)) "CR 708.8 the copy stamp rides through underneath the listing, ready to be reverted to"
+
+  -- The same fork one field over: the Conversion's listed 2/2 and CR 708.2's "no
+  -- name" against the Arbiter's copied 1/5 and its copied name. Here because the
+  -- fork lives at Projection.copiableSnapshotOf rather than at the twelve families'
+  -- reader, so a fix confined to ruleAbilitiesOf leaves this case red.
+  Spec.it s "CR 708.2 a face-down copy projects the listed 2/2 and no name" $ do
+    island <- S.printingOf s registry "Island"
+    arbiter <- S.printingOf s registry "Silent Arbiter"
+    clone <- S.printingOf s registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    case faceDownCopyBoard island arbiter clone piker cyber of
+      Nothing -> Spec.assertFailure s "the Clone should be on the battlefield as a copy of the Arbiter"
+      Just (board, spell, cloneId, _, _) -> do
+        Spec.assertEqWith s "the copied 1/5 before" (S.powerToughnessOf cloneId board) (Just (1, 5))
+        Spec.assertEqWith s "and the copied name before" (Projection.namesOf cloneId board) (Set.singleton (S.printingName arbiter))
+        let down = S.runPure (aimByFiltering cloneId) board (S.cast S.bob spell >> Stack.resolveTop)
+        Spec.assertEqWith s "CR 708.2 the listed 2/2, not the copied 1/5" (S.powerToughnessOf cloneId down) (Just (2, 2))
+        Spec.assertEqWith s "CR 708.2 no name, not the copied one" (Projection.namesOf cloneId down) Set.empty
+        Spec.assertEqWith s "CR 708.2 the listed subtype, not the copied Construct" (Projection.subtypesOf cloneId down) (Set.singleton Subtype.Cyberman)
