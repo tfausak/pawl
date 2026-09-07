@@ -117,6 +117,7 @@ isCast action = case action of
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
+  A.Suspend _ -> False
   A.PutCompanionIntoHand -> False
   A.Ignore _ _ -> False
   A.EndEffect _ -> False
@@ -133,6 +134,7 @@ isActivate action = case action of
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
+  A.Suspend _ -> False
   A.PutCompanionIntoHand -> False
   A.Ignore _ _ -> False
   A.EndEffect _ -> False
@@ -150,6 +152,7 @@ isManaAbility action = case action of
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
+  A.Suspend _ -> False
   A.PutCompanionIntoHand -> False
   A.Ignore _ _ -> False
   A.EndEffect _ -> False

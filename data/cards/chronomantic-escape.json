@@ -1,6 +1,31 @@
 {
   "faces": [
     {
+      "keywords": [
+        {
+          "type": "Suspend",
+          "value": {
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 2
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "White"
+                    }
+                  }
+                }
+              ]
+            },
+            "counters": 3
+          }
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",

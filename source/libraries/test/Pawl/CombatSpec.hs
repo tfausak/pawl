@@ -4925,10 +4925,11 @@ facingBob gs =
 -- stores is read at Pawl.Engine.CombatRestriction.cantAttackPlayer beside the
 -- printed carrier's.
 --
--- Not implemented, and STRICTER than printed in both places: the suspend keyword
--- and the self-exile with time counters (#3340), so pawl's card is cast for its
--- mana cost alone and goes to the graveyard as CR 608.2n says, never returning.
--- Neither reaches the restriction this group is about.
+-- Not implemented, and STRICTER than printed: the card's own "exile Chronomantic
+-- Escape with three time counters on it", which needs the resolving SPELL to
+-- name itself and no spell binds that slot (#3356) -- so pawl's card goes to the
+-- graveyard as CR 608.2n says, never returning. Its suspend ability is printed
+-- and works; neither clause reaches the restriction this group is about.
 --
 -- THREE SEATS with both opponents defending (CR 802.2), the only board on which
 -- "can't attack you" and a blanket "can't attack" come apart for a creature with

@@ -13,9 +13,8 @@ import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 -- are here are CR 116.2a's land play, CR 116.2b's turning a face-down permanent
 -- face up, CR 116.2c's paying to end a continuous effect, CR 116.2d's ignoring a
 -- static ability's effect, CR 116.2e's Circling Vultures discard, CR 116.2h's
--- foretell, CR 116.2k's plot and CR 116.2m's unlock cost. CR 116.2f's suspend
--- is #3340; CR 116.2i's planar die is #934 and CR 116.2j's conspiracy is #937.
--- Grows.
+-- foretell, CR 116.2f's suspend, CR 116.2k's plot and CR 116.2m's unlock cost.
+-- CR 116.2i's planar die is #934 and CR 116.2j's conspiracy is #937. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
@@ -167,6 +166,21 @@ data Action
     -- with foretell" rather than a half. No printing has foretell on a
     -- multi-faced card.
     Foretell ObjectId.ObjectId
+  | -- | CR 116.2f / 702.62a: pay a card's suspend cost and exile it from your
+    -- hand with N time counters on it, making it a suspended card. "Any time
+    -- they have priority, but only if they could begin to cast that card by
+    -- putting it onto the stack", and it does not use the stack (CR 702.62a) --
+    -- so it is an Action rather than anything that goes through
+    -- Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
+    --
+    -- Carries only the card, Plot's and Foretell's shape: rule 702.62a leaves
+    -- nothing to choose. What it costs and how many counters ride along are the
+    -- keyword's own payload, which Pawl.Engine.Suspend reads off the card, and
+    -- the destination is fixed at exile.
+    --
+    -- WHICH HALF is not carried, for Plot's reason: rule 702.62a exiles "it"
+    -- rather than a half. No printing has suspend on a multi-faced card.
+    Suspend ObjectId.ObjectId
   | -- | CR 116.2g / 702.139a: pay {3} and put your chosen companion into your
     -- hand from outside the game. "Any time you have priority and the stack is
     -- empty, but only during a main phase of your turn", once per game, and it

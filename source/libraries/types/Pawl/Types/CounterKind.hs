@@ -66,16 +66,18 @@ data CounterKind keyword
     -- battle sitting at 0 that owes no ability. All three count Object.counters
     -- directly, as loyalty's and lore's readers do.
     Defense
-  | -- | CR 702.63a: the counters vanishing counts down. Rule 122.1 gives time
-    -- counters no lettered clause either -- 122.1a-j never name them -- so rule
-    -- 702.63 is the whole citation, exactly as rule 714 is Lore's.
+  | -- | CR 702.62a / 702.63a: the counters suspend and vanishing count down. Rule
+    -- 122.1 gives time counters no lettered clause either -- 122.1a-j never name
+    -- them -- so those two rules are the whole citation, exactly as rule 714 is
+    -- Lore's.
     --
     -- Contributes nothing to the CR 613 layer system, so
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its
-    -- readers are vanishing's own three abilities, minted by
-    -- Pawl.Engine.Keyword, which count Object.counters directly -- and a CARD's
-    -- own text, which may both place them (Tidewalker's entry rewrite) and count
-    -- them (its CR 208.2a power and toughness, a Quantity.ObjectCounters).
+    -- readers are vanishing's own three abilities and suspend's two exile-zone
+    -- ones, minted by Pawl.Engine.Keyword, which count Object.counters directly
+    -- -- and a CARD's own text, which may both place them (Tidewalker's entry
+    -- rewrite) and count them (its CR 208.2a power and toughness, a
+    -- Quantity.ObjectCounters).
     Time
   | -- | CR 702.32a: the counters fading counts down. Rule 122.1 gives fade
     -- counters no lettered clause either, so rule 702.32 is the whole citation,

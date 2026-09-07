@@ -849,6 +849,8 @@ library codec
     Pawl.Codec.SubtypeSpec
     Pawl.Codec.Supertype
     Pawl.Codec.SupertypeSpec
+    Pawl.Codec.Suspend
+    Pawl.Codec.SuspendSpec
     Pawl.Codec.TakeExtraTurn
     Pawl.Codec.TakeExtraTurnSpec
     Pawl.Codec.TapForTotalPower
@@ -1049,6 +1051,7 @@ library engine
     Pawl.Engine.Star
     Pawl.Engine.Subtype
     Pawl.Engine.Summoning
+    Pawl.Engine.Suspend
     Pawl.Engine.Target
     Pawl.Engine.Turn
     Pawl.Engine.UntapRestriction
@@ -1873,6 +1876,7 @@ library types
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily
     Pawl.Types.Supertype
+    Pawl.Types.Suspend
     Pawl.Types.TakeExtraTurn
     Pawl.Types.TapForTotalPower
     Pawl.Types.TapPermanents

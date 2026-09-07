@@ -8,6 +8,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.Suspend as Suspend
 
 -- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302. So casing on this is NOT
@@ -202,6 +203,14 @@ data Keyword
     -- rules-modifying continuous effect (CR 611.1) other players' gates ask
     -- about, so nothing is minted.
     SplitSecond
+  | -- | 702.62a: suspend N--[cost] -- three abilities. CR 116.2f's special
+    -- action exiles the card from hand with N time counters for [cost]
+    -- (Pawl.Engine.Suspend); the two triggered abilities function in exile and
+    -- are minted by Pawl.Engine.Keyword.exileTriggeredAbilitiesOf.
+    --
+    -- Not implemented: rule 702.62a's last sentence, the haste a creature spell
+    -- cast this way gains until its caster loses control of it (#3355).
+    Suspend (Suspend.Suspend Keyword)
   | -- | 702.63a: vanishing N -- enter with N time counters, remove one at each
     -- upkeep, and sacrifice the permanent when the last one goes. Nothing is CR
     -- 702.63b's numberless printing, which states only the last two abilities.

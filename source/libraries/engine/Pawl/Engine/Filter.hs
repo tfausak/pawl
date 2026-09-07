@@ -34,6 +34,7 @@ import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Suspend as Suspend
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.Teams as Teams
@@ -1968,6 +1969,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.61a names no word CR 612.2 can swap: "mana ability" is CR 605.1a's
   -- own classification and "the stack" is a zone.
   Keyword.Type.SplitSecond -> keyword
+  -- CR 702.62a states a cost, so rewriteCost reaches it as flashback's does. The
+  -- N is a number and not a word, and "time counter" is the rule's own noun.
+  Keyword.Type.Suspend (Suspend.MkSuspend n cost) -> Keyword.Type.Suspend (Suspend.MkSuspend n (rewriteCost pairs cost))
   -- CR 702.77a states a cost, so rewriteCost reaches it as flashback's does. The
   -- N is a number and not a word, and "+1/+1 counter" is in the ability
   -- Pawl.Engine.Keyword.reinforce mints rather than in this value.

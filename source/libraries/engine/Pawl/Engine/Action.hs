@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Room as Room
+import qualified Pawl.Engine.Suspend as Suspend
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Action (Action)
@@ -242,6 +243,14 @@ legalActions pid gs =
       -- 116.2b's (any priority at all) nor CR 116.2a's sorcery speed. The gate is
       -- asked inside Foretell.canForetell beside the {2}, for plots' reason.
       foretells = fmap Action.Foretell (Foretell.foretellable pid gs)
+      -- CR 116.2f / 702.62a: the ninth special action, and a FOURTH window --
+      -- "any time they have priority, but only if they could begin to cast that
+      -- card by putting it onto the stack". Neither CR 116.2b's bare priority
+      -- nor CR 116.2a's sorcery speed: the card's own castability is the gate,
+      -- so a sorcery with suspend is offered at sorcery speed and an instant
+      -- with suspend whenever it could be cast. Asked inside Suspend.canSuspend
+      -- beside the cost, for plots' reason.
+      suspends = fmap Action.Suspend (Suspend.suspendable pid gs)
       -- CR 116.2g / 702.139a: the eighth special action, back on CR 116.2a's
       -- window -- "any time they have priority and the stack is empty during a
       -- main phase of their turn" -- plus a once-per-game clause no other
@@ -336,4 +345,4 @@ legalActions pid gs =
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
       manaAbilityActivations = fmap Action.ActivateManaAbility manaSources
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> endings <> plots <> foretells <> companions <> activations <> manaAbilityActivations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> endings <> plots <> foretells <> suspends <> companions <> activations <> manaAbilityActivations
