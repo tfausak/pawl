@@ -635,6 +635,7 @@ rewriteEffect pairs effect = case effect of
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.Convert ref -> Effect.Convert (rewriteObjectRef pairs ref)
+  Effect.Flip ref -> Effect.Flip (rewriteObjectRef pairs ref)
   -- CR 612.2a through the combined back face as well as the ref, Effect.Create's
   -- reason one opcode over: the face is card data the ability carries, and its
   -- words are the ability's words.

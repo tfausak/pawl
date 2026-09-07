@@ -708,6 +708,7 @@ mintCard pid under printingId dest position gs =
             Object.zone = dest,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
+            Object.flipped = False,
             Object.exiledFaceDown = False,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
@@ -895,6 +896,7 @@ createEmblem pid card = do
                 Object.zone = Zone.Command,
                 Object.tapped = TapState.Untapped,
                 Object.facing = Facing.FaceUp,
+                Object.flipped = False,
                 Object.exiledFaceDown = False,
                 Object.damage = 0,
                 Object.sickness = Sickness.Settled pid,
@@ -5843,6 +5845,7 @@ createTokens controller card copy n tapped entering = do
                       -- CR 110.5b: face up, for the same rule's reason. No effect
                       -- in the pool creates a token face down.
                       Object.facing = Facing.FaceUp,
+                      Object.flipped = False,
                       Object.exiledFaceDown = False,
                       Object.damage = 0,
                       Object.sickness = Sickness.Sick,
@@ -6038,6 +6041,7 @@ meld controller victims resultCard = do
                 -- CR 712.14c's "back faces up", which for the interned combined
                 -- face is its only face; Object.face = Nothing is that face.
                 Object.facing = Facing.FaceUp,
+                Object.flipped = False,
                 Object.exiledFaceDown = False,
                 Object.damage = 0,
                 -- CR 302.6 through CR 400.7: a permanent that has just entered is

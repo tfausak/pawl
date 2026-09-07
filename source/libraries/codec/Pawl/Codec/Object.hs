@@ -85,6 +85,7 @@ codec = Fields.object $ do
   zone <- Fields.required "zone" Zone.codec Object.zone
   tapped <- Fields.defaulted "tapped" TapState.Type.Untapped TapState.codec Object.tapped
   facing <- Fields.defaulted "facing" Facing.Type.FaceUp Facing.codec Object.facing
+  flipped <- Fields.defaulted "flipped" False Common.boolean Object.flipped
   exiledFaceDown <- Fields.defaulted "exiledFaceDown" False Common.boolean Object.exiledFaceDown
   damage <- Fields.defaulted "damage" 0 Common.natural Object.damage
   sickness <- Fields.required "sickness" Sickness.codec Object.sickness
@@ -130,6 +131,7 @@ codec = Fields.object $ do
         Object.zone = zone,
         Object.tapped = tapped,
         Object.facing = facing,
+        Object.flipped = flipped,
         Object.exiledFaceDown = exiledFaceDown,
         Object.damage = damage,
         Object.sickness = sickness,
