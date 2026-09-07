@@ -459,7 +459,9 @@ data Effect card ability
   | -- | The permanent in the slot gains this designation -- CR 702.112a's
     -- renown, CR 701.37a's monstrous, CR 701.60a's suspect and CR 719.3a's
     -- solved. Writes Object.designations, which CR 613 could not carry, and is
-    -- idempotent (CR 702.112c, CR 701.60d).
+    -- idempotent (CR 702.112c, CR 701.60d). CR 701.37c's X rides along in the
+    -- payload's `value` and is written to Object.designationValues on the same
+    -- transition.
     Designate Designate.Designate
   | -- | CR 716.2a's first half: "[Cost]: This Class's level becomes N." Writes
     -- Object.classLevel, CR 716.2b making a level a designation; the "only if

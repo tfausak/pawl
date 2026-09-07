@@ -288,6 +288,7 @@ createCard pid printingId = do
             Object.classLevel = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
+            Object.designationValues = Map.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,

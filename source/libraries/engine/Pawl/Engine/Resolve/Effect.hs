@@ -4454,6 +4454,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       Object.counters = Map.empty,
                       Object.counterTimestamps = Map.empty,
                       Object.designations = Set.empty,
+                      -- CR 701.37c's X rides the designation, so it is zeroed
+                      -- with it -- `designations` above, same sentence.
+                      Object.designationValues = Map.empty,
                       -- CR 109.5's "you" is RE-STAMPED, and it is the one binding
                       -- that must be: Pawl.Engine.Cast and Pawl.Engine.Activate
                       -- write the caster or activator into it as the original goes
@@ -5151,15 +5154,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- player recipient, an illegal slot (CR 608.2b) and an id naming no object all
   -- write nothing. CR 701.60c's menace and can't-block are read off
   -- Object.designations live.
-  Effect.Designate (Designate.MkDesignate designation slot) ->
+  Effect.Designate (Designate.MkDesignate designation slot mValue) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           gs <- State.get
+          -- CR 701.37c's X, settled against the RESOLUTION -- the ability's own
+          -- source and slots, `Effect.Create`'s reading of its count -- so a
+          -- "Monstrosity X" reads the X its activation announced (CR 601.2b) and
+          -- not a live board. Written on the TRANSITION alone, with the mark, so
+          -- CR 701.37a's second monstrosity leaves the first value standing.
+          let value =
+                Quantity.evaluateFor (effectViewOf source legal gs) (effectContext gs controller source legal (slotBindings resolving gs)) gs resolving source
+                  =<< mValue
+              mark o = o {Object.designations = Set.insert designation (Object.designations o)}
+              recordValue o = maybe o (\n -> o {Object.designationValues = Map.insert designation (Integer.toNaturalSaturating n) (Object.designationValues o)}) value
           Monad.when (maybe False (not . Set.member designation . Object.designations) (Game.lookupObject target gs)) $ do
             State.modify'
-              (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.insert designation (Object.designations o)}) target (GameState.objects g)})
+              (\g -> g {GameState.objects = Map.adjust (recordValue . mark) target (GameState.objects g)})
             State.modify' (Event.recordEvent (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated designation target)))
       _ -> pure ()
   -- CR 716.2a: "This Class's level becomes N." A state write on the slot's

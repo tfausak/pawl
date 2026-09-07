@@ -70,6 +70,9 @@ codec =
       -- CR 702.112b's designation, read against the object the quantity is aimed
       -- at, so only the designation is on the wire.
       Arm.payload "HasDesignation" Designation.codec Quantity.HasDesignation (\x -> case x of Quantity.HasDesignation y -> Just y; _ -> Nothing),
+      -- CR 701.37c's number, with the same designation on the wire that
+      -- HasDesignation above carries: which mark's value is asked is a value.
+      Arm.payload "DesignationValue" Designation.codec Quantity.DesignationValue (\x -> case x of Quantity.DesignationValue y -> Just y; _ -> Nothing),
       Arm.nullary "WasKicked" Quantity.WasKicked,
       -- CR 702.33f's "kicked with its [A] kicker", with the COST on the wire and
       -- the object still implicit: which kicker cost is asked about is the whole

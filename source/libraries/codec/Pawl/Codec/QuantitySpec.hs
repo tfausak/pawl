@@ -217,6 +217,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.HasDesignation Designation.Suspected)
       " {\"type\":\"HasDesignation\",\"value\":{\"type\":\"Suspected\"}} "
+  -- CR 701.37c: the same designation on the wire, asking the NUMBER rather than
+  -- the membership.
+  Spec.it s "DesignationValue Monstrous" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.DesignationValue Designation.Monstrous)
+      " {\"type\":\"DesignationValue\",\"value\":{\"type\":\"Monstrous\"}} "
   -- CR 716.2b: the object's LEVEL, also with nothing on the wire, and also not a
   -- member of Pawl.Types.Designation -- rule 716.2b's designation is a number.
   Spec.it s "ClassLevel" $
