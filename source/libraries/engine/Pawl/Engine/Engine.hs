@@ -454,20 +454,17 @@ runTurnBasedActions phase = do
     -- CR 511.3's removal from combat is an end-of-STEP action; runStep does it.
     Phase.Ending EndingStep.Cleanup -> do
       Monad.when hasActive (discardToHandSize active)
-      -- CR 514.2: damage wears off AND until-end-of-turn effects end,
-      -- simultaneously -- one sweep over the stored-effect carriers, one over
-      -- marked damage, one over the mana pools. NOT guarded: CR 703.4p is the
-      -- game's action, and their order is not observable. Mana.endManaRetention
-      -- only ENDS the retention -- the mana itself is taken by this same step's
-      -- CR 500.5 sweep at its end, which makes retained mana outlive every
-      -- earlier step. This is the one reachable CR 603.3a window that
-      -- GameState.battlefieldWhenTriggered closes: the discard above has fired a
-      -- rule 701.9a trigger, CR 514.3a does not place it until after this line,
-      -- and an "until end of turn" control effect ending here would otherwise
-      -- credit it to whoever got the permanent back.
-      State.modify' Damage.removeAllDamage
-      State.modify' Expiry.dropAtCleanup
-      State.modify' Mana.endManaRetention
+      -- CR 514.2's second action, the same one CR 500.11's skipped ending phase
+      -- takes the other road to. NOT guarded: CR 703.4p is the game's action, so
+      -- it runs with no active player. Mana.endManaRetention only ENDS the
+      -- retention -- the mana itself is taken by this same step's CR 500.5 sweep
+      -- at its end, which makes retained mana outlive every earlier step. This is
+      -- the one reachable CR 603.3a window that GameState.battlefieldWhenTriggered
+      -- closes: the discard above has fired a rule 701.9a trigger, CR 514.3a does
+      -- not place it until after this line, and an "until end of turn" control
+      -- effect ending here would otherwise credit it to whoever got the permanent
+      -- back.
+      cleanupSecondAction
     _ -> pure ()
 
 -- CR 505.4 / 703.4f / 714.3c's ACTION half: one lore counter onto each Saga this
@@ -1590,30 +1587,38 @@ runStep = do
 -- and then lost its last step to a skip is `skipStep`'s case, not this one.
 --
 -- The ENDING phase is the one whose skip still owes something, and
--- `endTurnDurations` says what: the phase never happened, but the turn it was
+-- `cleanupSecondAction` says what: the phase never happened, but the turn it was
 -- the last of ends all the same.
 skipWholePhase :: Phase.Phase -> Game ()
 skipWholePhase phase = do
   State.modify' (\gs -> gs {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)})
-  Monad.when (Turn.wholePhaseOf phase == Just PhaseSelector.EndingPhase) endTurnDurations
+  Monad.when (Turn.wholePhaseOf phase == Just PhaseSelector.EndingPhase) cleanupSecondAction
   advance
 
--- CR 611.2a: a duration stated as "until end of turn" is over when the TURN is
--- over, and the turn is over whether or not its cleanup step ran. So the two
--- sweeps that end such a duration -- CR 514.2's stored-effect half
--- (Expiry.dropAtCleanup) and its mana-unit half (Mana.endManaRetention) -- run on
--- CR 500.11's whole-phase skip too, which is the road that removes the cleanup
--- step. CR 724.2d states the same split one phase over -- the combat phase an
--- effect ends keeps its "until end of combat" expiries though its last step is
--- skipped -- and Resolve's EndCombatPhase arm is where the engine already writes
--- it.
+-- CR 514.2's second turn-based action, whole: marked damage is removed and every
+-- "until end of turn" and "this turn" effect ends, SIMULTANEOUSLY. Three sweeps
+-- -- one over marked damage, one over the stored-effect carriers, one over the
+-- mana pools -- in an order CR 703.4p leaves unobservable, because they are one
+-- action.
 --
--- The cleanup step's TURN-BASED ACTIONS are NOT run here, and that is CR 614.10a:
--- anything scheduled for a skipped step or phase won't happen. CR 514.1's
--- discard to hand size is one, and so is the OTHER half of CR 514.2 -- CR 120.6
--- keys the removal of marked damage to the cleanup step rather than to the turn,
--- so nothing outside that step ever asks for it. Only the duration half has CR
--- 611.2a behind it, which is what splits one simultaneous action in two here.
+-- Shared by the cleanup step that normally runs it and by CR 500.11's skip of the
+-- whole ending phase, which is the road that removes that step: CR 611.2a states
+-- the duration as the TURN, and the turn is over whether or not its cleanup step
+-- ran. CR 724.1d and CR 724.2d are the CR making that same call -- an ended turn
+-- is routed THROUGH the cleanup step rather than past it, and an ended combat
+-- phase expires its "until end of combat" effects though its last step is
+-- skipped (Resolve's EndCombatPhase arm).
+--
+-- Running only PART of it is what must not happen, whichever way CR 614.10a is
+-- read. A 5/4 with 3 marked damage whose pump ends alone reverts to a 2/1 that
+-- CR 704.5g then destroys -- a board neither "the phase never happened" nor "the
+-- turn ended" produces, and CR 514.2's "simultaneously" is there to forbid it.
+-- Pawl.ExpirySpec's "CR 514.2 a pumped creature with damage marked on it neither
+-- dies to its own shrinking nor keeps the pump" is what proves that.
+--
+-- CR 514.1's discard to hand size is NOT here. It is the cleanup step's FIRST
+-- turn-based action, scheduled separately from this one, so CR 614.10a takes it
+-- with the skipped step.
 --
 -- CR 500.5's pool empty is not run either, being that same rule's turn-based
 -- action (CR 703.4q) at the end of a step that did not happen. The mana
@@ -1621,8 +1626,9 @@ skipWholePhase phase = do
 -- does end takes it; no player receives priority in between, CR 502.4 giving the
 -- untap step none. Pawl.ExpirySpec's "CR 514.2 retained mana is not spendable
 -- once the skipped turn is over" is what proves that.
-endTurnDurations :: Game ()
-endTurnDurations = do
+cleanupSecondAction :: Game ()
+cleanupSecondAction = do
+  State.modify' Damage.removeAllDamage
   State.modify' Expiry.dropAtCleanup
   State.modify' Mana.endManaRetention
 
