@@ -621,9 +621,9 @@ prohibitsCasting pid oid name variable gs =
         -- clause would prohibit every cast.
         PlayerEffect.CastOnlyAtSorcerySpeed -> not (Turn.sorcerySpeedWindow pid gs)
         -- CR 305.1 again, exactly as CantPlayLandChosenName above: a land is
-        -- played and never cast, so the unrestricted play-side prohibition stops
-        -- nothing here either.
-        PlayerEffect.CantPlayLands -> False
+        -- played and never cast, so the play-side prohibition stops nothing here
+        -- either, however its Filter reads.
+        PlayerEffect.CantPlayLands _ -> False
         -- CR 601.3's other half: this arm ALLOWS a cast the rules would refuse,
         -- and no permission prohibits anything. mayCastFromGraveyard below is
         -- where it is read.
@@ -654,7 +654,7 @@ prohibitsActivatingGiven effects = List.elem PlayerEffect.CantActivateAbilities 
 prohibitsActivating :: PlayerId -> GameState -> Bool
 prohibitsActivating pid gs = prohibitsActivatingGiven (applying pid gs)
 
--- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
+-- CR 305.1: does any effect prohibit `pid` from PLAYING this land?
 -- The play-side twin of prohibitsCasting above, and a separate question rather
 -- than a widening of it: CR 305.1 makes playing a land a special action that
 -- never uses the stack, so a land is never a spell and none of the cast-side
@@ -667,15 +667,18 @@ prohibitsActivating pid gs = prohibitsActivatingGiven (applying pid gs)
 -- the land if it is ONE of them. No printed land has two, so the set is a
 -- singleton in this pool.
 --
--- And takes NO object, where prohibitsCasting above does: the two prohibitions
--- read here narrow by a name or by nothing at all, and no printed sentence
--- narrows a land play by a quality a Filter would state ("can't play nonbasic
--- lands"). One that did would want the object, for the reason the cast side wants
--- it.
+-- And takes the OBJECT beside them, for the reason prohibitsCasting above does:
+-- CantPlayLands narrows by a quality a Filter states (City in a Bottle's "a name
+-- originally printed in the Arabian Nights expansion"), and that is a question
+-- about the card in the zone rather than about the player.
+--
+-- The Filter is read against the card AS THAT ZONE SHOWS IT (CR 712.8a's front
+-- face), where the name set beside it is CR 709.4's combined view. No printed
+-- land has two names, so nothing in this pool tells the two readings apart.
 --
 -- A DISJUNCTION for CR 101.2's reason.
-prohibitsPlayingLand :: PlayerId -> Set.Set CardName -> GameState -> Bool
-prohibitsPlayingLand pid names gs =
+prohibitsPlayingLand :: PlayerId -> Set.Set CardName -> ObjectId -> GameState -> Bool
+prohibitsPlayingLand pid names oid gs =
   let prohibits (source, effect) = case effect of
         PlayerEffect.CantPlayLandChosenName -> not (Set.disjoint names (chosenNamesOf source gs))
         -- CR 305.1 in the direction CantCastChosenName below takes: Teferi's
@@ -684,9 +687,14 @@ prohibitsPlayingLand pid names gs =
         -- but Action.legalActions is what asks that of a land play, and an
         -- effect that moved it would have to say so.
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        -- Damping Engine's "can't play lands", which narrows nothing: every land
-        -- this player could play is stopped, so the name goes unread.
-        PlayerEffect.CantPlayLands -> True
+        -- CR 305.1's quality-bearing prohibition, the play-side twin of
+        -- CantCastMatching below: City in a Bottle's list of names, and Damping
+        -- Engine's `And []`, which every land matches.
+        --
+        -- No CR 601.3a lookahead beside it, where the cast side has one: a land
+        -- play announces no choice that could move a characteristic, CR 305.1
+        -- being a special action with no proposal to make.
+        PlayerEffect.CantPlayLands criterion -> matchesObjectFor pid source criterion oid gs
         -- CR 305.1 once more: a permission naming the zone a SPELL may be cast
         -- from stops no land play, which is why Yawgmoth's Will's "you may play
         -- lands ... from your graveyard" is the arm below rather than this one.
@@ -805,7 +813,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -864,7 +872,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -926,7 +934,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -1171,7 +1179,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -1212,7 +1220,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -1256,7 +1264,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -1404,7 +1412,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -1458,7 +1466,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -1510,7 +1518,7 @@ activationCostAdjustmentsGiven effects targets family kind loyalty srcId gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -1617,7 +1625,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CantBecomeMonarch -> Nothing
   PlayerEffect.CantCastMatching _ -> Nothing
   PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-  PlayerEffect.CantPlayLands -> Nothing
+  PlayerEffect.CantPlayLands _ -> Nothing
   PlayerEffect.CastFrom _ -> Nothing
   PlayerEffect.PlayLandsFrom _ -> Nothing
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -1797,7 +1805,7 @@ mayCastFrom pid zone oid gs =
         -- prohibitsCasting above is where Damping Engine and Silence are read.
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
         -- The play-side twin can name the same ZONE and still answers nothing
         -- here: CR 305.1 makes playing a land a special action, so a grant to
         -- play lands from a graveyard permits no cast (Crucible of Worlds lets
@@ -1889,7 +1897,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         -- would let a permission outvote one.
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
    in inTheirOwnHand && any allows (applying pid gs)
 
 -- CR 305.1: which piles may `pid` play a land from because an EFFECT says so?
@@ -1954,7 +1962,7 @@ playLandPiles pid gs =
         -- separate gates so that neither can outvote the other by accident.
         PlayerEffect.CantCastMatching _ -> []
         PlayerEffect.CastOnlyAtSorcerySpeed -> []
-        PlayerEffect.CantPlayLands -> []
+        PlayerEffect.CantPlayLands _ -> []
         -- A cost, not a zone: CR 118.9's grant says what a spell PAYS and
         -- widens no pile a land may be played from.
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> []
@@ -2036,7 +2044,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -2113,7 +2121,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -2181,7 +2189,7 @@ protectionCarriers gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -2250,7 +2258,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -2331,7 +2339,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantBecomeMonarch -> current
         PlayerEffect.CantCastMatching _ -> current
         PlayerEffect.CastOnlyAtSorcerySpeed -> current
-        PlayerEffect.CantPlayLands -> current
+        PlayerEffect.CantPlayLands _ -> current
         PlayerEffect.CastFrom _ -> current
         PlayerEffect.PlayLandsFrom _ -> current
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
@@ -2397,7 +2405,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -2454,7 +2462,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -2528,7 +2536,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
-        PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
@@ -2588,7 +2596,7 @@ unpreventable gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -2652,7 +2660,7 @@ unredirectable gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -2735,7 +2743,7 @@ statedFlips pid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
-        PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
@@ -2819,7 +2827,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.CantBecomeMonarch -> pure effect
   PlayerEffect.CantCastMatching _ -> pure effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> pure effect
-  PlayerEffect.CantPlayLands -> pure effect
+  PlayerEffect.CantPlayLands _ -> pure effect
   PlayerEffect.CastFrom grant ->
     fmap (\ref -> PlayerEffect.CastFrom grant {CastFromZone.from = (CastFromZone.from grant) {InZone.player = ref}}) (f (InZone.player (CastFromZone.from grant)))
   PlayerEffect.PlayLandsFrom inZone ->

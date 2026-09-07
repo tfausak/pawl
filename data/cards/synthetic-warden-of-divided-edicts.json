@@ -44,7 +44,11 @@
         },
         {
           "effect": {
-            "type": "CantPlayLands"
+            "type": "CantPlayLands",
+            "value": {
+              "type": "And",
+              "value": []
+            }
           },
           "scope": {
             "type": "EachPlayer"

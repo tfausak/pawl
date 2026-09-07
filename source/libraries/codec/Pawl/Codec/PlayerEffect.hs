@@ -56,7 +56,7 @@ codec =
       Arm.nullary "CantBecomeMonarch" PlayerEffect.CantBecomeMonarch,
       Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching (\x -> case x of PlayerEffect.CantCastMatching y -> Just y; _ -> Nothing),
       Arm.nullary "CastOnlyAtSorcerySpeed" PlayerEffect.CastOnlyAtSorcerySpeed,
-      Arm.nullary "CantPlayLands" PlayerEffect.CantPlayLands,
+      Arm.payload "CantPlayLands" filterCodec PlayerEffect.CantPlayLands (\x -> case x of PlayerEffect.CantPlayLands y -> Just y; _ -> Nothing),
       Arm.payload "CastFrom" CastFromZone.codec PlayerEffect.CastFrom (\x -> case x of PlayerEffect.CastFrom y -> Just y; _ -> Nothing),
       Arm.payload "PlayLandsFrom" InZone.codec PlayerEffect.PlayLandsFrom (\x -> case x of PlayerEffect.PlayLandsFrom y -> Just y; _ -> Nothing),
       Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),

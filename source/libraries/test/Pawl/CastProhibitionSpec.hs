@@ -1967,11 +1967,81 @@ conjurersBanSpec s registry =
       Spec.assertBool s (elem (plainsId, Nothing) (Action.playableLands S.alice after)) "the unnamed Plains still is playable"
       Spec.assertBool s (notElem (Action.Type.Play barrensId Nothing) (Action.legalActions S.alice after)) "and no Play is offered for the Barrens"
 
+-- City in a Bottle {2} Artifact -- second sentence: "Players can't cast spells
+-- or play lands with a name originally printed in the Arabian Nights
+-- expansion." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com, 2026-09-06.)
+--
+-- CR 206.3a prints the whole name list, so both halves are an Or of
+-- Filter.HasName; what is new is the PLAY half. CR 305.1 makes playing a land a
+-- special action that never uses the stack, so the cast-side prohibition beside
+-- it reaches no land however its Filter reads -- which is why
+-- PlayerEffect.CantPlayLands now carries a Filter of its own and
+-- Action.playableLands hands prohibitsPlayingLand the object it narrows by.
+--
+-- Desert is the listed land and the Mountain is the falsifier: they differ only
+-- in whether CR 206.3a names them, and a prohibition that narrowed nothing --
+-- Damping Engine's reading -- would take the Mountain too. The pair of BOARDS
+-- differing in one thing is the Bottle itself, which is what says the denial is
+-- the card's rather than the fixture's.
+--
+-- bob is asked as well, because CR 611.1's "players" is every seat and not the
+-- Bottle's controller alone.
+cityInABottleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cityInABottleSpec s registry =
+  Spec.describe s "CityInABottle" $ do
+    Spec.it s "CR 305.1 a land whose name CR 206.3a lists can't be played, and its neighbour still can" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      desert <- S.printingOf s registry "Desert"
+      bottle <- S.printingOf s registry "City in a Bottle"
+      let hands base =
+            let (aliceDesert, g1) = S.addHandCard desert S.alice base
+                (aliceMountain, g2) = S.addHandCard mountain S.alice g1
+                (bobDesert, g3) = S.addHandCard desert S.bob g2
+             in (aliceDesert, aliceMountain, bobDesert, g3)
+          -- alice's own main phase with priority in hand, which is what makes
+          -- the OFFER assertions below say something: CR 305.1's window is
+          -- Action.legalActions', and outside it no land is offered at all.
+          mainPhase base =
+            base
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          (_, withBottle) = S.addPermanent bottle S.alice (mainPhase (S.landsInPlay plains 4))
+          (aliceDesertId, aliceMountainId, bobDesertId, gs) = hands withBottle
+          (freeDesertId, _, _, before) = hands (mainPhase (S.landsInPlay plains 4))
+          playable = Action.playableLands S.alice gs
+      Spec.assertBool s (notElem (aliceDesertId, Nothing) playable) "CR 305.1 alice's Desert, whose name CR 206.3a lists, is not playable"
+      Spec.assertBool s (elem (aliceMountainId, Nothing) playable) "her Mountain, which that list does not name, still is"
+      Spec.assertBool s (notElem (Action.Type.Play aliceDesertId Nothing) (Action.legalActions S.alice gs)) "and no Play is offered for the Desert"
+      Spec.assertBool s (elem (Action.Type.Play aliceMountainId Nothing) (Action.legalActions S.alice gs)) "while the Mountain is offered"
+      Spec.assertBool s (notElem (bobDesertId, Nothing) (Action.playableLands S.bob gs)) "CR 611.1 bob's Desert is stopped too, the sentence naming every seat"
+      Spec.assertBool s (elem (freeDesertId, Nothing) (Action.playableLands S.alice before)) "and the same Desert is playable on the board the Bottle is missing from"
+
+    -- The cast half on the same board, which the arm above cannot answer for: CR
+    -- 305.1 keeps the two gates apart, so a Filter on either one alone would
+    -- leave the other sentence unwritten. Asked through prohibitsCasting rather
+    -- than through legalActions, so that the negative cannot pass for want of
+    -- mana.
+    Spec.it s "CR 601.3a a spell whose name CR 206.3a lists can't be cast, and its neighbour still can" $ do
+      plains <- S.printingOf s registry "Plains"
+      kirdApe <- S.printingOf s registry "Kird Ape"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bottle <- S.printingOf s registry "City in a Bottle"
+      let (_, withBottle) = S.addPermanent bottle S.alice (S.landsInPlay plains 4)
+          (apeId, withApe) = S.addHandCard kirdApe S.alice withBottle
+          (pikerId, gs) = S.addHandCard piker S.alice withApe
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice apeId (S.printingName kirdApe) VariableChoice.Announced gs) "CR 601.3a alice may not cast her Kird Ape, whose name CR 206.3a lists"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice pikerId (S.printingName piker) VariableChoice.Announced gs)) "and her Goblin Piker, which that list does not name, is untouched"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   nullChamberSpec s registry
   runedHaloSpec s registry
   conjurersBanSpec s registry
+  cityInABottleSpec s registry
   silenceSpec s registry
   ceaseFireSpec s registry
   blossomingCalmSpec s registry

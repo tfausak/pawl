@@ -3726,8 +3726,10 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 307.5 narrows a MOMENT rather than a class of spell, so there is no
   -- quality here either (Teferi, Mage of Zhalfir).
   PlayerEffect.CastOnlyAtSorcerySpeed -> []
-  -- CR 305.1's unrestricted prohibition narrows nothing: every land is stopped.
-  PlayerEffect.CantPlayLands -> []
+  -- CR 305.1's play-side prohibition, narrowed by the land's own qualities
+  -- exactly as the cast-side one above is (City in a Bottle's is an Or of
+  -- HasName, Damping Engine's is `And []`).
+  PlayerEffect.CantPlayLands f -> [f]
   -- CR 601.3's zone permission, narrowed by the card's own qualities exactly as
   -- the timing permission beside it is (Yawgmoth's Will's is `And []`, Garruk's
   -- Horde's "creature spells"). WHOSE zone rides beside the Filter and is no
