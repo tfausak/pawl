@@ -118,6 +118,7 @@ codec =
       Arm.payload "PermanentTurnedFaceUp" filterCodec TriggerCondition.PermanentTurnedFaceUp (\x -> case x of TriggerCondition.PermanentTurnedFaceUp y -> Just y; _ -> Nothing),
       Arm.payload "PermanentBecomesDesignated" PermanentBecomesDesignated.codec TriggerCondition.PermanentBecomesDesignated (\x -> case x of TriggerCondition.PermanentBecomesDesignated y -> Just y; _ -> Nothing),
       Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
+      Arm.nullary "SelfMutates" TriggerCondition.SelfMutates,
       Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
       Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
       Arm.nullary "SelfBecomesCrewed" TriggerCondition.SelfBecomesCrewed,

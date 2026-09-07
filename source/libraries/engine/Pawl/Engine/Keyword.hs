@@ -276,6 +276,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a states two STATIC abilities, so neither is minted here.
   Keyword.Buyback _ -> []
@@ -387,6 +388,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a states no activated ability, in the hand or anywhere else.
   Keyword.Buyback _ -> []
@@ -625,6 +627,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a functions while the spell is on the stack, and states no
   -- activated ability there or on the battlefield.
@@ -1048,6 +1051,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- it's on" -- it widens no zone, it prices a cast the rules already allowed.
   -- Pawl.Engine.Cost.candidateCostsFor is where that offer lives.
   Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
   -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling discards
   -- the card, it never casts it. Rule 702.122a is one too, one zone over.
   Keyword.Cycling {} -> []
@@ -1344,6 +1348,43 @@ bestowModifications =
     Modification.AddSubtype Subtype.Aura,
     Modification.GainEnchant bestowEnchant
   ]
+
+-- CR 702.140a: the MUTATE costs -- "you may pay [cost] rather than pay this
+-- spell's mana cost" -- offered as alternative costs by
+-- Pawl.Engine.Cost.candidateCostsFor. bestowCosts' shape above in every
+-- respect, including the list: Face.keywords is a Set that could hold two, and
+-- CR 601.2b's announcement picks one of the offered costs whatever their number.
+--
+-- Offered from EVERY zone the card can be cast from, bestowCosts' posture: rule
+-- 702.140a's static ability "functions while the spell with mutate is on the
+-- stack", which CR 113.6e reaches from wherever the cast begins.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+mutateCosts :: Set Keyword -> [Cost Keyword]
+mutateCosts keywords =
+  let costOf keyword = case keyword of
+        Keyword.Mutate cost -> Just cost
+        _ -> Nothing
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.140a: what a mutating creature spell targets -- "a non-Human creature
+-- with the same owner as this spell". Always exactly that, so the RULE states
+-- it and no card has to; minted here for bestowEnchant's reason above.
+--
+-- Pool.Creatures narrowed by the two conjuncts the rule names. CR 702.140a
+-- prints no "up to", so the slot is required (TargetSlot.required), which is
+-- what makes CR 702.140b's "if its target is illegal" a question with an answer.
+--
+-- Not implemented: rule 702.140a's owner is the SPELL's, and Filter.OwnedBy
+-- resolves against CR 109.5's "you" -- the spell's CONTROLLER at CR 601.2c and
+-- CR 608.2b. The two differ only for a spell cast from a zone its owner is not
+-- (Pawl.Types.PlayerEffect's CastFromAnotherPlayersZone), and no mutate card in
+-- data/cards/ is reachable that way (#3368).
+mutateTarget :: TargetSlot.TargetSlot
+mutateTarget =
+  TargetSlot.required
+    Pool.Creatures
+    (Just (Filter.And [Filter.Not (Filter.HasSubtype Subtype.Human), Filter.OwnedBy PlayerRelation.You]))
 
 -- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's controller
 -- pays to turn it face up as CR 116.2b's special action -- or Nothing when the
@@ -1759,6 +1800,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a's SECOND static ability is a replacement effect (CR 614.1a), and
   -- it is still not one of these: "as it resolves" scopes it to CR 608.2n's own
@@ -1973,6 +2015,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a says nothing about combat.
   Keyword.Buyback _ -> []
@@ -2145,6 +2188,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Multikicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Bestow _ -> []
+  Keyword.Mutate _ -> []
   Keyword.Entwine _ -> []
   -- CR 702.27a says nothing about attaching.
   Keyword.Buyback _ -> []
@@ -2257,6 +2301,7 @@ familyOf keyword = case keyword of
   Keyword.Multikicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
   Keyword.Bestow _ -> Just KeywordFamily.Bestow
+  Keyword.Mutate _ -> Just KeywordFamily.Mutate
   Keyword.Morph {} -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Buyback _ -> Just KeywordFamily.Buyback

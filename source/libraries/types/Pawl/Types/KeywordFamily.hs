@@ -161,4 +161,9 @@ data KeywordFamily
     -- card's own inset frame; no card in the pool asks yet, and it is owed at
     -- the keyword rather than at the first asker.
     Prototype
+  | -- | CR 702.140a: mutate [cost]. The family a card writing "a creature with
+    -- mutate" would name, as against one card's own mutate cost; no card in the
+    -- pool asks yet, and it is owed at the keyword rather than at the first
+    -- asker.
+    Mutate
   deriving (Bounded, Enum, Eq, Ord, Show)

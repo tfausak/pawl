@@ -1,5 +1,6 @@
 module Pawl.Types.Source where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.MeldSource as MeldSource
@@ -33,6 +34,30 @@ data Source
     -- OfCard: CR 108.2b excludes tokens and nothing excludes a melded permanent,
     -- whose components are both Magic cards.
     OfMeld MeldSource.MeldSource
+  | -- | CR 730.2: a merged permanent -- "represented by the card or copy that
+    -- represented that object in addition to any other components that were
+    -- representing it". The components in TOP-TO-BOTTOM order, so the head is
+    -- what CR 730.2a's "only the characteristics of its topmost component"
+    -- names and every characteristic read resolves through.
+    --
+    -- ITS OWN CONSTRUCTOR rather than OfMeld, whose payload answers a different
+    -- question: a melded permanent reads an interned combined face that is no
+    -- component of it (CR 712.8g) and sums its components' front faces for the
+    -- mana value (CR 202.3c), where a merged permanent reads one component and
+    -- CR 730.2a gives it that component's mana value like every other
+    -- characteristic. The two share only what Pawl.Engine.Game.componentsOf
+    -- answers -- CR 730.3 restates CR 712.21 -- which is exactly what that
+    -- classifier is for.
+    --
+    -- Still a card for CR 108.2's purposes when its topmost component is one,
+    -- OfMeld's reason: CR 730.2d makes the resulting permanent a token only if
+    -- the topmost component is, and pawl's merge arrives only from CR 702.140c,
+    -- whose components are cards.
+    --
+    -- Not implemented: CR 730.2d's token components, CR 730.2e through 730.2g's
+    -- face-down components, CR 730.2h's flip components, and CR 730.2i/730.2j's
+    -- double-faced components (#874).
+    OfMerge (NonEmpty.NonEmpty PrintingId.PrintingId)
   | -- | CR 111.3/111.6: a token -- a permanent not represented by a card. Its
     -- characteristics ARE a Card (CR 111.3: effect-defined values are functionally
     -- equivalent to printed ones), interned like any other printing, and carrying

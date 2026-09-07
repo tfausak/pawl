@@ -1952,6 +1952,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.MoreThanMeetsTheEye cost -> Keyword.Type.MoreThanMeetsTheEye (rewriteCost pairs cost)
   -- CR 702.103a states its cost as part of the keyword too.
   Keyword.Type.Bestow cost -> Keyword.Type.Bestow (rewriteCost pairs cost)
+  Keyword.Type.Mutate cost -> Keyword.Type.Mutate (rewriteCost pairs cost)
   Keyword.Type.Fear -> keyword
   Keyword.Type.Intimidate -> keyword
   Keyword.Type.Morph (Morph.MkMorph cost variant) -> Keyword.Type.Morph (Morph.MkMorph (rewriteCost pairs cost) variant)

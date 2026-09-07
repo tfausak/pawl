@@ -349,7 +349,7 @@ targetSlotsOf obj oid gs face =
     -- spell cast bestowed one, and its printed face declares none. A printed
     -- Aura's projection is seeded from that same printed list, so this is the
     -- wider read rather than a different one.
-    (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Binding.modesOf (Object.bindings obj)) face)
+    (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Object.mutating obj) (Binding.modesOf (Object.bindings obj)) face)
 
 -- CR 608.2c: one clause's instructions, in written order, carrying the one thing
 -- a later instruction can ask about an earlier one -- whether it HAPPENED. CR
@@ -556,6 +556,7 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
         | otherwise -> Nothing
       Source.OfCard _ -> Nothing
       Source.OfMeld _ -> Nothing
+      Source.OfMerge _ -> Nothing
       Source.OfToken _ -> Nothing
       Source.OfEmblem _ -> Nothing
       Source.OfSpellCopy _ -> Nothing
@@ -1239,6 +1240,7 @@ sourceObjectOf :: Source.Source -> [ObjectId]
 sourceObjectOf src = case src of
   Source.OfCard _ -> []
   Source.OfMeld _ -> []
+  Source.OfMerge _ -> []
   Source.OfToken _ -> []
   Source.OfAbility a -> [ActivatedAbilitySource.source a]
   Source.OfTrigger t -> [TriggeredAbilitySource.source t]
@@ -1631,6 +1633,7 @@ copyOnStackOf source = case source of
   -- 111.1) and an emblem into the command zone (CR 114.1). CR 202.3c's copy of a
   -- melded permanent is a permanent copy and does not come through here.
   Source.OfMeld _ -> Nothing
+  Source.OfMerge _ -> Nothing
   Source.OfToken _ -> Nothing
   Source.OfEmblem _ -> Nothing
 
@@ -1684,6 +1687,7 @@ stackTargetSlots obj oid gs =
         Source.OfCard _ -> fromFace
         Source.OfSpellCopy _ -> fromFace
         Source.OfMeld _ -> fromFace
+        Source.OfMerge _ -> fromFace
         Source.OfToken _ -> fromFace
         Source.OfEmblem _ -> fromFace
 

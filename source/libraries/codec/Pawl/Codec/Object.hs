@@ -112,6 +112,7 @@ codec = Fields.object $ do
   designations <- Fields.defaulted "designations" Set.empty (Common.set Designation.codec) Object.designations
   kicked <- Fields.defaulted "kicked" Map.empty (Common.keyedList kickerPayment) Object.kicked
   bestowed <- Fields.defaulted "bestowed" False Common.boolean Object.bestowed
+  mutating <- Fields.defaulted "mutating" False Common.boolean Object.mutating
   prototyped <- Fields.defaulted "prototyped" False Common.boolean Object.prototyped
   boughtBack <- Fields.defaulted "boughtBack" False Common.boolean Object.boughtBack
   phyrexianLifePaid <- Fields.defaulted "phyrexianLifePaid" 0 Common.natural Object.phyrexianLifePaid
@@ -158,6 +159,7 @@ codec = Fields.object $ do
         Object.designations = designations,
         Object.kicked = kicked,
         Object.bestowed = bestowed,
+        Object.mutating = mutating,
         Object.prototyped = prototyped,
         Object.boughtBack = boughtBack,
         Object.phyrexianLifePaid = phyrexianLifePaid,

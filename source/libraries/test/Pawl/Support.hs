@@ -922,6 +922,7 @@ addObjectIn zone printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -1166,6 +1167,7 @@ addToken card pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -1226,6 +1228,7 @@ addLibraryCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -1291,6 +1294,7 @@ addGraveyardCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -1360,6 +1364,7 @@ addExiledCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -1434,6 +1439,7 @@ addHandCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -1517,6 +1523,7 @@ landsFor land pid n base =
                   Object.designations = Set.empty,
                   Object.kicked = Map.empty,
                   Object.bestowed = False,
+                  Object.mutating = False,
                   Object.prototyped = False,
                   Object.boughtBack = False,
                   Object.phyrexianLifePaid = 0,
@@ -1576,6 +1583,7 @@ handOne printing base =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -1641,6 +1649,7 @@ pikerInHand land piker n ph =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -2490,6 +2499,7 @@ promptDecider prompt = case prompt of
   Prompt.Search decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseX decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseMutateSide decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
@@ -2608,6 +2618,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.Search {} -> "Search"
   Prompt.CastWhileSearching {} -> "CastWhileSearching"
   Prompt.ChooseX {} -> "ChooseX"
+  Prompt.ChooseMutateSide {} -> "ChooseMutateSide"
   Prompt.ChooseEntwine {} -> "ChooseEntwine"
   Prompt.ChooseBuyback {} -> "ChooseBuyback"
   Prompt.ChooseKicker {} -> "ChooseKicker"
@@ -3087,6 +3098,7 @@ oneMountainState mountain ph =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -3295,6 +3307,7 @@ spellOnStack printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,

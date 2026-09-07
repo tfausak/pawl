@@ -321,6 +321,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Evolved (ObjectId.MkObjectId 6))
       " {\"type\":\"Evolved\",\"value\":6} "
+  -- CR 702.140d: the merged permanent, Evolved's shape -- CR 730.2b leaves the
+  -- spell that merged with no id of its own to name.
+  Spec.it s "Mutated" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Mutated (ObjectId.MkObjectId 7))
+      " {\"type\":\"Mutated\",\"value\":7} "
   -- CR 702.134c: the mentor first, the creature it mentored second. Distinct ids
   -- prove the order, which is what "put a shield counter on THAT creature" reads.
   Spec.it s "Mentored" $

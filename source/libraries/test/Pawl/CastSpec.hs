@@ -247,6 +247,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
             Source.OfCard printingId ->
               Spec.assertBool s (maybe False (Card.isCreature . Card.combined) (Game.cardOfPrinting printingId after)) "creature"
             Source.OfMeld _ -> Spec.assertFailure s "expected a single card source"
+            Source.OfMerge _ -> Spec.assertFailure s "expected a single card source"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
@@ -358,6 +359,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
             Source.OfCard printingId ->
               Spec.assertEqWith s "name" (fmap S.nameOf (Game.cardOfPrinting printingId after)) (Just (CardName.MkCardName $ Text.pack "Goblin Piker"))
             Source.OfMeld _ -> Spec.assertFailure s "expected a single card source"
+            Source.OfMerge _ -> Spec.assertFailure s "expected a single card source"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ -> Spec.assertFailure s "expected a card source"
@@ -708,6 +710,7 @@ handInPlay printing board =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -3414,6 +3417,10 @@ nameOnStack wanted gs oid = case Game.lookupObject oid gs of
     -- resolves to. No caller reaches one -- CR 701.42a never puts it on the
     -- stack -- so this is the OfCard read rather than a second rule.
     Source.OfMeld _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
+    -- CR 730.2a: the topmost component's name, which Game.faceOf already
+    -- resolves to. No caller reaches one -- CR 730.2 merges onto the
+    -- battlefield -- so this is the OfCard read rather than a second rule.
+    Source.OfMerge _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
     Source.OfToken printingId -> fmap S.nameOf (Game.cardOfPrinting printingId gs) == Just wanted
     Source.OfAbility _ -> False
     Source.OfTrigger _ -> False
