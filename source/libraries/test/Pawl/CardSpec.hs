@@ -538,7 +538,7 @@ objectRefPositions =
     ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
     ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
     ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
-    ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders), [plantedRef "cc"]),
+    ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders []), [plantedRef "cc"]),
     ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") []), [plantedRef "bc-original", plantedRef "bc-subject"]),
     ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied), [plantedRef "cs"]),
     -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
@@ -1066,7 +1066,7 @@ ownCounts effect = case effect of
   -- is card data like Create's. The riders are skipped for the reason Create's
   -- arm above skips its own: a rider count is a Quantity, and effectFilters below
   -- is where a Filter under one is swept.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _) -> quantityCounts quantity
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _ _) -> quantityCounts quantity
   -- Neither a Quantity nor a Duration, so no Count can hide here; the refs'
   -- Filters are effectFilters' business below.
   Effect.BecomeCopy {} -> []
@@ -3824,13 +3824,15 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.StateCoinFlip _ -> []
 
 -- CR 707.9's "except ..." clauses. Only the GainKeywords arm reaches a Filter,
--- and only through the keyword it names; CR 707.9b's two arms name a pair of
--- literals and a set of card types, neither of which narrows anything.
+-- and only through the keyword it names; CR 707.9b's other arms name a pair of
+-- literals, a set of card types and a set of supertypes, none of which narrows
+-- anything.
 copyExceptionFilters :: CopyException.CopyException -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 copyExceptionFilters exception = case exception of
   CopyException.SetPowerToughness _ -> []
   CopyException.GainKeywords keywords -> concatMap keywordFilters (Set.toList keywords)
   CopyException.AddCardTypes _ -> []
+  CopyException.RemoveSupertypes _ -> []
   -- CR 707.9a's "this ability" carries no payload, so nothing to narrow. The
   -- ability it points at is the resolving one, which this walk reaches where the
   -- card prints it.
@@ -4594,8 +4596,9 @@ effectFilters effect = case effect of
   Effect.Create (Create.MkCreate quantity card riders _ _) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> overFaces cardFilters card
   Effect.Conjure (Conjure.MkConjure quantity card _) -> frame Unframed (quantityFilters quantity) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
-  -- count's and the riders' Filters are as much card text as Create's.
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> frame SourceHostFramed (objectRefFilters ref)
+  -- count's and the riders' Filters are as much card text as Create's. The
+  -- exceptions frame themselves, BecomeCopy's arm below.
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders exceptions) -> frame Unframed (quantityFilters quantity <> riderFilters riders) <> frame SourceHostFramed (objectRefFilters ref) <> concatMap copyExceptionFilters exceptions
   -- BOTH refs, RequireBlock's arm below: each EachMatching Filter is card text.
   -- The exceptions beside them carry Filters through a KEYWORD, and frame them
   -- themselves (copyExceptionFilters) -- EntryRewrite's AsCopy arm takes the same

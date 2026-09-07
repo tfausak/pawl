@@ -13,8 +13,9 @@
 -- P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
--- count buys, kicked Rite of Replication; and CR 122.6's entry rider on it,
--- Littjara Mirrorlake) and its BecomeCopy arm (CR 707.4's
+-- count buys, kicked Rite of Replication; CR 122.6's entry rider on it,
+-- Littjara Mirrorlake; and CR 707.9b's exception riding it, Multiversal
+-- Recruitment's "except it isn't legendary" read by CR 704.5j) and its BecomeCopy arm (CR 707.4's
 -- change of a permanent already on the battlefield, and CR 707.9a's "except it
 -- has this ability" riding it -- Unstable Shapeshifter, which copies twice
 -- because of it, and whose token copy copies again because CR 707.9a put the
@@ -128,6 +129,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -903,6 +905,56 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the token's name is the copied creature's" (Projection.namesOf tokenId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
         Spec.assertEqWith s "the token's power is the copied creature's" (Projection.powerOf tokenId resolved) $ Just 2
         Spec.assertEqWith s "the token's toughness is the copied creature's" (Projection.toughnessOf tokenId resolved) $ Just 1
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- THE PROVING TEST for CR 707.9b's SUBTRACTIVE arm -- the exception that takes
+  -- a SUPERTYPE off the copy -- and for CR 707.9's exceptions riding CR 707.1's
+  -- token mint rather than only the two copy doors. Multiversal Recruitment
+  -- {3}{U} Sorcery: "Create a token that's a copy of target creature you control,
+  -- except it isn't legendary." Flashback {5}{U}{U}, which nothing below reaches.
+  --
+  -- Read at GAMEPLAY level by CR 704.5j: alice's Azusa, Lost but Seeking is
+  -- legendary, so a token copy that KEPT the supertype would be a second
+  -- legendary permanent with her name under one controller, and the state-based
+  -- action would bury one of the two. Cackling Counterpart on the twin board is
+  -- the control -- CR 707.1's same mint, aimed at the same Azusa, with no
+  -- exception -- and it does lose one, so the two boards differ in the exception
+  -- and nothing else.
+  --
+  -- The Counterpart aimed at the TOKEN is where the copiable claim bites (CR
+  -- 707.2 / 707.9b): the second token reads the first token's copiable values and
+  -- so is not legendary either. Under a CR 613 write over the first token instead
+  -- the second would arrive legendary, clash with Azusa herself, and the count
+  -- would stop at two.
+  Spec.it s "Multiversal Recruitment's token copy is not legendary, and neither is a copy of it (CR 707.9b)" $ do
+    island <- S.printingOf s registry "Island"
+    azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
+    recruitment <- S.printingOf s registry "Multiversal Recruitment"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let azusaName = CardName.MkCardName (Text.pack "Azusa, Lost but Seeking")
+        named gs = filter (\oid -> Set.member azusaName (Projection.namesOf oid gs)) (Set.toList (GameState.battlefield gs))
+        (azusaId, board) = S.addPermanent azusa S.alice (S.landsInPlay island 7)
+        excepted = castAndResolve (targeting azusaId) recruitment board
+        -- The control: the same board, the same target, the copy effect that
+        -- states no exception.
+        control = castAndResolve (targeting azusaId) counterpart board
+    -- THE GAMEPLAY ASSERTION, ahead of every proxy INCLUDING the token match
+    -- below: a token that kept the supertype is buried by CR 704.5j, so the
+    -- match would report a missing token rather than the count.
+    Spec.assertEqWith s "the legend and her non-legendary token both stay (CR 704.5j)" (length (named excepted)) 2
+    Spec.assertEqWith s "where the copy without the exception loses one to the legend rule" (length (named control)) 1
+    case tokensOnBattlefield excepted of
+      [tokenId] -> do
+        -- CR 707.2 through CR 707.9b: a copy OF the token takes the token's
+        -- copiable values, the missing supertype among them.
+        let twice = castAndResolve (targeting tokenId) counterpart excepted
+        Spec.assertEqWith s "and a copy of that token is not legendary either (CR 707.2)" (length (named twice)) 3
+        -- Diagnostics, after the behaviour: CR 707.2 still ran, and only the
+        -- supertype was excepted.
+        Spec.assertEqWith s "the token is Azusa by name (CR 707.2)" (Projection.namesOf tokenId excepted) (Set.singleton azusaName)
+        Spec.assertEqWith s "and has her 1/2" (S.powerToughnessOf tokenId excepted) $ Just (1, 2)
+        Spec.assertEqWith s "and no supertype at all" (PC.supertypes (Projection.project tokenId excepted)) Set.empty
+        Spec.assertEqWith s "where Azusa herself is still legendary" (PC.supertypes (Projection.project azusaId excepted)) (Set.singleton Supertype.Legendary)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
   -- THE PROVING TEST for the copiable stamp. The target is itself a copy, so

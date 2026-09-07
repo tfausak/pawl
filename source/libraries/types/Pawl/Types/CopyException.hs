@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
+import qualified Pawl.Types.Supertype as Supertype
 
 -- | CR 707.9: one exception to the copying process, the "except ..." clause of a
 -- copy effect. Quicksilver Gargantuan's "except it's 7/7" is CR 707.9d's own
@@ -11,18 +12,17 @@ import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 -- 707.9a's; Phyrexian Metamorph's "except it's an artifact in addition to its
 -- other types" is the carve-out CR 707.9d's last two sentences make.
 --
--- A LIST of these rides EntryRewrite.AsCopy and Pawl.Types.BecomeCopy rather than
--- one: the printed clauses are joined by "and" (Moritte of the Frost states
--- three), and CR 707.9f reads "any other exceptions that effect includes" --
--- plural, of one effect.
+-- A LIST of these rides EntryRewrite.AsCopy, Pawl.Types.BecomeCopy and
+-- Pawl.Types.CreateCopy rather than one: the printed clauses are joined by "and"
+-- (Moritte of the Frost states three), and CR 707.9f reads "any other exceptions
+-- that effect includes" -- plural, of one effect.
 --
--- BOTH CARRIERS take the same list, since CR 707.9 is a rider on the copying
+-- ALL THREE CARRIERS take the same list, since CR 707.9 is a rider on the copying
 -- process rather than on the door the copy arrives by: Copycrook's "except it
 -- has [ability]" and Unstable Shapeshifter's "except it has this ability" are the
 -- same sentence over CR 707.5's entry replacement and CR 707.4's battlefield
--- change. Pawl.Types.CreateCopy takes none, and that is card-driven rather than
--- structural -- every printed "create a token copy ... except it has haste"
--- pairs the clause with a delayed sacrifice pawl cannot yet write (#2302).
+-- change, and Multiversal Recruitment's "except it isn't legendary" is that
+-- sentence over CR 707.1's token mint.
 --
 -- Every arm writes into the COPIABLE snapshot, never into a CR 613 layer, which
 -- is what CR 707.9a and CR 707.9b both require: the excepted value or ability
@@ -33,10 +33,10 @@ import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 --
 -- Not implemented: CR 707.9c's exception that declines to copy a characteristic
 -- (Vesuvan Doppelganger's "except it doesn't copy that creature's color"), the
--- SUBTYPE and SUPERTYPE halves of CR 707.9b's "in addition to its other types"
--- (Visage Bandit's "a Shapeshifter Rogue", Sakashima the Impostor's "legendary"),
--- and CR 707.9e's exception that is an additional effect rather than a
--- characteristic (Altered Ego's additional counters) (#1292).
+-- SUBTYPE and SUPERTYPE halves of CR 707.9b's ADDITIVE "in addition to its other
+-- types" (Visage Bandit's "a Shapeshifter Rogue", Sakashima the Impostor's
+-- "legendary"), and CR 707.9e's exception that is an additional effect rather
+-- than a characteristic (Altered Ego's additional counters) (#1292).
 data CopyException
   = -- | CR 707.9b: the copy's power and toughness are these numbers instead of
     -- the copied object's ("except it's 7/7").
@@ -107,4 +107,22 @@ data CopyException
     -- SetPowerToughness above does, and it must not touch the keywords a CDA is
     -- written as -- a Metamorph copying a Tarmogoyf keeps the Goyf's CDA.
     AddCardTypes (Set.Set CardType.CardType)
+  | -- | CR 707.9b: the copy is NOT these supertypes, whatever the copied object's
+    -- were ("except it isn't legendary", Multiversal Recruitment).
+    --
+    -- A DIFFERENCE and not a replacement of the whole supertype set, which is CR
+    -- 205.4b: an object that loses a supertype "retains any other supertypes it
+    -- had", so a copy of a snow legendary permanent is still snow. The arm is the
+    -- subtractive counterpart of AddCardTypes rather than a SetSupertypes.
+    --
+    -- A Set for AddCardTypes' reason, though every printing names Legendary
+    -- alone; CR 205.4a lists five supertypes and none of the sentence's shape
+    -- says only one may appear.
+    --
+    -- CR 707.9d's strip has nothing to take here and that is not an omission: it
+    -- drops the characteristic-defining ability that DEFINES the excepted
+    -- characteristic, and no pawl characteristic-defining ability defines a
+    -- supertype -- Pawl.Types.ProjectedCharacteristics carries characteristicPT
+    -- and reaches subtypes through CR 702.73a's changeling, and nothing else.
+    RemoveSupertypes (Set.Set Supertype.Supertype)
   deriving (Eq, Ord, Show)

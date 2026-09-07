@@ -259,7 +259,7 @@ ownQuantities effect = case effect of
   Effect.DecreaseSpeed d -> [SpeedDecrease.quantity d]
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> [quantity]
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> quantity : Resolve.riderQuantities riders
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> quantity : Resolve.riderQuantities riders
   Effect.BecomeCopy {} -> []
   Effect.CopyStackObject {} -> []
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
@@ -1166,7 +1166,7 @@ effectObjectRefs effect = case effect of
   -- a time. CreateEmblem answers the same way for CR 114.2's emblem.
   Effect.Create {} -> []
   Effect.Conjure {} -> []
-  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> read_ [ref]
+  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _) -> read_ [ref]
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _) -> read_ [original, subject]
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets) -> read_ (ref : copyTargetsRefs targets)
   Effect.Replace {} -> []
@@ -2374,10 +2374,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let bare riders = riders == EntryRiders.defaultValue {EntryRiders.counters = EntryRiders.counters riders}
         offends effect = case effect of
-          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders) -> not (bare riders)
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _) -> not (bare riders)
           _ -> False
         counters effect = case effect of
-          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders) -> not (Map.null (EntryRiders.counters riders))
+          Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ riders _) -> not (Map.null (EntryRiders.counters riders))
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no copy token carrying a rider at all
