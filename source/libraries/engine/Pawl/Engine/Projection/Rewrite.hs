@@ -4,6 +4,7 @@
 -- of it for size.
 module Pawl.Engine.Projection.Rewrite where
 
+import qualified Data.Char as Char
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -886,13 +887,42 @@ rewriteStaticAbility pairs sa =
     }
 
 -- CR 612.2a's name half, gated on both words being creature types -- CR 612.2
--- prohibits every other family. Text.replace, since CR 111.4's derived name
--- holds one word per subtype; it matches a substring, so a name holding the word
--- inside a longer one is over-reached (#644).
+-- prohibits every other family. EVERY occurrence, since CR 111.4's derived name
+-- holds one word per subtype and Artificial Evolution replaces all instances of
+-- the word; whole ones only, since CR 612.2 changes a word only where it is used
+-- as a creature type, and the same letters inside a longer word of a
+-- card-authored name are not. Pawl.CounterspellSpec's Ursine Rite pair is what
+-- proves the boundary, and its Temporal Summons pair the two-word type.
 rewriteTokenName :: Subtype.Type.Subtype -> Subtype.Type.Subtype -> CardName.CardName -> CardName.CardName
 rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.creatureTypeWord to) of
-  (Just f, Just t) -> CardName.MkCardName (Text.replace f t (CardName.unwrap name))
+  (Just f, Just t) -> CardName.MkCardName (replaceWholeWord f t (CardName.unwrap name))
   _ -> name
+
+-- Every whole-word occurrence of `from` in a text replaced by `to`. Not a
+-- whitespace tokenizer, because CR 205.3m's Time Lord is two words: the needle is
+-- matched entire and only its two edges are checked. A word character is
+-- alphanumeric, or the hyphen or apostrophe CR 205.3m writes its own types with
+-- (Assembly-Worker, C'tan, Shi'ar), so those join letters into one word rather
+-- than dividing it.
+--
+-- Total on the words creatureTypeWord answers, every one of which is non-empty;
+-- Text.breakOn is partial on an empty needle.
+replaceWholeWord :: Text.Text -> Text.Text -> Text.Text -> Text.Text
+replaceWholeWord from to = go Text.empty
+  where
+    go acc rest =
+      let (before, match) = Text.breakOn from rest
+          done = acc <> before
+       in if Text.null match
+            then done
+            else
+              let after = Text.drop (Text.length from) match
+               in if edge (lastChar done) && edge (fmap fst (Text.uncons after))
+                    then go (done <> to) after
+                    else go (done <> Text.take 1 match) (Text.drop 1 match)
+    edge = maybe True notWord
+    notWord c = not (Char.isAlphaNum c || c == '\'' || c == '-')
+    lastChar t = if Text.null t then Nothing else Just (Text.last t)
 
 -- CR 612.1 over an ACTIVATED ability printed on a permanent: the payload, CR
 -- 702.178a's "as long as" gate, and the ACTIVATION COST (CR 118.1, CR 602.1a),
