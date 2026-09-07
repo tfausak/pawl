@@ -2195,6 +2195,11 @@ representativeEvents cond =
         TriggerCondition.HauntedCreatureDies -> one (moved Zone.Battlefield Zone.Graveyard)
         TriggerCondition.SpellOrAbilityCounters _ ->
           one (GameEvent.SpellCountered (Countering.MkCountering departed arrived S.alice))
+        -- CR 701.6a's other subject and this condition's only event: the payload is
+        -- the same record, so the floor is the same as the arm above's -- empty,
+        -- the condition binding nothing.
+        TriggerCondition.AbilityIsCountered ->
+          one (GameEvent.AbilityCountered (Countering.MkCountering departed arrived S.alice))
         -- CR 615.13: the recipient has to be a PLAYER, this condition being
         -- scoped to damage that would be dealt to one -- an event naming a
         -- creature matches nothing and would pin the floor at empty.
@@ -2513,6 +2518,7 @@ everyTriggerCondition =
     TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard Filter.Type.IsSource TurnScope.EachTurn),
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
+    TriggerCondition.AbilityIsCountered,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
     TriggerCondition.SelfPreventsDamage (Filter.Type.And []),
     TriggerCondition.PlayerGainsLife PlayerRelation.You,

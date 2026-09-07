@@ -14,8 +14,8 @@ spec s =
       s
       Countering.codec
       Countering.MkCountering
-        { Countering.spell = ObjectId.MkObjectId 4,
+        { Countering.countered = ObjectId.MkObjectId 4,
           Countering.source = ObjectId.MkObjectId 5,
           Countering.controller = PlayerId.MkPlayerId 1
         }
-      " {\"spell\":4,\"source\":5,\"controller\":1} "
+      " {\"countered\":4,\"source\":5,\"controller\":1} "

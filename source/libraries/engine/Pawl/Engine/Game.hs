@@ -1214,6 +1214,7 @@ castOf event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost {} -> Nothing
   GameEvent.LifeGained {} -> Nothing
@@ -1286,6 +1287,7 @@ discardOf event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost {} -> Nothing
   GameEvent.LifeGained {} -> Nothing
@@ -1364,6 +1366,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost {} -> Nothing
   GameEvent.LifeGained {} -> Nothing
@@ -1457,6 +1460,7 @@ damageDealt event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
@@ -1600,6 +1604,7 @@ lifeGainOf event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing

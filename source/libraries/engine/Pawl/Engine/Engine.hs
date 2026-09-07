@@ -712,6 +712,7 @@ abilityTriggeredOf event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost {} -> Nothing
   GameEvent.LifeGained {} -> Nothing
