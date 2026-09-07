@@ -1,7 +1,7 @@
 -- CR 508.1d / 613.11: the continuous effects that REQUIRE an attack. The twin
 -- of Pawl.Engine.BlockRequirement on the other side of the combat phase, and
 -- one of the modules on the axis CR 613.11 reaches past the layer system. None
--- is a layer, and Pawl.Engine.Projection sees none of them.
+-- is a layer, and no layer of Pawl.Engine.Projection rewrites them.
 --
 -- The only reader of Pawl.Types.AttackRequirement, of
 -- Pawl.Types.ActiveAttackRequirement and of Object.goadedBy -- the printed
@@ -24,7 +24,6 @@ import qualified Pawl.Engine.Requirement as Requirement
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
@@ -32,6 +31,7 @@ import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.RequiredDefender as RequiredDefender
 import qualified Pawl.Types.RequirementArity as RequirementArity
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
 -- CR 508.1d: every requirement in force right now, INSTANTIATED against the
 -- (creature, target) pairs the active player may declare -- as a weight on one
@@ -111,32 +111,30 @@ instances candidates targets gs =
       -- both unforced until some permanent actually declares a requirement.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> ([], [])
-        Just face -> case Face.attackRequirements face of
-          -- Every permanent in almost every game.
-          [] -> ([], [])
-          requirements ->
-            -- The same two ability losses BlockRequirement.instances asks
-            -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
-            -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
-            -- requirement that has started to apply is argued there. Why CR
-            -- 613.11 also lets the CR 305.7 gate be liveAfterLayers rather than
-            -- liveGiven is argued there too.
-            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              then
-                -- CR 612.1's word swap over the source's own text, computed HERE
-                -- rather than hoisted beside setEffs, the placement
-                -- CombatRestriction.restricted argues for: textChangesAffecting
-                -- folds the whole continuous-effect list, and the empty case above
-                -- already turned away every permanent that prints no requirement.
-                --
-                -- The SOURCE's changes and not the required creature's: CR 612.1
-                -- changes the words printed on THAT object, and the subject clause
-                -- below is printed on the card stating the requirement.
-                mconcat (fmap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements)
-              else ([], [])
+      fromPermanent source = case RuleAbilities.attackRequirements (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> ([], [])
+        requirements ->
+          -- The same two ability losses BlockRequirement.instances asks
+          -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
+          -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
+          -- requirement that has started to apply is argued there. Why CR
+          -- 613.11 also lets the CR 305.7 gate be liveAfterLayers rather than
+          -- liveGiven is argued there too.
+          if (null setEffs || Projection.liveAfterLayers setEffs source gs)
+            && not (removed source)
+            then
+              -- CR 612.1's word swap over the source's own text, computed HERE
+              -- rather than hoisted beside setEffs, the placement
+              -- CombatRestriction.restricted argues for: textChangesAffecting
+              -- folds the whole continuous-effect list, and the empty case above
+              -- already turned away every permanent that prints no requirement.
+              --
+              -- The SOURCE's changes and not the required creature's: CR 612.1
+              -- changes the words printed on THAT object, and the subject clause
+              -- below is printed on the card stating the requirement.
+              mconcat (fmap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements)
+            else ([], [])
       -- One whole-board projection and one grant walk for the whole walk, both
       -- unforced until some permanent actually reaches `named`.
       pcs = Projection.projectAll gs

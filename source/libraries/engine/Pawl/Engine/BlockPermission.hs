@@ -2,7 +2,7 @@
 -- than the one creature CR 509.1a gives it. The fourth module on the axis CR
 -- 613.11 reaches past the layer system, alongside Pawl.Engine.PlayerEffect,
 -- Pawl.Engine.CombatRestriction and the two requirement modules. None is a
--- layer, and Pawl.Engine.Projection sees none of them.
+-- layer, and no layer of Pawl.Engine.Projection rewrites them.
 --
 -- The only reader of Pawl.Types.BlockPermission. Pawl.Engine.Combat asks for a
 -- NUMBER per creature -- or for no bound at all -- and never learns which card
@@ -21,10 +21,10 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.BlockPermission as BlockPermission
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
 -- CR 509.1a: how many creatures BEYOND the first each of `candidates` may block
 -- right now. Absent from the map is the ordinary creature, which blocks one.
@@ -100,32 +100,30 @@ additionalBlocks candidates gs =
               gs
               source
             $ if null changes then quantity else Projection.rewriteQuantity changes quantity
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> []
-        Just face -> case Face.blockPermissions face of
-          -- Every permanent in almost every game.
-          [] -> []
-          permissions ->
-            -- The same two ability losses CombatRestriction.inForce asks about:
-            -- CR 305.7's basic-land subtype set, and CR 604.2 against a CR
-            -- 613.1f layer-6 removal.
-            if (null setEffs || Projection.liveAfterLayers setEffs source gs) && not (removed source)
-              then
-                -- CR 612.1's word swap over the source's own text, computed here
-                -- rather than hoisted for CombatRestriction.inForce's reason: the
-                -- empty case above already turned away every permanent that
-                -- prints no permission.
-                let changes = Projection.textChangesAffecting source gs
-                 in [ (creature, extra)
-                    | permission <- permissions,
-                      granted source changes permission,
-                      -- Bound here rather than in the pair, so a counted
-                      -- permission folds the battlefield once per permission and
-                      -- not once per candidate.
-                      let extra = amount source changes permission,
-                      let affected = BlockPermission.affected permission,
-                      creature <- candidates,
-                      named source (if null changes then affected else Projection.rewriteAffected changes affected) creature
-                    ]
-              else []
+      fromPermanent source = case RuleAbilities.blockPermissions (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> []
+        permissions ->
+          -- The same two ability losses CombatRestriction.inForce asks about:
+          -- CR 305.7's basic-land subtype set, and CR 604.2 against a CR
+          -- 613.1f layer-6 removal.
+          if (null setEffs || Projection.liveAfterLayers setEffs source gs) && not (removed source)
+            then
+              -- CR 612.1's word swap over the source's own text, computed here
+              -- rather than hoisted for CombatRestriction.inForce's reason: the
+              -- empty case above already turned away every permanent that
+              -- prints no permission.
+              let changes = Projection.textChangesAffecting source gs
+               in [ (creature, extra)
+                  | permission <- permissions,
+                    granted source changes permission,
+                    -- Bound here rather than in the pair, so a counted
+                    -- permission folds the battlefield once per permission and
+                    -- not once per candidate.
+                    let extra = amount source changes permission,
+                    let affected = BlockPermission.affected permission,
+                    creature <- candidates,
+                    named source (if null changes then affected else Projection.rewriteAffected changes affected) creature
+                  ]
+            else []
    in Map.fromListWith (\a b -> (+) <$> a <*> b) (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))

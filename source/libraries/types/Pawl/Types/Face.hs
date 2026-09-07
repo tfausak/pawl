@@ -364,20 +364,27 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 611.1: this face's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary Tower).
     -- The sibling of staticAbilities on the axis CR 613.10/613.11 put OUTSIDE the
-    -- layer system, so these are read by Pawl.Engine.PlayerEffect and never by
-    -- Pawl.Engine.Projection.
+    -- layer system, so these are read by Pawl.Engine.PlayerEffect and rewritten
+    -- by no layer -- carried on Pawl.Types.ProjectedCharacteristics all the same,
+    -- for the reason blockRequirements below gives.
     playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
     -- | CR 604.1/604.2 / 509.1c: this face's printed BLOCKING REQUIREMENTS -- "all
     -- creatures able to block enchanted creature do so" (Lure).
     -- Pawl.Types.BlockRequirement argues why neither staticAbilities nor
-    -- playerAbilities can hold one. Read by Pawl.Engine.BlockRequirement and never
-    -- by Pawl.Engine.Projection, since CR 613.11 applies these after the layer
-    -- system rather than inside it.
+    -- playerAbilities can hold one. Read by Pawl.Engine.BlockRequirement and
+    -- rewritten by no layer, since CR 613.11 applies these after the layer system
+    -- rather than inside it.
+    --
+    -- CARRIED through the projection all the same, as Pawl.Types.RuleAbilities on
+    -- Pawl.Types.ProjectedCharacteristics: CR 707.2 names rules text among the
+    -- copiable values, so a copy answers with the copied face's list and a merged
+    -- permanent with every component's (CR 702.140e). The gatherers read it
+    -- through Pawl.Engine.Projection.View.ruleAbilitiesOf rather than off a face.
     blockRequirements :: [BlockRequirement.BlockRequirement],
     -- | CR 604.1/604.2 / 509.1a: this face's printed BLOCKING PERMISSIONS --
     -- "this creature can block an additional creature each combat" (Foriysian
-    -- Brigade); read by Pawl.Engine.BlockPermission, never by
-    -- Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    -- Brigade); read by Pawl.Engine.BlockPermission, rewritten by no layer, for
+    -- blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of combatRestrictions below, because
     -- these ADD where a restriction BINDS: Pawl.Types.BlockPermission's header
@@ -386,12 +393,12 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 508.1d: this face's printed ATTACKING REQUIREMENTS --
     -- "creatures enchanted player controls attack each combat if able" (Curse of
     -- the Nightly Hunt). The twin of blockRequirements on the other side of the
-    -- combat phase; read by Pawl.Engine.AttackRequirement, never by
-    -- Pawl.Engine.Projection, for that field's CR 613.11 reason.
+    -- combat phase; read by Pawl.Engine.AttackRequirement, rewritten by no
+    -- layer, for that field's CR 613.11 reason.
     attackRequirements :: [AttackRequirement.AttackRequirement],
     -- | CR 604.1/604.2 / 508.1c / 509.1b: this face's printed COMBAT RESTRICTIONS
     -- -- "enchanted creature can't attack or block" (Pacifism); read by
-    -- Pawl.Engine.CombatRestriction, never by Pawl.Engine.Projection, for
+    -- Pawl.Engine.CombatRestriction, rewritten by no layer, for
     -- blockRequirements' CR 613.11 reason. ONE list for both of Pacifism's halves,
     -- where the requirements take two fields: Pawl.Types.CombatRestriction argues
     -- why the axis that split those is absent here.
@@ -399,7 +406,7 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 701.21a / 101.2: this face's printed SACRIFICE
     -- PROHIBITIONS -- "creatures you control but don't own ... can't be
     -- sacrificed" (Garland, Royal Kidnapper); read by
-    -- Pawl.Engine.SacrificeRestriction, never by Pawl.Engine.Projection, for
+    -- Pawl.Engine.SacrificeRestriction, rewritten by no layer, for
     -- blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of combatRestrictions above, because the
@@ -410,7 +417,7 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 502.3 / 101.2: this face's printed UNTAP PROHIBITIONS --
     -- "each land with an activated ability that isn't a mana ability doesn't untap
     -- during its controller's untap step" (Tsabo's Web); read by
-    -- Pawl.Engine.UntapRestriction, never by Pawl.Engine.Projection, for
+    -- Pawl.Engine.UntapRestriction, rewritten by no layer, for
     -- blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of sacrificeRestrictions above, for the
@@ -425,7 +432,7 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 303.4 / 301.5 / 101.2: this face's printed ATTACHMENT
     -- PROHIBITIONS -- "enchanted land ... can't be enchanted by other Auras"
     -- (Consecrate Land), "this creature can't be equipped" (Goblin Brawler);
-    -- read by Pawl.Engine.AttachRestriction, never by Pawl.Engine.Projection,
+    -- read by Pawl.Engine.AttachRestriction, rewritten by no layer,
     -- for blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of untapRestrictions above, for the reason
@@ -435,7 +442,7 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 400.4a / 101.2: this face's printed ENTRY PROHIBITIONS
     -- -- "creature cards in graveyards and libraries can't enter the
     -- battlefield" (Grafdigger's Cage); read by Pawl.Engine.EntryRestriction,
-    -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    -- rewritten by no layer, for blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of attachRestrictions above, for the
     -- reason that field gives: the two forbid unrelated game actions, and this
@@ -444,7 +451,7 @@ data Face card = MkFace
     -- | CR 604.1\/604.2 \/ 122.6 \/ 101.2: this face's printed COUNTER
     -- PROHIBITIONS -- "counters can't be put on artifacts, creatures,
     -- enchantments, or lands" (Solemnity); read by
-    -- Pawl.Engine.CounterRestriction, never by Pawl.Engine.Projection, for
+    -- Pawl.Engine.CounterRestriction, rewritten by no layer, for
     -- blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of entryRestrictions above, for the reason
@@ -458,8 +465,8 @@ data Face card = MkFace
     counterRestrictions :: [CounterRestriction.CounterRestriction],
     -- | CR 604.1\/604.2 \/ 602.2 \/ 101.2: this face's printed ACTIVATION
     -- PROHIBITIONS -- "its activated abilities can't be activated" (Arrest);
-    -- read by Pawl.Engine.ActivationProhibition, never by
-    -- Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    -- read by Pawl.Engine.ActivationProhibition, rewritten by no layer, for
+    -- blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of counterRestrictions above, for the
     -- reason that field gives: the two forbid unrelated game actions, and this
@@ -472,7 +479,7 @@ data Face card = MkFace
     activationProhibitions :: [ActivationProhibition.ActivationProhibition],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,
-    -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    -- rewritten by no layer, for blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of combatRestrictions above, for the reason
     -- Pawl.Types.AttackCost's header gives: a creature under one of these CAN
@@ -481,7 +488,7 @@ data Face card = MkFace
     attackCosts :: [AttackCost.AttackCost],
     -- | CR 604.1/604.2 / 509.1b / 509.1d: this face's printed COSTS TO BLOCK --
     -- Oppressive Rays' {3} per blocking creature; read by Pawl.Engine.BlockCost,
-    -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    -- rewritten by no layer, for blockRequirements' CR 613.11 reason.
     --
     -- attackCosts' twin, its own field for that field's reason with CR 509.1a's
     -- candidate list substituted for CR 508.1a's, and separate from it because one

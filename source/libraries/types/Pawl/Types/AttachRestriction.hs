@@ -28,7 +28,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- a prohibition in the class of continuous effects that "affect game rules
 -- rather than objects" -- and CR 101.2a holds rule 101.2 clear of exactly what
 -- Modification does, adding abilities to objects and removing them.
--- Pawl.Engine.Projection sees none of these.
+-- no layer of Pawl.Engine.Projection rewrites them.
 --
 -- CR 101.2 is what gives it force over CR 701.3a's permission, and CR 702.16c and
 -- CR 702.16d are the rulebook's own instances of the same shape -- protection

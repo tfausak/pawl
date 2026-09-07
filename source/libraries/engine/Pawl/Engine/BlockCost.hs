@@ -2,8 +2,8 @@
 -- something. One of the modules on the axis CR 613.11 reaches past the layer
 -- system (alongside Pawl.Engine.PlayerEffect, Pawl.Engine.BlockRequirement,
 -- Pawl.Engine.AttackRequirement, Pawl.Engine.CombatRestriction and
--- Pawl.Engine.AttackCost). None is a layer, and Pawl.Engine.Projection sees none
--- of them.
+-- Pawl.Engine.AttackCost). None is a layer, and no layer of
+-- Pawl.Engine.Projection rewrites them.
 --
 -- Pawl.Engine.AttackCost's twin, NARROWER by that module's second argument: an
 -- attack is announced against something (CR 508.1b) and a cost to attack may be
@@ -29,7 +29,6 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.Cost as Cost
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -37,6 +36,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PerCreature as PerCreature
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
 -- CR 509.1d read for ONE creature: what must its controller pay for it to block?
 -- One entry per printed cost in force, unpooled, because CR 509.1d is what totals
@@ -64,24 +64,22 @@ costsOn blocker gs =
       -- read against the FULL projection rather than a partial one.
       view = Projection.project blocker gs
       grants = Projection.controlGrants gs
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> []
-        Just face -> case Face.blockCosts face of
-          -- Every permanent in almost every game.
-          [] -> []
-          costs ->
-            -- The same two ability losses AttackCost.costsOn asks about: CR
-            -- 305.7's basic-land subtype set, and CR 604.2 against a CR 613.1f
-            -- layer-6 removal.
-            --
-            -- Proved by Pawl.CombatEffectSpec's LandSubtypeStrip case "an
-            -- animated Hollow Warrior set to Mountain costs nothing to block",
-            -- which is where the group's per-reader case for this copy of the
-            -- guard lives.
-            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              then concatMap (fromCost source) costs
-              else []
+      fromPermanent source = case RuleAbilities.blockCosts (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> []
+        costs ->
+          -- The same two ability losses AttackCost.costsOn asks about: CR
+          -- 305.7's basic-land subtype set, and CR 604.2 against a CR 613.1f
+          -- layer-6 removal.
+          --
+          -- Proved by Pawl.CombatEffectSpec's LandSubtypeStrip case "an
+          -- animated Hollow Warrior set to Mountain costs nothing to block",
+          -- which is where the group's per-reader case for this copy of the
+          -- guard lives.
+          if (null setEffs || Projection.liveAfterLayers setEffs source gs)
+            && not (removed source)
+            then concatMap (fromCost source) costs
+            else []
       -- CR 509.1d reads the share LIVE, here, from the board the caller handed
       -- this function; the lock-in belongs to Pawl.Engine.Combat.declareBlockers,
       -- which binds totalCost's answer once. CR 109.5's "you" for the count is the
