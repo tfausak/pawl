@@ -2252,7 +2252,9 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
   -- itself, so "Bear" sits inside "Bearer", where it is not being used as a
   -- creature type. Synthetic because no printing meets rewriteFace's joint
   -- condition -- a card-authored token name holding one of that token's own
-  -- subtypes inside a longer word (#644).
+  -- subtypes inside a longer word: Scryfall is:token t:creature, 2026-08-14, the
+  -- only two names holding their own subtype in a longer word are Kobolds of Kher
+  -- Keep and Pheres-Band Revelers, each the plural of that subtype.
   --
   -- The control first, so the pair cannot pass on a chain that minted nothing.
   Spec.it s "CR 111.4 an unevolved Ursine Rite mints a Bear named Bearer of the Wilds" $ do
