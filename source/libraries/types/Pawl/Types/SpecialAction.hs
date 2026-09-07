@@ -20,7 +20,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- companion, foretell, plot), so they belong to Pawl.Types.Keyword rather than
 -- here whenever those land; and CR 116.2c's permission is created by a
 -- RESOLUTION rather than printed, so it rides the stored effect it ends (Pawl.Types.Expiry's WhenPaid)
--- rather than a face's text (#875).
+-- rather than a face's text; see #875.
 data SpecialAction
   = -- | CR 116.2e: "You may discard this card any time you could cast an
     -- instant." Circling Vultures is the card the rule names.

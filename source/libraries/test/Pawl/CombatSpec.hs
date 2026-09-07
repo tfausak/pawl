@@ -4926,7 +4926,7 @@ facingBob gs =
 -- printed carrier's.
 --
 -- Not implemented, and STRICTER than printed in both places: the suspend keyword
--- and the self-exile with time counters (#875), so pawl's card is cast for its
+-- and the self-exile with time counters (#3340), so pawl's card is cast for its
 -- mana cost alone and goes to the graveyard as CR 608.2n says, never returning.
 -- Neither reaches the restriction this group is about.
 --

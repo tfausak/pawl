@@ -331,8 +331,8 @@ reaches is a capability the design forbids building anyway.
 - **Measure the suite count, never infer it.** Report before -> after, and say
   so again after any merge from `origin/main` moved the baseline.
 - **Landing a capability a census tracks means editing the census in the same
-  PR** --- #875 (CR 116 special actions), #876 (CR 701 keyword actions), #877
-  (CR 702 keyword abilities). Nothing checks the three bodies, so every row is
+  PR** --- #876 (CR 701 keyword actions) and #877 (CR 702 keyword abilities).
+  Nothing checks the two bodies, so every row is
   yours: the eponymous case, a row landed under another name, and a row under
   no constructor of the tracked type at all. Re-read the row as it stands --- a
   PR earlier in the same session may already have edited it.
