@@ -1331,6 +1331,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.HauntedCreatureDies -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
+  TriggerCondition.AbilityIsCountered -> condition
   TriggerCondition.DamageToPlayerPrevented _ -> condition
   TriggerCondition.SelfPreventsDamage f -> TriggerCondition.SelfPreventsDamage (Filter.rewrite pairs f)
   TriggerCondition.PlayerGainsLife _ -> condition

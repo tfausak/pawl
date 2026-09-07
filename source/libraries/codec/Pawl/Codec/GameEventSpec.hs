@@ -223,7 +223,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.codec
       (GameEvent.SpellCountered (Countering.MkCountering (ObjectId.MkObjectId 4) (ObjectId.MkObjectId 5) (PlayerId.MkPlayerId 1)))
-      " {\"type\":\"SpellCountered\",\"value\":{\"spell\":4,\"source\":5,\"controller\":1}} "
+      " {\"type\":\"SpellCountered\",\"value\":{\"countered\":4,\"source\":5,\"controller\":1}} "
+  -- CR 701.6a's other subject over the same payload, so the tag is the whole of
+  -- the difference on the wire.
+  Spec.it s "AbilityCountered" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.AbilityCountered (Countering.MkCountering (ObjectId.MkObjectId 4) (ObjectId.MkObjectId 5) (PlayerId.MkPlayerId 1)))
+      " {\"type\":\"AbilityCountered\",\"value\":{\"countered\":4,\"source\":5,\"controller\":1}} "
   Spec.it s "LoyaltyAbilityActivated" $
     Common.assertCodec
       s

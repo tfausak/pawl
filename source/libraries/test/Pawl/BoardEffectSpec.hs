@@ -2197,13 +2197,14 @@ plusOnePlusOnesOn moid gs =
     obj <- Game.lookupObject oid gs
     Map.lookup CounterKind.PlusOnePlusOne (Object.counters obj)
 
--- The counterings recorded so far, in stack-sweep order. The local sibling of
--- Pawl.EventSpec's own: Event.counter is the only funnel that appends one, and
--- what it appends is exactly the set the opcode ACTUALLY countered.
+-- The SPELL counterings recorded so far, in stack-sweep order; a countered
+-- ability records GameEvent.AbilityCountered and is not in this. The local
+-- sibling of Pawl.EventSpec's own: Event.counter is the only funnel that appends
+-- one, and what it appends is exactly the set the opcode ACTUALLY countered.
 counteredSpells :: GameState.GameState -> [ObjectId.ObjectId]
 counteredSpells gs =
   let counteringOf event = case event of
-        GameEvent.SpellCountered c -> Just (Countering.spell c)
+        GameEvent.SpellCountered c -> Just (Countering.countered c)
         _ -> Nothing
    in Maybe.mapMaybe counteringOf (S.eventsOf gs)
 
@@ -2384,9 +2385,9 @@ faerieTokensUnder pid gs =
 --     one ability and one spell that "your opponents control" must spare.
 --
 -- bob also has a Baral, Chief of Compliance, whose "whenever a spell or ability
--- you control counters A SPELL" is the fence on #541: countering an ability
--- records nothing for Baral to read, so it must fire once here and not three
--- times.
+-- you control counters A SPELL" is the fence keeping GameEvent.SpellCountered and
+-- GameEvent.AbilityCountered apart: a countered ability records the sibling event
+-- and not his, so he must fire once here and not three times.
 --
 -- Four Islands, one more than Baral's CR 601.2f reduction leaves {1}{U}{U}
 -- needing, so no assertion below turns on the reduction having applied. Every
@@ -2490,8 +2491,9 @@ glenElendrasAnswerSpec s registry = Spec.describe s "GlenElendrasAnswer" $ do
         -- THE gameplay assertion, and it comes first: three objects were
         -- countered this way -- one spell and two abilities -- so three Faeries.
         Spec.assertEqWith s "one spell and two abilities countered this way, so three Faeries under bob" (faerieTokensUnder S.bob resolved) 3
-        -- #541's fence. Baral's "counters A SPELL" saw one countering, not
-        -- three: CR 608.2n's ceasing ability leaves no record for it to read.
+        -- The fence. Baral's "counters A SPELL" saw one countering, not three:
+        -- the other two are GameEvent.AbilityCountered, which his condition does
+        -- not read.
         Spec.assertEqWith s "CR 113.9 Baral fired once, for the spell alone" (length triggers) 1
         -- CR 608.2n: a countered ability ceases to exist, so a live object is
         -- one the sweep spared.
@@ -2527,6 +2529,123 @@ glenElendrasAnswerSpec s registry = Spec.describe s "GlenElendrasAnswer" $ do
         Spec.assertEqWith s "and Baral, whose trigger says A SPELL, did not fire at all" (length triggers) 0
         Spec.assertBool s (all (\oid -> Maybe.isNothing (Game.lookupObject oid resolved)) theirs) "CR 608.2n both opponent abilities ceased to exist"
         Spec.assertEqWith s "and nothing reached alice's graveyard: an ability has none to reach (CR 608.2n)" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 0
+
+-- Synthetic Echo Silencer {1}{U} Enchantment: "Whenever an ability is countered,
+-- draw a card." Synthetic because nothing printed watches it: Scryfall
+-- o:"ability is countered", 2026-09-06, returns Green Slime, Teferi's Response
+-- and Trickbind, each of which reads its OWN resolution's "countered this way"
+-- slot rather than the log, and o:/[Ww]henever an ability is countered/ returns
+-- nothing at all. CR 701.6a forbids no such printing.
+--
+-- ONE board branched on the victim alone, and the pair is the whole proof: the
+-- object waiting on the stack is alice's activated ability on one branch and her
+-- SPELL on the other, and everything else -- the Sorcerer it came from included,
+-- settled on both -- is identical. bob's Baral, Chief of Compliance sits in the
+-- same game on both, reading "counters A SPELL", so exactly one of the two
+-- watchers fires on each branch.
+--
+-- THREE SEATS: alice holds the victim, bob does the countering, and carol holds
+-- the watcher, so a card carol drew cannot be one of Baral's. Every library is
+-- stocked, CR 104.3c otherwise deciding the game before a draw is read. Four
+-- Islands, one more than Baral's CR 601.2f reduction leaves {1}{U}{U} needing,
+-- so no assertion turns on the reduction.
+--
+-- Answers the victim, the Answer in bob's hand, and the board.
+echoSilencerBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe Printing.Printing ->
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+echoSilencerBoard island glenElendra baral silencer sorcerer mSpell = case soleActivatedAbility sorcerer of
+  Nothing -> Nothing
+  Just ability ->
+    let lands = S.landsFor island S.bob 4 S.threePlayerGame
+        stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 5]
+        stocked = List.foldl' (flip stock) lands [S.alice, S.bob, S.carol]
+        (_, withBaral) = S.addPermanent baral S.bob stocked
+        (_, withSilencer) = S.addPermanent silencer S.carol withBaral
+        (hers, withSorcerer) = S.addPermanent sorcerer S.alice withSilencer
+        -- CR 302.6: the Sorcerer must have settled before its {T} may be
+        -- activated at all, and it settles on BOTH branches so the two boards
+        -- differ only in what waits on the stack.
+        settled = List.foldl' (\g pid -> S.runPure S.identityAnswer g (Engine.settleAll pid)) withSorcerer [S.alice, S.bob, S.carol]
+        -- CR 120.3a: the activation names alice herself as the recipient, which
+        -- no assertion reads -- it never resolves.
+        atAlice :: Prompt.Prompt r -> r
+        atAlice p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+          _ -> S.identityAnswer p
+        populated = case mSpell of
+          Just spell -> Just (S.spellOnStack spell S.alice settled)
+          Nothing ->
+            let before = GameState.stack settled
+                after = S.runPure atAlice (settled {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice hers ability)
+             in case filter (`notElem` before) (GameState.stack after) of
+                  [oid] -> Just (oid, after)
+                  _ -> Nothing
+     in fmap (\(victim, gs) -> let (answer, board) = S.addHandCard glenElendra S.bob gs in (victim, answer, board)) populated
+
+-- How many of the triggers a settle put on the stack this player controls.
+triggersUnder :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId] -> Int
+triggersUnder pid gs = length . filter (\oid -> Projection.controllerOf oid gs == Just pid)
+
+echoSilencerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+echoSilencerSpec s registry = Spec.describe s "EchoSilencer" $ do
+  -- The proving case for GameEvent.AbilityCountered: CR 608.2n leaves no object
+  -- behind, so the log entry is the ONLY thing a later trigger can read, and
+  -- before it existed this drew nothing.
+  Spec.it s "CR 701.6a a countered ability is recorded, so a watcher of it fires and Baral does not" $ do
+    island <- S.printingOf s registry "Island"
+    glenElendra <- S.printingOf s registry "Glen Elendra's Answer"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    silencer <- S.printingOf s registry "Synthetic Echo Silencer"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    case echoSilencerBoard island glenElendra baral silencer sorcerer Nothing of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (victim, answer, board) -> do
+        let before = length (Game.zoneMembers Zone.Hand S.carol board)
+            (resolved, triggers) = glenElendraRun answer board
+            -- EVERY trigger the settle raised, not just the top one: the draw
+            -- must be readable however many other watchers the board holds, or
+            -- a mutation that wakes Baral would absorb this assertion instead
+            -- of the fence below.
+            drawn = List.foldl' (\gs _ -> S.runPure S.identityAnswer gs Stack.resolveTop) resolved triggers
+        -- THE gameplay assertion, and it comes first: carol's watcher fired and
+        -- its draw resolved, which no reading of the log without this event can
+        -- produce.
+        Spec.assertEqWith s "carol drew the card her watcher promises for the countered ability" (length (Game.zoneMembers Zone.Hand S.carol drawn) - before) 1
+        -- The fence, in the same game: Baral says "counters A SPELL", and an
+        -- ability is not one.
+        Spec.assertEqWith s "Baral, whose trigger says A SPELL, did not fire" (triggersUnder S.bob resolved triggers) 0
+        Spec.assertEqWith s "and the watcher's is the only trigger on the stack" (length triggers) 1
+        Spec.assertBool s (Maybe.isNothing (Game.lookupObject victim resolved)) "CR 608.2n the countered ability ceased to exist"
+  -- The discriminating twin: the SAME board with alice's ability replaced by
+  -- alice's SPELL and nothing else changed. The two watchers swap, which is what
+  -- makes the draw above the ability's and not merely a countering's.
+  Spec.it s "CR 701.6a a countered SPELL is Baral's event and not the watcher's" $ do
+    island <- S.printingOf s registry "Island"
+    glenElendra <- S.printingOf s registry "Glen Elendra's Answer"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    silencer <- S.printingOf s registry "Synthetic Echo Silencer"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    divination <- S.printingOf s registry "Divination"
+    case echoSilencerBoard island glenElendra baral silencer sorcerer (Just divination) of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (victim, answer, board) -> do
+        let before = length (Game.zoneMembers Zone.Hand S.carol board)
+            (resolved, triggers) = glenElendraRun answer board
+            -- The stack is run down here for the same reason as on the twin: a
+            -- hand read before the triggers resolve cannot tell silence from a
+            -- trigger that merely has not resolved yet.
+            drawn = List.foldl' (\gs _ -> S.runPure S.identityAnswer gs Stack.resolveTop) resolved triggers
+        Spec.assertEqWith s "carol drew nothing: a countered spell is not her event" (length (Game.zoneMembers Zone.Hand S.carol drawn) - before) 0
+        Spec.assertEqWith s "and no trigger of hers reached the stack" (triggersUnder S.carol resolved triggers) 0
+        Spec.assertEqWith s "while Baral fired once for the spell" (triggersUnder S.bob resolved triggers) 1
+        Spec.assertEqWith s "CR 701.6a the countered spell reached alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+        Spec.assertBool s (not (S.onBattlefield victim resolved)) "the countered spell never resolved"
 
 baneOfProgressSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do
@@ -3325,6 +3444,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   comeBackWrongSpec s registry
   swiftSilenceSpec s registry
   glenElendrasAnswerSpec s registry
+  echoSilencerSpec s registry
   countOnLuckSpec s registry
   soldeviDiggerSpec s registry
   actOnImpulseSpec s registry

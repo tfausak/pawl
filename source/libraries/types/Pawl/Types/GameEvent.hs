@@ -199,6 +199,12 @@ data GameEvent
     -- same place. Emitted only where a countering actually happened, both of that
     -- funnel's "can't be countered" gates (CR 113.6g, CR 613.11) returning first.
     SpellCountered Countering.Countering
+  | -- | CR 701.6a's other subject: an ABILITY was countered. Emitted by the same
+    -- funnel and carrying the same Countering, and a sibling arm rather than a
+    -- widening of the one above: rule 608.2n makes a countered ability cease to
+    -- exist rather than move, so there is no Moved event beside this one, and
+    -- Baral, Chief of Compliance's "counters A SPELL" must not see it.
+    AbilityCountered Countering.Countering
   | -- | CR 119.3: a player LOST LIFE, and how much -- greater than 0, every
     -- producer guarding its own zero so that neither CR 702.179d's speed increase
     -- nor a "whenever an opponent loses life" fires on nothing.

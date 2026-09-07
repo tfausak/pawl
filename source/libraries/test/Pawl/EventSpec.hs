@@ -38,7 +38,9 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- CR 701.6a: the counterings recorded so far this turn, in order. The sibling of
+-- CR 701.6a: the SPELL counterings recorded so far this turn, in order --
+-- GameEvent.AbilityCountered is that rule's other subject and is deliberately not
+-- in it, every board here countering a spell. The sibling of
 -- Support.zoneChangesOf, kept local because Event.counter is the only funnel that
 -- appends one and this module is the only reader.
 counteringsOf :: GameState.GameState -> [Countering.Countering]
