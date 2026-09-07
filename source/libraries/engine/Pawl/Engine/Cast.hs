@@ -573,7 +573,8 @@ stampKicked paid sid gs =
 
 -- CR 702.27a's designation, written onto the spell's own stack incarnation: "if
 -- the buyback cost was paid". Read back by Pawl.Engine.Resolve.finishSpell, which
--- is the one place CR 608.2n's destination is decided.
+-- is the one place rule 702.27a's rewrite is minted as a replacement row over CR
+-- 608.2n's move (Pawl.Engine.Replacement.installBuybackReturn).
 --
 -- stampKicked's shape above in every respect: an idempotent write of a field no
 -- layer computes, one direction only, rule 702.27a giving no way to unpay the

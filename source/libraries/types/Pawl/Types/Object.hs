@@ -380,9 +380,10 @@ data Object = MkObject
     prototyped :: Bool,
     -- | CR 702.27a: was this SPELL's buyback cost paid? Stamped by
     -- Pawl.Engine.Cast at CR 601.2b onto the stack incarnation, and read by
-    -- Pawl.Engine.Resolve.finishSpell, which is rule 702.27a's "put this spell
-    -- into its owner's hand instead of into that player's graveyard as it
-    -- resolves".
+    -- Pawl.Engine.Resolve.finishSpell, which is rule 702.27a's "as it resolves"
+    -- and which installs the rewrite as a replacement row rather than performing
+    -- it (Pawl.Engine.Replacement.installBuybackReturn), so CR 616.1 orders it
+    -- against every other row watching the same move.
     --
     -- A Bool where `kicked` above is a map keyed by cost: rule 702.27a states ONE
     -- cost and one payment of it, and nothing reads back WHICH cost was paid --
