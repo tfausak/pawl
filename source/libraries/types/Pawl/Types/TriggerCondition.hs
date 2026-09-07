@@ -256,9 +256,12 @@ data TriggerCondition
     HauntedCreatureDies
   | -- | CR 701.6a: "whenever a spell or ability you control counters a spell"
     -- (Baral, Chief of Compliance); the relation is on the countering side.
-    --
-    -- Not implemented: a countered-ability event and its condition (#541).
     SpellOrAbilityCounters PlayerRelation.PlayerRelation
+  | -- | CR 701.6a read from the VICTIM's side, and only for that rule's ability
+    -- half: "whenever an ability is countered" (Synthetic Echo Silencer). Matches
+    -- GameEvent.AbilityCountered and nothing else, so the arm above stays silent
+    -- here and this one stays silent for a countered spell.
+    AbilityIsCountered
   | -- | CR 615.13: "whenever damage that would be dealt to you is prevented"
     -- (Selfless Squire), blind to which prevention effect applied.
     DamageToPlayerPrevented PlayerRelation.PlayerRelation

@@ -3,30 +3,31 @@ module Pawl.Types.Countering where
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
--- | CR 701.6a: one act of COUNTERING a spell. Recorded by
+-- | CR 701.6a: one act of COUNTERING a spell or ability. Recorded by
 -- Pawl.Engine.Event.counter, the one funnel every countering in the engine goes
 -- through.
 --
--- A record rather than three positional fields on GameEvent.SpellCountered: two
--- of the three are ObjectIds, and `spell` and `source` are the two ends of the
--- same act, so a caller that swapped them would still typecheck.
+-- A record rather than three positional fields on the GameEvent arms that carry
+-- it: two of the three are ObjectIds, and `countered` and `source` are the two
+-- ends of the same act, so a caller that swapped them would still typecheck.
 --
--- Only the SPELL half of rule 701.6a is here, and that is the printed word
--- rather than an omission: the one reader is Baral, Chief of Compliance's
--- "whenever a spell or ability you control counters A SPELL". Stifle counters an
--- ABILITY, which CR 113.9 keeps a separate object, and Pawl.Engine.Event.counter
--- ceases it (CR 608.2n) without recording anything, so Baral cannot see it. A
--- countered ability therefore has no look-back record (#541); the sibling that
--- would carry one is not this type widened, since widening it is exactly what
--- would make Baral fire.
+-- ONE record for both of rule 701.6a's subjects, and TWO GameEvent arms over it
+-- --- GameEvent.SpellCountered and GameEvent.AbilityCountered. The act is the
+-- same act, and the difference the readers care about is which KIND of object
+-- was cancelled: Baral, Chief of Compliance's "counters A SPELL" must stay
+-- silent when an ability is countered, and that is the constructor's job rather
+-- than a field's. Widening one arm to carry both is what would make Baral fire;
+-- Pawl.BoardEffectSpec's GlenElendrasAnswer groups are the fence.
 data Countering = MkCountering
-  { -- | CR 701.6a: the spell that was countered, as it was on the stack. The id is
-    -- already dead by the time any reader sees this: countering removes it from
-    -- the stack through Pawl.Engine.Event.changeZone, and CR 400.7 mints a fresh
-    -- incarnation in the graveyard. Carried anyway, because it is WHAT HAPPENED
-    -- -- the event otherwise says only that somebody countered something, and
-    -- two counters in one batch would be indistinguishable entries.
-    spell :: ObjectId.ObjectId,
+  { -- | CR 701.6a: the spell or ability that was countered, as it was on the
+    -- stack. The id is already dead by the time any reader sees this: a
+    -- countered spell leaves the stack through Pawl.Engine.Event.changeZone and
+    -- CR 400.7 mints a fresh incarnation in the graveyard, and a countered
+    -- ability ceases to exist outright (CR 608.2n). Carried anyway, because it
+    -- is WHAT HAPPENED -- the event otherwise says only that somebody countered
+    -- something, and two counters in one batch would be indistinguishable
+    -- entries.
+    countered :: ObjectId.ObjectId,
     -- | The spell or ability that did the countering, which is what Baral, Chief
     -- of Compliance's "a spell or ability YOU CONTROL counters a spell" names.
     -- Whichever object Pawl.Engine.Resolve calls the effect's source: the

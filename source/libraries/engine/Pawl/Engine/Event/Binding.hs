@@ -1266,6 +1266,13 @@ eventBindingSlots cond = case cond of
   -- would name the countered card in its owner's graveyard. A card that says
   -- "exile it instead" is the one that must bind `became` here.
   TriggerCondition.SpellOrAbilityCounters _ -> Set.empty
+  -- Empty by the RULE rather than by decision, one step further than the arm
+  -- above: CR 608.2n leaves a countered ability no card and no zone, so there is
+  -- no `became` for CR 400.7e to withhold or grant. The countered ability's CR
+  -- 113.7 source permanent is a slot that could be bound, and nothing reads it:
+  -- the printings that want it -- Green Slime, Teferi's Response, Trickbind --
+  -- take it off their own resolution's Counter slot, not off a trigger.
+  TriggerCondition.AbilityIsCountered -> Set.empty
   -- CR 615.13's amount, guaranteed given a match: the event carries a Natural
   -- unconditionally, so unlike SelfLeavesTheBattlefield's `became` there is no
   -- shape of the event that withholds it.

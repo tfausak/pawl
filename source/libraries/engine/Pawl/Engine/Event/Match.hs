@@ -221,6 +221,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.Transformed {} -> Nothing
@@ -262,6 +263,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -344,6 +346,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -401,6 +404,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -464,6 +468,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -531,6 +536,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -606,6 +612,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -687,6 +694,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -765,6 +773,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -830,6 +839,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -903,6 +913,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -973,6 +984,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1043,6 +1055,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1112,6 +1125,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1182,6 +1196,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1264,6 +1279,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1335,6 +1351,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1405,6 +1422,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1499,6 +1517,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1593,6 +1612,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1659,6 +1679,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1751,6 +1772,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1826,6 +1848,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1897,6 +1920,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -1982,6 +2006,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2043,6 +2068,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2120,6 +2146,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2187,6 +2214,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2265,6 +2293,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2338,6 +2367,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2469,6 +2499,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.Drew {} -> False
           GameEvent.Revealed {} -> False
           GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
           GameEvent.Transformed {} -> False
@@ -2598,6 +2629,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.Drew {} -> False
           GameEvent.Revealed {} -> False
           GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
           GameEvent.Transformed {} -> False
@@ -2663,6 +2695,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2728,6 +2761,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2796,6 +2830,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -2893,6 +2928,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AttackerBlocked {} -> False
           GameEvent.AttackerUnblocked _ -> False
           GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
           GameEvent.Transformed {} -> False
@@ -2960,6 +2996,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3041,6 +3078,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3117,6 +3155,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3215,6 +3254,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3299,6 +3339,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3398,6 +3439,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -3430,6 +3472,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3512,6 +3555,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3606,6 +3650,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3678,6 +3723,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AttackerBlocked {} -> False
           GameEvent.AttackerUnblocked _ -> False
           GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
           GameEvent.Transformed {} -> False
@@ -3760,6 +3806,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AttackerBlocked {} -> False
           GameEvent.AttackerUnblocked _ -> False
           GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
           GameEvent.Transformed {} -> False
@@ -3812,6 +3859,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -3912,6 +3960,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.AttackerBlocked {} -> False
           GameEvent.AttackerUnblocked _ -> False
           GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
           GameEvent.HalfUnlocked {} -> False
           GameEvent.TurnedFaceUp _ -> False
           GameEvent.Transformed {} -> False
@@ -3946,6 +3995,78 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- and there is no event for this arm to see.
   TriggerCondition.SpellOrAbilityCounters relation -> case event of
     GameEvent.SpellCountered c -> PlayerRelation.holds (Game.teams gs) relation you (Countering.controller c)
+    -- CR 701.6a's other subject, and the fence Baral needs: his sentence says
+    -- "counters A SPELL", so a countered ABILITY is not his event.
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 701.6a from the VICTIM's side: an ability was countered, whoever did it.
+  -- The event alone settles it -- the arm above's relation has no counterpart
+  -- here, the printed sentence this serves naming no player at all -- so the
+  -- constructor IS the match.
+  --
+  -- A countered SPELL is silence rather than a miss, which is the whole point of
+  -- the two arms: CR 608.2n cancels a spell and an ability by different means,
+  -- and Baral, Chief of Compliance reads the other one.
+  --
+  -- The bearer is not part of the match, SpellOrAbilityCounters' posture: the
+  -- bearer is a permanent and the countering happens somewhere else. Neither
+  -- "can't be countered" gate needs a clause, for that arm's reason: through CR
+  -- 101.2 nothing was countered, so `counter` records no event to see.
+  TriggerCondition.AbilityIsCountered -> case event of
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> True
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -4051,6 +4172,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4135,6 +4257,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4214,6 +4337,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4292,6 +4416,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4399,6 +4524,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4474,6 +4600,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4579,6 +4706,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4686,6 +4814,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -4717,6 +4846,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4808,6 +4938,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4883,6 +5014,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -4959,6 +5091,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5027,6 +5160,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5097,6 +5231,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5181,6 +5316,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5267,6 +5403,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5331,6 +5468,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5401,6 +5539,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5465,6 +5604,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5526,6 +5666,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5601,6 +5742,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5685,6 +5827,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5786,6 +5929,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5863,6 +6007,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5927,6 +6072,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
@@ -5955,6 +6101,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6018,6 +6165,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6080,6 +6228,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6138,6 +6287,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6205,6 +6355,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6268,6 +6419,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6330,6 +6482,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6397,6 +6550,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6459,6 +6613,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6530,6 +6685,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6603,6 +6759,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6673,6 +6830,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False
@@ -6744,6 +6902,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.Transformed {} -> False

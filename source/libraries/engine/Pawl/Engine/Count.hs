@@ -715,6 +715,9 @@ snapshotView gs shape event = case event of
   -- both would count one countering twice. It carries no snapshot either.
   -- Becomes a real view the day an EventShape names countering (#162).
   GameEvent.SpellCountered _ -> Nothing
+  -- The sibling has no Moved event beside it either, CR 608.2n ceasing the
+  -- ability rather than moving it, and carries no snapshot for the same reason.
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.Transformed {} -> Nothing

@@ -525,6 +525,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SpellOrAbilityCounters PlayerRelation.Opponent)
       " {\"type\":\"SpellOrAbilityCounters\",\"value\":{\"type\":\"Opponent\"}} "
+  -- The same rule read from the victim's side, and nullary: the printed sentence
+  -- names no player, so there is no relation to round-trip.
+  Spec.it s "AbilityIsCountered" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.AbilityIsCountered
+      " {\"type\":\"AbilityIsCountered\"} "
   -- CR 615.13's prevention trigger. Both relations, for the same reason.
   Spec.it s "DamageToPlayerPrevented round-trips both relations" $ do
     Common.assertCodec

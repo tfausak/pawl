@@ -520,6 +520,7 @@ damageOf event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.Transformed {} -> Nothing
@@ -578,6 +579,7 @@ revealOf event = case event of
   GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.Transformed {} -> Nothing
@@ -5387,11 +5389,13 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 --     graveyard, nothing arrives anywhere, and there is no destination for CR 614
 --     to replace.
 --
--- The ability branch records NO event, so no trigger can watch it (#541). Widening
--- GameEvent.SpellCountered is the wrong direction -- its one reader asks about
--- countering A SPELL and must stay silent here. What a countered ability does
--- leave is counterReturning's answer, which is the RESOLUTION's own tally (Glen
--- Elendra's Answer's "countered this way") and not a look-back at the history.
+-- Each branch records its OWN event -- GameEvent.SpellCountered and
+-- GameEvent.AbilityCountered, over the same Countering payload. Two arms rather
+-- than one widened arm because Baral, Chief of Compliance's reader asks about
+-- countering A SPELL and must stay silent on the ability branch; Pawl.BoardEffectSpec's
+-- GlenElendrasAnswer groups are the fence. What a countered ability leaves
+-- BESIDES the event is counterReturning's answer, which is the RESOLUTION's own
+-- tally (Glen Elendra's Answer's "countered this way") and not a look-back.
 --
 -- TWO "can't be countered" gates, one per carrier. CR 101.2 makes either the whole
 -- story: the countering effect resolves and does nothing. Neither is targeting
@@ -5421,7 +5425,8 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- can't-be-countered gates, since through CR 101.2 such a spell was never
 -- countered; and a move the CR 616.1 loop cancelled, which leaves the spell on
 -- the stack. The ability branch is not one of them -- that countering really
--- happened, and its silence is #541.
+-- happened, and CR 608.2n leaving no object behind is exactly why the event is
+-- the only record of it.
 --
 -- `source` and `controller` are the countering spell or ability and its controller
 -- (CR 405.4), taken from the caller rather than re-derived: by the time the CR
@@ -5472,6 +5477,14 @@ counterOne source controller oid = do
     -- one, so asking first would fall through to the graveyard move by accident.
     Just _ | Game.isAbility oid gs -> do
       State.modify' (Game.cease oid)
+      State.modify'
+        . recordEvent
+        $ GameEvent.AbilityCountered
+          Countering.MkCountering
+            { Countering.countered = oid,
+              Countering.source = source,
+              Countering.controller = controller
+            }
       pure True
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure False
@@ -5484,7 +5497,7 @@ counterOne source controller oid = do
               . recordEvent
               $ GameEvent.SpellCountered
                 Countering.MkCountering
-                  { Countering.spell = oid,
+                  { Countering.countered = oid,
                     Countering.source = source,
                     Countering.controller = controller
                   }
@@ -6501,6 +6514,7 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 701.6a's countering is a spell or ability DOING something, not one
   -- triggering, so Baral takes the first pass like every other watcher.
   TriggerCondition.SpellOrAbilityCounters _ -> False
+  TriggerCondition.AbilityIsCountered -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
   -- CR 603.3b again: a prevention is something that happens to a damage event,
   -- not an ability triggering.
@@ -6758,6 +6772,7 @@ controllerTurnScoped cond = case cond of
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
+  TriggerCondition.AbilityIsCountered -> False
   -- Damage can be prevented on anybody's turn.
   TriggerCondition.DamageToPlayerPrevented _ -> False
   -- Damage can be prevented on anybody's turn, the arm above's reason.

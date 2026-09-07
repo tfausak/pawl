@@ -136,6 +136,9 @@ movedOf event = case event of
   -- The Moved event `counter` records alongside this one is rule 701.6a's zone
   -- change; this one only says the move WAS a countering. The Discarded case.
   GameEvent.SpellCountered _ -> Nothing
+  -- And the sibling is not a zone change at all: CR 608.2n's ceasing ability
+  -- leaves no zone for a Moved event to name.
+  GameEvent.AbilityCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.Transformed {} -> Nothing
@@ -368,6 +371,7 @@ looksBack condition = case condition of
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
+  TriggerCondition.AbilityIsCountered -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
   TriggerCondition.SelfPreventsDamage _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
@@ -572,6 +576,7 @@ batchScoped condition = case condition of
   TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
   TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
+  TriggerCondition.AbilityIsCountered -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
   -- Per PREVENTION, which is what the record already is: groupPreventions
   -- collapsed the batch to one entry per applying instance -- over recipients as
@@ -885,6 +890,7 @@ eventTriggers events gs =
         GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
@@ -1080,6 +1086,7 @@ eventTriggers events gs =
         GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
@@ -1291,6 +1298,7 @@ eventTriggers events gs =
         GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
@@ -1428,6 +1436,7 @@ eventTriggers events gs =
         GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.AbilityCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.Transformed {} -> Map.empty
@@ -2014,6 +2023,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.HauntedCreatureDies -> Set.singleton Zone.Exile
   -- CR 113.6's default again: the bearer watches from the battlefield.
   TriggerCondition.SpellOrAbilityCounters _ -> battlefield
+  TriggerCondition.AbilityIsCountered -> battlefield
   -- The same default: Selfless Squire watches damage addressed to its controller from
   -- the battlefield, and a card in a graveyard sees nothing prevented.
   TriggerCondition.DamageToPlayerPrevented _ -> battlefield
@@ -2234,6 +2244,7 @@ stateTriggers gs
               TriggerCondition.CardLeavesGraveyard {} -> False
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
+              TriggerCondition.AbilityIsCountered -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False
               TriggerCondition.SelfPreventsDamage _ -> False
               TriggerCondition.PlayerGainsLife _ -> False

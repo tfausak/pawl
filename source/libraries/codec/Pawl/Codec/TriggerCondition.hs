@@ -93,6 +93,7 @@ codec =
       Arm.payload "PermanentTappedForMana" PermanentTappedForMana.codec TriggerCondition.PermanentTappedForMana (\x -> case x of TriggerCondition.PermanentTappedForMana y -> Just y; _ -> Nothing),
       Arm.nullary "HauntedCreatureDies" TriggerCondition.HauntedCreatureDies,
       Arm.payload "SpellOrAbilityCounters" PlayerRelation.codec TriggerCondition.SpellOrAbilityCounters (\x -> case x of TriggerCondition.SpellOrAbilityCounters y -> Just y; _ -> Nothing),
+      Arm.nullary "AbilityIsCountered" TriggerCondition.AbilityIsCountered,
       Arm.payload "DamageToPlayerPrevented" PlayerRelation.codec TriggerCondition.DamageToPlayerPrevented (\x -> case x of TriggerCondition.DamageToPlayerPrevented y -> Just y; _ -> Nothing),
       Arm.payload "SelfPreventsDamage" filterCodec TriggerCondition.SelfPreventsDamage (\x -> case x of TriggerCondition.SelfPreventsDamage y -> Just y; _ -> Nothing),
       Arm.payload "PlayerGainsLife" PlayerRelation.codec TriggerCondition.PlayerGainsLife (\x -> case x of TriggerCondition.PlayerGainsLife y -> Just y; _ -> Nothing),
