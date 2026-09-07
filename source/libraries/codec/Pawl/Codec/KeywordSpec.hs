@@ -872,6 +872,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Partner
       " {\"type\":\"Partner\"} "
+  Spec.it s "ChooseABackground" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.ChooseABackground
+      " {\"type\":\"ChooseABackground\"} "
   -- CR 702.122a's N rides the constructor, so crew 1 and crew 6 are distinct
   -- keywords and must encode distinguishably.
   Spec.it s "Crew carries its N" $ do

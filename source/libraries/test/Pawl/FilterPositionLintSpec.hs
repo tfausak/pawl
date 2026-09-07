@@ -274,6 +274,7 @@ canHostSubjects predicate = case predicate of
   -- Zero: the MIRROR atom is not this one, and its own lint counts it through the
   -- codec (canAttachToSubjectCounts) rather than through this recursion.
   Filter.Type.CanAttachToSubject -> 0
+  Filter.Type.IsCommander -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsActivatedAbility -> 0
   Filter.Type.IsAbility -> 0

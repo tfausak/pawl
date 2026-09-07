@@ -400,6 +400,12 @@ data View = MkView
     -- characteristic axis distinguishes the two and no CR 613 layer can change the
     -- answer. False for every candidate with no object behind it.
     token :: Bool,
+    -- CR 903.3: is this candidate one of the cards its OWNER designated as a
+    -- commander? Read from Pawl.Engine.Commander.isCommander, never from a
+    -- projection -- rule 903.3's designation is a printing fixed before the game
+    -- begins, so no CR 613 layer can change the answer, `token` above's posture.
+    -- False for every candidate with no object behind it.
+    commander :: Bool,
     -- CR 113.3b: is this candidate an ACTIVATED ability on the stack, rather
     -- than CR 113.3c's triggered one? Read from Object.source
     -- (Pawl.Engine.Game.isActivatedAbility) exactly as `token` above is, and
@@ -679,6 +685,8 @@ playerView pid =
       controller = Nothing,
       -- CR 108.3 gives an owner to a CARD; a player owns cards and is not one.
       owner = Nothing,
+      -- CR 903.3 designates a CARD; a player designates one and is not one.
+      commander = False,
       -- CR 400.1 puts OBJECTS in zones; a player is in none of them (CR 109.1).
       zone = Nothing,
       -- CR 601.2a casts an OBJECT; a player was never cast either.
@@ -1601,6 +1609,10 @@ matches context view predicate = case predicate of
   -- the two arms above it cannot change while the game runs, because CR 111.3
   -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
+  -- CR 903.3's designation, read off the owner's deck rather than off the
+  -- candidate: `token` above's posture, and immutable for the same kind of
+  -- reason -- the designation is made before the game begins (CR 702.124a).
+  Filter.IsCommander -> commander view
   -- CR 113.3b against rule 113.3c, read the way IsToken above is: a live read of
   -- what the object IS (Object.source), which no layer rewrites.
   Filter.IsActivatedAbility -> activatedAbility view
@@ -1812,6 +1824,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
+  Filter.IsCommander -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
   Filter.IsAbility -> predicate
@@ -1936,8 +1949,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Horsemanship -> keyword
   Keyword.Type.Skulk -> keyword
   Keyword.Type.Melee -> keyword
-  -- CR 702.124h names no colour, type or quality CR 612.2 could swap.
+  -- CR 702.124h names no colour, type or quality CR 612.2 could swap, and CR
+  -- 702.124k names only the Background enchantment type.
   Keyword.Type.Partner -> keyword
+  Keyword.Type.ChooseABackground -> keyword
   -- CR 702.23a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Rampage _ -> keyword
   Keyword.Type.Aftermath -> keyword
@@ -2279,6 +2294,7 @@ bakeBound players predicate = case predicate of
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
+  Filter.IsCommander -> predicate
   Filter.IsToken -> predicate
   Filter.IsActivatedAbility -> predicate
   Filter.IsAbility -> predicate
@@ -2411,6 +2427,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsHostOfSource -> []
   Filter.CanHostSubject -> []
   Filter.CanAttachToSubject -> []
+  Filter.IsCommander -> []
   Filter.IsToken -> []
   Filter.IsActivatedAbility -> []
   Filter.IsAbility -> []
@@ -2546,6 +2563,7 @@ statesAQuality predicate = case predicate of
   Filter.IsHostOfSource -> True
   Filter.CanHostSubject -> True
   Filter.CanAttachToSubject -> True
+  Filter.IsCommander -> True
   Filter.IsToken -> True
   Filter.IsActivatedAbility -> True
   Filter.IsAbility -> True

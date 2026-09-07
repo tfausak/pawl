@@ -327,9 +327,14 @@ data Keyword
     -- Pawl.Engine.Commander.designations.
     --
     -- Not implemented: CR 702.124i's partner—[text], CR 702.124j's partner with
-    -- [name], CR 702.124k's choose a Background and CR 702.124m's Doctor's
-    -- companion, which CR 702.124f keeps distinct from this one (#939).
+    -- [name] and CR 702.124m's Doctor's companion, which CR 702.124f keeps
+    -- distinct from this one (#939).
     Partner
+  | -- | 702.124k: "You may designate two cards as your commander rather than one
+    -- if one of them is this card and the other is a legendary Background
+    -- enchantment card." A deck-construction ability like Partner above, read by
+    -- Pawl.Engine.Commander.designations.
+    ChooseABackground
   | -- | 702.127a: three static abilities in one word -- cast this half from your
     -- graveyard, never from anywhere else, and exile it as it leaves the stack.
     Aftermath

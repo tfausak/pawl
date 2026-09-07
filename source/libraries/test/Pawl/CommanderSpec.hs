@@ -4,13 +4,14 @@
 -- Covers Pawl.Engine.Commander (CR 903.3's designation, CR 903.6's starting zone,
 -- CR 903.8's permission and tax, CR 903.9a's state-based action, CR 903.9b's
 -- command-zone replacement), CR 702.124h's two-commander designation, the
--- Player.commander and Player.commanderCasts fields, Deck's commander, the
--- Zone.Command arm of Pawl.Engine.Cast.castableZones, and the CR 903.8 increase
--- Pawl.Engine.Cost.spellAdjustments folds into CR 601.2f. Also the commander half
--- of Pawl.Engine.Setup's subgame pair -- CR 729.2c in and CR 729.5c out -- and
--- the commander half of its restart, CR 727.5a. Those live here rather than in
--- Pawl.SetupSpec because they need a designated commander and this is the file
--- that builds one.
+-- Player.commander and Player.commanderCasts fields, Deck's commander, CR
+-- 702.124k's Background designation and the Filter.IsCommander atom that reads
+-- it, the Zone.Command arm of Pawl.Engine.Cast.castableZones, and the CR 903.8
+-- increase Pawl.Engine.Cost.spellAdjustments folds into CR 601.2f. Also the
+-- commander half of Pawl.Engine.Setup's subgame pair -- CR 729.2c in and CR
+-- 729.5c out -- and the commander half of its restart, CR 727.5a. Those live
+-- here rather than in Pawl.SetupSpec because they need a designated commander
+-- and this is the file that builds one.
 --
 -- CR 903.12h's Brawl group is here for the same reason, and because it is the
 -- CR 903.10a group's board with one setting changed.
@@ -40,6 +41,15 @@
 -- Akiri gets +1\/+0 for each artifact you control. / Partner"). Rograkh's {0}
 -- is what makes CR 702.124d readable: his cast spends no mana, so whatever the
 -- board then pays for Akiri is her own cost and CR 903.8's tax alone.
+--
+-- The Choose a Background group takes that same fixture and a third pool: Wilson,
+-- Refined Grizzly ({1}{G} Legendary Creature -- Bear Warrior 2\/2, "This spell
+-- can't be countered. \/ Reach, vigilance, trample \/ Ward {2} \/ Choose a
+-- Background") and Raised by Giants ({5}{G} Legendary Enchantment -- Background,
+-- "Commander creatures you own have base power and toughness 10\/10 and are
+-- Giants in addition to their other types"). Raised by Giants is the Background
+-- whose text reads the designation back, which is what makes CR 702.124k
+-- observable at gameplay level rather than only in the command zone.
 --
 -- The Bounce group adds two of bob's spells and the Islands to cast them with:
 -- Unsummon ({U} Instant, "return target creature to its owner's hand") for rule
@@ -136,6 +146,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   castSpec s registry
   taxSpec s registry
   partnerSpec s registry
+  backgroundSpec s registry
   bounceSpec s registry
   commanderDamageSpec s registry
   brawlSpec s registry
@@ -500,6 +511,71 @@ partnerSpec s registry = Spec.describe s "Partner" $ do
     Spec.assertEqWith s "CR 903.10a: twenty-two from Rograkh alone loses bob the game" (statusOf S.bob lethal) (Just (Status.Departed Departure.Type.Lost))
     Spec.assertEqWith s "at 7 life, so CR 704.5a is not what killed him either" (S.lifeOf S.bob lethal) (Just 7)
     Spec.assertEqWith s "and it was his tally that reached it, not Akiri's" (List.sort (tallyFrom S.alice S.bob lethal)) [11, 22]
+
+backgroundSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+backgroundSpec s registry = Spec.describe s "Choose a Background" $ do
+  -- CR 702.124k: "you may designate two cards as your commander rather than one
+  -- if one of them is this card and the other is a legendary Background
+  -- enchantment card", and CR 702.124b starts both in the command zone.
+  Spec.it s "CR 702.124k a Background is designated beside the card that chooses it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    wilson <- S.printingOf s registry "Wilson, Refined Grizzly"
+    raised <- S.printingOf s registry "Raised by Giants"
+    let gs = partnerBoard mountain plains 6 [wilson, raised]
+    Spec.assertEqWith s "both are in the command zone" (List.sort (commandZoneNames gs)) (List.sort [S.nameOf (Printing.card wilson), S.nameOf (Printing.card raised)])
+    Spec.assertEqWith s "and both are commanders, the enchantment as much as the creature" (fmap (\oid -> Commander.isCommander oid gs) (inCommandZone gs)) [True, True]
+    Spec.assertEqWith s "she is designated both" (fmap (List.sort . commanderPrintingsOf gs) (Map.lookup S.alice (GameState.players gs))) (Just (List.sort [wilson, raised]))
+  -- CR 702.124k's exclusion, which the rule states in BOTH directions: a card
+  -- with "choose a Background" beside anything that is not a legendary Background
+  -- enchantment card, and a legendary Background enchantment card that no "choose
+  -- a Background" commander accompanies -- including one named on its own, since
+  -- rule 702.124k's second clause admits no exception for a lone Background.
+  --
+  -- Each leg is the control board with ONE printing swapped, so nothing but the
+  -- pairing differs. Akiri is the sharpest of the three: she has a partner
+  -- ability, which CR 702.124f keeps from combining with this one.
+  Spec.it s "CR 702.124k the exclusion runs both ways" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    wilson <- S.printingOf s registry "Wilson, Refined Grizzly"
+    raised <- S.printingOf s registry "Raised by Giants"
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let board = partnerBoard mountain plains 6
+    Spec.assertEqWith s "control leg: Wilson beside the Background designates both" (List.length (commandZoneNames (board [wilson, raised]))) 2
+    Spec.assertEqWith s "CR 702.124k: Wilson beside a card that is no Background designates neither" (commandZoneNames (board [wilson, shimatsu])) []
+    Spec.assertEqWith s "CR 702.124f: a partner ability is not this one, so Akiri beside the Background designates neither" (commandZoneNames (board [akiri, raised])) []
+    Spec.assertEqWith s "CR 702.124k: and a Background named alone is no commander either" (commandZoneNames (board [raised])) []
+    Spec.assertEqWith s "control leg: Wilson named alone still is (CR 903.3)" (commandZoneNames (board [wilson])) [S.nameOf (Printing.card wilson)]
+  -- The designation read at gameplay level, which is what makes it more than a
+  -- bookkeeping entry: Raised by Giants says "commander creatures you own have
+  -- base power and toughness 10\/10 and are Giants in addition to their other
+  -- types", and Wilson is a commander only because rule 702.124k let the pair
+  -- stand.
+  --
+  -- Two boards differing in ONE thing, the deck's second named card. Akiri makes
+  -- the negative: CR 702.124f refuses her beside the Background, so neither card
+  -- is designated and Wilson is the 2\/2 Bear Warrior he is printed as. Both
+  -- boards put the same two permanents on the battlefield, so the enchantment is
+  -- there and applying in each.
+  Spec.it s "CR 702.124k a Background reads the designation its own limb created" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    wilson <- S.printingOf s registry "Wilson, Refined Grizzly"
+    raised <- S.printingOf s registry "Raised by Giants"
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    let played pair =
+          let (wilsonId, withWilson) = S.addPermanent wilson S.alice (partnerBoard mountain plains 6 pair)
+              (_, both) = S.addPermanent raised S.alice withWilson
+           in (wilsonId, both)
+        (designatedId, designated) = played [wilson, raised]
+        (refusedId, refused) = played [akiri, raised]
+    Spec.assertEqWith s "CR 702.124k: Wilson is a commander, so the Background sets him to 10/10" (S.powerToughnessOf designatedId designated) (Just (10, 10))
+    Spec.assertBool s (Set.member Subtype.Type.Giant (Projection.subtypesOf designatedId designated)) "and makes him a Giant"
+    Spec.assertBool s (Set.member Subtype.Type.Bear (Projection.subtypesOf designatedId designated)) "in addition to the Bear he is printed as (CR 205.1b)"
+    Spec.assertEqWith s "negative leg: the same enchantment leaves an undesignated Wilson at his printed 2/2" (S.powerToughnessOf refusedId refused) (Just (2, 2))
+    Spec.assertBool s (not (Set.member Subtype.Type.Giant (Projection.subtypesOf refusedId refused))) "and no Giant"
 
 -- Answers CR 903.9b's offer with Returns for exactly one seat and Leaves for every
 -- other, which is what tells "asked alice" apart from "asked bob" and from "never

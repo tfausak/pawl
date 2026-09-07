@@ -2388,6 +2388,8 @@ filterReads f = case f of
   Filter.Type.CanAttachToSubject -> Set.fromList [Types, Subtypes, Colors, Keywords, PowerA, Controller]
   -- Reads nothing: no Modification writes Object.source.
   Filter.Type.IsToken -> Set.empty
+  -- Reads nothing either: no Modification writes CR 903.3's designation.
+  Filter.Type.IsCommander -> Set.empty
   -- Reads nothing, for the atom above's reason and off the same record: CR
   -- 113.3's two kinds are told apart by Pawl.Types.Source, which no Modification
   -- writes.
@@ -2579,6 +2581,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.IsToken -> False
+  Filter.Type.IsCommander -> False
   Filter.Type.IsActivatedAbility -> False
   Filter.Type.IsAbility -> False
   Filter.Type.IsEmblem -> False
