@@ -12,9 +12,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 data BecameCrewed = MkBecameCrewed
   { vehicle :: ObjectId.ObjectId,
     -- | CR 702.122b: the creatures tapped to pay the cost of THAT crew ability,
-    -- which is the set rule 702.122e's rider would read. Empty is reachable --
-    -- a crew cost paid with no TapForTotalPower component left is not a shape
-    -- the pool prints, but nothing in the type forbids it.
+    -- which is also the set rule 702.122e's rider asks about. Empty when the cost
+    -- carried no TapForTotalPower component, which no printed crew ability does.
     crewedBy :: Set.Set ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)

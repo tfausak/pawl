@@ -35,9 +35,10 @@
 -- the CREWER, which neither Vehicle above can be, so crewsVehicleSpec below adds
 -- a creature that reads the relation from that side.
 --
--- Not covered here, because no card in the pool reaches them: CR 702.122c's
--- "creature that crewed it THIS TURN", which outlives the resolution this
--- fixture watches, and CR 702.122d's "can't crew Vehicles".
+-- Not covered here, because no card in the pool reaches them: rule 702.122c's
+-- relation read LATER IN THE TURN, which Subterranean Schooner's "target creature
+-- that crewed it this turn" wants and which outlives the resolution these
+-- fixtures watch, and CR 702.122d's "can't crew Vehicles".
 module Pawl.CrewSpec where
 
 import qualified Data.Map.Strict as Map
@@ -322,7 +323,7 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
     mech <- S.printingOf s registry "Mobilizer Mech"
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
-    let (mechId, vehicleIds, crewIds, gs) = mechBoard mech [dreadnought] [hillGiant]
+    let (mechId, vehicleIds, crewIds, gs) = crewReaderBoard mech [dreadnought] [hillGiant]
     case (vehicleIds, crewIds) of
       ([dreadId], [giantId]) -> do
         let (onStack, after) = crewAndSettle (crewingAt [giantId] dreadId) mechId gs
@@ -340,7 +341,7 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (mechId, vehicleIds, crewIds, gs) = mechBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
+    let (mechId, vehicleIds, crewIds, gs) = crewReaderBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
     case (vehicleIds, crewIds) of
       ([firstId, secondId], [giantId, blindId]) -> do
         let (_, once) = crewAndSettle (crewingAt [giantId] firstId) mechId gs
@@ -366,7 +367,7 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (_, vehicleIds, crewIds, gs) = mechBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
+    let (_, vehicleIds, crewIds, gs) = crewReaderBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
     case (vehicleIds, crewIds) of
       ([crewedId, bystanderId], [giantId, blindId]) -> do
         let (onStack, after) = crewAndSettle (crewingAt [giantId, blindId] bystanderId) crewedId gs
@@ -375,18 +376,19 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
         Spec.assertEqWith s "with nothing triggered onto the stack" (length (GameState.stack onStack)) 0
       _ -> Spec.assertFailure s "fixture should have two other Vehicles and two crewers"
 
--- alice's board for CR 702.122e and CR 702.122b: one permanent whose printing is
--- `mech` -- Mobilizer Mech for the one, Gearshift Ace for the other -- one per printing in
--- `vehicles` and one per printing in `crewers`, all Settled and untapped, with
+-- alice's board for CR 702.122e and CR 702.122b: one permanent per printing, the
+-- first being the card that READS the crewing -- Mobilizer Mech for rule 702.122e
+-- and Gearshift Ace for rule 702.122b -- then one per printing in `vehicles` and
+-- one per printing in `crewers`, all Settled and untapped, with
 -- alice holding priority in her precombat main phase. Three seats, for the reason
 -- the module header gives.
-mechBoard :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], GameState.GameState)
-mechBoard mech vehicles crewers =
-  let (mechId, gs0) = S.addPermanent mech S.alice S.threePlayerGame
+crewReaderBoard :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], GameState.GameState)
+crewReaderBoard reader vehicles crewers =
+  let (readerId, gs0) = S.addPermanent reader S.alice S.threePlayerGame
       add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
       (vehicleIds, gs1) = foldl add ([], gs0) vehicles
       (crewIds, gs2) = foldl add ([], gs1) crewers
-   in (mechId, vehicleIds, crewIds, gs2 {GameState.priority = Just S.alice})
+   in (readerId, vehicleIds, crewIds, gs2 {GameState.priority = Just S.alice})
 
 -- Crew `vehicleId`, then let CR 603.3 gather what that resolution triggered onto
 -- the stack (Engine.settleForPriority) and resolve it. Both states are returned:
@@ -426,7 +428,7 @@ crewsVehicleSpec s registry = Spec.describe s "CrewsVehicle" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (aceId, vehicleIds, crewIds, gs) = mechBoard ace [dreadnought, dreadnought] [hillGiant, blindSpot]
+    let (aceId, vehicleIds, crewIds, gs) = crewReaderBoard ace [dreadnought, dreadnought] [hillGiant, blindSpot]
     case (vehicleIds, crewIds) of
       ([crewedId, bystanderId], [giantId, blindId]) -> do
         -- Hill Giant is tapped where it stands, so the board holds a tapped
@@ -444,7 +446,7 @@ crewsVehicleSpec s registry = Spec.describe s "CrewsVehicle" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (aceId, vehicleIds, crewIds, gs) = mechBoard ace [dreadnought, dreadnought] [hillGiant, blindSpot]
+    let (aceId, vehicleIds, crewIds, gs) = crewReaderBoard ace [dreadnought, dreadnought] [hillGiant, blindSpot]
     case (vehicleIds, crewIds) of
       ([crewedId, _], [giantId, blindId]) -> do
         let (onStack, after) = crewAndSettle (crewingWith [giantId, blindId]) crewedId (tap aceId gs)

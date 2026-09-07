@@ -307,7 +307,7 @@ data GameEvent
   | -- | CR 702.122e: a Vehicle BECAME CREWED -- "a crew ability of [this Vehicle]
     -- resolves". TWO data, Mentored's shape above: the Vehicle, the crew
     -- ability's source, and CR 702.122b's creatures that crewed it, which the
-    -- ability's cost bound under Pawl.Engine.Binding.crewingPermanent and which
+    -- ability's cost bound under Pawl.Engine.Binding.tappedForTotalPower and which
     -- is not derivable from the Vehicle. Emitted on RESOLUTION, Mentored's gate
     -- rather than Evolved's: rule 702.122e names the resolution and nothing
     -- about its effect.
