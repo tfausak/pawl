@@ -2304,6 +2304,10 @@ representativeEvents cond =
         -- not the bearer -- which pins the floor for a matching pair too, since
         -- this arm binds nothing either way.
         TriggerCondition.SelfEvolves -> one (GameEvent.Evolved departed)
+        -- CR 702.140d's own event, and the only one this condition admits.
+        -- `departed` for SelfEvolves' reason: the pair does not match, which
+        -- pins the floor for a matching pair too.
+        TriggerCondition.SelfMutates -> one (GameEvent.Mutated departed)
         -- CR 702.134c's own event, and the only one this condition admits. TWO
         -- distinct ids, which is what the pin needs here: eventBindings stamps the
         -- SECOND under `thatMentoredCreature`, so an arm that bound the mentor
@@ -2579,6 +2583,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
     TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
     TriggerCondition.SelfEvolves,
+    TriggerCondition.SelfMutates,
     TriggerCondition.AttachedCreatureMentors,
     TriggerCondition.AttachedCreatureDies,
     TriggerCondition.AttachedCreatureBecomesTapped,

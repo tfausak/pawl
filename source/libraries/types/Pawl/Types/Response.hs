@@ -28,6 +28,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
@@ -569,4 +570,7 @@ data Response
   | -- | CR 401.4's answer: the order an owner chose for the cards arriving at one
     -- end of their library, as a permutation of the offered indices.
     ArrangedLibraryArrivals [Natural.Natural]
+  | -- | CR 702.140c's answer: which side of the target creature a mutating
+    -- creature spell was put on.
+    ChoseMutateSide MutateSide.MutateSide
   deriving (Eq, Ord, Show)

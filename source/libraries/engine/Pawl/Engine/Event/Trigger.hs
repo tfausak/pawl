@@ -144,6 +144,7 @@ movedOf event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -323,6 +324,7 @@ looksBack condition = case condition of
   TriggerCondition.PermanentBecomesDesignated {} -> False
   -- Nor here: rule 702.100b's counters are put on a permanent on the battlefield.
   TriggerCondition.SelfEvolves -> False
+  TriggerCondition.SelfMutates -> False
   -- Nor here, for the same reason one rule over: rule 702.134a's counter goes on a
   -- creature that CR 508.1k has made an attacking creature, and a permanent leaving
   -- the battlefield is removed from combat (CR 506.4) rather than mentored.
@@ -519,6 +521,7 @@ batchScoped condition = case condition of
   TriggerCondition.PermanentTransforms _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
   TriggerCondition.SelfEvolves -> False
+  TriggerCondition.SelfMutates -> False
   TriggerCondition.AttachedCreatureMentors -> False
   TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfBecomesCrewed -> False
@@ -901,6 +904,7 @@ eventTriggers events gs =
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
@@ -1098,6 +1102,7 @@ eventTriggers events gs =
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
@@ -1320,6 +1325,7 @@ eventTriggers events gs =
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
@@ -1459,6 +1465,7 @@ eventTriggers events gs =
         GameEvent.Transformed {} -> Map.empty
         GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mutated _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
@@ -1882,6 +1889,7 @@ zonesTriggeredFrom cond = case cond of
   -- The same default again: rule 702.100b's marker goes to a creature, and
   -- Renegade Krasis is the creature watching itself.
   TriggerCondition.SelfEvolves -> battlefield
+  TriggerCondition.SelfMutates -> battlefield
   -- The same default a third time, from the Equipment's side: CR 301.5c unattaches
   -- an Equipment rather than moving it, so one that equips anything is on the
   -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
@@ -2319,6 +2327,7 @@ stateTriggers gs
               -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
               -- the counters it put are indistinguishable from any others.
               TriggerCondition.SelfEvolves -> False
+              TriggerCondition.SelfMutates -> False
               -- CR 702.134c likewise, and one step further removed: what it fires
               -- on is a resolution, and the counter that resolution put is a
               -- counter like any other, so the board afterwards says nothing about

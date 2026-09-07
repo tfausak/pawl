@@ -48,6 +48,15 @@ spec s = Spec.describe s "Pawl.Codec.Source" $ do
             }
       )
       " {\"type\":\"OfMeld\",\"value\":{\"result\":8,\"components\":[9,10]}} "
+  -- CR 730.2: a bare list rather than OfMeld's record, since a merged permanent
+  -- has no interned result face to name beside its components -- CR 730.2a reads
+  -- the head of this list instead.
+  Spec.it s "OfMerge" $
+    Common.assertCodec
+      s
+      Source.codec
+      (Source.OfMerge (PrintingId.MkPrintingId 11 NonEmpty.:| [PrintingId.MkPrintingId 12]))
+      " {\"type\":\"OfMerge\",\"value\":[11,12]} "
   -- CR 602.
   Spec.it s "OfAbility" $
     Common.assertCodec

@@ -289,6 +289,7 @@ createCard pid printingId = do
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -428,7 +429,7 @@ newGame perform matchup = do
 -- answers the advanced supply. Every other object is passed through untouched.
 --
 -- Read through Game.componentsOf, a classifier over Source and never a case on
--- Source.OfMeld, so CR 730.3's merged permanent (#874) arrives through the same
+-- Source.OfMeld, so CR 730.3's merged permanent arrives through the same
 -- door -- the posture Event.changeZoneAttaching's CR 712.21 split already takes.
 --
 -- No zone conjunct where that split carries one: this is not a zone change but

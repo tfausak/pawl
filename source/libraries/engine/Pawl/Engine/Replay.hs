@@ -31,6 +31,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Program as Program
@@ -104,6 +105,7 @@ encode p answer = case p of
   Prompt.Search {} -> Response.Searched answer
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
+  Prompt.ChooseMutateSide {} -> Response.ChoseMutateSide answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ChooseKicker {} -> Response.AnnouncedKicker answer
   Prompt.ChooseBuyback {} -> Response.AnnouncedBuyback answer
@@ -490,6 +492,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseReducedCost {} -> case response of
     Response.ChoseReducedCost total_ -> Just total_
+    _ -> Nothing
+  Prompt.ChooseMutateSide {} -> case response of
+    Response.ChoseMutateSide side -> Just side
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -929,6 +934,9 @@ defaultAnswer p = case p of
   -- the head is both deterministic and the one that can never strand a payment a
   -- costlier order would have made unpayable.
   Prompt.ChooseReducedCost _ _ _ offers -> NonEmpty.head offers
+  -- CR 702.140c: a two-way choice with no decline, so a short transcript takes
+  -- the side the rule names first.
+  Prompt.ChooseMutateSide {} -> MutateSide.Over
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.

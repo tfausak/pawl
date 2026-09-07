@@ -162,6 +162,10 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   -- CR 712.8g: the combined back face, which is the printing every
   -- characteristic read of a melded permanent resolves through.
   Just (Source.OfMeld meld) -> printingOf (MeldSource.result meld) gs
+  -- CR 730.2a: "a merged permanent has only the characteristics of its topmost
+  -- component", so the head of the component list is the printing every
+  -- characteristic read of a merged permanent resolves through.
+  Just (Source.OfMerge components) -> printingOf (NonEmpty.head components) gs
   Just (Source.OfToken pid) -> printingOf pid gs
   Just (Source.OfAbility _) -> Nothing
   Just (Source.OfTrigger _) -> Nothing
@@ -439,6 +443,11 @@ cardOfSource gs mSource = case mSource of
     -- and every reader past this point needs to know nothing about melding. The
     -- components are read by `componentsOf` below and by nothing else.
     Source.OfMeld meld -> cardOfPrinting (MeldSource.result meld) gs
+    -- CR 730.2a: the topmost component, which is the head of the list, and every
+    -- reader past this point needs to know nothing about merging. The rest are
+    -- read by `componentsOf` below and -- for CR 702.140e's added abilities --
+    -- by Pawl.Engine.Projection.View.withMergedAbilities.
+    Source.OfMerge components -> cardOfPrinting (NonEmpty.head components) gs
     Source.OfToken pid -> cardOfPrinting pid gs
     Source.OfAbility _ -> Nothing
     Source.OfTrigger _ -> Nothing
@@ -465,8 +474,8 @@ cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
 -- 712.21d almost word for word -- one permanent leaves and each component is put
 -- into the appropriate zone, the owner arranges them, the exiler fixes their
 -- relative timestamp order, an effect that finds the new object finds all of
--- them, and one replacement effect applies to all of them -- so mutate (#874)
--- extends this one function rather than the rules that read it. Each series then
+-- them, and one replacement effect applies to all of them -- so mutate extends
+-- this one function rather than the rules that read it. Each series then
 -- ends on a sentence the other has no counterpart for: CR 712.21e counts a
 -- melded permanent as one object but two cards, and CR 730.3e is about a merged
 -- permanent's token components. CR 202.3c and CR 701.27g read this too.
@@ -477,6 +486,9 @@ cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
 componentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
 componentsOf source = case source of
   Source.OfMeld meld -> Seq.fromList (NonEmpty.toList (MeldSource.components meld))
+  -- CR 730.2, in top-to-bottom order, which is the order CR 730.3a's arrangement
+  -- prompt offers and CR 702.140e's ability fold reads.
+  Source.OfMerge components -> Seq.fromList (NonEmpty.toList components)
   Source.OfCard _ -> Seq.empty
   Source.OfToken _ -> Seq.empty
   Source.OfAbility _ -> Seq.empty
@@ -729,7 +741,7 @@ faceUpFaceOf oid gs = do
 manaCostFacesOf :: ObjectId -> GameState -> Seq.Seq (Face Card)
 manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just (Facing.FaceDown state) -> Seq.singleton (Card.faceDownFace (FaceDownState.listed state))
-  _ -> case fmap (componentsOf . Object.source) (lookupObject oid gs) of
+  _ -> case fmap (meldComponentsOf . Object.source) (lookupObject oid gs) of
     -- CR 202.3c: each COMPONENT's front face, and never the combined face the
     -- rest of the object's characteristics come off (CR 712.8g) -- that face
     -- prints no mana cost of its own, and CR 202.3a's exception for a melded
@@ -739,6 +751,28 @@ manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
       printing <- printingOfObject oid gs
       let card = Printing.card printing
       Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
+
+-- `componentsOf` NARROWED to CR 202.3c's own subject, which is a melded
+-- permanent and nothing else: rule 202.3c is an exception to CR 202.3, and CR
+-- 730.2a states no such exception -- a merged permanent's mana value is its
+-- topmost component's like its every other characteristic. So the two readers of
+-- rule 202.3c -- `manaCostFacesOf` above and Pawl.Engine.Event.copiedSnapshot's
+-- zeroing -- take this one, where CR 712.21's and CR 730.3's shared departure
+-- takes `componentsOf`.
+--
+-- A SECOND classifier over Source rather than a Bool beside the first, so that
+-- neither reader has to case on OfMeld itself; both quantify over printings.
+meldComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
+meldComponentsOf source = case source of
+  Source.OfMeld meld -> Seq.fromList (NonEmpty.toList (MeldSource.components meld))
+  Source.OfMerge _ -> Seq.empty
+  Source.OfCard _ -> Seq.empty
+  Source.OfToken _ -> Seq.empty
+  Source.OfAbility _ -> Seq.empty
+  Source.OfTrigger _ -> Seq.empty
+  Source.OfEmblem _ -> Seq.empty
+  Source.OfSpellCopy _ -> Seq.empty
+  Source.OfInherentTrigger _ -> Seq.empty
 
 -- CR 202.3c's "the front faces of each card that represents it", one card at a
 -- time. Empty rather than an error for a printing the game does not know, the
@@ -949,6 +983,9 @@ isSpell oid gs = case lookupObject oid gs of
       -- CR 701.42a puts a melded permanent onto the BATTLEFIELD, so it is never a
       -- card on the stack; the zone conjunct above already answers False for it.
       Source.OfMeld _ -> False
+      -- CR 730.2 merges an object INTO a permanent, so a merged permanent is
+      -- never on the stack either; the zone conjunct answers False for it too.
+      Source.OfMerge _ -> False
       Source.OfToken _ -> False
       Source.OfAbility _ -> False
       Source.OfTrigger _ -> False
@@ -981,6 +1018,7 @@ isAbility oid gs = case lookupObject oid gs of
     Object.zone obj == Zone.Stack && case Object.source obj of
       Source.OfCard _ -> False
       Source.OfMeld _ -> False
+      Source.OfMerge _ -> False
       Source.OfToken _ -> False
       Source.OfAbility _ -> True
       Source.OfTrigger _ -> True
@@ -1012,6 +1050,7 @@ isActivatedAbility oid gs = case lookupObject oid gs of
       Source.OfInherentTrigger _ -> False
       Source.OfCard _ -> False
       Source.OfMeld _ -> False
+      Source.OfMerge _ -> False
       Source.OfToken _ -> False
       Source.OfEmblem _ -> False
       Source.OfSpellCopy _ -> False
@@ -1027,6 +1066,7 @@ isEmblem oid gs = case lookupObject oid gs of
     Source.OfEmblem _ -> True
     Source.OfCard _ -> False
     Source.OfMeld _ -> False
+    Source.OfMerge _ -> False
     Source.OfToken _ -> False
     Source.OfAbility _ -> False
     Source.OfTrigger _ -> False
@@ -1049,6 +1089,7 @@ abilitySourceOf oid gs = case lookupObject oid gs of
         Source.OfInherentTrigger _ -> Nothing
         Source.OfCard _ -> Nothing
         Source.OfMeld _ -> Nothing
+        Source.OfMerge _ -> Nothing
         Source.OfToken _ -> Nothing
         Source.OfEmblem _ -> Nothing
         Source.OfSpellCopy _ -> Nothing
@@ -1078,6 +1119,12 @@ sourceIsToken source = case source of
   -- CR 108.2 / 108.2b: both cards representing a melded permanent are Magic
   -- cards, and CR 701.42b keeps a token out of a meld pair in the first place.
   Source.OfMeld _ -> False
+  -- CR 730.2d: "if a merged permanent contains a token, the resulting permanent
+  -- is a token only if the topmost component is a token". Nothing in the pool
+  -- can put a token in a component list -- Pawl.Engine.Event.merge refuses a
+  -- token target -- so the answer is False for every merged permanent pawl can
+  -- build (#874).
+  Source.OfMerge _ -> False
   Source.OfAbility _ -> False
   Source.OfTrigger _ -> False
   Source.OfEmblem _ -> False
@@ -1196,6 +1243,7 @@ castOf event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -1272,6 +1320,7 @@ discardOf event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -1353,6 +1402,7 @@ enteredBattlefieldChange event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -1449,6 +1499,7 @@ damageDealt event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -1593,6 +1644,7 @@ lifeGainOf event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing

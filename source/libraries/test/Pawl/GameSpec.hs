@@ -207,6 +207,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.designations = Set.empty,
               Object.kicked = Map.empty,
               Object.bestowed = False,
+              Object.mutating = False,
               Object.prototyped = False,
               Object.boughtBack = False,
               Object.phyrexianLifePaid = 0,
@@ -2356,6 +2357,7 @@ handBobBolt lightningBolt gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -2379,6 +2381,9 @@ namedIs wanted gs mo =
           -- CR 712.8g: the combined back face is where a melded permanent's name
           -- comes from, so the result printing answers.
           Source.OfMeld meld -> named (MeldSource.result meld)
+          -- CR 730.2a: the topmost component is where a merged permanent's name
+          -- comes from, so the head of the list answers.
+          Source.OfMerge components -> named (NonEmpty.head components)
           Source.OfToken printingId -> named printingId
           Source.OfAbility _ -> False
           Source.OfTrigger _ -> False
@@ -2788,6 +2793,7 @@ restartOnStack mountain =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,

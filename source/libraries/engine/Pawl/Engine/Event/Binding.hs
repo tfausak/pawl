@@ -1411,6 +1411,7 @@ eventBindingSlots cond = case cond of
   -- the bearer -- Renegade Krasis says "this creature", so there is no "it" to
   -- bind that Binding.triggerSource does not already answer.
   TriggerCondition.SelfEvolves -> Set.empty
+  TriggerCondition.SelfMutates -> Set.empty
   -- NOT empty, unlike SelfEvolves above, and the pair CR 702.134c names is why:
   -- neither the mentor nor the mentored creature is the bearer, so Aegis of the
   -- Legion's "that creature" has no other name to be read under. Guaranteed given a

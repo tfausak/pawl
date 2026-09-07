@@ -1454,6 +1454,7 @@ handAppend printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,

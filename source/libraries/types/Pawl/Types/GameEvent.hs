@@ -287,6 +287,11 @@ data GameEvent
     -- placement records: that one says +1/+1 counters arrived, this one says the
     -- evolve ability put them.
     Evolved ObjectId.ObjectId
+  | -- | CR 702.140d / 730.2: a creature MUTATED -- a mutating creature spell
+    -- merged with it (CR 702.140c), naming the merged permanent. ONE id,
+    -- Evolved's shape above: CR 730.2b keeps the permanent the same object, so
+    -- the spell that merged into it has no id of its own left to name.
+    Mutated ObjectId.ObjectId
   | -- | CR 702.134c: a creature MENTORED another. TWO ids, in the rule's own
     -- order, the second not being derivable from the first since CR 603.3d
     -- chooses rule 702.134a's target. Emitted on the ability RESOLVING and gated

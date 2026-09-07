@@ -986,6 +986,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Station
       " {\"type\":\"Station\"} "
+  -- CR 702.140a's payload is a whole Cost, and it must not share Bestow's tag:
+  -- both name an alternative cost that rewrites the spell, and only the tag
+  -- tells CR 702.103b's Aura from rule 702.140c's merge.
+  Spec.it s "Mutate carries its cost, and is not Bestow" $ do
+    let mutate n = Keyword.Mutate (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        bestowOf n = Keyword.Bestow (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (mutate 4)
+      " {\"type\":\"Mutate\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (mutate 4) /= Codec.encode Keyword.codec (bestowOf 4)) "the same cost under two keywords encodes differently"
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
 
