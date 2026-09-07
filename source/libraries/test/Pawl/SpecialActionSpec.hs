@@ -86,7 +86,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
 
 -- bob's turn with a spell on the stack, alice holding the Vultures, a Doomed
@@ -1009,6 +1012,31 @@ soleExileOf gs = case Set.toList (GameState.exile gs) of
   [oid] -> Just oid
   _ -> Nothing
 
+-- The intervening "if" of the triggered ability on top of the stack, asked the
+-- way Pawl.Engine.Stack's CR 608.2a arm asks it. Nothing when the top is not a
+-- triggered ability or states no condition -- which the caller asserts against,
+-- so a board that stopped holding one cannot pass by answering neither.
+interveningOfTop :: GameState.GameState -> Maybe Bool
+interveningOfTop gs = case GameState.stack gs of
+  [] -> Nothing
+  oid : _ -> do
+    obj <- Game.lookupObject oid gs
+    case Object.source obj of
+      Source.OfTrigger borne -> do
+        cond <- TriggeredAbility.intervening (TriggeredAbilitySource.ability borne)
+        pure (Stack.interveningStillHolds gs obj (TriggeredAbilitySource.source borne) cond)
+      _ -> Nothing
+
+-- Aims Pull from Eternity at the one exiled card, PICKED OUT OF THE OFFERED SET
+-- rather than built, suspendAnswer's reason (CR 608.2b).
+pullAt :: Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
+pullAt exiled p = case p of
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.map
+      (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (\r -> Recipient.objectOf r == exiled) (Set.toList recipients)))
+      slots
+  _ -> S.identityAnswer p
+
 suspending :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 suspending s registry = Spec.describe s "CR 116.2f Rift Bolt" $ do
   -- CR 116.2f's window is the CARD'S OWN CASTABILITY -- "only if they could
@@ -1088,6 +1116,50 @@ suspending s registry = Spec.describe s "CR 116.2f Rift Bolt" $ do
         after = runUntil (suspendAnswer boltId) stop drained
     Spec.assertEqWith s "bob takes nothing: no counter to remove, so nothing watches its removal" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and the Bolt is still sitting in exile" (length (GameState.exile after)) 1
+  -- CR 702.62a's "if it's exiled" is CR 603.4's intervening "if": it immediately
+  -- follows the trigger condition, so CR 608.2a re-checks it as the ability
+  -- resolves. The pair is one board where the suspended card is still in exile
+  -- when the free-play ability resolves and one where bob's Pull from Eternity
+  -- has put it in alice's graveyard first -- same suspend, same counter removal,
+  -- same ability on the stack.
+  --
+  -- ASSERTED ON THE ABILITY'S FATE and not on the board, because the two
+  -- readings agree on today's board by accident of CR 400.7: the id the trigger
+  -- bound is deleted as the card leaves exile, so
+  -- Pawl.Engine.Resolve.Effect.offerCast would find no object to offer and cast
+  -- nothing even with no condition to fail. Pawl.Engine.Stack.interveningStillHolds
+  -- is the resolution's own question, asked here directly.
+  Spec.it s "CR 603.4 the free play is removed if the card has left exile by the time it resolves" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    bolt <- S.printingOf s registry "Rift Bolt"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    pull <- S.printingOf s registry "Pull from Eternity"
+    let (boltId, _, gs) = riftBoltBoard mountain bolt traveler
+        (pullId, withPull) = S.addHandCard pull S.bob (S.landsFor plains S.bob 1 gs)
+        suspended = snd (Engine.runGamePure (suspendAnswer boltId) withPull Engine.priorityLoop)
+        -- The countdown's own removal, driven through the funnel rather than
+        -- through two turns of upkeeps: what this case is about is the window
+        -- between the ability being placed and its resolution, and CR 702.62a's
+        -- second ability has its own case above.
+        placed = case soleExileOf suspended of
+          Nothing -> suspended
+          Just exiledId -> S.runPure S.identityAnswer suspended (Event.removeCounters exiledId CounterKind.Time 1 >> Engine.settleForPriority)
+        -- bob's response, the one thing that differs: the exiled card goes to
+        -- alice's graveyard while the ability waits on the stack.
+        pulled = S.runPure (pullAt (soleExileOf placed)) placed (S.cast S.bob pullId >> Stack.resolveTop)
+    Spec.assertBool s (Maybe.isJust (soleExileOf suspended)) "the Bolt was suspended, so the cases below are about a card in exile"
+    Spec.assertEqWith s "the free-play ability is on the stack" (length (GameState.stack placed)) 1
+    Spec.assertBool s (Maybe.isJust (soleExileOf placed)) "with the Bolt still exiled while it waits"
+    Spec.assertEqWith s "and bob's Pull from Eternity takes it out of exile" (length (GameState.exile pulled)) 0
+    -- ONE assertion carrying both readings, so an ability that stopped stating a
+    -- condition at all cannot pass by answering neither: Nothing is a failure
+    -- here where two separate `forM_`s would have skipped silently.
+    Spec.assertEqWith
+      s
+      "CR 608.2a still exiled the ability resolves, and CR 603.4 pulled out of exile it is removed instead"
+      (interveningOfTop placed, interveningOfTop pulled)
+      (Just True, Just False)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
