@@ -241,12 +241,18 @@ flashOn oid face gs =
 -- 601.2c will judge exists only on the board that announcement produces
 -- (`proposedFor`). Read printed, a bestow candidate is fillable on a board with
 -- no creature at all and CR 601.2e then takes the whole cast back; see #2911.
+--
+-- CR 702.140a's mutate slot rides beside it and for the same reason: rule
+-- 702.140a's spell "targets a non-Human creature", so a mutate candidate is
+-- announceable only where such a creature is, and the slot exists only on the
+-- board that announcement produces (`proposedFor` again).
 targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
     let modal = Face.spell face
-     in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) modal gs) (Modal.Type.selection modal)
+        given = Map.union (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) (Card.mutateSlotMapGiven (maybe False Object.mutating (Game.lookupObject oid gs)))
+     in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid given modal gs) (Modal.Type.selection modal)
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -359,7 +365,9 @@ castAimable pid oid gs = case Game.faceOf oid gs of
   Nothing -> []
   Just face ->
     let modal = Face.spell face
-        enchant = Card.enchantSlotMapGiven (Projection.enchantOf oid gs)
+        -- CR 702.140a's slot beside CR 303.4a's, `targetable` above's union: a
+        -- mutating creature spell aims at the creature it will merge with.
+        enchant = Map.union (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) (Card.mutateSlotMapGiven (maybe False Object.mutating (Game.lookupObject oid gs)))
         slotsOf mi = Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal)
         objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
         setsOf slots = Target.legalSets (Just pid) True Map.empty oid slots gs
@@ -641,12 +649,36 @@ stampCastFrom sid castFrom gs =
         Map.adjust (\o -> o {Object.castFrom = castFrom}) sid (GameState.objects gs)
     }
 
+-- CR 702.140a: "if you do, it becomes a mutating creature spell and targets a
+-- non-Human creature with the same owner as this spell". The record of that
+-- announcement, stamped at the moment CR 601.2b settles on the candidate rule
+-- 702.140a offers, and read by Pawl.Engine.Card.mutateSlotMapGiven at CR
+-- 601.2c's target choice, at CR 608.2b's re-check and at CR 702.140b/702.140c's
+-- fork in Pawl.Engine.Stack.
+--
+-- stampBestowed's shape above in every respect: an idempotent write of a field
+-- no layer computes, one direction only, rule 702.140a's choice being available
+-- while casting and never after.
+stampMutating :: ObjectId -> GameState -> GameState
+stampMutating sid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.mutating = True}) sid (GameState.objects gs)
+    }
+
 -- CR 702.103a: was this the bestow candidate? Asked of the keyword that offered
 -- the cost CR 601.2b's announcement settled on (Cast.castProposed's `castFor`),
 -- which is the record Pawl.Types.CandidateCost exists to keep.
 castBestowed :: Maybe Keyword -> Bool
 castBestowed castFor = case castFor of
   Just (Keyword.Type.Bestow _) -> True
+  _ -> False
+
+-- CR 702.140a, castBestowed's twin: was this the mutate candidate? Asked of the
+-- same `castFor` tag.
+castMutating :: Maybe Keyword -> Bool
+castMutating castFor = case castFor of
+  Just (Keyword.Type.Mutate _) -> True
   _ -> False
 
 -- CR 718.3, castBestowed's twin: was this the prototype candidate? Asked of the
@@ -678,7 +710,12 @@ castPrototyped castFor = case castFor of
 proposedFor :: ObjectId -> Maybe Keyword -> GameState -> GameState
 proposedFor oid castFor gs =
   let bestowedGs = if castBestowed castFor then stampBestowed oid gs else gs
-   in if castPrototyped castFor then stampPrototyped oid bestowedGs else bestowedGs
+      -- CR 702.140a's stamp joins the fold for the TARGET gate rather than for a
+      -- characteristic: `targetable` reads it to decide whether rule 702.140a's
+      -- target can be chosen at all, which CR 601.2e would otherwise take the
+      -- whole cast back for.
+      mutatingGs = if castMutating castFor then stampMutating oid bestowedGs else bestowedGs
+   in if castPrototyped castFor then stampPrototyped oid mutatingGs else mutatingGs
 
 -- CR 601.3a asked of ONE candidate, through the board rule 702.103d says to judge
 -- it on: Aether Storm's "creature spells can't be cast" stops Nyxborn Rollicker's
@@ -2080,6 +2117,11 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- colours of that cost. Stamped beside the bestow record above and
               -- for its reason: CR 601.2c's targets and CR 601.2f's pricing below
               -- both have to read the spell as rule 718.3b left it.
+              -- CR 702.140a: the announcement has settled on the mutate
+              -- candidate, so the spell is a mutating creature spell and targets
+              -- -- BEFORE CR 601.2c's targets below, which is the only place
+              -- that target can be chosen.
+              Monad.when (castMutating castFor) (State.modify' (stampMutating sid))
               Monad.when (castPrototyped castFor) (State.modify' (stampPrototyped sid))
               -- Re-read, because `gs` above predates the stamp and both CR 601.2c
               -- and CR 601.2f have to be judged on the spell as rule 702.103b
@@ -2089,7 +2131,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- filter one step up, which runs before the stamp exists, stamps a
               -- copy of its own per candidate (proposedFor).
               bestowedGs <- State.get
-              let slots = Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) chosenModes face
+              let slots = Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes face
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
                   -- greatest toughness among creatures you control". Read HERE

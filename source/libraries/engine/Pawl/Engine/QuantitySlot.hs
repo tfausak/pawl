@@ -130,6 +130,8 @@ overSlots f quantity = case quantity of
   -- The designation, which carries no reference either -- ObjectCounters' position,
   -- with which designation in the kind's place.
   Quantity.HasDesignation _ -> pure quantity
+  -- CR 701.37c's number, HasDesignation's arm above with the same payload.
+  Quantity.DesignationValue _ -> pure quantity
   Quantity.ClassLevel -> pure quantity
   Quantity.WasKicked -> pure quantity
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
@@ -275,6 +277,7 @@ nestedRefs quantity = case quantity of
   Quantity.ObjectCounters _ -> Set.empty
   Quantity.ObjectCountersOfAnyKind -> Set.empty
   Quantity.HasDesignation _ -> Set.empty
+  Quantity.DesignationValue _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it
@@ -354,6 +357,7 @@ nestedCounts quantity = case quantity of
   Quantity.IsStartingPlayer _ -> []
   Quantity.IsActivePlayer _ -> []
   Quantity.HasDesignation _ -> []
+  Quantity.DesignationValue _ -> []
   Quantity.ClassLevel -> []
   Quantity.WasKicked -> []
   -- CR 702.33d's per-cost tally reads a Cost off the spell's own announcement,
@@ -523,6 +527,7 @@ mapPlayerRefs f intoCount quantity = case quantity of
   Quantity.ObjectCounters _ -> quantity
   Quantity.ObjectCountersOfAnyKind -> quantity
   Quantity.HasDesignation _ -> quantity
+  Quantity.DesignationValue _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it

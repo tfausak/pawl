@@ -86,8 +86,10 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.classLevel = Nothing,
           Object.unlockedHalves = Set.empty,
           Object.designations = Set.empty,
+          Object.designationValues = Map.empty,
           Object.kicked = Map.empty,
           Object.bestowed = False,
+          Object.mutating = False,
           Object.prototyped = False,
           Object.boughtBack = False,
           Object.phyrexianLifePaid = 0,
@@ -178,11 +180,13 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.classLevel = Just (ClassLevel.MkClassLevel 2),
           Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Fire")),
           Object.designations = Set.singleton Designation.Renowned,
+          Object.designationValues = Map.singleton Designation.Monstrous 26,
           Object.kicked =
             Map.singleton
               Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []}
               25,
           Object.bestowed = True,
+          Object.mutating = True,
           Object.prototyped = True,
           Object.boughtBack = True,
           Object.phyrexianLifePaid = 19,
@@ -224,8 +228,10 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"ringBearerFor\":16,\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
+          <> ",\"designationValues\":[{\"designation\":{\"type\":\"Monstrous\"},\"value\":26}]"
           <> ",\"kicked\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]},\"times\":25}]"
           <> ",\"bestowed\":true"
+          <> ",\"mutating\":true"
           <> ",\"prototyped\":true"
           <> ",\"boughtBack\":true"
           <> ",\"phyrexianLifePaid\":19"

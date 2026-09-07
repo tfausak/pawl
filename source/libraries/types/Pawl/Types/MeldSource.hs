@@ -26,8 +26,8 @@ import qualified Pawl.Types.PrintingId as PrintingId
 -- NonEmpty rather than a pair: CR 701.42a says "two cards" of a meld pair, but
 -- nothing in rule 701.42 or rule 712.4 fixes the count for the readers above,
 -- which all quantify over "each card that represents it". Pawl.Engine.Game's
--- componentsOf is the shared reader, and CR 730.3's merged permanents will
--- answer it the same way.
+-- componentsOf is the shared reader, and CR 730.3's merged permanents answer it
+-- the same way (Pawl.Types.Source's OfMerge arm).
 --
 -- A record rather than positional fields, for Pawl.Types.ActivatedAbilitySource's
 -- reason: which printing is which cannot be got wrong at a construction site,

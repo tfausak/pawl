@@ -444,6 +444,12 @@ data Keyword
     -- CR 702.184c's substitution of another characteristic is
     -- Quantity.StationMeasure's own arm, not a payload here.
     Station
+  | -- | 702.140a: "mutate [cost]" -- "you may pay [cost] rather than pay this
+    -- spell's mana cost. If you do, it becomes a mutating creature spell and
+    -- targets a non-Human creature with the same owner as this spell". The
+    -- target slot and CR 730's merge are minted from this constructor rather
+    -- than printed.
+    Mutate (Cost.Cost Keyword)
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

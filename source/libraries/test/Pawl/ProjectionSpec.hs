@@ -299,6 +299,7 @@ humilityTimestamp humility gs =
         Just obj -> case Object.source obj of
           Source.OfCard p -> Game.cardOfPrinting p gs == Just (Printing.card humility)
           Source.OfMeld _ -> False
+          Source.OfMerge _ -> False
           Source.OfToken _ -> False
           Source.OfAbility _ -> False
           Source.OfTrigger _ -> False

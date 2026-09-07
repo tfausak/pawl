@@ -211,6 +211,9 @@ candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
     -- CR 701.42a puts a melded permanent onto the battlefield rather than onto
     -- the stack, so it is never announced and there is no cost to offer for it.
     Source.OfMeld _ -> []
+    -- CR 730.2 merges an object into a permanent on the battlefield, so a merged
+    -- permanent is never announced either.
+    Source.OfMerge _ -> []
     Source.OfToken _ -> []
     Source.OfAbility _ -> []
     Source.OfTrigger _ -> []
@@ -297,6 +300,24 @@ candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
               fmap
                 (\prototype -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Prototype prototype)) (withAdditional Cost.MkCost {Cost.mana = Just (Prototype.cost prototype), Cost.components = []}))
                 (Keyword.prototypes (Map.keysSet (Projection.keywordsOf oid gs)))
+            -- CR 702.140a: mutate, offered from EVERY zone for bestow's reason
+            -- -- rule 702.140a's static ability "functions while the spell with
+            -- mutate is on the stack", which CR 113.6e reaches from wherever the
+            -- cast begins -- so it joins the zone's own list rather than
+            -- replacing it, and LAST, so `firstOffered` still reads the printed
+            -- cost.
+            --
+            -- CR 118.9d wraps it in `withAdditional` for flashback's reason, and
+            -- rule 702.140a says the same in its own words: "casting a spell
+            -- using its mutate ability follows the rules for paying alternative
+            -- costs".
+            --
+            -- The keywords are read off the PROJECTION, bestow's read and for
+            -- rule 613.1's reason.
+            mutated =
+              fmap
+                (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
+                (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
             -- CR 702.162a: more than meets the eye, read from EVERY zone for
             -- bestow's reason -- "a static ability that functions in any zone from
             -- which the spell may be cast".
@@ -335,7 +356,7 @@ candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
             -- not permit; a printing whose back face had a mana cost would be the
             -- card that told the two apart.
             orConverted zoneCandidates = if null converted then zoneCandidates else converted
-         in (<> (bestowed <> prototyped)) . orConverted $ case Object.zone obj of
+         in (<> (bestowed <> prototyped <> mutated)) . orConverted $ case Object.zone obj of
               -- Four shapes, differing in what they do to the printed cost.
               -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
               -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it

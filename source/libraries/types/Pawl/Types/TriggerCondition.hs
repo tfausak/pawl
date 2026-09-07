@@ -363,6 +363,11 @@ data TriggerCondition
     PermanentBecomesDesignated PermanentBecomesDesignated.PermanentBecomesDesignated
   | -- | CR 702.100b: the bearer evolved (Renegade Krasis). Self-scoped.
     SelfEvolves
+  | -- | CR 702.140d: "whenever this creature mutates" (Cubwarden), which rule
+    -- 702.140d fires when a mutating creature spell merges with it. Self-scoped,
+    -- SelfEvolves' shape: the merged permanent is the only object the event
+    -- names.
+    SelfMutates
   | -- | CR 702.134c: the creature the bearer is attached to mentored another
     -- (Aegis of the Legion). Attachment-scoped, so vacuously False while
     -- attached to nothing or to a player (CR 303.4).

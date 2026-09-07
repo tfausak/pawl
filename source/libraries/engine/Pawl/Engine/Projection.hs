@@ -2780,6 +2780,7 @@ quantityReads q = case q of
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.ObjectCountersOfAnyKind -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
+  Quantity.Type.DesignationValue _ -> Set.empty
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.TimesKickedWith _ -> Set.empty
@@ -3797,6 +3798,13 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
 -- copiableMintsType, anyCopiableKeyword and staticAbilitiesOf -- so a copy
 -- answers off the text it copied rather than the copier's (CR 707.2), which is
 -- what Pawl.CopySpec's copiedAbilitySpec proves a disjunct at a time.
+--
+-- CR 730.2a's MERGE is inside that same copy-awareness and needs no route of its
+-- own: Pawl.Engine.Event.merge stamps the merged copiable record where a copy
+-- effect stamps its snapshot (CR 613.2a puts the two in one sublayer), so all
+-- four readers see an under component's replacement effect. Pawl.MutateSpec's
+-- Corpsejack Menace case is what proves it; before #3371 the merge WAS an
+-- uncovered route, and this enumeration was false.
 --
 -- The two grantor disjuncts are asked of the BATTLEFIELD, which is not where
 -- every grant comes from, so the gate mirrors the REST of gatherGiven's arms

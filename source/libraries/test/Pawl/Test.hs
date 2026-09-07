@@ -526,6 +526,7 @@ import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MoveCounterSpec
 import qualified Pawl.MulliganSpec
+import qualified Pawl.MutateSpec
 import qualified Pawl.OmenSpec
 import qualified Pawl.OutsideTheGameSpec
 import qualified Pawl.PhasingSpec
@@ -1136,6 +1137,7 @@ spec s registry = do
   Pawl.MassEffectSpec.spec s registry
   Pawl.BoardEffectSpec.spec s registry
   Pawl.MeldSpec.spec s registry
+  Pawl.MutateSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry

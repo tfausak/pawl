@@ -538,13 +538,25 @@ data View = MkView
     -- Pawl.Engine.CombatRestriction.inForce hold no view and read the object
     -- directly.
     designations :: Set.Set Designation.Designation,
+    -- CR 701.37c: what value did each of this candidate's marks get set with?
+    -- Read straight off Object.designationValues, and empty where there is no
+    -- object to read it off, both for the reasons `designations` above gives. Its
+    -- one reader is Pawl.Engine.Quantity's DesignationValue arm, answering Hydra
+    -- Broodmaster's token count and the tokens' own printed box.
+    --
+    -- A number beside the Set rather than inside it, `classLevel` below's reason:
+    -- membership and the value are asked by different atoms, and only
+    -- "monstrosity X" sets one at all.
+    designationValues :: Map.Map Designation.Designation Natural.Natural,
     -- CR 716.2b: the level designation on this candidate, or Nothing for the
     -- overwhelming majority of permanents, which have never been given one. Read
     -- straight off Object.classLevel, for `designations` above's reason -- rule
     -- 716.2b makes it a designation rather than a characteristic, so no projection
     -- writes it -- and a Maybe rather than a member of that Set because it is a
     -- NUMBER, which is also why it needs its own field rather than a fifth
-    -- Pawl.Types.Designation constructor.
+    -- Pawl.Types.Designation constructor with a `designationValues` entry: CR
+    -- 716.2d gives an unlevelled permanent a level, where an unset mark has no
+    -- value (see Pawl.Types.Designation).
     --
     -- CR 716.2d's "treated as though its level is 1" is deliberately NOT applied
     -- here: this field reports the mark, and Pawl.Engine.Quantity's ClassLevel arm
@@ -779,6 +791,9 @@ playerView pid =
       -- CR 701.60b and CR 719.3b saying the same of the other marks, and a
       -- player is not one.
       designations = Set.empty,
+      -- CR 701.37c's X belongs to a mark a player cannot have -- `designations`
+      -- above, same sentence.
+      designationValues = Map.empty,
       -- CR 716.2b: a level is a designation A PERMANENT can have, and a player is
       -- not one -- `designations` above, same sentence.
       classLevel = Nothing,
@@ -1952,6 +1967,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.MoreThanMeetsTheEye cost -> Keyword.Type.MoreThanMeetsTheEye (rewriteCost pairs cost)
   -- CR 702.103a states its cost as part of the keyword too.
   Keyword.Type.Bestow cost -> Keyword.Type.Bestow (rewriteCost pairs cost)
+  Keyword.Type.Mutate cost -> Keyword.Type.Mutate (rewriteCost pairs cost)
   Keyword.Type.Fear -> keyword
   Keyword.Type.Intimidate -> keyword
   Keyword.Type.Morph (Morph.MkMorph cost variant) -> Keyword.Type.Morph (Morph.MkMorph (rewriteCost pairs cost) variant)

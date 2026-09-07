@@ -694,6 +694,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -845,8 +846,10 @@ placeBorne srcId pending = do
             Object.classLevel = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
+            Object.designationValues = Map.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,

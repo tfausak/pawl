@@ -365,6 +365,82 @@ arborColossusSpec s registry =
               Spec.assertBool s (not (S.onBattlefield maiden after)) "so its own trigger did fire"
               Spec.assertEqWith s "and the Wardens drew nothing" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
 
+-- CR 701.37c: "other abilities of that permanent may also refer to X", and the
+-- value of X in them "is equal to the value of X as that permanent became
+-- monstrous". Arbor Colossus above is the same rule with a printed N; this is the
+-- rule with an X the activation announced (CR 601.2b).
+--
+-- Hydra Broodmaster {4}{G}{G} 7/7 -- "{X}{X}{G}: Monstrosity X" and "When this
+-- creature becomes monstrous, create X X/X green Hydra creature tokens" -- reads
+-- the X back TWICE, for the token count and for the tokens' own box. Both are
+-- asserted, since a reading that re-announced X or counted the +1/+1 counters
+-- would get one of them right on its own.
+hydraBroodmasterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hydraBroodmasterSpec s registry =
+  let hydraToken = CardName.MkCardName (Text.pack "Hydra Token")
+      monstrousness oid gs = fmap (Set.member Designation.Monstrous . Object.designations) (Game.lookupObject oid gs)
+      -- CR 701.37c's record itself, read off the permanent rather than inferred
+      -- from what the trigger made.
+      recordedX oid gs = Game.lookupObject oid gs >>= Map.lookup Designation.Monstrous . Object.designationValues
+      plusOnes = S.counterOf CounterKind.PlusOnePlusOne
+      tokenSizes gs =
+        List.sort
+          [ S.powerToughnessOf oid gs
+          | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
+            fmap S.nameOf (Game.cardOf oid gs) == Just hydraToken
+          ]
+      -- CR 601.2b's announcement is the one question the activation asks.
+      announcing :: Natural -> Prompt.Prompt r -> r
+      announcing x p = case p of
+        Prompt.ChooseX {} -> x
+        _ -> S.identityAnswer p
+      -- One activation announcing `x`, its trigger settled onto the stack and
+      -- resolved -- Arbor Colossus' `monstrosity` above with a value to announce.
+      monstrosity x broodmaster gs = case Activate.abilitiesFor broodmaster gs of
+        [ability]
+          | Activate.activatable S.alice broodmaster ability gs ->
+              Right . snd . Engine.runGamePure (announcing x) gs $ do
+                Activate.activateAbility S.alice broodmaster ability
+                Stack.resolveTop
+                Engine.settleForPriority
+                Engine.priorityLoop
+        [_] -> Left 0
+        other -> Left (length other)
+      -- Twelve Forests: {2}{2}{G} for the X=2 activation and {3}{3}{G} for the
+      -- second one below, so the negative differs from the positive in the
+      -- designation alone and not in what alice can pay.
+      board = do
+        broodmasterPrinting <- S.printingOf s registry "Hydra Broodmaster"
+        forest <- S.printingOf s registry "Forest"
+        pure (S.addPermanent broodmasterPrinting S.alice (S.landsInPlay forest 12))
+   in Spec.describe s "Hydra Broodmaster" $ do
+        -- The proving test.
+        Spec.it s "CR 701.37c monstrosity 2 makes TWO 2/2 Hydras" $ do
+          (broodmaster, gs) <- board
+          Spec.assertEqWith s "no Hydra token to begin with" (tokenSizes gs) []
+          case monstrosity 2 broodmaster gs of
+            Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
+            Right after -> do
+              Spec.assertEqWith s "two tokens, each a 2/2: the announced X is both the count and the box" (tokenSizes after) [Just (2, 2), Just (2, 2)]
+              Spec.assertEqWith s "two +1/+1 counters, so the counters read the same X" (plusOnes broodmaster after) 2
+              Spec.assertEqWith s "which makes the Broodmaster a 9/9" (S.powerToughnessOf broodmaster after) (Just (9, 9))
+              Spec.assertEqWith s "and it is monstrous" (monstrousness broodmaster after) (Just True)
+              Spec.assertEqWith s "with 2 recorded as the X it became monstrous with" (recordedX broodmaster after) (Just 2)
+        -- CR 701.37a's "if this permanent isn't monstrous" and CR 701.37b's "it
+        -- stays monstrous": the second activation announces a DIFFERENT X, pays
+        -- for it, and does nothing -- so no trigger, no tokens, and the recorded
+        -- value stays the first one rather than being overwritten.
+        Spec.it s "CR 701.37b a second monstrosity announcing 3 makes nothing and leaves the recorded X at 2" $ do
+          (broodmaster, gs) <- board
+          case monstrosity 2 broodmaster gs of
+            Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
+            Right once -> case monstrosity 3 broodmaster once of
+              Left n -> Spec.assertFailure s ("expected the monstrous Broodmaster to stay activatable, got " <> show n)
+              Right twice -> do
+                Spec.assertEqWith s "still the two 2/2 Hydras, no 3/3s" (tokenSizes twice) [Just (2, 2), Just (2, 2)]
+                Spec.assertEqWith s "still two +1/+1 counters, not five" (plusOnes broodmaster twice) 2
+                Spec.assertEqWith s "and the recorded X is unchanged" (recordedX broodmaster twice) (Just 2)
+
 -- CR 702.63 vanishing, which rule 702 states as triggered
 -- abilities -- and the first whose rule text spans BOTH mints, since rule
 -- 702.63a's three abilities are one CR 614.1c entry replacement
@@ -2068,6 +2144,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   flankingSpec s registry
   renownSpec s registry
   arborColossusSpec s registry
+  hydraBroodmasterSpec s registry
   vanishingSpec s registry
   numberlessVanishingSpec s registry
   fadingSpec s registry

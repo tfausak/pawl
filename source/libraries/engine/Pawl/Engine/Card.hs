@@ -1548,7 +1548,7 @@ chosenModes chosen face = Modal.chosenModes chosen (Face.spell face)
 -- the card's enchant slot (CR 303.4a) if it has one. Only these slots are
 -- prompted at cast and re-validated at CR 608.2b.
 modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSlot
-modesTargetSlots chosen face = modesTargetSlotsGiven (Face.enchant face) chosen face
+modesTargetSlots chosen face = modesTargetSlotsGiven (Face.enchant face) False chosen face
 
 -- modesTargetSlots with the enchant INSTANCES handed in rather than read off the
 -- printed face -- what an object's projection holds (CR 613.1f), which is where a
@@ -1559,8 +1559,21 @@ modesTargetSlots chosen face = modesTargetSlotsGiven (Face.enchant face) chosen 
 -- rather than on the empty printed list. modesTargetSlots above is the same
 -- function fed the printed instances, which is what a caller holding only a face
 -- can supply.
-modesTargetSlotsGiven :: [TargetSlot] -> Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSlot
-modesTargetSlotsGiven enchants chosen face = Map.union (enchantSlotMapGiven enchants) (Modal.modesTargetSlots chosen (Face.spell face))
+--
+-- The MUTATING flag rides beside the enchant instances for the same reason and
+-- reaches the same two callers: CR 702.140a's target is the spell's only if CR
+-- 601.2b's announcement settled on the mutate candidate, and both CR 601.2c's
+-- prompt and CR 608.2b's re-check have to read it. Two keywords add a slot to a
+-- spell this way and no card carries both -- CR 702.103b's bestow is on
+-- enchantment creature cards and rule 702.140a's mutate is on creature cards --
+-- so the union needs no order between them.
+modesTargetSlotsGiven :: [TargetSlot] -> Bool -> Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSlot
+modesTargetSlotsGiven enchants mutating chosen face =
+  Map.unions
+    [ enchantSlotMapGiven enchants,
+      mutateSlotMapGiven mutating,
+      Modal.modesTargetSlots chosen (Face.spell face)
+    ]
 
 isLand :: Face.Face Card.Card -> Bool
 isLand f = Set.member CardType.Land (TypeLine.types (Face.typeLine f))
@@ -1649,6 +1662,28 @@ isOmen f = Set.member Subtype.Omen (TypeLine.subtypes (Face.typeLine f))
 -- declares this name, which is what makes the merge above collision-free.
 enchantSlot :: SlotName
 enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
+
+-- CR 702.140a: the slot a mutating creature spell's required target is bound
+-- under, enchantSlot's shape above and for its reasons -- a genuine target in
+-- the ordinary namespace, held collision-free by the same CardSpec lint that no
+-- mode declares this name. Pawl.CardSpec's "the lint itself catches two modes
+-- declaring one slot name" is where that lint is held to it, on a spell mode
+-- misauthored onto this very name.
+mutateSlot :: SlotName
+mutateSlot = SlotName.MkSlotName (Text.pack "mutate")
+
+-- CR 702.140a's target slot as a one-entry map, empty unless CR 601.2b's
+-- announcement settled on the mutate candidate (Pawl.Engine.Cast.stampMutating,
+-- read here as Object.mutating). enchantSlotMapGiven's shape one keyword over:
+-- the Bool is the projected reading the two gates that ask per candidate take,
+-- and a spell that is not a mutating creature spell contributes no slot.
+--
+-- ONE slot however many mutate abilities the face prints, rule 702.140a giving
+-- a mutating creature spell a single target; the slot itself is the rule's own
+-- (Pawl.Engine.Keyword.mutateTarget) rather than any instance's, so there is
+-- nothing here for a fold like foldEnchant to conjoin.
+mutateSlotMapGiven :: Bool -> Map SlotName TargetSlot
+mutateSlotMapGiven mutating = if mutating then Map.singleton mutateSlot Keyword.mutateTarget else Map.empty
 
 -- CR 303.4a / 702.5a: the enchant abilities' target slot as a one-entry map,
 -- empty for every non-Aura. ONE slot however many instances of enchant the

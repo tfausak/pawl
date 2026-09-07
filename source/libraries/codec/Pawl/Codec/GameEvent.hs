@@ -80,6 +80,7 @@ codec =
       Arm.payload "Transformed" Transformed.codec GameEvent.Transformed (\x -> case x of GameEvent.Transformed y -> Just y; _ -> Nothing),
       Arm.payload "BecameDesignated" BecameDesignated.codec GameEvent.BecameDesignated (\x -> case x of GameEvent.BecameDesignated y -> Just y; _ -> Nothing),
       Arm.payload "Evolved" ObjectId.codec GameEvent.Evolved (\x -> case x of GameEvent.Evolved y -> Just y; _ -> Nothing),
+      Arm.payload "Mutated" ObjectId.codec GameEvent.Mutated (\x -> case x of GameEvent.Mutated y -> Just y; _ -> Nothing),
       Arm.payload "Mentored" Mentored.codec GameEvent.Mentored (\x -> case x of GameEvent.Mentored y -> Just y; _ -> Nothing),
       Arm.payload "Trained" ObjectId.codec GameEvent.Trained (\x -> case x of GameEvent.Trained y -> Just y; _ -> Nothing),
       Arm.payload "BecameCrewed" ObjectId.codec GameEvent.BecameCrewed (\x -> case x of GameEvent.BecameCrewed y -> Just y; _ -> Nothing),

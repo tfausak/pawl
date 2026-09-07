@@ -134,6 +134,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.MutateSide as MutateSide
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -526,6 +527,7 @@ damageOf event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -586,6 +588,7 @@ revealOf event = case event of
   GameEvent.Transformed {} -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
@@ -734,8 +737,10 @@ mintCard pid under printingId dest position gs =
             Object.classLevel = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
+            Object.designationValues = Map.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.mutating = False,
             Object.prototyped = False,
             Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
@@ -923,8 +928,10 @@ createEmblem pid card = do
                 Object.classLevel = Nothing,
                 Object.unlockedHalves = Set.empty,
                 Object.designations = Set.empty,
+                Object.designationValues = Map.empty,
                 Object.kicked = Map.empty,
                 Object.bestowed = False,
+                Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
                 Object.phyrexianLifePaid = 0,
@@ -3262,7 +3269,12 @@ copiedSnapshot src gs =
       -- (Game.manaCostFacesOf), and nothing left in the snapshot says the number
       -- came off two front faces -- so the override is made here, where the
       -- COPIED object is still in hand, rather than in the projection.
-      melded = maybe False (not . Seq.null . Game.componentsOf . Object.source) (Game.lookupObject src gs)
+      --
+      -- Game.meldComponentsOf and not componentsOf: rule 202.3c's exception is
+      -- about a melded permanent, and CR 730.2a gives a merged permanent its
+      -- topmost component's mana value like its every other characteristic, so
+      -- a copy of one has that number rather than 0.
+      melded = maybe False (not . Seq.null . Game.meldComponentsOf . Object.source) (Game.lookupObject src gs)
    in if backFace || melded then snapshot {PC.manaValue = Just 0} else snapshot
 
 -- CR 608.2h: `copiedSnapshot` for an object that may already be gone -- the
@@ -4747,7 +4759,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               --
               -- Read through Game.componentsOf, a classifier over Source and
               -- never a case on Source.OfMeld: CR 730.3 restates this rule for a
-              -- merged permanent, so mutate (#874) extends that one function
+              -- merged permanent, so mutate extends that one function
               -- rather than this branch.
               --
               -- The rule's own scope, both halves of it: FROM the battlefield
@@ -5062,7 +5074,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
 --
 -- Read off `dest` and never off the source's identity: the two named zones are
 -- the rule's own condition, and CR 730.3a restates the whole sentence for a
--- merged permanent (#874), which reaches this through the same Seq.
+-- merged permanent, which reaches this through the same Seq.
 --
 -- Exile is NOT here. CR 712.21b gives that case to the EXILING player and asks
 -- about relative timestamps rather than an arrangement, so it is a different
@@ -5890,8 +5902,10 @@ createTokens controller card copy n tapped entering = do
                       Object.classLevel = Nothing,
                       Object.unlockedHalves = Set.empty,
                       Object.designations = Set.empty,
+                      Object.designationValues = Map.empty,
                       Object.kicked = Map.empty,
                       Object.bestowed = False,
+                      Object.mutating = False,
                       Object.prototyped = False,
                       Object.boughtBack = False,
                       Object.phyrexianLifePaid = 0,
@@ -6080,8 +6094,10 @@ meld controller victims resultCard = do
                 Object.classLevel = Nothing,
                 Object.unlockedHalves = Set.empty,
                 Object.designations = Set.empty,
+                Object.designationValues = Map.empty,
                 Object.kicked = Map.empty,
                 Object.bestowed = False,
+                Object.mutating = False,
                 Object.prototyped = False,
                 Object.boughtBack = False,
                 Object.phyrexianLifePaid = 0,
@@ -6182,6 +6198,139 @@ meldable victims gs = do
             if Card.Type.layout card == Layout.Meld then Just (oid, pid) else Nothing
           _ -> Nothing
   traverse printingOf (first NonEmpty.:| rest) >>= \melding -> Just (owner, origin, melding)
+
+-- CR 730.2 / 702.140c: merge this spell with this permanent -- "place that
+-- object on top of or under that permanent. That permanent becomes a merged
+-- permanent represented by the card or copy that represented that object in
+-- addition to any other components that were representing it." Answers whether
+-- the merge happened; a spell with no card behind it, or a target that is gone,
+-- leaves the board untouched.
+--
+-- Here rather than beside Pawl.Engine.Stack's CR 702.140c fork for `meld`'s
+-- reason one rule over: the spell must stop being an object, which files its CR
+-- 608.2h record, and that write is this module's.
+--
+-- WHAT IS NOT DONE HERE is the whole of CR 730.2b: no object is minted, no zone
+-- index is written for the battlefield, and runEntry is not called -- "the
+-- resulting permanent isn't considered to have just entered the battlefield". So
+-- the CR 616.1 entry loop does not run, CR 603.6a's enters-the-battlefield scan
+-- sees nothing, and CR 730.2c falls out with no work at all: the permanent's
+-- Object row is the SAME row, so its timestamp, its summoning sickness, its
+-- damage, its counters, its attachments and every continuous effect keyed on its
+-- id are untouched. `meld`, which mints a permanent, is the shape this one is
+-- deliberately not.
+--
+-- The SPELL leaves the stack by ceasing to be an object rather than by a zone
+-- change: CR 730.2b says "that object leaves its previous zone and becomes part
+-- of an object on the battlefield", which is no move to a zone that CR 400.7
+-- could mint an incarnation in. forgetObject files the CR 608.2h record, so a
+-- clause of the very resolution that merged them can still say what its source
+-- was.
+--
+-- The ORDER is CR 702.140c's choice, already made by the caller: Over puts the
+-- spell's printing at the head, which CR 730.2a then reads every characteristic
+-- off, and Under puts it at the tail.
+--
+-- The CHARACTERISTICS the merge leaves are stamped here, into the same
+-- Binding.copyOf a copy effect writes: CR 613.2a puts copy effects and merges in
+-- one sublayer, CR 613.7 orders them by timestamp and CR 730.2a fixes this one's
+-- at the merge, so the two sides are folded against what layer 1a had left each
+-- of them at this moment (Projection.copiableCharacteristics of the spell and of
+-- the permanent, both read BEFORE anything is rewritten) and the result replaces
+-- whatever an earlier copy effect on the target had put there. See
+-- Projection.withMergedAbilities for why the fold is over records rather than
+-- over printed faces; see #3371.
+--
+-- The EVENT is recorded last, after the merge has landed, so CR 702.140d's
+-- "whenever this creature mutates" trigger is gathered against a permanent that
+-- already projects rule 702.140e's added abilities -- which is what lets a
+-- Cubwarden merged UNDER trigger at all.
+--
+-- Not implemented: CR 730.2d's token-ness and CR 730.2e through 730.2j's
+-- face-down, flip and double-faced components. A spell with no printing behind
+-- it -- CR 707.10's copy of a mutating creature spell -- refuses here rather
+-- than merging (#874).
+merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
+merge sid target side = do
+  gs <- State.get
+  case (Game.lookupObject sid gs, Game.lookupObject target gs) of
+    (Just spell, Just permanent) -> case (Object.source spell, mergeComponents (Object.source permanent)) of
+      (Source.OfCard pid, Just existing) -> do
+        let merged = case side of
+              MutateSide.Over -> pid NonEmpty.:| existing
+              MutateSide.Under -> case existing of
+                first : rest -> first NonEmpty.:| (rest <> [pid])
+                [] -> pid NonEmpty.:| []
+            -- What layer 1a had left each side, read off the PRE-merge board:
+            -- the spell's own record and the permanent's, which is that
+            -- permanent's copy snapshot where an earlier copy effect gave it one
+            -- and its printed seed otherwise.
+            spellPc = Projection.copiableCharacteristics sid gs
+            hostPc = Projection.copiableCharacteristics target gs
+            -- CR 730.2a's base is the TOPMOST side and CR 702.140e's union comes
+            -- from the other, which is the whole of what the side decides.
+            resulting = case side of
+              MutateSide.Over -> Projection.withMergedAbilities hostPc spellPc
+              MutateSide.Under -> Projection.withMergedAbilities spellPc hostPc
+        State.modify' (`forgetObject` sid)
+        State.modify'
+          ( \g ->
+              g
+                { GameState.objects =
+                    Map.adjust
+                      ( \o ->
+                          o
+                            { Object.source = Source.OfMerge merged,
+                              Object.bindings = Binding.setCopy resulting (Object.bindings o)
+                            }
+                      )
+                      target
+                      (GameState.objects g)
+                }
+          )
+        State.modify' (recordEvent (GameEvent.Mutated target))
+        pure True
+      _ -> pure False
+    _ -> pure False
+
+-- CR 730.2's "any other components that were representing it", in top-to-bottom
+-- order: one printing for an ordinary card (CR 108.2), and the existing stack
+-- for a permanent already merged.
+--
+-- Not implemented: a TOKEN component, which CR 730.2d's token-ness rule is
+-- about, and a MELDED component, whose characteristics come off an interned
+-- combined face that is no component of it (CR 712.8g). Nothing answers for
+-- either, so a mutating creature spell targeting one does not merge (#874).
+mergeComponents :: Source.Source -> Maybe [PrintingId.PrintingId]
+mergeComponents source = case source of
+  Source.OfCard pid -> Just [pid]
+  Source.OfMerge components -> Just (NonEmpty.toList components)
+  Source.OfMeld _ -> Nothing
+  Source.OfToken _ -> Nothing
+  Source.OfAbility _ -> Nothing
+  Source.OfTrigger _ -> Nothing
+  Source.OfEmblem _ -> Nothing
+  Source.OfSpellCopy _ -> Nothing
+  -- CR 722.3c's copy is never on the battlefield to be merged INTO, and CR
+  -- 702.140c's mutating spell is a creature spell rather than a copy of a card,
+  -- so no road reaches this arm.
+  Source.OfCardCopy _ -> Nothing
+  Source.OfInherentTrigger _ -> Nothing
+
+-- `merge` above's refusal, asked BEFORE its side is chosen: CR 702.140c's
+-- over-or-under is a real decision, and a question whose answer the next line
+-- discards is not one the engine should put to a player. Pawl.Engine.Stack asks
+-- this first and takes the ordinary entry when it answers False, so the prompt
+-- is raised only where the merge will actually happen.
+--
+-- The same two reads `merge` makes, and no other: a spell with a printing behind
+-- it, and a target whose components can be named.
+mergeable :: ObjectId -> ObjectId -> GameState -> Bool
+mergeable sid target gs = case (Game.lookupObject sid gs, Game.lookupObject target gs) of
+  (Just spell, Just permanent) -> case (Object.source spell, mergeComponents (Object.source permanent)) of
+    (Source.OfCard _, Just _) -> True
+    _ -> False
+  _ -> False
 
 -- Stop being an object at all, the CR 701.42a half of melding that
 -- Game.removeFromZones alone does not do: the id leaves its zone AND the object
@@ -6591,6 +6740,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
   TriggerCondition.SelfEvolves -> False
+  TriggerCondition.SelfMutates -> False
   -- CR 702.134c watches a mentor ability RESOLVING, which is neither of CR 603.3b's
   -- two classes' subjects read carelessly: an ability resolving is something the
   -- rules did, but the rule's second pass is for a condition that IS another
@@ -6712,6 +6862,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentBecomesDesignated {} -> False
   -- Rule 702.100b names no turn either: a creature can evolve on anyone's.
   TriggerCondition.SelfEvolves -> False
+  TriggerCondition.SelfMutates -> False
   -- Rule 702.134c names none either. CR 508.1 does make every mentoring happen on
   -- the mentor's controller's turn, but that is a consequence of what mentor
   -- watches rather than a narrowing this condition states, and the Equipment's

@@ -384,8 +384,12 @@ data Filter keyword
     -- transformed however it turned before, and neither is one represented by
     -- more than one card.
     --
-    -- Not implemented: CR 730.3's merged permanent, the second exclusion's other
-    -- half (#874).
+    -- The second exclusion's other half, CR 730.2's merged permanent, is the
+    -- same read: Pawl.Engine.Game.componentsOf answers for both. Pawl.MeldSpec's
+    -- "CR 701.27g a melded permanent is not a transformed permanent" is what
+    -- proves the melded half; no board in the suite puts a double-faced
+    -- component under a merged permanent, so the merged half is a regression
+    -- fence rather than a proof.
     Transformed
   | -- | CR 701.54e: the candidate "is your Ring-bearer", asked of the Context's
     -- perspective (CR 109.5). ONE of the rule's three conjuncts -- "on the

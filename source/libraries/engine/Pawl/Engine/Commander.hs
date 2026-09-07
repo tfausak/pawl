@@ -121,8 +121,8 @@ isCommander oid gs = Maybe.isJust (commanderPrintingOf oid gs)
 -- or a merged permanent" -- so the rules do call such a permanent a commander,
 -- and the designation sits on one of the cards representing it rather than on
 -- the permanent. Game.componentsOf is the plural read, a classifier over Source
--- and never a case on Source.OfMeld, so CR 730.3's merged permanent (#874)
--- arrives through the same door.
+-- and never a case on Source.OfMeld, so CR 730.3's merged permanent arrives
+-- through the same door.
 --
 -- What this answers FOR a melded permanent is the component card, which is
 -- exactly what CR 903.9c's procedure needs to single out -- see

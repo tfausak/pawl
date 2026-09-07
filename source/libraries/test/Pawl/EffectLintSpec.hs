@@ -306,7 +306,8 @@ ownQuantities effect = case effect of
   Effect.CreateEmblem _ -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
-  Effect.Designate (Designate.MkDesignate _ _) -> []
+  -- CR 701.37c's X, the one Quantity a designation carries.
+  Effect.Designate (Designate.MkDesignate _ _ value) -> Foldable.toList value
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
@@ -361,6 +362,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.ObjectCounters {} -> False
   Quantity.Type.ObjectCountersOfAnyKind -> False
   Quantity.Type.HasDesignation {} -> False
+  Quantity.Type.DesignationValue {} -> False
   Quantity.Type.ClassLevel -> False
   Quantity.Type.WasKicked -> False
   Quantity.Type.TimesKickedWith {} -> False
@@ -1739,7 +1741,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> [slot]
           Effect.TurnFaceUp slot -> [slot]
           Effect.BecomesBlocked slot -> [slot]
-          Effect.Designate (Designate.MkDesignate _ slot) -> [slot]
+          Effect.Designate (Designate.MkDesignate _ slot _) -> [slot]
           Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ slot) -> [slot]
           Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked _ _ slot) -> [slot]
           Effect.Evolve slot -> [slot]

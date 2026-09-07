@@ -39,6 +39,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
+import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
@@ -288,6 +289,12 @@ data Prompt r where
   -- | CR 702.42a: whether the modal spell is entwined, before ChooseModes; the
   -- Cost is what entwining adds (CR 601.2f).
   ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt EntwineDecision.EntwineDecision
+  -- | CR 702.140c: which side of the target creature a mutating creature spell
+  -- is put on, asked as the spell RESOLVES (CR 702.140c) and not at CR 601.2b's
+  -- announcement -- the ObjectIds are the resolving spell and the creature it
+  -- merges with. Never elided: CR 730.2a makes the two answers differ in the
+  -- merged permanent's every characteristic.
+  ChooseMutateSide :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt MutateSide.MutateSide
   -- | CR 702.33a: how many times one kicker cost is paid, after ChooseModes and
   -- before ChooseCost (CR 601.2b); the Maybe Natural is the limit, Nothing for
   -- CR 702.33c's multikicker, and an answer past it is rejected.
@@ -444,7 +451,7 @@ data Prompt r where
   OrderCombatTolls :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | CR 712.21a: the order the owner puts a melded permanent's component cards
   -- into their graveyard or library, first named put in first. CR 730.3a says
-  -- the sentence again for a merged permanent (#874), so the name is the
+  -- the sentence again for a merged permanent, so the name is the
   -- leaving permanent's components rather than meld's.
   OrderComponentCards :: Decider.Decider -> PlayerId.PlayerId -> Zone.Zone -> [PrintingId.PrintingId] -> Prompt [Natural.Natural]
   -- | The relative order of a per-object batch over one player's objects, a

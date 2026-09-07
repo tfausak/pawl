@@ -1617,21 +1617,21 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Designate (Designate.MkDesignate Designation.Renowned (SlotName.MkSlotName (Text.pack "self"))))
+      (Effect.Designate (Designate.MkDesignate Designation.Renowned (SlotName.MkSlotName (Text.pack "self")) Nothing))
       " {\"type\":\"Designate\",\"value\":{\"designation\":{\"type\":\"Renowned\"},\"slot\":\"self\"}} "
   Spec.it s "Designate Monstrous" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Designate (Designate.MkDesignate Designation.Monstrous (SlotName.MkSlotName (Text.pack "self"))))
+      (Effect.Designate (Designate.MkDesignate Designation.Monstrous (SlotName.MkSlotName (Text.pack "self")) Nothing))
       " {\"type\":\"Designate\",\"value\":{\"designation\":{\"type\":\"Monstrous\"},\"slot\":\"self\"}} "
   Spec.it s "Designate Suspected" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Designate (Designate.MkDesignate Designation.Suspected (SlotName.MkSlotName (Text.pack "self"))))
+      (Effect.Designate (Designate.MkDesignate Designation.Suspected (SlotName.MkSlotName (Text.pack "self")) Nothing))
       " {\"type\":\"Designate\",\"value\":{\"designation\":{\"type\":\"Suspected\"},\"slot\":\"self\"}} "
   -- CR 716.2a's first half. Designate's shape with a number where that has a
   -- designation tag.
