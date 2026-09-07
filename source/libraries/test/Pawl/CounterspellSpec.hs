@@ -1670,6 +1670,34 @@ dragonFodderChain s registry swap = do
       after = S.runPure S.identityAnswer evolved Stack.resolveTop
   pure (S.tokensOf after, after)
 
+-- The same shape as dragonFodderChain for a synthetic token-minting sorcery
+-- named by `cardName`: cast it, optionally resolve an Artificial Evolution at it
+-- on the stack, then resolve it. Returns the tokens and the final state.
+--
+-- Three Forests and three Islands, so neither the {1}{G} Rite nor the {1}{U}
+-- Summons can strand the Evolution's {U}.
+syntheticTokenChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m ([ObjectId.ObjectId], GameState.GameState)
+syntheticTokenChain s registry cardName swap = do
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  minter <- S.printingOf s registry cardName
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let g1 = S.landsFor island S.alice 3 (S.landsInPlay forest 3)
+      (minterId, g2) = S.addHandCard minter S.alice g1
+      (evolutionId, g3) = S.addHandCard artificialEvolution S.alice g2
+      onStack = S.runPure S.identityAnswer g3 (S.cast S.alice minterId)
+      spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      evolved = case swap of
+        Nothing -> onStack
+        Just (from, to) ->
+          S.runPure (evolveAt spellId from to) onStack $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      after = S.runPure S.identityAnswer evolved Stack.resolveTop
+  pure (S.tokensOf after, after)
+
 -- The permanent half of the same rule: alice controls Bitterblossom, optionally
 -- has an Artificial Evolution resolved at IT (a permanent, not a spell), and then
 -- her upkeep begins so the printed trigger fires and resolves. Returns the tokens
@@ -2208,6 +2236,55 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     Spec.assertEqWith s "one token" (length tokens) 1
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Rogue" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Elf, Subtype.Rogue])) tokens
     mapM_ (\oid -> Spec.assertEqWith s "named Elf Rogue Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Rogue Token")))) tokens
+
+  -- The SECOND word of the same CR 111.4 name, so a rewrite that only reached the
+  -- first would show here. Rogue -> Assassin, both creature types, both whole
+  -- words of "Faerie Rogue Token".
+  Spec.it s "CR 612.2a an evolved Bitterblossom's second name word moves too" $ do
+    (tokens, after) <- bitterblossomChain s registry (Just (Subtype.Rogue, Subtype.Assassin))
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "named Faerie Assassin Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Faerie Assassin Token")))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Faerie Assassin" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Faerie, Subtype.Assassin])) tokens
+
+  -- CR 612.2's limit on the same rule: a text-changing effect changes only words
+  -- "used in the correct way". Synthetic Ursine Rite ({1}{G} Sorcery, "Create a
+  -- 2/2 green Bear creature token named Bearer of the Wilds") names its token
+  -- itself, so "Bear" sits inside "Bearer", where it is not being used as a
+  -- creature type. Synthetic because no printing meets rewriteFace's joint
+  -- condition -- a card-authored token name holding one of that token's own
+  -- subtypes inside a longer word: Scryfall is:token t:creature, 2026-08-14, the
+  -- only two names holding their own subtype in a longer word are Kobolds of Kher
+  -- Keep and Pheres-Band Revelers, each the plural of that subtype.
+  --
+  -- The control first, so the pair cannot pass on a chain that minted nothing.
+  Spec.it s "CR 111.4 an unevolved Ursine Rite mints a Bear named Bearer of the Wilds" $ do
+    (tokens, after) <- syntheticTokenChain s registry "Synthetic Ursine Rite" Nothing
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "named Bearer of the Wilds" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Bearer of the Wilds")))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Bear" (Projection.subtypesOf oid after) (Set.singleton Subtype.Bear)) tokens
+
+  Spec.it s "CR 612.2 an evolved Ursine Rite's token turns Elf but keeps its name" $ do
+    (tokens, after) <- syntheticTokenChain s registry "Synthetic Ursine Rite" (Just (Subtype.Bear, Subtype.Elf))
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "still named Bearer of the Wilds" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Bearer of the Wilds")))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
+
+  -- CR 205.3m's one two-word creature type, which is why the boundary test cannot
+  -- be a whitespace tokenizer: Synthetic Temporal Summons ({1}{U} Sorcery, "Create
+  -- a 2/2 blue Time Lord creature token") mints CR 111.4's "Time Lord Token", and
+  -- the swap has to match both words as one. Synthetic because no printing creates
+  -- a Time Lord token at all (Scryfall is:token t:"time lord", 2026-09-06, no hit).
+  Spec.it s "CR 111.4 an unevolved Temporal Summons mints a Time Lord Token" $ do
+    (tokens, after) <- syntheticTokenChain s registry "Synthetic Temporal Summons" Nothing
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "named Time Lord Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Time Lord Token")))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Time Lord" (Projection.subtypesOf oid after) (Set.singleton Subtype.TimeLord)) tokens
+
+  Spec.it s "CR 612.2a an evolved Temporal Summons replaces both words at once" $ do
+    (tokens, after) <- syntheticTokenChain s registry "Synthetic Temporal Summons" (Just (Subtype.TimeLord, Subtype.Elf))
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "named Elf Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Token")))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
 
   -- CR 612.2a's third carrier: an ability rule 702 MINTS. "Afterlife 2" is all
   -- Ministrant of Obligation prints; CR 702.135a is where the word Spirit is
