@@ -286,9 +286,10 @@ abilitiesFor keyword count = case keyword of
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
-  -- CR 702.124a: a deck-construction ability, which functions before the game
-  -- begins and mints nothing in it. Pawl.Engine.Commander.designations reads it.
+  -- CR 702.124a: deck-construction abilities, which function before the game
+  -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
   Keyword.Escalate _ -> []
   Keyword.Riot -> []
   Keyword.Unleash -> []
@@ -418,9 +419,10 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
-  -- CR 702.124a: a deck-construction ability, which functions before the game
-  -- begins and mints nothing in it. Pawl.Engine.Commander.designations reads it.
+  -- CR 702.124a: deck-construction abilities, which function before the game
+  -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -659,9 +661,10 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
-  -- CR 702.124a: a deck-construction ability, which functions before the game
-  -- begins and mints nothing in it. Pawl.Engine.Commander.designations reads it.
+  -- CR 702.124a: deck-construction abilities, which function before the game
+  -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1144,9 +1147,10 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
-  -- CR 702.124a: a deck-construction ability, which functions before the game
-  -- begins and mints nothing in it. Pawl.Engine.Commander.designations reads it.
+  -- CR 702.124a: deck-construction abilities, which function before the game
+  -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1849,9 +1853,10 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
-  -- CR 702.124a: a deck-construction ability, which functions before the game
-  -- begins and mints nothing in it. Pawl.Engine.Commander.designations reads it.
+  -- CR 702.124a: deck-construction abilities, which function before the game
+  -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -2045,9 +2050,10 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
-  -- CR 702.124a: a deck-construction ability, which functions before the game
-  -- begins and mints nothing in it. Pawl.Engine.Commander.designations reads it.
+  -- CR 702.124a: deck-construction abilities, which function before the game
+  -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -2218,9 +2224,10 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
-  -- CR 702.124a: a deck-construction ability, which functions before the game
-  -- begins and mints nothing in it. Pawl.Engine.Commander.designations reads it.
+  -- CR 702.124a: deck-construction abilities, which function before the game
+  -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
   Keyword.Partner -> []
+  Keyword.ChooseABackground -> []
   Keyword.Escalate _ -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -2382,6 +2389,8 @@ familyOf keyword = case keyword of
   Keyword.Skulk -> Nothing
   -- CR 702.124h carries no parameter, so there is no family to name it by.
   Keyword.Partner -> Nothing
+  -- CR 702.124k carries none either.
+  Keyword.ChooseABackground -> Nothing
   Keyword.Escalate _ -> Just KeywordFamily.Escalate
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing

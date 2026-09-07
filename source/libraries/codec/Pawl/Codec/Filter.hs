@@ -107,6 +107,7 @@ codec keywordCodec =
       Arm.nullary "IsHostOfSource" Filter.IsHostOfSource,
       Arm.nullary "CanHostSubject" Filter.CanHostSubject,
       Arm.nullary "CanAttachToSubject" Filter.CanAttachToSubject,
+      Arm.nullary "IsCommander" Filter.IsCommander,
       Arm.nullary "IsToken" Filter.IsToken,
       Arm.nullary "IsActivatedAbility" Filter.IsActivatedAbility,
       Arm.nullary "IsAbility" Filter.IsAbility,

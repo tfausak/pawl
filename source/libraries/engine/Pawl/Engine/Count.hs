@@ -373,6 +373,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsHostOfSource -> predicate
   Filter.Type.CanHostSubject -> predicate
   Filter.Type.CanAttachToSubject -> predicate
+  Filter.Type.IsCommander -> predicate
   Filter.Type.IsToken -> predicate
   Filter.Type.IsActivatedAbility -> predicate
   Filter.Type.IsAbility -> predicate
@@ -914,6 +915,12 @@ viewOfSnapshot mController isToken counters snapshot =
       -- CR 111.6: "A token isn't a card", which is a fact about the OBJECT and
       -- not a characteristic, so the arm supplies it above.
       Filter.token = isToken,
+      -- CR 903.3's designation is recoverable only from an OBJECT, which a
+      -- ProjectedCharacteristics is not -- `owner` above's situation one rule
+      -- over, and no arm passes one. So IsCommander is vacuously false of a
+      -- snapshot, which no card in `data/cards/` notices: every printed
+      -- "commander creatures you own" is a battlefield static ability.
+      Filter.commander = False,
       -- CR 113.3b: CR 608.2h's record is of characteristics rather than of an
       -- object on the stack, so there is no ability here to be either kind.
       Filter.activatedAbility = False,

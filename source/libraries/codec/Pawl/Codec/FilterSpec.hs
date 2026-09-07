@@ -397,6 +397,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.CanAttachToSubject
       " {\"type\":\"CanAttachToSubject\"} "
+  Spec.it s "IsCommander" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsCommander
+      " {\"type\":\"IsCommander\"} "
   Spec.it s "IsToken" $
     Common.assertCodec
       s

@@ -336,6 +336,11 @@ data Filter keyword
     -- values equivalent to printed ones, which is what lets
     -- Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsToken
+  | -- | CR 903.3: the candidate is one of the cards its OWNER designated as a
+    -- commander -- Raised by Giants' "commander creatures you own".
+    -- Uncharacteristic and immutable for IsToken's reason, and more strongly: CR
+    -- 903.3's designation is made before the game begins and no rule rewrites it.
+    IsCommander
   | -- | CR 113.3b: the candidate is an ACTIVATED ability on the stack, not CR
     -- 113.3c's triggered one -- Squelch's "target activated ability".
     -- Uncharacteristic and immutable for IsToken's reason.

@@ -21,8 +21,9 @@
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
---   * CR 702.124's partner limbs other than CR 702.124h's plain one, and CR
---     903.3a's "this card can be your commander" (#939).
+--   * CR 702.124's partner limbs other than CR 702.124h's plain one and CR
+--     702.124k's Background, and CR 903.3a's "this card can be your commander"
+--     (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
 module Pawl.Engine.Commander where
 
@@ -36,6 +37,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Face as Face
@@ -55,41 +57,85 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | CR 903.3 \/ CR 702.124: the cards this deck may designate as its
 -- commanders. One designation is rule 903.3's; two are rule 702.124h's, and
 -- only when EACH of them has partner -- "you can have two commanders if both
--- have partner".
+-- have partner" -- or rule 702.124k's, and only when one has "choose a
+-- Background" and the other is a legendary Background enchantment card.
 --
--- Read off the FRONT FACE's printed keywords rather than through the
--- projection, which is CR 702.124a: a partner ability "modifies the rules for
--- deck construction ... and functions before the game begins", so there is no
--- object for a continuous effect to have touched yet. Pawl.Engine.Vanguard reads
--- rule 902.4's card the same way and for the same reason.
+-- Read off the FRONT FACE's printed keywords and type line rather than through
+-- the projection, which is CR 702.124a: a partner ability "modifies the rules
+-- for deck construction ... and functions before the game begins", so there is
+-- no object for a continuous effect to have touched yet. Pawl.Engine.Vanguard
+-- reads rule 902.4's card the same way and for the same reason.
 --
 -- More than two is empty for CR 702.124g: "no partner ability or combination of
--- partner abilities can ever let a player have more than two commanders".
+-- partner abilities can ever let a player have more than two commanders". CR
+-- 702.124f is why the two limbs are separate disjuncts rather than one
+-- predicate: "different partner abilities are distinct from one another and
+-- cannot be combined", so a card with partner beside a Background is no pair.
+--
+-- Rule 702.124k's exclusion runs BOTH ways and both halves are here. A card with
+-- "choose a Background" paired with anything that is not a legendary Background
+-- enchantment card designates nothing, and a legendary Background enchantment
+-- card is no commander "unless you have also designated a commander with 'choose
+-- a Background'" -- which is why the ONE-card case below is gated too. Rule
+-- 702.124k's second clause admits no exception for a Background named on its
+-- own, and pawl reaches that reading without CR 903.3's creature/Vehicle/
+-- Spacecraft restriction, which it does not enforce (#940).
 --
 -- Empty is also what an ILLEGAL pair gets, which is the closest pawl can come to
 -- rejecting the deck: nothing validates a deck (#940) and Pawl.Engine.Setup has
--- no channel to refuse one, so a pair rule 702.124h does not allow designates
+-- no channel to refuse one, so a pair rule 702.124 does not allow designates
 -- neither card and starts no commander in the command zone.
 --
 -- Not implemented: CR 702.124i's partner—[text], CR 702.124j's partner with
--- [name], CR 702.124k's Background and CR 702.124m's Doctor's companion, each of
--- which admits a different pair; and CR 903.3a's "this card can be your
--- commander" (#939).
+-- [name] and CR 702.124m's Doctor's companion, each of which admits a different
+-- pair; and CR 903.3a's "this card can be your commander" (#939).
 designations :: Deck.Deck -> Set.Set Printing.Printing
 designations deck =
   let named = Deck.commander deck
-      hasPartner printing = Set.member Keyword.Partner (Face.keywords (Card.frontFace (Printing.card printing)))
    in case Set.toList named of
         [] -> named
+        [one] | isBackground one -> Set.empty
         [_] -> named
         [_, _] | all hasPartner named -> named
+        [a, b] | choosesBackground a && isBackground b -> named
+        [a, b] | choosesBackground b && isBackground a -> named
         _ -> Set.empty
+
+-- | CR 702.124h's requirement of one card of a pair.
+hasPartner :: Printing.Printing -> Bool
+hasPartner = printedKeyword Keyword.Partner
+
+-- | CR 702.124k's requirement of the card that names the other.
+choosesBackground :: Printing.Printing -> Bool
+choosesBackground = printedKeyword Keyword.ChooseABackground
+
+-- | CR 702.124k's requirement of the card that is named: "a legendary Background
+-- enchantment card". All three of legendary, enchantment and Background, since
+-- rule 702.124k names all three -- Faceless One is the printing that would tell
+-- an enchantment CREATURE apart, and it is legal because rule 702.124k asks for
+-- an enchantment card and not for a card that is ONLY an enchantment.
+isBackground :: Printing.Printing -> Bool
+isBackground printing =
+  let face = Card.frontFace (Printing.card printing)
+      typeLine = Face.typeLine face
+   in Set.member Supertype.Legendary (TypeLine.supertypes typeLine)
+        && Set.member CardType.Enchantment (TypeLine.types typeLine)
+        && Set.member Subtype.Background (TypeLine.subtypes typeLine)
+
+-- | CR 702.124a: a partner ability is read off the printed front face, for the
+-- reason `designations` gives.
+printedKeyword :: Keyword.Keyword -> Printing.Printing -> Bool
+printedKeyword keyword printing =
+  Set.member keyword (Face.keywords (Card.frontFace (Printing.card printing)))
 
 -- | CR 903.3: record which cards this player designated as their commanders.
 -- Called once per designation by Pawl.Engine.Setup.createDeck, from the Deck.

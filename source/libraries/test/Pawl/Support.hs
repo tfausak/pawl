@@ -3430,6 +3430,7 @@ stubView table oid =
                 Filter.canHostSubject = False,
                 Filter.canAttachToSubject = False,
                 Filter.token = False,
+                Filter.commander = False,
                 Filter.activatedAbility = False,
                 Filter.ability = False,
                 Filter.emblem = False,
