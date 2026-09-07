@@ -5683,8 +5683,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- for its reasons -- a bare id comparison, no view and no Filter, so a Vehicle
   -- that has since left the battlefield is still answered about the event.
   TriggerCondition.SelfBecomesCrewed -> case event of
-    GameEvent.Trained _ -> False
     GameEvent.BecameCrewed oid -> oid == bearer
+    GameEvent.Trained _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.BecameDesignated {} -> False

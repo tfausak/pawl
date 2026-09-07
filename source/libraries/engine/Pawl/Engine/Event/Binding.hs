@@ -1469,6 +1469,11 @@ eventBindingSlots cond = case cond of
   -- 702.149a's counter goes on the bearer, so Savior of Ollenbock's "this creature"
   -- is Binding.triggerSource and the event names nobody else.
   TriggerCondition.SelfTrains -> Set.empty
+  -- Empty for that arm's reason too: rule 702.122e's event names the Vehicle,
+  -- which is already Binding.triggerSource, and nobody else.
+  --
+  -- Not implemented: rule 702.122e's rider, which would name the creatures that
+  -- paid that activation's crew cost (#915).
   TriggerCondition.SelfBecomesCrewed -> Set.empty
   -- CR 701.21a's event names a player and a permanent, and this claims the
   -- PLAYER: Vengeful Tracker's "deals 2 damage to them" reads the seat that
