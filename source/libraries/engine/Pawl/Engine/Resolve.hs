@@ -1034,22 +1034,23 @@ resolveAbilityWith runSubgame abilId srcId ability = do
       -- Read off THIS ability and not off the Vehicle, so two crew activations in
       -- a turn name two sets (CrewSpec's "a second crew ability").
       --
+      -- Off the `obj` this resolution opened with, which is where the modes were
+      -- read too, and NOT off the state as it stands here: resolveModesWith ends
+      -- with CR 608.2n's cease, so by this line the ability object is gone and a
+      -- fresh lookup answers Nothing. Pinned by CrewSpec's "the Ace gives first
+      -- strike to the Vehicle it crewed", which goes red on the later read.
+      --
       -- Not implemented: CR 702.122b's own timing, which makes a creature crew as
       -- it is TAPPED rather than as the ability resolves -- a crew activation that
       -- never resolves still crewed, and here fires nothing (#915).
       case ActivatedAbility.keyword ability of
-        Just (Keyword.Crew _) -> do
-          -- The ability object as it stands NOW, not the `obj` read before the
-          -- modes ran: the bindings an effect of this very resolution added
-          -- would otherwise be invisible, which is the stale-snapshot shape.
-          -- The slot itself is stamped at activation and never rewritten.
-          crewers <- State.gets (maybe Set.empty crewersOf . Game.lookupObject abilId)
+        Just (Keyword.Crew _) ->
           State.modify'
             ( Event.recordEvent
                 ( GameEvent.BecameCrewed
                     BecameCrewed.MkBecameCrewed
                       { BecameCrewed.vehicle = srcId,
-                        BecameCrewed.crewedBy = crewers
+                        BecameCrewed.crewedBy = crewersOf obj
                       }
                 )
             )
