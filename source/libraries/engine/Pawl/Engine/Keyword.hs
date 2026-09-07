@@ -105,6 +105,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Reinforce as Reinforce
@@ -283,6 +284,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> List.genericReplicate count decayed
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
@@ -415,6 +417,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
@@ -645,6 +648,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
@@ -1118,6 +1122,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   -- CR 702.168a grants NO permission, and it is the near miss worth stating: the
   -- ability "functions in any zone FROM WHICH YOU COULD PLAY THE CARD it's on",
@@ -1231,6 +1236,29 @@ bestowCosts keywords =
         Keyword.Bestow cost -> Just cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.160a / CR 718.1: the PROTOTYPE inset frames -- the second mana cost,
+-- power and toughness a prototype card prints -- offered as an alternative cost
+-- by Pawl.Engine.Cost.candidateCostsFor and read back as characteristics by
+-- Pawl.Engine.Projection.View.baseCharacteristics once CR 601.2b has settled on
+-- one.
+--
+-- A LIST because Face.keywords is a Set that could hold two of these, not
+-- because a card does: CR 718.1 gives a prototype card "a second set of power,
+-- toughness, and mana cost characteristics", singular, and
+-- Pawl.Engine.Projection.View.withPrototype reads the first for that reason.
+-- Offered from EVERY zone the card can be cast from, which is CR 113.6e's
+-- classification of an ability that modifies how its own object can be cast --
+-- bestowCosts' posture, reached by a rule rather than by rule 702.160a's own
+-- words.
+--
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+prototypes :: Set Keyword -> [Prototype.Prototype]
+prototypes keywords =
+  let inset keyword = case keyword of
+        Keyword.Prototype prototype -> Just prototype
+        _ -> Nothing
+   in Maybe.mapMaybe inset (Set.toAscList keywords)
 
 -- CR 702.162a: the MORE THAN MEETS THE EYE costs -- "you may cast this card
 -- converted by paying [cost] rather than its mana cost" -- offered by
@@ -1706,6 +1734,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- make a second instance mint a second row.
   Keyword.ReadAhead -> []
   Keyword.Training -> []
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
@@ -1871,6 +1900,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
@@ -2032,6 +2062,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Compleated -> []
   Keyword.ReadAhead -> []
   Keyword.Training -> []
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   Keyword.Disguise _ -> []
   Keyword.Plot _ -> []
@@ -2119,6 +2150,9 @@ familyOf keyword = case keyword of
   Keyword.Rampage _ -> Just KeywordFamily.Rampage
   Keyword.CumulativeUpkeep _ -> Just KeywordFamily.CumulativeUpkeep
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
+  -- CR 702.160a's parameterized keyword: "a card with prototype" drops the
+  -- inset frame's cost and box.
+  Keyword.Prototype _ -> Just KeywordFamily.Prototype
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Disguise _ -> Just KeywordFamily.Disguise
   Keyword.Plot _ -> Just KeywordFamily.Plot

@@ -6,11 +6,12 @@ import qualified Pawl.Types.Keyword as Keyword
 -- | CR 601.2b: one of the costs a spell may be cast for, together with WHAT
 -- OFFERED IT.
 --
--- The cost alone is not enough, because four rule 702 abilities condition
+-- The cost alone is not enough, because several rule 702 abilities condition
 -- something AFTER the cast on which candidate was chosen: CR 702.34a's "if the
 -- flashback cost was paid" and CR 702.133a's "if this spell was cast using its
--- jump-start ability" both exile the card as it leaves the stack, and CR
--- 702.103b makes a spell cast bestowed an Aura enchantment. A bare
+-- jump-start ability" both exile the card as it leaves the stack, CR
+-- 702.103b makes a spell cast bestowed an Aura enchantment, and CR 718.3b gives
+-- a spell cast prototyped its inset frame's cost, box and colours. A bare
 -- @Cost@ answers "what was paid" and never "which cost that was", and the two
 -- come apart the moment a second permission offers the same card a second cost
 -- from the same zone.

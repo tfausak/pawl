@@ -106,6 +106,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
@@ -253,6 +254,25 @@ candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
               fmap
                 (\cost -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
                 (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+            -- CR 702.160a / CR 718.3: prototype, offered from EVERY zone for
+            -- bestow's reason -- CR 113.6e classes an ability that modifies how
+            -- its own object can be cast as functioning "in any zone from which
+            -- it could be played or cast" -- so it is appended beside the zone's
+            -- own list rather than replacing it, and LAST, so `firstOffered`
+            -- still reads the printed cost.
+            --
+            -- CR 118.9d wraps it in `withAdditional` for flashback's reason. The
+            -- inset frame's POWER AND TOUGHNESS ride the tag rather than the
+            -- cost: nothing about the price depends on them, and
+            -- Pawl.Engine.Projection.View.withPrototype reads them back off
+            -- the keyword once Pawl.Engine.Cast has stamped the choice.
+            --
+            -- The keywords are read off the PROJECTION, bestow's read and for
+            -- rule 613.1's reason.
+            prototyped =
+              fmap
+                (\prototype -> CandidateCost.MkCandidateCost (Just (Keyword.Type.Prototype prototype)) (withAdditional Cost.MkCost {Cost.mana = Just (Prototype.cost prototype), Cost.components = []}))
+                (Keyword.prototypes (Map.keysSet (Projection.keywordsOf oid gs)))
             -- CR 702.162a: more than meets the eye, read from EVERY zone for
             -- bestow's reason -- "a static ability that functions in any zone from
             -- which the spell may be cast".
@@ -291,7 +311,7 @@ candidateCostsGiven permitted pid name oid gs = case Game.lookupObject oid gs of
             -- not permit; a printing whose back face had a mana cost would be the
             -- card that told the two apart.
             orConverted zoneCandidates = if null converted then zoneCandidates else converted
-         in (<> bestowed) . orConverted $ case Object.zone obj of
+         in (<> (bestowed <> prototyped)) . orConverted $ case Object.zone obj of
               -- Four shapes, differing in what they do to the printed cost.
               -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
               -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it

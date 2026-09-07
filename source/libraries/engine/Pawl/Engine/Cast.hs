@@ -574,6 +574,22 @@ stampBestowed sid gs =
         Map.adjust (\o -> o {Object.bestowed = True}) sid (GameState.objects gs)
     }
 
+-- CR 718.3: "as a player casts a prototype card, the player chooses whether they
+-- cast the card normally or cast it as a prototyped spell". The record of that
+-- choice, stamped at the moment CR 601.2b settles on the candidate rule 702.160a
+-- offers, and read back by Pawl.Engine.Projection.View.withPrototype, which
+-- swaps CR 718.3b's alternative cost, box and colours in.
+--
+-- stampBestowed's shape above in every respect: an idempotent write of a field no
+-- layer computes, one direction only, rule 718.3's choice being available while
+-- casting and never after.
+stampPrototyped :: ObjectId -> GameState -> GameState
+stampPrototyped sid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.prototyped = True}) sid (GameState.objects gs)
+    }
+
 -- CR 601.2a: record on the spell the zone it was moved to the stack from, which
 -- CR 400.7 otherwise leaves it no memory of. `asProposed` wrote the same value
 -- onto the card before the move, for the gate; this is the write CR 601.2f's
@@ -597,22 +613,36 @@ castBestowed castFor = case castFor of
   Just (Keyword.Type.Bestow _) -> True
   _ -> False
 
+-- CR 718.3, castBestowed's twin: was this the prototype candidate? Asked of the
+-- same `castFor` tag, which is why a second payload keyword offering a cost joins
+-- this fold rather than needing a road of its own.
+castPrototyped :: Maybe Keyword -> Bool
+castPrototyped castFor = case castFor of
+  Just (Keyword.Type.Prototype _) -> True
+  _ -> False
+
 -- CR 702.103d: the board ONE candidate's cast is judged against -- "when casting
 -- a spell bestowed, only its characteristics as modified by the bestow ability
--- are evaluated to determine if it can be cast". The bestow stamp is the whole of
--- it, because bestow is the only candidate CR 601.2b can settle on that rewrites
--- the spell (CR 702.103b); every other keyword offering a cost leaves the
+-- are evaluated to determine if it can be cast". CR 718.3a says the same of the
+-- prototype candidate -- "while casting a prototyped spell, use only its
+-- alternative power, toughness, and mana cost when evaluating those
+-- characteristics to see if it can be cast" -- so both stamps go on here. The two
+-- are the whole of it: every other keyword offering a cost leaves the
 -- characteristics the gate reads exactly as they were, and answers the same board
--- it was handed.
+-- it was handed. A third such keyword would join this fold rather than needing a
+-- road of its own.
 --
 -- Applied to a state the caller only READS -- asProposed's posture, and one zone
--- earlier than stampBestowed's real write: the castability gate and CR 601.2b's
+-- earlier than the two stamps' real writes: the castability gate and CR 601.2b's
 -- payability filter both have to price a candidate before the player has chosen
 -- it, so each candidate gets its own copy of the board and none of them lands on
--- the game. Projection.bestowGathered is what makes the stamp visible on a card
+-- the game. Projection.bestowGathered and
+-- Projection.View.baseCharacteristics are what make the stamps visible on a card
 -- still lying in the zone it would be cast from.
 proposedFor :: ObjectId -> Maybe Keyword -> GameState -> GameState
-proposedFor oid castFor gs = if castBestowed castFor then stampBestowed oid gs else gs
+proposedFor oid castFor gs =
+  let bestowedGs = if castBestowed castFor then stampBestowed oid gs else gs
+   in if castPrototyped castFor then stampPrototyped oid bestowedGs else bestowedGs
 
 -- CR 601.3a asked of ONE candidate, through the board rule 702.103d says to judge
 -- it on: Aether Storm's "creature spells can't be cast" stops Nyxborn Rollicker's
@@ -1888,6 +1918,13 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
               -- target for that spell as defined by its enchant creature ability
               -- and rule 601.2c").
               Monad.when (castBestowed castFor) (State.modify' (stampBestowed sid))
+              -- CR 718.3b: the announcement has settled on the prototype
+              -- candidate, so the spell has only its alternative mana cost,
+              -- power and toughness -- and, rule 718.3b's second sentence, the
+              -- colours of that cost. Stamped beside the bestow record above and
+              -- for its reason: CR 601.2c's targets and CR 601.2f's pricing below
+              -- both have to read the spell as rule 718.3b left it.
+              Monad.when (castPrototyped castFor) (State.modify' (stampPrototyped sid))
               -- Re-read, because `gs` above predates the stamp and both CR 601.2c
               -- and CR 601.2f have to be judged on the spell as rule 702.103b
               -- left it -- CR 702.103d's "only its characteristics as modified by

@@ -6,6 +6,7 @@ import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Morph as Morph
+import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
 
 -- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
@@ -376,6 +377,9 @@ data Keyword
     -- entered unless it has exactly that chapter's number of lore counters; rule
     -- 714.3b REPLACES rule 714.3a's ability rather than adding to it.
     ReadAhead
+  | -- | 702.160a: a second mana cost, power and toughness the caster may choose
+    -- instead of the printed ones as the card is cast (CR 718.3).
+    Prototype Prototype.Prototype
   | -- | 702.164a: toxic N. CR 702.164b's total toxic value is the SUM over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic).
     Toxic Natural.Natural
