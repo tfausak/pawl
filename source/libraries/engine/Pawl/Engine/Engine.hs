@@ -55,6 +55,7 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Suspend as Suspend
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.UntapRestriction as UntapRestriction
@@ -1313,6 +1314,14 @@ priorityLoop = do
                               -- CR 116.2h / 702.143b: a special action too.
                               Action.Type.Foretell oid -> do
                                 Foretell.foretell p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 116.2f / 702.62a: a special action too, and
+                              -- the one whose window is the card's own
+                              -- castability rather than a phase.
+                              Action.Type.Suspend oid -> do
+                                Suspend.suspend Resolve.performManaAbility p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

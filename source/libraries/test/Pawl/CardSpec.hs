@@ -260,6 +260,7 @@ import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Suspend as Suspend
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
@@ -2544,6 +2545,8 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Disguise cost -> costFilters cost
   -- CR 702.143a: the foretell cost, reached the same way.
   Keyword.Foretell cost -> costFilters cost
+  -- CR 702.62a: the suspend cost, reached the same way; its N is a number.
+  Keyword.Suspend (Suspend.MkSuspend _ cost) -> costFilters cost
   -- CR 702.139a's condition, which is a Filter rather than a Cost. KeywordFramed
   -- like the rest: Pawl.Engine.Companion.fulfilled matches it against a printed
   -- face through a bare Context, so no slot is in scope.

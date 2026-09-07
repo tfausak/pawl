@@ -1043,6 +1043,7 @@ offeredPlays pid gs =
         A.DiscardFromHand _ -> False
         A.Plot _ -> False
         A.Foretell _ -> False
+        A.Suspend _ -> False
         A.PutCompanionIntoHand -> False
         A.Ignore _ _ -> False
         A.EndEffect _ -> False
@@ -2141,6 +2142,7 @@ manaActivationOffer action = case action of
   A.Ignore _ _ -> False
   A.Plot _ -> False
   A.Foretell _ -> False
+  A.Suspend _ -> False
   A.PutCompanionIntoHand -> False
   A.EndEffect _ -> False
 

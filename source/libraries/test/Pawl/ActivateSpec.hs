@@ -4126,6 +4126,7 @@ activationsIn =
         A.DiscardFromHand _ -> False
         A.Plot _ -> False
         A.Foretell _ -> False
+        A.Suspend _ -> False
         A.PutCompanionIntoHand -> False
         A.Ignore _ _ -> False
         A.EndEffect _ -> False

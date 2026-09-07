@@ -398,6 +398,7 @@ import qualified Pawl.Codec.StepBeginsSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
+import qualified Pawl.Codec.SuspendSpec
 import qualified Pawl.Codec.TakeExtraTurnSpec
 import qualified Pawl.Codec.TapForTotalPowerSpec
 import qualified Pawl.Codec.TapPermanentsSpec
@@ -1005,6 +1006,7 @@ spec s registry = do
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
+  Pawl.Codec.SuspendSpec.spec s
   Pawl.Codec.TakeExtraTurnSpec.spec s
   Pawl.Codec.TapForTotalPowerSpec.spec s
   Pawl.Codec.TapPermanentsSpec.spec s

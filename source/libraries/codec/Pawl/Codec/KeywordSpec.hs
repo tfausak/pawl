@@ -20,6 +20,7 @@ import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Suspend as Suspend
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
@@ -360,6 +361,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (foretell 1)
       " {\"type\":\"Foretell\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (foretell 1) /= Codec.encode Keyword.codec (plotOf 1)) "the same cost under two keywords encodes differently"
+  -- CR 702.62a's payload is a Cost and rule 702.62a's N beside it, Equip's shape
+  -- one field over -- so it is an OBJECT rather than a bare cost, and cannot
+  -- collide with Plot's tag whatever the cost. Nothing but this case guards the
+  -- ENCODE direction, since Pawl.Codec.Keyword is an Arm.tagged list whose own
+  -- `_ -> Nothing` fallthroughs let a missing arm compile (#2262).
+  Spec.it s "Suspend carries its counters and its cost" $ do
+    let suspend n cost = Keyword.Suspend (Suspend.MkSuspend n (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic cost])) []))
+    Common.assertCodec
+      s
+      Keyword.codec
+      (suspend 1 3)
+      " {\"type\":\"Suspend\",\"value\":{\"counters\":1,\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (suspend 1 3) /= Codec.encode Keyword.codec (suspend 2 3)) "the counters are carried, not defaulted"
   -- CR 702.94a's payload is a Cost too, and must not share Plot's or Flashback's
   -- tag: all three name a cost on a card, and miracle's is the one CR 118.9
   -- alternative the reveal window offers.

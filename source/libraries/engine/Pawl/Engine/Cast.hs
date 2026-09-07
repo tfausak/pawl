@@ -1226,18 +1226,53 @@ castable pid oid name facing gs =
         candidateAllowed pid oid proposedName proposed candidate
           && candidateFillable pid oid name proposed candidate
           && payableCost (spendingFor pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
-   in timingOk pid oid name proposed
-        && inCastableZone pid oid name proposed
-        -- CR 601.3's prohibit half from a different CARRIER: a spell on the stack
-        -- (CR 702.61a) rather than a continuous effect on a player. It names
-        -- neither a player nor a quality of the spell, so no candidate can escape
-        -- it and it stays out of `candidateOk` above.
-        && not (SplitSecond.inForce proposed)
-        && printedRestrictionsOk pid oid name proposed
-        && legendaryRestrictionOk pid oid name proposed
+   in cardGatesOk pid oid name proposed
         -- Gated HERE, upstream of Action.legalActions, because the engine never
         -- offers an illegal action and then rejects it.
         && any candidateOk (Cost.candidateCostsFor pid name oid proposed)
+
+-- `castable`'s conjuncts that are about the CARD and the board rather than about
+-- one candidate cost -- the timing window, the zone's permission, and the three
+-- prohibitions no announcement can escape. Split out so CR 116.2f's
+-- could-begin-to-cast test below asks exactly the same questions `castable` does
+-- rather than a near-copy that can drift.
+--
+-- Takes the board `asProposed` already stamped, since every conjunct reads the
+-- half being proposed off it.
+cardGatesOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+cardGatesOk pid oid name proposed =
+  timingOk pid oid name proposed
+    && inCastableZone pid oid name proposed
+    -- CR 601.3's prohibit half from a different CARRIER: a spell on the stack
+    -- (CR 702.61a) rather than a continuous effect on a player. It names
+    -- neither a player nor a quality of the spell, so no candidate can escape
+    -- it and it stays out of `candidateOk` in `castable` above.
+    && not (SplitSecond.inForce proposed)
+    && printedRestrictionsOk pid oid name proposed
+    && legendaryRestrictionOk pid oid name proposed
+
+-- CR 116.2f: "could they begin to cast that card by putting it onto the stack",
+-- the test CR 702.62a's special action is gated on, and CR 702.62c is what puts
+-- the prohibitions inside it -- "while determining if you could begin to cast a
+-- card with suspend, take into consideration any effects that would PROHIBIT
+-- that card from being cast".
+--
+-- `castable` less its payability and fillability: beginning to cast is CR 601.2a,
+-- which puts the card on the stack, and CR 601.2c's targets and CR 601.2h's
+-- payment are both later steps of that same rule -- so a card whose targets
+-- cannot be filled or whose mana cannot be found could still be BEGUN. The
+-- prohibition half is still asked per candidate, `castable`'s reason: CR 702.103d
+-- judges a prohibition against the spell the announcement would produce.
+--
+-- FACE UP and from the card's own zone, since rule 116.2f's subject is a card in
+-- a hand.
+couldBeginToCast :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+couldBeginToCast pid oid name gs =
+  let proposed = asProposed oid name Facing.FaceUp gs
+      proposedName = maybe name Face.name (proposedFace oid name proposed)
+      allowed = candidateAllowed pid oid proposedName proposed
+      candidates = Cost.candidateCostsFor pid name oid proposed
+   in cardGatesOk pid oid name proposed && any allowed candidates
 
 -- Every cast this player may propose right now, in castZones' order, as the
 -- (object, half, facing) triples Action.Cast is built from. `castable` re-checks
