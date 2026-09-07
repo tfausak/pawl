@@ -2,7 +2,7 @@
 -- something. One of the modules on the axis CR 613.11 reaches past the layer
 -- system (alongside Pawl.Engine.PlayerEffect, Pawl.Engine.BlockRequirement,
 -- Pawl.Engine.AttackRequirement and Pawl.Engine.CombatRestriction). None is a
--- layer, and Pawl.Engine.Projection sees none of them.
+-- layer, and no layer of Pawl.Engine.Projection rewrites them.
 --
 -- This module's question is wider than its siblings' by its second argument,
 -- which comes from the card read through CR 508.1b's announcement -- Ghostly
@@ -29,7 +29,6 @@ import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Cost as Cost
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -37,6 +36,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PerCreature as PerCreature
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
 -- CR 508.1h read for ONE announced attack: what must this creature's controller
 -- pay for it to attack THAT target? One entry per printed cost in force,
@@ -85,22 +85,20 @@ costsOn attacker target gs =
       -- read against the FULL projection rather than a partial one.
       view = Projection.project attacker gs
       grants = Projection.controlGrants gs
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> []
-        Just face -> case Face.attackCosts face of
-          -- Every permanent in almost every game.
-          [] -> []
-          costs ->
-            -- The same two ability losses CombatRestriction.restricted asks
-            -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
-            -- CR 613.1f layer-6 removal. CR 613.11 / 601.2f put this after every
-            -- layer, which is why the CR 305.7 gate is liveAfterLayers rather
-            -- than liveGiven -- the same reason `view` above is the full
-            -- projection.
-            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              then concatMap (fromCost source) costs
-              else []
+      fromPermanent source = case RuleAbilities.attackCosts (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> []
+        costs ->
+          -- The same two ability losses CombatRestriction.restricted asks
+          -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
+          -- CR 613.1f layer-6 removal. CR 613.11 / 601.2f put this after every
+          -- layer, which is why the CR 305.7 gate is liveAfterLayers rather
+          -- than liveGiven -- the same reason `view` above is the full
+          -- projection.
+          if (null setEffs || Projection.liveAfterLayers setEffs source gs)
+            && not (removed source)
+            then concatMap (fromCost source) costs
+            else []
       -- CR 508.1b's announcement judged against the source's controller. The
       -- wide arm asks the same question of the planeswalker's controller, which
       -- is CR 306.6's separate thing to attack rather than a second player: the

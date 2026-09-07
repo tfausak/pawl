@@ -4,7 +4,7 @@
 -- Pawl.Engine.BlockRequirement, Pawl.Engine.AttackRequirement,
 -- Pawl.Engine.CombatRestriction, Pawl.Engine.AttackCost,
 -- Pawl.Engine.SacrificeRestriction and Pawl.Engine.UntapRestriction). None is a
--- layer, and Pawl.Engine.Projection sees none of them.
+-- layer, and no layer of Pawl.Engine.Projection rewrites them.
 --
 -- The only reader of Pawl.Types.AttachRestriction. Its callers ask about a PAIR
 -- and never learn which card produced the answer.
@@ -56,12 +56,12 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
 -- CR 303.4's last sentence and CR 301.5 with CR 101.2: does any effect in force
 -- right now say `subject` can't become attached to `host`? Consecrate Land's
@@ -114,15 +114,13 @@ refusesGiven pcs subject host gs =
       subjectView = Projection.viewOfObject subject gs
       hostView = Projection.project host gs
       grants = Projection.controlGrants gs
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> False
-        Just face -> case Face.attachRestrictions face of
-          -- Every permanent in almost every game.
-          [] -> False
-          restrictions ->
-            (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+      fromPermanent source = case RuleAbilities.attachRestrictions (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> False
+        restrictions ->
+          (null setEffs || Projection.liveAfterLayers setEffs source gs)
+            && not (removed source)
+            && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
       fromRestriction source changes restriction =
         let affected = AttachRestriction.affected restriction
             attachers = AttachRestriction.attachers restriction

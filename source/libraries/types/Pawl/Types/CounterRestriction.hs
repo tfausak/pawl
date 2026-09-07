@@ -30,7 +30,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- Pawl.Types.EntryRestriction's shape and its filing, one game action over: CR
 -- 613.11 puts a continuous effect that "affects game rules rather than objects"
 -- outside the layer system, CR 101.2a says such an effect is not an ability being
--- added or removed, and Pawl.Engine.Projection sees none of them. Every step of
+-- added or removed, and no layer of Pawl.Engine.Projection rewrites them. Every step of
 -- that type's argument for why it cannot be a Pawl.Types.Modification holds here
 -- unchanged.
 --

@@ -18,6 +18,7 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
@@ -213,6 +214,24 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- GRANTED one is not, which falls out of where each is written rather than
     -- being enforced here -- the posture activatedAbilities takes.
     enchant :: [TargetSlot.TargetSlot],
+    -- | CR 613.11: the ability families that affect game rules rather than
+    -- objects -- combat, attack, block, untap, entry, sacrifice, counter,
+    -- attach and activation restrictions, requirements, costs and permissions.
+    -- Pawl.Types.RuleAbilities says why the twelve ride one field.
+    --
+    -- Here for playerAbilities' reason exactly: CR 613.11 applies them outside
+    -- the layer system, so no layer writes this, but CR 707.2 names rules text
+    -- among the copiable values and CR 707.2a copies the abilities derived from
+    -- it -- so a permanent that became a copy of Silent Arbiter limits attackers
+    -- and its own printed face is never consulted. CR 702.140e's union rides the
+    -- same field (Pawl.Engine.Projection.View.withMergedAbilities), which is
+    -- what gives a mutated permanent every component's.
+    --
+    -- Read through Pawl.Engine.Projection.View.ruleAbilitiesOf, which the twelve
+    -- gatherer modules share; Pawl.MutateSpec's "CR 702.140e Silent Arbiter
+    -- under a Cubwarden still lets only one creature attack" is what proves the
+    -- union reaches them.
+    ruleAbilities :: RuleAbilities.RuleAbilities,
     -- | CR 613.1f: has a layer-6 "loses all abilities" effect applied to this
     -- object? Recorded rather than left implicit because CR 305.6's intrinsic
     -- "{T}: Add [mana symbol]" is minted from `subtypes` instead of being stored

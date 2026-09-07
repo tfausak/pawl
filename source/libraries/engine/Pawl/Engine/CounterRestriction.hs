@@ -4,8 +4,8 @@
 -- Pawl.Engine.AttackRequirement, Pawl.Engine.CombatRestriction,
 -- Pawl.Engine.AttackCost, Pawl.Engine.SacrificeRestriction,
 -- Pawl.Engine.UntapRestriction, Pawl.Engine.AttachRestriction and
--- Pawl.Engine.EntryRestriction). None is a layer, and Pawl.Engine.Projection sees
--- none of them.
+-- Pawl.Engine.EntryRestriction). None is a layer, and no layer of
+-- Pawl.Engine.Projection rewrites them.
 --
 -- The only reader of Pawl.Types.CounterRestriction. Its callers ask a Bool about
 -- one object and one kind and never learn which card produced it.
@@ -29,17 +29,16 @@
 module Pawl.Engine.CounterRestriction where
 
 import qualified Data.Set as Set
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
 -- CR 101.2 with CR 122.6: does an effect in force right now say that counters of
 -- `kind` CAN'T BE PUT ON `oid`? Solemnity's second sentence and Melira, Sylvok
@@ -74,15 +73,13 @@ prohibited oid kind gs =
           affected
           view
           gs
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> False
-        Just face -> case Face.counterRestrictions face of
-          -- Every permanent in almost every game.
-          [] -> False
-          restrictions ->
-            (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+      fromPermanent source = case RuleAbilities.counterRestrictions (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> False
+        restrictions ->
+          (null setEffs || Projection.liveAfterLayers setEffs source gs)
+            && not (removed source)
+            && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
       -- The CR 305.7 setEffs gate and the CR 612.1 rewrite are REGRESSION FENCES
       -- rather than proven behaviour, exactly as Pawl.Engine.EntryRestriction's
       -- header records of its own: neither printing in the pool is a land, and no

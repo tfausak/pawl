@@ -4,7 +4,7 @@
 -- Pawl.Engine.BlockRequirement, Pawl.Engine.AttackRequirement,
 -- Pawl.Engine.CombatRestriction, Pawl.Engine.AttackCost,
 -- Pawl.Engine.SacrificeRestriction and Pawl.Engine.UntapRestriction). None is a
--- layer, and Pawl.Engine.Projection sees none of them.
+-- layer, and no layer of Pawl.Engine.Projection rewrites them.
 --
 -- The only reader of Pawl.Types.EntryRestriction. Each caller asks a Bool about
 -- one entry and never learns which card produced it.
@@ -19,15 +19,14 @@
 module Pawl.Engine.EntryRestriction where
 
 import qualified Data.Set as Set
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import Pawl.Types.Zone (Zone)
 
 -- CR 101.2 with CR 400.4a: does an effect in force right now say that `oid`,
@@ -70,15 +69,13 @@ prohibited oid origin gs =
           affected
           view
           gs
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> False
-        Just face -> case Face.entryRestrictions face of
-          -- Every permanent in almost every game.
-          [] -> False
-          restrictions ->
-            (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+      fromPermanent source = case RuleAbilities.entryRestrictions (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> False
+        restrictions ->
+          (null setEffs || Projection.liveAfterLayers setEffs source gs)
+            && not (removed source)
+            && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
       -- Two of the three gates above are REGRESSION FENCES rather than proven
       -- behaviour, and both were mutated: CR 305.7's setEffs gate cannot fire for
       -- any printing in the pool, none of which is a land, and no card in

@@ -1,8 +1,8 @@
 -- CR 508.1c / 509.1b / 613.11: the continuous effects that FORBID an attack or
 -- a block. One of the modules on the axis CR 613.11 reaches past the layer
 -- system (alongside Pawl.Engine.PlayerEffect, Pawl.Engine.BlockRequirement and
--- Pawl.Engine.AttackRequirement). None is a layer, and Pawl.Engine.Projection
--- sees none of them.
+-- Pawl.Engine.AttackRequirement). None is a layer, and no layer of
+-- Pawl.Engine.Projection rewrites them.
 --
 -- Not all of them are card data: CR 701.35a's detain forbids both declarations
 -- and is read off the victim (Pawl.Engine.Detain) rather than off any card's
@@ -53,7 +53,6 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -64,6 +63,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -533,33 +533,31 @@ gathered gs =
       -- can settle with a bare bit.
       keepsRulesText source = null setEffs || Projection.liveAfterLayers setEffs source gs
       keepsAbilities source = keepsRulesText source && not (removed source)
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> []
-        Just face ->
-          designationRows source <> mintedRows source <> case Face.combatRestrictions face of
-            -- Every permanent in almost every game.
-            [] -> []
-            restrictions ->
-              -- The same two ability losses AttackRequirement.instances asks
-              -- about, as `keepsAbilities` above. Why CR 613.6 cannot rescue a
-              -- restriction that has started to apply is argued in
-              -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
-              -- 305.7 gate be liveAfterLayers rather than liveGiven.
-              if keepsAbilities source
-                then
-                  -- CR 612.1's word swap over the source's own text, computed HERE
-                  -- rather than hoisted beside setEffs: textChangesAffecting folds
-                  -- the whole continuous-effect list, and the empty case above
-                  -- already turned away every permanent that prints no restriction,
-                  -- so the fold runs once per restriction-bearing permanent instead
-                  -- of once per permanent on the battlefield.
-                  --
-                  -- The SOURCE's changes and not the restricted creature's: CR
-                  -- 612.1 changes the words printed on THAT object, and the gate
-                  -- is printed on the card stating the restriction.
-                  let changes = Projection.textChangesAffecting source gs
-                   in fmap (\restriction -> (source, changes, restriction)) restrictions
-                else []
+      fromPermanent source =
+        designationRows source <> mintedRows source <> case RuleAbilities.combatRestrictions (Projection.ruleAbilitiesOf source gs) of
+          -- Every permanent in almost every game.
+          [] -> []
+          restrictions ->
+            -- The same two ability losses AttackRequirement.instances asks
+            -- about, as `keepsAbilities` above. Why CR 613.6 cannot rescue a
+            -- restriction that has started to apply is argued in
+            -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
+            -- 305.7 gate be liveAfterLayers rather than liveGiven.
+            if keepsAbilities source
+              then
+                -- CR 612.1's word swap over the source's own text, computed HERE
+                -- rather than hoisted beside setEffs: textChangesAffecting folds
+                -- the whole continuous-effect list, and the empty case above
+                -- already turned away every permanent that prints no restriction,
+                -- so the fold runs once per restriction-bearing permanent instead
+                -- of once per permanent on the battlefield.
+                --
+                -- The SOURCE's changes and not the restricted creature's: CR
+                -- 612.1 changes the words printed on THAT object, and the gate
+                -- is printed on the card stating the restriction.
+                let changes = Projection.textChangesAffecting source gs
+                 in fmap (\restriction -> (source, changes, restriction)) restrictions
+              else []
       -- CR 114.4: "abilities of emblems function in the command zone", which is
       -- what makes CR 701.54c's restriction on the emblem named The Ring do
       -- anything at all. Pawl.Engine.Projection.gatherGiven walks the same zone
@@ -582,11 +580,10 @@ gathered gs =
       -- name no creature at all -- a commander whose card printed Silent Arbiter's
       -- bound would otherwise cap the whole table's attackers from the command
       -- zone.
-      fromCommandZone source = case Game.faceOf source gs of
-        Just face
-          | Vanguard.functionsFromCommandZone source gs ->
-              fmap (\restriction -> (source, [], restriction)) (Face.combatRestrictions face)
-        _ -> []
+      fromCommandZone source
+        | Vanguard.functionsFromCommandZone source gs =
+            fmap (\restriction -> (source, [], restriction)) (RuleAbilities.combatRestrictions (Projection.ruleAbilitiesOf source gs))
+        | otherwise = []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
         <> concatMap fromCommandZone (Set.toList (GameState.command gs))
 

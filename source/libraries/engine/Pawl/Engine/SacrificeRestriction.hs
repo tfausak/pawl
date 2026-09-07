@@ -2,8 +2,8 @@
 -- One of the modules on the axis CR 613.11 reaches past the layer system
 -- (alongside Pawl.Engine.PlayerEffect, Pawl.Engine.BlockRequirement,
 -- Pawl.Engine.AttackRequirement, Pawl.Engine.CombatRestriction and
--- Pawl.Engine.AttackCost). None is a layer, and Pawl.Engine.Projection sees
--- none of them.
+-- Pawl.Engine.AttackCost). None is a layer, and no layer of
+-- Pawl.Engine.Projection rewrites them.
 --
 -- The only reader of Pawl.Types.SacrificeRestriction. Every caller asks for a
 -- SET OF IDS -- or for one id's answer -- and never learns which card produced
@@ -20,14 +20,13 @@ module Pawl.Engine.SacrificeRestriction where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 
 -- CR 701.21a with CR 101.2: which of `candidates` an effect in force right now
@@ -59,29 +58,27 @@ cantBeSacrificed candidates gs =
           candidate
           affected
           gs
-      fromPermanent source = case Game.faceOf source gs of
-        Nothing -> []
-        Just face -> case Face.sacrificeRestrictions face of
-          -- Every permanent in almost every game.
-          [] -> []
-          restrictions ->
-            -- The same two ability losses AttackRequirement.instances asks
-            -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
-            -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
-            -- restriction that has started to apply is argued in
-            -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
-            -- 305.7 gate be liveAfterLayers rather than liveGiven.
-            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              then
-                -- CR 612.1's word swap over the SOURCE's own text, computed here
-                -- rather than hoisted beside setEffs, the placement
-                -- CombatRestriction.restricted argues for: textChangesAffecting
-                -- folds the whole continuous-effect list, and the empty case
-                -- above already turned away every permanent that prints no
-                -- prohibition.
-                concatMap (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
-              else []
+      fromPermanent source = case RuleAbilities.sacrificeRestrictions (Projection.ruleAbilitiesOf source gs) of
+        -- Every permanent in almost every game.
+        [] -> []
+        restrictions ->
+          -- The same two ability losses AttackRequirement.instances asks
+          -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
+          -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
+          -- restriction that has started to apply is argued in
+          -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
+          -- 305.7 gate be liveAfterLayers rather than liveGiven.
+          if (null setEffs || Projection.liveAfterLayers setEffs source gs)
+            && not (removed source)
+            then
+              -- CR 612.1's word swap over the SOURCE's own text, computed here
+              -- rather than hoisted beside setEffs, the placement
+              -- CombatRestriction.restricted argues for: textChangesAffecting
+              -- folds the whole continuous-effect list, and the empty case
+              -- above already turned away every permanent that prints no
+              -- prohibition.
+              concatMap (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+            else []
       fromRestriction source changes restriction =
         let affected = SacrificeRestriction.affected restriction
          in filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
