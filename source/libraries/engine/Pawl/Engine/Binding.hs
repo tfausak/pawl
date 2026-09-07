@@ -391,15 +391,59 @@ sacrificedPermanent = SlotName.MkSlotName (Text.pack "thatSacrificedPermanent")
 -- Not needed for {T}: CR 107.5 taps the SOURCE, which CR 113.7's `triggerSource`
 -- already names.
 --
--- CostComponent.TapForTotalPower is deliberately NOT bound here (#915). Its
--- chosen set answers a different question -- CR 702.122a's crewing creatures --
--- and merging the two into one name would make Binding.onlyOne answer Nothing on
--- a cost carrying both components.
+-- CostComponent.TapForTotalPower is deliberately NOT bound here. Its chosen set
+-- answers a different question -- CR 702.122a's crewing creatures -- and merging
+-- the two into one name would make Binding.onlyOne answer Nothing on a cost
+-- carrying both components, which data/cards/synthetic-crewed-battery.json
+-- prints. That set is `tappedForTotalPower` below.
 --
 -- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
 -- card's targetSlots may name it" sweep as sacrificedPermanent above.
 tappedPermanent :: SlotName
 tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
+
+-- CR 601.2f again, for the OTHER tapping component: the permanents a
+-- CostComponent.TapForTotalPower payment tapped. Stamped by Pawl.Engine.Activate
+-- off the payment CR 601.2h makes, tappedPermanent's route exactly.
+--
+-- Its own name rather than tappedPermanent's, for the reason that slot gives: a
+-- cost carrying both components (data/cards/synthetic-crewed-battery.json) would
+-- otherwise answer Binding.onlyOne Nothing for either question.
+--
+-- CR 702.122b is what reads it: a creature "crews a Vehicle" when it is tapped to
+-- pay a crew ability's cost, and Pawl.Engine.Resolve.resolveAbilityWith puts this
+-- set on GameEvent.BecameCrewed so that Gearshift Ace's "whenever this creature
+-- crews a Vehicle" can find itself in it. The component is not crew's alone, so
+-- the slot is named for the component; on a non-crew cost nothing reads it.
+--
+-- SET-VALUED and read as a set: CR 702.122a's "any number" is a set by
+-- construction, so a reader taking Binding.onlyOne of it would go quiet on every
+-- crew paid by more than one creature.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as tappedPermanent above.
+tappedForTotalPower :: SlotName
+tappedForTotalPower = SlotName.MkSlotName (Text.pack "thatTappedForTotalPower")
+
+-- CR 702.122b: the reserved slot under which the VEHICLE a creature just crewed
+-- is bound -- the "that Vehicle" in Gearshift Ace's "whenever this creature crews
+-- a Vehicle, that Vehicle gains first strike until end of turn". Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered, manaSource's
+-- route rather than a payment's.
+--
+-- Not `triggerSource` (CR 113.7): the bearer is the CREWER and the Vehicle is the
+-- other side of rule 702.122c's relation, which is exactly the pair the
+-- crewer-side wording keeps apart.
+--
+-- Every read is CURRENT information (CR 608.2h's first clause), tappedPermanent's
+-- reason: the Vehicle is on the battlefield when the crew ability resolves, and a
+-- Vehicle that has left by the time the trigger resolves is one this effect
+-- modifies nothing of. Pawl.Engine.Resolve.Slots.effectViewOf needs no arm.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as the slots above.
+crewedVehicle :: SlotName
+crewedVehicle = SlotName.MkSlotName (Text.pack "thatCrewedVehicle")
 
 -- CR 106.12a: the reserved slot under which the permanent that was TAPPED FOR
 -- MANA is bound -- the "its" in Wild Growth's "whenever enchanted land is tapped
@@ -885,6 +929,10 @@ setCombatDamager oid = Map.insert combatDamager (toObject oid)
 -- Bind an object under the reserved mentoredCreature slot (CR 702.134c).
 setMentoredCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
+
+-- Bind an object under the reserved crewedVehicle slot (CR 702.122b).
+setCrewedVehicle :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setCrewedVehicle oid = Map.insert crewedVehicle (toObject oid)
 
 -- Bind an object under the reserved attachedHost slot (CR 701.3a).
 setAttachedHost :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

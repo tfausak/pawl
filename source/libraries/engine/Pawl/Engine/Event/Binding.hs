@@ -20,6 +20,7 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
@@ -647,6 +648,15 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- promise needs: every GameEvent.Mentored carries both ids.
   (TriggerCondition.AttachedCreatureMentors, GameEvent.Mentored (Mentored.MkMentored _ mentored)) ->
     Binding.setMentoredCreature mentored Map.empty
+  -- CR 702.122b's "that Vehicle": the Vehicle the bearer just crewed, which
+  -- Gearshift Ace's "that Vehicle gains first strike until end of turn" reads.
+  -- The CREWERS get no slot -- matchesTrigger has just proved the bearer is one
+  -- of them, and no printed payload points at the others.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.BecameCrewed carries a vehicle.
+  (TriggerCondition.SelfCrewsVehicle, GameEvent.BecameCrewed ev) ->
+    Binding.setCrewedVehicle (BecameCrewed.vehicle ev) Map.empty
   -- CR 400.7f, the sibling of CR 400.7e's `became` arms above: an ability that
   -- triggers when an enchanted permanent leaves the battlefield "can find the new
   -- object that each Aura enchanting that permanent became in its owner's
@@ -1471,11 +1481,19 @@ eventBindingSlots cond = case cond of
   -- is Binding.triggerSource and the event names nobody else.
   TriggerCondition.SelfTrains -> Set.empty
   -- Empty for that arm's reason too: rule 702.122e's event names the Vehicle,
-  -- which is already Binding.triggerSource, and nobody else.
+  -- which is already Binding.triggerSource, and the creatures it also carries are
+  -- the OTHER side of the relation, which no rule 702.122e wording reads as a
+  -- subject.
   --
-  -- Not implemented: rule 702.122e's rider, which would name the creatures that
-  -- paid that activation's crew cost (#915).
+  -- Not implemented: rule 702.122e's rider, the intervening "if" that would ask a
+  -- condition of the creatures which paid that activation's crew cost. The event
+  -- carries them (GameEvent.BecameCrewed); what is missing is a condition that
+  -- reads them (#915).
   TriggerCondition.SelfBecomesCrewed -> Set.empty
+  -- CR 702.122b's crewer side, which DOES name somebody the bearer does not: the
+  -- Vehicle it crewed, Gearshift Ace's "that Vehicle". Guaranteed given a match,
+  -- every GameEvent.BecameCrewed carrying a vehicle.
+  TriggerCondition.SelfCrewsVehicle -> Set.singleton Binding.crewedVehicle
   -- CR 701.21a's event names a player and a permanent, and this claims the
   -- PLAYER: Vengeful Tracker's "deals 2 damage to them" reads the seat that
   -- sacrificed, which the eventBindings arm stamps for every match.

@@ -172,6 +172,8 @@ library codec
     Pawl.Codec.BecameAttackedSpec
     Pawl.Codec.BecameBlocking
     Pawl.Codec.BecameBlockingSpec
+    Pawl.Codec.BecameCrewed
+    Pawl.Codec.BecameCrewedSpec
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
     Pawl.Codec.BecameTarget
@@ -1500,6 +1502,7 @@ library types
     Pawl.Types.BecameAttached
     Pawl.Types.BecameAttacked
     Pawl.Types.BecameBlocking
+    Pawl.Types.BecameCrewed
     Pawl.Types.BecameDesignated
     Pawl.Types.BecameTarget
     Pawl.Types.BecameUnattached

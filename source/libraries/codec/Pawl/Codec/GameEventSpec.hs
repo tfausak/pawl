@@ -17,6 +17,7 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
@@ -345,14 +346,20 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Trained (ObjectId.MkObjectId 8))
       " {\"type\":\"Trained\",\"value\":8} "
-  -- CR 702.122e: the Vehicle whose crew ability resolved, and nothing else --
-  -- rule 702.122e names the resolution rather than what paid for it.
+  -- CR 702.122e: the Vehicle whose crew ability resolved, and CR 702.122b's
+  -- creatures that crewed it. The Vehicle is not among them -- rule 702.122a's
+  -- "other" creatures -- so the fixture keeps the two sides apart.
   Spec.it s "BecameCrewed" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BecameCrewed (ObjectId.MkObjectId 9))
-      " {\"type\":\"BecameCrewed\",\"value\":9} "
+      ( GameEvent.BecameCrewed
+          BecameCrewed.MkBecameCrewed
+            { BecameCrewed.vehicle = ObjectId.MkObjectId 9,
+              BecameCrewed.crewedBy = Set.fromList [ObjectId.MkObjectId 10]
+            }
+      )
+      " {\"type\":\"BecameCrewed\",\"value\":{\"crewedBy\":[10],\"vehicle\":9}} "
   -- CR 701.21a: the sacrificing player and the permanent, in that order, and the
   -- id is the PRE-MOVE one -- the record is written before the zone change, which
   -- is CR 603.10a's look-back.

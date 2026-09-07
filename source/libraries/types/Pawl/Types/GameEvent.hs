@@ -6,6 +6,7 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
@@ -304,10 +305,13 @@ data GameEvent
     -- training creature itself.
     Trained ObjectId.ObjectId
   | -- | CR 702.122e: a Vehicle BECAME CREWED -- "a crew ability of [this Vehicle]
-    -- resolves". The id is the Vehicle, the crew ability's source, and the event
-    -- is emitted on RESOLUTION, Mentored's gate rather than Evolved's: rule
-    -- 702.122e names the resolution and nothing about its effect.
-    BecameCrewed ObjectId.ObjectId
+    -- resolves". TWO data, Mentored's shape above: the Vehicle, the crew
+    -- ability's source, and CR 702.122b's creatures that crewed it, which the
+    -- ability's cost bound under Pawl.Engine.Binding.crewingPermanent and which
+    -- is not derivable from the Vehicle. Emitted on RESOLUTION, Mentored's gate
+    -- rather than Evolved's: rule 702.122e names the resolution and nothing
+    -- about its effect.
+    BecameCrewed BecameCrewed.BecameCrewed
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice goes through,
     -- and distinct from the Moved event the same sacrifice records: CR 700.4

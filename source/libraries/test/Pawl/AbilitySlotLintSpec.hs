@@ -307,7 +307,11 @@ activatedAbilityOffends ability =
         if tapsAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.tappedPermanent
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped]) (ActivatedAbility.modal ability)
+      tappedForTotal =
+        if tapsForTotalPowerAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.tappedForTotalPower
+          else Set.empty
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal]) (ActivatedAbility.modal ability)
 
 -- Does this cost sacrifice a permanent the payer CHOOSES? Binding.variableX's
 -- shape exactly: CR 601.2h's payment binds the slot (Cost.payComponent's
@@ -332,8 +336,8 @@ sacrificesAsCost = any isSacrifice . Cost.Type.components
 -- CostComponent.TapThis is deliberately not counted: CR 107.5 taps the SOURCE,
 -- which CR 113.7's `triggerSource` already names.
 --
--- CostComponent.TapForTotalPower is not counted either, and that is not an
--- oversight: its arm binds nothing (#915).
+-- CostComponent.TapForTotalPower is counted by tapsForTotalPowerAsCost below
+-- instead, under a slot of its own.
 --
 -- Not offered on the CAST side (cardOffends below): Cast.castSpell discards the
 -- payment map, so a spell reading the slot would silently no-op.
@@ -342,6 +346,21 @@ tapsAsCost = any isTap . Cost.Type.components
   where
     isTap component = case component of
       CostComponent.TapPermanents {} -> True
+      _ -> False
+
+-- Does this cost tap permanents to reach a THRESHOLD? tapsAsCost's shape, and the
+-- same reason one rule over: CR 601.2h's payment binds
+-- Binding.tappedForTotalPower (Cost.payComponent's TapForTotalPower arm, folded on
+-- by Activate), which is CR 702.122b's "crews a Vehicle" relation.
+--
+-- Its own question and not a second answer to tapsAsCost's: a cost carrying both
+-- components (data/cards/synthetic-crewed-battery.json) binds both slots, and one
+-- carrying either binds only that one.
+tapsForTotalPowerAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+tapsForTotalPowerAsCost = any isThresholdTap . Cost.Type.components
+  where
+    isThresholdTap component = case component of
+      CostComponent.TapForTotalPower {} -> True
       _ -> False
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"

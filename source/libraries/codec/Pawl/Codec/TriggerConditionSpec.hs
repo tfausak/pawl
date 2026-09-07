@@ -852,6 +852,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfBecomesCrewed
       " {\"type\":\"SelfBecomesCrewed\"} "
+  -- CR 702.122b's crewer side, nullary for the arm above's reason.
+  Spec.it s "SelfCrewsVehicle" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfCrewsVehicle
+      " {\"type\":\"SelfCrewsVehicle\"} "
   -- CR 603.10a's sacrifice family, narrowed both ways: Vengeful Tracker's
   -- "whenever an opponent sacrifices an artifact".
   Spec.it s "PermanentSacrificed round-trips both halves" $

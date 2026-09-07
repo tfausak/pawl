@@ -36,6 +36,7 @@ import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Clause as Clause
@@ -76,6 +77,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Recipient (Recipient)
+import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
@@ -1018,15 +1020,52 @@ resolveAbilityWith runSubgame abilId srcId ability = do
       resolveModesWith runSubgame abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
       -- CR 702.122e: "becomes crewed" IS "a crew ability of this Vehicle
       -- resolves", so the marker is written here rather than where the cost was
-      -- paid -- a crew activation that is countered never crews anything.
+      -- paid -- a crew activation that is countered never makes its Vehicle
+      -- become crewed.
       --
       -- Read off ActivatedAbility.keyword, the stamp Keyword.mintedBy writes, so
       -- this is a case on a rule-702 KEYWORD and not on an effect's identity.
       -- The source is the Vehicle -- CR 113.7's "the object whose ability was
       -- activated" -- which is what rule 702.122e's "[this Vehicle]" names.
+      --
+      -- CR 702.122b/c's other side rides along: the creatures rule 702.122a's
+      -- cost tapped, which Cost.payComponent bound under
+      -- Binding.tappedForTotalPower and Activate folded onto this ability object.
+      -- Read off THIS ability and not off the Vehicle, so two crew activations in
+      -- a turn name two sets (CrewSpec's "a second crew ability").
+      --
+      -- Not implemented: CR 702.122b's own timing, which makes a creature crew as
+      -- it is TAPPED rather than as the ability resolves -- a crew activation that
+      -- never resolves still crewed, and here fires nothing (#915).
       case ActivatedAbility.keyword ability of
-        Just (Keyword.Crew _) -> State.modify' (Event.recordEvent (GameEvent.BecameCrewed srcId))
+        Just (Keyword.Crew _) -> do
+          -- The ability object as it stands NOW, not the `obj` read before the
+          -- modes ran: the bindings an effect of this very resolution added
+          -- would otherwise be invisible, which is the stale-snapshot shape.
+          -- The slot itself is stamped at activation and never rewritten.
+          crewers <- State.gets (maybe Set.empty crewersOf . Game.lookupObject abilId)
+          State.modify'
+            ( Event.recordEvent
+                ( GameEvent.BecameCrewed
+                    BecameCrewed.MkBecameCrewed
+                      { BecameCrewed.vehicle = srcId,
+                        BecameCrewed.crewedBy = crewers
+                      }
+                )
+            )
         _ -> pure ()
+
+-- CR 702.122b: the creatures that paid a crew ability's cost, read off the
+-- ability object Pawl.Engine.Activate stamped the payment onto. Empty when the
+-- slot is absent, which is what a cost with no TapForTotalPower component would
+-- leave; every printed crew ability has one (Pawl.Engine.Keyword's `crew`).
+crewersOf :: Object.Object -> Set.Set ObjectId
+crewersOf obj =
+  Set.fromList
+    ( Maybe.mapMaybe
+        Recipient.objectOf
+        (Set.toList (Maybe.fromMaybe Set.empty (Map.lookup Binding.tappedForTotalPower (Binding.targetsOf (Object.bindings obj)))))
+    )
 
 -- The no-subgame activated-ability resolver.
 resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()

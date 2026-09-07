@@ -2604,7 +2604,8 @@ pay perform moment subject announced spending pid oid cost = do
 -- older snapshot still when the toll goes unpaid (#3119).
 --
 -- The bound slots ride out unread. A component of a combat toll binds what
--- payComponent binds it (Sacrifice and TapPermanents each reserve a name), and
+-- payComponent binds it (Sacrifice, TapPermanents and TapForTotalPower each
+-- reserve a name), and
 -- there is no resolving ability holding a binding environment to write them
 -- into -- CR 508.1j and CR 509.1f name a payment and no effect, where CR
 -- 601.2f's components are paid for a spell that goes on to resolve.
@@ -2891,8 +2892,8 @@ mergeBound bound outcome = case outcome of
   Payment.Unpaid -> Payment.Unpaid
   Payment.Paid rest -> Payment.Paid (Map.unionWith Set.union bound rest)
 
--- A component that bound no slot, which is every component but Sacrifice and
--- TapPermanents.
+-- A component that bound no slot, which is every component but Sacrifice,
+-- TapPermanents and TapForTotalPower.
 bindsNothing :: Payment.Payment
 bindsNothing = Payment.Paid Map.empty
 
@@ -3561,14 +3562,18 @@ payComponent moment slots pid oid component = case component of
   -- that were tapped, not a best case. The tap goes through tapObject, TapThis'
   -- route, so each one is a becomes-tapped event (CR 701.26a).
   --
-  -- Not implemented: CR 702.122b/c's "crews a Vehicle" and "crewed by" relation,
-  -- and so CR 702.122e's intervening-"if" rider and CR 702.122d's restriction --
-  -- the chosen set is spent here and recorded nowhere (#915). Rule 702.122e's
-  -- trigger itself asks nothing of it: Pawl.Engine.Resolve.resolveAbilityWith
-  -- records GameEvent.BecameCrewed off the resolving ability's own keyword stamp,
-  -- which Pawl.CrewSpec's "BecomesCrewed" cases prove. The sibling arm below binds
-  -- Binding.tappedPermanent, and this one deliberately does NOT share it: see
-  -- that slot's own comment for why one name for both questions would go quiet.
+  -- Binds Binding.tappedForTotalPower, which is CR 702.122b's "crews a Vehicle"
+  -- relation: Pawl.Engine.Resolve.resolveAbilityWith reads the slot off the
+  -- ability object and puts the set on GameEvent.BecameCrewed, so Gearshift Ace's
+  -- crewer-side trigger can find itself among them. Its own slot and NOT the
+  -- sibling arm's Binding.tappedPermanent: see that slot's comment for why one
+  -- name for both questions would go quiet on a cost carrying both components.
+  --
+  -- Not implemented: CR 702.122d's "can't crew Vehicles" restriction, and CR
+  -- 702.122e's intervening-"if" rider, which would read this set as the trigger's
+  -- condition rather than as its subject (#915). This component is not crew's
+  -- alone (data/cards/synthetic-crewed-battery.json), which is why the binding is
+  -- unconditional here and the crew reading is made where the keyword is known.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates slots pid oid criterion gs
@@ -3578,7 +3583,7 @@ payComponent moment slots pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && totalPower >= toInteger n
       then do
         Monad.mapM_ tapObject (Set.toAscList chosen)
-        pure bindsNothing
+        pure (Payment.Paid (Map.singleton Binding.tappedForTotalPower (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- The payer chooses WHICH permanents to tap, so this is a prompt. Sacrifice's
   -- posture rather than TapForTotalPower's: the count is exact, so as many

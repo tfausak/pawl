@@ -769,8 +769,10 @@ crew n =
 -- crew's TapForTotalPower: rule 702.184a fixes the count and reads the tapped
 -- creature's power afterwards, where crew's number is a threshold on an aggregate
 -- and fixes no count. That is also what makes the power readable at all --
--- TapPermanents binds Binding.tappedPermanent and TapForTotalPower binds nothing
--- (#915). `Not IsSource` is rule 702.184a's own "another", and load-bearing for
+-- TapPermanents binds Binding.tappedPermanent, where TapForTotalPower's set
+-- reaches CR 702.122b's relation under a slot of its own
+-- (Binding.tappedForTotalPower) and never that one. `Not IsSource` is rule
+-- 702.184a's own "another", and load-bearing for
 -- crew's reason one rule over: a Spacecraft past CR 721.2b's threshold is a
 -- creature and could otherwise station itself.
 --
