@@ -13,8 +13,10 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MorphVariant as MorphVariant
+import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -892,6 +894,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Decayed
       " {\"type\":\"Decayed\"} "
+  -- CR 702.160a's inset frame rides the constructor: cost, power and toughness
+  -- together, since CR 718.3 chooses all three at once.
+  Spec.it s "Prototype carries its inset frame" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Prototype assemblerFrame)
+      " {\"type\":\"Prototype\",\"value\":{\"cost\":[{\"type\":\"Generic\",\"value\":1},{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"White\"}}}],\"power\":2,\"toughness\":2}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Prototype assemblerFrame) /= Codec.encode Keyword.codec (Keyword.Prototype assemblerFrame {Prototype.power = 4})) "two inset frames differing only in power encode differently"
   -- CR 702.164a's N rides the constructor.
   Spec.it s "Toxic carries its N" $ do
     Common.assertCodec
@@ -940,3 +951,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       " {\"type\":\"Station\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Keyword.codec
+
+-- CR 718.1: Autonomous Assembler's inset frame, "Prototype {1}{W} -- 2/2".
+assemblerFrame :: Prototype.Prototype
+assemblerFrame =
+  Prototype.MkPrototype
+    { Prototype.cost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.White)],
+      Prototype.power = 2,
+      Prototype.toughness = 2
+    }

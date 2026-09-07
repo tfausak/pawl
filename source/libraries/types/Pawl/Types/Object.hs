@@ -359,6 +359,25 @@ data Object = MkObject
     -- later (CR 702.26i), which Pawl.PhasingSpec's "CR 702.103g a bestowed Aura
     -- that phases in unattached is a creature again" proves.
     bestowed :: Bool,
+    -- | CR 718.3: was this object cast as a PROTOTYPED spell? Stamped by
+    -- Pawl.Engine.Cast at CR 601.2b once the announcement settles on the
+    -- candidate CR 702.160a offers, and read by
+    -- Pawl.Engine.Projection.View.withPrototype, which swaps CR 718.3b's
+    -- alternative mana cost, power, toughness and colours in for the printed
+    -- ones.
+    --
+    -- A Bool, `bestowed` above's shape: the values themselves live on the card,
+    -- in Pawl.Types.Keyword's Prototype arm, so nothing about them has to be
+    -- copied onto the object. That also settles CR 718.2a -- the alternative set
+    -- is a copiable value because the swap happens in the base characteristics,
+    -- which is what Pawl.Engine.Event.copiedSnapshot freezes.
+    --
+    -- CR 718.4 is the clearing rule: "in every zone except the stack or the
+    -- battlefield ... a prototype card has only its normal characteristics". So
+    -- this survives exactly the stack-to-battlefield move
+    -- (Pawl.Engine.Event.changeZoneAttaching, `bestowed`'s line) and no other,
+    -- CR 400.7's new incarnation taking it everywhere else.
+    prototyped :: Bool,
     -- | CR 601.2b with CR 107.4f: how many of the Phyrexian mana symbols in the
     -- cost of the SPELL that became this permanent its controller announced they
     -- would pay 2 life for. CR 702.150a's compleated is the one reader, through
@@ -557,6 +576,10 @@ newIncarnation object =
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move that
       -- keeps it, `kicked` above's route.
       bestowed = False,
+      -- CR 718.3's record is written back by
+      -- Pawl.Engine.Event.changeZoneAttaching's mkObj for the one move CR 718.4
+      -- keeps it across, `bestowed` above's route.
+      prototyped = False,
       -- CR 601.2b's record is written back by
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
       phyrexianLifePaid = 0,

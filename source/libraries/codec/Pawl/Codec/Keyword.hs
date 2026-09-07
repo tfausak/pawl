@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Morph as Morph
+import qualified Pawl.Codec.Prototype as Prototype
 import qualified Pawl.Codec.Reinforce as Reinforce
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -125,6 +126,7 @@ codec =
       Arm.nullary "Compleated" Keyword.Compleated,
       Arm.payload "Miracle" (Cost.codec codec) Keyword.Miracle (\x -> case x of Keyword.Miracle y -> Just y; _ -> Nothing),
       Arm.nullary "ReadAhead" Keyword.ReadAhead,
+      Arm.payload "Prototype" Prototype.codec Keyword.Prototype (\x -> case x of Keyword.Prototype y -> Just y; _ -> Nothing),
       Arm.payload "Toxic" Common.natural Keyword.Toxic (\x -> case x of Keyword.Toxic y -> Just y; _ -> Nothing),
       Arm.payload "Disguise" (Cost.codec codec) Keyword.Disguise (\x -> case x of Keyword.Disguise y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),

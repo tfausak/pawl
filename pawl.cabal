@@ -720,6 +720,8 @@ library codec
     Pawl.Codec.ProductionTagSpec
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.ProjectedCharacteristicsSpec
+    Pawl.Codec.Prototype
+    Pawl.Codec.PrototypeSpec
     Pawl.Codec.PutCounters
     Pawl.Codec.PutCountersFrom
     Pawl.Codec.PutCountersFromSpec
@@ -1390,6 +1392,7 @@ library test
     Pawl.PowerToughnessSpec
     Pawl.PreventionSpec
     Pawl.ProjectionSpec
+    Pawl.PrototypeSpec
     Pawl.PutCounterSpec
     Pawl.RadSpec
     Pawl.RegistrySpec
@@ -1799,6 +1802,7 @@ library types
     Pawl.Types.ProjectedCharacteristics
     Pawl.Types.Prompt
     Pawl.Types.ProposedEvent
+    Pawl.Types.Prototype
     Pawl.Types.PutCounters
     Pawl.Types.PutCountersFrom
     Pawl.Types.Quantity

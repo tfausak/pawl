@@ -1209,9 +1209,13 @@ readsX quantity = case quantity of
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A
 -- land has no mana cost (CR 202.1b), so its mana value is 0 (CR 202.3a).
 manaValueOf :: Face.Face Card.Card -> Integer
-manaValueOf face = case Face.manaCost face of
-  Nothing -> 0
-  Just (ManaCost.MkManaCost symbols) -> sum (fmap symbolValue symbols)
+manaValueOf face = maybe 0 manaCostValue (Face.manaCost face)
+
+-- manaValueOf's arithmetic on a bare cost, for the one reader that holds a mana
+-- cost no face prints: CR 718.2's inset frame
+-- (Pawl.Engine.Projection.View.withPrototype).
+manaCostValue :: ManaCost.ManaCost -> Integer
+manaCostValue (ManaCost.MkManaCost symbols) = sum (fmap symbolValue symbols)
 
 symbolValue :: ManaSymbol.ManaSymbol -> Integer
 symbolValue symbol = case symbol of

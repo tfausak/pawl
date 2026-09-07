@@ -67,6 +67,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Power as Power
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
@@ -880,104 +881,155 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.halves = Nothing
       }
   Just face ->
-    -- The seed predates every layer, so it can describe no object: every view is
-    -- Nothing. That silences the printed box's board-reading shapes only where
-    -- they go through this view at all -- Pawl.Engine.Count.evaluate reads a
-    -- Scope.InHistory snapshot and a Scope.OverPlayers player directly, so a Count
-    -- over either would read LIVE state here. What keeps both out is CR 208.1 /
-    -- 208.2: a printed box is a number or a star, and Pawl.CardSpec's "every
-    -- printed power and toughness box is a number or a star" lint holds every
-    -- card's own faces to it. A MINTED face may print a computed box (CR 111.3),
-    -- which Resolve.bakeTokenCharacteristics stamps into a Literal as the token is
-    -- created -- undeterminable ones included, so the only quantity that reaches
-    -- this seed from a token is CR 208.2's star. Pawl.CountSpec's Miming Slime
-    -- group is what proves that.
-    let seedViewOf = const Nothing
-        seedContext = Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)
-     in PC.MkProjectedCharacteristics
-          { -- CR 709.4a: the names the object shows, which `face` cannot carry --
-            -- Game.namesOf decides which halves show.
-            PC.names = Game.namesOf oid gs,
-            PC.supertypes = TypeLine.supertypes (Face.typeLine face),
-            -- CR 702: a printed keyword appears once; layer 6 adds multiplicity.
-            PC.keywords = Map.fromSet (const 1) (Face.keywords face),
-            PC.colors = printedColorsOf face,
-            -- CR 202.1: the printed cost of the face the object is showing, so CR
-            -- 708.2a's face-down substitution leaves a face-down object with none.
-            -- `face` rather than Game.manaCostFacesOf below: CR 712.8e lends a
-            -- transformed permanent its front face's mana VALUE and not its cost,
-            -- and CR 202.3c's melded sum is a number no single cost states.
-            PC.manaCost = Face.manaCost face,
-            -- CR 202.3, derived here so the rest of the fold reads a number.
-            -- Game.manaCostFacesOf rather than `face`: CR 712.8e reads a transformed
-            -- permanent's mana value off its FRONT face's cost, and CR 708.2a's
-            -- face-down face has no mana cost (so CR 202.3a's 0). SUMMED because CR
-            -- 202.3c gives a melded permanent "the combined mana cost of the front
-            -- faces of each card that represents it"; every other object answers
-            -- with one face, whose sum is itself. An object with no card behind it
-            -- never arrives here -- Game.faceOf answers Nothing for it and the arm
-            -- above carries CR 202.3a's 0 -- so an empty Seq here is a printing the
-            -- game does not know (Game.frontFaceOfPrinting), which is Nothing.
-            PC.manaValue = case Game.manaCostFacesOf oid gs of
-              faces | Seq.null faces -> Nothing
-              faces -> Just (sum (fmap Quantity.manaValueOf faces)),
-            -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
-            -- instead" belongs to a CDA, so a printed star with none behind it is
-            -- Nothing. A star given its value by CR 208.2b reports Nothing off the
-            -- battlefield; one with a CDA is filled at layer 7a.
-            PC.power = case Face.power face of
-              Nothing -> Nothing
-              Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
-            PC.toughness = case Face.toughness face of
-              Nothing -> Nothing
-              Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
-            -- CR 306.5a: a literal number, copied through rather than evaluated.
-            PC.loyalty = Face.loyalty face,
-            -- CR 310.4a: a literal number, likewise.
-            PC.defense = Face.defense face,
-            PC.characteristicPT = seedCharacteristicPT face,
-            PC.cardTypes = TypeLine.types (Face.typeLine face),
-            PC.subtypes = TypeLine.subtypes (Face.typeLine face),
-            -- CR 604.1 / 613.10: the two ability lists the layer fold never
-            -- rewrites. In the SEED for enchant's reason below -- CR 707.2
-            -- names rules text among the copiable values -- which is what puts
-            -- a copied permanent's static and player abilities where
-            -- staticAbilitiesOf and Pawl.Engine.PlayerEffect can find them
-            -- instead of on the copier's printed face (CR 707.2a).
-            PC.staticAbilities = Face.staticAbilities face,
-            PC.playerAbilities = Face.playerAbilities face,
-            -- CR 116.2, in the seed for the same reason and read by
-            -- specialActionsOf below: CR 707.2a copies the abilities a face's
-            -- rules text derives, and CR 116.2d's permission is one of them.
-            PC.specialActions = Face.specialActions face,
-            PC.activatedAbilities = Face.activatedAbilities face,
-            PC.replacementEffects = Face.replacementEffects face,
-            PC.triggeredAbilities = Face.triggeredAbilities face,
-            -- CR 702.5a's printed instances. In the SEED rather than folded in
-            -- later, so they ride copiableCharacteristics: CR 707.2 names rules
-            -- text among the copiable values, and a granted instance is not
-            -- copiable precisely because applyModification writes it after the
-            -- seed. Read off `face`, so CR 708.2a's face-down substitution leaves
-            -- a face-down permanent with none.
-            PC.enchant = Face.enchant face,
-            -- CR 613.1's starting point, before layer 6 has run:
-            -- applyModification's LoseAllAbilities arm is the only writer.
-            PC.lostAllAbilities = False,
-            -- The seed is CR 613.1's starting point, before layer 3 has run.
-            PC.subtypeWordChanges = [],
-            PC.textChangedKeywords = Map.empty,
-            -- CR 613.1's starting point, before rules-changing effects.
-            PC.assignsCombatDamageWithToughness = False,
-            -- CR 613.1's starting point, before layer 6 has run:
-            -- applyModification's GrantsStationToughness arm is the only writer.
-            PC.grantsStationToughness = False,
-            -- CR 709.5 / 709.5b: the halves this object has, which -- like the
-            -- names above -- `face` cannot carry, a Face being one half's worth
-            -- of characteristics. Game.halvesOf decides, and it reads the copy
-            -- snapshot first, so a copy of a copy of a Room goes on carrying the
-            -- doors.
-            PC.halves = Game.halvesOf oid gs
-          }
+    -- CR 718.3b's swap sits OUTSIDE the record rather than in four of its fields,
+    -- so that CR 718.5's "remain the same" is visible as the default: everything
+    -- the seed builds is the printed value, and withPrototype below rewrites exactly
+    -- the four characteristics rule 718.3b names.
+    withPrototype oid gs face $
+      -- The seed predates every layer, so it can describe no object: every view is
+      -- Nothing. That silences the printed box's board-reading shapes only where
+      -- they go through this view at all -- Pawl.Engine.Count.evaluate reads a
+      -- Scope.InHistory snapshot and a Scope.OverPlayers player directly, so a Count
+      -- over either would read LIVE state here. What keeps both out is CR 208.1 /
+      -- 208.2: a printed box is a number or a star, and Pawl.CardSpec's "every
+      -- printed power and toughness box is a number or a star" lint holds every
+      -- card's own faces to it. A MINTED face may print a computed box (CR 111.3),
+      -- which Resolve.bakeTokenCharacteristics stamps into a Literal as the token is
+      -- created -- undeterminable ones included, so the only quantity that reaches
+      -- this seed from a token is CR 208.2's star. Pawl.CountSpec's Miming Slime
+      -- group is what proves that.
+      let seedViewOf = const Nothing
+          seedContext = Filter.contextFor (Game.teams gs) (controllerOf oid gs) (Just oid)
+       in PC.MkProjectedCharacteristics
+            { -- CR 709.4a: the names the object shows, which `face` cannot carry --
+              -- Game.namesOf decides which halves show.
+              PC.names = Game.namesOf oid gs,
+              PC.supertypes = TypeLine.supertypes (Face.typeLine face),
+              -- CR 702: a printed keyword appears once; layer 6 adds multiplicity.
+              PC.keywords = Map.fromSet (const 1) (Face.keywords face),
+              PC.colors = printedColorsOf face,
+              -- CR 202.1: the printed cost of the face the object is showing, so CR
+              -- 708.2a's face-down substitution leaves a face-down object with none.
+              -- `face` rather than Game.manaCostFacesOf below: CR 712.8e lends a
+              -- transformed permanent its front face's mana VALUE and not its cost,
+              -- and CR 202.3c's melded sum is a number no single cost states.
+              PC.manaCost = Face.manaCost face,
+              -- CR 202.3, derived here so the rest of the fold reads a number.
+              -- Game.manaCostFacesOf rather than `face`: CR 712.8e reads a transformed
+              -- permanent's mana value off its FRONT face's cost, and CR 708.2a's
+              -- face-down face has no mana cost (so CR 202.3a's 0). SUMMED because CR
+              -- 202.3c gives a melded permanent "the combined mana cost of the front
+              -- faces of each card that represents it"; every other object answers
+              -- with one face, whose sum is itself. An object with no card behind it
+              -- never arrives here -- Game.faceOf answers Nothing for it and the arm
+              -- above carries CR 202.3a's 0 -- so an empty Seq here is a printing the
+              -- game does not know (Game.frontFaceOfPrinting), which is Nothing.
+              PC.manaValue = case Game.manaCostFacesOf oid gs of
+                faces | Seq.null faces -> Nothing
+                faces -> Just (sum (fmap Quantity.manaValueOf faces)),
+              -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
+              -- instead" belongs to a CDA, so a printed star with none behind it is
+              -- Nothing. A star given its value by CR 208.2b reports Nothing off the
+              -- battlefield; one with a CDA is filled at layer 7a.
+              PC.power = case Face.power face of
+                Nothing -> Nothing
+                Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
+              PC.toughness = case Face.toughness face of
+                Nothing -> Nothing
+                Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
+              -- CR 306.5a: a literal number, copied through rather than evaluated.
+              PC.loyalty = Face.loyalty face,
+              -- CR 310.4a: a literal number, likewise.
+              PC.defense = Face.defense face,
+              PC.characteristicPT = seedCharacteristicPT face,
+              PC.cardTypes = TypeLine.types (Face.typeLine face),
+              PC.subtypes = TypeLine.subtypes (Face.typeLine face),
+              -- CR 604.1 / 613.10: the two ability lists the layer fold never
+              -- rewrites. In the SEED for enchant's reason below -- CR 707.2
+              -- names rules text among the copiable values -- which is what puts
+              -- a copied permanent's static and player abilities where
+              -- staticAbilitiesOf and Pawl.Engine.PlayerEffect can find them
+              -- instead of on the copier's printed face (CR 707.2a).
+              PC.staticAbilities = Face.staticAbilities face,
+              PC.playerAbilities = Face.playerAbilities face,
+              -- CR 116.2, in the seed for the same reason and read by
+              -- specialActionsOf below: CR 707.2a copies the abilities a face's
+              -- rules text derives, and CR 116.2d's permission is one of them.
+              PC.specialActions = Face.specialActions face,
+              PC.activatedAbilities = Face.activatedAbilities face,
+              PC.replacementEffects = Face.replacementEffects face,
+              PC.triggeredAbilities = Face.triggeredAbilities face,
+              -- CR 702.5a's printed instances. In the SEED rather than folded in
+              -- later, so they ride copiableCharacteristics: CR 707.2 names rules
+              -- text among the copiable values, and a granted instance is not
+              -- copiable precisely because applyModification writes it after the
+              -- seed. Read off `face`, so CR 708.2a's face-down substitution leaves
+              -- a face-down permanent with none.
+              PC.enchant = Face.enchant face,
+              -- CR 613.1's starting point, before layer 6 has run:
+              -- applyModification's LoseAllAbilities arm is the only writer.
+              PC.lostAllAbilities = False,
+              -- The seed is CR 613.1's starting point, before layer 3 has run.
+              PC.subtypeWordChanges = [],
+              PC.textChangedKeywords = Map.empty,
+              -- CR 613.1's starting point, before rules-changing effects.
+              PC.assignsCombatDamageWithToughness = False,
+              -- CR 613.1's starting point, before layer 6 has run:
+              -- applyModification's GrantsStationToughness arm is the only writer.
+              PC.grantsStationToughness = False,
+              -- CR 709.5 / 709.5b: the halves this object has, which -- like the
+              -- names above -- `face` cannot carry, a Face being one half's worth
+              -- of characteristics. Game.halvesOf decides, and it reads the copy
+              -- snapshot first, so a copy of a copy of a Room goes on carrying the
+              -- doors.
+              PC.halves = Game.halvesOf oid gs
+            }
+
+-- CR 718.3b: "both a prototyped spell and the permanent it becomes have only its
+-- alternative set of power, toughness, and mana cost characteristics. If that
+-- mana cost includes one or more colored mana symbols, the spell and the
+-- permanent it becomes are also that color or colors." The four characteristics
+-- rule 718.3b names, swapped into the seed and nothing else swapped, which is CR
+-- 718.5.
+--
+-- IN THE SEED, which is what makes CR 718.2a fall out with no work of its own:
+-- "the existence and values of these alternative characteristics are part of the
+-- object's copiable values", and a copy freezes exactly this record
+-- (Pawl.Engine.Event.copiedSnapshot over copiableCharacteristics). CR 718.3c's
+-- copy reads the frozen values for that reason and needs nothing of its own,
+-- which Pawl.PrototypeSpec's "CR 718.2a / 718.3c a copy of the prototyped spell
+-- is a white 2/2 too" proves: the token Lithoform Engine leaves has
+-- Object.prototyped False by construction, so its colours and box can only have
+-- come from the snapshot. CR 718.3d's copy of a prototyped PERMANENT rides the
+-- same read and has no producer in data/cards/, so it is a regression fence.
+--
+-- CR 718.4 is not re-asked here. Object.prototyped is stamped only as the card
+-- is cast (Pawl.Engine.Cast.stampPrototyped) and survives only the
+-- stack-to-battlefield move (Pawl.Engine.Event.changeZoneAttaching), so a
+-- prototype card in every other zone answers False and keeps its printed
+-- characteristics, which is rule 718.4's sentence exactly.
+--
+-- The FIRST inset frame, and CR 718.1 is why one is enough: it gives a prototype
+-- card "a second set of power, toughness, and mana cost characteristics",
+-- singular, so no printing offers two for Object.prototyped's Bool to have to
+-- choose between.
+withPrototype :: ObjectId -> GameState -> Face.Face Card.Type.Card -> ProjectedCharacteristics -> ProjectedCharacteristics
+withPrototype oid gs face pc = case (maybe False Object.prototyped (Game.lookupObject oid gs), Keyword.prototypes (Face.keywords face)) of
+  (True, frame : _) ->
+    pc
+      { PC.manaCost = Just (Prototype.cost frame),
+        -- CR 202.3 off the inset cost, exactly as the printed field is derived
+        -- from the printed one.
+        PC.manaValue = Just (Quantity.manaCostValue (Prototype.cost frame)),
+        PC.power = Just (Prototype.power frame),
+        PC.toughness = Just (Prototype.toughness frame),
+        -- CR 202.2 with rule 718.3b's second sentence. printedColorsOf's own
+        -- shape, with the inset cost in place of the printed one: a colour
+        -- indicator is a separate characteristic (CR 204.2) that rule 718.3b does
+        -- not name, so it survives.
+        PC.colors = Set.union (Face.colorIndicator face) (manaCostColors (Just (Prototype.cost frame)))
+      }
+  _ -> pc
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
 -- coloured symbols and its colour indicator. No devoid here: CR 702.114a makes it

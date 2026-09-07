@@ -2728,6 +2728,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.68a names no quality: the payload is a NUMBER, and the +N/+0 is
   -- written into the ability Pawl.Engine.Keyword.frenzy mints.
   Keyword.Frenzy _ -> []
+  -- CR 718.1's inset frame is a mana cost and a printed box; neither reaches a
+  -- Filter, and rule 702.160a's ability names no quality.
+  Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
   -- CR 702.184a is payload-free: the "another untapped creature you control" the
   -- cost taps is written into the ability Pawl.Engine.Keyword.station mints, not

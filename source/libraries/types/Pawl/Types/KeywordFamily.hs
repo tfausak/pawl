@@ -146,4 +146,9 @@ data KeywordFamily
   | -- | CR 702.103a: bestow [cost]. No card in the pool asks yet, and it is owed
     -- at the keyword rather than at the first asker.
     Bestow
+  | -- | CR 702.160a: prototype [cost] -- [power]\/[toughness]. The family a card
+    -- writing "a card with prototype" would name, as against one prototype
+    -- card's own inset frame; no card in the pool asks yet, and it is owed at
+    -- the keyword rather than at the first asker.
+    Prototype
   deriving (Bounded, Enum, Eq, Ord, Show)

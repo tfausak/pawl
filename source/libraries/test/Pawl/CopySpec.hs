@@ -1454,6 +1454,7 @@ handAppend printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = Map.empty,
             Object.bestowed = False,
+            Object.prototyped = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.Type.MkMana [],
             Object.announcedX = Nothing,

@@ -86,6 +86,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.designations = Set.empty,
           Object.kicked = Map.empty,
           Object.bestowed = False,
+          Object.prototyped = False,
           Object.phyrexianLifePaid = 0,
           Object.manaSpent = Mana.MkMana [],
           Object.announcedX = Nothing,
@@ -177,6 +178,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
               Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []}
               25,
           Object.bestowed = True,
+          Object.prototyped = True,
           Object.phyrexianLifePaid = 19,
           Object.manaSpent =
             Mana.MkMana
@@ -217,6 +219,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
           <> ",\"kicked\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]},\"times\":25}]"
           <> ",\"bestowed\":true"
+          <> ",\"prototyped\":true"
           <> ",\"phyrexianLifePaid\":19"
           <> ",\"manaSpent\":[{\"manaType\":{\"type\":\"Colored\",\"value\":{\"type\":\"Green\"}}"
           <> ",\"tags\":[],\"retention\":{\"type\":\"Ordinary\"},\"restriction\":null,\"rider\":null}]"
