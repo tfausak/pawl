@@ -5,7 +5,6 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Status as Status
 
@@ -102,14 +101,12 @@ data Player = MkPlayer
     -- convention `counters` above uses. Only ever climbs -- rule 903.10a counts
     -- the whole game, so nothing takes damage back out.
     --
-    -- Keyed by the commander's OWNER, not by an object and not by a printing.
-    -- CR 400.7 mints a fresh id on every zone change, so an id could not survive
-    -- the commander's first cast.
-    --
-    -- Not implemented: CR 702.124d's "consider damage from each of your two
-    -- commanders separately", which a partner deck's two commanders need and
-    -- this key cannot tell apart -- they pool under their shared owner (#939).
-    commanderDamage :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- Keyed by the COMMANDER, as `commander` above names one, and not by an
+    -- object: CR 400.7 mints a fresh id on every zone change, so an id could not
+    -- survive the commander's first cast. Not by its owner either, which is CR
+    -- 702.124d -- "consider damage from each of your two commanders separately"
+    -- -- and would pool a partner deck's pair under one key.
+    commanderDamage :: Map.Map PrintingId.PrintingId Natural.Natural,
     -- | CR 309.2 \/ 309.2a: the dungeon cards this player owns from outside the
     -- game, empty for a player who brought none. Deck.dungeons is where they come
     -- from and Pawl.Engine.Setup.createDeck copies them here.

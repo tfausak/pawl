@@ -468,6 +468,38 @@ partnerSpec s registry = Spec.describe s "Partner" $ do
             Spec.assertEqWith s "and one cast is tallied, against him" (commanderCastsOf back) [1]
           _ -> Spec.assertBool s False "expected Rograkh back in the command zone beside Akiri"
       _ -> Spec.assertBool s False "expected both commanders in the command zone"
+  -- CR 702.124d against CR 903.10a: "consider damage from each of your two
+  -- commanders separately". Eleven from each is twenty-two between them and
+  -- eleven apiece, so nobody has been dealt 21 by the SAME commander. One tally
+  -- shared by the pair reads 22 and takes the game off bob.
+  --
+  -- Both commanders are placed on the battlefield beside the copies CR 903.6
+  -- started in the command zone, which is the cheapest board that has two
+  -- commanders dealing damage; nothing here reads the command zone.
+  Spec.it s "CR 702.124d two partners dealing eleven each kill nobody" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    rograkh <- S.printingOf s registry "Rograkh, Son of Rohgahh"
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    let gs = partnerBoard mountain plains 1 [rograkh, akiri]
+        -- CR 903.7: bob is in the same Commander game, and the fixture builds
+        -- only alice's deck, so his forty is set here. Without it CR 704.5a's
+        -- zero life would decide every case below before rule 903.10a could.
+        seated = gs {GameState.players = Map.adjust (\p -> p {Player.life = 40}) S.bob (GameState.players gs)}
+        (rogOid, withRograkh) = S.addPermanent rograkh S.alice seated
+        (akiriOid, both) = S.addPermanent akiri S.alice withRograkh
+        hit n oid g = S.settleSba (S.runPure S.identityAnswer g (Damage.applyDamage [Damage.damageEvent g DamageKind.Combat oid (Recipient.ToPlayer S.bob) n]))
+        eleven = hit 11 akiriOid (hit 11 rogOid both)
+    Spec.assertEqWith s "CR 702.124d: eleven from each leaves bob in the game" (statusOf S.bob eleven) (Just Status.Playing)
+    Spec.assertEqWith s "the two tallies stand apart at eleven each" (tallyFrom S.alice S.bob eleven) [11, 11]
+    Spec.assertEqWith s "and he took all 22 life, so CR 704.5a is not what spared him" (S.lifeOf S.bob eleven) (Just 18)
+    -- The positive leg, on that same board one swing further: eleven more from
+    -- Rograkh alone takes HIS tally to 22, which is rule 903.10a's "21 or more
+    -- by the same commander". The two boards differ in that one hit.
+    let lethal = hit 11 rogOid eleven
+    Spec.assertEqWith s "CR 903.10a: twenty-two from Rograkh alone loses bob the game" (statusOf S.bob lethal) (Just (Status.Departed Departure.Type.Lost))
+    Spec.assertEqWith s "at 7 life, so CR 704.5a is not what killed him either" (S.lifeOf S.bob lethal) (Just 7)
+    Spec.assertEqWith s "and it was his tally that reached it, not Akiri's" (List.sort (tallyFrom S.alice S.bob lethal)) [11, 22]
 
 -- Answers CR 903.9b's offer with Returns for exactly one seat and Leaves for every
 -- other, which is what tells "asked alice" apart from "asked bob" and from "never
@@ -679,11 +711,16 @@ commanderInPlay pid gs =
   let ours oid = Commander.isCommander oid gs && fmap Object.owner (Game.lookupObject oid gs) == Just pid
    in List.find ours (Set.toList (GameState.battlefield gs))
 
--- CR 903.10a's tally: the combat damage `victim` has been dealt by the commander
--- `owner` brought.
-tallyFrom :: PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> Natural
+-- CR 903.10a's tally: the combat damage `victim` has been dealt by each commander
+-- `owner` brought, one entry per designation in printing-id order. A LIST and not
+-- a sum, which is CR 702.124d -- "consider damage from each of your two
+-- commanders separately" -- so a partner pair's two entries stay apart here as
+-- they do in Player.commanderDamage.
+tallyFrom :: PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> [Natural]
 tallyFrom owner victim gs =
-  maybe 0 (Map.findWithDefault 0 owner . Player.commanderDamage) (Map.lookup victim (GameState.players gs))
+  let designated = foldMap Player.commander (Map.lookup owner (GameState.players gs))
+      tally = foldMap Player.commanderDamage (Map.lookup victim (GameState.players gs))
+   in fmap (\printingId -> Map.findWithDefault 0 printingId tally) (Set.toAscList designated)
 
 -- One more combat with `attacker` active: CR 502.3's untap, which also ends CR
 -- 302.6's summoning sickness, and then the combat phase run step by step through
@@ -720,7 +757,7 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
     let (_, board) = S.addPermanent piker S.alice (commanderDuel kalakscion jedit)
         after = swing S.aggressiveAnswer S.alice board
     Spec.assertEqWith s "bob took 7 from the commander and 2 from the Piker" (S.lifeOf S.bob after) (Just 31)
-    Spec.assertEqWith s "and only the 7 was tallied" (tallyFrom S.alice S.bob after) 7
+    Spec.assertEqWith s "and only the 7 was tallied" (tallyFrom S.alice S.bob after) [7]
   -- CR 903.10a counts COMBAT damage, so the same commander dealing the same
   -- twenty-one points outside combat tallies nothing -- and the victim, at the
   -- same 19 the lethal case below leaves them at, is still playing.
@@ -734,7 +771,7 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
         let event = Damage.damageEvent board DamageKind.Noncombat oid (Recipient.ToPlayer S.bob) 21
             after = S.settleSba (S.runPure S.identityAnswer board (Damage.applyDamage [event]))
         Spec.assertEqWith s "bob lost the 21 life" (S.lifeOf S.bob after) (Just 19)
-        Spec.assertEqWith s "nothing was tallied" (tallyFrom S.alice S.bob after) 0
+        Spec.assertEqWith s "nothing was tallied" (tallyFrom S.alice S.bob after) [0]
         Spec.assertEqWith s "and he is still playing" (statusOf S.bob after) (Just Status.Playing)
   -- CR 903.10a itself: three 7-point swings are exactly 21.
   Spec.it s "CR 903.10a twenty-one combat damage from one commander loses the game" $ do
@@ -742,7 +779,7 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
     jedit <- S.printingOf s registry "Jedit Ojanen"
     let board = commanderDuel kalakscion jedit
         after = List.foldl' (\g _ -> swing S.aggressiveAnswer S.alice g) board [1 .. 3 :: Int]
-    Spec.assertEqWith s "bob's tally is 21" (tallyFrom S.alice S.bob after) 21
+    Spec.assertEqWith s "bob's tally is 21" (tallyFrom S.alice S.bob after) [21]
     -- CR 903.7's forty is what makes this assertion the load-bearing one: at 19
     -- CR 704.5a has not fired, so rule 903.10a is the only rule that can have.
     Spec.assertEqWith s "and his life is 19, so CR 704.5a did not kill him" (S.lifeOf S.bob after) (Just 19)
@@ -755,7 +792,7 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
     jedit <- S.printingOf s registry "Jedit Ojanen"
     let board = commanderDuel kalakscion jedit
         after = List.foldl' (\g _ -> swing S.aggressiveAnswer S.alice g) board [1 .. 2 :: Int]
-    Spec.assertEqWith s "bob's tally is 14" (tallyFrom S.alice S.bob after) 14
+    Spec.assertEqWith s "bob's tally is 14" (tallyFrom S.alice S.bob after) [14]
     Spec.assertEqWith s "he is at 26" (S.lifeOf S.bob after) (Just 26)
     Spec.assertEqWith s "still playing" (statusOf S.bob after) (Just Status.Playing)
     Spec.assertEqWith s "and the game has no result" (GameState.result after) Nothing
@@ -769,8 +806,8 @@ commanderDamageSpec s registry = Spec.describe s "CommanderDamage" $ do
     let seated = designating [(S.alice, kalakscion), (S.bob, jedit), (S.carol, shimatsu)] S.threePlayerGame
         board = intoPlay S.bob (intoPlay S.alice seated)
         after = List.foldl' (flip (swing (S.attackTo S.carol))) board [S.alice, S.alice, S.bob, S.bob]
-    Spec.assertEqWith s "alice's commander dealt carol 14" (tallyFrom S.alice S.carol after) 14
-    Spec.assertEqWith s "bob's dealt her 10" (tallyFrom S.bob S.carol after) 10
+    Spec.assertEqWith s "alice's commander dealt carol 14" (tallyFrom S.alice S.carol after) [14]
+    Spec.assertEqWith s "bob's dealt her 10" (tallyFrom S.bob S.carol after) [10]
     Spec.assertEqWith s "24 in all, so she is at 16" (S.lifeOf S.carol after) (Just 16)
     Spec.assertEqWith s "and neither tally reaches 21, so she is still playing" (statusOf S.carol after) (Just Status.Playing)
     Spec.assertEqWith s "with no result" (GameState.result after) Nothing
@@ -807,7 +844,7 @@ brawlSpec s registry = Spec.describe s "Brawl" $ do
     Spec.assertEqWith s "he is at 4, so CR 704.5a was never in the race either" (S.lifeOf S.bob after) (Just 4)
     -- CR 903.12h switches off the state-based action, not CR 903.10a's tally,
     -- which a card may still read.
-    Spec.assertEqWith s "and the tally still reached 21" (tallyFrom S.alice S.bob after) 21
+    Spec.assertEqWith s "and the tally still reached 21" (tallyFrom S.alice S.bob after) [21]
 
 -- Accepts CR 903.9a's offer; everything else is the identity answerer. The
 -- default (Script.declining, via Replay.defaultAnswer) LEAVES the commander where

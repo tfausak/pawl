@@ -22,7 +22,7 @@
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
 --   * CR 702.124's partner limbs other than CR 702.124h's plain one, and CR
---     702.124d's per-commander damage tally (#939).
+--     903.3a's "this card can be your commander" (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
 module Pawl.Engine.Commander where
 
@@ -126,10 +126,11 @@ isCommander oid gs = Maybe.isJust (commanderPrintingOf oid gs)
 --
 -- What this answers FOR a melded permanent is the component card, which is
 -- exactly what CR 903.9c's procedure needs to single out -- see
--- `commandZoneComponent`. Every other reader wants the Bool: rule 903.10a's
--- tally (`commanderOwnerOf`) counts a melded commander's combat damage, and rule
--- 903.8's cast permission cannot be reached by one, since no melded permanent is
--- ever in the command zone to be cast from.
+-- `commandZoneComponent`. Rule 903.10a's tally is keyed by that same answer, so
+-- a melded commander's combat damage lands under the card that is the
+-- commander; rule 903.8's cast permission wants only the Bool, and cannot be
+-- reached by a melded permanent at all, since none is ever in the command zone
+-- to be cast from.
 commanderPrintingOf :: ObjectId -> GameState -> Maybe PrintingId.PrintingId
 commanderPrintingOf oid gs = do
   obj <- Game.lookupObject oid gs
@@ -156,20 +157,6 @@ commandZoneComponent oid gs = do
   Monad.guard (not (Seq.null (Game.componentsOf (Object.source obj))))
   commanderPrintingOf oid gs
 
--- | CR 903.10a's key: the owner of the commander that dealt this damage, or
--- Nothing when the source was not a commander at all.
---
--- The OWNER and not the object, for `isCommander`'s reason: rule 903.3's
--- designation survives CR 400.7's fresh incarnations, which no object id does.
---
--- Not implemented: CR 702.124d's "consider damage from each of your two
--- commanders separately". A partner deck's two commanders share an owner, so
--- Player.commanderDamage pools their tallies under one key (#939).
-commanderOwnerOf :: ObjectId -> GameState -> Maybe PlayerId
-commanderOwnerOf oid gs
-  | isCommander oid gs = fmap Object.owner (Game.lookupObject oid gs)
-  | otherwise = Nothing
-
 -- | CR 903.10a / CR 704.6c: "a player who's been dealt 21 or more combat damage
 -- by the same commander over the course of the game loses the game". The
 -- predicate Pawl.Engine.Sba.losesNow reads, kept here for the reason this
@@ -179,12 +166,10 @@ commanderOwnerOf oid gs
 --
 -- The MAXIMUM over the tally and never its sum, which is the whole of "by the
 -- SAME commander": two commanders that between them dealt 24 have killed
--- nobody.
---
--- Not implemented: that reading for two commanders sharing an OWNER, which is
--- how CR 702.124a's partner decks make them. Player.commanderDamage keys the
--- tally by owner, so a partner pair's damage pools into one entry and 11 from
--- each reads as 22 (#939).
+-- nobody. Player.commanderDamage is keyed per commander (CR 702.124d), so that
+-- holds of a partner deck's pair as much as of two opponents'.
+-- Pawl.CommanderSpec's "CR 702.124d two partners dealing eleven each kill
+-- nobody" is the proof.
 --
 -- ">= 21" and not "== 21", because rule 903.10a says "21 or more" and one
 -- damage event can carry the difference on its own.

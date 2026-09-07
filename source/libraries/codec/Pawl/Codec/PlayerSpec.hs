@@ -10,7 +10,6 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Status as Status
 
@@ -69,7 +68,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.speed = Just 4,
           Player.commander = Set.fromList [PrintingId.MkPrintingId 5, PrintingId.MkPrintingId 17],
           Player.commanderCasts = Map.fromList [(PrintingId.MkPrintingId 5, 6), (PrintingId.MkPrintingId 17, 19)],
-          Player.commanderDamage = Map.singleton (PlayerId.MkPlayerId 7) 8,
+          Player.commanderDamage = Map.singleton (PrintingId.MkPrintingId 7) 8,
           Player.dungeons = Set.fromList [PrintingId.MkPrintingId 9, PrintingId.MkPrintingId 11],
           Player.outsideTheGame = Map.singleton (PrintingId.MkPrintingId 12) 13,
           Player.completedDungeons = 10,

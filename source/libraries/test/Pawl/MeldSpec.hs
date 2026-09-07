@@ -1095,7 +1095,7 @@ spec s registry = Spec.describe s "Meld" $ do
         firstPid : _ -> do
           let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton firstPid}) S.alice (GameState.players board)}
               pings gs = S.runPure S.identityAnswer gs (Damage.applyDamage [Damage.damageEvent gs DamageKind.Combat meldedId (Recipient.ToPlayer S.bob) 2])
-              tally gs = maybe 0 (Map.findWithDefault 0 S.alice . Player.commanderDamage) (Map.lookup S.bob (GameState.players gs))
+              tally gs = maybe 0 (Map.findWithDefault 0 firstPid . Player.commanderDamage) (Map.lookup S.bob (GameState.players gs))
           Spec.assertEqWith s "CR 903.10a the Garrison is alice's commander, so the melded permanent's 2 is tallied" (tally (pings designated)) 2
           Spec.assertEqWith s "and nothing is tallied when she designated neither half" (tally (pings board)) 0
           Spec.assertEqWith s "setup: bob took the 2 either way" (fmap (S.lifeOf S.bob) [pings designated, pings board]) [Just 18, Just 18]
