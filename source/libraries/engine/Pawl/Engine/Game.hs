@@ -797,6 +797,10 @@ mergeComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
 mergeComponentsOf source = case source of
   Source.OfMerge components -> Seq.fromList (NonEmpty.toList components)
   Source.OfMeld _ -> Seq.empty
+  -- CR 722.3c: a prepared card's copy is one printing, and no mutating creature
+  -- spell can have merged with it -- Pawl.Engine.Event.mergeComponents refuses
+  -- every source but OfCard and OfMerge.
+  Source.OfCardCopy _ -> Seq.empty
   Source.OfCard _ -> Seq.empty
   Source.OfToken _ -> Seq.empty
   Source.OfAbility _ -> Seq.empty
