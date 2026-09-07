@@ -13,8 +13,9 @@ import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 -- are here are CR 116.2a's land play, CR 116.2b's turning a face-down permanent
 -- face up, CR 116.2c's paying to end a continuous effect, CR 116.2d's ignoring a
 -- static ability's effect, CR 116.2e's Circling Vultures discard, CR 116.2h's
--- foretell, CR 116.2k's plot and CR 116.2m's unlock cost; the tracker for the
--- rest of rule 116.2 is #875. Grows.
+-- foretell, CR 116.2k's plot and CR 116.2m's unlock cost. CR 116.2f's suspend
+-- is #3340; CR 116.2i's planar die is #934 and CR 116.2j's conspiracy is #937.
+-- Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
