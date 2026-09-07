@@ -279,7 +279,7 @@ data Object = MkObject
     --
     -- NOT the other direction. A `preparedCopy` on the permanent would have to be
     -- kept in step with a copy the state-based action can remove, where this
-    -- direction has one writer -- Pawl.Engine.Prepare.mintOnDesignated -- and
+    -- direction has one writer -- Pawl.Engine.Prepare.mint -- and
     -- every reader already holds the copy: Pawl.Engine.Sba sweeps exile and
     -- Pawl.Engine.Cast is asked about the object being cast.
     --
