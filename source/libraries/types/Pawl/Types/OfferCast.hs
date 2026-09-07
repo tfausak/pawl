@@ -28,6 +28,10 @@ data OfferCast = MkOfferCast
     -- carries both postures in one sentence. Wild Evocation's "the player casts
     -- it ... if able" is the mandatory one; every other producer prints a "may".
     --
+    -- Not implemented: a printed "plays that card" reaches CR 116.2a's land
+    -- drop as well as CR 601's cast, and this opcode offers only the cast, so
+    -- Word of Command cannot make a player play a land (#3347).
+    --
     -- Mandatory does NOT mean the cast always happens: rule 601.3's prohibitions
     -- and an unpayable cost still stop it, which is what "if able" says out
     -- loud. Nor does it always remove the question -- CR 118.8c hands it back

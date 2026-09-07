@@ -114,6 +114,8 @@ import qualified Pawl.Codec.ConjureDestinationSpec
 import qualified Pawl.Codec.ConjureSpec
 import qualified Pawl.Codec.ContinuousEffectSpec
 import qualified Pawl.Codec.ControlChangedSpec
+import qualified Pawl.Codec.ControlDurationSpec
+import qualified Pawl.Codec.ControlPlayerSpec
 import qualified Pawl.Codec.ControllerBecomesTargetSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.CopyExceptionSpec
@@ -306,6 +308,7 @@ import qualified Pawl.Codec.PileSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
 import qualified Pawl.Codec.PlayerAttacksPlayerSpec
 import qualified Pawl.Codec.PlayerAttacksWithSpec
+import qualified Pawl.Codec.PlayerControlSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerCounterTallySpec
 import qualified Pawl.Codec.PlayerCountersSpec
@@ -715,7 +718,9 @@ spec s registry = do
   Pawl.Codec.CompletedDungeonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ContinuousEffectSpec.spec s
+  Pawl.Codec.ControlDurationSpec.spec s
   Pawl.Codec.ControlChangedSpec.spec s
+  Pawl.Codec.ControlPlayerSpec.spec s
   Pawl.Codec.ControllerBecomesTargetSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
   Pawl.Codec.CopyExceptionSpec.spec s
@@ -912,6 +917,7 @@ spec s registry = do
   Pawl.Codec.PlayerCounterTallySpec.spec s
   Pawl.Codec.PlayerCountersSpec.spec s
   Pawl.Codec.PlayerDrawsNthCardSpec.spec s
+  Pawl.Codec.PlayerControlSpec.spec s
   Pawl.Codec.PlayerEffectSpec.spec s
   Pawl.Codec.PlayerIdSpec.spec s
   Pawl.Codec.PlayerQuantitySpec.spec s

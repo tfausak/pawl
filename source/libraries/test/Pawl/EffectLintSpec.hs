@@ -230,6 +230,7 @@ ownQuantities effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
+  Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   -- The entry riders' counts, which Resolve.slotsOf reads and ownCounts does
@@ -981,7 +982,7 @@ storedPlayerScope effect = case effect of
 -- Which chooser-shaped ObjectRef arms Pawl.Engine.Resolve can ASK for at the
 -- position this tags. A CR 608.2d choice is announced while the effect is
 -- applied, so an opcode that never reaches the Game monad for its objects cannot
--- make one -- and today exactly three arms of Resolve do, over different subsets.
+-- make one -- and only some arms of Resolve do, over different subsets.
 -- Named for those ARMS rather than for the opcodes: this is a property of
 -- what Pawl.Engine.Resolve implements, not of the card's alphabet.
 data Asks
@@ -1002,6 +1003,11 @@ data Asks
     -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and CR
     -- 701.27a turns over PERMANENTS.
     AsksTransformGather
+  | -- | Pawl.Engine.Resolve's Effect.LookAt arm. It asks the hand chooser --
+    -- Word of Command's "look at target opponent's hand and choose a card from
+    -- it" -- through the same chooseCardsInHand the move gather uses, and falls
+    -- through to the pure sweep for every other arm.
+    AsksLookAtArm
   deriving (Eq, Show)
 
 -- Whether an ObjectRef arm is a resolution-time QUESTION rather than a read --
@@ -1069,6 +1075,12 @@ asksFor asks ref = case asks of
   AsksTransformGather -> case ref of
     ObjectRef.AnyNumberMatching {} -> True
     _ -> False
+  -- One arm and one only, for AsksTransformGather's reason: Resolve's
+  -- Effect.LookAt arm routes the hand chooser through chooseCardsInHand and
+  -- falls through to the pure sweep for everything else.
+  AsksLookAtArm -> case ref of
+    ObjectRef.ChosenCardInHand {} -> True
+    _ -> False
 
 -- Every ObjectRef position one effect holds, each tagged with the asking site
 -- that reads it. effectFilters' sibling one field shallower: that traversal takes
@@ -1114,6 +1126,7 @@ effectObjectRefs effect = case effect of
   -- nothing.
   Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
   Effect.ControlPlayerNextTurn {} -> []
+  Effect.ControlPlayerThisResolution {} -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
   Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
   -- THE gather that asks, and the one that elides the random arm (#1733).
@@ -1122,7 +1135,7 @@ effectObjectRefs effect = case effect of
   Effect.Mill {} -> []
   -- CR 701.20a's reveal, the other asking arm.
   Effect.Reveal (Reveal.MkReveal ref _) -> [(AsksRevealArm, ref)]
-  Effect.LookAt (LookAt.MkLookAt ref _) -> read_ [ref]
+  Effect.LookAt (LookAt.MkLookAt ref _) -> [(AsksLookAtArm, ref)]
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
@@ -1692,7 +1705,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         -- the enumeration is checkable by reading down that file.
         --
         -- One shape of singular reader is deliberately absent:
-        -- Effect.ControlPlayerNextTurn,
+        -- Effect.ControlPlayerNextTurn, Effect.ControlPlayerThisResolution,
         -- MonarchTarget's InSlot and ExchangeSides' WithController match
         -- Recipient.ToPlayer, and no binder in boundPlurally mints a player slot.
         --

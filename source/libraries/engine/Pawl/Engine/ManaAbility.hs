@@ -238,6 +238,7 @@ manaProduced effect = case effect of
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame _ -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
+  Effect.ControlPlayerThisResolution _ -> Nothing
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
   Effect.TurnFaceDown _ -> Nothing
@@ -417,6 +418,7 @@ movesLibraryCard effect = case effect of
   Effect.Venture {} -> False
   Effect.PlayerSacrifices {} -> False
   Effect.ControlPlayerNextTurn _ -> False
+  Effect.ControlPlayerThisResolution _ -> False
   Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
   Effect.TurnFaceDown _ -> False

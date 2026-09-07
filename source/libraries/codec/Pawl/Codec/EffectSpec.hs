@@ -37,6 +37,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Count as Count
@@ -299,6 +300,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ControlPlayerNextTurn (SlotName.MkSlotName (Text.pack "target")))
       " {\"type\":\"ControlPlayerNextTurn\",\"value\":\"target\"} "
+  -- CR 723.2's arm, with rule 723.7's restriction written: Word of Command's.
+  Spec.it s "ControlPlayerThisResolution" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ControlPlayerThisResolution (ControlPlayer.MkControlPlayer (SlotName.MkSlotName (Text.pack "opponent")) True))
+      " {\"type\":\"ControlPlayerThisResolution\",\"value\":{\"slot\":\"opponent\",\"manaFromLandsOnly\":true}} "
   -- Both ObjectRef arms, plus the two shapes CR 701.19c's regeneration rider
   -- takes. The two-element literal pins the elided (Nothing) arm of the
   -- bound-count slot below.

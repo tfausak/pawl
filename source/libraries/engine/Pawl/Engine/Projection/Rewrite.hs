@@ -437,6 +437,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) (rewriteQuantity pairs quantity))
   Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
+  Effect.ControlPlayerThisResolution _ -> effect
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot mBuried mPermanents)
   -- CR 612.1: the ref may carry a Filter of printed card text, so a text-changer
   -- reaches it exactly as Destroy's above. A REGRESSION FENCE rather than a

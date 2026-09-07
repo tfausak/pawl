@@ -24,6 +24,7 @@ import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.Conjure as Conjure
+import qualified Pawl.Codec.ControlPlayer as ControlPlayer
 import qualified Pawl.Codec.CopyStackObject as CopyStackObject
 import qualified Pawl.Codec.Counter as Counter
 import qualified Pawl.Codec.Create as Create
@@ -113,6 +114,7 @@ codec cardCodec abilityCodec =
       Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
       Arm.optionalPayload "RestartGame" ObjectRef.codec Effect.RestartGame (\x -> case x of Effect.RestartGame y -> Just y; _ -> Nothing),
       Arm.payload "ControlPlayerNextTurn" SlotName.codec Effect.ControlPlayerNextTurn (\x -> case x of Effect.ControlPlayerNextTurn y -> Just y; _ -> Nothing),
+      Arm.payload "ControlPlayerThisResolution" ControlPlayer.codec Effect.ControlPlayerThisResolution (\x -> case x of Effect.ControlPlayerThisResolution y -> Just y; _ -> Nothing),
       Arm.payload "Destroy" Destroy.codec Effect.Destroy (\x -> case x of Effect.Destroy y -> Just y; _ -> Nothing),
       Arm.payload "Fight" Fight.codec Effect.Fight (\x -> case x of Effect.Fight y -> Just y; _ -> Nothing),
       Arm.payload "Sacrifice" SacrificeEffect.codec Effect.Sacrifice (\x -> case x of Effect.Sacrifice y -> Just y; _ -> Nothing),

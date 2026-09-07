@@ -667,7 +667,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     Spec.assertEqWith s "and alice, the active player, is who was asked" asked [S.alice]
   Spec.it s "CR 723.1 a controlled active player's choice of defender routes to their controller" $ do
     -- THREE seats (alice active, bob, carol) with carol controlling alice
-    -- (Mindslaver-style: GameState.activeControl = Just (MkDecider carol)),
+    -- (Mindslaver-style: GameState.control names carol as alice's decider),
     -- the established fixture idiom for a controlled player -- the same shape
     -- GameSpec's CR 723.6 concede test (GameSpec.hs:811-858) and DecideSpec's
     -- CR 723.3 case (DecideSpec.hs:19-23) both set up. Three seats, not two, so
@@ -689,8 +689,8 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- `Decide.deciderFor pid gs` would record `[Decider.MkDecider S.alice]`
     -- below -- handing alice's own choice back to her, which is the CR 723.1
     -- violation this test exists to catch -- and none of the other six cases in
-    -- this group sets activeControl, so none of them would notice.
-    let controlled = (S.oneDefendingPlayer S.threePlayerGame) {GameState.activeControl = Just (Decider.MkDecider S.carol)}
+    -- this group sets GameState.control, so none of them would notice.
+    let controlled = (S.oneDefendingPlayer S.threePlayerGame) {GameState.control = S.turnControl S.carol S.alice}
         (_, deciders) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefenderRecordingDecider S.bob) controlled (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))

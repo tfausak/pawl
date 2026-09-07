@@ -27,6 +27,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
@@ -66,6 +67,7 @@ import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -655,7 +657,23 @@ manaSourcesGiven capacity grants pcs pid gs =
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
       isSource oid = any (\(cost, restrictions, ability, _, _) -> Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
-   in filter isSource (Projection.controlsGiven grants pid gs)
+      -- CR 723.7, in the one form a card prints it: Word of Command's "the
+      -- player can activate mana abilities only if they're from lands that
+      -- player controls". Read off the control row rather than from the
+      -- resolving effect, so this stays a question about the PLAYER; every
+      -- uncontrolled player and every CR 723.1 control answers False and the
+      -- filter is the identity.
+      --
+      -- Rule 723.7's other half -- "and only if mana they produce is spent to
+      -- ... play that card" -- needs no line here: a CR 723.2 control lives
+      -- inside one resolution, and the only payment window inside Word of
+      -- Command's is the cast it forces.
+      --
+      -- The types are the PROJECTED ones (CR 613), so a Song of the Dryads'd
+      -- Sol Ring is a land here and a Dryad Arbor is one too.
+      landsOnly = maybe False PlayerControl.manaFromLandsOnly (Map.lookup pid (GameState.control gs))
+      isLand oid = maybe False (Set.member CardType.Land . PC.cardTypes) (Map.lookup oid pcs)
+   in filter (\oid -> isSource oid && (not landsOnly || isLand oid)) (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
 -- types, carrying at least these production-time tags.
