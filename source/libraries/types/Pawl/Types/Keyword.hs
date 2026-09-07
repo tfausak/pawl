@@ -299,6 +299,9 @@ data Keyword
   | -- | 702.118b: a creature with skulk can't be blocked by creatures with
     -- greater power.
     Skulk
+  | -- | 702.120a: for each mode of this modal spell (CR 700.2) chosen beyond the
+    -- first, an additional cost paid as it is cast.
+    Escalate (Cost.Cost Keyword)
   | -- | 702.121a: whenever this creature attacks, it gets +1/+1 until end of turn
     -- for each opponent you attacked with a creature this combat.
     Melee

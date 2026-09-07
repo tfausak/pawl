@@ -2531,6 +2531,9 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Kicker cost -> costFilters cost
   Keyword.Multikicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
+  -- CR 702.120a: the escalate cost, whose components may hold a Filter exactly as
+  -- entwine's may.
+  Keyword.Escalate cost -> costFilters cost
   -- CR 702.27a: the buyback cost, whose components may hold a Filter exactly as
   -- kicker's and entwine's may.
   Keyword.Buyback cost -> costFilters cost
