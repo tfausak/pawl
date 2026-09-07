@@ -29,6 +29,7 @@ import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Combat as Combat
@@ -44,6 +45,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -57,12 +60,14 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -356,6 +361,152 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: the rejected one alice owns is a Human" (Projection.subtypesOf humanId board) (Set.fromList [Subtype.Cleric, Subtype.Human])
     Spec.assertEqWith s "setup: and the other is a creature bob owns" (fmap Object.owner (Game.lookupObject theirsId board)) (Just S.bob)
     Spec.assertEqWith s "setup: which is a creature all the same" (Projection.subtypesOf theirsId board) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+  -- CR 702.140e's second sentence read over the ability families CR 613.11
+  -- applies OUTSIDE the layer system -- the twelve Pawl.Types.RuleAbilities
+  -- carries. Every case below is a pair of boards differing in the UNDER
+  -- component alone, so a refusal is the under component's printed sentence
+  -- talking and not the merge breaking the declaration.
+  --
+  -- Silent Arbiter ({4} Artifact Creature -- Construct 1/5, "No more than one
+  -- creature can attack each combat"): a Construct and no Human, so rule
+  -- 702.140a admits it as a mutate target.
+  Spec.it s "CR 702.140e a Silent Arbiter under a Cubwarden still holds alice to one attacker" $ do
+    plains <- S.printingOf s registry "Plains"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    arbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (host, board, spellId, one, two) = withTwoPikers piker (mutateBoard plains arbiter cubwarden)
+        after = intoCombat (merging MutateSide.Over host board spellId)
+        (cHost, cBoard, cSpell, cOne, cTwo) = withTwoPikers piker (mutateBoard plains falcon cubwarden)
+        control = intoCombat (merging MutateSide.Over cHost cBoard cSpell)
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [one, two] after)) "CR 702.140e the merged permanent keeps the Arbiter's bound, so the two Pikers cannot attack together"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [one] after) "CR 508.1c the bound is a ceiling: either Piker alone still attacks"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [two] after) "and so does the other"
+    -- The paired board, differing in the under component alone: Falcon
+    -- Abomination prints no combat restriction, so the same two Pikers attack.
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [cOne, cTwo] control) "CR 730.2a with a Falcon Abomination under it instead, the two attack together"
+    -- The proxies, after the behaviours.
+    Spec.assertEqWith s "the two cards represent one permanent" (componentNames host after) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Silent Arbiter")]
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [one, two] (intoCombat board))) "setup: the unmerged Arbiter bound them already"
+  -- Dormant Gomazoa ({1}{U}{U} Creature -- Jellyfish 0/4, "This creature doesn't
+  -- untap during your untap step"), through CR 502.3's turn-based action itself.
+  Spec.it s "CR 702.140e a Dormant Gomazoa under a Cubwarden still does not untap" $ do
+    plains <- S.printingOf s registry "Plains"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    gomazoa <- S.printingOf s registry "Dormant Gomazoa"
+    let untapping (h, b, sp) =
+          let merged = S.tapObject h (merging MutateSide.Over h b sp)
+           in (h, S.runPure S.identityAnswer merged (Engine.untapAll S.alice))
+        (host, after) = untapping (mutateBoard plains gomazoa cubwarden)
+        (cHost, control) = untapping (mutateBoard plains falcon cubwarden)
+    Spec.assertEqWith s "CR 702.140e/502.3 the merged permanent keeps the Gomazoa's prohibition and stays tapped" (fmap Object.tapped (Game.lookupObject host after)) (Just TapState.Tapped)
+    -- The paired board, differing in the under component alone.
+    Spec.assertEqWith s "CR 502.3 with a Falcon Abomination under it instead, the same permanent untaps" (fmap Object.tapped (Game.lookupObject cHost control)) (Just TapState.Untapped)
+    Spec.assertEqWith s "the two cards represent one permanent" (componentNames host after) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Dormant Gomazoa")]
+  -- Prized Unicorn ({2}{G} Creature -- Unicorn 2/2, "All creatures able to block
+  -- this creature do so"), through CR 509.1c's own gate on bob's declaration.
+  Spec.it s "CR 702.140e a Prized Unicorn under a Cubwarden still makes bob block it" $ do
+    plains <- S.printingOf s registry "Plains"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    unicorn <- S.printingOf s registry "Prized Unicorn"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let attacking under =
+          let (h, b, sp) = mutateBoard plains under cubwarden
+              (blocker, withBlocker) = S.addPermanent piker S.bob b
+              merged = intoCombat (merging MutateSide.Over h withBlocker sp)
+           in (h, blocker, S.runPure S.aggressiveAnswer merged (Combat.declareAttackers S.manaPerformer S.alice))
+        (host, blockerId, after) = attacking unicorn
+        -- The paired board's under component is a Goblin Piker rather than the
+        -- Falcon Abomination the cases above use: the Falcon prints flying, and
+        -- a blocker that CANNOT block would make an empty declaration legal for
+        -- the wrong reason.
+        (cHost, _, control) = attacking piker
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty after)) "CR 702.140e the merged permanent keeps the Unicorn's requirement, so bob may not decline to block"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blockerId (Set.singleton host)) after) "while blocking it is legal"
+    -- The paired board, differing in the under component alone.
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty control) "CR 509.1c with a Goblin Piker under it instead, bob may decline"
+    -- The proxies, after the behaviours: both merged permanents really attacked,
+    -- so neither block question was asked of an empty combat.
+    Spec.assertEqWith s "setup: the merged permanent attacked" (S.attackerDeclarationsOf after) [host]
+    Spec.assertEqWith s "setup: and so did the control's" (S.attackerDeclarationsOf control) [cHost]
+  -- Exalted Dragon ({5}{W} Creature -- Dragon 5/5, "This creature can't attack
+  -- unless you sacrifice a land"), through CR 508.1h's payment during the
+  -- declaration itself.
+  Spec.it s "CR 702.140e an Exalted Dragon under a Cubwarden still charges a land to attack" $ do
+    plains <- S.printingOf s registry "Plains"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    dragon <- S.printingOf s registry "Exalted Dragon"
+    let attacking under =
+          let (h, b, sp) = mutateBoard plains under cubwarden
+              merged = intoCombat (merging MutateSide.Over h b sp)
+           in (h, S.runPure S.aggressiveAnswer merged (Combat.declareAttackers S.manaPerformer S.alice))
+        (host, after) = attacking dragon
+        (cHost, control) = attacking falcon
+    Spec.assertEqWith s "CR 702.140e/508.1h the merged permanent keeps the Dragon's toll: one of the four Plains was sacrificed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Plains")) S.alice after) 3
+    Spec.assertEqWith s "and it attacked all the same" (S.attackerDeclarationsOf after) [host]
+    -- The paired board, differing in the under component alone.
+    Spec.assertEqWith s "CR 508.1 with a Falcon Abomination under it instead, the four Plains all survive" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Plains")) S.alice control) 4
+    Spec.assertEqWith s "and that one attacked too" (S.attackerDeclarationsOf control) [cHost]
+  -- CR 603.7 read over a merged permanent: a delayed ability's DECLARATION is
+  -- card data rather than a characteristic, so no projection carries it and the
+  -- lookup walks the components' cards instead (Game.facesOfWithLastKnown).
+  --
+  -- Ivory Gargoyle ({4}{W} Creature -- Gargoyle 2/2, "When this creature dies,
+  -- return it to the battlefield ... at the beginning of the next end step and
+  -- you skip your next draw step"): a Gargoyle and no Human, and its dies trigger
+  -- arms a delayed ability declared on ITS face and not on Cubwarden's.
+  --
+  -- The case stops at the ARM rather than at the return, where
+  -- Pawl.LeavesTriggerSpec's ivoryGargoyleSpec stops and for that group's reason:
+  -- CR 603.7e leaves the delayed ability the dead battlefield id, so its payload
+  -- finds nothing to move once the end step arrives (#3173). What this proves is
+  -- that the name resolved to text at all.
+  Spec.it s "CR 603.7 an Ivory Gargoyle under a Cubwarden still arms its delayed ability" $ do
+    plains <- S.printingOf s registry "Plains"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    gargoyle <- S.printingOf s registry "Ivory Gargoyle"
+    let dying under =
+          let (h, b, sp) = mutateBoard plains under cubwarden
+              merged = merging MutateSide.Over h b sp
+              killed = S.runPure S.identityAnswer merged (Event.destroy Regenerability.Regenerable [h])
+              settled = S.runPure S.identityAnswer killed Engine.settleForPriority
+           in (h, settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+        (host, placed, armed) = dying gargoyle
+        (_, cPlaced, control) = dying falcon
+    Spec.assertEqWith s "CR 603.7 resolving the under component's dies trigger armed its delayed ability" (Seq.length (GameState.delayedTriggers armed)) 1
+    -- The paired board, differing in the under component alone: Falcon
+    -- Abomination declares no delayed ability and has no dies trigger to arm one.
+    Spec.assertEqWith s "CR 730.2a with a Falcon Abomination under it instead, nothing is armed" (Seq.length (GameState.delayedTriggers control)) 0
+    -- The proxies, after the behaviour: the merged permanent really died, and its
+    -- dies trigger really was the thing that resolved.
+    Spec.assertEqWith s "setup: the merged permanent died" (Game.lookupObject host placed) Nothing
+    Spec.assertEqWith s "setup: and its dies trigger was on the stack" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "setup: while the control board put nothing there" (length (GameState.stack cPlaced)) 0
+
+-- The merged board moved to CR 508.1's declaration, on S.combatBoardOf's terms:
+-- alice active, bob the defending player (CR 506.2), and the beginning of combat
+-- step already past. The merge itself has to happen in a main phase, so the two
+-- cannot come from one fixture.
+intoCombat :: GameState.GameState -> GameState.GameState
+intoCombat gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob]},
+      GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.DeclareAttackers)
+    }
+
+-- mutateBoard with two more of alice's creatures on it, for the cases that ask
+-- how many creatures may be declared rather than what one of them may do.
+withTwoPikers :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId) -> (ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+withTwoPikers piker (host, board, spellId) =
+  let (one, withOne) = S.addPermanent piker S.alice board
+      (two, withTwo) = S.addPermanent piker S.alice withOne
+   in (host, withTwo, spellId, one, two)
 
 -- CR 614.12a's as-enters copy choice answered with `victim`, PINNED to that id
 -- rather than searched for, so a mutation cannot be repaired by an answerer that

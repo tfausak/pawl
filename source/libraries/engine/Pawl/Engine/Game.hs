@@ -784,6 +784,30 @@ manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
       let card = Printing.card printing
       Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
 
+-- `componentsOf` NARROWED to CR 730.2's own subject, which is a merged permanent
+-- and nothing else, TOP TO BOTTOM. meldComponentsOf below is the same narrowing
+-- on the other side of that classifier, and for the same reason: CR 712.8g gives
+-- a melded permanent only its combined back face, so a reader that must see past
+-- the topmost component of a MERGE must not see past a meld's result face.
+--
+-- Its two readers are `facesOfWithLastKnown` and `cardsOfWithLastKnown` below,
+-- for CR 702.140e's abilities. Every other rule that looks past the topmost
+-- component takes `componentsOf`, which CR 712.21 and CR 730.3 share.
+mergeComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
+mergeComponentsOf source = case source of
+  Source.OfMerge components -> Seq.fromList (NonEmpty.toList components)
+  Source.OfMeld _ -> Seq.empty
+  -- CR 722.3c: such a copy is never on the battlefield to be merged INTO, which
+  -- is Pawl.Engine.Event.mergeComponents' own arm for it.
+  Source.OfCardCopy _ -> Seq.empty
+  Source.OfCard _ -> Seq.empty
+  Source.OfToken _ -> Seq.empty
+  Source.OfAbility _ -> Seq.empty
+  Source.OfTrigger _ -> Seq.empty
+  Source.OfEmblem _ -> Seq.empty
+  Source.OfSpellCopy _ -> Seq.empty
+  Source.OfInherentTrigger _ -> Seq.empty
+
 -- `componentsOf` NARROWED to CR 202.3c's own subject, which is a melded
 -- permanent and nothing else: rule 202.3c is an exception to CR 202.3, and CR
 -- 730.2a states no such exception -- a merged permanent's mana value is its
@@ -845,8 +869,49 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- card's other faces: that fallback is about which face happens to be up as an
 -- opcode RUNS, and a zone-functioning question is asked of the face the ability
 -- was read off.
+--
+-- Over EVERY card representing the object (CR 702.140e), which is what lets a
+-- delayed ability an under-component declared be found at all. Left-biased, so a
+-- name two components both declare resolves to the topmost one's text -- CR
+-- 730.2a's tie-break, and unreachable while Pawl.CardSpec's D4 dataflow lint
+-- keeps a name local to the face that arms it.
 delayedAbilitiesOf :: ObjectId -> GameState -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-delayedAbilitiesOf oid gs = maybe Map.empty Face.delayedAbilities (faceOfWithLastKnown oid gs)
+delayedAbilitiesOf oid gs = Map.unions (fmap Face.delayedAbilities (facesOfWithLastKnown oid gs))
+
+-- CR 702.140e: the faces of every card representing `oid`, topmost first -- one
+-- face for an ordinary object, and a merged permanent's whole stack. The one
+-- read that looks past CR 730.2a's topmost component WITHOUT going through the
+-- copy snapshot, and CR 603.7 is why: a delayed ability's declaration is card
+-- data rather than a characteristic, so no projection carries it and there is
+-- nothing but the printings to walk; see #3373.
+facesOfWithLastKnown :: ObjectId -> GameState -> [Face Card]
+facesOfWithLastKnown oid gs =
+  Maybe.maybeToList (faceOfWithLastKnown oid gs)
+    <> Maybe.mapMaybe
+      (fmap (resolveFaceFor (lookupObject oid gs)) . flip cardOfPrinting gs)
+      -- The head is the topmost component, which faceOfWithLastKnown already
+      -- answered with -- and answered with CR 708.2's substitution applied,
+      -- which this arm does not repeat.
+      (drop 1 (Foldable.toList (foldMap mergeComponentsOf (sourceOfWithLastKnown oid gs))))
+
+-- CR 702.140e: every card representing `oid`, topmost first -- what
+-- `cardOfWithLastKnown` answers with, widened past CR 730.2a's topmost
+-- component for facesOfWithLastKnown's reason. Its reader is
+-- Pawl.Engine.Resolve.Effect.declaredDelayedAbility's fallback, which asks the
+-- card rather than the face that is up.
+cardsOfWithLastKnown :: ObjectId -> GameState -> [Card]
+cardsOfWithLastKnown oid gs =
+  Maybe.maybeToList (cardOfWithLastKnown oid gs)
+    <> Maybe.mapMaybe
+      (`cardOfPrinting` gs)
+      (drop 1 (Foldable.toList (foldMap mergeComponentsOf (sourceOfWithLastKnown oid gs))))
+
+-- `cardOfWithLastKnown`'s own lookup, stopping at the Source: the live object's
+-- first, then the record filed under the id it had while it existed (CR 608.2h).
+sourceOfWithLastKnown :: ObjectId -> GameState -> Maybe Source.Source
+sourceOfWithLastKnown oid gs = case lookupObject oid gs of
+  Just obj -> Just (Object.source obj)
+  Nothing -> fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs))
 
 -- CR 708.2 / CR 708.8 over ONE object: write which face it is showing, and give
 -- it CR 613.7f's new timestamp -- "a permanent receives a new timestamp each time

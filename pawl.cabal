@@ -785,6 +785,8 @@ library codec
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
     Pawl.Codec.RoundingSpec
+    Pawl.Codec.RuleAbilities
+    Pawl.Codec.RuleAbilitiesSpec
     Pawl.Codec.Sacrifice
     Pawl.Codec.SacrificeAnyNumber
     Pawl.Codec.SacrificeAnyNumberSpec
@@ -1852,6 +1854,7 @@ library types
     Pawl.Types.RollDie
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
+    Pawl.Types.RuleAbilities
     Pawl.Types.Sacrifice
     Pawl.Types.SacrificeAnyNumber
     Pawl.Types.SacrificeEffect

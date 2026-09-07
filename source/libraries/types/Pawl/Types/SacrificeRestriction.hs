@@ -21,7 +21,7 @@ import qualified Pawl.Types.Affected as Affected
 -- a CHARACTERISTIC change computed inside CR 613's layers, where CR 613.11 puts
 -- this in the class of continuous effects that "affect game rules rather than
 -- objects", and CR 101.2a says outright that such an effect is not an ability
--- being added or removed. Pawl.Engine.Projection sees none of these.
+-- being added or removed. no layer of Pawl.Engine.Projection rewrites them.
 --
 -- CR 101.2 is what gives the prohibition its force: "if a rule or effect allows
 -- or directs something to happen, and another effect states that it can't

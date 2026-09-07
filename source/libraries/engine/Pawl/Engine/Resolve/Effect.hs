@@ -289,12 +289,19 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- that arms it and the fallback cannot pick up somebody else's ability: two faces
 -- reusing one name would have to be two arms as well, and the lint's equality is
 -- what would catch a card writing one.
+--
+-- Both arms quantify over EVERY card representing the source (CR 702.140e), so
+-- an under-component's declaration is found: Game.delayedAbilitiesOf walks the
+-- faces that are up and Game.cardsOfWithLastKnown the cards behind them.
 declaredDelayedAbility :: ObjectId -> AbilityName -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
 declaredDelayedAbility source name gs =
-  let onFace = Game.faceOfWithLastKnown source gs >>= (Map.lookup name . Face.delayedAbilities)
-      onCard = do
-        card <- Game.cardOfWithLastKnown source gs
-        Maybe.listToMaybe (Maybe.mapMaybe (Map.lookup name . Face.delayedAbilities) (NonEmpty.toList (Card.Type.faces card)))
+  let onFace = Map.lookup name (Game.delayedAbilitiesOf source gs)
+      onCard =
+        Maybe.listToMaybe
+          ( concatMap
+              (Maybe.mapMaybe (Map.lookup name . Face.delayedAbilities) . NonEmpty.toList . Card.Type.faces)
+              (Game.cardsOfWithLastKnown source gs)
+          )
    in onFace <|> onCard
 
 -- Does a Create's slot name EVERY token it minted rather than one particular one
