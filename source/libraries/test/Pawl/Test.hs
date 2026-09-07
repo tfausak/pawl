@@ -1071,6 +1071,7 @@ spec s registry = do
   Pawl.CopySpec.copyTargetSpec s registry
   Pawl.CopySpec.stirCopySpec s registry
   Pawl.CopySpec.copiedAbilitySpec s registry
+  Pawl.CopySpec.faceDownCopySpec s registry
   Pawl.CopySpec.permanentCopySpec s registry
   Pawl.CopySpec.copyAbilityOnStackSpec s registry
   Pawl.CopySpec.copiedTriggerTargetSpec s registry
