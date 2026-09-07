@@ -14,7 +14,7 @@
 -- Pawl.Engine.Sba; and its last sentence -- the permanent loses the designation
 -- at the time the spell becomes cast (CR 601.2i) -- is written by
 -- Pawl.Engine.Cast at that step. All three read Object.preparedCopyOf, which
--- `mintOnDesignated` below is the only writer of.
+-- `mint` below is the only writer of.
 --
 -- THE INVARIANT: rule 722 is part of the rulebook, so reading Layout.Preparation
 -- and Designation.Prepared here is the same closed-half act as reading a Phase.
@@ -88,6 +88,40 @@ mayGain designation oid gs = case designation of
 -- the copying process that apply to that permanent. Those characteristics become
 -- the copy's normal characteristics."
 --
+-- A no-op for every other designation, and for a permanent with no prepare spell
+-- (CR 722.3a already refused that one at `mayGain` above) -- both by construction
+-- rather than by a guard, since `mint` answers with the state unchanged.
+mintOnDesignated :: Designation.Designation -> ObjectId -> Game ()
+mintOnDesignated designation oid =
+  Monad.when (designation == Designation.Prepared) (State.modify' (mint oid))
+
+-- CR 722.3c's second trigger: "or phases in prepared". A permanent that phased
+-- out still carrying the designation comes back prepared -- CR 702.26d makes the
+-- phasing event not a zone change, so CR 400.7 mints no new incarnation for the
+-- mark to be lost with -- and the rule mints a copy for that arrival exactly as
+-- it does for a gain, so this is `mint` again and not a second minting road.
+--
+-- Nothing has to end the OLD copy first: `copyStands` below reads battlefield
+-- membership, so the copy went with the permanent when it phased out and CR
+-- 704.5e's sweep removed it. That is what makes rule 722.3c's two branches
+-- disjoint rather than cumulative.
+--
+-- Called from Pawl.Engine.Phasing's phasing event once every returning permanent
+-- is back in the battlefield set, which is the rule's own order -- the copy is
+-- minted for a permanent that HAS phased in. That module's comment says why
+-- nothing in the pool observes the order.
+--
+-- A no-op for a permanent that phases in UNPREPARED, which is every other
+-- permanent that ever phases in.
+mintOnPhasedIn :: ObjectId -> GameState -> GameState
+mintOnPhasedIn oid gs =
+  let prepared = maybe False (Set.member Designation.Prepared . Object.designations) (Game.lookupObject oid gs)
+   in if prepared then mint oid gs else gs
+
+-- CR 722.3c's copy itself, shared by the rule's two triggers above -- one
+-- function so a permanent that gains the designation and one that phases in
+-- prepared cannot come to mint different things.
+--
 -- The copy's card is the prepare face alone under Layout.Normal, which is that
 -- last sentence exactly: a one-faced card whose characteristics are its normal
 -- ones, so nothing downstream has to know it came off a preparation card. The
@@ -112,19 +146,13 @@ mayGain designation oid gs = case designation of
 -- event to watch. CR 111.5's token-creation rollback has no counterpart here --
 -- rule 722.3c states no replaceable creation event.
 --
--- CR 722.3c's other trigger, "or phases in prepared", is not implemented: nothing
--- calls this from Pawl.Engine.Phasing, so a permanent that phases out prepared and
--- back in gets no second copy (#868). Phasing OUT is implemented -- `copyStands`
--- below ends the copy, which is what that branch would otherwise duplicate.
---
--- A no-op for every other designation, and for a permanent with no prepare spell
--- (CR 722.3a already refused that one at `mayGain` above) -- both by construction
--- rather than by a guard, since `prepareFace` answers Nothing.
-mintOnDesignated :: Designation.Designation -> ObjectId -> Game ()
-mintOnDesignated designation oid = Monad.when (designation == Designation.Prepared) $ do
-  gs <- State.get
+-- Answers with the state unchanged for a permanent with no prepare spell (CR
+-- 722.3a already refused that one at `mayGain` above), by construction rather
+-- than by a guard, since Pawl.Engine.Game.prepareSpellOf answers Nothing.
+mint :: ObjectId -> GameState -> GameState
+mint oid gs =
   case (Game.prepareSpellOf oid gs, Projection.controllerOf oid gs) of
-    (Just face, Just controller) -> do
+    (Just face, Just controller) ->
       let copyCard = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = pure face}
           (printingId, gs1) = Game.intern (Printing.MkPrinting copyCard) gs
           (copyId, gs2) = Game.freshObjectId gs1
@@ -186,15 +214,13 @@ mintOnDesignated designation oid = Monad.when (designation == Designation.Prepar
                 Object.exertedBy = Set.empty,
                 Object.activatedOnce = Set.empty
               }
-      State.put
-        ( Game.insertIntoZone
+       in Game.insertIntoZone
             Zone.Exile
             LibraryPosition.Top
             controller
             copyId
             gs3 {GameState.objects = Map.insert copyId copy (GameState.objects gs3)}
-        )
-    _ -> pure ()
+    _ -> gs
 
 -- CR 722.3c's residency condition, read by Pawl.Engine.Sba on every state-based
 -- check: "this copy remains in exile for as long as the prepared permanent remains
@@ -213,10 +239,11 @@ mintOnDesignated designation oid = Monad.when (designation == Designation.Prepar
 -- permanent "is treated as though it doesn't exist" while its zone still reads
 -- Zone.Battlefield (CR 702.26d), and Pawl.Engine.Phasing's design is that every
 -- battlefield reader gets rule 702.26b for free by walking the SET. So a prepared
--- permanent that phases out stops keeping its copy, which is what CR 722.3c's own
--- "or phases in prepared" branch presupposes -- phasing in would otherwise mint a
--- second copy beside the first. Pawl.PreparationSpec's "CR 702.26b Reality Ripple
--- phases the Aviator out and the copy ceases to exist" is what proves it.
+-- permanent that phases out stops keeping its copy, which is what makes CR
+-- 722.3c's "or phases in prepared" branch a fresh mint rather than a second copy
+-- beside the first. Pawl.PreparationSpec's "CR 702.26b Reality Ripple phases the
+-- Aviator out and the copy ceases to exist" is what proves it, and its "CR 722.3c
+-- the Aviator phases in prepared and mints a fresh Jump copy" the pair.
 --
 -- False for an object that is not a prepare copy at all, which is every object but
 -- one per prepared permanent -- so the caller may ask it of anything.
