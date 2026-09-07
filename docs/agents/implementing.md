@@ -154,6 +154,11 @@ perfectly good-looking line of output. Read the label, then decide.
   is vacuous however early it sits. Ask what a wrong implementation would have
   produced at the moment you read the value; for a counter that means
   resolving the stack down, not reading its top.
+- **Pass a script the guard refuses as `@FILE`.** The worktree guard rejects a
+  sed expression carrying parentheses, pipes, `;`, `*`, quotes or backslash
+  escapes on the command line. Write it to your scratchpad and run
+  `script/mutate.sh FILE @/path/to/script PATTERN`; a hand-rolled
+  backup-and-restore is the fallback, never a `git checkout`.
 - **Never `git checkout <file>` to revert a mutation** --- real edits are lost
   that way. Copy the file to a backup and move it back, or let
   `script/mutate.sh` do it; its backup lives under `mktemp -d`, never beside
@@ -194,7 +199,14 @@ new decision.
 Keep a test-local answerer when the prompt protocol itself is the subject, when
 structurally identical prompts must receive different answers, or when the
 harness cannot express the state or decision without hiding what the test
-proves. Nested games, replayed or randomized decisions, serialized scenarios,
+proves. The harness has no vocabulary for `Prompt.OrderTriggers`,
+`ChooseMutateSide` or `ChooseTapsForTotalPower`; a test needing one runs
+`S.runPure` with a test-local answerer (`Pawl.AuraSpec`'s bestow group is the
+pattern) and says so at the site. A spec that matches on `Prompt` needs
+`GADTs`, which implies `MonoLocalBinds`, so a local `let` over a polymorphic
+helper there wants its own signature. A hand-built combat board needs
+`S.combatBoardOf`, which fills `combat.defenders` and `remaining`; without it
+`S.runCombat` runs no combat and a negative passes vacuously. Nested games, replayed or randomized decisions, serialized scenarios,
 and end-state check programs remain outside this harness. Do not migrate a
 working test merely to reduce its line count; migrate when the harness makes
 the rule's preconditions and decisions more explicit.

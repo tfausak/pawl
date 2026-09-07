@@ -74,9 +74,10 @@ to agents as written. What it doesn't say:
 
 - The isolation guard refuses a command whose text holds the bare word
   `source` (the tree's top directory), a heredoc beside another command, or a
-  `sed` expression carrying parentheses, a pipe or a `$` --- `script/mutate.sh`'s
-  argument most of all. Grep as `grep -rn X . --include='*.hs'` or against a
-  quoted deeper path, and run a heredoc as a command of its own.
+  `sed` expression carrying parentheses, a pipe, a `;` or a `$` ---
+  `script/mutate.sh`'s argument most of all. Grep as `grep -rn X .
+  --include='*.hs'` or against a quoted deeper path, run a heredoc as a command
+  of its own, and give `mutate.sh` its script as `@FILE` from your scratchpad.
 
 - Every worktree shares ONE stash stack, so a stash made in yours can be popped
   by an agent in another --- losing your edits and landing theirs in your tree.
@@ -249,6 +250,13 @@ to agents as written. What it doesn't say:
     A NEW FIELD's invisible site is positional record construction in the test
     suite, which absorbs it in argument order. Grep every construction site of
     the type by hand.
+
+    A NEW READ OF A PERMANENT'S CARD goes through the projection
+    (`Pawl.Engine.Projection.View`) or the copiable record it stamps
+    (`Binding.copyOf`), never `Game.cardOf` or `Game.faceOf`, which answer the
+    PRINTED card: a permanent that is a copy of the card, and a merged
+    permanent (`Source.OfMerge`), then silently read the wrong thing. A Clone
+    of the producer is the tripwire; put that board in the test.
 
     A new field or disjunct on `Pawl.Types.ProjectedCharacteristics` or
     `Pawl.Engine.Filter`'s `View` must be filled in EVERY builder ---
