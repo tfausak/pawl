@@ -11,6 +11,7 @@ import qualified Pawl.Codec.RuleAbilitiesSpec as RuleAbilitiesSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
@@ -83,7 +84,11 @@ testCharacteristics =
       -- Synthetic like the rest of this value: a Mountain has no halves, and
       -- what the case is about is that the field carries a whole card through
       -- the wire (CR 709.5).
-      PC.halves = Just CardSpec.mountainCard
+      PC.halves = Just CardSpec.mountainCard,
+      -- Synthetic for halves' reason: a Mountain has no inset frame, and what
+      -- the case is about is that the field carries a whole FACE through the
+      -- wire (CR 722.2b).
+      PC.prepare = Just (NonEmpty.head (Card.Type.faces CardSpec.mountainCard))
     }
 
 testCharacteristicsJson :: String
@@ -107,7 +112,8 @@ testCharacteristicsJson =
     <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}],"
     <> "\"assignsCombatDamageWithToughness\":true,"
     <> "\"grantsStationToughness\":true,"
-    <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]}}"
+    <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]},"
+    <> "\"prepare\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}}"
 
 -- | Every field but the two required ones at its default.
 minimalCharacteristics :: PC.ProjectedCharacteristics
@@ -139,7 +145,8 @@ minimalCharacteristics =
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,
       PC.grantsStationToughness = False,
-      PC.halves = Nothing
+      PC.halves = Nothing,
+      PC.prepare = Nothing
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

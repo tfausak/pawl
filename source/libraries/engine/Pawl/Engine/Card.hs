@@ -329,7 +329,7 @@ flippedFace card = case Card.layout card of
 -- CR 722.2a's PREPARE SPELL: the inset frame of a preparation card, whose text
 -- "defines alternative characteristics that the object may have while it's a
 -- spell" (CR 722.2). Nothing for every other layout, and for a preparation card
--- printed with no second face -- which Pawl.CardSpec's two-face lint rules out of
+-- printed with no second face -- which Pawl.EffectLintSpec's two-face lint rules out of
 -- the corpus, so the arm is a total function's tail rather than a case a card can
 -- reach.
 --

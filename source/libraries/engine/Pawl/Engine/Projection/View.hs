@@ -941,7 +941,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         -- controller's station abilities of its own.
         PC.grantsStationToughness = False,
         -- CR 709.5: no card behind the object, so no halves either.
-        PC.halves = Nothing
+        PC.halves = Nothing,
+        -- CR 722.2b, for the same reason one line up.
+        PC.prepare = Nothing
       }
   Just face ->
     -- CR 718.3b's swap sits OUTSIDE the record rather than in four of its fields,
@@ -1051,7 +1053,12 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- of characteristics. Game.halvesOf decides, and it reads the copy
               -- snapshot first, so a copy of a copy of a Room goes on carrying the
               -- doors.
-              PC.halves = Game.halvesOf oid gs
+              PC.halves = Game.halvesOf oid gs,
+              -- CR 722.2b: the prepare spell this object has, which `face` cannot
+              -- carry either -- CR 722.4 leaves the normal half alone in every
+              -- zone, so the inset frame is nowhere in it. Game.prepareSpellOf
+              -- decides, and it reads the copy snapshot first for halves' reason.
+              PC.prepare = Game.prepareSpellOf oid gs
             }
 
 -- CR 718.3b: "both a prototyped spell and the permanent it becomes have only its

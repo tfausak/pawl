@@ -13,6 +13,7 @@ import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.Face as Face
 import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
@@ -62,6 +63,7 @@ codec = Fields.object $ do
   assignsCombatDamageWithToughness <- Fields.defaulted "assignsCombatDamageWithToughness" False Common.boolean PC.assignsCombatDamageWithToughness
   grantsStationToughness <- Fields.defaulted "grantsStationToughness" False Common.boolean PC.grantsStationToughness
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
+  prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
   pure
     PC.MkProjectedCharacteristics
       { PC.names = names,
@@ -90,5 +92,6 @@ codec = Fields.object $ do
         PC.textChangedKeywords = textChangedKeywords,
         PC.assignsCombatDamageWithToughness = assignsCombatDamageWithToughness,
         PC.grantsStationToughness = grantsStationToughness,
-        PC.halves = halves
+        PC.halves = halves,
+        PC.prepare = prepare
       }

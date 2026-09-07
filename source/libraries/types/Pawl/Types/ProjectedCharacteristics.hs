@@ -12,6 +12,7 @@ import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -313,6 +314,23 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- copiable and says nothing about CR 709.5c's designations, so a copy of a
     -- Room enters with its own doors shut (CR 709.5d) and this field says which
     -- doors those are.
-    halves :: Maybe Card.Card
+    halves :: Maybe Card.Card,
+    -- | CR 722.2b: the PREPARE SPELL this object has -- "the existence and values
+    -- of these alternative characteristics are part of the object's copiable
+    -- values" -- and Nothing for an object with no inset frame. `halves` above's
+    -- shape and for its reason: rule 722.2b puts the alternative characteristics
+    -- among the copiable values in as many words, so a permanent that COPIED a
+    -- preparation card has a prepare spell and one that copied something else has
+    -- none, whatever card is printed underneath either.
+    --
+    -- A whole FACE rather than a name, because the readers need the
+    -- characteristics: CR 722.3c mints a copy whose card is this face alone, and
+    -- CR 722.3a's gate asks only whether one exists.
+    --
+    -- The prepared DESIGNATION is not here, and that is CR 722.3b's own scope
+    -- rather than an omission: it is a designation, which CR 722.3a's own wording
+    -- and Pawl.Types.Designation's argument keep off the copiable values, so a
+    -- permanent that copies a prepared one is not prepared and mints nothing.
+    prepare :: Maybe (Face.Face Card.Card)
   }
   deriving (Eq, Ord, Show)

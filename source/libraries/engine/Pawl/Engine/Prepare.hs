@@ -26,7 +26,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.Card as Card.Type
@@ -50,12 +49,19 @@ import qualified Pawl.Types.Zone as Zone
 -- alternative characteristics exist, even if the object currently doesn't use
 -- them"?
 --
--- A read of the CARD through Pawl.Engine.Card.prepareFace, so it answers the same
--- for a preparation card wherever it lies, which is what CR 722.2a's "card, spell,
--- or permanent" asks for. A token, an ability and an emblem have no card and so no
--- prepare spell.
+-- A read of the object's COPIABLE VALUES through Pawl.Engine.Game.prepareSpellOf,
+-- never of the printing behind Object.source, and CR 722.2b is why: "the existence
+-- and values of these alternative characteristics are part of the object's
+-- copiable values". So a Clone that entered as a copy of a preparation card has a
+-- prepare spell and a preparation card that became a copy of something else has
+-- none. That function's own comment says why CR 722.3c's "ignoring other
+-- exceptions to the copying process" does not say otherwise.
+--
+-- Every zone, which is CR 722.2a's own scope -- "a card, spell, or permanent". A
+-- token, an ability and an emblem have no card and no snapshot, and so no prepare
+-- spell.
 hasPrepareSpell :: ObjectId -> GameState -> Bool
-hasPrepareSpell oid gs = case Game.cardOf oid gs >>= Card.prepareFace of
+hasPrepareSpell oid gs = case Game.prepareSpellOf oid gs of
   Nothing -> False
   Just _ -> True
 
@@ -88,13 +94,13 @@ mayGain designation oid gs = case designation of
 -- printing is interned like a token's (CR 111.3's road, Pawl.Engine.Event's
 -- createTokens), and Source.OfCardCopy is what keeps it from being a card.
 --
--- "IGNORING OTHER EXCEPTIONS TO THE COPYING PROCESS" is why the face is taken off
--- the CARD rather than off Projection.copiableCharacteristics: a Clone of a
--- prepared permanent, or a copy effect with an exception, changes what the
--- permanent's copiable values are, and this rule says to disregard all of it and
--- read the prepare spell. CR 722.2b keeps the alternative characteristics
--- copiable, which is a claim about the PERMANENT's copiable values rather than
--- about this copy.
+-- The face comes from the permanent's COPIABLE VALUES (hasPrepareSpell's read,
+-- Pawl.Engine.Game.prepareSpellOf), which is CR 722.2b. "IGNORING OTHER
+-- EXCEPTIONS TO THE COPYING PROCESS THAT APPLY TO THAT PERMANENT" narrows what is
+-- minted rather than where the face is read: CR 707.9's riders -- a copy effect
+-- that says "except it's a 1/1" -- do not reach this copy, which is exactly what
+-- taking the prepare face WHOLE, rather than folding the permanent's projection
+-- into it, already does.
 --
 -- Its OWNER is the permanent's controller, whom the rule names as the creator; CR
 -- 108.4 gives an object created outside a card's ownership no other candidate. Who
@@ -108,7 +114,8 @@ mayGain designation oid gs = case designation of
 --
 -- CR 722.3c's other trigger, "or phases in prepared", is not implemented: nothing
 -- calls this from Pawl.Engine.Phasing, so a permanent that phases out prepared and
--- back in gets no second copy (#868).
+-- back in gets no second copy (#868). Phasing OUT is implemented -- `copyStands`
+-- below ends the copy, which is what that branch would otherwise duplicate.
 --
 -- A no-op for every other designation, and for a permanent with no prepare spell
 -- (CR 722.3a already refused that one at `mayGain` above) -- both by construction
@@ -116,7 +123,7 @@ mayGain designation oid gs = case designation of
 mintOnDesignated :: Designation.Designation -> ObjectId -> Game ()
 mintOnDesignated designation oid = Monad.when (designation == Designation.Prepared) $ do
   gs <- State.get
-  case (Game.cardOf oid gs >>= Card.prepareFace, Projection.controllerOf oid gs) of
+  case (Game.prepareSpellOf oid gs, Projection.controllerOf oid gs) of
     (Just face, Just controller) -> do
       let copyCard = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = pure face}
           (printingId, gs1) = Game.intern (Printing.MkPrinting copyCard) gs
@@ -201,6 +208,16 @@ mintOnDesignated designation oid = Monad.when (designation == Designation.Prepar
 -- another zone. So the read is LIVE off the named permanent rather than a flag
 -- anything would have to unset.
 --
+-- Battlefield MEMBERSHIP and not Object.zone, which is
+-- Pawl.Engine.Damage.onBattlefield's distinction and CR 702.26b's: a phased-out
+-- permanent "is treated as though it doesn't exist" while its zone still reads
+-- Zone.Battlefield (CR 702.26d), and Pawl.Engine.Phasing's design is that every
+-- battlefield reader gets rule 702.26b for free by walking the SET. So a prepared
+-- permanent that phases out stops keeping its copy, which is what CR 722.3c's own
+-- "or phases in prepared" branch presupposes -- phasing in would otherwise mint a
+-- second copy beside the first. Pawl.PreparationSpec's "CR 702.26b Reality Ripple
+-- phases the Aviator out and the copy ceases to exist" is what proves it.
+--
 -- False for an object that is not a prepare copy at all, which is every object but
 -- one per prepared permanent -- so the caller may ask it of anything.
 copyStands :: Object.Object -> GameState -> Bool
@@ -209,7 +226,7 @@ copyStands copy gs = case Object.preparedCopyOf copy of
   Just permanentId -> case Game.lookupObject permanentId gs of
     Nothing -> False
     Just permanent ->
-      Object.zone permanent == Zone.Battlefield
+      Set.member permanentId (GameState.battlefield gs)
         && Set.member Designation.Prepared (Object.designations permanent)
 
 -- CR 601.2i by way of CR 722.3c's last sentence: "that permanent loses the
