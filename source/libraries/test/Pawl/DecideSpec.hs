@@ -31,7 +31,7 @@ spec s = Spec.describe s "Pawl.Engine.Decide" $ do
     let gs =
           (Setup.emptyGame S.bothPlayers)
             { GameState.activePlayer = S.alice,
-              GameState.control = Map.singleton S.bob (S.resolutionControl S.alice),
+              GameState.control = Map.singleton S.bob (pure (S.resolutionControl S.alice)),
               GameState.pendingControl = Map.empty
             }
 

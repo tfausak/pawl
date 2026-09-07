@@ -671,7 +671,7 @@ manaSourcesGiven capacity grants pcs pid gs =
       --
       -- The types are the PROJECTED ones (CR 613), so a Song of the Dryads'd
       -- Sol Ring is a land here and a Dryad Arbor is one too.
-      landsOnly = maybe False PlayerControl.manaFromLandsOnly (Map.lookup pid (GameState.control gs))
+      landsOnly = maybe False (PlayerControl.manaFromLandsOnly . Decide.effective) (Map.lookup pid (GameState.control gs))
       isLand oid = maybe False (Set.member CardType.Land . PC.cardTypes) (Map.lookup oid pcs)
    in filter (\oid -> isSource oid && (not landsOnly || isLand oid)) (Projection.controlsGiven grants pid gs)
 

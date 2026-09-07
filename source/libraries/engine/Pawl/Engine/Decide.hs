@@ -1,5 +1,6 @@
 module Pawl.Engine.Decide where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import Pawl.Types.Decider (Decider)
 import qualified Pawl.Types.Decider as Decider
@@ -20,5 +21,12 @@ import Pawl.Types.PlayerId (PlayerId)
 -- resolution.
 deciderFor :: PlayerId -> GameState -> Decider
 deciderFor pid gs = case Map.lookup pid (GameState.control gs) of
-  Just control -> PlayerControl.decider control
+  Just rows -> PlayerControl.decider (effective rows)
   Nothing -> Decider.MkDecider pid
+
+-- CR 723.1a: "the last one to be created is the one that works", and the stack
+-- is kept in creation order, so that is its last element. The row that WORKS,
+-- which is also the row whose CR 723.7 restriction applies
+-- (Pawl.Engine.Mana.manaSourcesGiven).
+effective :: NonEmpty.NonEmpty PlayerControl.PlayerControl -> PlayerControl.PlayerControl
+effective = NonEmpty.last

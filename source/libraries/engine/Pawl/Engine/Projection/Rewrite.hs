@@ -1391,6 +1391,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.AttachedPermanentTappedForMana -> condition
   TriggerCondition.PermanentTappedForMana payload -> TriggerCondition.PermanentTappedForMana payload {PermanentTappedForMana.filter = Filter.rewrite pairs (PermanentTappedForMana.filter payload)}
   TriggerCondition.SelfTrains -> condition
+  TriggerCondition.SelfBecomesCrewed -> condition
   TriggerCondition.PermanentSacrificed payload -> TriggerCondition.PermanentSacrificed payload {PermanentSacrificed.filter = Filter.rewrite pairs (PermanentSacrificed.filter payload)}
   TriggerCondition.SagaFinalChapterTriggers _ -> condition
   -- CR 603.7's slot name is card data but not card TEXT, so no CR 612.1 swap

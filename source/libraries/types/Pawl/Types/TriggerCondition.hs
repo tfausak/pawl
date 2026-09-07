@@ -363,6 +363,13 @@ data TriggerCondition
   | -- | CR 702.149c: the bearer trained (Savior of Ollenbock). Self-scoped, and
     -- recorded only where a counter actually went on.
     SelfTrains
+  | -- | CR 702.122e: "whenever this Vehicle becomes crewed" (Mobilizer Mech),
+    -- which that rule defines as a crew ability of the bearer RESOLVING.
+    -- Self-scoped.
+    --
+    -- Not implemented: rule 702.122e's second sentence, the intervening "if"
+    -- that reads the creatures which paid THAT activation's crew cost (#915).
+    SelfBecomesCrewed
   | -- | CR 603.10a: "whenever an opponent sacrifices an artifact" (Vengeful
     -- Tracker) -- the CR 701.21a game action, not the zone change SelfDies
     -- reads. Mayhem Devil's unrestricted wording is AnyPlayer and the trivial

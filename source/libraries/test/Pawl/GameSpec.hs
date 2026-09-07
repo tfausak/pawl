@@ -730,6 +730,73 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "CR 723.2: bob decides for himself on his own turn" (Decide.deciderFor S.bob bobsTurn) (Decider.MkDecider S.bob)
     Spec.assertEqWith s "and every question there is his" (List.nub (askedOf "ChooseAction" S.bob bobAsks)) [Just (Decider.MkDecider S.bob)]
 
+  -- CR 723.1a with the two control lifetimes overlapping, which is the case PR
+  -- #3349 got wrong; see #3351. Rule 723.1a's "overwrite" is the
+  -- continuous-effect sense: both effects exist and the last one CREATED is the
+  -- one that works.
+  -- So a Word of Command resolving on a turn a Mindslaver already owns does not
+  -- destroy the Mindslaver control -- it layers over it, and when the CR 723.2
+  -- span ends the CR 723.1 one is again the last created and works for the rest
+  -- of the turn (CR 723.1: "the effect doesn't end until the beginning of the
+  -- next turn").
+  --
+  -- Both real cards, and the whole line driven through the loop: alice
+  -- sacrifices Mindslaver at bob, bob's turn begins under her control, and she
+  -- casts Word of Command at him during it.
+  --
+  -- What makes the board discriminate is that the two readings differ on every
+  -- priority bob gets AFTER the Word of Command resolution: alice under the rule,
+  -- bob under a control the resolution erased.
+  Spec.it s "CR 723.1a gameplay: Word of Command over a Mindslaver hands bob back to alice, not to himself" $ do
+    mindslaver <- S.printingOf s registry "Mindslaver"
+    wordOfCommand <- S.printingOf s registry "Word of Command"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (_msId, g1) = S.addPermanent mindslaver S.alice g0
+        -- {4} for Mindslaver's activation, then {B}{B} for Word of Command on
+        -- bob's turn. Separate lands, since the Mountains are spent by then.
+        (_a1, g2) = S.addPermanent mountain S.alice g1
+        (_a2, g3) = S.addPermanent mountain S.alice g2
+        (_a3, g4) = S.addPermanent mountain S.alice g3
+        (_a4, g5) = S.addPermanent mountain S.alice g4
+        (_s1, g6) = S.addPermanent swamp S.alice g5
+        (_s2, g7) = S.addPermanent swamp S.alice g6
+        (_wocId, g8) = S.addHandCard wordOfCommand S.alice g7
+        -- bob's own resources, and TWO cards so Word of Command's CR 608.2d
+        -- choice out of his hand is a real question rather than an elision.
+        (_bMtn, g9) = S.addPermanent mountain S.bob g8
+        (boltId, g10) = S.addHandCard lightningBolt S.bob g9
+        (_bElves, g11) = S.addHandCard elves S.bob g10
+        gStart =
+          g11
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        -- Alice's turn: Mindslaver at bob (CR 723.1).
+        afterActivation = snd (Engine.runGamePure gateAnswer gStart Engine.priorityLoop)
+        bobsTurn = snd (Engine.runGamePure gateAnswer afterActivation Engine.handoffTurn)
+        bobMain = bobsTurn {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+        -- Bob's controlled main phase, with alice casting Word of Command at him
+        -- out of HER hand. `layeringAnswer` passes for bob's seat, so nothing bob
+        -- does here is anyone's doing but Word of Command's.
+        ((_, afterWord), asks) = State.runState (Engine.runGame (layeringAnswer boltId) bobMain Engine.priorityLoop) []
+        -- CR 723.1's own ending is unmoved by any of this.
+        afterBob = S.runPure S.identityAnswer afterWord Engine.handoffTurn
+    Spec.assertEqWith s "CR 723.1: alice controls bob as his turn begins" (Decide.deciderFor S.bob bobsTurn) (Decider.MkDecider S.alice)
+    -- THE ASSERTION. Bob is asked for priority before Word of Command resolves
+    -- and again after it has; a resolution raises no priority question, so an
+    -- overwritten-and-deleted CR 723.1 row would put BOB on the later ones.
+    Spec.assertBool s (length (askedOf "ChooseAction" S.bob asks) >= 2) "bob was asked for priority both before and after the Word of Command resolution"
+    Spec.assertEqWith s "CR 723.1a: alice still decides for bob once Word of Command has finished resolving" (List.nub (askedOf "ChooseAction" S.bob asks)) [Just (Decider.MkDecider S.alice)]
+    Spec.assertEqWith s "and the Mindslaver row is what is left on the stack" (GameState.control afterWord) (S.turnControl S.alice S.bob)
+    -- The CR 723.2 span really did happen: bob's own Bolt was chosen and cast.
+    Spec.assertEqWith s "Word of Command made bob cast his own Bolt at himself" (S.lifeOf S.bob afterWord) (Just 17)
+    Spec.assertEqWith s "CR 723.1: and it still ends at the next turn" (Decide.deciderFor S.bob afterBob) (Decider.MkDecider S.bob)
+
   -- CR 723.7, in the one form a card prints it: Word of Command's "the player
   -- can activate mana abilities only if they're from lands that player
   -- controls".
@@ -2319,6 +2386,25 @@ namedIs wanted gs mo =
           Source.OfSpellCopy printingId -> named printingId
           Source.OfInherentTrigger _ -> False
         Nothing -> False
+
+-- The layering board's answerer: alice casts out of her OWN hand, every other
+-- seat passes, and the Decider on each priority question is recorded. Bob's seat
+-- passing is what keeps his own agency out of the outcome -- everything his
+-- cards do is Word of Command's doing.
+--
+-- Keyed on the asked PLAYER and not on the Decider, because on this board bob's
+-- questions carry alice throughout and the two would be indistinguishable.
+layeringAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [(String, PlayerId.PlayerId, Maybe Decider.Decider)] r
+layeringAnswer pinned p = case p of
+  Prompt.ChooseAction decider player actions -> do
+    State.modify' (<> [("ChooseAction", player, Just decider)])
+    pure $
+      if player == S.alice
+        then case filter isCastAction actions of
+          h : _ -> h
+          [] -> A.Pass
+        else A.Pass
+  _ -> wordAnswer pinned p
 
 -- Records who was ASKED and which Decider the prompt carried -- the whole point
 -- of a CR 723 case being that the two come apart -- then answers as Word of

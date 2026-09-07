@@ -2339,6 +2339,9 @@ representativeEvents cond =
         -- `departed` for SelfEvolves' reason: the pair does not match, which pins
         -- the floor for a matching pair too, this arm binding nothing either way.
         TriggerCondition.SelfTrains -> one (GameEvent.Trained departed)
+        -- CR 702.122e's own event, and the only one this condition admits, on
+        -- `departed` for SelfTrains' reason above.
+        TriggerCondition.SelfBecomesCrewed -> one (GameEvent.BecameCrewed departed)
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- pair need not actually match -- `departed` is no artifact on the empty
         -- board -- which is fine for what this pins: the arm binds the event's
@@ -2589,6 +2592,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.Opponent (Filter.Type.And [])),
     TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And [])),
     TriggerCondition.SelfTrains,
+    TriggerCondition.SelfBecomesCrewed,
     -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
     -- eventBindings arm that had cased on the relation and stamped nothing under
     -- one of them would go unseen if only one were listed. Vengeful Tracker

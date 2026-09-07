@@ -836,6 +836,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentTappedForMana {} -> []
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
+  -- Nor does CR 702.122e's, which is nullary.
+  TriggerCondition.SelfBecomesCrewed -> []
   -- CR 701.21a's carries a PlayerRelation and a Filter, neither of which holds a
   -- Count.
   TriggerCondition.PermanentSacrificed {} -> []
@@ -3197,6 +3199,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
+  -- CR 702.122e's carries none either: it names "this Vehicle" and nothing about
+  -- it to narrow by.
+  TriggerCondition.SelfBecomesCrewed -> []
   -- CR 106.12a's bystander reading DOES carry a Filter -- Autumn Willow,
   -- Harmony's "a land creature" -- and is swept like the PermanentSacrificed arm
   -- below.
@@ -3481,6 +3486,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfEvolves -> []
   TriggerCondition.AttachedCreatureMentors -> []
   TriggerCondition.SelfTrains -> []
+  TriggerCondition.SelfBecomesCrewed -> []
   TriggerCondition.PermanentSacrificed {} -> []
   TriggerCondition.SagaFinalChapterTriggers _ -> []
   TriggerCondition.PlayerBecomesMonarch _ -> []
