@@ -232,7 +232,7 @@ combinedFaces card = case Card.layout card of
   -- the two arms above take, and here it is the WHOLE answer rather than the
   -- zone-dependent half of one: the alternative characteristics are reached
   -- only by the copy CR 722.3c mints, which is a different object with a
-  -- printing of its own (Pawl.Engine.Prepare.prepare).
+  -- printing of its own (Pawl.Engine.Prepare.mintOnDesignated).
   Layout.Preparation -> pure (NonEmpty.head (Card.faces card))
   -- CR 712.8a: "While a double-faced card is outside the game or in a zone other
   -- than the battlefield or stack, it has only the characteristics of its front
