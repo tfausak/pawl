@@ -9,7 +9,7 @@ import qualified Pawl.Types.Decider as Decider
 -- Keyed per controlled player in GameState.control. A record and not a bare
 -- Decider because rule 723.2's control is scoped to one resolution while rule
 -- 723.1's runs for a turn, and rule 723.3 lets neither assume the controlled
--- player is the active one (#881).
+-- player is the active one; see #881.
 data PlayerControl = MkPlayerControl
   { decider :: Decider.Decider,
     duration :: ControlDuration.ControlDuration,

@@ -1376,6 +1376,38 @@ fromAmongMembers legal resolving chosen slot = do
     Just objects -> objects
     Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
 
+-- CR 402.3 with a CR 608.2d choice: each hand the reference names is offered to
+-- its OWN owner (a hand's cards are that player's alone), who picks one card
+-- matching the filter. The candidates are read as the instruction is reached (CR
+-- 608.2c), the asks run in APNAP order (CR 608.2e, CR 101.4) through
+-- handChoosers, and the answer is FILTERED rather than trusted. Elided at one
+-- card and skipped at none (CR 101.3, CR 609.3).
+--
+-- The ONE asking read of ObjectRef.ChosenCardInHand, shared by Effect.MoveToZone's
+-- gather and by Effect.LookAt, so the two cannot ask differently. Every other
+-- position reads the ref through the pure Slots.objectRefObjects, which answers
+-- [] for it -- Pawl.EffectLintSpec's "no effect asks for a chosen card where
+-- nothing can ask" is what stops a card writing one there.
+chooseCardsInHand ::
+  ObjectId ->
+  ObjectId ->
+  PlayerId ->
+  Map.Map SlotName (Set Recipient) ->
+  ChosenCardInHand.ChosenCardInHand ->
+  Game [ObjectId]
+chooseCardsInHand resolving source controller legal (ChosenCardInHand.MkChosenCardInHand player filter_) = do
+  gs <- State.get
+  let context = effectContext gs controller source legal (slotBindings resolving gs)
+      ask asked candidates = case candidates of
+        [] -> pure []
+        [only] -> pure [only]
+        first : second : more -> do
+          let offered = first NonEmpty.:| (second : more)
+          answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
+          pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+  fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf context gs pid filter_)) $
+    handChoosers legal controller gs player
+
 -- The printed "from among them", a CR 608.2d choice: the candidates are the
 -- members of a GROUP an earlier clause of this resolution bound rather than a
 -- zone's contents, which is the whole difference from the zone-keyed choices --
@@ -1416,38 +1448,6 @@ fromAmongMembers legal resolving chosen slot = do
 -- of a player's own simultaneous choices to that player. Elided at one candidate
 -- and skipped at none (CR 101.3, CR 609.3). Filtered, not trusted: an answer
 -- naming a card never offered falls back to the first candidate.
--- CR 402.3 with a CR 608.2d choice: each hand the reference names is offered to
--- its OWN owner (a hand's cards are that player's alone), who picks one card
--- matching the filter. The candidates are read as the instruction is reached (CR
--- 608.2c), the asks run in APNAP order (CR 608.2e, CR 101.4) through
--- handChoosers, and the answer is FILTERED rather than trusted. Elided at one
--- card and skipped at none (CR 101.3, CR 609.3).
---
--- The ONE asking read of ObjectRef.ChosenCardInHand, shared by Effect.MoveToZone's
--- gather and by Effect.LookAt, so the two cannot ask differently. Every other
--- position reads the ref through the pure Slots.objectRefObjects, which answers
--- [] for it -- Pawl.EffectLintSpec's "no effect asks for a chosen card where
--- nothing can ask" is what stops a card writing one there.
-chooseCardsInHand ::
-  ObjectId ->
-  ObjectId ->
-  PlayerId ->
-  Map.Map SlotName (Set Recipient) ->
-  ChosenCardInHand.ChosenCardInHand ->
-  Game [ObjectId]
-chooseCardsInHand resolving source controller legal (ChosenCardInHand.MkChosenCardInHand player filter_) = do
-  gs <- State.get
-  let context = effectContext gs controller source legal (slotBindings resolving gs)
-      ask asked candidates = case candidates of
-        [] -> pure []
-        [only] -> pure [only]
-        first : second : more -> do
-          let offered = first NonEmpty.:| (second : more)
-          answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
-          pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-  fmap concat . Monad.mapM (\pid -> ask pid (handCardsOf context gs pid filter_)) $
-    handChoosers legal controller gs player
-
 chooseCardFromAmong ::
   ObjectId ->
   ObjectId ->
@@ -3193,13 +3193,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- The arm above over the hidden zone CR 400.2 makes a hand: what it
               -- says about when the candidates are read (CR 608.2c), about the asks
               -- running in APNAP order (CR 608.2e, CR 101.4) and about the answer
-              -- being filtered rather than trusted holds unchanged.
-              --
-              -- What the hidden zone changes is WHO may be asked: CR 402.3 gives a
-              -- hand's cards to its owner alone, so each seat is offered its OWN hand
-              -- and no other. Narrowing the offer by filter is the card's own words
-              -- saying which cards were ever legal answers (CR 608.2d). Elided at one
-              -- card and skipped at none (CR 101.3, CR 609.3).
+              -- being filtered rather than trusted holds unchanged. What the hidden
+              -- zone changes is WHO may be asked, and chooseCardsInHand is where
+              -- CR 402.3's answer to that lives -- shared with Effect.LookAt, so
+              -- the two positions cannot ask differently.
               ObjectRef.ChosenCardInHand chosenInHand -> chooseCardsInHand resolving source controller legal chosenInHand
               -- The printed "from among them", a CR 608.2d choice, asked by
               -- chooseCardFromAmong -- which is where the rule lives, this opcode

@@ -24,8 +24,8 @@ spec s = Spec.describe s "Pawl.Engine.Decide" $ do
       Spec.assertEq s (Decide.deciderFor S.alice gs) $ Decider.MkDecider S.alice
 
   -- CR 723.2's shape, which the active-player guard deciderFor used to carry
-  -- made unreachable (#881): alice controls bob on ALICE's turn, for the length
-  -- of one resolution. CR 723.3 is what says this is not a contradiction -- the
+  -- made unreachable, see #881: alice controls bob on ALICE's turn, for the
+  -- length of one resolution. CR 723.3 is what says this is not a contradiction -- the
   -- rule fixes who the active player is, not who may be controlled.
   Spec.describe s "CR 723.2: a controlled player who is not the active player" $ do
     let gs =

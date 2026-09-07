@@ -245,8 +245,8 @@ data GameState = MkGameState
     -- | CR 723: who is being controlled right now, keyed by the controlled
     -- player. Keyed rather than a single slot for the active player because CR
     -- 723.2's control is not the active player's and does not last a turn
-    -- (#881); each row carries its own lifetime, and CR 723.3 is why a row says
-    -- nothing about who the active player is.
+    -- (see #881); each row carries its own lifetime, and CR 723.3 is why a row
+    -- says nothing about who the active player is.
     control :: Map.Map PlayerId.PlayerId PlayerControl.PlayerControl,
     -- | CR 725.1 / 725.3: the monarch, a single game-wide designation.
     monarch :: Maybe PlayerId.PlayerId,

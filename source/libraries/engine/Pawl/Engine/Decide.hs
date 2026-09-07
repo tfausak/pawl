@@ -15,7 +15,7 @@ import Pawl.Types.PlayerId (PlayerId)
 -- "a player who's being controlled during their turn is still the active player"
 -- says only that control leaves the active player alone -- not that the
 -- controlled player is the active one. CR 723.2's control is held on someone
--- else's turn (#881), so the row's own lifetime is what ends it: rule 723.1's at
+-- else's turn, see #881, so the row's own lifetime ends it: rule 723.1's at
 -- Pawl.Engine.Engine's turn handoff, rule 723.2's at Pawl.Engine.Stack's end of
 -- resolution.
 deciderFor :: PlayerId -> GameState -> Decider

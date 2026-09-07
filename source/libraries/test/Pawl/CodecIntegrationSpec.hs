@@ -339,7 +339,7 @@ gameStateRoundTripSpec s registry = do
     mountain <- S.printingOf s registry "Mountain"
     roundTrips "a state with a monarch" (S.withMonarch S.bob (S.oneMountainState mountain Phase.PrecombatMain))
 
-  -- CR 723.2's row, which is the shape GameState.control grew to hold (#881):
+  -- CR 723.2's row, which is the shape GameState.control grew to hold, see #881:
   -- a Decider, a lifetime and rule 723.7's restriction, keyed by the controlled
   -- player. Its own case because the field is Fields.defaulted -- an empty map
   -- round-trips whatever the codec says about the value type, so a board with a

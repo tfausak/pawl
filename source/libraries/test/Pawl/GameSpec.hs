@@ -665,7 +665,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "CR 723.5a: alice's hand is untouched" (S.handSize S.alice after) 0
 
   -- CR 723.2 gameplay: Word of Command. The shape CR 723.1's whole-turn control
-  -- cannot express (#881) -- the controlled player is bob while the ACTIVE
+  -- cannot express, see #881 -- the controlled player is bob while the ACTIVE
   -- player is alice, and the control lives for exactly one resolution.
   --
   -- Two cards in bob's hand, which is what keeps the CR 608.2d choice real: a
