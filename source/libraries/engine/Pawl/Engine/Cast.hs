@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.SplitSecond as SplitSecond
@@ -830,14 +831,15 @@ castableZones pid oid face gs =
         _ -> False
    in filter permitted castZones
 
--- CR 601.3: may this player cast this half of this exiled card? THREE
--- INDEPENDENT PERMISSIONS, any of which suffices, because the rules state three.
+-- CR 601.3: may this player cast this half of this exiled card? FOUR INDEPENDENT
+-- PERMISSIONS, any of which suffices, because the rules state four.
 -- The first is Object.playableFromExile's, whose two conjuncts are below and
 -- whose second is why a card its own Adventure exiled offers only the creature
 -- half, while the same card in a hand -- or exiled by some other effect --
 -- offers both; the second is CR 702.170d's
 -- plotted card, which permitsCastPlotted answers; the third is CR 702.143a's
--- foretold card, which permitsCastForetold answers.
+-- foretold card, which permitsCastForetold answers; the fourth is CR 722.3c's
+-- prepare copy, which permitsCastPrepared answers.
 --
 --   * Object.playableFromExile names a player -- which is what keeps a
 --     permission from being an offer to the table. Written either by CR 715.3d's
@@ -856,6 +858,28 @@ permitsCastFromExile pid oid face gs =
   (permitsPlayFromExile pid oid gs && not (Card.isAdventure face && grantedByAdventureRule oid gs))
     || permitsCastPlotted pid oid gs
     || permitsCastForetold pid oid gs
+    || permitsCastPrepared pid oid gs
+
+-- CR 722.3c's own permission, the FOURTH of permitsCastFromExile's disjuncts:
+-- "for as long as the copy remains in exile, the prepared permanent's controller
+-- may cast the copy."
+--
+-- Read LIVE off the permanent the copy names rather than off an
+-- Object.playableFromExile stamped at the mint, and the rule is why: it names the
+-- prepared permanent's CONTROLLER, which CR 109.4 lets change while the copy sits
+-- in exile. A stored seat would keep letting the old controller cast it.
+--
+-- Pawl.Engine.Prepare.copyStands is the rest of the sentence -- the permanent is
+-- still on the battlefield and still prepared -- and the same read the CR 704.5e
+-- exception takes, so the copy is castable exactly while it is allowed to be in
+-- exile. Nothing about the FACE is asked: the copy's printing has one, and CR
+-- 715.3d's Adventure exclusion is scoped to rule 715.3d's own permission.
+permitsCastPrepared :: PlayerId -> ObjectId -> GameState -> Bool
+permitsCastPrepared pid oid gs = case Game.lookupObject oid gs of
+  Nothing -> False
+  Just copy -> case Object.preparedCopyOf copy of
+    Nothing -> False
+    Just permanentId -> Prepare.copyStands copy gs && Projection.controllerOf permanentId gs == Just pid
 
 -- CR 715.3d's "this way": was this exiled object's stored permission written by
 -- rule 715.3d itself, rather than by an Effect.GrantPlayFromExile a card states?
@@ -1688,6 +1712,12 @@ castSpellWith perform offered applied widened pid oid name facing = do
     Nothing -> pure ()
     Just face -> do
       let castFrom = fmap Object.zone (Game.lookupObject oid before)
+          -- CR 722.3c's last sentence, captured BEFORE CR 601.2a's move for
+          -- `castFrom`'s reason: the move mints a fresh CR 400.7 incarnation and
+          -- Object.newIncarnation clears this field with the rest of the
+          -- per-incarnation state, so this line is the only point where the
+          -- permanent the copy was minted for is still nameable.
+          preparedFor = Game.lookupObject oid before >>= Object.preparedCopyOf
           -- Read off the PROPOSED state, so a face-down cast is priced at CR
           -- 702.37a's {3} rather than at the card's own mana cost -- the same
           -- candidate list `castable` gated the offer on.
@@ -1805,7 +1835,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed perform spending pid sid face castFrom keywordsBefore candidates spent before
+          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent before
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
@@ -1849,8 +1879,12 @@ followIntoSpell permission old new gs = case permission of
 -- `spent` is the one-shot flash grants the cast spends (CR 611.2a), asked of the
 -- pre-move state by castSpellWith for the reason the two above are, and dropped
 -- beside the CR 601.2i event below -- after the last step that can reject.
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom keywordsBefore candidateCosts spent before = do
+--
+-- `preparedFor` is CR 722.3c's prepared permanent, asked of the pre-move state
+-- for the same reason and spent beside the CR 601.2i event for `spent`'s: that
+-- rule's own words are "at the time the spell becomes cast".
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent before = do
   gs <- State.get
   let candidates = fmap CandidateCost.cost candidateCosts
       decider = Decide.deciderFor pid gs
@@ -2358,6 +2392,15 @@ castProposed perform spending pid sid face castFrom keywordsBefore candidateCost
                           -- your hand" trigger reads it off the event, since CR
                           -- 400.7 left `sid` no memory of it.
                           State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g) castFrom)) g)
+                          -- CR 722.3c's last sentence: "that permanent loses the
+                          -- prepared designation AT THE TIME THE SPELL BECOMES
+                          -- CAST (see rule 601.2i)". So it is here, beside rule
+                          -- 601.2i's own event and after the last step that can
+                          -- reject -- a proposal the game returned from was never
+                          -- a cast and must not unprepare anything. The copy is
+                          -- already off in the stack by now, which is why the id
+                          -- comes from `preparedFor` above rather than from `sid`.
+                          Monad.mapM_ Prepare.unprepare preparedFor
                           -- CR 611.2a: the grants this cast spends, for the
                           -- event's own reason -- nothing past this line rejects.
                           State.modify' (PlayerEffect.consume spent)

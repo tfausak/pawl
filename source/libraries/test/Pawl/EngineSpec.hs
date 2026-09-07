@@ -58,6 +58,9 @@ cardBackedCount gs =
         -- CR 112.1a: no card is associated with a copy of a spell, so it is not
         -- one of the cards this counts.
         Source.OfSpellCopy _ -> False
+        -- CR 707.10a's copy of a card is not a card either, so it comes and goes
+        -- without breaking the conservation this counts.
+        Source.OfCardCopy _ -> False
         Source.OfInherentTrigger _ -> False
    in Map.size (Map.filter fromCard (GameState.objects gs))
 

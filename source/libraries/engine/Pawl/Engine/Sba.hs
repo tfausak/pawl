@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
@@ -903,10 +904,11 @@ performStateBasedActions = Event.simultaneously $ do
   -- `let`.
   Monad.mapM_ (Departure.depart Departure.Type.Lost) (List.reverse leaving)
   departed <- State.get
-  let -- CR 704.5d and CR 704.5e: the two objects the rules say cease to exist
-      -- outside one zone -- a token anywhere but the battlefield, a copy of a
-      -- spell anywhere but the stack. ONE pass, because CR 704.3 makes the whole
-      -- check one event and the two arms differ only in the zone.
+  let -- CR 704.5d and CR 704.5e: the objects the rules say cease to exist outside
+      -- a zone of their own -- a token anywhere but the battlefield, a copy of a
+      -- spell anywhere but the stack, a copy of a card anywhere but the stack, the
+      -- battlefield and CR 722.3c's exile. ONE pass, because CR 704.3 makes the
+      -- whole check one event and the arms differ only in which zones they keep.
       --
       -- Computed from the post-bury state so a token that just died (now in the
       -- graveyard) or was redirected (Rest in Peace -> exile) is removed here; its
@@ -933,11 +935,24 @@ performStateBasedActions = Event.simultaneously $ do
           -- this removes it there. CR 724.1b's exile and CR 701.6a's countering
           -- arrive the same way.
           --
-          -- The rule's SECOND sentence -- a copy of a CARD outside the stack or
-          -- the battlefield -- is not implemented: pawl has no copy of a card
-          -- (CR 707.13), which is #888's subject, so nothing can be in that
-          -- state (gap #888).
           Source.OfSpellCopy _ -> Object.zone obj /= Zone.Stack
+          -- The rule's SECOND sentence, and the one exception the rules state to
+          -- it. CR 704.5e: "if a copy of a card is in any zone other than the
+          -- stack or the battlefield, it ceases to exist" -- so the same shape
+          -- again with two zones instead of one. CR 722.3c adds exile for as long
+          -- as its own condition holds ("this copy remains in exile for as long as
+          -- the prepared permanent remains on the battlefield and has the prepared
+          -- designation. This is an exception to rule 704.5e"), which
+          -- Pawl.Engine.Prepare.copyStands is.
+          --
+          -- So this pass is what ENDS the copy as well as what keeps it: nothing
+          -- else has to watch the permanent leave or unprepare, because the
+          -- condition is read live here on the next check. Pawl.PreparationSpec's
+          -- "CR 722.3c the copy leaves exile when the Aviator does" is what proves
+          -- that half.
+          Source.OfCardCopy _
+            | Object.zone obj == Zone.Exile -> not (Prepare.copyStands obj departed)
+            | otherwise -> Object.zone obj `notElem` [Zone.Stack, Zone.Battlefield]
           _ -> False
       vanishing = filter isVanishing (Map.keys (GameState.objects departed))
       ceaseToExist g oid = case Game.lookupObject oid g of

@@ -730,6 +730,7 @@ mintCard pid under printingId dest position gs =
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
             Object.foretold = Nothing,
+            Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -920,6 +921,7 @@ createEmblem pid card = do
                 Object.playableFromExile = Nothing,
                 Object.plotted = Nothing,
                 Object.foretold = Nothing,
+                Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
                 Object.protector = Nothing,
                 Object.ventureRoom = Nothing,
@@ -5894,6 +5896,7 @@ createTokens controller card copy n tapped entering = do
                       Object.playableFromExile = Nothing,
                       Object.plotted = Nothing,
                       Object.foretold = Nothing,
+                      Object.preparedCopyOf = Nothing,
                       Object.ringBearerFor = Nothing,
                       Object.protector = Nothing,
                       Object.ventureRoom = Nothing,
@@ -6085,6 +6088,7 @@ meld controller victims resultCard = do
                 Object.playableFromExile = Nothing,
                 Object.plotted = Nothing,
                 Object.foretold = Nothing,
+                Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
                 Object.protector = Nothing,
                 Object.ventureRoom = Nothing,
@@ -6308,6 +6312,10 @@ mergeComponents source = case source of
   Source.OfTrigger _ -> Nothing
   Source.OfEmblem _ -> Nothing
   Source.OfSpellCopy _ -> Nothing
+  -- CR 722.3c's copy is never on the battlefield to be merged INTO, and CR
+  -- 702.140c's mutating spell is a creature spell rather than a copy of a card,
+  -- so no road reaches this arm.
+  Source.OfCardCopy _ -> Nothing
   Source.OfInherentTrigger _ -> Nothing
 
 -- `merge` above's refusal, asked BEFORE its side is chosen: CR 702.140c's

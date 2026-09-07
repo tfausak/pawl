@@ -151,6 +151,12 @@ resolveOneWith runSubgame = do
         -- zone, never cast). Drop it, like a token.
         Source.OfEmblem _ -> State.put gs {GameState.stack = rest}
         Source.OfSpellCopy printingId -> resolveCardBacked runSubgame oid rest printingId
+        -- CR 722.3c calls the cast copy a SPELL in as many words -- "that
+        -- permanent loses the prepared designation at the time the spell becomes
+        -- cast" -- and CR 608.1 then resolves it like any other. So the same road
+        -- the two card-backed arms above take, through the printing the mint
+        -- interned.
+        Source.OfCardCopy printingId -> resolveCardBacked runSubgame oid rest printingId
         Source.OfInherentTrigger InherentTriggerSource.MkInherentTriggerSource {InherentTriggerSource.ability = ability} ->
           -- An inherent ability has no source object, so the ability object
           -- itself stands in for one and Object.owner is its controller -- the
