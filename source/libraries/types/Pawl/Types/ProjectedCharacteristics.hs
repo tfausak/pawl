@@ -228,8 +228,8 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- what gives a mutated permanent every component's.
     --
     -- Read through Pawl.Engine.Projection.View.ruleAbilitiesOf, which the twelve
-    -- gatherer modules share; Pawl.MutateSpec's "CR 702.140e Silent Arbiter
-    -- under a Cubwarden still lets only one creature attack" is what proves the
+    -- gatherer modules share; Pawl.MutateSpec's "CR 702.140e a Silent Arbiter
+    -- under a Cubwarden still holds alice to one attacker" is what proves the
     -- union reaches them.
     ruleAbilities :: RuleAbilities.RuleAbilities,
     -- | CR 613.1f: has a layer-6 "loses all abilities" effect applied to this

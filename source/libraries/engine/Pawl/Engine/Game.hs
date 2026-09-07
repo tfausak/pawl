@@ -790,16 +790,15 @@ manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- a melded permanent only its combined back face, so a reader that must see past
 -- the topmost component of a MERGE must not see past a meld's result face.
 --
--- The one reader is `facesOfWithLastKnown` below, for CR 702.140e's abilities.
--- Every other rule that looks past the topmost component takes `componentsOf`,
--- which CR 712.21 and CR 730.3 share.
+-- Its two readers are `facesOfWithLastKnown` and `cardsOfWithLastKnown` below,
+-- for CR 702.140e's abilities. Every other rule that looks past the topmost
+-- component takes `componentsOf`, which CR 712.21 and CR 730.3 share.
 mergeComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
 mergeComponentsOf source = case source of
   Source.OfMerge components -> Seq.fromList (NonEmpty.toList components)
   Source.OfMeld _ -> Seq.empty
-  -- CR 722.3c: a prepared card's copy is one printing, and no mutating creature
-  -- spell can have merged with it -- Pawl.Engine.Event.mergeComponents refuses
-  -- every source but OfCard and OfMerge.
+  -- CR 722.3c: such a copy is never on the battlefield to be merged INTO, which
+  -- is Pawl.Engine.Event.mergeComponents' own arm for it.
   Source.OfCardCopy _ -> Seq.empty
   Source.OfCard _ -> Seq.empty
   Source.OfToken _ -> Seq.empty

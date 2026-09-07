@@ -364,8 +364,9 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 611.1: this face's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary Tower).
     -- The sibling of staticAbilities on the axis CR 613.10/613.11 put OUTSIDE the
-    -- layer system, so these are read by Pawl.Engine.PlayerEffect and never by
-    -- Pawl.Engine.Projection.
+    -- layer system, so these are read by Pawl.Engine.PlayerEffect and rewritten
+    -- by no layer -- carried on Pawl.Types.ProjectedCharacteristics all the same,
+    -- for the reason blockRequirements below gives.
     playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
     -- | CR 604.1/604.2 / 509.1c: this face's printed BLOCKING REQUIREMENTS -- "all
     -- creatures able to block enchanted creature do so" (Lure).
@@ -382,8 +383,8 @@ data Face card = MkFace
     blockRequirements :: [BlockRequirement.BlockRequirement],
     -- | CR 604.1/604.2 / 509.1a: this face's printed BLOCKING PERMISSIONS --
     -- "this creature can block an additional creature each combat" (Foriysian
-    -- Brigade); read by Pawl.Engine.BlockPermission, never by
-    -- Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    -- Brigade); read by Pawl.Engine.BlockPermission, rewritten by no layer, for
+    -- blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of combatRestrictions below, because
     -- these ADD where a restriction BINDS: Pawl.Types.BlockPermission's header
@@ -392,8 +393,8 @@ data Face card = MkFace
     -- | CR 604.1/604.2 / 508.1d: this face's printed ATTACKING REQUIREMENTS --
     -- "creatures enchanted player controls attack each combat if able" (Curse of
     -- the Nightly Hunt). The twin of blockRequirements on the other side of the
-    -- combat phase; read by Pawl.Engine.AttackRequirement, never by
-    -- Pawl.Engine.Projection, for that field's CR 613.11 reason.
+    -- combat phase; read by Pawl.Engine.AttackRequirement, rewritten by no
+    -- layer, for that field's CR 613.11 reason.
     attackRequirements :: [AttackRequirement.AttackRequirement],
     -- | CR 604.1/604.2 / 508.1c / 509.1b: this face's printed COMBAT RESTRICTIONS
     -- -- "enchanted creature can't attack or block" (Pacifism); read by
@@ -464,8 +465,8 @@ data Face card = MkFace
     counterRestrictions :: [CounterRestriction.CounterRestriction],
     -- | CR 604.1\/604.2 \/ 602.2 \/ 101.2: this face's printed ACTIVATION
     -- PROHIBITIONS -- "its activated abilities can't be activated" (Arrest);
-    -- read by Pawl.Engine.ActivationProhibition, never by
-    -- Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    -- read by Pawl.Engine.ActivationProhibition, rewritten by no layer, for
+    -- blockRequirements' CR 613.11 reason.
     --
     -- Its own field rather than an arm of counterRestrictions above, for the
     -- reason that field gives: the two forbid unrelated game actions, and this

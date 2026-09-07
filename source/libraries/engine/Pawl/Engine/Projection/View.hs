@@ -849,8 +849,8 @@ specialActionsOf oid gs = case copiableSnapshotOf oid gs of
 -- copy therefore contributes what it was a copy OF, which is what rule 730.2a's
 -- "copiable" asks for and what a per-component face walk would have got wrong.
 --
--- Pawl.MutateSpec's "CR 702.140e Silent Arbiter under a Cubwarden still lets only
--- one creature attack" is what proves the merged read.
+-- Pawl.MutateSpec's "CR 702.140e a Silent Arbiter under a Cubwarden still holds
+-- alice to one attacker" is what proves the merged read.
 ruleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
 ruleAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
   Just snapshot -> PC.ruleAbilities snapshot
