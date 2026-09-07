@@ -122,6 +122,7 @@ codec =
       Arm.payload "Crew" Common.natural Keyword.Crew (\x -> case x of Keyword.Crew y -> Just y; _ -> Nothing),
       Arm.payload "Fabricate" Common.natural Keyword.Fabricate (\x -> case x of Keyword.Fabricate y -> Just y; _ -> Nothing),
       Arm.nullary "Partner" Keyword.Partner,
+      Arm.nullary "ChooseABackground" Keyword.ChooseABackground,
       Arm.nullary "Riot" Keyword.Riot,
       Arm.nullary "Unleash" Keyword.Unleash,
       Arm.nullary "Daybound" Keyword.Daybound,

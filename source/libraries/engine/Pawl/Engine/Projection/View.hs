@@ -17,6 +17,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Defender as Defender
@@ -191,6 +192,10 @@ viewOfCard face =
           -- CR 111.6: "A token isn't a card." CR 704.5d already made a token in
           -- any zone this builder describes cease to exist.
           Filter.token = False,
+          -- CR 903.3's designation is made of a card in a DECK and answered of an
+          -- object; a printed face carries neither, so IsCommander is vacuously
+          -- False here, `token` above's posture.
+          Filter.commander = False,
           -- CR 113.3b: an ability on the stack is never a printed face, so this
           -- builder's candidate cannot be one.
           Filter.activatedAbility = False,
@@ -556,6 +561,10 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- viewWithLastKnownAnywhere writes CR 608.2h's answer over it for the
       -- readers owed one, exactly as `owner` above has it.
       Filter.token = Game.isToken oid gs,
+      -- CR 903.3, read off the owner's designation for `token` above's reason: it
+      -- is fixed before the game begins (CR 702.124a) and no rule rewrites it.
+      -- False for an id naming nothing.
+      Filter.commander = Commander.isCommander oid gs,
       -- CR 113.3b, read off Object.source for `token` above's reason: which of CR
       -- 113.3's kinds an ability is is fixed for the life of the object. False
       -- for an id naming nothing, and for every object that is not an ability on
