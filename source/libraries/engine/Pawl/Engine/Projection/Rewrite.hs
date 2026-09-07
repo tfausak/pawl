@@ -704,7 +704,7 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)
   Effect.BecomeMonarch {} -> effect
   Effect.TakeTheInitiative {} -> effect
-  Effect.Designate (Designate.MkDesignate _ _) -> effect
+  Effect.Designate (Designate.MkDesignate d slot value) -> Effect.Designate (Designate.MkDesignate d slot (fmap (rewriteQuantity pairs) value))
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.SetHalfLocked (SetHalfLocked.MkSetHalfLocked {}) -> effect
@@ -1496,6 +1496,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.IsStartingPlayer _ -> quantity
   Quantity.Type.IsActivePlayer _ -> quantity
   Quantity.Type.HasDesignation _ -> quantity
+  Quantity.Type.DesignationValue _ -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
   -- A LEAF like WasKicked above, and the Cost it names is deliberately NOT

@@ -1135,7 +1135,9 @@ ownCounts effect = case effect of
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
-  Effect.Designate (Designate.MkDesignate _ _) -> []
+  -- CR 701.37c's X is a Quantity like any other -- Search's count above, same
+  -- sentence. A designation set with no number has no Count to reach.
+  Effect.Designate (Designate.MkDesignate _ _ value) -> foldMap quantityCounts value
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
@@ -1856,7 +1858,7 @@ effectReplacements effect = case effect of
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
-  Effect.Designate (Designate.MkDesignate _ _) -> []
+  Effect.Designate (Designate.MkDesignate {}) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
@@ -2245,7 +2247,7 @@ effectMintedFaces effect = case effect of
   Effect.RequireAttack {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
-  Effect.Designate (Designate.MkDesignate _ _) -> []
+  Effect.Designate (Designate.MkDesignate {}) -> []
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.SetHalfLocked {} -> []
@@ -3028,6 +3030,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.IsStartingPlayer _ -> []
   Quantity.Type.IsActivePlayer _ -> []
   Quantity.Type.HasDesignation _ -> []
+  Quantity.Type.DesignationValue _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
   Quantity.Type.TimesKickedWith {} -> []
@@ -4678,7 +4681,9 @@ effectFilters effect = case effect of
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
   Effect.TakeTheInitiative _ -> []
-  Effect.Designate (Designate.MkDesignate _ _) -> []
+  -- CR 701.37c's X is a Quantity like any other, so its Filters are reachable
+  -- from here. A designation set with no number has none to reach.
+  Effect.Designate (Designate.MkDesignate _ _ value) -> foldMap quantityFilters value
   Effect.SetClassLevel (SetClassLevel.MkSetClassLevel _ _) -> []
   Effect.Unsuspect ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.SetHalfLocked {} -> []

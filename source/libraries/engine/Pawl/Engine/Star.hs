@@ -44,6 +44,7 @@ substituteStar star quantity = case quantity of
   Quantity.ObjectCounters _ -> quantity
   Quantity.ObjectCountersOfAnyKind -> quantity
   Quantity.HasDesignation _ -> quantity
+  Quantity.DesignationValue _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
   -- CR 702.33f's read, WasKicked's arm above in every respect: the Cost it

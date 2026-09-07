@@ -85,6 +85,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.classLevel = Nothing,
           Object.unlockedHalves = Set.empty,
           Object.designations = Set.empty,
+          Object.designationValues = Map.empty,
           Object.kicked = Map.empty,
           Object.bestowed = False,
           Object.mutating = False,
@@ -177,6 +178,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.classLevel = Just (ClassLevel.MkClassLevel 2),
           Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Fire")),
           Object.designations = Set.singleton Designation.Renowned,
+          Object.designationValues = Map.singleton Designation.Monstrous 26,
           Object.kicked =
             Map.singleton
               Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 24]), Cost.components = []}
@@ -223,6 +225,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"plotted\":0,\"foretold\":15,\"ringBearerFor\":16,\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
+          <> ",\"designationValues\":[{\"designation\":{\"type\":\"Monstrous\"},\"value\":26}]"
           <> ",\"kicked\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":24}]},\"times\":25}]"
           <> ",\"bestowed\":true"
           <> ",\"mutating\":true"

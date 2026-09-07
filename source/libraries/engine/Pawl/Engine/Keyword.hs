@@ -3103,7 +3103,7 @@ renown n =
     }
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource))
-    designate = Effect.Designate (Designate.MkDesignate Designation.Renowned Binding.triggerSource)
+    designate = Effect.Designate (Designate.MkDesignate Designation.Renowned Binding.triggerSource Nothing)
 
 -- CR 702.105a. The whole of the keyword is in the CONDITION,
 -- TriggerCondition.SelfAttacksPlayerWithMostLife, which is why the payload is
