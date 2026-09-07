@@ -2382,7 +2382,10 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 namedTokens :: Set.Set CardName.CardName
 namedTokens =
   Set.fromList
-    [ CardName.MkCardName (Text.pack "Nalaar Aetherjet"),
+    [ -- Synthetic Ursine Rite's, whose card-authored name spells its own Bear
+      -- subtype inside a longer word -- the CR 612.2 boundary case.
+      CardName.MkCardName (Text.pack "Bearer of the Wilds"),
+      CardName.MkCardName (Text.pack "Nalaar Aetherjet"),
       CardName.MkCardName (Text.pack "Rabid Sheep")
     ]
 
@@ -2391,12 +2394,20 @@ tokenNameOffends token
   | Set.member Supertype.Legendary (TypeLine.supertypes (Face.typeLine token)) = False
   | Set.member (Face.name token) namedTokens = False
   | otherwise =
-      case traverse (fmap (Text.pack . fst) . Common.asTagged . Codec.encode Subtype.codec) (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
+      case traverse printedWord (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
         Left _ -> True
         Right subtypes ->
           notElem
             (CardName.unwrap $ Face.name token)
             (fmap (\ordering -> Text.unwords (ordering <> [Text.pack "Token"])) (List.permutations subtypes))
+  where
+    -- The subtype as PRINTED, which the codec's tag is not: CR 205.3m's Time
+    -- Lord is two words and its Assembly-Worker punctuated, where each tag is
+    -- one bare identifier. Engine.Subtype.creatureTypeWord is that list; a
+    -- subtype of another family has no entry there and its tag is the word.
+    printedWord subtype = case SubtypeEngine.creatureTypeWord subtype of
+      Just word -> Right word
+      Nothing -> fmap (Text.pack . fst) (Common.asTagged (Codec.encode Subtype.codec subtype))
 
 -- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
 -- 702.14c's landwalk criterion, plus the components of any Cost a keyword names
