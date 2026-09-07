@@ -1958,10 +1958,18 @@ slotNamesCollide sets = Set.size (Set.unions sets) /= sum (fmap Set.size sets)
 -- Activate stamps Modal.modesTargetSlots, which has no enchant half. Each ability is checked on
 -- its own for the same reason: two abilities are two separate announcements, so
 -- a name they share is never fused.
+--
+-- CR 702.140a's mutate slot joins it there, and unconditionally rather than off
+-- the face's keywords: Card.modesTargetSlotsGiven fuses the three maps with the
+-- same left-biased Map.unions, so a mode named `mutate` on ANY card would be
+-- shadowed the moment that card were also given mutate -- and a lint that asked
+-- only of the cards carrying the keyword today would go quiet on the card that
+-- acquired it tomorrow. Card.mutateSlot's haddock names this lint; before
+-- #3371 it named it and the lint did not cover it.
 cardSlotNamesCollide :: Face.Face Card.Type.Card -> Bool
 cardSlotNamesCollide card =
   let modeSlots modal = fmap (Map.keysSet . Mode.targetSlots) (Foldable.toList (Modal.modes modal))
-   in slotNamesCollide (Map.keysSet (Card.enchantSlotMap card) : modeSlots (Face.spell card))
+   in slotNamesCollide (Map.keysSet (Card.enchantSlotMap card) : Set.singleton Card.mutateSlot : modeSlots (Face.spell card))
         || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Face.activatedAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Face.triggeredAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
@@ -5222,6 +5230,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (cardSlotNamesCollide (face {Face.activatedAbilities = [distinct]}))) "and two modes naming distinct slots are accepted"
     Spec.assertBool s (cardSlotNamesCollide fused) "Dream's Grip with both modes on one slot is rejected"
     Spec.assertBool s (not (collides dreamsGrip)) "and the real card, naming them 'tapped' and 'untapped', is accepted"
+    -- CR 702.140a's slot, which Card.modesTargetSlotsGiven fuses into the SPELL's
+    -- modes the way CR 303.4a's enchant slot is: a spell mode named `mutate`
+    -- would be shadowed on any card that also carried the keyword, so the lint
+    -- rejects the name on every card rather than only on the ones carrying it.
+    let mutated = face {Face.spell = (Face.spell face) {Modal.modes = Seq.singleton (lintMode [tap Card.mutateSlot] [Card.mutateSlot])}}
+    Spec.assertBool s (cardSlotNamesCollide mutated) "a spell mode declaring the mutate slot's name is rejected"
   -- CR 608.2d's either-or, whose two branches must name each other: the corpus
   -- half, with the same shape the slot-name pair above has.
   Spec.it s "no card's either-or names a sibling that does not name it back" $ do

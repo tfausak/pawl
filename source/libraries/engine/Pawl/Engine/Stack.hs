@@ -397,16 +397,21 @@ resolveCardBacked runSubgame oid rest printingId = do
                 -- CR 730.2a makes the two answers differ in the merged
                 -- permanent's every characteristic.
                 --
-                -- A merge that REFUSES (Event.merge's own note: a target no
+                -- A merge that REFUSES (Event.mergeable's own note: a target no
                 -- component list can be read off) falls through to the ordinary
                 -- entry below, so the spell resolves as the creature spell it
-                -- also is rather than being lost (#874).
+                -- also is rather than being lost (#874). Asked BEFORE the side
+                -- is, so a player is never put a question whose answer the
+                -- refusal would then discard.
                   case mutatingTarget oid gs1 of
-                    Just victim -> do
+                    Just victim | Event.mergeable oid victim gs1 -> do
                       side <- Game.choose (Prompt.ChooseMutateSide (Decide.deciderFor controller gs1) controller oid victim)
                       merged <- Event.merge oid victim side
+                      -- A FENCE, said plainly: `mergeable` above asked the same
+                      -- two reads off the same board, and nothing between them
+                      -- can change it, so this never fires.
                       Monad.unless merged entersOrdinarily
-                    Nothing -> entersOrdinarily
+                    _ -> entersOrdinarily
                 else
                   -- `entering` is carried on BOTH branches below: CR 712.13 is
                   -- about the resolving spell rather than about which kind of

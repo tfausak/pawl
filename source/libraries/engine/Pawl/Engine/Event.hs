@@ -6227,6 +6227,16 @@ meldable victims gs = do
 -- spell's printing at the head, which CR 730.2a then reads every characteristic
 -- off, and Under puts it at the tail.
 --
+-- The CHARACTERISTICS the merge leaves are stamped here, into the same
+-- Binding.copyOf a copy effect writes: CR 613.2a puts copy effects and merges in
+-- one sublayer, CR 613.7 orders them by timestamp and CR 730.2a fixes this one's
+-- at the merge, so the two sides are folded against what layer 1a had left each
+-- of them at this moment (Projection.copiableCharacteristics of the spell and of
+-- the permanent, both read BEFORE anything is rewritten) and the result replaces
+-- whatever an earlier copy effect on the target had put there. See
+-- Projection.withMergedAbilities for why the fold is over records rather than
+-- over printed faces; see #3371.
+--
 -- The EVENT is recorded last, after the merge has landed, so CR 702.140d's
 -- "whenever this creature mutates" trigger is gathered against a permanent that
 -- already projects rule 702.140e's added abilities -- which is what lets a
@@ -6240,44 +6250,79 @@ merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
   case (Game.lookupObject sid gs, Game.lookupObject target gs) of
-    (Just spell, Just permanent) -> case (Object.source spell, representing (Object.source permanent)) of
+    (Just spell, Just permanent) -> case (Object.source spell, mergeComponents (Object.source permanent)) of
       (Source.OfCard pid, Just existing) -> do
         let merged = case side of
               MutateSide.Over -> pid NonEmpty.:| existing
               MutateSide.Under -> case existing of
                 first : rest -> first NonEmpty.:| (rest <> [pid])
                 [] -> pid NonEmpty.:| []
+            -- What layer 1a had left each side, read off the PRE-merge board:
+            -- the spell's own record and the permanent's, which is that
+            -- permanent's copy snapshot where an earlier copy effect gave it one
+            -- and its printed seed otherwise.
+            spellPc = Projection.copiableCharacteristics sid gs
+            hostPc = Projection.copiableCharacteristics target gs
+            -- CR 730.2a's base is the TOPMOST side and CR 702.140e's union comes
+            -- from the other, which is the whole of what the side decides.
+            resulting = case side of
+              MutateSide.Over -> Projection.withMergedAbilities hostPc spellPc
+              MutateSide.Under -> Projection.withMergedAbilities spellPc hostPc
         State.modify' (`forgetObject` sid)
         State.modify'
           ( \g ->
               g
                 { GameState.objects =
-                    Map.adjust (\o -> o {Object.source = Source.OfMerge merged}) target (GameState.objects g)
+                    Map.adjust
+                      ( \o ->
+                          o
+                            { Object.source = Source.OfMerge merged,
+                              Object.bindings = Binding.setCopy resulting (Object.bindings o)
+                            }
+                      )
+                      target
+                      (GameState.objects g)
                 }
           )
         State.modify' (recordEvent (GameEvent.Mutated target))
         pure True
       _ -> pure False
     _ -> pure False
-  where
-    -- CR 730.2's "any other components that were representing it", in top-to-
-    -- bottom order: one printing for an ordinary card (CR 108.2), and the
-    -- existing stack for a permanent already merged.
-    --
-    -- Not implemented: a TOKEN component, which CR 730.2d's token-ness rule is
-    -- about, and a MELDED component, whose characteristics come off an interned
-    -- combined face that is no component of it (CR 712.8g). Nothing answers for
-    -- either, so a mutating creature spell targeting one does not merge (#874).
-    representing source = case source of
-      Source.OfCard pid -> Just [pid]
-      Source.OfMerge components -> Just (NonEmpty.toList components)
-      Source.OfMeld _ -> Nothing
-      Source.OfToken _ -> Nothing
-      Source.OfAbility _ -> Nothing
-      Source.OfTrigger _ -> Nothing
-      Source.OfEmblem _ -> Nothing
-      Source.OfSpellCopy _ -> Nothing
-      Source.OfInherentTrigger _ -> Nothing
+
+-- CR 730.2's "any other components that were representing it", in top-to-bottom
+-- order: one printing for an ordinary card (CR 108.2), and the existing stack
+-- for a permanent already merged.
+--
+-- Not implemented: a TOKEN component, which CR 730.2d's token-ness rule is
+-- about, and a MELDED component, whose characteristics come off an interned
+-- combined face that is no component of it (CR 712.8g). Nothing answers for
+-- either, so a mutating creature spell targeting one does not merge (#874).
+mergeComponents :: Source.Source -> Maybe [PrintingId.PrintingId]
+mergeComponents source = case source of
+  Source.OfCard pid -> Just [pid]
+  Source.OfMerge components -> Just (NonEmpty.toList components)
+  Source.OfMeld _ -> Nothing
+  Source.OfToken _ -> Nothing
+  Source.OfAbility _ -> Nothing
+  Source.OfTrigger _ -> Nothing
+  Source.OfEmblem _ -> Nothing
+  Source.OfSpellCopy _ -> Nothing
+  Source.OfInherentTrigger _ -> Nothing
+
+-- `merge` above's refusal, asked BEFORE its side is chosen: CR 702.140c's
+-- over-or-under is a real decision, and a question whose answer the next line
+-- discards is not one the engine should put to a player. Pawl.Engine.Stack asks
+-- this first and takes the ordinary entry when it answers False, so the prompt
+-- is raised only where the merge will actually happen.
+--
+-- The same two reads `merge` makes, and no other: a spell with a printing behind
+-- it, and a target whose components can be named.
+mergeable :: ObjectId -> ObjectId -> GameState -> Bool
+mergeable sid target gs = case (Game.lookupObject sid gs, Game.lookupObject target gs) of
+  (Just spell, Just permanent) -> case (Object.source spell, mergeComponents (Object.source permanent)) of
+    (Source.OfCard _, Just _) -> True
+    _ -> False
+  _ -> False
 
 -- Stop being an object at all, the CR 701.42a half of melding that
 -- Game.removeFromZones alone does not do: the id leaves its zone AND the object
