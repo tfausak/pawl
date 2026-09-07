@@ -2,10 +2,12 @@
 
 module Pawl.Codec.CreateCopy where
 
+import qualified Pawl.Codec.CopyException as CopyException
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.CreateCopy as CreateCopy
 
@@ -20,15 +22,18 @@ import qualified Pawl.Types.CreateCopy as CreateCopy
 --
 -- The riders are elided the same way and for Create's reason: CR 110.5b's
 -- default is no riders at all, which is every copy token in the pool but
--- Littjara Mirrorlake's.
+-- Littjara Mirrorlake's. So are the CR 707.9 exceptions, and for AsCopy's
+-- reason: the "except ..." clause is absent from most printings.
 codec :: Codec.Codec CreateCopy.CreateCopy
 codec = Fields.object $ do
   quantity <- Fields.defaulted "quantity" CreateCopy.defaultQuantity Quantity.codec CreateCopy.quantity
   ref <- Fields.required "ref" ObjectRef.codec CreateCopy.ref
   riders <- Fields.defaulted "riders" EntryRiders.defaultValue EntryRiders.codec CreateCopy.riders
+  exceptions <- Fields.defaulted "exceptions" [] (Common.list CopyException.codec) CreateCopy.exceptions
   pure
     CreateCopy.MkCreateCopy
       { CreateCopy.quantity = quantity,
         CreateCopy.ref = ref,
-        CreateCopy.riders = riders
+        CreateCopy.riders = riders,
+        CreateCopy.exceptions = exceptions
       }

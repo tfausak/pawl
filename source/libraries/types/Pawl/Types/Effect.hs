@@ -278,6 +278,9 @@ data Effect card ability
   | -- | CR 707.1 / 111.3: create this many tokens per named object that are
     -- copies of it (Cackling Counterpart), entering simultaneously.
     --
+    -- The payload carries CR 707.9's exceptions, BecomeCopy's arm below: the
+    -- excepted value joins the token's copiable values (Multiversal Recruitment).
+    --
     -- Not implemented: the rest of the EntryRiders record beyond CR 122.6's
     -- counters, and a bound slot for CR 603.7c's "it" -- Kiki-Jiki's hasty token
     -- and the delayed sacrifice that names it (#2302).
