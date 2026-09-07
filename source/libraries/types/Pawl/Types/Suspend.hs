@@ -14,6 +14,10 @@ import qualified Pawl.Types.Cost as Cost
 -- exiles the card with, and `cost` is what that action charges. Two fields
 -- rather than two constructors because rule 702.62a states them in one sentence
 -- and the special action needs both at once.
+--
+-- `counters` is a settled Natural and so cannot state CR 107.3d's chosen X,
+-- which the five printed "Suspend X" cards write into the N and the cost at once
+-- (gap #3360).
 data Suspend keyword = MkSuspend
   { counters :: Natural.Natural,
     cost :: Cost.Cost keyword

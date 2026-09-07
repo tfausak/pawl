@@ -3577,10 +3577,14 @@ suspendedNow = Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters 
 --
 -- CAST and not rule 702.62a's wider "PLAY it", which for a land with suspend
 -- would be a land play: Scryfall `keyword:suspend t:land`, 2026-09-07, no hit --
--- a land with suspend is the card that would tell the two apart. Rule 702.62a's
--- "if it's exiled" is likewise not stated as an intervening "if"; the condition
--- is the removal of a counter from an exiled card, which is what CR 400.7 leaves
--- reachable.
+-- a land with suspend is the card that would tell the two apart.
+--
+-- THE INTERVENING "IF" is rule 702.62a's "if it's exiled", which immediately
+-- follows the trigger condition and so is CR 603.4's, gated at the gather and
+-- re-checked at resolution (CR 608.2a) like any other. It is NOT true by
+-- construction: the counter's removal is what triggers the ability, and any
+-- player may move the card out of exile in the window that opens before it
+-- resolves.
 --
 -- Not implemented: rule 702.62a's last sentence, the haste a creature spell cast
 -- this way gains until its caster loses control of it -- Durkwood Baloth
@@ -3593,7 +3597,7 @@ suspendLastCounter =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.intervening = Just stillExiled,
       TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
@@ -3607,6 +3611,30 @@ suspendLastCounter =
             OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced}
           }
+
+-- CR 702.62a's "if it's exiled", cumulativeUpkeep's onBattlefield one zone over:
+-- a count of the exile zone kept by Filter.IsSource, which is at least one
+-- exactly while the card the ability is on is still there.
+--
+-- PlayerRef.EachPlayer because exile is shared and has no per-player copy to
+-- name (Pawl.Types.InZone).
+--
+-- THE TWO READINGS AGREE on every board in this pool, and by accident rather
+-- than by the rule: CR 400.7 mints a fresh id as the card leaves exile and
+-- deletes the one the trigger bound, so Pawl.Engine.Resolve.Effect.offerCast
+-- finds no object for the stale reference and makes no offer either way. What
+-- the clause decides is therefore the ABILITY'S FATE and not the board --
+-- removed on resolution rather than resolved -- which is what
+-- Pawl.SpecialActionSpec's Pull from Eternity pair asserts, through
+-- Pawl.Engine.Stack.interveningStillHolds.
+stillExiled :: Condition.Condition
+stillExiled =
+  Condition.Compares
+    ( Compares.MkCompares
+        (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Exile PlayerRef.EachPlayer)) Filter.IsSource Aggregation.Members))
+        Comparison.AtLeast
+        (Quantity.Literal 1)
+    )
 
 -- CR 702.63a's SECOND and THIRD abilities, the first being mintedReplacementsFor's
 -- -- so vanishing's rule text spans both mints. Ordered as rule 702.63a prints

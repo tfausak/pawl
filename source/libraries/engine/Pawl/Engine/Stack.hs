@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.CarryOver as CarryOver
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -135,7 +136,7 @@ resolveOneWith runSubgame = do
           -- pass one check and fail the other.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) ((Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs}) gs srcId cond) ->
+              | not (interveningStillHolds gs obj srcId cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -177,12 +178,42 @@ resolveOneWith runSubgame = do
           -- field would be Nothing however it was filled.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just oid) (Binding.slotObjects (Object.bindings obj))) gs oid cond) ->
+              | not (interveningStillHolds gs obj oid cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
                   modal = TriggeredAbility.modal ability
                in Resolve.resolveModesWith runSubgame oid oid (Modal.chosenModes chosen modal)
+
+-- CR 608.2a's re-check of an intervening "if", asked of a triggered ability that
+-- is ALREADY ON THE STACK: does its condition still hold? False is the removal
+-- the two arms above perform.
+--
+-- ONE function for both of them, which is what keeps rule 608.2a from meaning
+-- one thing for a borne trigger and another for an inherent one. The two arms
+-- differ only in which id stands in for the source -- the bearer for a borne
+-- ability, the ability object itself for an inherent one -- and passing
+-- Projection.hostOf that id is right either way: CR 303.4 attaches nothing to an
+-- ability object, so the field is Nothing for the inherent arm however it is
+-- filled.
+--
+-- `obj` is the ABILITY on the stack, whose Object.owner is CR 109.5's "you" and
+-- whose bindings supply the context's slots; `srcId` is what the condition's own
+-- Filter.IsSource means. The view is Projection.viewWithLastKnownAnywhere for the
+-- reason the arms above give: CR 608.2h is owed to every object the clause reads.
+--
+-- Named rather than inlined so a test can ask the resolution's own question
+-- without driving a board that cannot tell the two answers apart --
+-- Pawl.SpecialActionSpec's Rift Bolt pair is the caller that needs it, CR
+-- 702.62a's "if it's exiled" being a clause whose two readings agree on today's
+-- board (see Pawl.Engine.Keyword.stillExiled).
+interveningStillHolds :: GameState.GameState -> Object.Object -> ObjectId -> Condition.Type.Condition -> Bool
+interveningStillHolds gs obj srcId =
+  Condition.holds
+    (Projection.viewWithLastKnownAnywhere gs)
+    ((Filter.contextWithSlots (Game.teams gs) (Just (Object.owner obj)) (Just srcId) (Binding.slotObjects (Object.bindings obj))) {Filter.sourceAttachedTo = Projection.hostOf srcId gs})
+    gs
+    srcId
 
 -- The no-subgame resolve-top (every existing caller and test): a resolving spell
 -- or ability with a PlaySubgame effect would draw. Engine's live loop uses
