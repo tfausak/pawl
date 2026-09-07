@@ -848,8 +848,11 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         -- CR 202.3a all the same: CR 109.1 makes an ability on the stack an
         -- OBJECT, and an object with no mana cost has mana value 0 -- neither of
         -- that rule's two exceptions (a nonmodal double-faced back face, a melded
-        -- permanent) is an object with no card behind it. Pawl.CounterspellSpec's
-        -- Synthetic Weigh the Trigger group is what proves it.
+        -- permanent) is an object with no card behind it. CR 603.3's "no other
+        -- characteristics" does not take it back: CR 109.3 lists mana COST as a
+        -- characteristic and not mana value, which rule 202.3 derives from it.
+        -- Pawl.CounterspellSpec's Synthetic Weigh the Trigger group is what
+        -- proves the number.
         PC.manaValue = Just 0,
         PC.power = Nothing,
         PC.toughness = Nothing,
