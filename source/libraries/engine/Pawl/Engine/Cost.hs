@@ -3528,8 +3528,11 @@ payComponent moment slots pid oid component = case component of
   -- route, so each one is a becomes-tapped event (CR 701.26a).
   --
   -- Not implemented: CR 702.122b/c's "crews a Vehicle" and "crewed by" relation,
-  -- and so CR 702.122e's trigger and CR 702.122d's restriction -- the chosen set
-  -- is spent here and recorded nowhere (#915). The sibling arm below binds
+  -- and so CR 702.122e's intervening-"if" rider and CR 702.122d's restriction --
+  -- the chosen set is spent here and recorded nowhere (#915). Rule 702.122e's
+  -- trigger itself asks nothing of it: Pawl.Engine.Resolve.resolveAbilityWith
+  -- records GameEvent.BecameCrewed off the resolving ability's own keyword stamp,
+  -- which Pawl.CrewSpec's "BecomesCrewed" cases prove. The sibling arm below binds
   -- Binding.tappedPermanent, and this one deliberately does NOT share it: see
   -- that slot's own comment for why one name for both questions would go quiet.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do

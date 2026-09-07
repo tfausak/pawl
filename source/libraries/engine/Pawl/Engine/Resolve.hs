@@ -46,9 +46,11 @@ import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
@@ -987,9 +989,20 @@ resolveAbilityWith runSubgame abilId srcId ability = do
   gs <- State.get
   case Game.lookupObject abilId gs of
     Nothing -> pure ()
-    Just obj ->
+    Just obj -> do
       let chosen = Binding.modesOf (Object.bindings obj)
-       in resolveModesWith runSubgame abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
+      resolveModesWith runSubgame abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
+      -- CR 702.122e: "becomes crewed" IS "a crew ability of this Vehicle
+      -- resolves", so the marker is written here rather than where the cost was
+      -- paid -- a crew activation that is countered never crews anything.
+      --
+      -- Read off ActivatedAbility.keyword, the stamp Keyword.mintedBy writes, so
+      -- this is a case on a rule-702 KEYWORD and not on an effect's identity.
+      -- The source is the Vehicle (CR 113.7a), which is what rule 702.122e's
+      -- "[this Vehicle]" names.
+      case ActivatedAbility.keyword ability of
+        Just (Keyword.Crew _) -> State.modify' (Event.recordEvent (GameEvent.BecameCrewed srcId))
+        _ -> pure ()
 
 -- The no-subgame activated-ability resolver.
 resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
