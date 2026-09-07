@@ -1,5 +1,6 @@
 module Pawl.Types.GameState where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -247,7 +248,13 @@ data GameState = MkGameState
     -- 723.2's control is not the active player's and does not last a turn
     -- (see #881); each row carries its own lifetime, and CR 723.3 is why a row
     -- says nothing about who the active player is.
-    control :: Map.Map PlayerId.PlayerId PlayerControl.PlayerControl,
+    --
+    -- A STACK per player, oldest first, because CR 723.1a's "overwrite" is the
+    -- continuous-effect sense: both effects exist and the last one CREATED is
+    -- the one that works, so a rule 723.2 control laid over a live rule 723.1
+    -- one must give that one back when it lapses; see #3351. Never empty -- a
+    -- player with no control has no key.
+    control :: Map.Map PlayerId.PlayerId (NonEmpty.NonEmpty PlayerControl.PlayerControl),
     -- | CR 725.1 / 725.3: the monarch, a single game-wide designation.
     monarch :: Maybe PlayerId.PlayerId,
     -- | CR 726.1 / 726.3: the initiative, the monarch's sibling designation.

@@ -463,15 +463,17 @@ threePlayerGame = Setup.emptyGame threePlayers
 -- CR 723.1's control row as GameState.control holds it: `decider` makes
 -- `controlled`'s choices for a whole turn, with no CR 723.7 restriction. What
 -- Mindslaver installs, and what a test hand-building a controlled board wants.
-turnControl :: PlayerId.PlayerId -> PlayerId.PlayerId -> Map.Map PlayerId.PlayerId PlayerControl.PlayerControl
+turnControl :: PlayerId.PlayerId -> PlayerId.PlayerId -> Map.Map PlayerId.PlayerId (NonEmpty.NonEmpty PlayerControl.PlayerControl)
 turnControl decider controlled =
   Map.singleton
     controlled
-    PlayerControl.MkPlayerControl
-      { PlayerControl.decider = Decider.MkDecider decider,
-        PlayerControl.duration = ControlDuration.UntilTurnEnds,
-        PlayerControl.manaFromLandsOnly = False
-      }
+    ( pure
+        PlayerControl.MkPlayerControl
+          { PlayerControl.decider = Decider.MkDecider decider,
+            PlayerControl.duration = ControlDuration.UntilTurnEnds,
+            PlayerControl.manaFromLandsOnly = False
+          }
+    )
 
 -- CR 723.2's row, the one Word of Command installs: `decider` decides for its
 -- key until the object that wrote it finishes resolving, and rule 723.7's mana
