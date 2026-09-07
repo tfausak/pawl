@@ -1435,6 +1435,113 @@ manaOnly symbols = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost 
 handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
+-- Borrowed Malevolence's two modes, in printed order (CR 700.2 /
+-- data/cards/borrowed-malevolence.json):
+--   0. "Target creature gets +1/+1 until end of turn." -- slot "boosted"
+--   1. "Target creature gets -1/-1 until end of turn." -- slot "weakened"
+-- under "Choose one or both --" (ModeSelection.ChooseBetween 1 2), plus
+-- "Escalate {2}" (CR 702.120).
+--
+-- The board: alice has `lands` untapped Swamps, bob has a Hill Giant (3/3) and a
+-- Wall of Stone (0/8), and the spell is in alice's hand. Two victims of DIFFERENT
+-- sizes, so neither mode's effect can be mistaken for the other's, and the Wall's
+-- eight toughness keeps CR 704.5f from destroying it once mode 1 has run.
+malevolenceBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+malevolenceBoard swamp malevolence hillGiant wallOfStone lands =
+  let (giantId, gs1) = S.addPermanent hillGiant S.bob (S.landsInPlay swamp lands)
+      (wallId, gs2) = S.addPermanent wallOfStone S.bob gs1
+      (gs, spellId) = S.handOne malevolence gs2
+   in (gs, spellId, giantId, wallId)
+
+boostSlot :: SlotName.SlotName
+boostSlot = SlotName.MkSlotName (Text.pack "boosted")
+
+-- Answers CR 601.2b's mode question with `modes`, aims mode 0's "boosted" slot at
+-- `toBoost` and mode 1's "weakened" slot at `toWeaken`, and defers everything else
+-- to S.identityAnswer.
+--
+-- The targets are FILTERED out of the offered set rather than built, so an answer
+-- that names a recipient the engine never offered cannot slip past CR 608.2b's
+-- re-read at resolution as a silent no-op.
+malevolences ::
+  [Natural] ->
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  r
+malevolences modes toBoost toWeaken p = case p of
+  Prompt.ChooseModes {} -> Seq.fromList (fmap ModeIndex.MkModeIndex modes)
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapWithKey
+      (\slot (_, options) -> Set.filter (== Recipient.ToCreature (if slot == boostSlot then toBoost else toWeaken)) options)
+      sets
+  _ -> S.identityAnswer p
+
+-- CR 702.120: escalate, the first additional cost whose SIZE is a function of the
+-- mode choice CR 601.2b makes one step earlier.
+escalateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+escalateSpec s registry = Spec.describe s "Escalate" $ do
+  -- CR 702.120a's "for each mode you choose beyond the first": two modes is one
+  -- extra {2}, so the cast costs {B} plus {2}. Three Swamps pay it exactly, which
+  -- is what tells the escalated total from the printed {B} alone.
+  Spec.it s "CR 702.120a both modes cost {B} plus the escalate {2}: all three Swamps are tapped and both modes land" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    malevolence <- S.printingOf s registry "Borrowed Malevolence"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, giantId, wallId) = malevolenceBoard swamp malevolence hillGiant wallOfStone 3
+        (_, after) = castAndResolve (malevolences [0, 1] giantId wallId) gs spellId
+    Spec.assertEqWith s "mode 0 gave the Hill Giant +1/+1" (S.powerToughnessOf giantId after) (Just (4, 4))
+    Spec.assertEqWith s "mode 1 gave the Wall of Stone -1/-1" (S.powerToughnessOf wallId after) (Just (-1, 7))
+    Spec.assertEqWith s "{B} plus the escalate {2}: all three Swamps are tapped" (S.tappedCount S.alice after) 3
+  -- The complement, one Swamp away from nothing: the SAME board answered with one
+  -- mode pays no escalate cost at all, so an engine charging it per mode rather
+  -- than per mode beyond the first is caught here.
+  Spec.it s "CR 702.120a one mode costs only {B}: one Swamp is tapped and mode 1 never runs" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    malevolence <- S.printingOf s registry "Borrowed Malevolence"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, giantId, wallId) = malevolenceBoard swamp malevolence hillGiant wallOfStone 3
+        (_, after) = castAndResolve (malevolences [0] giantId wallId) gs spellId
+    Spec.assertEqWith s "mode 0 gave the Hill Giant +1/+1" (S.powerToughnessOf giantId after) (Just (4, 4))
+    Spec.assertEqWith s "mode 1 never ran, so the Wall of Stone is untouched" (S.powerToughnessOf wallId after) (Just (0, 8))
+    Spec.assertEqWith s "only {B} was paid, so two Swamps are still untapped" (S.tappedCount S.alice after) 1
+  -- CR 601.2b puts the mode choice BEFORE the cost, so a player holding one Swamp
+  -- may still announce both modes -- and CR 601.2e then returns the game to the
+  -- moment before the cast was proposed. Nothing is narrowed for them, and nothing
+  -- is charged: the rewind is the rule's own answer to an unpayable proposal.
+  Spec.it s "CR 601.2e with only {B} the two-mode cast rewinds: no Swamp is tapped and neither creature moves" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    malevolence <- S.printingOf s registry "Borrowed Malevolence"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, giantId, wallId) = malevolenceBoard swamp malevolence hillGiant wallOfStone 1
+        (_, after) = castAndResolve (malevolences [0, 1] giantId wallId) gs spellId
+    Spec.assertEqWith s "mode 0 never ran: the Hill Giant is untouched" (S.powerToughnessOf giantId after) (Just (3, 3))
+    Spec.assertEqWith s "mode 1 never ran either: the Wall of Stone is untouched" (S.powerToughnessOf wallId after) (Just (0, 8))
+    Spec.assertEqWith s "and nothing was paid: the one Swamp is still untapped" (S.tappedCount S.alice after) 0
+    Spec.assertBool s (S.castable S.alice spellId gs) "the spell was castable all along"
+  -- The other half of the rewind, one Swamp and one board away from the case
+  -- above and differing only in the ANSWER: the one-mode cast the player can
+  -- afford is still there for them.
+  Spec.it s "CR 601.2e the same one-Swamp board casts for one mode: the Hill Giant gets +1/+1" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    malevolence <- S.printingOf s registry "Borrowed Malevolence"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (gs, spellId, giantId, wallId) = malevolenceBoard swamp malevolence hillGiant wallOfStone 1
+        (_, after) = castAndResolve (malevolences [0] giantId wallId) gs spellId
+    Spec.assertEqWith s "mode 0 gave the Hill Giant +1/+1" (S.powerToughnessOf giantId after) (Just (4, 4))
+    Spec.assertEqWith s "mode 1 never ran, so the Wall of Stone is untouched" (S.powerToughnessOf wallId after) (Just (0, 8))
+    Spec.assertEqWith s "{B} and nothing more: the one Swamp is tapped" (S.tappedCount S.alice after) 1
+
 -- CR 702.33: kicker, the first OPTIONAL ADDITIONAL COST whose payoff is read back
 -- during resolution rather than settled while the spell is cast.
 kickerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -3069,6 +3176,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   corrosiveGaleSpec s registry
   modalCastSpec s registry
   entwineSpec s registry
+  escalateSpec s registry
   kickerSpec s registry
   auraTargetSpec s registry
   fireboltSpec s registry

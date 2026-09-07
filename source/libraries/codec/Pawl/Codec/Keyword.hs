@@ -114,6 +114,7 @@ codec =
       Arm.nullary "Devoid" Keyword.Devoid,
       Arm.nullary "Ingest" Keyword.Ingest,
       Arm.nullary "Skulk" Keyword.Skulk,
+      Arm.payload "Escalate" (Cost.codec codec) Keyword.Escalate (\x -> case x of Keyword.Escalate y -> Just y; _ -> Nothing),
       Arm.nullary "Melee" Keyword.Melee,
       Arm.payload "Crew" Common.natural Keyword.Crew (\x -> case x of Keyword.Crew y -> Just y; _ -> Nothing),
       Arm.payload "Fabricate" Common.natural Keyword.Fabricate (\x -> case x of Keyword.Fabricate y -> Just y; _ -> Nothing),
