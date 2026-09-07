@@ -58,9 +58,14 @@ data Player = MkPlayer
     -- speed only "if your speed is less than 4", and CR 702.179e reads 4 as max
     -- speed. Nothing in rule 702.179 lowers it.
     speed :: Maybe Natural.Natural,
-    -- | CR 903.3: the card this player designated as their commander, or Nothing
+    -- | CR 903.3: the cards this player designated as their commanders, empty
     -- outside a Commander game. The designation is made before the game begins
     -- and never changes.
+    --
+    -- A SET, because CR 702.124a's partner abilities designate two cards rather
+    -- than one and CR 702.124g caps every combination of them at two. Which
+    -- pairs are legal is judged before this is written, by
+    -- Pawl.Engine.Commander.designations.
     --
     -- A PRINTING and not an ObjectId, because CR 400.7 mints a fresh id on every
     -- zone change and a commander crosses zones constantly -- command zone to
@@ -76,26 +81,34 @@ data Player = MkPlayer
     -- game: Pawl.Engine.Setup.createDeck interns each of a deck's distinct
     -- printings exactly once, so this id is the same one the commander's own
     -- objects carry and Pawl.Engine.Commander.isCommander can compare the two.
-    commander :: Maybe PrintingId.PrintingId,
-    -- | CR 903.8: how many times this player has cast their commander from the
-    -- command zone this game. The commander tax is {2} for each of them.
+    commander :: Set.Set PrintingId.PrintingId,
+    -- | CR 903.8: how many times this player has cast each of their commanders
+    -- from the command zone this game. The commander tax is {2} for each of
+    -- them. Absent key means zero, the convention `counters` above uses.
     --
     -- Counted here rather than on the object for `commander`'s reason -- no object
     -- survives the round trip. Counts CASTS and not returns, which is the detail
     -- rule 903.8 turns on: a commander that dies and goes back to the command zone
     -- without being recast has not made its own next cast any dearer.
-    commanderCasts :: Natural.Natural,
+    --
+    -- Keyed PER COMMANDER, which is CR 702.124d: "when casting a commander with
+    -- partner, ignore how many times your other commander has been cast". A
+    -- single counter would charge a partner deck's second commander {2} on its
+    -- first cast. Pawl.CommanderSpec's "the other commander is untaxed by the
+    -- first one's casts" is the proof.
+    commanderCasts :: Map.Map PrintingId.PrintingId Natural.Natural,
     -- | CR 903.10a: how much COMBAT damage this player has been dealt by each
     -- commander, over the course of the game. Absent key means zero, the
     -- convention `counters` above uses. Only ever climbs -- rule 903.10a counts
     -- the whole game, so nothing takes damage back out.
     --
     -- Keyed by the commander's OWNER, not by an object and not by a printing.
-    -- CR 400.7 mints a fresh id on every zone change, so an id could not
-    -- survive the commander's first cast; and `commander` above is at most one
-    -- printing per player (CR 903.3 designates one card), so the owner names
-    -- exactly one commander today. Partner and background decks, which give a
-    -- player two, would need a finer key (#939).
+    -- CR 400.7 mints a fresh id on every zone change, so an id could not survive
+    -- the commander's first cast.
+    --
+    -- Not implemented: CR 702.124d's "consider damage from each of your two
+    -- commanders separately", which a partner deck's two commanders need and
+    -- this key cannot tell apart -- they pool under their shared owner (#939).
     commanderDamage :: Map.Map PlayerId.PlayerId Natural.Natural,
     -- | CR 309.2 \/ 309.2a: the dungeon cards this player owns from outside the
     -- game, empty for a player who brought none. Deck.dungeons is where they come

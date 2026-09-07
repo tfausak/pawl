@@ -33,8 +33,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
           Player.counters = Map.empty,
           Player.ringTemptations = 0,
           Player.speed = Nothing,
-          Player.commander = Nothing,
-          Player.commanderCasts = 0,
+          Player.commander = Set.empty,
+          Player.commanderCasts = Map.empty,
           Player.commanderDamage = Map.empty,
           Player.dungeons = Set.empty,
           Player.outsideTheGame = Map.empty,
@@ -51,6 +51,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
   -- `counters` carries a kind at ZERO beside one at two: an absent kind reads as
   -- zero (Pawl.Types.Player), so the two are the same to a card, but the map
   -- really holds the entry and the round trip has to keep it.
+  -- TWO commanders, which is CR 702.124a's partner deck: `commander` is a set and
+  -- `commanderCasts` a map keyed by it, so the round trip has to keep both apart.
   Spec.it s "a departed Commander player with counters, speed and dungeon" $
     Common.assertCodec
       s
@@ -65,8 +67,8 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
               ],
           Player.ringTemptations = 3,
           Player.speed = Just 4,
-          Player.commander = Just (PrintingId.MkPrintingId 5),
-          Player.commanderCasts = 6,
+          Player.commander = Set.fromList [PrintingId.MkPrintingId 5, PrintingId.MkPrintingId 17],
+          Player.commanderCasts = Map.fromList [(PrintingId.MkPrintingId 5, 6), (PrintingId.MkPrintingId 17, 19)],
           Player.commanderDamage = Map.singleton (PlayerId.MkPlayerId 7) 8,
           Player.dungeons = Set.fromList [PrintingId.MkPrintingId 9, PrintingId.MkPrintingId 11],
           Player.outsideTheGame = Map.singleton (PrintingId.MkPrintingId 12) 13,
@@ -79,7 +81,7 @@ spec s = Spec.describe s "Pawl.Codec.Player" $ do
       ( " {\"life\":-1,\"status\":{\"type\":\"Departed\",\"value\":{\"type\":\"Conceded\"}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"Energy\"},\"value\":2}"
           <> ",{\"key\":{\"type\":\"Poison\"},\"value\":0}]"
-          <> ",\"ringTemptations\":3,\"speed\":4,\"commander\":5,\"commanderCasts\":6"
+          <> ",\"ringTemptations\":3,\"speed\":4,\"commander\":[5,17],\"commanderCasts\":{\"5\":6,\"17\":19}"
           <> ",\"commanderDamage\":{\"7\":8},\"dungeons\":[9,11],\"outsideTheGame\":{\"12\":13},\"completedDungeons\":10,\"completedDungeonNames\":[\"Tomb of Annihilation\",\"Undercity\"]"
           <> ",\"startingDeck\":{\"14\":15},\"companion\":16,\"companionTaken\":true} "
       )

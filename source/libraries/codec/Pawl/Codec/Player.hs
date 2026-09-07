@@ -22,7 +22,8 @@ import qualified Pawl.Types.Status as Status.Type
 --
 -- `commanderDamage` is keyed by a PlayerId, a Natural newtype, so it takes
 -- 'Common.naturalMap' -- a JSON object keyed by the decimal seat, which is what
--- Pawl.Codec.Combat writes for the same key type.
+-- Pawl.Codec.Combat writes for the same key type. `commanderCasts` takes it for
+-- the same reason, one key type over (CR 702.124d keys the tax per commander).
 --
 -- `speed` is 'Fields.required' over 'Common.maybe' rather than defaulted to 0,
 -- because CR 702.179b makes the absence a THIRD state: CR 704.5aa fires on a
@@ -35,8 +36,8 @@ codec = Fields.object $ do
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset PlayerCounterKind.codec) Player.counters
   ringTemptations <- Fields.defaulted "ringTemptations" 0 Common.natural Player.ringTemptations
   speed <- Fields.required "speed" (Common.maybe Common.natural) Player.speed
-  commander <- Fields.defaulted "commander" Nothing (Common.maybe PrintingId.codec) Player.commander
-  commanderCasts <- Fields.defaulted "commanderCasts" 0 Common.natural Player.commanderCasts
+  commander <- Fields.defaulted "commander" Set.empty (Common.set PrintingId.codec) Player.commander
+  commanderCasts <- Fields.defaulted "commanderCasts" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.commanderCasts
   commanderDamage <- Fields.defaulted "commanderDamage" Map.empty (Common.naturalMap PlayerId.codec Common.natural) Player.commanderDamage
   dungeons <- Fields.defaulted "dungeons" Set.empty (Common.set PrintingId.codec) Player.dungeons
   outsideTheGame <- Fields.defaulted "outsideTheGame" Map.empty (Common.naturalMap PrintingId.codec Common.natural) Player.outsideTheGame

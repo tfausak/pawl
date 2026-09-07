@@ -938,7 +938,7 @@ spec s registry = Spec.describe s "Meld" $ do
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         [firstPid, secondPid] -> do
-          let designating pid gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just pid}) S.alice (GameState.players gs)}
+          let designating pid gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton pid}) S.alice (GameState.players gs)}
               run pid = S.runPure reclaiming (designating pid board) (Event.destroy Regenerability.Regenerable [meldedId] >> Engine.settleForPriority)
               nameOf pid = fmap (S.nameOf . Printing.card) (Game.printingOf pid board)
           Spec.assertEqWith s "CR 903.9a naming the first component puts THAT card into the command zone" (commandNames (run firstPid)) (Maybe.maybeToList (nameOf firstPid))
@@ -982,7 +982,7 @@ spec s registry = Spec.describe s "Meld" $ do
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         [firstPid, secondPid] -> do
-          let designating pid gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just pid}) S.alice (GameState.players gs)}
+          let designating pid gs = gs {GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton pid}) S.alice (GameState.players gs)}
               run pid = S.runPure (returningComponent meldedId) (designating pid board) (do S.cast S.alice griptideId; Stack.resolveTop)
               declined pid = S.runPure (arranging meldedId [0, 1]) (designating pid board) (do S.cast S.alice griptideId; Stack.resolveTop)
               nameOf pid = Maybe.maybeToList (fmap (S.nameOf . Printing.card) (Game.printingOf pid board))
@@ -1030,7 +1030,7 @@ spec s registry = Spec.describe s "Meld" $ do
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         firstPid : _ -> do
-          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Just firstPid}) S.alice (GameState.players board)}
+          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton firstPid}) S.alice (GameState.players board)}
               split = S.runPure (returningComponent meldedId) designated (do S.cast S.alice griptideId; Stack.resolveTop)
               declined = S.runPure (arranging meldedId [0, 1]) designated (do S.cast S.alice griptideId; Stack.resolveTop)
           Spec.assertEqWith s "CR 903.9c one card was put into the library" (cardsArrivingIn Zone.Library split) (Just 1)
@@ -1062,7 +1062,7 @@ spec s registry = Spec.describe s "Meld" $ do
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         [firstPid, _] -> do
-          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Just firstPid}) S.alice (GameState.players board)}
+          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton firstPid}) S.alice (GameState.players board)}
               after = S.runPure (returningComponent meldedId) designated (do S.cast S.alice unsummonId; Stack.resolveTop)
               handNames gs = Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs)
           Spec.assertEqWith s "CR 903.9c the Garrison is alice's commander, so it goes to the command zone" (commandNames after) [S.printingName garrison]
@@ -1093,7 +1093,7 @@ spec s registry = Spec.describe s "Meld" $ do
       Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       Just (meldedId, components) -> case Foldable.toList components of
         firstPid : _ -> do
-          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Just firstPid}) S.alice (GameState.players board)}
+          let designated = board {GameState.players = Map.adjust (\p -> p {Player.commander = Set.singleton firstPid}) S.alice (GameState.players board)}
               pings gs = S.runPure S.identityAnswer gs (Damage.applyDamage [Damage.damageEvent gs DamageKind.Combat meldedId (Recipient.ToPlayer S.bob) 2])
               tally gs = maybe 0 (Map.findWithDefault 0 S.alice . Player.commanderDamage) (Map.lookup S.bob (GameState.players gs))
           Spec.assertEqWith s "CR 903.10a the Garrison is alice's commander, so the melded permanent's 2 is tallied" (tally (pings designated)) 2
