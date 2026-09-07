@@ -19,6 +19,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
+import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Morph as Morph
@@ -1212,6 +1213,15 @@ matches context view predicate = case predicate of
   -- CR 709.4a's own test, said the way that rule says it: membership, so an
   -- object showing several names matches on any one of them.
   Filter.HasName n -> Set.member n (names view)
+  -- The same membership test, against the set CR 206.3 defines rather than one
+  -- name the card gives. ANY of the candidate's names, which is CR 709.4a's
+  -- reading exactly as HasName's is -- Pawl.FilterSpec's "CR 709.4a matches an
+  -- object showing a listed name among others" is what proves it is not every
+  -- one. False for a code the rule does not name, which
+  -- Pawl.Codec.Expansion.make keeps out of card data.
+  Filter.HasNameOriginallyPrintedIn e -> case Expansion.names e of
+    Nothing -> False
+    Just listed -> any (\name -> Set.member name listed) (names view)
   -- CR 702.1 / CR 109.3: abilities ARE a characteristic, so this is the same kind
   -- of read HasCardType is -- off the projection where there is one, which is what
   -- makes "target creature with flying" (Plummet, CR 702.9) track a grant and a
@@ -1685,6 +1695,9 @@ rewrite pairs predicate = case predicate of
   -- word ... that is the same as a Magic color word, basic land type, or
   -- creature type". This function's pairs are exactly such a subtype swap.
   Filter.HasName _ -> predicate
+  -- Untouched for HasName's reason, one indirection along: the atom names an
+  -- expansion, and the names it stands for are card names too.
+  Filter.HasNameOriginallyPrintedIn _ -> predicate
   -- CR 702.14a: a keyword can hold a land-type word too, so "creature with
   -- swampwalk" is text a swap reaches exactly as "creature that's a Swamp" is.
   -- rewriteKeyword below is the descent, shared with the two sites that rewrite
@@ -2159,6 +2172,7 @@ bakeBound players predicate = case predicate of
   Filter.HasColor _ -> predicate
   Filter.HasSubtype _ -> predicate
   Filter.HasName _ -> predicate
+  Filter.HasNameOriginallyPrintedIn _ -> predicate
   Filter.HasKeyword _ -> predicate
   Filter.HasKeywordFamily _ -> predicate
   Filter.PowerAtLeast _ -> predicate
@@ -2303,6 +2317,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasColor _ -> []
   Filter.HasSubtype _ -> []
   Filter.HasName _ -> []
+  Filter.HasNameOriginallyPrintedIn _ -> []
   Filter.HasKeyword _ -> []
   Filter.HasKeywordFamily _ -> []
   Filter.PowerAtLeast _ -> []
@@ -2433,6 +2448,9 @@ statesAQuality predicate = case predicate of
   -- specific description a search can give -- so the searcher may decline to
   -- find one that is there, and CR 701.23d's "must find" does not apply.
   Filter.HasName _ -> True
+  -- CR 701.23b for HasName's reason: "with a name originally printed in the
+  -- Arabian Nights expansion" states a quality as squarely as one name does.
+  Filter.HasNameOriginallyPrintedIn _ -> True
   Filter.HasKeyword _ -> True
   Filter.HasKeywordFamily _ -> True
   Filter.PowerAtLeast _ -> True

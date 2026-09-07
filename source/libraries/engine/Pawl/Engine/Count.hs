@@ -302,6 +302,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasColor _ -> predicate
   Filter.Type.HasSubtype _ -> predicate
   Filter.Type.HasName _ -> predicate
+  Filter.Type.HasNameOriginallyPrintedIn _ -> predicate
   Filter.Type.HasKeyword _ -> predicate
   Filter.Type.HasKeywordFamily _ -> predicate
   Filter.Type.PowerAtLeast _ -> predicate

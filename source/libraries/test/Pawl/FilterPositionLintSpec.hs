@@ -208,6 +208,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasColor _ -> 0
   Filter.Type.HasSubtype _ -> 0
   Filter.Type.HasName _ -> 0
+  Filter.Type.HasNameOriginallyPrintedIn _ -> 0
   Filter.Type.PowerAtLeast _ -> 0
   Filter.Type.PowerAtMost _ -> 0
   Filter.Type.ToughnessGreaterThanPower -> 0

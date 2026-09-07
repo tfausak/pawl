@@ -6,6 +6,7 @@ import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
+import qualified Pawl.Codec.Expansion as Expansion
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
@@ -41,6 +42,7 @@ codec keywordCodec =
       Arm.payload "HasColor" Color.codec Filter.HasColor (\x -> case x of Filter.HasColor y -> Just y; _ -> Nothing),
       Arm.payload "HasSubtype" Subtype.codec Filter.HasSubtype (\x -> case x of Filter.HasSubtype y -> Just y; _ -> Nothing),
       Arm.payload "HasName" CardName.codec Filter.HasName (\x -> case x of Filter.HasName y -> Just y; _ -> Nothing),
+      Arm.payload "HasNameOriginallyPrintedIn" Expansion.codec Filter.HasNameOriginallyPrintedIn (\x -> case x of Filter.HasNameOriginallyPrintedIn y -> Just y; _ -> Nothing),
       Arm.payload "HasKeyword" keywordCodec Filter.HasKeyword (\x -> case x of Filter.HasKeyword y -> Just y; _ -> Nothing),
       Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily (\x -> case x of Filter.HasKeywordFamily y -> Just y; _ -> Nothing),
       Arm.payload "PowerAtLeast" Common.integer Filter.PowerAtLeast (\x -> case x of Filter.PowerAtLeast y -> Just y; _ -> Nothing),
