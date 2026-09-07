@@ -4425,7 +4425,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- under, which conjureOntoBattlefield stamps.
             ConjureDestination.Battlefield -> Monad.void (Event.conjureOntoBattlefield controller card (Integer.toNaturalSaturating n))
       _ -> pure ()
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry) -> do
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry exceptions) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the
     -- same CR 111.2 funnel, carrying the copied permanent's COPIABLE values
@@ -4462,7 +4462,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- ONE call per named permanent, with the whole count: CR 614.12's
                 -- entry loop is handed the batch, so the copies enter
                 -- simultaneously and none may copy a sibling.
-                Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
+                --
+                -- CR 707.9's exceptions are folded into the snapshot on the way
+                -- in, exactly as the CR 707.5 entry road folds AsCopy's, so the
+                -- excepted value is part of the token's own copiable values (CR
+                -- 707.9b) -- Multiversal Recruitment's "except it isn't
+                -- legendary". "This ability" is the resolving object's, read the
+                -- way the BecomeCopy arm below reads it.
+                Monad.void (Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisTriggeredAbility resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
       _ -> pure ()
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
     State.modify' $ \gs ->

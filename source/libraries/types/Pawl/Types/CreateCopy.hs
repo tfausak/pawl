@@ -1,5 +1,6 @@
 module Pawl.Types.CreateCopy where
 
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
@@ -22,7 +23,21 @@ data CreateCopy = MkCreateCopy
     -- +1/+1 counter on it" is the same sentence Eyes of Gitaxias writes over a
     -- Create. Only `counters` is read here -- Pawl.CardSpec lints that no
     -- CreateCopy in the pool sets any of the others (gap #2302).
-    riders :: EntryRiders.EntryRiders Quantity.Quantity
+    riders :: EntryRiders.EntryRiders Quantity.Quantity,
+    -- | CR 707.9's "except ..." clause, empty for a copy effect that states none.
+    -- The SAME list EntryRewrite.AsCopy and Pawl.Types.BecomeCopy carry, applied
+    -- by the same fold (Pawl.Engine.Replacement.applyCopyExceptions) into the
+    -- snapshot the token is minted from, which is CR 707.9b's requirement that
+    -- the excepted value join the copiable values -- Multiversal Recruitment's
+    -- "except it isn't legendary".
+    --
+    -- NOT the same clause as `riders` above, though both reach the token: an
+    -- exception modifies the copiable values (CR 707.2), while an entry rider is
+    -- CR 122.6's counters written onto the object. Littjara Mirrorlake's "except
+    -- it enters with an additional +1/+1 counter on it" prints as an exception
+    -- and is a rider, which is CR 707.9e's distinction rather than a spelling
+    -- choice.
+    exceptions :: [CopyException.CopyException]
   }
   deriving (Eq, Ord, Show)
 

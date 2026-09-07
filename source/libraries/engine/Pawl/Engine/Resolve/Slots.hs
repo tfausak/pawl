@@ -547,7 +547,7 @@ effectObjectRefs effect = case effect of
   Effect.DecreaseSpeed {} -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
-  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _) -> [ref]
+  Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _) -> [ref]
   -- Both sides: CR 707.2's copiable values come off one and go onto the other.
   -- The exceptions beside them read no slot: CR 707.9a's "this ability" is the
   -- resolving object's own, and neither of CR 707.9b's arms names an object.
@@ -918,7 +918,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The COUNT only: the conjured card is literal card data, its destination is
   -- a constructor, and the conjurer is the resolving controller.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> quantitySlots quantity
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   Effect.BecomeCopy {} -> Map.empty
   Effect.CopyStackObject {} -> Map.empty
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
@@ -1378,7 +1378,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- hands it to Event.conjure exactly as written. The COUNT is the effect
   -- speaking, read in the resolution's own slots.
   Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.slotsAreExhaustive quantity
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy {} -> True
   Effect.CopyStackObject {} -> True
   -- The ReplacementEffect's own reads are replacementRowReads', and slotsOf
@@ -1585,7 +1585,7 @@ readsX = any effectReadsX
       -- creating effect's number (tokenBoxQuantities).
       Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
       Effect.Conjure (Conjure.MkConjure quantity _ _) -> Quantity.readsX quantity
-      Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders) -> any Quantity.readsX (quantity : riderQuantities riders)
+      Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.BecomeCopy {} -> False
       Effect.CopyStackObject {} -> False
       Effect.Replace {} -> False

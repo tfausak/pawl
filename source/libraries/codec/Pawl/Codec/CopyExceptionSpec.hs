@@ -11,6 +11,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
+import qualified Pawl.Types.Supertype as Supertype
 
 -- CR 707.9: the "except ..." clause of a copy effect. Quicksilver Gargantuan,
 -- the printed card CR 707.9b's power/toughness arm comes from, is square, so the
@@ -46,6 +47,13 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       CopyException.codec
       (CopyException.AddCardTypes (Set.fromList [CardType.Enchantment, CardType.Artifact]))
       " {\"type\":\"AddCardTypes\",\"value\":[{\"type\":\"Artifact\"},{\"type\":\"Enchantment\"}]} "
+
+  Spec.it s "RemoveSupertypes round-trips, ascending by supertype" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      (CopyException.RemoveSupertypes (Set.fromList [Supertype.Snow, Supertype.Legendary]))
+      " {\"type\":\"RemoveSupertypes\",\"value\":[{\"type\":\"Legendary\"},{\"type\":\"Snow\"}]} "
 
   -- CR 707.9a's second arm is NULLARY, so the tag alone is the whole value.
   Spec.it s "GainThisAbility round-trips as a bare tag" $

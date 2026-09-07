@@ -504,7 +504,7 @@ rewriteEffect pairs effect = case effect of
   --
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword, Create's arm above (#1190).
-  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders))
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders exceptions) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders) (fmap (rewriteCopyException pairs) exceptions))
   -- The exceptions ride this opcode too, and take the same walk AsCopy's do
   -- (rewriteEntryRewrite below).
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject exceptions) ->
@@ -1117,6 +1117,9 @@ rewriteCopyException pairs exception = case exception of
   -- CR 707.9b's type clause names CARD types (CR 205.2a's list), and CR 612.2's
   -- swap reaches only subtypes, so there is nothing here for a pair to change.
   CopyException.AddCardTypes _ -> exception
+  -- CR 205.4a's supertypes for the same reason: CR 612.2's swap reaches subtypes
+  -- alone.
+  CopyException.RemoveSupertypes _ -> exception
   -- CR 707.9a's "this ability" carries no word of its own. The ability it points
   -- at is the resolving one, which the projection already rewrote where it was
   -- read (rewriteTriggeredAbility).

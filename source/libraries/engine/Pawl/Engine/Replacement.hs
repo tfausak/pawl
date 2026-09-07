@@ -2073,6 +2073,22 @@ applyCopyException this snapshot exception = case exception of
   -- exception does not" is what proves it.
   CopyException.AddCardTypes types ->
     snapshot {PC.cardTypes = Set.union (PC.cardTypes snapshot) types}
+  -- CR 707.9b over CR 205.4a's part of the type line: "except it isn't legendary"
+  -- (Multiversal Recruitment), so a DIFFERENCE rather than an empty set -- the
+  -- clause names one supertype and a copy of a snow legendary permanent is still
+  -- snow.
+  --
+  -- Into the snapshot for the arms above's reason, which is what makes the
+  -- excepted value survive a second copy (CR 707.2 / 707.9b): Pawl.CopySpec's
+  -- "and so is a token copy of that token" is what proves it, since a CR 613
+  -- layer-4 write over the token would be left behind there and CR 704.5j would
+  -- take one of the two legends.
+  --
+  -- Nothing else moves. CR 707.9d's strip would drop a characteristic-defining
+  -- ability that defines the excepted characteristic, and none defines a
+  -- supertype (Pawl.Types.CopyException's arm).
+  CopyException.RemoveSupertypes supertypes ->
+    snapshot {PC.supertypes = Set.difference (PC.supertypes snapshot) supertypes}
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- permanents matching the rewrite's printed noun phrase, other than itself, minus
