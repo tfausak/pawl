@@ -1521,12 +1521,14 @@ beginTurnOf pid gs =
                 ( \decider ->
                     Map.singleton
                       pid
-                      PlayerControl.MkPlayerControl
-                        { PlayerControl.decider = decider,
-                          PlayerControl.duration = ControlDuration.UntilTurnEnds,
-                          -- CR 723.7: Mindslaver prints no restriction.
-                          PlayerControl.manaFromLandsOnly = False
-                        }
+                      ( pure
+                          PlayerControl.MkPlayerControl
+                            { PlayerControl.decider = decider,
+                              PlayerControl.duration = ControlDuration.UntilTurnEnds,
+                              -- CR 723.7: Mindslaver prints no restriction.
+                              PlayerControl.manaFromLandsOnly = False
+                            }
+                      )
                 )
                 promoted,
             GameState.pendingControl = Map.delete pid (GameState.pendingControl gs)

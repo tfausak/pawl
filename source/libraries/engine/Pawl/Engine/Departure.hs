@@ -15,6 +15,7 @@ import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -398,7 +399,11 @@ controlEffectsEnd pid gs =
         Decider.MkDecider d -> d == pid
    in gs
         { GameState.continuousEffects = filter (not . Projection.givesControlTo pid) (GameState.continuousEffects gs),
-          GameState.control = Map.filter (not . heldBy . PlayerControl.decider) (GameState.control gs),
+          -- Per ROW, not per player: CR 800.4a ends the departing player's own
+          -- controlling effects, and a row underneath held by someone still
+          -- playing is untouched (CR 723.1a then makes the topmost survivor the
+          -- one that works). A stack with nothing left loses its key.
+          GameState.control = Map.mapMaybe (NonEmpty.nonEmpty . NonEmpty.filter (not . heldBy . PlayerControl.decider)) (GameState.control gs),
           GameState.pendingControl = Map.filter (not . heldBy) (GameState.pendingControl gs),
           GameState.replacements = filter (not . givesControlOnEntryTo pid) (GameState.replacements gs)
         }

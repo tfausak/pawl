@@ -1376,6 +1376,21 @@ fromAmongMembers legal resolving chosen slot = do
     Just objects -> objects
     Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
 
+-- CR 723.1a: the new control is the last one CREATED, so it goes ON TOP of any
+-- control already running on that player rather than replacing it. That rule's
+-- "overwrite" is the continuous-effect sense -- both effects exist and the later
+-- one works -- so a Word of Command cast at a player Mindslaver already controls
+-- layers over the CR 723.1 row, and Pawl.Engine.Stack's lapse hands that row
+-- back; see #3351.
+--
+-- The stack is kept in creation order, so appending is what "last created"
+-- means and Pawl.Engine.Decide.effective reads the end of it.
+pushControl :: PlayerId -> PlayerControl.PlayerControl -> GameState -> GameState
+pushControl pid row gs =
+  gs {GameState.control = Map.insertWith after pid (pure row) (GameState.control gs)}
+  where
+    after new old = old <> new
+
 -- CR 402.3 with a CR 608.2d choice: each hand the reference names is offered to
 -- its OWN owner (a hand's cards are that player's alone), who picks one card
 -- matching the filter. The candidates are read as the instruction is reached (CR
@@ -2771,23 +2786,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Written into the live GameState.control rather than scheduled, which is the
   -- whole difference from the arm above: rule 723.1b's control waits for a turn,
-  -- and this one is spent inside the resolution that installed it. Map.insert
-  -- overwrites, which is rule 723.1a's answer for either kind.
+  -- and this one is spent inside the resolution that installed it. CR 723.1a is
+  -- pushControl's, not Map.insert's -- a live control on the same player is
+  -- layered under rather than destroyed.
   Effect.ControlPlayerThisResolution (ControlPlayer.MkControlPlayer slot landsOnly) ->
     State.modify' $ \gs ->
       case legalOne slot legal of
         Just (Recipient.ToPlayer target) ->
-          gs
-            { GameState.control =
-                Map.insert
-                  target
-                  PlayerControl.MkPlayerControl
-                    { PlayerControl.decider = Decider.MkDecider controller,
-                      PlayerControl.duration = ControlDuration.UntilResolutionEnds,
-                      PlayerControl.manaFromLandsOnly = landsOnly
-                    }
-                  (GameState.control gs)
-            }
+          pushControl
+            target
+            PlayerControl.MkPlayerControl
+              { PlayerControl.decider = Decider.MkDecider controller,
+                PlayerControl.duration = ControlDuration.UntilResolutionEnds,
+                PlayerControl.manaFromLandsOnly = landsOnly
+              }
+            gs
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> do

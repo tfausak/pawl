@@ -348,7 +348,7 @@ gameStateRoundTripSpec s registry = do
     mountain <- S.printingOf s registry "Mountain"
     resolve <- corpusResolver s
     let plain = S.oneMountainState mountain Phase.PrecombatMain
-        controlled = plain {GameState.control = Map.singleton S.bob (S.resolutionControl S.alice)}
+        controlled = plain {GameState.control = Map.singleton S.bob (pure (S.resolutionControl S.alice))}
         c = GameState.Codec.codec resolve
     roundTrips "alice controlling bob for one resolution" controlled
     Spec.assertEqWith
@@ -360,7 +360,7 @@ gameStateRoundTripSpec s registry = do
       s
       "and written once there is a row"
       (fmap (Common.lookupPair "control") (Common.asObject (Codec.encode c controlled)))
-      (Right (Just (Codec.encode (Common.naturalMap PlayerId.Codec.codec PlayerControl.Codec.codec) (GameState.control controlled))))
+      (Right (Just (Codec.encode (Common.naturalMap PlayerId.Codec.codec (Common.nonEmpty PlayerControl.Codec.codec)) (GameState.control controlled))))
 
   -- The one thing the round trip above cannot say. `decode . encode == id` holds
   -- whenever the two sides agree, including on a shape neither of them should

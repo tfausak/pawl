@@ -2,6 +2,7 @@ module Pawl.Engine.Stack where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -51,16 +52,27 @@ resolveTopWith runSubgame = do
 --
 -- Every UntilResolutionEnds row and not just the resolving object's, because a
 -- resolution is not re-entrant: nothing runs between the effect that wrote a row
--- and this call except the rest of that same resolution. The CR 723.1 rows are
--- untouched, their expiry being Pawl.Engine.Engine.beginTurnOf's.
+-- and this call except the rest of that same resolution.
+--
+-- The CR 723.1 row UNDER it survives, which is the point of the stack: rule
+-- 723.1a's "overwrite" is the continuous-effect sense, so once the later effect
+-- has ended the earlier one is again the last created and works for the rest of
+-- the turn -- a Word of Command cast at a Mindslavered player hands that player
+-- back to the Mindslaver's controller, not to themselves; see #3351. Rule
+-- 723.1's own expiry stays Pawl.Engine.Engine.beginTurnOf's, and
+-- Pawl.GameSpec's "CR 723.1a gameplay: Word of Command over a Mindslaver hands
+-- bob back to alice, not to himself" is what proves the hand-back.
 endResolutionControl :: GameState.GameState -> GameState.GameState
-endResolutionControl gs =
-  gs
-    { GameState.control =
-        Map.filter
-          ((/= ControlDuration.UntilResolutionEnds) . PlayerControl.duration)
-          (GameState.control gs)
-    }
+endResolutionControl gs = gs {GameState.control = Map.mapMaybe outlivesResolution (GameState.control gs)}
+
+-- The rows of one player's control stack that a resolution ending leaves in
+-- place, or Nothing where none is left -- a player under no control has no key.
+outlivesResolution :: NonEmpty.NonEmpty PlayerControl.PlayerControl -> Maybe (NonEmpty.NonEmpty PlayerControl.PlayerControl)
+outlivesResolution = NonEmpty.nonEmpty . NonEmpty.filter survives
+  where
+    survives row = case PlayerControl.duration row of
+      ControlDuration.UntilTurnEnds -> True
+      ControlDuration.UntilResolutionEnds -> False
 
 -- One object resolves. CR 729.1a's "the spell or ability that created the
 -- subgame" names both kinds of object, so the injected runner goes to the spell
