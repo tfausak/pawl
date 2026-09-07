@@ -2911,6 +2911,7 @@ faceDownCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject cloneId down)) "setup: the Conversion turned the copy face down"
         Spec.assertEqWith s "setup: and it is still face up on the other leg" (fmap Object.facing (Game.lookupObject cloneId up)) (Just Facing.FaceUp)
         Spec.assertEqWith s "setup: the printed Arbiter is gone, so the bound on the face-up board is the copy's" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Silent Arbiter")) S.alice up) 0
+        Spec.assertBool s (Maybe.isJust (Binding.copyOf . Object.bindings =<< Game.lookupObject cloneId down)) "CR 708.8 the copy stamp rides through underneath the listing, ready to be reverted to"
 
   -- The same fork one field over: the Conversion's listed 2/2 and CR 708.2's "no
   -- name" against the Arbiter's copied 1/5 and its copied name. Here because the
