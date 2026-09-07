@@ -239,7 +239,7 @@ data GameState = MkGameState
     -- about the same key.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
-    -- controlled; last created wins (CR 723.1a), promoted to activeControl at
+    -- controlled; last created wins (CR 723.1a), promoted into `control` at
     -- that player's turn (CR 723.1b).
     pendingControl :: Map.Map PlayerId.PlayerId Decider.Decider,
     -- | CR 723: who is being controlled right now, keyed by the controlled

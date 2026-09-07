@@ -473,6 +473,18 @@ turnControl decider controlled =
         PlayerControl.manaFromLandsOnly = False
       }
 
+-- CR 723.2's row, the one Word of Command installs: `decider` decides for its
+-- key until the object that wrote it finishes resolving, and rule 723.7's mana
+-- restriction rides with it. Unkeyed, since the controlled player is whoever
+-- the caller puts it under.
+resolutionControl :: PlayerId.PlayerId -> PlayerControl.PlayerControl
+resolutionControl decider =
+  PlayerControl.MkPlayerControl
+    { PlayerControl.decider = Decider.MkDecider decider,
+      PlayerControl.duration = ControlDuration.UntilResolutionEnds,
+      PlayerControl.manaFromLandsOnly = True
+    }
+
 -- Every attack option turned OFF, leaving CR 507.1's choice of ONE defending
 -- player. The one thing that differs from the board handed in, so a case about
 -- CR 507.1's prompt and a case about CR 802.2's absence of one are the same

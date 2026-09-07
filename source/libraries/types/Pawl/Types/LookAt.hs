@@ -10,8 +10,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- shows the cards "only to the specified player", which pawl has nowhere to
 -- record: there is no per-player view of the game state at all
 -- (docs/design.md's PlayerView), so a looker field would be data nothing could
--- read (#1412). Every printing in the pool has the resolving controller look at
--- their own library, which is what the ObjectRef already says.
+-- read (#1412). The ObjectRef says whose zone is looked in, which is as near as
+-- the state gets -- Into the Wilds names the controller's own library, Word of
+-- Command a targeted opponent's hand.
 data LookAt = MkLookAt
   { ref :: ObjectRef.ObjectRef,
     slot :: SlotName.SlotName

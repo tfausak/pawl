@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.GameEvent as GameEvent.Codec
 import qualified Pawl.Codec.GameState as GameState.Codec
+import qualified Pawl.Codec.PlayerControl as PlayerControl.Codec
 import qualified Pawl.Codec.PlayerId as PlayerId.Codec
 import qualified Pawl.Codec.Printing as Printing.Codec
 import qualified Pawl.Engine.Card as Card
@@ -337,6 +338,29 @@ gameStateRoundTripSpec s registry = do
   Spec.it s "the monarch round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
     roundTrips "a state with a monarch" (S.withMonarch S.bob (S.oneMountainState mountain Phase.PrecombatMain))
+
+  -- CR 723.2's row, which is the shape GameState.control grew to hold (#881):
+  -- a Decider, a lifetime and rule 723.7's restriction, keyed by the controlled
+  -- player. Its own case because the field is Fields.defaulted -- an empty map
+  -- round-trips whatever the codec says about the value type, so a board with a
+  -- row in it is what reads that half of the codec at all.
+  Spec.it s "a control row round trips, and is written only once there is one" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    resolve <- corpusResolver s
+    let plain = S.oneMountainState mountain Phase.PrecombatMain
+        controlled = plain {GameState.control = Map.singleton S.bob (S.resolutionControl S.alice)}
+        c = GameState.Codec.codec resolve
+    roundTrips "alice controlling bob for one resolution" controlled
+    Spec.assertEqWith
+      s
+      "control is absent while nobody is controlled"
+      (fmap (Common.lookupPair "control") (Common.asObject (Codec.encode c plain)))
+      (Right Nothing)
+    Spec.assertEqWith
+      s
+      "and written once there is a row"
+      (fmap (Common.lookupPair "control") (Common.asObject (Codec.encode c controlled)))
+      (Right (Just (Codec.encode (Common.naturalMap PlayerId.Codec.codec PlayerControl.Codec.codec) (GameState.control controlled))))
 
   -- The one thing the round trip above cannot say. `decode . encode == id` holds
   -- whenever the two sides agree, including on a shape neither of them should
