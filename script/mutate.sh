@@ -45,7 +45,9 @@ Applies SED_EXPR to FILE, runs the tasty subtree PATTERN selects, prints the
 first failing assertion, and restores FILE.
 
   FILE       the file to mutate
-  SED_EXPR   a sed script; it must actually change FILE
+  SED_EXPR   a sed script; it must actually change FILE. `@PATH` reads the
+             script from PATH instead, for an expression the worktree guard
+             refuses on the command line (parentheses, pipes, quotes, `;`)
   PATTERN    a tasty pattern, passed as -p; required, and keep it narrow
   CABAL_ARG  extra arguments for `cabal test`; `--no-semaphore -j4` when the
              shared GHC semaphore is corrupt and cabal hangs on it instead of
@@ -106,7 +108,14 @@ trap restore EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-sed "$sed_expr" "$backup" >"$work/mutated"
+case $sed_expr in
+  @*)
+    sed -f "${sed_expr#@}" "$backup" >"$work/mutated"
+    ;;
+  *)
+    sed "$sed_expr" "$backup" >"$work/mutated"
+    ;;
+esac
 cp "$work/mutated" "$file"
 
 if cmp -s "$backup" "$file"; then

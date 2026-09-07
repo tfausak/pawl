@@ -152,8 +152,20 @@ them. They are corrected by the next unit that edits the file, under the
 self-review rule in `CLAUDE.md`.
 
 Act on a finding by sending the unit's agent back, not by filing and
-re-dispatching: a send-back costs 5k to 80k against ~200k for a fresh unit, and
-catches the defect before the merge rather than after.
+re-dispatching: a send-back costs 5k to 120k against ~200k for a fresh unit
+(re-measured 2026-09-07), and catches the defect before the merge rather than
+after.
+
+**A unit past the size signal gets its own round, BEFORE auto-merge is
+armed.** Measured 2026-09-06/07 over 33 units: every unit past ~300k subagent
+tokens or ~300 tool uses carried a defect the audit found, and no unit under
+it did. The recurring class was a read of the printed card where the copiable
+values were owed (`CLAUDE.md` item 4 now names it). Arming on ready and
+auditing in parallel turns each finding into a second PR, a second CI cycle
+and a window where `main` is wrong; the focused round takes about ten minutes,
+so hold the arm and the worktree until it reports. Cut subsystem "first
+slices" so they stay under the signal: a brief that needs more than three
+proving assertions is two units.
 
 **Run a clustering pass whenever the cluster list runs dry.** The audit
 lane's other standing job, and how the fixed cost above gets recovered: one
