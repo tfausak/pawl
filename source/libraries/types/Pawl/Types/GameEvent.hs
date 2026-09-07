@@ -298,6 +298,11 @@ data GameEvent
     -- rather than Mentored's. ONE id, rule 702.149a putting its counter on the
     -- training creature itself.
     Trained ObjectId.ObjectId
+  | -- | CR 702.122e: a Vehicle BECAME CREWED -- "a crew ability of [this Vehicle]
+    -- resolves". The id is the Vehicle, the crew ability's source, and the event
+    -- is emitted on RESOLUTION, Mentored's gate rather than Evolved's: rule
+    -- 702.122e names the resolution and nothing about its effect.
+    BecameCrewed ObjectId.ObjectId
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice goes through,
     -- and distinct from the Moved event the same sacrifice records: CR 700.4

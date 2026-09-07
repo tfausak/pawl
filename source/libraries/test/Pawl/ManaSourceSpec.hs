@@ -335,9 +335,10 @@ selfTapSpec s registry = Spec.describe s "A self-tap and an other-tap over one c
 --
 -- SYNTHETIC because the shape it needs is one COST carrying a threshold tap
 -- beside another tapping component, and the printed producers of a threshold tap
--- are crew (CR 702.122a; `data/cards/consulate-dreadnought.json` is the only one
--- of those in `data/cards/`) and Mossbridge Troll, in each of which it is the
--- whole of its ability's cost, so nothing contends with it. Scryfall
+-- are crew (CR 702.122a; `data/cards/consulate-dreadnought.json` and
+-- `data/cards/mobilizer-mech.json` are those in `data/cards/`) and Mossbridge
+-- Troll, in each of which it is the whole of its ability's cost, so nothing
+-- contends with it. Scryfall
 -- `oracle:"total power" oracle:tap`, 2026-08-18, eight cards -- a printing whose
 -- one cost taps for a total power AND taps something counted is what would
 -- refute this and let the synthetic go.

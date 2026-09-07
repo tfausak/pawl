@@ -528,6 +528,7 @@ damageOf event = case event of
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
+  GameEvent.BecameCrewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
@@ -587,6 +588,7 @@ revealOf event = case event of
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.Trained _ -> Nothing
+  GameEvent.BecameCrewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
@@ -6574,6 +6576,8 @@ reactsToAbilityTriggering cond = case cond of
   -- Rule 702.149c watches a training ability RESOLVING, which is the same
   -- first-pass event the arm above argues rule 702.134c's is.
   TriggerCondition.SelfTrains -> False
+  -- Rule 702.122e names a crew ability RESOLVING, the same first-pass event.
+  TriggerCondition.SelfBecomesCrewed -> False
   -- CR 700.4's zone change is a first-pass event too, and not an ability
   -- triggering.
   TriggerCondition.AttachedCreatureDies -> False
@@ -6709,6 +6713,9 @@ controllerTurnScoped cond = case cond of
   -- consequence: CR 508.1a makes the training happen on the ACTIVE player's turn,
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
   TriggerCondition.SelfTrains -> False
+  -- Rule 702.122e names no turn either: a Vehicle may be crewed at instant speed
+  -- on any player's turn, CR 702.122a's cost carrying no timing clause.
+  TriggerCondition.SelfBecomesCrewed -> False
   -- CR 701.21a says nothing about whose turn it is, and neither does the printed
   -- "whenever an opponent sacrifices an artifact" -- the relation names a seat,
   -- not a turn.
