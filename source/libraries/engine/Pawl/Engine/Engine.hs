@@ -1587,10 +1587,43 @@ runStep = do
 -- begin writes nothing. (Combat.clearAttackedThisStep does run outside one, at
 -- every step's end, but a clearer cannot strand anything.) The phase that BEGAN
 -- and then lost its last step to a skip is `skipStep`'s case, not this one.
+--
+-- The ENDING phase is the one whose skip still owes something, and
+-- `endTurnDurations` says what: the phase never happened, but the turn it was
+-- the last of ends all the same.
 skipWholePhase :: Phase.Phase -> Game ()
 skipWholePhase phase = do
   State.modify' (\gs -> gs {GameState.remaining = Turn.dropRestOfPhase phase (GameState.remaining gs)})
+  Monad.when (Turn.wholePhaseOf phase == Just PhaseSelector.EndingPhase) endTurnDurations
   advance
+
+-- CR 611.2a: a duration stated as "until end of turn" is over when the TURN is
+-- over, and the turn is over whether or not its cleanup step ran. So the two
+-- sweeps that end such a duration -- CR 514.2's stored-effect half
+-- (Expiry.dropAtCleanup) and its mana-unit half (Mana.endManaRetention) -- run on
+-- every road out of the ending phase, including the two that remove the cleanup
+-- step: CR 500.11's whole-phase skip and CR 614.1b's step skip. CR 724.2d states
+-- the same split one phase over -- the combat phase an effect ends keeps its
+-- "until end of combat" expiries though its last step is skipped -- and
+-- Resolve's EndCombatPhase arm is where the engine already writes it.
+--
+-- The cleanup step's TURN-BASED ACTIONS are NOT run here, and that is CR 614.10a:
+-- anything scheduled for a skipped step or phase won't happen. CR 514.1's
+-- discard to hand size is one, and so is the OTHER half of CR 514.2 -- CR 120.6
+-- keys the removal of marked damage to the cleanup step rather than to the turn,
+-- so nothing outside that step ever asks for it. Only the duration half has CR
+-- 611.2a behind it, which is what splits one simultaneous action in two here.
+--
+-- CR 500.5's pool empty is not run either, being that same rule's turn-based
+-- action (CR 703.4q) at the end of a step that did not happen. The mana
+-- Mana.endManaRetention hands back is ordinary, so the next step or phase that
+-- does end takes it; no player receives priority in between, CR 502.4 giving the
+-- untap step none. Pawl.ExpirySpec's "CR 514.2 retained mana is not spendable
+-- once the skipped turn is over" is what proves that.
+endTurnDurations :: Game ()
+endTurnDurations = do
+  State.modify' Expiry.dropAtCleanup
+  State.modify' Mana.endManaRetention
 
 -- CR 614.1b / CR 500.11: THIS STEP is skipped -- proceed past it as though it
 -- didn't exist. Nothing step-grain happens: no CR 603.2b record, no turn-based
@@ -1614,8 +1647,17 @@ skipWholePhase phase = do
 -- No CR 704.3 check: that rule keys the sweep to a player receiving priority,
 -- and a skipped step grants none. The next step's own check, which runs ahead of
 -- its priority round, catches whatever the sweeps here raised.
+--
+-- CR 611.2a's half, ahead of `endPhase` so that CR 500.5's pool empty inside it
+-- sees mana Mana.endManaRetention has already made ordinary -- CR 514.2 then CR
+-- 500.5, the order the cleanup step runs them in. Nothing in the pool writes this
+-- selector: Scryfall o:skips (o:"ending phase" or o:"end step" or o:cleanup),
+-- 2026-09-06, returns only Possessed Portal, whose "skips that draw" is not a
+-- step skip. So this arm is a fence rather than a proven behaviour, and the
+-- ending-phase road beside it is the one Pawl.ExpirySpec drives.
 skipStep :: Phase.Phase -> Game ()
 skipStep phase = do
+  Monad.when (phase == Phase.Ending EndingStep.Cleanup) endTurnDurations
   Foldable.traverse_ endPhase (Turn.phaseEndingAt phase)
   advance
 

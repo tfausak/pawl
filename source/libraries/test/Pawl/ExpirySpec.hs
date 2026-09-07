@@ -21,6 +21,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
@@ -1795,6 +1796,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   dovinSpec s registry
   oldFatSpiderSpec s registry
   lingeringSpec s registry
+  skippedEndingPhaseSpec s registry
 
 -- CR 116.2c's duration, which no sweep of this module ends: the unit-level half
 -- of Pawl.AuraSpec's Gliding Licid pair. The offer that DOES end it is
@@ -1955,3 +1957,216 @@ pingsBob :: Prompt.Prompt r -> r
 pingsBob p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
   _ -> S.identityAnswer p
+
+-- CR 500.11 / 611.2a: an ENDING PHASE skipped whole. The cleanup step is where
+-- CR 514.2 ends every "until end of turn" duration, and skipping the phase takes
+-- that step with it -- but the turn still ends, and CR 611.2a is what the
+-- duration was stated in terms of. Engine.endTurnDurations is the sweep on that
+-- road; CR 724.2d states the same split one phase over, for a combat phase whose
+-- end of combat step is skipped.
+--
+-- Synthetic Curfew Bell ({2}{U} Instant, "Target player skips their next ending
+-- phase") is the producer, and it is synthetic because no printing reaches this:
+-- Scryfall o:skips (o:"ending phase" or o:"end step" or o:cleanup), 2026-09-06,
+-- returns only Possessed Portal, whose "skips that draw" is not a step skip.
+--
+-- HARRIED DRONESMITH is on every board here and is what keeps these cases from
+-- being vacuous. Its "at the beginning of combat on your turn" Thopter is created
+-- during alice's combat phase, and its delayed "sacrifice it at the beginning of
+-- your next end step" is the trigger the skipped phase removes (CR 724.1e). So
+-- alice's creature count on bob's turn says whether the ending phase happened at
+-- all, on the same board that reads the expiry -- without it a fixed engine and
+-- a Bell that silently never installed would look alike.
+skippedEndingPhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+skippedEndingPhaseSpec s registry = Spec.describe s "SkippedEndingPhase" $ do
+  -- THE PROVING CASE for CR 514.2's stored-effect half. Giant Growth's +3/+3 is
+  -- an Expiry.AtCleanup continuous effect, and the cleanup step that would sweep
+  -- it never runs.
+  Spec.it s "CR 611.2a a pump ends with the turn though the ending phase was skipped" $ do
+    (pikerId, _, gs) <- pumpBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = curfewAnswer pikerId S.alice
+        alicesMain = throughPostcombatMain answer gs
+        bobsTurn = throughPostcombatMain answer (intoNextTurn answer alicesMain)
+        carolsTurn = throughPostcombatMain answer (intoNextTurn answer bobsTurn)
+    Spec.assertEqWith s "CR 611.2a back to its printed power on bob's turn, though no cleanup step ran" (Projection.powerOf pikerId bobsTurn) (Just 2)
+    Spec.assertEqWith s "and still on carol's, so nothing merely deferred it" (Projection.powerOf pikerId carolsTurn) (Just 2)
+    Spec.assertEqWith s "CR 724.1e the end step never began, so the Thopter was never sacrificed" (S.creaturesInPlay S.alice bobsTurn) 3
+    Spec.assertEqWith s "the pump was live while alice's turn still ran" (Projection.powerOf pikerId alicesMain) (Just 5)
+  -- The paired control, differing in ONE decision: the Bell is never cast. Same
+  -- board, same seats, same answers everywhere else -- so alice's ending phase
+  -- runs, and both the sacrifice and the CR 514.2 sweep happen the ordinary way.
+  Spec.it s "CR 514.2 without the Bell the ending phase runs and does the same work" $ do
+    (pikerId, bellId, gs) <- pumpBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = declinesBellAnswer bellId pikerId S.alice
+        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
+    Spec.assertEqWith s "the Thopter was sacrificed at alice's end step" (S.creaturesInPlay S.alice bobsTurn) 2
+    Spec.assertEqWith s "and the pump ended at her cleanup step" (Projection.powerOf pikerId bobsTurn) (Just 2)
+  -- The "whose" dimension, and the reason the board carries three seats: a Bell
+  -- aimed at carol must leave ALICE's ending phase alone, which a skip that
+  -- ignored PhasePattern.whosePhase would not.
+  Spec.it s "CR 614.1b a Bell aimed at carol leaves alice's own ending phase alone" $ do
+    (pikerId, _, gs) <- pumpBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = curfewAnswer pikerId S.carol
+        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
+    Spec.assertEqWith s "alice's end step ran, so her Thopter went" (S.creaturesInPlay S.alice bobsTurn) 2
+    Spec.assertEqWith s "and her cleanup step ended the pump" (Projection.powerOf pikerId bobsTurn) (Just 2)
+  -- THE PROVING CASE for CR 514.2's mana half, which is the one with no
+  -- counterweight: Mana.endManaRetention is the only place a
+  -- ManaRetention.UntilEndOfTurn reverts, and Mana.emptyManaPools keeps anything
+  -- that is not Ordinary -- so a retention the skip strands is stranded for the
+  -- rest of the game, not merely for a turn.
+  --
+  -- Read at GAMEPLAY level, as whether alice can cast Giant Growth off the
+  -- floating green: she can while her own turn runs, and cannot on bob's, where
+  -- her only other mana is three Islands. The pool assertion beside it is the
+  -- same claim said directly.
+  Spec.it s "CR 514.2 retained mana is not spendable once the skipped turn is over" $ do
+    (bellId, growthId, gs) <- manaBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = castsOnlyAnswer bellId S.alice
+        alicesMain = throughPostcombatMain answer gs
+        bobsTurn = throughPostcombatMain answer (intoNextTurn answer alicesMain)
+        carolsTurn = throughPostcombatMain answer (intoNextTurn answer bobsTurn)
+        castsGrowth held = Maybe.isJust (List.find (S.isCastOf growthId) (Action.legalActions S.alice (withPriority S.alice held)))
+    Spec.assertBool s (not (castsGrowth bobsTurn)) "CR 611.2a alice cannot cast a {G} spell off the retained green on bob's turn"
+    Spec.assertEqWith s "and her pool is empty there" (poolSize S.alice bobsTurn) 0
+    Spec.assertEqWith s "still empty on carol's, so nothing merely deferred it" (poolSize S.alice carolsTurn) 0
+    Spec.assertEqWith s "CR 724.1e the end step never began, so the Thopter was never sacrificed" (S.creaturesInPlay S.alice bobsTurn) 3
+    Spec.assertBool s (castsGrowth alicesMain) "the retention was live while alice's own turn ran"
+  -- manaBoard's paired control, differing in the one decision again.
+  Spec.it s "CR 514.2 without the Bell the cleanup step ends the retention" $ do
+    (bellId, _, gs) <- manaBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = declinesOnlyAnswer bellId S.alice
+        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
+    Spec.assertEqWith s "the Thopter was sacrificed at alice's end step" (S.creaturesInPlay S.alice bobsTurn) 2
+    Spec.assertEqWith s "and her pool emptied at her cleanup step" (poolSize S.alice bobsTurn) 0
+
+-- alice active on turn 2 at her own upkeep, with three seats so the Bell's
+-- "target player" is a real choice, and every library stocked so no fixture
+-- player decks (CR 704.5b) over the turns these cases run. Turn 2, so no case
+-- here sits on a game's first turn.
+curfewSeats :: Printing.Printing -> GameState.GameState -> GameState.GameState
+curfewSeats land gs =
+  let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard land pid h)) g [1 .. (8 :: Int)]
+      stocked = List.foldl' stock gs [S.alice, S.bob, S.carol]
+   in stocked
+        { GameState.activePlayer = S.alice,
+          GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+          GameState.remaining = S.phasesAfter (Phase.Beginning BeginningStep.Upkeep),
+          GameState.turnNumber = 2
+        }
+
+-- alice's Goblin Piker (2/1) to pump, her Harried Dronesmith, three Islands for
+-- the Bell's {2}{U} and one Forest for Giant Growth's {G}. NO green in the pool
+-- on this board, so the Forest is the only way to pay the pump and the mana
+-- board below is where a retention is read.
+pumpBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+pumpBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  dronesmith <- S.printingOf s registry "Harried Dronesmith"
+  bell <- S.printingOf s registry "Synthetic Curfew Bell"
+  growth <- S.printingOf s registry "Giant Growth"
+  let (pikerId, gs1) = S.addPermanent piker S.alice S.threePlayerGame
+      (_, gs2) = S.addPermanent dronesmith S.alice gs1
+      gs3 = S.landsFor forest S.alice 1 (S.landsFor island S.alice 3 gs2)
+      (bellId, gs4) = S.addHandCard bell S.alice gs3
+      (_, gs5) = S.addHandCard growth S.alice gs4
+  pure (pikerId, bellId, curfewSeats island gs5)
+
+-- alice's Shizuko, Caller of Autumn ({1}{G}{G}, "At the beginning of each
+-- player's upkeep, that player adds {G}{G}{G}. Until end of turn, they don't
+-- lose this mana as steps and phases end"), her Harried Dronesmith and three
+-- Islands. Giant Growth stays IN HAND and is never cast: it is the {G} spell the
+-- assertions ask about, and no Forest anywhere is what makes the floating green
+-- the only way to pay it.
+--
+-- The Bell's {2}{U} may take up to two of the three green for its generic half,
+-- which is why nothing here counts the pool while alice's turn runs: what matters
+-- is that a step end would have taken any ORDINARY mana, so whatever is still
+-- floating at her postcombat main is floating because of the retention.
+manaBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+manaBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
+  dronesmith <- S.printingOf s registry "Harried Dronesmith"
+  bell <- S.printingOf s registry "Synthetic Curfew Bell"
+  growth <- S.printingOf s registry "Giant Growth"
+  let (_, gs1) = S.addPermanent shizuko S.alice S.threePlayerGame
+      (_, gs2) = S.addPermanent dronesmith S.alice gs1
+      gs3 = S.landsFor island S.alice 3 gs2
+      (bellId, gs4) = S.addHandCard bell S.alice gs3
+      (growthId, gs5) = S.addHandCard growth S.alice gs4
+  pure (bellId, growthId, curfewSeats island gs5)
+
+-- CR 117.1a: a player needs priority to cast an instant, and these boards are
+-- read between steps rather than inside a priority round. The one field that
+-- differs, applied to every board a cast is asked of, so the pair below differs
+-- in the pool and in nothing else.
+withPriority :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+withPriority pid gs = gs {GameState.priority = Just pid}
+
+-- Run whole steps until `done` holds, the game ends, or the bound runs out. The
+-- bound is three three-player turns' worth of steps, so a skip that dropped more
+-- of the schedule than it should fails an assertion rather than hanging.
+runSteps :: (GameState.GameState -> Bool) -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runSteps done answer gs0 =
+  let go n g =
+        if n <= (0 :: Int) || done g || Maybe.isJust (GameState.result g)
+          then g
+          else go (n - 1) (S.runPure answer g Engine.runStep)
+   in go 60 gs0
+
+-- Top-level rather than `where` bindings because the answerer is rank-2 and GHC
+-- will not infer it.
+throughPostcombatMain :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+throughPostcombatMain = runSteps ((== Phase.PostcombatMain) . GameState.phase)
+
+intoNextTurn :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+intoNextTurn answer gs = runSteps ((/= GameState.turnNumber gs) . GameState.turnNumber) answer gs
+
+-- Casts whatever is castable, aiming Giant Growth at `pumped` and the Bell at
+-- `skipper`. Both are answered by FILTERING the offered set (S.preferring): a
+-- ChooseTargets over creatures never offers a player and one over players never
+-- offers a creature, so exactly one of the two survives each filter, and no
+-- hand-built recipient can miss CR 608.2b's re-read at resolution.
+curfewAnswer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+curfewAnswer pumped skipper p = case p of
+  Prompt.ChooseAction _ _ actions -> firstCast actions
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> r == Recipient.ToCreature pumped || r == Recipient.ToPlayer skipper) sets
+  _ -> S.identityAnswer p
+
+-- curfewAnswer's paired control, differing in ONE decision: the Bell is never
+-- cast. The board, the seats and every other answer are shared.
+declinesBellAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+declinesBellAnswer bell pumped skipper p = case p of
+  Prompt.ChooseAction _ _ actions -> firstCast (filter (not . S.isCastOf bell) actions)
+  _ -> curfewAnswer pumped skipper p
+
+-- Casts the Bell and NOTHING else, so the Giant Growth in hand stays there as the
+-- {G} spell the mana assertions ask about.
+castsOnlyAnswer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+castsOnlyAnswer bell skipper p = case p of
+  Prompt.ChooseAction _ _ actions -> firstCast (filter (S.isCastOf bell) actions)
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer skipper) sets
+  _ -> S.identityAnswer p
+
+-- castsOnlyAnswer's paired control: casts nothing at all.
+declinesOnlyAnswer :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+declinesOnlyAnswer bell skipper p = case p of
+  Prompt.ChooseAction {} -> A.Pass
+  _ -> castsOnlyAnswer bell skipper p
+
+firstCast :: [A.Action] -> A.Action
+firstCast actions =
+  let isCast a = case a of
+        A.Cast {} -> True
+        _ -> False
+   in case filter isCast actions of
+        h : _ -> h
+        [] -> A.Pass

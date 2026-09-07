@@ -153,10 +153,10 @@ follows expiry = case expiry of
 -- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
 -- the next projection revert -- nothing is explicitly undone.
 --
--- Not implemented: a turn whose ENDING PHASE was skipped never reaches the
--- cleanup step, so this never runs and every entry it would have ended --
--- AtCleanup, and an AtEndOfTurnOf whose turn this is -- outlives its turn
--- (#491).
+-- A turn whose ENDING PHASE or cleanup step was skipped never reaches the
+-- cleanup step's turn-based actions, and Engine.endTurnDurations runs this
+-- there anyway: CR 611.2a ends the duration when the turn ends, whether or not
+-- the step that normally sweeps it happened.
 dropAtCleanup :: GameState -> GameState
 dropAtCleanup gs =
   let survives expiry = case expiry of
