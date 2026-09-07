@@ -15,6 +15,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -57,11 +58,11 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
       codec
       ( GrantedAbility.Triggered
           ( TriggeredAbility.MkTriggeredAbility
-              TriggerCondition.SelfDealsCombatDamageToPlayer
+              (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer)
               emptyModal
               Nothing
               TriggerLimit.Unlimited
           )
       )
-      " {\"type\":\"Triggered\",\"value\":{\"condition\":{\"type\":\"SelfDealsCombatDamageToPlayer\"},\"modal\":{\"modes\":[{}]}}} "
+      " {\"type\":\"Triggered\",\"value\":{\"condition\":{\"type\":\"SelfDealsCombatDamageToPlayer\",\"value\":{\"type\":\"AnyPlayer\"}},\"modal\":{\"modes\":[{}]}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

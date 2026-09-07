@@ -28,6 +28,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -514,17 +515,17 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
   Spec.it s "CR 603.2 SelfDealsCombatDamageToPlayer matches the bearer's combat damage to a player" $ do
     let bearer = ObjectId.MkObjectId 1
         ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
-    Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev) "matches"
+    Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) ev) "matches"
 
   Spec.it s "it does not match combat damage to a creature" $ do
     let bearer = ObjectId.MkObjectId 1
         ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToCreature (ObjectId.MkObjectId 2)) 2 False False False 0 Nothing DamageKind.Combat)
-    Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)) "no match"
+    Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) ev)) "no match"
 
   Spec.it s "it does not match noncombat damage to a player" $ do
     let bearer = ObjectId.MkObjectId 1
         ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent bearer (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Noncombat)
-    Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfDealsCombatDamageToPlayer ev)) "no match"
+    Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) ev)) "no match"
 
   Spec.it s "CR 400.7: a zone change forgets attachment" $ do
     plains <- S.printingOf s registry "Plains"

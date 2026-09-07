@@ -3238,6 +3238,14 @@ apply batch candidate event =
 -- here: the entry replacement stamps the permanent's snapshot, and
 -- Pawl.Engine.Resolve's CR 707.10 copy stamps the spell's off this same
 -- function.
+--
+-- Not implemented: CR 707.2's "status ... [is] not copied", for the one status
+-- that changes what a permanent's characteristics ARE. Projection.copiableCharacteristics
+-- reads Game.faceOf, which CR 710.2 substitutes a flipped permanent's alternative
+-- half at, so a copy of a flipped flip card acquires that half's name, type line
+-- and power/toughness where the rule leaves it the normal one (#3364).
+-- Face-down status is the exception rule 707.2 names, and reads correctly through
+-- the same seam.
 copiedSnapshot :: ObjectId -> GameState -> PC.ProjectedCharacteristics
 copiedSnapshot src gs =
   let snapshot = Projection.copiableCharacteristics src gs
@@ -6484,7 +6492,7 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 603.8: a state trigger's condition is a fact about the game state, and a
   -- game state is not an ability triggering.
   TriggerCondition.StateIs _ -> False
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
@@ -6733,7 +6741,7 @@ controllerTurnScoped cond = case cond of
   -- not a turn.
   TriggerCondition.PermanentSacrificed {} -> False
   TriggerCondition.StateIs _ -> False
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False

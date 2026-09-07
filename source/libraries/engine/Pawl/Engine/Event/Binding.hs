@@ -114,7 +114,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- happened. Given a match both are unconditional, which is what
   -- eventBindingSlots' per-condition promise needs: every GameEvent.DamageDealt
   -- carries a DamageEvent.amount.
-  (TriggerCondition.SelfDealsCombatDamageToPlayer, GameEvent.DamageDealt ev) ->
+  (TriggerCondition.SelfDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
     case DamageEvent.target ev of
       Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
       Recipient.ToCreature _ -> Map.empty
@@ -1019,7 +1019,7 @@ eventBindingSlots cond = case cond of
   -- CR 510.2's amount beside it, which Questing Beast's "that much" reads: the
   -- same slot CR 615.13's prevention and CR 119.9's life gain stamp. Guaranteed
   -- given a match -- every DamageDealt event carries an amount.
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
   -- CR 120.3's amount for enrage, which Coalhauler Swine's "it deals that much
   -- damage to each player" reads: the same slot CR 615.13's prevention and CR
   -- 119.9's life gain stamp, and guaranteed given a match -- every DamageDealt

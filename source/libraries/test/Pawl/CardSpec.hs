@@ -858,7 +858,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.CardLeavesGraveyard {} -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
@@ -3243,7 +3243,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
   -- Enrage's condition is nullary: rule 120.3 qualifies the damage in no way, so
   -- there is nothing for a text change to rewrite.
   TriggerCondition.SelfIsDealtDamage -> []
@@ -3414,7 +3414,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- CR 603.8's state trigger holds a Condition, which is a pair of Quantities
   -- and Filters -- no SlotName of its own.
   TriggerCondition.StateIs _ -> []
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
   TriggerCondition.SelfIsDealtDamage -> []
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []

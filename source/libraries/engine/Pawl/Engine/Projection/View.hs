@@ -708,6 +708,10 @@ copiableCharacteristics oid gs = case copiableSnapshotOf oid gs of
   -- Replacement.applyCopyExceptions stamps into the snapshot this arm goes
   -- around (#3249). No card in data/cards/ pairs an exception with a
   -- Room-eligible copy.
+  -- Not implemented: CR 707.2's "status ... [is] not copied" for CR 110.5's
+  -- flipped status, which baseCharacteristics reads through Game.faceOf and so
+  -- folds a flipped permanent's alternative half into the value a copy freezes
+  -- (#3364). Pawl.Engine.Event.copiedSnapshot is the reader that spends it.
   Nothing -> baseCharacteristics oid gs
 
 -- CR 707.3: the copy snapshot an object's copiable RULES TEXT is read from --
