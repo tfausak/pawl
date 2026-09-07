@@ -576,6 +576,8 @@ library codec
     Pawl.Codec.MeldSpec
     Pawl.Codec.Mentored
     Pawl.Codec.MentoredSpec
+    Pawl.Codec.MergeComponent
+    Pawl.Codec.MergeComponentSpec
     Pawl.Codec.Mill
     Pawl.Codec.Milled
     Pawl.Codec.MilledSpec
@@ -1729,6 +1731,7 @@ library types
     Pawl.Types.Meld
     Pawl.Types.MeldSource
     Pawl.Types.Mentored
+    Pawl.Types.MergeComponent
     Pawl.Types.Mill
     Pawl.Types.Milled
     Pawl.Types.MillTally

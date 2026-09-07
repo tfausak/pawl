@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.MeldSource as MeldSource
+import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -50,13 +51,14 @@ spec s = Spec.describe s "Pawl.Codec.Source" $ do
       " {\"type\":\"OfMeld\",\"value\":{\"result\":8,\"components\":[9,10]}} "
   -- CR 730.2: a bare list rather than OfMeld's record, since a merged permanent
   -- has no interned result face to name beside its components -- CR 730.2a reads
-  -- the head of this list instead.
+  -- the head of this list instead. A CARD over a TOKEN, so rule 730.2d's
+  -- distinction between the two kinds of component survives the wire.
   Spec.it s "OfMerge" $
     Common.assertCodec
       s
       Source.codec
-      (Source.OfMerge (PrintingId.MkPrintingId 11 NonEmpty.:| [PrintingId.MkPrintingId 12]))
-      " {\"type\":\"OfMerge\",\"value\":[11,12]} "
+      (Source.OfMerge (MergeComponent.OfCard (PrintingId.MkPrintingId 11) NonEmpty.:| [MergeComponent.OfToken (PrintingId.MkPrintingId 12)]))
+      " {\"type\":\"OfMerge\",\"value\":[{\"type\":\"OfCard\",\"value\":11},{\"type\":\"OfToken\",\"value\":12}]} "
   -- CR 602.
   Spec.it s "OfAbility" $
     Common.assertCodec

@@ -39,6 +39,7 @@ import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MeldSource as MeldSource
+import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
@@ -165,7 +166,7 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   -- CR 730.2a: "a merged permanent has only the characteristics of its topmost
   -- component", so the head of the component list is the printing every
   -- characteristic read of a merged permanent resolves through.
-  Just (Source.OfMerge components) -> printingOf (NonEmpty.head components) gs
+  Just (Source.OfMerge components) -> printingOf (MergeComponent.printing (NonEmpty.head components)) gs
   Just (Source.OfToken pid) -> printingOf pid gs
   Just (Source.OfAbility _) -> Nothing
   Just (Source.OfTrigger _) -> Nothing
@@ -450,7 +451,7 @@ cardOfSource gs mSource = case mSource of
     -- reader past this point needs to know nothing about merging. The rest are
     -- read by `componentsOf` below and -- for CR 702.140e's added abilities --
     -- by Pawl.Engine.Projection.View.withMergedAbilities.
-    Source.OfMerge components -> cardOfPrinting (NonEmpty.head components) gs
+    Source.OfMerge components -> cardOfPrinting (MergeComponent.printing (NonEmpty.head components)) gs
     Source.OfToken pid -> cardOfPrinting pid gs
     Source.OfAbility _ -> Nothing
     Source.OfTrigger _ -> Nothing
@@ -487,12 +488,18 @@ cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
 -- melded permanent as one object but two cards, and CR 730.3e is about a merged
 -- permanent's token components. CR 202.3c and CR 701.27g read this too.
 --
--- EMPTY rather than a singleton for OfCard: the question is which cards
+-- EMPTY rather than a singleton for OfCard: the question is which components
 -- represent an object that several may, and a one-card object has nothing for CR
 -- 712.21's split to do. A reader wanting the ordinary card asks `cardOfSource`.
-componentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
+--
+-- COMPONENTS rather than bare printings, since CR 730.2d asks which of them is a
+-- token and CR 730.3 puts a token one somewhere else than a card one
+-- (`sourceOfComponent`). A reader that wants only the printings maps
+-- `MergeComponent.printing` over these.
+componentsOf :: Source.Source -> Seq.Seq MergeComponent.MergeComponent
 componentsOf source = case source of
-  Source.OfMeld meld -> Seq.fromList (NonEmpty.toList (MeldSource.components meld))
+  -- CR 701.42b keeps a token out of a meld pair, so both components are cards.
+  Source.OfMeld meld -> fmap MergeComponent.OfCard (Seq.fromList (NonEmpty.toList (MeldSource.components meld)))
   -- CR 730.2, in top-to-bottom order, which is the order CR 730.3a's arrangement
   -- prompt offers and CR 702.140e's ability fold reads.
   Source.OfMerge components -> Seq.fromList (NonEmpty.toList components)
@@ -840,7 +847,7 @@ manaCostFacesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- component takes `componentsOf`, which CR 712.21 and CR 730.3 share.
 mergeComponentsOf :: Source.Source -> Seq.Seq PrintingId.PrintingId
 mergeComponentsOf source = case source of
-  Source.OfMerge components -> Seq.fromList (NonEmpty.toList components)
+  Source.OfMerge components -> fmap MergeComponent.printing (Seq.fromList (NonEmpty.toList components))
   Source.OfMeld _ -> Seq.empty
   -- CR 722.3c: such a copy is never on the battlefield to be merged INTO, which
   -- is Pawl.Engine.Event.mergeComponents' own arm for it.
@@ -1315,11 +1322,14 @@ sourceIsToken source = case source of
   -- cards, and CR 701.42b keeps a token out of a meld pair in the first place.
   Source.OfMeld _ -> False
   -- CR 730.2d: "if a merged permanent contains a token, the resulting permanent
-  -- is a token only if the topmost component is a token". Nothing in the pool
-  -- can put a token in a component list -- Pawl.Engine.Event.merge refuses a
-  -- token target -- so the answer is False for every merged permanent pawl can
-  -- build (#874).
-  Source.OfMerge _ -> False
+  -- is a token only if the topmost component is a token". The head of the list,
+  -- which is CR 730.2a's topmost component, and never any other component.
+  --
+  -- Object.source and not the copiable record Pawl.Engine.Binding.setCopy stamps,
+  -- which is where every CHARACTERISTIC of a merged permanent is read: CR 707.2
+  -- lists the copiable values and token-ness is no characteristic of them (CR
+  -- 111.1), so this is a fact about what REPRESENTS the permanent.
+  Source.OfMerge components -> componentIsToken (NonEmpty.head components)
   Source.OfAbility _ -> False
   Source.OfTrigger _ -> False
   Source.OfEmblem _ -> False
@@ -1332,6 +1342,24 @@ sourceIsToken source = case source of
   -- CR 707.10f is written about a copy of a permanent SPELL.
   Source.OfCardCopy _ -> False
   Source.OfInherentTrigger _ -> False
+
+-- CR 730.2d / 111.1: is this component of a merged permanent a token rather than
+-- a card? The same classification as `sourceIsToken` one type over, and the read
+-- CR 730.3's departure takes to put each component into the zone its own kind
+-- calls for.
+componentIsToken :: MergeComponent.MergeComponent -> Bool
+componentIsToken component = case component of
+  MergeComponent.OfToken _ -> True
+  MergeComponent.OfCard _ -> False
+
+-- CR 730.2/730.3: what a component of a merged permanent represents once it is
+-- an object of its own again -- the card representing itself (CR 108.2), or the
+-- token it always was (CR 111.3). Pawl.Engine.Event's CR 712.21/730.3 split and
+-- Pawl.Engine.Setup's rebuild are its readers.
+sourceOfComponent :: MergeComponent.MergeComponent -> Source.Source
+sourceOfComponent component = case component of
+  MergeComponent.OfCard pid -> Source.OfCard pid
+  MergeComponent.OfToken pid -> Source.OfToken pid
 
 -- CR 111.8: a token that has LEFT the battlefield -- one waiting for the state-
 -- based action CR 111.7 and CR 704.5d state. Two rules read it and must agree:

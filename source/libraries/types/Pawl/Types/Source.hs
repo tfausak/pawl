@@ -4,6 +4,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.MeldSource as MeldSource
+import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 
@@ -50,14 +51,13 @@ data Source
     -- classifier is for.
     --
     -- Still a card for CR 108.2's purposes when its topmost component is one,
-    -- OfMeld's reason: CR 730.2d makes the resulting permanent a token only if
-    -- the topmost component is, and pawl's merge arrives only from CR 702.140c,
-    -- whose components are cards.
+    -- OfMeld's reason, and a token when that component is one: rule 730.2d says
+    -- which, and Pawl.Engine.Game.sourceIsToken reads the head for it.
     --
-    -- Not implemented: CR 730.2d's token components, CR 730.2e through 730.2g's
-    -- face-down components, CR 730.2h's flip components, and CR 730.2i/730.2j's
-    -- double-faced components (#874).
-    OfMerge (NonEmpty.NonEmpty PrintingId.PrintingId)
+    -- Not implemented: CR 730.2e through 730.2g's face-down components, CR
+    -- 730.2h's flip components, and CR 730.2i/730.2j's double-faced components
+    -- (#874).
+    OfMerge (NonEmpty.NonEmpty MergeComponent.MergeComponent)
   | -- | CR 111.3/111.6: a token -- a permanent not represented by a card. Its
     -- characteristics ARE a Card (CR 111.3: effect-defined values are functionally
     -- equivalent to printed ones), interned like any other printing, and carrying

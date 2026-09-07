@@ -263,6 +263,7 @@ import qualified Pawl.Codec.ManaUnitSpec
 import qualified Pawl.Codec.MeldSourceSpec
 import qualified Pawl.Codec.MeldSpec
 import qualified Pawl.Codec.MentoredSpec
+import qualified Pawl.Codec.MergeComponentSpec
 import qualified Pawl.Codec.MillSpec
 import qualified Pawl.Codec.MillTallySpec
 import qualified Pawl.Codec.MilledSpec
@@ -875,6 +876,7 @@ spec s registry = do
   Pawl.Codec.MeldSourceSpec.spec s
   Pawl.Codec.MeldSpec.spec s
   Pawl.Codec.MentoredSpec.spec s
+  Pawl.Codec.MergeComponentSpec.spec s
   Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
   Pawl.Codec.MilledSpec.spec s
