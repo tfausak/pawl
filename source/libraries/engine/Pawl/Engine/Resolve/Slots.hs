@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
+import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
@@ -103,6 +104,7 @@ import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveCounters as MoveCounters
+import qualified Pawl.Types.MoveMana as MoveMana
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
 import qualified Pawl.Types.Object as Object
@@ -508,6 +510,8 @@ effectObjectRefs effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> [ref]
   Effect.ChangeText {} -> []
   Effect.AddMana {} -> []
+  Effect.ActivateManaAbilities {} -> []
+  Effect.MoveMana {} -> []
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   -- CR 727.5's exemption, absent when nothing is exempt.
@@ -668,6 +672,8 @@ effectPlayerRefs effect = case effect of
   Effect.ModifyTarget {} -> []
   Effect.ChangeText {} -> []
   Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
+  Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref _) -> [ref]
+  Effect.MoveMana (MoveMana.MkMoveMana from to) -> [from, to]
   Effect.Search (Search.MkSearch searcher owner _ _ _ _ _ _) -> [searcher, owner]
   Effect.ExileAllGraveyards -> []
   Effect.RestartGame {} -> []
@@ -821,6 +827,11 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
     joinTwo (joinSlots (fmap quantitySlots (Projection.quantitiesOf modification))) (durationSlots duration)
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
   Effect.AddMana {} -> Map.empty
+  -- The actor is effectPlayerRefs' half, joined at the head; the FILTER is a
+  -- read like Search's, a card naming a slot in it being read here.
+  Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities _ filter_) -> filterSlotsOf filter_
+  -- Both refs are effectPlayerRefs' half.
+  Effect.MoveMana {} -> Map.empty
   -- The count and the FILTER: both references are effectPlayerRefs' half, and a
   -- search filter naming a slot is a read like any other now that the arm
   -- matches it in the resolution's own context -- Bifurcate's "with the same
@@ -1307,6 +1318,8 @@ ownSlotsAreExhaustive effect = case effect of
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
   Effect.AddMana _ -> True
+  Effect.ActivateManaAbilities _ -> True
+  Effect.MoveMana _ -> True
   -- The COUNT's own nested reads. The filter's are exhaustive by construction:
   -- slotsOf reports them through Filter.boundSlots, the one walk that enumerates
   -- what a Filter reads, and no Filter atom carries a Quantity for
@@ -1521,6 +1534,8 @@ readsX = any effectReadsX
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
+      Effect.ActivateManaAbilities _ -> False
+      Effect.MoveMana _ -> False
       Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
@@ -1706,6 +1721,8 @@ boundSlots effect = case effect of
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
   Effect.AddMana _ -> Set.empty
+  Effect.ActivateManaAbilities _ -> Set.empty
+  Effect.MoveMana _ -> Set.empty
   Effect.Search {} -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty

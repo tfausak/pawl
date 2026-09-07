@@ -111,6 +111,8 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
   Effect.AddMana _ -> Nothing
+  Effect.ActivateManaAbilities {} -> Nothing
+  Effect.MoveMana {} -> Nothing
   Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing

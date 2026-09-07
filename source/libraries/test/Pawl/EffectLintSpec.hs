@@ -215,6 +215,8 @@ ownQuantities effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationQuantities duration <> Projection.quantitiesOf modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
+  Effect.ActivateManaAbilities _ -> []
+  Effect.MoveMana _ -> []
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
@@ -1113,6 +1115,8 @@ effectObjectRefs effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
   Effect.ChangeText {} -> []
   Effect.AddMana {} -> []
+  Effect.ActivateManaAbilities {} -> []
+  Effect.MoveMana {} -> []
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
