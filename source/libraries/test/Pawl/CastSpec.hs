@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -77,6 +78,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -1713,6 +1715,63 @@ furies decision victim p = case p of
 buybackAnnouncements :: [Response.Response] -> [BuybackDecision.BuybackDecision]
 buybackAnnouncements responses = [d | Response.AnnouncedBuyback d <- responses]
 
+-- CR 616.1e: rule 702.27a's rewrite is a replacement effect (CR 614.1a), so a row
+-- another OBJECT contributes to the same CR 608.2n move races it. Rest in Peace
+-- ({1}{W} Enchantment, "When this enchantment enters, exile all graveyards. /
+-- If a card or token would be put into a graveyard from anywhere, exile it
+-- instead" -- Oracle text fetched from Scryfall 2026-09-07) is the
+-- racer, on alice's battlefield beside the five Forests; its entry trigger is
+-- never put on the stack, the fixture placing the permanent outright.
+--
+-- Nothing in CR 616.1a-d buckets either row -- both are ordinary continuous
+-- effects of static abilities (CR 604.2), so neither is CR 614.15's
+-- self-replacement -- and CR 616.1e leaves the choice to the affected object's
+-- controller. Both orders are legal and the boards differ: buyback first puts the
+-- card into its owner's hand, and Rest in Peace first exiles it, leaving buyback
+-- no graveyard move to replace (CR 614.6).
+buybackRaceBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+buybackRaceBoard forest elvishFury piker restInPeace =
+  let (pikerId, gs1) = S.addPermanent piker S.bob (S.landsInPlay forest 5)
+      (restId, gs2) = S.addPermanent restInPeace S.alice gs1
+      (gs, spellId) = S.handOne elvishFury gs2
+   in (gs, spellId, pikerId, restId)
+
+-- `furies` buying back, plus CR 616.1e's order: take the candidate the Rest in
+-- Peace SOURCES when `restFirst`, and rule 702.27a's row -- whose source is the
+-- spell's own stack incarnation, an id no fixture holds -- when not. Pinned by
+-- source rather than by index, so neither answer can turn into the other under a
+-- change to the engine's canonical candidate order.
+racingFuries :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+racingFuries restFirst restId victim p = case p of
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> (ReplacementEntry.source entry == restId) == restFirst) entries)
+  _ -> furies BuybackDecision.BuysBack victim p
+
+-- Cast and resolve, keeping the seats asked to order CR 616.1's applicable
+-- effects along with the finished board. The RESOLUTION's prompt stream, which
+-- castAndResolve's Replay.record does not reach: CR 608.2n's move is proposed
+-- there, and CR 616.1's question with it.
+buybackRace ::
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ([PlayerId.PlayerId], GameState.GameState)
+buybackRace answer gs oid =
+  let step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      step p = case p of
+        Prompt.ChooseReplacement _ pid _ -> do
+          State.modify' (<> [pid])
+          pure (answer p)
+        _ -> pure (answer p)
+      cast = snd (fst (State.runState (Engine.runGame step gs (S.cast S.alice oid)) []))
+      ((_, after), asked) = State.runState (Engine.runGame step cast Stack.resolveTop) []
+   in (asked, after)
+
 buybackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 buybackSpec s registry = Spec.describe s "Buyback" $ do
   -- CR 702.27a's "you MAY pay": declining is a real answer, and CR 608.2n's
@@ -1775,6 +1834,38 @@ buybackSpec s registry = Spec.describe s "Buyback" $ do
     Spec.assertEqWith s "the ordinary cast resolved: the Piker got its +2/+2" (S.powerToughnessOf pikerId after) (Just (4, 3))
     Spec.assertEqWith s "no buyback question was put, so the answerer's BuysBack never applied" (buybackAnnouncements asked) []
     Spec.assertEqWith s "the one Forest paid {G}" (S.tappedCount S.alice after) 1
+  -- CR 616.1e's first order, on the board buybackRaceBoard describes: rule
+  -- 702.27a's row applies and CR 614.6 makes the graveyard move never happen, so
+  -- Rest in Peace's row -- keyed on a graveyard destination -- has nothing left
+  -- to be applicable to.
+  Spec.it s "CR 616.1e buyback taken before Rest in Peace puts the spell into its owner's hand" $ do
+    forest <- S.printingOf s registry "Forest"
+    elvishFury <- S.printingOf s registry "Elvish Fury"
+    piker <- S.printingOf s registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, spellId, pikerId, restId) = buybackRaceBoard forest elvishFury piker restInPeace
+        (asked, after) = buybackRace (racingFuries False restId pikerId) gs spellId
+    Spec.assertEqWith s "CR 702.27a: the resolved spell is in alice's hand" (buybackNamesIn Zone.Hand S.alice after) [Just (S.printingName elvishFury)]
+    Spec.assertEqWith s "CR 614.6: so Rest in Peace exiled nothing" (buybackNamesIn Zone.Exile S.alice after) []
+    Spec.assertEqWith s "and CR 608.2n's graveyard is empty" (buybackNamesIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "CR 616.1e: the spell's controller was asked, once" asked [S.alice]
+    Spec.assertEqWith s "the Piker got its +2/+2 either way" (S.powerToughnessOf pikerId after) (Just (4, 3))
+  -- The same board and the same answerer for the ONE answer, buybackSpec's pair
+  -- shape: taking Rest in Peace first exiles the card, and CR 614.6 leaves rule
+  -- 702.27a nothing to replace -- the outcome pawl could not reach while
+  -- finishSpell named the hand itself.
+  Spec.it s "CR 616.1e Rest in Peace taken first exiles the bought-back spell instead" $ do
+    forest <- S.printingOf s registry "Forest"
+    elvishFury <- S.printingOf s registry "Elvish Fury"
+    piker <- S.printingOf s registry "Goblin Piker"
+    restInPeace <- S.printingOf s registry "Rest in Peace"
+    let (gs, spellId, pikerId, restId) = buybackRaceBoard forest elvishFury piker restInPeace
+        (asked, after) = buybackRace (racingFuries True restId pikerId) gs spellId
+    Spec.assertEqWith s "CR 614.6: the resolved spell is in exile" (buybackNamesIn Zone.Exile S.alice after) [Just (S.printingName elvishFury)]
+    Spec.assertEqWith s "and buyback had no graveyard move left, so alice's hand is empty" (buybackNamesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "the graveyard is empty on this order too" (buybackNamesIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "CR 616.1e: alice was asked here as well" asked [S.alice]
+    Spec.assertEqWith s "the Piker got the same +2/+2" (S.powerToughnessOf pikerId after) (Just (4, 3))
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty

@@ -3149,6 +3149,78 @@ installTurnSkips entry gs =
          in g1 {GameState.replacements = active : GameState.replacements g1}
    in List.foldl' install gs (Set.toAscList (ExtraTurn.skipped entry))
 
+-- CR 702.27a's second static ability, as a row over CR 608.2n's own move:
+-- "if the buyback cost was paid, put this spell into its owner's hand instead of
+-- into that player's graveyard as it resolves". Installed by
+-- Pawl.Engine.Resolve.finishSpell immediately before it proposes the graveyard
+-- move, so this rewrite and every other row watching that move reach CR 616.1's
+-- loop together and the spell's controller orders them (CR 616.1e). Rest in Peace
+-- over a bought-back Elvish Fury is the board that observes it: buyback first
+-- puts the card in its owner's hand, Rest in Peace first exiles it and CR 614.6
+-- leaves buyback nothing to replace. Pawl.CastSpec's "CR 616.1e buyback taken
+-- before Rest in Peace puts the spell into its owner's hand" and "CR 616.1e Rest
+-- in Peace taken first exiles the bought-back spell instead" drive both orders.
+--
+-- MINTED AT THE MOVE rather than gathered off the stack as a printed row, which
+-- is how rule 702.27a's "as it resolves" is scoped: the rule leaves a countered
+-- (CR 701.6a) or a fizzled (CR 608.2b) spell in the graveyard, and neither road
+-- reaches finishSpell, so a standing row keyed on a graveyard destination would
+-- over-apply to both.
+--
+-- installTurnSkips' shape in every other respect. Uses.Once and Expiry.Never are
+-- flashback's pair (Pawl.Engine.Cast.armCastFromGraveyard): the move happens
+-- once, and rule 702.27a states no duration. A row Rest in Peace outraces is left
+-- unspent and is inert, CR 400.7 giving the exiled card a new id that
+-- Filter.IsSource cannot match.
+--
+-- ReplacementOrigin.Other, not SelfReplacement: CR 604.2 has a static ability
+-- create the continuous effect, and CR 614.15 scopes a self-replacement to an
+-- effect of a RESOLVING spell replacing that spell's own effect. So CR 616.1a
+-- buckets neither this nor Rest in Peace, and CR 616.1e is the step that applies.
+installBuybackReturn :: ObjectId -> PlayerId -> GameState -> GameState
+installBuybackReturn spellId caster gs =
+  let (ts, gs1) = Game.freshTimestamp gs
+      active =
+        ActiveReplacement.MkActiveReplacement
+          { ActiveReplacement.effect =
+              ReplacementEffect.ZoneChangeR
+                ( ZoneChangeR.MkZoneChangeR
+                    ZoneChangePattern.MkZoneChangePattern
+                      { -- Rule 702.27a names the destination it replaces, so the
+                        -- pattern does too -- and a row that named none would
+                        -- re-fire on its own output.
+                        ZoneChangePattern.whenDestination = Just Zone.Graveyard,
+                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                        -- Rule 702.27a says "this spell", so the row is scoped
+                        -- to the object it was minted for -- castFromGraveyardExile's
+                        -- Filter.IsSource, and for its reason.
+                        ZoneChangePattern.whatObject = Filter.Type.IsSource
+                      }
+                    Zone.Hand
+                    False
+                    False
+                ),
+            -- CR 113.7: the spell itself, which the pattern's IsSource is
+            -- compared against.
+            ActiveReplacement.source = spellId,
+            -- CR 109.5's "you". Nothing in rule 702.27a's rewrite reads it --
+            -- the destination is the OWNER's hand, which Event.changeZone
+            -- decides off the moving object (CR 400.3) -- but the row carries it
+            -- as every other row does, armCastFromGraveyard's posture.
+            ActiveReplacement.controller = caster,
+            ActiveReplacement.timestamp = ts,
+            ActiveReplacement.expiry = Expiry.Never,
+            ActiveReplacement.uses = Uses.Once,
+            ActiveReplacement.origin = ReplacementOrigin.Other,
+            -- No clause: rule 702.27a's own "if the buyback cost was paid" is the
+            -- designation Pawl.Engine.Cast.stampBoughtBack wrote, and finishSpell
+            -- has already read it (see Pawl.Types.ActiveReplacement).
+            ActiveReplacement.condition = Nothing,
+            ActiveReplacement.rider = Nothing,
+            ActiveReplacement.slots = Map.empty
+          }
+   in gs1 {GameState.replacements = active : GameState.replacements gs1}
+
 asPhaseBegin :: ProposedEvent -> Maybe (PhaseSelector, PlayerId)
 asPhaseBegin event = case event of
   ProposedEvent.WouldBeginPhase selector pid -> Just (selector, pid)
