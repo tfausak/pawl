@@ -343,7 +343,7 @@ looksBack condition = case condition of
   -- zone change at all, so CR 603.10a's list cannot reach them.
   TriggerCondition.StepBegins {} -> False
   TriggerCondition.StateIs _ -> False
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
@@ -529,7 +529,7 @@ batchScoped condition = case condition of
   TriggerCondition.PermanentEnters _ -> False
   TriggerCondition.StepBegins {} -> False
   TriggerCondition.StateIs _ -> False
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
   TriggerCondition.SelfIsDealtDamage -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   -- A True beside PermanentsDie: CR 510.2 deals every combat damage of a step
@@ -1932,7 +1932,7 @@ zonesTriggeredFrom cond = case cond of
   -- CR 603.8's state triggers are not event triggers, so this scan is not their
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> battlefield
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> battlefield
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> battlefield
   -- CR 113.6's default again, and the match's own shape on top of it: this arm
   -- compares the bearer against the event's RECIPIENT, and CR 120.3's recipient is
   -- a player or a permanent -- so a bearer anywhere but the battlefield can never
@@ -2227,7 +2227,7 @@ stateTriggers gs
               -- about it is a CR 603.8 state.
               TriggerCondition.PermanentEnters _ -> False
               TriggerCondition.StepBegins {} -> False
-              TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+              TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
               TriggerCondition.SelfIsDealtDamage -> False
               TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
               TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False

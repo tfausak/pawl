@@ -454,13 +454,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
-  -- CR 510.1b / 510.2: the bearer dealt COMBAT damage to a PLAYER. Combat damage
-  -- already records a DamageDealt event, so this is a filter over the log.
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> case event of
+  -- CR 510.1b / 510.2: the bearer dealt COMBAT damage to a PLAYER the relation
+  -- admits. Combat damage already records a DamageDealt event, so this is a
+  -- filter over the log.
+  --
+  -- The relation is asked of the RECIPIENT, against CR 109.5's `you` -- the
+  -- ability's controller, which CR 603.3a makes the bearer's controller. It is
+  -- not redundant with the attack: CR 614.9's redirection replaces the event's
+  -- recipient and nothing else, so Harm's Way can make an attacking creature's
+  -- combat damage land on its own controller, and an "opponent" trigger must not
+  -- fire there. Pawl.FlipSpec's "CR 603.2 Harm's Way sends Akki's combat damage
+  -- to alice, and Akki does not flip" is what proves it.
+  TriggerCondition.SelfDealsCombatDamageToPlayer relation -> case event of
     GameEvent.DamageDealt ev ->
       DamageEvent.source ev == bearer
         && DamageEvent.kind ev == DamageKind.Combat
-        && isPlayerRecipient (DamageEvent.target ev)
+        && maybe False (PlayerRelation.holds (Game.teams gs) relation you) (Recipient.playerOf (DamageEvent.target ev))
     GameEvent.Moved {} -> False
     GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False

@@ -45,9 +45,16 @@ data TriggerCondition
   | -- | CR 603.8: a state trigger, armed again only once the ability has left
     -- the stack.
     StateIs Condition.Condition
-  | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player.
-    -- Self-scoped.
-    SelfDealsCombatDamageToPlayer
+  | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player the
+    -- PlayerRelation admits. Self-scoped on the SOURCE, which is what "self"
+    -- names; the relation is the RECIPIENT half, read against CR 109.5's "you".
+    --
+    -- The relation is written out rather than defaulted, PermanentSacrificed's
+    -- posture: Longtusk Cub's "deals combat damage to a player" spells itself
+    -- AnyPlayer, where Akki Lavarunner's and Questing Beast's "to an opponent"
+    -- is Opponent, and the two are different triggers on a board where the
+    -- damage is redirected to the creature's own controller (CR 614.9).
+    SelfDealsCombatDamageToPlayer PlayerRelation.PlayerRelation
   | -- | CR 120.3: the bearer was dealt damage -- the enrage trigger's event
     -- (Ripjaw Raptor).
     SelfIsDealtDamage

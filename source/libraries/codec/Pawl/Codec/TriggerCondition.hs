@@ -43,7 +43,7 @@ codec =
       Arm.payload "PermanentEnters" filterCodec TriggerCondition.PermanentEnters (\x -> case x of TriggerCondition.PermanentEnters y -> Just y; _ -> Nothing),
       Arm.payload "StepBegins" StepBegins.codec TriggerCondition.StepBegins (\x -> case x of TriggerCondition.StepBegins y -> Just y; _ -> Nothing),
       Arm.payload "StateIs" Condition.codec TriggerCondition.StateIs (\x -> case x of TriggerCondition.StateIs y -> Just y; _ -> Nothing),
-      Arm.nullary "SelfDealsCombatDamageToPlayer" TriggerCondition.SelfDealsCombatDamageToPlayer,
+      Arm.payload "SelfDealsCombatDamageToPlayer" PlayerRelation.codec TriggerCondition.SelfDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.SelfDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
       Arm.nullary "SelfIsDealtDamage" TriggerCondition.SelfIsDealtDamage,
       Arm.payload "PermanentDealsCombatDamageToPlayer" filterCodec TriggerCondition.PermanentDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
       Arm.payload "PermanentsDealCombatDamageToPlayer" filterCodec TriggerCondition.PermanentsDealCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentsDealCombatDamageToPlayer y -> Just y; _ -> Nothing),

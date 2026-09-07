@@ -372,6 +372,11 @@ data Effect card ability
     -- second opcode because CR 701.28c-f restate the gates in convert's own
     -- words, and sharing one implementation so the two cannot drift.
     Convert ObjectRef.ObjectRef
+  | -- | CR 710.2: flip the permanents the ObjectRef names, so each shows its
+    -- alternative characteristics. Not Transform above: CR 710.1's flip card has
+    -- the normal Magic card back, so CR 701.27c withholds a turn from it, and
+    -- what changes here is a status (CR 110.5) rather than which face is up.
+    Flip ObjectRef.ObjectRef
   | -- | CR 701.42a: meld the cards the payload's ObjectRef names -- put them
     -- onto the battlefield with their back faces up and combined, as one
     -- permanent (CR 712.14c).

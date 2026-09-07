@@ -38,6 +38,32 @@ data Layout
     -- its left half was cast as a spell") is what makes the order load-bearing
     -- here rather than decorative.
     Room
+  | -- | CR 710.1: a card with "a two-part card frame on a single card", whose
+    -- alternative characteristics are printed upside down and are used "only if
+    -- the permanent is on the battlefield and only if the permanent is flipped"
+    -- (CR 710.1b).
+    --
+    -- Neither of the two-frame shapes above. CR 715.2's inset frame gives a SPELL
+    -- alternative characteristics, where this one gives them to a PERMANENT, and
+    -- reaching them is a change of STATUS (CR 110.5) rather than a way of casting
+    -- -- so nothing about a flip card is a second cast, and Card.castableFaces
+    -- offers only the normal half. It is not Transforming either: CR 710.1's
+    -- "the back of a flip card is the normal Magic card back" excludes it from
+    -- CR 712.1's double-faced cards, and CR 701.27c therefore withholds a
+    -- transform from it.
+    --
+    -- Its own arm rather than a reading of Transforming for a second reason the
+    -- rules state outright. CR 710.1c: "a flip card's color and mana cost don't
+    -- change if the permanent is flipped", where CR 712.8f gives a turned-over
+    -- permanent "only the characteristics of the face that's up". So the flipped
+    -- read is PER-CHARACTERISTIC and not a face swap, which is
+    -- Pawl.Engine.Card.flippedFace.
+    --
+    -- FIRST face normal, the rest alternative -- the positional reading Adventure
+    -- and the double-faced arms below take. CR 710.1a puts the normal half at the
+    -- TOP of the frame and CR 710.1b the alternative at the bottom, which is a
+    -- printing fact Pawl.Types.Card.faces' order stands in for.
+    Flip
   | -- | CR 715.1: a card with "a two-part card frame, with a smaller frame
     -- inset within their text box". CR 715.2 makes the inset frame's text a set
     -- of ALTERNATIVE characteristics the object may have while it is a spell,

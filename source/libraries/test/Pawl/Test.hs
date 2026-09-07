@@ -488,6 +488,7 @@ import qualified Pawl.Extra.Word8Spec
 import qualified Pawl.FaceDownSpec
 import qualified Pawl.FilterPositionLintSpec
 import qualified Pawl.FilterSpec
+import qualified Pawl.FlipSpec
 import qualified Pawl.GameSpec
 import qualified Pawl.GoadSpec
 import qualified Pawl.InitiativeSpec
@@ -1101,6 +1102,7 @@ spec s registry = do
   Pawl.Extra.Word8Spec.spec s
   Pawl.FaceDownSpec.spec s registry
   Pawl.FilterSpec.spec s
+  Pawl.FlipSpec.spec s registry
   Pawl.GameSpec.spec s registry
   Pawl.GoadSpec.spec s registry
   Pawl.Json.ArraySpec.spec s

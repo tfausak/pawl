@@ -202,6 +202,14 @@ combinedFaces card = case Card.layout card of
   -- permanent, so no half is locked and nothing is taken back out -- see
   -- roomFace below, which is this value with the locked halves subtracted.
   Layout.Room -> Card.faces card
+  -- CR 710.2: "in every zone other than the battlefield, and also on the
+  -- battlefield before the permanent flips, a flip card has only the normal
+  -- characteristics of the card." So the normal half, which is Adventure's
+  -- expression over yet another claim -- and the ALTERNATIVE half is reached
+  -- only through Object.flipped, which is a status (CR 110.5) rather than a
+  -- chosen face, so `flippedFace` below is where it is read and
+  -- Pawl.Engine.Game.resolveFaceFor is what chooses between the two.
+  Layout.Flip -> pure (NonEmpty.head (Card.faces card))
   -- CR 715.4: "In every zone except the stack, and while on the stack not as an
   -- Adventure, an adventurer card has only its normal characteristics." The
   -- alternative characteristics of CR 715.2 are reached ONLY through
@@ -244,6 +252,65 @@ combinedFaces card = case Card.layout card of
   -- is a different classification (CR 701.42b / 712.4c) rather than because the
   -- answer differs.
   Layout.Meld -> pure (NonEmpty.head (Card.faces card))
+
+-- CR 710.2: what a FLIPPED permanent's characteristics are -- "once a permanent
+-- is flipped, its normal name, text box, type line, power, and toughness don't
+-- apply and the alternative versions of those characteristics apply instead."
+-- Nothing for a card no permanent can flip, which every layout but Flip is (CR
+-- 710.1), and Nothing again for a Flip card printing no alternative half, which
+-- Pawl.EffectLintSpec's "CR 710.1 a flip card prints exactly two faces" corpus
+-- lint makes unreachable.
+--
+-- NOT a face swap, and CR 710.1c is the whole of the difference: "a flip card's
+-- color and mana cost don't change if the permanent is flipped." So this is the
+-- ALTERNATIVE half carrying the NORMAL half's mana cost and colour indicator --
+-- the two characteristics CR 202.1 and CR 204.2 put on the card rather than in
+-- the text box, and the two from which CR 202.2's colour and CR 202.3's mana
+-- value both fall out with no arm of their own. Rule 710.2's own list is what
+-- says the other direction is right: it names name, text box, type line, power
+-- and toughness, and every field this does NOT rewrite is one of those.
+--
+-- A SUBSTITUTION at Pawl.Engine.Game.resolveFaceFor and not a CR 613 layer, which
+-- is CR 110.5a's "status is not a characteristic, though it may affect a
+-- permanent's characteristics" -- the road `faceDownFace` above takes for the
+-- same reason. CR 710.1c's second sentence falls out of it: "any changes to it by
+-- external effects will still apply", because every layer runs on top of whatever
+-- this seam answers with.
+--
+-- The substitution is also where a copy of a flipped permanent goes wrong, which
+-- is cited at the two readers that spend it --
+-- Pawl.Engine.Projection.View.copiableCharacteristics and
+-- Pawl.Engine.Event.copiedSnapshot (#3364).
+--
+-- The FIRST alternative half, and CR 710.1b is why one is enough: the bottom half
+-- of the frame is one set of characteristics. docs/design.md section 2.11's rule
+-- against baking arity in is what makes this a `tail` rather than a pair.
+flippedFace :: Card.Card -> Maybe (Face.Face Card.Card)
+flippedFace card = case Card.layout card of
+  Layout.Normal -> Nothing
+  Layout.Split -> Nothing
+  Layout.Room -> Nothing
+  Layout.Flip -> case NonEmpty.tail (Card.faces card) of
+    [] -> Nothing
+    alternative : _ ->
+      Just
+        alternative
+          { -- CR 710.1c, first half: the mana cost is the normal half's, and CR
+            -- 202.3 derives the mana value from it wherever it is read.
+            Face.manaCost = Face.manaCost normal,
+            -- CR 710.1c, second half: the colour does not change either, and CR
+            -- 202.2 with CR 204.2 makes it exactly the mana cost above plus this
+            -- indicator. No printed flip card has one; taking the normal half's
+            -- is what makes the rule true rather than the pool.
+            Face.colorIndicator = Face.colorIndicator normal
+          }
+  Layout.Adventure -> Nothing
+  Layout.Omen -> Nothing
+  Layout.Transforming -> Nothing
+  Layout.ModalDoubleFaced -> Nothing
+  Layout.Meld -> Nothing
+  where
+    normal = NonEmpty.head (Card.faces card)
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
@@ -543,6 +610,13 @@ castableFaces card = case Card.layout card of
   -- spell still HAS, not about what may be cast, so it changes nothing here --
   -- CR 709.3a still evaluates and prices only the chosen half.
   Layout.Room -> NonEmpty.toList (Card.faces card)
+  -- CR 710.1b puts the alternative characteristics out of reach of a cast
+  -- entirely: they are used "only if the permanent is on the battlefield and only
+  -- if the permanent is flipped", and a card being cast is neither. So a flip
+  -- card offers its normal half and nothing else -- Normal's expression, where
+  -- Adventure below offers both halves because CR 715.3 gives the caster a
+  -- choice and CR 710 gives none.
+  Layout.Flip -> [NonEmpty.head (Card.faces card)]
   -- CR 715.3: "As a player plays an adventurer card, the player chooses whether
   -- they play the card normally or as an Adventure." Both, for Split's reason:
   -- the choice is the player's, and offering each half as its own legal action
@@ -777,6 +851,12 @@ landFaces card =
         -- something the rule requires (see hasSharedTypeLine below); a Room with
         -- a land in its type line would want the arm castableFaces has.
         Layout.Room -> byDefault
+        -- CR 710.2 leaves a flip card in a hand showing only its normal
+        -- characteristics, so the default view is what a player would play as a
+        -- land. No flip card prints a land face -- CR 710.1a's text box holds the
+        -- ability that flips a permanent -- so the filter below drops the pair
+        -- either way.
+        Layout.Flip -> byDefault
         Layout.Adventure -> byDefault
         -- CR 720.4 leaves an omen card in a hand showing only its normal
         -- characteristics, exactly as CR 715.4 does an adventurer card, so the
@@ -821,6 +901,7 @@ staysWhenPutOntoBattlefield card = case Card.layout card of
   Layout.Normal -> False
   Layout.Split -> False
   Layout.Room -> False
+  Layout.Flip -> False
   Layout.Adventure -> False
   Layout.Omen -> False
   Layout.Transforming -> False
@@ -874,6 +955,12 @@ backFace card =
         -- "a card that isn't a double-faced card ... stays in its current zone"
         -- is the answer, and Nothing is how this function says it.
         Layout.Room -> Nothing
+        -- CR 710.1's last sentence is what keeps a flip card off this list:
+        -- "the back of a flip card is the normal Magic card back", so it is not
+        -- one of CR 712.1's double-faced cards and has no back face at all. Its
+        -- second set of characteristics is printed upside down on the SAME face
+        -- (CR 710.1b), and `flippedFace` above is where that one is read.
+        Layout.Flip -> Nothing
         Layout.Adventure -> Nothing
         Layout.Omen -> Nothing
         Layout.Transforming -> successor
@@ -959,6 +1046,12 @@ turnedOver mName card = case Card.layout card of
   -- double-faced card, so an instruction to transform one does nothing. Its two
   -- halves are both on the front, which is what a shared type line means.
   Layout.Room -> Nothing
+  -- CR 701.27c / 712.9 again, and CR 710.1's normal Magic card back is why a
+  -- flip card is not represented by a double-faced card: an instruction to
+  -- transform one does nothing. Flipping is a different act entirely -- a change
+  -- of status (CR 110.5, CR 710.2) rather than a turn -- and
+  -- Pawl.Engine.Game.flipsOver is what answers for it.
+  Layout.Flip -> Nothing
   Layout.Adventure -> Nothing
   Layout.Omen -> Nothing
   Layout.Transforming -> nextFace mName card
@@ -1024,6 +1117,11 @@ enteringFace card shown = case Card.layout card of
   -- this answer on Object.unlockedHalves rather than on Object.face, gated by
   -- hasSharedTypeLine below -- see the `face` note in its mkObj.
   Layout.Room -> shown
+  -- CR 710.2 gives a flip card only its normal characteristics wherever it is
+  -- not a flipped permanent, and only the normal half was ever castable
+  -- (castableFaces above), so there is no half for this move to carry. CR
+  -- 110.5b is the rest of it: the permanent enters unflipped.
+  Layout.Flip -> Nothing
   Layout.Adventure -> Nothing
   -- CR 720.4's "in every zone except the stack" is CR 715.4's claim again, and an
   -- Omen never becomes a permanent at all -- CR 720.3d shuffles it into its
@@ -1083,6 +1181,12 @@ manaCostFace card live = case Card.layout card of
   -- CR 712.8e's exception is written about a nonmodal double-faced permanent and
   -- reaches nothing here.
   Layout.Room -> live
+  -- The live face, which for a flipped permanent is `flippedFace` above --
+  -- already carrying the NORMAL half's mana cost, which is CR 710.1c's "a flip
+  -- card's color and mana cost don't change if the permanent is flipped". So
+  -- this arm needs no exception of CR 712.8e's shape: the swap kept the cost
+  -- rather than replacing it, and mana value falls out of it (CR 202.3).
+  Layout.Flip -> live
   Layout.Adventure -> live
   Layout.Omen -> live
   Layout.Transforming -> NonEmpty.head (Card.faces card)
@@ -1134,6 +1238,7 @@ showsBackFace card mName = case Card.layout card of
   Layout.Normal -> False
   Layout.Split -> False
   Layout.Room -> False
+  Layout.Flip -> False
   Layout.Adventure -> False
   Layout.Omen -> False
   Layout.Transforming ->
@@ -1162,6 +1267,10 @@ hasSharedTypeLine card = case Card.layout card of
   Layout.Normal -> False
   Layout.Split -> False
   Layout.Room -> True
+  -- CR 710.1's two-part frame is not CR 709.5's shared type line: each half of a
+  -- flip card prints a type line of its own (CR 710.1a / 710.1b), and the
+  -- alternative one applies instead of the normal one rather than alongside it.
+  Layout.Flip -> False
   Layout.Adventure -> False
   Layout.Omen -> False
   Layout.Transforming -> False

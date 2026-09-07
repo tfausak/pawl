@@ -569,6 +569,20 @@ resolveFace mName card = case mName of
 -- characteristics the spell has.
 resolveFaceFor :: Maybe Object.Object -> Card -> Face Card
 resolveFaceFor mObj card = case mObj of
+  -- CR 710.2: a FLIPPED permanent's normal name, text box, type line, power and
+  -- toughness "don't apply and the alternative versions of those characteristics
+  -- apply instead". Ahead of the Room arm and of CR 709.3b's chosen half, and
+  -- neither can arise beside it: Card.flippedFace answers only for a Flip card,
+  -- which has no shared type line and offers only its normal half to a cast.
+  --
+  -- No battlefield gate of its own, where the Room arm below needs one: CR 110.5d
+  -- gives only permanents status, and Object.flipped is written only by
+  -- `flipPermanent` below (which gates on the battlefield) and cleared by CR
+  -- 400.7's new incarnation, so no object outside the battlefield carries it.
+  Just obj
+    | Object.flipped obj,
+      Just flipped <- Card.flippedFace card ->
+        flipped
   Just obj
     | Just halves <- halvesCardOf obj card,
       Object.zone obj == Zone.Battlefield ->
@@ -586,6 +600,16 @@ resolveFaceFor mObj card = case mObj of
 -- object has. The set is what CR 709.4a's "one of its names" asks about.
 namesFor :: Maybe Object.Object -> Card -> Set.Set CardName.CardName
 namesFor mObj card = case mObj of
+  -- CR 710.2's list names the NAME first, so a flipped permanent has the
+  -- alternative half's name and not the normal one -- which is what makes CR
+  -- 710.2's own Example true from this side, a "search your library for a
+  -- legendary card" finding no Tok-Tok because the card in the library is not a
+  -- flipped permanent. CR 710.5 is the separate clause that lets a player CHOOSE
+  -- the alternative name off an unflipped card, and is #679's.
+  Just obj
+    | Object.flipped obj,
+      Just flipped <- Card.flippedFace card ->
+        Set.singleton (Face.name flipped)
   Just obj
     | Just halves <- halvesCardOf obj card,
       Object.zone obj == Zone.Battlefield ->
@@ -882,6 +906,48 @@ turnFaceOver now oid gs = case (turnsTo oid gs, lookupObject oid gs) of
     let (ts, stamped) = freshTimestamp gs
      in stamped {GameState.objects = Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now, Object.timestamp = ts} (GameState.objects stamped)}
   _ -> gs
+
+-- CR 710.2 over ONE object: set its flipped status, or leave the map exactly as
+-- it was. `flipsOver` below is the whole membership question, asked rather than
+-- repeated here so that a caller sweeping a batch can tell which of its victims
+-- will actually flip.
+--
+-- ONE FIELD, in place, and no new object: CR 110.5 makes flipping a change of
+-- status, and CR 110.5c has a permanent retain its status until something changes
+-- it. Nothing else moves -- no timestamp, unlike `turnFaceOver` above, because CR
+-- 613.7 grants a new one for turning face up or down (613.7f) and for
+-- transforming or converting (613.7g) and names no rule for flipping.
+--
+-- IDEMPOTENT, which is CR 710.4's one-way process said as an assignment: flipping
+-- an already-flipped permanent writes the value it already had.
+flipPermanent :: ObjectId -> GameState -> GameState
+flipPermanent oid gs
+  | flipsOver oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.flipped = True}) oid (GameState.objects gs)}
+  | otherwise = gs
+
+-- | CR 710.2 asked rather than performed: may this permanent flip? `flipPermanent`
+-- above is the only performer and asks this, so the three ways nothing happens are
+-- stated once, and none of them is an error:
+--
+--   * the id names nothing on the BATTLEFIELD. CR 710.1b uses the alternative
+--     characteristics "only if the permanent is on the battlefield", and CR
+--     110.5d gives only permanents status at all.
+--   * the id names nothing, or nothing with a card behind it (CR 113.7a).
+--   * the card is not a flip card, so it has no alternative characteristics to
+--     apply -- Card.flippedFace's refusal, read off the card's LAYOUT.
+--
+-- A layout classification and never which card it is, `turnsTo` above's posture:
+-- the closed half asks whether the object has a second set of characteristics CR
+-- 710.1b reaches, and the card data carries the ability that asks for the flip.
+--
+-- Read off the object's OWN printed card (`cardOf`), not off a copy snapshot, so
+-- a permanent that copied an unflipped flip card carries the flip trigger and
+-- can never flip. Whether the rules allow such a copy to flip at all is a
+-- question the CR does not settle (#3366).
+flipsOver :: ObjectId -> GameState -> Bool
+flipsOver oid gs =
+  Set.member oid (GameState.battlefield gs)
+    && Maybe.isJust (cardOf oid gs >>= Card.flippedFace)
 
 -- | CR 701.27a asked rather than performed: the face this permanent WOULD turn
 -- to, or Nothing where the turn is declined. `turnFaceOver` above is the only

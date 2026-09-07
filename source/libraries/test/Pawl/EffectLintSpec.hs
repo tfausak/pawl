@@ -288,6 +288,7 @@ ownQuantities effect = case effect of
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
+  Effect.Flip _ -> []
   Effect.Meld (Meld.MkMeld _ _) -> []
   Effect.PhaseOut _ -> []
   Effect.AddPhases _ -> []
@@ -1195,6 +1196,9 @@ effectObjectRefs effect = case effect of
   -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
   -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.
   Effect.Convert ref -> [(AsksTransformGather, ref)]
+  -- A plain READ, unlike the two above: CR 710 states no "any number" flip, and
+  -- Pawl.Engine.Resolve's Flip arm sweeps the ref and asks nothing.
+  Effect.Flip ref -> read_ [ref]
   -- A plain READ: Pawl.Engine.Resolve's Meld arm sweeps the ref and asks nothing.
   Effect.Meld (Meld.MkMeld ref _) -> read_ [ref]
   Effect.PhaseOut ref -> read_ [ref]
@@ -2826,6 +2830,17 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- nothing. Wax // Wane is what makes it non-vacuous.
     Spec.assertBool s (any ((> 1) . length . Card.Type.faces . Printing.card) ps) "the pool has a multi-face card to lint"
     Spec.assertEqWith s "no card repeats a face name" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 710.1a with CR 710.1b: a flip card's frame has a top half and a bottom
+  -- half, so a Flip card prints exactly two faces. Held over the pool rather
+  -- than by construction, for the pairwise-distinct lint's reason -- a card file
+  -- is data -- and it is what makes Pawl.Engine.Card.flippedFace's empty-tail
+  -- arm unreachable, where a one-faced Flip card would silently never flip.
+  Spec.it s "CR 710.1 a flip card prints exactly two faces" $ do
+    ps <- S.allPrintings s
+    let offends card = Card.Type.layout card == Layout.Flip && length (Card.Type.faces card) /= 2
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertBool s (any ((== Layout.Flip) . Card.Type.layout . Printing.card) ps) "the pool has a flip card to lint"
+    Spec.assertEqWith s "every flip card has two halves" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against a hand-built offender rather than a
   -- card file: a card that repeats a face name must not be loadable.
   Spec.it s "the lint itself catches a card that repeats a face name" $ do

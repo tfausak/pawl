@@ -60,6 +60,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.zone = Zone.Hand,
           Object.tapped = TapState.Untapped,
           Object.facing = Facing.FaceUp,
+          Object.flipped = False,
           Object.exiledFaceDown = False,
           Object.damage = 0,
           Object.sickness = Sickness.Sick,
@@ -130,6 +131,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
                 { FaceDownState.reason = FaceDownReason.Morphed,
                   FaceDownState.listed = FaceDownCharacteristics.defaultValue
                 },
+          Object.flipped = True,
           Object.exiledFaceDown = True,
           Object.damage = 4,
           Object.sickness = Sickness.Settled (PlayerId.MkPlayerId 5),
@@ -205,7 +207,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
       ( " {\"owner\":1,\"enteredUnder\":2,\"source\":{\"type\":\"OfToken\",\"value\":3}"
           <> ",\"zone\":{\"type\":\"Battlefield\"},\"tapped\":{\"type\":\"Tapped\"}"
           <> ",\"facing\":{\"type\":\"FaceDown\",\"value\":{\"reason\":{\"type\":\"Morphed\"},\"listed\":{}}}"
-          <> ",\"exiledFaceDown\":true,\"damage\":4"
+          <> ",\"flipped\":true,\"exiledFaceDown\":true,\"damage\":4"
           <> ",\"sickness\":{\"type\":\"Settled\",\"value\":5}"
           <> ",\"bindings\":{\"target\":{\"targets\":[{\"type\":\"ToCreature\",\"value\":6}]}}"
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}"

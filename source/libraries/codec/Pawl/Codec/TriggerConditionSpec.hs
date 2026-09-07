@@ -74,13 +74,22 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.StateIs (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
       " {\"type\":\"StateIs\",\"value\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}} "
-  -- CR 603.2 / 509-510: the bearer dealt combat damage to a player.
-  Spec.it s "SelfDealsCombatDamageToPlayer" $
+  -- CR 603.2 / 509-510: the bearer dealt combat damage to a player the relation
+  -- admits. BOTH relations, since the pool prints one of each: CR 702.70a's
+  -- poisonous and Longtusk Cub say "a player", where Akki Lavarunner and
+  -- Questing Beast say "an opponent", and a collapsed encoding would make the
+  -- two one trigger.
+  Spec.it s "SelfDealsCombatDamageToPlayer round-trips both relations" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      TriggerCondition.SelfDealsCombatDamageToPlayer
-      " {\"type\":\"SelfDealsCombatDamageToPlayer\"} "
+      (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer)
+      " {\"type\":\"SelfDealsCombatDamageToPlayer\",\"value\":{\"type\":\"AnyPlayer\"}} "
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.Opponent)
+      " {\"type\":\"SelfDealsCombatDamageToPlayer\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 120.3: the same history read the other way round -- the bearer was DEALT
   -- damage. Nullary, since enrage qualifies the damage in no way.
   Spec.it s "SelfIsDealtDamage" $

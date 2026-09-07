@@ -859,7 +859,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.CardLeavesGraveyard {} -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
   TriggerCondition.SelfIsDealtDamage -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
@@ -1115,6 +1115,7 @@ ownCounts effect = case effect of
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
+  Effect.Flip _ -> []
   -- CR 701.42a's combined back face, Create's token one opcode over: card data
   -- nested in card data, so its own counts are swept.
   Effect.Meld (Meld.MkMeld _ card) -> overFaces cardCounts card
@@ -1405,6 +1406,7 @@ effectNestedEffects effect = case effect of
   Effect.DoesNotUntapNext {} -> []
   Effect.Transform {} -> []
   Effect.Convert {} -> []
+  Effect.Flip {} -> []
   -- Create's answer: the combined face's effects belong to ANOTHER object, and
   -- effectMintedFaces is what reaches them.
   Effect.Meld {} -> []
@@ -1835,6 +1837,7 @@ effectReplacements effect = case effect of
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
+  Effect.Flip _ -> []
   -- CR 614: the combined back face may print its own entry replacement, so the
   -- sweep descends into it as it does a token's.
   Effect.Meld (Meld.MkMeld _ card) -> overFaces cardReplacementEffects card
@@ -2223,6 +2226,7 @@ effectMintedFaces effect = case effect of
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.Convert _ -> []
+  Effect.Flip _ -> []
   -- CR 701.42a: the combined back face is a face this card mints, interned at
   -- resolution exactly as a token's card is.
   Effect.Meld (Meld.MkMeld _ card) -> fmap ((,) MintedMeld) (NonEmpty.toList (Card.Type.faces card))
@@ -3245,7 +3249,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
   -- Enrage's condition is nullary: rule 120.3 qualifies the damage in no way, so
   -- there is nothing for a text change to rewrite.
   TriggerCondition.SelfIsDealtDamage -> []
@@ -3416,7 +3420,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   -- CR 603.8's state trigger holds a Condition, which is a pair of Quantities
   -- and Filters -- no SlotName of its own.
   TriggerCondition.StateIs _ -> []
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
   TriggerCondition.SelfIsDealtDamage -> []
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> []
@@ -4641,6 +4645,7 @@ effectFilters effect = case effect of
   Effect.DoesNotUntapNext ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Transform ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Convert ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Flip ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Meld (Meld.MkMeld ref card) -> frame SourceHostFramed (objectRefFilters ref) <> overFaces cardFilters card
   Effect.PhaseOut ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.AddPhases _ -> []

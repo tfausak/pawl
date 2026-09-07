@@ -53,7 +53,10 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "SelfDealsCombatDamageToPlayer"
+            "type": "SelfDealsCombatDamageToPlayer",
+            "value": {
+              "type": "AnyPlayer"
+            }
           },
           "modal": {
             "modes": [

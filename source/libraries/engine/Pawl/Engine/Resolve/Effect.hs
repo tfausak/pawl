@@ -6410,6 +6410,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- SAME call and not a similar one. The two opcodes stay distinct in the card
   -- data (Pawl.Types.Effect.Convert) and identical in behaviour here.
   Effect.Convert ref -> turnPermanentsOver legal resolving controller source ref
+  Effect.Flip ref ->
+    State.modify' $ \gs ->
+      -- CR 710.2: flip each named permanent, so its alternative characteristics
+      -- apply from now on. The victims are enumerated ONCE (CR 608.2f), off the
+      -- board as it stands before any of them flips -- which changes nothing
+      -- here, no permanent's flipped status being visible to another's gate, but
+      -- is Effect.Tap's discipline and costs nothing to keep.
+      --
+      -- Not turnPermanentsOver's shape, though both change what a permanent
+      -- shows. CR 701.27f's already-turned gate belongs to a TURN and has no
+      -- flip counterpart -- CR 710.4 makes flipping one-way, so a second flip is
+      -- an assignment of the value already there rather than something a rule
+      -- must ignore -- and CR 613.7 grants a flip no new timestamp, so there is
+      -- no CR 613.7m ordering for the batch to ask its controllers about.
+      --
+      -- Through Game.flipPermanent, which carries CR 110.5d's battlefield gate
+      -- and the layout classification, so an instruction naming a permanent with
+      -- no alternative characteristics simply does nothing.
+      foldr Game.flipPermanent gs (objectRefObjects legal resolving controller source gs ref)
   Effect.Meld (Meld.MkMeld ref resultCard) -> do
     gs <- State.get
     -- An ordinary read of the ref (CR 608.2c), not a question: the cards were

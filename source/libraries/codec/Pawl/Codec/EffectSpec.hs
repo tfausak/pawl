@@ -1258,6 +1258,34 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
       )
       "Convert and Transform of the same slot encode differently"
+  -- CR 710.2. Transform's wire shape again, and the same assertion carries the
+  -- weight: Pawl.Codec.Effect is Arm.tagged, so a missing arm compiles with no
+  -- round-trip test at all (#2262), and a tag collapsed onto Transform's would
+  -- make a flip card transform instead.
+  --
+  -- The SLOT arm only. CR 710.1a puts the ability that flips a permanent in that
+  -- permanent's own text box, and every flip card in the pool prints "flip it";
+  -- the filter arm is here because ObjectRef offers it, not because a printing
+  -- sweeps a set.
+  Spec.it s "Flip round-trips both ObjectRef arms, and is not Transform" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Flip (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      " {\"type\":\"Flip\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Flip (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      " {\"type\":\"Flip\",\"value\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+    Spec.assertBool
+      s
+      ( toJson (Effect.Flip (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+          /= toJson (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      )
+      "Flip and Transform of the same slot encode differently"
   -- CR 701.42a. The slot Hanweir Battlements' own exile bound, plus the combined
   -- back face inline -- through the card codec, which here writes a bare name.
   -- Pawl.Codec.Effect is Arm.tagged, so a missing arm compiles with no round-trip

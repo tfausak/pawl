@@ -1995,7 +1995,7 @@ representativeEvents cond =
         -- it at all (Event.matchesTrigger's StateIs arm answers False for every
         -- event). Any event is therefore as representative as any other.
         TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
-        TriggerCondition.SelfDealsCombatDamageToPlayer -> one combatDamage
+        TriggerCondition.SelfDealsCombatDamageToPlayer _ -> one combatDamage
         -- CR 120.3's event pointed the other way, at the BEARER -- so the pair
         -- really matches. TWO of them, combat and noncombat, because this
         -- condition is the one damage arm that admits both: a floor claimed for
@@ -2470,7 +2470,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentsDie Filter.Type.IsSource,
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
-    TriggerCondition.SelfDealsCombatDamageToPlayer,
+    TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
     TriggerCondition.SelfIsDealtDamage,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.Type.And []),

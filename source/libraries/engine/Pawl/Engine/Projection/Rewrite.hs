@@ -635,6 +635,7 @@ rewriteEffect pairs effect = case effect of
   Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.Convert ref -> Effect.Convert (rewriteObjectRef pairs ref)
+  Effect.Flip ref -> Effect.Flip (rewriteObjectRef pairs ref)
   -- CR 612.2a through the combined back face as well as the ref, Effect.Create's
   -- reason one opcode over: the face is card data the ability carries, and its
   -- words are the ability's words.
@@ -1314,7 +1315,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope fromZone ordinal)
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins {} -> condition
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
+  TriggerCondition.SelfDealsCombatDamageToPlayer _ -> condition
   TriggerCondition.SelfIsDealtDamage -> condition
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDealCombatDamageToPlayer f -> TriggerCondition.PermanentsDealCombatDamageToPlayer (Filter.rewrite pairs f)
