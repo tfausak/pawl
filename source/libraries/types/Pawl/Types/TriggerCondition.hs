@@ -382,6 +382,11 @@ data TriggerCondition
     -- Not implemented: rule 702.122e's second sentence, the intervening "if"
     -- that reads the creatures which paid THAT activation's crew cost (#915).
     SelfBecomesCrewed
+  | -- | CR 702.122b: "whenever this creature crews a Vehicle" (Gearshift Ace),
+    -- which that rule makes true of a creature tapped to pay a Vehicle's crew
+    -- cost. Self-scoped, SelfBecomesCrewed's other side: that one is asked of the
+    -- Vehicle and this one of a crewer.
+    SelfCrewsVehicle
   | -- | CR 603.10a: "whenever an opponent sacrifices an artifact" (Vengeful
     -- Tracker) -- the CR 701.21a game action, not the zone change SelfDies
     -- reads. Mayhem Devil's unrestricted wording is AnyPlayer and the trivial

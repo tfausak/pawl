@@ -31,9 +31,14 @@
 -- ability reaches nothing that reads the crewing, so becomesCrewedSpec below adds
 -- a second Vehicle rather than another case on this one.
 --
--- Not covered here, because neither Vehicle's printed text reaches them: CR
--- 702.122b/c's "crews"/"crewed by" relation and CR 702.122d's "can't crew
--- Vehicles".
+-- CR 702.122b has its own fixture too, Gearshift Ace: rule 702.122b is asked of
+-- the CREWER, which neither Vehicle above can be, so crewsVehicleSpec below adds
+-- a creature that reads the relation from that side.
+--
+-- Not covered here, because no card in the pool reaches them: rule 702.122c's
+-- relation read LATER IN THE TURN, which Subterranean Schooner's "target creature
+-- that crewed it this turn" wants and which outlives the resolution these
+-- fixtures watch, and CR 702.122d's "can't crew Vehicles".
 module Pawl.CrewSpec where
 
 import qualified Data.Map.Strict as Map
@@ -55,6 +60,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -122,6 +128,7 @@ spec s registry = Spec.describe s "Crew" $ do
   crewCostSpec s registry
   crewedVehicleSpec s registry
   becomesCrewedSpec s registry
+  crewsVehicleSpec s registry
 
 -- CR 208.3 and CR 301.7a: the printed numbers are on the card and are not the
 -- permanent's characteristics until it is a creature.
@@ -316,7 +323,7 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
     mech <- S.printingOf s registry "Mobilizer Mech"
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
-    let (mechId, vehicleIds, crewIds, gs) = mechBoard mech [dreadnought] [hillGiant]
+    let (mechId, vehicleIds, crewIds, gs) = crewReaderBoard mech [dreadnought] [hillGiant]
     case (vehicleIds, crewIds) of
       ([dreadId], [giantId]) -> do
         let (onStack, after) = crewAndSettle (crewingAt [giantId] dreadId) mechId gs
@@ -334,7 +341,7 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (mechId, vehicleIds, crewIds, gs) = mechBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
+    let (mechId, vehicleIds, crewIds, gs) = crewReaderBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
     case (vehicleIds, crewIds) of
       ([firstId, secondId], [giantId, blindId]) -> do
         let (_, once) = crewAndSettle (crewingAt [giantId] firstId) mechId gs
@@ -360,7 +367,7 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
     dreadnought <- S.printingOf s registry "Consulate Dreadnought"
     hillGiant <- S.printingOf s registry "Hill Giant"
     blindSpot <- S.printingOf s registry "Blind-Spot Giant"
-    let (_, vehicleIds, crewIds, gs) = mechBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
+    let (_, vehicleIds, crewIds, gs) = crewReaderBoard mech [dreadnought, dreadnought] [hillGiant, blindSpot]
     case (vehicleIds, crewIds) of
       ([crewedId, bystanderId], [giantId, blindId]) -> do
         let (onStack, after) = crewAndSettle (crewingAt [giantId, blindId] bystanderId) crewedId gs
@@ -369,17 +376,19 @@ becomesCrewedSpec s registry = Spec.describe s "BecomesCrewed" $ do
         Spec.assertEqWith s "with nothing triggered onto the stack" (length (GameState.stack onStack)) 0
       _ -> Spec.assertFailure s "fixture should have two other Vehicles and two crewers"
 
--- alice's board for CR 702.122e: one Mobilizer Mech, one permanent per printing in
--- `vehicles` and one per printing in `crewers`, all Settled and untapped, with
+-- alice's board for CR 702.122e and CR 702.122b: one permanent per printing, the
+-- first being the card that READS the crewing -- Mobilizer Mech for rule 702.122e
+-- and Gearshift Ace for rule 702.122b -- then one per printing in `vehicles` and
+-- one per printing in `crewers`, all Settled and untapped, with
 -- alice holding priority in her precombat main phase. Three seats, for the reason
 -- the module header gives.
-mechBoard :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], GameState.GameState)
-mechBoard mech vehicles crewers =
-  let (mechId, gs0) = S.addPermanent mech S.alice S.threePlayerGame
+crewReaderBoard :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], GameState.GameState)
+crewReaderBoard reader vehicles crewers =
+  let (readerId, gs0) = S.addPermanent reader S.alice S.threePlayerGame
       add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
       (vehicleIds, gs1) = foldl add ([], gs0) vehicles
       (crewIds, gs2) = foldl add ([], gs1) crewers
-   in (mechId, vehicleIds, crewIds, gs2 {GameState.priority = Just S.alice})
+   in (readerId, vehicleIds, crewIds, gs2 {GameState.priority = Just S.alice})
 
 -- Crew `vehicleId`, then let CR 603.3 gather what that resolution triggered onto
 -- the stack (Engine.settleForPriority) and resolve it. Both states are returned:
@@ -397,4 +406,62 @@ crewingAt tappers target p = case p of
   Prompt.ChooseTapsForTotalPower {} -> Set.fromList tappers
   Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
   Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, candidates) -> Set.filter ((== Just target) . Recipient.objectOf) candidates) sets
+  _ -> S.identityAnswer p
+
+-- CR 702.122b: the crewer's side of rule 702.122c's relation, read by Gearshift
+-- Ace's "whenever this creature crews a Vehicle, that Vehicle gains first strike
+-- until end of turn".
+--
+-- TWO Dreadnoughts on every board here, and a creature TAPPED FOR ANOTHER REASON
+-- on both: the readings this has to be told apart from are "any tapped creature
+-- crewed" and "any Vehicle gains it", and one Vehicle with one tapped creature
+-- distinguishes neither.
+--
+-- The arithmetic is non-degenerate for the module header's reason: crew 6 is paid
+-- by the Ace (2) and Blind-Spot Giant (4) in the positive case and by Hill Giant
+-- (3) and Blind-Spot Giant (4) in the negative, so no single creature and no
+-- other pair reaches the threshold.
+crewsVehicleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+crewsVehicleSpec s registry = Spec.describe s "CrewsVehicle" $ do
+  Spec.it s "CR 702.122b the Ace gives first strike to the Vehicle it crewed" $ do
+    ace <- S.printingOf s registry "Gearshift Ace"
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (aceId, vehicleIds, crewIds, gs) = crewReaderBoard ace [dreadnought, dreadnought] [hillGiant, blindSpot]
+    case (vehicleIds, crewIds) of
+      ([crewedId, bystanderId], [giantId, blindId]) -> do
+        -- Hill Giant is tapped where it stands, so the board holds a tapped
+        -- creature that crewed nothing.
+        let (onStack, after) = crewAndSettle (crewingWith [aceId, blindId]) crewedId (tap giantId gs)
+        Spec.assertBool s (not (hasFirstStrike crewedId onStack)) "the Vehicle has no first strike while the trigger waits"
+        Spec.assertBool s (hasFirstStrike crewedId after) "and has it once the trigger has resolved"
+        Spec.assertBool s (not (hasFirstStrike bystanderId after)) "the Vehicle the Ace did not crew gains nothing"
+      _ -> Spec.assertFailure s "fixture should have two Vehicles and two other crewers"
+  -- The negative, one board away: the same Vehicle is crewed by the OTHER two
+  -- creatures while the Ace is tapped for a reason of its own. Rule 702.122b asks
+  -- what was tapped to PAY, so a tapped Ace that paid nothing grants nothing.
+  Spec.it s "CR 702.122b an Ace tapped for another reason has crewed nothing" $ do
+    ace <- S.printingOf s registry "Gearshift Ace"
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    let (aceId, vehicleIds, crewIds, gs) = crewReaderBoard ace [dreadnought, dreadnought] [hillGiant, blindSpot]
+    case (vehicleIds, crewIds) of
+      ([crewedId, _], [giantId, blindId]) -> do
+        let (onStack, after) = crewAndSettle (crewingWith [giantId, blindId]) crewedId (tap aceId gs)
+        Spec.assertBool s (isCreature crewedId after) "the Vehicle was crewed all the same"
+        Spec.assertBool s (not (hasFirstStrike crewedId after)) "and gained no first strike"
+        Spec.assertEqWith s "with nothing triggered onto the stack" (length (GameState.stack onStack)) 0
+      _ -> Spec.assertFailure s "fixture should have two Vehicles and two other crewers"
+
+-- Does this permanent have first strike right now, after the layer fold?
+hasFirstStrike :: ObjectId.ObjectId -> GameState.GameState -> Bool
+hasFirstStrike = Projection.hasKeyword Keyword.FirstStrike
+
+-- Taps `tappers` to pay CR 702.122a's cost and answers nothing else: Gearshift
+-- Ace's trigger targets nothing, so crewingAt's target answers would go unasked.
+crewingWith :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+crewingWith tappers p = case p of
+  Prompt.ChooseTapsForTotalPower {} -> Set.fromList tappers
   _ -> S.identityAnswer p

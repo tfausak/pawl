@@ -38,6 +38,7 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BecameCrewed as BecameCrewed
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
@@ -2345,7 +2346,10 @@ representativeEvents cond =
         TriggerCondition.SelfTrains -> one (GameEvent.Trained departed)
         -- CR 702.122e's own event, and the only one this condition admits, on
         -- `departed` for SelfTrains' reason above.
-        TriggerCondition.SelfBecomesCrewed -> one (GameEvent.BecameCrewed departed)
+        TriggerCondition.SelfBecomesCrewed -> one (GameEvent.BecameCrewed (BecameCrewed.MkBecameCrewed departed (Set.singleton departed)))
+        -- The same event under CR 702.122b's crewer reading, with `departed` on
+        -- BOTH sides so the pair matches whichever side the arm reads.
+        TriggerCondition.SelfCrewsVehicle -> one (GameEvent.BecameCrewed (BecameCrewed.MkBecameCrewed departed (Set.singleton departed)))
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- pair need not actually match -- `departed` is no artifact on the empty
         -- board -- which is fine for what this pins: the arm binds the event's
@@ -2598,6 +2602,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana PlayerRelation.AnyPlayer (Filter.Type.And [])),
     TriggerCondition.SelfTrains,
     TriggerCondition.SelfBecomesCrewed,
+    TriggerCondition.SelfCrewsVehicle,
     -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
     -- eventBindings arm that had cased on the relation and stamped nothing under
     -- one of them would go unseen if only one were listed. Vengeful Tracker
