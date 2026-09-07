@@ -1961,9 +1961,11 @@ pingsBob p = case p of
 -- CR 500.11 / 611.2a: an ENDING PHASE skipped whole. The cleanup step is where
 -- CR 514.2 ends every "until end of turn" duration, and skipping the phase takes
 -- that step with it -- but the turn still ends, and CR 611.2a is what the
--- duration was stated in terms of. Engine.endTurnDurations is the sweep on that
--- road; CR 724.2d states the same split one phase over, for a combat phase whose
--- end of combat step is skipped.
+-- duration was stated in terms of. Engine.cleanupSecondAction is the sweep on
+-- that road, and it runs CR 514.2's action WHOLE -- marked damage with the
+-- durations -- because that rule makes the two simultaneous. CR 724.2d states the
+-- same call one phase over, for a combat phase whose end of combat step is
+-- skipped.
 --
 -- Synthetic Curfew Bell ({2}{U} Instant, "Target player skips their next ending
 -- phase") is the producer, and it is synthetic because no printing reaches this:
@@ -1973,10 +1975,13 @@ pingsBob p = case p of
 -- HARRIED DRONESMITH is on every board here and is what keeps these cases from
 -- being vacuous. Its "at the beginning of combat on your turn" Thopter is created
 -- during alice's combat phase, and its delayed "sacrifice it at the beginning of
--- your next end step" is the trigger the skipped phase removes (CR 724.1e). So
--- alice's creature count on bob's turn says whether the ending phase happened at
--- all, on the same board that reads the expiry -- without it a fixed engine and
--- a Bell that silently never installed would look alike.
+-- your next end step" is what the skipped phase DEFERS -- CR 614.10a's second
+-- sentence, anything scheduled for the "next" occurrence waiting for the first
+-- occurrence that isn't skipped. So alice's creature count on bob's turn says
+-- whether the ending phase happened at all, on the same board that reads the
+-- expiry -- without it a fixed engine and a Bell that silently never installed
+-- would look alike -- and the deferral case below pins where the sacrifice went
+-- instead.
 skippedEndingPhaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 skippedEndingPhaseSpec s registry = Spec.describe s "SkippedEndingPhase" $ do
   -- THE PROVING CASE for CR 514.2's stored-effect half. Giant Growth's +3/+3 is
@@ -1991,8 +1996,46 @@ skippedEndingPhaseSpec s registry = Spec.describe s "SkippedEndingPhase" $ do
         carolsTurn = throughPostcombatMain answer (intoNextTurn answer bobsTurn)
     Spec.assertEqWith s "CR 611.2a back to its printed power on bob's turn, though no cleanup step ran" (Projection.powerOf pikerId bobsTurn) (Just 2)
     Spec.assertEqWith s "and still on carol's, so nothing merely deferred it" (Projection.powerOf pikerId carolsTurn) (Just 2)
-    Spec.assertEqWith s "CR 724.1e the end step never began, so the Thopter was never sacrificed" (S.creaturesInPlay S.alice bobsTurn) 3
+    Spec.assertEqWith s "CR 614.10a the end step was skipped, so the Thopter was not sacrificed there" (S.creaturesInPlay S.alice bobsTurn) 3
     Spec.assertEqWith s "the pump was live while alice's turn still ran" (Projection.powerOf pikerId alicesMain) (Just 5)
+  -- THE PROVING CASE for CR 514.2's SIMULTANEITY. The removal of marked damage
+  -- and the end of the durations are one turn-based action, so a pump that ends
+  -- must never meet the damage it was covering: alice's Piker comes out of the
+  -- skipped phase a 2/1 with nothing marked on it, not a 2/1 carrying 3 damage
+  -- that CR 704.5g destroys at the next check.
+  --
+  -- The damage is marked at alice's postcombat main rather than on the starting
+  -- board because a 2/1 with 3 marked is already dead to CR 704.5g at the first
+  -- check, before Giant Growth could be cast. By then the pump has resolved and
+  -- the Bell is installed, and 3 is under the pumped toughness of 4, so the
+  -- Piker is alive on both readings up to the skipped phase.
+  Spec.it s "CR 514.2 a pumped creature with damage marked on it neither dies to its own shrinking nor keeps the pump" $ do
+    (pikerId, _, gs) <- pumpBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = curfewAnswer pikerId S.alice
+        alicesMain = S.markDamage pikerId 3 (throughPostcombatMain answer gs)
+        bobsTurn = throughPostcombatMain answer (intoNextTurn answer alicesMain)
+    Spec.assertEqWith s "CR 704.5g the Piker is still on the battlefield on bob's turn" (S.creaturesInPlay S.alice bobsTurn) 3
+    Spec.assertEqWith s "back to its printed 2/1, so the duration half ran" (S.powerToughnessOf pikerId bobsTurn) (Just (2, 1))
+    Spec.assertEqWith s "CR 514.2 and the damage went in the same action" (S.damageOf pikerId bobsTurn) (Just 0)
+    Spec.assertEqWith s "it was a 5/4 with 3 marked while alice's turn ran" (S.powerToughnessOf pikerId alicesMain) (Just (5, 4))
+  -- CR 614.10a's second sentence, which the count on bob's turn cannot see: the
+  -- skipped ending phase DEFERS the Dronesmith's delayed sacrifice rather than
+  -- removing it, so the Thopter waits for alice's first end step that isn't
+  -- skipped. Read on bob's SECOND turn, past the end step of alice's second turn,
+  -- where the deferred Thopter and the one that turn's combat made both go and
+  -- leave her Piker and her Dronesmith.
+  Spec.it s "CR 614.10a the skipped end step defers the sacrifice to alice's next one" $ do
+    (pikerId, _, gs) <- pumpBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = curfewAnswer pikerId S.alice
+        bobsTurn = throughPostcombatMain answer (intoNextTurn answer (throughPostcombatMain answer gs))
+        carolsTurn = throughPostcombatMain answer (intoNextTurn answer bobsTurn)
+        alicesNextTurn = throughPostcombatMain answer (intoNextTurn answer carolsTurn)
+        bobsSecondTurn = throughPostcombatMain answer (intoNextTurn answer alicesNextTurn)
+    Spec.assertEqWith s "the deferred Thopter and the new one both went at alice's next end step" (S.creaturesInPlay S.alice bobsSecondTurn) 2
+    Spec.assertEqWith s "it was still there through carol's turn" (S.creaturesInPlay S.alice carolsTurn) 3
+    Spec.assertEqWith s "and alice's second combat made a second one beside it" (S.creaturesInPlay S.alice alicesNextTurn) 4
   -- The paired control, differing in ONE decision: the Bell is never cast. Same
   -- board, same seats, same answers everywhere else -- so alice's ending phase
   -- runs, and both the sacrifice and the CR 514.2 sweep happen the ordinary way.
@@ -2034,7 +2077,7 @@ skippedEndingPhaseSpec s registry = Spec.describe s "SkippedEndingPhase" $ do
     Spec.assertBool s (not (castsGrowth bobsTurn)) "CR 611.2a alice cannot cast a {G} spell off the retained green on bob's turn"
     Spec.assertEqWith s "and her pool is empty there" (poolSize S.alice bobsTurn) 0
     Spec.assertEqWith s "still empty on carol's, so nothing merely deferred it" (poolSize S.alice carolsTurn) 0
-    Spec.assertEqWith s "CR 724.1e the end step never began, so the Thopter was never sacrificed" (S.creaturesInPlay S.alice bobsTurn) 3
+    Spec.assertEqWith s "CR 614.10a the end step was skipped, so the Thopter was not sacrificed there" (S.creaturesInPlay S.alice bobsTurn) 3
     Spec.assertBool s (castsGrowth alicesMain) "the retention was live while alice's own turn ran"
   -- manaBoard's paired control, differing in the one decision again.
   Spec.it s "CR 514.2 without the Bell the cleanup step ends the retention" $ do

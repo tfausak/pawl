@@ -3111,7 +3111,7 @@ asTokens event = case event of
 -- moment of that turn is the last moment it could matter, and AtCleanup is the
 -- store for exactly that. Uses.Once is CR 614.10a's per-occurrence spend, and it
 -- is what actually fires for the one card in the pool. The sweep reaches a turn
--- whose ending phase was skipped too, Engine.endTurnDurations running it on
+-- whose ending phase was skipped too, Engine.cleanupSecondAction running it on
 -- that road as well, so an unspent row is held to its turn there as here.
 installTurnSkips :: ExtraTurn -> GameState -> GameState
 installTurnSkips entry gs =

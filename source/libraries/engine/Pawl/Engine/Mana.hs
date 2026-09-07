@@ -565,11 +565,10 @@ emptyManaPools gs =
 -- mana itself does NOT: this only clears the duration, and the CR 500.5 sweep at
 -- the next step or phase END is what then takes the mana.
 --
--- TWO callers, both in Engine.hs and both pairing this with
--- Expiry.dropAtCleanup: the cleanup step's turn-based actions, where
--- Damage.removeAllDamage is beside them as CR 514.2's other half, and
--- Engine.endTurnDurations, where CR 614.10a leaves that half out because the
--- step it is scheduled for did not happen.
+-- ONE caller, Engine.cleanupSecondAction, which pairs this with
+-- Expiry.dropAtCleanup and with Damage.removeAllDamage as CR 514.2's other half.
+-- The cleanup step's turn-based actions and CR 500.11's skip of the whole ending
+-- phase both go through it, so the three never come apart.
 --
 -- Here rather than in Pawl.Engine.Expiry, which sweeps the carriers keyed by a
 -- Pawl.Types.Expiry: a mana unit carries none, and the pool is this module's.
