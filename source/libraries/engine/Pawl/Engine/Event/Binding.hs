@@ -321,9 +321,9 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- and Resolve, where the slot is read, never learns which condition placed the
   -- ability, so a second slot would be two names for one notion kept apart by
   -- every reader for a distinction no rule draws. It is also the only choice that
-  -- can ever serve CR 603.1b's AnyOf, whose slots eventBindingSlots INTERSECTS: a
-  -- fresh name would make the intersection with PermanentEnters empty forever
-  -- (#963).
+  -- serves CR 603.1b's AnyOf, whose slots eventBindingSlots INTERSECTS: a fresh
+  -- name would make the intersection with PermanentEnters empty forever, and
+  -- Case of the Pilfered Proof reads exactly that intersection.
   --
   -- Unconditional given a match, which is what eventBindingSlots' per-condition
   -- promise needs: every GameEvent.TurnedFaceUp carries exactly one ObjectId, and
@@ -829,14 +829,26 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- bearer, whom CR 113.7a's source slot already names.
   (TriggerCondition.SelfIsDealtDamage, GameEvent.DamageDealt ev) ->
     Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
-  -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
-  -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
-  -- AnyOf and is pinned by Pawl.TriggerSpec against every event either branch
-  -- admits. An AnyOf two of whose branches bind the SAME slot is not handled
-  -- (#963).
+  -- CR 603.1b's multi-condition ability, bound as the UNION of what its branches
+  -- stamp off this one event -- the only answer that fills a slot two branches
+  -- name. Case of the Pilfered Proof's "whenever a Detective you control enters
+  -- or is turned face up, put a +1/+1 counter on IT" is the reader: both branches
+  -- stamp `became`, so the payload finds the subject whichever one matched.
   --
-  -- So do the five CR 701/702 keyword-action conditions, deliberately: no card
-  -- in the pool reads the scrying player, the plotted card or the explorer, and
+  -- A BRANCH THE EVENT DID NOT MATCH contributes nothing, this function casing on
+  -- (condition, event) PAIRS: a branch watching another event class falls to the
+  -- wildcard below. Two branches of one class both stamp, off the SAME event, so
+  -- they agree on the id and Map.unions' left bias settles nothing.
+  --
+  -- Below eventBindingSlots' floor, never above it: that function INTERSECTS, and
+  -- an intersection is a subset of every branch's stamps, so every slot it
+  -- promises is stamped by whichever branch matched. The slots only some branch
+  -- binds are eventBindingSlotsSometimes' AnyOf arm.
+  (TriggerCondition.AnyOf conditions, _) ->
+    Map.unions (fmap (\c -> eventBindings gs bearerBecame becameInGraveyard you c event) conditions)
+  -- The five CR 701/702 keyword-action conditions reach this fallthrough and
+  -- stamp nothing, deliberately: no card in the pool reads the scrying player,
+  -- the plotted card or the explorer, and
   -- SelfExerted's "it" is the bearer, which CR 113.7a's source slot already
   -- names. eventBindingSlots claims nothing for any of them; see that function's
   -- arms.
@@ -1553,13 +1565,15 @@ eventBindingSlots cond = case cond of
 -- PRESCRIBES, not the silent no-op the lint exists to catch. Every other reader
 -- wants the floor, a slot bound sometimes being no guarantee at all.
 --
--- Three arms and no more, which is a fact about eventBindings above rather than
+-- Four arms and no more, which is a fact about eventBindings above rather than
 -- a convenience. Two of them are CR 400.7e's public-zone proviso, the only guard
 -- there that turns on the EVENT's own shape and that a match does not already
 -- settle, standing on exactly the two conditions CR 603.6c admits every
 -- destination for. The third is PermanentSacrificed, where CR 400.7e's new
 -- object is not on the event at all and the arrival table may not carry it --
--- see that arm. The other two conditional arms turn on GAME STATE instead --
+-- see that arm. The fourth is CR 603.1b's AnyOf, where what parts the ceiling
+-- from the floor is the BRANCHES disagreeing rather than any one event's shape.
+-- The other two conditional arms turn on GAME STATE instead --
 -- AttachedCreatureDies on CR 400.7f's arrival and PermanentReturnedToHand on CR
 -- 608.2h's record -- and the floor claims both outright, each for the reasons
 -- its own arm gives.
@@ -1592,4 +1606,24 @@ eventBindingSlotsSometimes cond = case cond of
   -- and delayedPending scans no batch at all. data/cards/prowling-geistcatcher.json
   -- is the reader.
   TriggerCondition.PermanentSacrificed {} -> Set.singleton Binding.became
+  -- CR 603.1b's branches disagreeing with each other, which is a fourth way for a
+  -- slot to be bound for some of a condition's events and not all: eventBindings
+  -- stamps whatever the MATCHED branch does, while the floor above intersects.
+  -- Balemurk Leech is the pool's shape -- PermanentEnters binds CR 400.7e's
+  -- `became` and RoomFullyUnlocked binds nothing, so a room unlocking leaves the
+  -- slot empty and a matching enchantment entering fills it.
+  --
+  -- The ceiling minus the floor, each branch contributing its own ceiling, so a
+  -- branch that itself binds a slot only sometimes is carried through.
+  --
+  -- WHAT THIS COSTS THE CARD LINT is a shape no printing has: a payload reading
+  -- `became` under an AnyOf only one branch binds it for would now pass. The
+  -- printed text cannot be written -- "it" has to name something under BOTH
+  -- halves of a rule 603.1b sentence, which is why the pool's disjoint pairs
+  -- (Balemurk Leech, Bartered Cow) all read nothing at all -- so the floor is
+  -- what every real card of this shape needs and this is slack, not a hole.
+  TriggerCondition.AnyOf conditions ->
+    Set.difference
+      (Set.unions (fmap (\c -> Set.union (eventBindingSlots c) (eventBindingSlotsSometimes c)) conditions))
+      (eventBindingSlots cond)
   _ -> Set.empty
