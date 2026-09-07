@@ -125,6 +125,10 @@ data Keyword
   | -- | 702.26a: a static ability modifying the rules of the untap step, read by
     -- Pawl.Engine.Phasing off the CR 502.1 turn-based action rather than minted.
     Phasing
+  | -- | 702.27a: "You may pay an additional [cost] as you cast this spell", plus
+    -- "if the buyback cost was paid, put this spell into its owner's hand instead
+    -- of into that player's graveyard as it resolves".
+    Buyback (Cost.Cost Keyword)
   | -- | 702.28b: a creature with shadow can't be blocked by creatures without
     -- shadow, and one without shadow can't be blocked by creatures with it.
     Shadow

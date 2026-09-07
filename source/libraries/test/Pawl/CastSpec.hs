@@ -40,6 +40,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
@@ -705,6 +706,7 @@ handInPlay printing board =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1667,6 +1669,112 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     Spec.assertEqWith s "the {2}{U} trigger drew two cards" (handSize S.alice settled) 2
     Spec.assertEqWith s "and the {1}{G} trigger did not run, so bob's Bird Maiden lives" (S.countOnBattlefieldByName (birdMaidenName board) S.bob settled) 1
     Spec.assertEqWith s "both questions were put, and only the blue one kicked" (kickerAnnouncements asked) [KickerDecision.MkKickerDecision 0, KickerDecision.MkKickerDecision 1]
+
+-- CR 702.27a: buyback, the one keyword whose cast-time announcement changes where
+-- CR 608.2n sends the spell. Elvish Fury {G} Instant is the producer -- "Buyback
+-- {4} / Target creature gets +2/+2 until end of turn" (Oracle text fetched from
+-- Scryfall 2026-09-07, MH1) -- whose payoff is an Effect.ModifyTarget pair pawl
+-- already builds, so the buyback machinery is the only thing under test.
+--
+-- The board: alice has `forests` untapped Forests, bob has a Goblin Piker, and
+-- Elvish Fury is in alice's hand. The ZONE the spell ends in is what the cases
+-- assert, and not the board: a spell resolved twice and a correct buyback agree
+-- on the Piker and differ only on where the card went.
+
+-- Which cards sit in one player's zone, by name.
+buybackNamesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
+buybackNamesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+
+buybackBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+buybackBoard forest elvishFury piker forests =
+  let (pikerId, gs1) = S.addPermanent piker S.bob (S.landsInPlay forest forests)
+      (gs, spellId) = S.handOne elvishFury gs1
+   in (gs, spellId, pikerId)
+
+-- Answers CR 702.27a's buyback question with `decision` and aims the one target
+-- slot at `victim` -- PINNED to that id rather than searched for, so a mutation
+-- cannot be repaired by an answerer that finds another legal target. Everything
+-- else defers to S.identityAnswer.
+furies ::
+  BuybackDecision.BuybackDecision ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  r
+furies decision victim p = case p of
+  Prompt.ChooseBuyback {} -> decision
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
+  _ -> S.identityAnswer p
+
+buybackAnnouncements :: [Response.Response] -> [BuybackDecision.BuybackDecision]
+buybackAnnouncements responses = [d | Response.AnnouncedBuyback d <- responses]
+
+buybackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+buybackSpec s registry = Spec.describe s "Buyback" $ do
+  -- CR 702.27a's "you MAY pay": declining is a real answer, and CR 608.2n's
+  -- ordinary destination stands.
+  Spec.it s "CR 608.2n declining buyback puts the spell into its owner's graveyard" $ do
+    forest <- S.printingOf s registry "Forest"
+    elvishFury <- S.printingOf s registry "Elvish Fury"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, spellId, pikerId) = buybackBoard forest elvishFury piker 5
+        (asked, after) = castAndResolve (furies BuybackDecision.Declines pikerId) gs spellId
+    Spec.assertEqWith s "CR 608.2n: the resolved spell is in alice's graveyard" (buybackNamesIn Zone.Graveyard S.alice after) [Just (S.printingName elvishFury)]
+    Spec.assertEqWith s "and her hand is empty" (buybackNamesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "the Piker still got its +2/+2" (S.powerToughnessOf pikerId after) (Just (4, 3))
+    Spec.assertEqWith s "the player was asked, and declined" (buybackAnnouncements asked) [BuybackDecision.Declines]
+    Spec.assertEqWith s "only {G} was paid, so one Forest is tapped" (S.tappedCount S.alice after) 1
+  -- CR 702.27a's second static ability, on the SAME board and the SAME answerer
+  -- but for the one answer: the +2/+2 is identical and the destination is not.
+  Spec.it s "CR 702.27a paying buyback puts the spell into its owner's hand instead" $ do
+    forest <- S.printingOf s registry "Forest"
+    elvishFury <- S.printingOf s registry "Elvish Fury"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, spellId, pikerId) = buybackBoard forest elvishFury piker 5
+        (asked, after) = castAndResolve (furies BuybackDecision.BuysBack pikerId) gs spellId
+    Spec.assertEqWith s "CR 702.27a: the resolved spell is in alice's hand" (buybackNamesIn Zone.Hand S.alice after) [Just (S.printingName elvishFury)]
+    Spec.assertEqWith s "and the graveyard CR 608.2n would have sent it to is empty" (buybackNamesIn Zone.Graveyard S.alice after) []
+    Spec.assertEqWith s "the Piker got the same +2/+2 either way" (S.powerToughnessOf pikerId after) (Just (4, 3))
+    Spec.assertEqWith s "the player was asked, and bought it back" (buybackAnnouncements asked) [BuybackDecision.BuysBack]
+    Spec.assertEqWith s "{G} plus the buyback {4}: five Forests are tapped" (S.tappedCount S.alice after) 5
+  -- What the hand is FOR: the card that came back is castable again, buyback and
+  -- all. Ten Forests leave five untapped after the first cast, so the second cast
+  -- is offered the same {4} and declines it, which sends the card to the graveyard
+  -- -- the case above's destination reached by the card rather than by the fixture.
+  Spec.it s "CR 702.27a the bought-back card is cast again, and the second +2/+2 lands" $ do
+    forest <- S.printingOf s registry "Forest"
+    elvishFury <- S.printingOf s registry "Elvish Fury"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, spellId, pikerId) = buybackBoard forest elvishFury piker 10
+        (_, once) = castAndResolve (furies BuybackDecision.BuysBack pikerId) gs spellId
+        againId = case Game.zoneMembers Zone.Hand S.alice once of
+          oid : _ -> oid
+          [] -> spellId
+        (asked, twice) = castAndResolve (furies BuybackDecision.Declines pikerId) once againId
+    Spec.assertEqWith s "the Piker took both +2/+2s (CR 613.4c)" (S.powerToughnessOf pikerId twice) (Just (6, 5))
+    Spec.assertEqWith s "and the second cast, declining, left the card in the graveyard" (buybackNamesIn Zone.Graveyard S.alice twice) [Just (S.printingName elvishFury)]
+    Spec.assertEqWith s "so the hand is empty again" (buybackNamesIn Zone.Hand S.alice twice) []
+    Spec.assertEqWith s "the second question was put too" (buybackAnnouncements asked) [BuybackDecision.Declines]
+    Spec.assertEqWith s "five Forests for the bought-back cast plus one for the declined second" (S.tappedCount S.alice twice) 6
+  -- CR 601.2b/601.2f-h: the additional cost is a real cost. With one Forest there
+  -- is {G} and nothing more, so buyback is not on offer at all -- and the ordinary
+  -- cast still is. The positive board above differs from this one in the Forest
+  -- count alone.
+  Spec.it s "CR 601.2f with one Forest the buyback is not offered, and the ordinary cast still is" $ do
+    forest <- S.printingOf s registry "Forest"
+    elvishFury <- S.printingOf s registry "Elvish Fury"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, spellId, pikerId) = buybackBoard forest elvishFury piker 1
+        (asked, after) = castAndResolve (furies BuybackDecision.BuysBack pikerId) gs spellId
+    Spec.assertEqWith s "CR 608.2n: the spell went to the graveyard all the same" (buybackNamesIn Zone.Graveyard S.alice after) [Just (S.printingName elvishFury)]
+    Spec.assertEqWith s "and not to the hand" (buybackNamesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "the ordinary cast resolved: the Piker got its +2/+2" (S.powerToughnessOf pikerId after) (Just (4, 3))
+    Spec.assertEqWith s "no buyback question was put, so the answerer's BuysBack never applied" (buybackAnnouncements asked) []
+    Spec.assertEqWith s "the one Forest paid {G}" (S.tappedCount S.alice after) 1
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
@@ -3178,6 +3286,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   entwineSpec s registry
   escalateSpec s registry
   kickerSpec s registry
+  buybackSpec s registry
   auraTargetSpec s registry
   fireboltSpec s registry
   flashbackCardTypeSpec s registry

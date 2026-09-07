@@ -1955,6 +1955,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Entwine cost -> Keyword.Type.Entwine (rewriteCost pairs cost)
   -- CR 702.120a states its cost as part of the keyword too.
   Keyword.Type.Escalate cost -> Keyword.Type.Escalate (rewriteCost pairs cost)
+  -- CR 702.27a states its cost as part of the keyword too.
+  Keyword.Type.Buyback cost -> Keyword.Type.Buyback (rewriteCost pairs cost)
   -- CR 702.45a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Bushido _ -> keyword
   -- CR 702.46a's N is a number and not a word, so CR 612.2 has nothing to swap

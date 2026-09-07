@@ -1496,6 +1496,7 @@ library types
     Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
     Pawl.Types.BlocksDeclared
+    Pawl.Types.BuybackDecision
     Pawl.Types.CandidateCost
     Pawl.Types.CandidateId
     Pawl.Types.CantAttackPlayer

@@ -112,6 +112,7 @@ codec = Fields.object $ do
   kicked <- Fields.defaulted "kicked" Map.empty (Common.keyedList kickerPayment) Object.kicked
   bestowed <- Fields.defaulted "bestowed" False Common.boolean Object.bestowed
   prototyped <- Fields.defaulted "prototyped" False Common.boolean Object.prototyped
+  boughtBack <- Fields.defaulted "boughtBack" False Common.boolean Object.boughtBack
   phyrexianLifePaid <- Fields.defaulted "phyrexianLifePaid" 0 Common.natural Object.phyrexianLifePaid
   manaSpent <- Fields.defaulted "manaSpent" (Mana.Type.MkMana []) Mana.codec Object.manaSpent
   announcedX <- Fields.defaulted "announcedX" Nothing (Common.maybe Common.natural) Object.announcedX
@@ -156,6 +157,7 @@ codec = Fields.object $ do
         Object.kicked = kicked,
         Object.bestowed = bestowed,
         Object.prototyped = prototyped,
+        Object.boughtBack = boughtBack,
         Object.phyrexianLifePaid = phyrexianLifePaid,
         Object.manaSpent = manaSpent,
         Object.announcedX = announcedX,

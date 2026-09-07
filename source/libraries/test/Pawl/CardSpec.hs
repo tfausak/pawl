@@ -2534,6 +2534,9 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.120a: the escalate cost, whose components may hold a Filter exactly as
   -- entwine's may.
   Keyword.Escalate cost -> costFilters cost
+  -- CR 702.27a: the buyback cost, whose components may hold a Filter exactly as
+  -- kicker's and entwine's may.
+  Keyword.Buyback cost -> costFilters cost
   -- CR 702.170a: the plot cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
   Keyword.Plot cost -> costFilters cost

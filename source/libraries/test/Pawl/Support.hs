@@ -921,6 +921,7 @@ addObjectIn zone printing pid gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1163,6 +1164,7 @@ addToken card pid gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1221,6 +1223,7 @@ addLibraryCard printing pid gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1284,6 +1287,7 @@ addGraveyardCard printing pid gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1351,6 +1355,7 @@ addExiledCard printing pid gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1423,6 +1428,7 @@ addHandCard printing pid gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1504,6 +1510,7 @@ landsFor land pid n base =
                   Object.kicked = Map.empty,
                   Object.bestowed = False,
                   Object.prototyped = False,
+                  Object.boughtBack = False,
                   Object.phyrexianLifePaid = 0,
                   Object.manaSpent = Mana.MkMana [],
                   Object.announcedX = Nothing,
@@ -1561,6 +1568,7 @@ handOne printing base =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -1624,6 +1632,7 @@ pikerInHand land piker n ph =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -2472,6 +2481,7 @@ promptDecider prompt = case prompt of
   Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseX decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ReturnCommander decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLibraryEnd decider _ _ -> Just (Decider.unwrap decider)
@@ -2589,6 +2599,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.CastWhileSearching {} -> "CastWhileSearching"
   Prompt.ChooseX {} -> "ChooseX"
   Prompt.ChooseEntwine {} -> "ChooseEntwine"
+  Prompt.ChooseBuyback {} -> "ChooseBuyback"
   Prompt.ChooseKicker {} -> "ChooseKicker"
   Prompt.ReturnCommander {} -> "ReturnCommander"
   Prompt.ChooseLibraryEnd {} -> "ChooseLibraryEnd"
@@ -3066,6 +3077,7 @@ oneMountainState mountain ph =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,
@@ -3271,6 +3283,7 @@ spellOnStack printing pid gs =
             Object.kicked = Map.empty,
             Object.bestowed = False,
             Object.prototyped = False,
+            Object.boughtBack = False,
             Object.phyrexianLifePaid = 0,
             Object.manaSpent = Mana.MkMana [],
             Object.announcedX = Nothing,

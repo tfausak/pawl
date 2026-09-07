@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
@@ -291,6 +292,10 @@ data Prompt r where
   -- before ChooseCost (CR 601.2b); the Maybe Natural is the limit, Nothing for
   -- CR 702.33c's multikicker, and an answer past it is rejected.
   ChooseKicker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Maybe Natural.Natural -> Prompt KickerDecision.KickerDecision
+  -- | CR 702.27a: whether the spell's buyback cost is paid, after ChooseKicker
+  -- and before ChooseCost (CR 601.2b); the Cost is what buying back adds (CR
+  -- 601.2f).
+  ChooseBuyback :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt BuybackDecision.BuybackDecision
   -- | CR 903.9a: whether the owner returns their commander from a graveyard or
   -- exile; declining leaves it until it moves there afresh.
   ReturnCommander :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt CommandZoneDecision.CommandZoneDecision

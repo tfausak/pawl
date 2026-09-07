@@ -501,6 +501,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (escalate 2)
       " {\"type\":\"Escalate\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (escalate 2) /= Codec.encode Keyword.codec (entwineOf 2)) "escalate {2} is not entwine {2}"
+  -- CR 702.27a's payload is a whole Cost too, and it must not share Kicker's
+  -- tag: both are additional costs announced at CR 601.2b, and only buyback's
+  -- payment changes where CR 608.2n sends the spell.
+  Spec.it s "Buyback carries its cost, and is not Kicker" $ do
+    let buyback n = Keyword.Buyback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (buyback 4)
+      " {\"type\":\"Buyback\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":4}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (buyback 4) /= Codec.encode Keyword.codec (Keyword.Kicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []))) "buyback {4} is not kicker {4}"
   -- CR 702.45a's N rides the constructor as poisonous' does.
   Spec.it s "Bushido carries its N" $ do
     Common.assertCodec
