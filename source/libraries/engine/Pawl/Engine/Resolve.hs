@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, noSubgame, performManaAbility, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, oneSlot, playerRefSlots, quantitySlots, slotBindings, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
@@ -418,8 +419,13 @@ resolveSpellWith runSubgame oid = do
 -- record CR 601.2b's announcement wrote (Pawl.Engine.Cast.stampBoughtBack), which
 -- is rule 702.27a's own "if the buyback cost was paid".
 --
--- All three replace the same event, so CR 616.1 would have the spell's controller
--- order them; the arms are ordered arbitrarily instead, and no printing carries
+-- Buyback's rewrite is a replacement effect (CR 614.1a) and is INSTALLED here as
+-- a row rather than performed (Replacement.installBuybackReturn), so CR 616.1's
+-- loop orders it against every other row watching the same move.
+--
+-- Not implemented: the Adventure and Omen riders are performed outright, so a row
+-- another object contributes to the same move is not ordered against them
+-- (#3359). Nor are the three ordered against each other, and no printing carries
 -- two -- buyback appears on instants and sorceries printed as such, where CR
 -- 715.3d's and CR 720.3d's riders belong to a creature card's other half.
 finishSpell :: ObjectId -> Face.Face Card.Type.Card -> PlayerId -> Game ()
@@ -439,9 +445,12 @@ finishSpell oid face controller
       -- hand instead of into that player's graveyard as it resolves". Reached only
       -- here, which is the whole of "as it resolves": a countered or fizzled spell
       -- never gets this far (CR 701.6a, CR 608.2b), and rule 702.27a leaves both of
-      -- those in the graveyard.
+      -- those in the graveyard -- so the row installed here exists for exactly the
+      -- move proposed on the next line, and CR 616.1's loop settles where the
+      -- spell actually lands.
       bought <- State.gets (maybe False Object.boughtBack . Game.lookupObject oid)
-      Event.changeZone oid (if bought then Zone.Hand else Zone.Graveyard)
+      Monad.when bought (State.modify' (Replacement.installBuybackReturn oid controller))
+      Event.changeZone oid Zone.Graveyard
   | otherwise = do
       exiled <- Event.changeZoneReturning oid Zone.Exile
       Monad.forM_ exiled $ \newId ->

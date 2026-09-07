@@ -1751,8 +1751,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- CR 702.27a's SECOND static ability is a replacement effect (CR 614.1a), and
   -- it is still not one of these: "as it resolves" scopes it to CR 608.2n's own
   -- move, which no Pawl.Types.ZoneChangeR pattern can say, so a row minted here
-  -- would also catch a countered or fizzled spell. Pawl.Engine.Resolve.finishSpell
-  -- is where that one move is decided instead.
+  -- would also catch a countered or fizzled spell. It is minted for that one move
+  -- instead, by Pawl.Engine.Resolve.finishSpell through
+  -- Pawl.Engine.Replacement.installBuybackReturn, which is what puts it in CR
+  -- 616.1's loop beside a Rest in Peace watching the same move.
   Keyword.Buyback _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
