@@ -1601,11 +1601,11 @@ skipWholePhase phase = do
 -- over, and the turn is over whether or not its cleanup step ran. So the two
 -- sweeps that end such a duration -- CR 514.2's stored-effect half
 -- (Expiry.dropAtCleanup) and its mana-unit half (Mana.endManaRetention) -- run on
--- every road out of the ending phase, including the two that remove the cleanup
--- step: CR 500.11's whole-phase skip and CR 614.1b's step skip. CR 724.2d states
--- the same split one phase over -- the combat phase an effect ends keeps its
--- "until end of combat" expiries though its last step is skipped -- and
--- Resolve's EndCombatPhase arm is where the engine already writes it.
+-- CR 500.11's whole-phase skip too, which is the road that removes the cleanup
+-- step. CR 724.2d states the same split one phase over -- the combat phase an
+-- effect ends keeps its "until end of combat" expiries though its last step is
+-- skipped -- and Resolve's EndCombatPhase arm is where the engine already writes
+-- it.
 --
 -- The cleanup step's TURN-BASED ACTIONS are NOT run here, and that is CR 614.10a:
 -- anything scheduled for a skipped step or phase won't happen. CR 514.1's
@@ -1647,17 +1647,8 @@ endTurnDurations = do
 -- No CR 704.3 check: that rule keys the sweep to a player receiving priority,
 -- and a skipped step grants none. The next step's own check, which runs ahead of
 -- its priority round, catches whatever the sweeps here raised.
---
--- CR 611.2a's half, ahead of `endPhase` so that CR 500.5's pool empty inside it
--- sees mana Mana.endManaRetention has already made ordinary -- CR 514.2 then CR
--- 500.5, the order the cleanup step runs them in. Nothing in the pool writes this
--- selector: Scryfall o:skips (o:"ending phase" or o:"end step" or o:cleanup),
--- 2026-09-06, returns only Possessed Portal, whose "skips that draw" is not a
--- step skip. So this arm is a fence rather than a proven behaviour, and the
--- ending-phase road beside it is the one Pawl.ExpirySpec drives.
 skipStep :: Phase.Phase -> Game ()
 skipStep phase = do
-  Monad.when (phase == Phase.Ending EndingStep.Cleanup) endTurnDurations
   Foldable.traverse_ endPhase (Turn.phaseEndingAt phase)
   advance
 
