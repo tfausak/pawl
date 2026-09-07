@@ -316,7 +316,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing (Filter.And []) Nothing Nothing Nothing Nothing))
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing (Filter.And []) Nothing Nothing Nothing Nothing Nothing))
       " {\"type\":\"DamageCantBePrevented\",\"value\":{}} "
   -- CR 615.12 narrowed / Excruciator, "damage that would be dealt by this
   -- creature": the same effect keyed to its own source (CR 614.15's relation),
@@ -325,7 +325,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing Nothing Nothing Nothing))
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing Nothing Nothing Nothing Nothing))
       " {\"type\":\"DamageCantBePrevented\",\"value\":{\"whatSource\":{\"type\":\"IsSource\"}}} "
   -- CR 614.9 / Lava Burst, "if Lava Burst would deal damage to a creature, that
   -- damage can't be ... dealt instead to another permanent or player": the
@@ -334,7 +334,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.DamageCantBeRedirected (DamagePattern.MkDamagePattern Nothing Filter.IsSource (Just (Filter.HasCardType CardType.Creature)) Nothing Nothing Nothing))
+      (PlayerEffect.DamageCantBeRedirected (DamagePattern.MkDamagePattern Nothing Filter.IsSource (Just (Filter.HasCardType CardType.Creature)) Nothing Nothing Nothing Nothing))
       " {\"type\":\"DamageCantBeRedirected\",\"value\":{\"whatRecipient\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"whatSource\":{\"type\":\"IsSource\"}}} "
   -- CR 701.23 / Leonin Arbiter.
   Spec.it s "CantSearchLibraries" $

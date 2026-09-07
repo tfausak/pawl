@@ -3621,7 +3621,8 @@ shieldOf oid gs =
                   -- No player chose this pair's source (CR 609.7a) and nothing
                   -- targeted it (CR 601.2c); rule 122.1c minted it off the
                   -- permanent's counters.
-                  DamagePattern.whichSource = Nothing
+                  DamagePattern.whichSource = Nothing,
+                  DamagePattern.boundRecipient = Nothing
                 }
               DamageRewrite.PreventRemovingShieldCounter
               -- CR 615.5: the counter removal is part of the REWRITE, so this

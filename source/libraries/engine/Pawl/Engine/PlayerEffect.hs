@@ -88,6 +88,7 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
@@ -2843,3 +2844,61 @@ playerRefsIn = Functor.getConst . overPlayerRefs (Functor.Const . pure)
 -- overPlayerRefs written, for a caller substituting each reference.
 mapPlayerRefs :: (PlayerRef.PlayerRef -> PlayerRef.PlayerRef) -> PlayerEffect -> PlayerEffect
 mapPlayerRefs f = Functor.runIdentity . overPlayerRefs (Functor.Identity . f)
+
+-- Every Pawl.Types.DamagePattern this effect holds, traversed rather than read:
+-- CR 615.12's prohibition and its CR 614.9 twin each carry one, and CR 601.2c's
+-- recipient inside it is baked as the effect is stored (Pawl.Engine.Resolve's
+-- AffectPlayers arm), exactly as overPlayerRefs above bakes a zone reference.
+--
+-- Applicative rather than a plain map, and the list instance is why: a pattern
+-- whose slot named several recipients yields one effect per recipient, and one
+-- whose slot named none yields no effect at all, which is CR 608.2b's answer.
+--
+-- Exhaustive with no wildcard, overPlayerRefs' posture: a new arm carrying a
+-- pattern has to say so here, and @-Werror@ is what asks. This is a
+-- CLASSIFICATION of the payload -- which arms narrow a damage event -- and never
+-- a case on which card wrote one.
+overDamagePatterns :: (Applicative f) => (DamagePattern.DamagePattern -> f DamagePattern.DamagePattern) -> PlayerEffect -> f PlayerEffect
+overDamagePatterns f effect = case effect of
+  PlayerEffect.CantCastSpells -> pure effect
+  PlayerEffect.CantActivateAbilities -> pure effect
+  PlayerEffect.CantCastMoreThan _ -> pure effect
+  PlayerEffect.CantCastChosenName -> pure effect
+  PlayerEffect.CantPlayLandChosenName -> pure effect
+  PlayerEffect.IncreaseSpellCost _ -> pure effect
+  PlayerEffect.IncreaseActivationCost _ -> pure effect
+  PlayerEffect.ReduceSpellCost _ -> pure effect
+  PlayerEffect.ReduceActivationCost _ -> pure effect
+  PlayerEffect.AddActivationCost _ -> pure effect
+  PlayerEffect.AddSpellCost _ -> pure effect
+  PlayerEffect.PlayAdditionalLands _ -> pure effect
+  PlayerEffect.NoMaximumHandSize -> pure effect
+  PlayerEffect.SetMaximumHandSize _ -> pure effect
+  PlayerEffect.IncreaseMaximumHandSize _ -> pure effect
+  PlayerEffect.ReduceMaximumHandSize _ -> pure effect
+  PlayerEffect.DontLoseUnspentMana _ -> pure effect
+  PlayerEffect.SpendManaAsThough _ -> pure effect
+  PlayerEffect.CantBeTargetedBy _ -> pure effect
+  PlayerEffect.HasProtectionFromChosenName -> pure effect
+  PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
+  PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect
+  PlayerEffect.CantBeCountered _ -> pure effect
+  PlayerEffect.DamageCantBePrevented pattern_ -> fmap PlayerEffect.DamageCantBePrevented (f pattern_)
+  PlayerEffect.DamageCantBeRedirected pattern_ -> fmap PlayerEffect.DamageCantBeRedirected (f pattern_)
+  PlayerEffect.CantSearchLibraries _ -> pure effect
+  PlayerEffect.CantBecomeMonarch -> pure effect
+  PlayerEffect.CantCastMatching _ -> pure effect
+  PlayerEffect.CastOnlyAtSorcerySpeed -> pure effect
+  PlayerEffect.CantPlayLands _ -> pure effect
+  PlayerEffect.CastFrom _ -> pure effect
+  PlayerEffect.PlayLandsFrom _ -> pure effect
+  PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
+  PlayerEffect.CantGetCounters _ -> pure effect
+  PlayerEffect.StateCoinFlip _ -> pure effect
+
+-- overDamagePatterns read: the SLOTS this effect's patterns name as their
+-- recipient (DamagePattern.boundRecipient), for the dataflow report
+-- Pawl.Engine.Resolve.Slots.slotsOf owes -- playerRefsIn's shape, one payload
+-- over.
+boundRecipientSlots :: PlayerEffect -> [SlotName.SlotName]
+boundRecipientSlots = Functor.getConst . overDamagePatterns (Functor.Const . Maybe.maybeToList . DamagePattern.boundRecipient)

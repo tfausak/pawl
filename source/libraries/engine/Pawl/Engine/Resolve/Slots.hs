@@ -1003,7 +1003,16 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.EndCombatPhase -> Map.empty
   Effect.GainControl {} -> Map.empty
   Effect.ArmDelayedTrigger {} -> Map.empty
-  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
+  -- Two reads, on the two halves of one opcode: the seat AffectedPlayers.Named
+  -- names, and CR 601.2c's RECIPIENT a stored damage-pattern effect names
+  -- (Whippoorwill's "that creature"). The second is Many, and for
+  -- ObjectRef.InSlot's reason: Resolve.bakeDamagePatternRecipient reads the
+  -- whole set and stores one effect per recipient, so a slot holding two is not
+  -- silently narrowed to one.
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected playerEffect) ->
+    joinTwo
+      (affectedPlayersSlots affected)
+      (joinSlots (fmap (\slot -> Map.singleton slot SlotArity.Many) (PlayerEffect.boundRecipientSlots playerEffect)))
   Effect.RequireBlock {} -> Map.empty
   Effect.CantBeRegenerated {} -> Map.empty
   Effect.ForbidBlock {} -> Map.empty

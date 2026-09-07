@@ -1751,7 +1751,8 @@ mintedReplacementsFor keyword count = case keyword of
                   DamagePattern.whatRecipient = Just Filter.IsSource,
                   DamagePattern.whoRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing,
-                  DamagePattern.whichSource = Nothing
+                  DamagePattern.whichSource = Nothing,
+                  DamagePattern.boundRecipient = Nothing
                 },
             DamageR.rewrite = DamageRewrite.PreventAll,
             DamageR.riders = Seq.empty
