@@ -42,6 +42,7 @@ import qualified Pawl.Codec.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PhasedOut as PhasedOut
 import qualified Pawl.Codec.Player as Player
+import qualified Pawl.Codec.PlayerControl as PlayerControl
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Prevention as Prevention
 import qualified Pawl.Codec.Printing as Printing
@@ -159,7 +160,7 @@ codec resolve = Fields.object $ do
   drawsThisTurn <- Fields.defaulted "drawsThisTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.drawsThisTurn
   activatedThisTurn <- Fields.defaulted "activatedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec)))) GameState.activatedThisTurn
   pendingControl <- Fields.defaulted "pendingControl" Map.empty (Common.naturalMap PlayerId.codec Decider.codec) GameState.pendingControl
-  activeControl <- Fields.defaulted "activeControl" Nothing (Common.maybe Decider.codec) GameState.activeControl
+  control <- Fields.defaulted "control" Map.empty (Common.naturalMap PlayerId.codec PlayerControl.codec) GameState.control
   monarch <- Fields.defaulted "monarch" Nothing (Common.maybe PlayerId.codec) GameState.monarch
   initiative <- Fields.defaulted "initiative" Nothing (Common.maybe PlayerId.codec) GameState.initiative
   daytime <- Fields.defaulted "daytime" Nothing (Common.maybe Daytime.codec) GameState.daytime
@@ -235,7 +236,7 @@ codec resolve = Fields.object $ do
         GameState.drawsThisTurn = drawsThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
         GameState.pendingControl = pendingControl,
-        GameState.activeControl = activeControl,
+        GameState.control = control,
         GameState.monarch = monarch,
         GameState.initiative = initiative,
         GameState.daytime = daytime,

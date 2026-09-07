@@ -68,6 +68,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
@@ -93,6 +94,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -1505,10 +1507,26 @@ beginTurnOf pid gs =
             GameState.phase = Turn.firstPhase,
             GameState.remaining = Turn.laterPhases,
             -- CR 723.1/723.1b: the new active player's pending control becomes
-            -- this turn's active control, and overwriting it every turn is what
-            -- ends a prior control at the next turn's start -- unless CR 800.4b
-            -- stops the promotion (`promoted`, above).
-            GameState.activeControl = promoted,
+            -- this turn's control, and REPLACING the whole map every turn is
+            -- what ends a prior control at the next turn's start -- unless CR
+            -- 800.4b stops the promotion (`promoted`, above). Replacing rather
+            -- than inserting is also what retires a CR 723.2 row a resolution
+            -- somehow left behind; no resolution spans a turn boundary, so that
+            -- is a belt on top of Pawl.Engine.Stack's braces.
+            GameState.control =
+              maybe
+                Map.empty
+                ( \decider ->
+                    Map.singleton
+                      pid
+                      PlayerControl.MkPlayerControl
+                        { PlayerControl.decider = decider,
+                          PlayerControl.duration = ControlDuration.UntilTurnEnds,
+                          -- CR 723.7: Mindslaver prints no restriction.
+                          PlayerControl.manaFromLandsOnly = False
+                        }
+                )
+                promoted,
             GameState.pendingControl = Map.delete pid (GameState.pendingControl gs)
           }
 

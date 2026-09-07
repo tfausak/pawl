@@ -129,6 +129,7 @@ zoneFunctionedFrom delayed effect = case effect of
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame _ -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
+  Effect.ControlPlayerThisResolution _ -> Nothing
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
   Effect.TurnFaceDown _ -> Nothing

@@ -108,6 +108,8 @@ import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.ControlDuration as ControlDuration
+import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
@@ -201,6 +203,7 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -2728,6 +2731,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- CR 723.1: schedule control of `target` by this ability's controller
           -- (CR 723.5). Map.insert overwrites a prior pending control (CR 723.1a).
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
+        -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
+        _ -> gs
+  -- CR 723.2: control that takes hold NOW and lapses when this object finishes
+  -- resolving, which Pawl.Engine.Stack.resolveTopWith is what performs -- the
+  -- one place that knows a resolution has ended.
+  --
+  -- Written into the live GameState.control rather than scheduled, which is the
+  -- whole difference from the arm above: rule 723.1b's control waits for a turn,
+  -- and this one is spent inside the resolution that installed it. Map.insert
+  -- overwrites, which is rule 723.1a's answer for either kind.
+  Effect.ControlPlayerThisResolution (ControlPlayer.MkControlPlayer slot landsOnly) ->
+    State.modify' $ \gs ->
+      case legalOne slot legal of
+        Just (Recipient.ToPlayer target) ->
+          gs
+            { GameState.control =
+                Map.insert
+                  target
+                  PlayerControl.MkPlayerControl
+                    { PlayerControl.decider = Decider.MkDecider controller,
+                      PlayerControl.duration = ControlDuration.UntilResolutionEnds,
+                      PlayerControl.manaFromLandsOnly = landsOnly
+                    }
+                  (GameState.control gs)
+            }
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> do

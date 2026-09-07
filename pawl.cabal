@@ -275,10 +275,14 @@ library codec
     Pawl.Codec.ContinuousEffectSpec
     Pawl.Codec.ControlChanged
     Pawl.Codec.ControlChangedSpec
+    Pawl.Codec.ControlDuration
+    Pawl.Codec.ControlDurationSpec
     Pawl.Codec.ControllerBecomesTarget
     Pawl.Codec.ControllerBecomesTargetSpec
     Pawl.Codec.ControllerRelation
     Pawl.Codec.ControllerRelationSpec
+    Pawl.Codec.ControlPlayer
+    Pawl.Codec.ControlPlayerSpec
     Pawl.Codec.CopyException
     Pawl.Codec.CopyExceptionSpec
     Pawl.Codec.CopyStackObject
@@ -662,6 +666,8 @@ library codec
     Pawl.Codec.PlayerAttacksPlayerSpec
     Pawl.Codec.PlayerAttacksWith
     Pawl.Codec.PlayerAttacksWithSpec
+    Pawl.Codec.PlayerControl
+    Pawl.Codec.PlayerControlSpec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerCounters
@@ -1537,8 +1543,10 @@ library types
     Pawl.Types.ConjureDestination
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControlChanged
+    Pawl.Types.ControlDuration
     Pawl.Types.ControllerBecomesTarget
     Pawl.Types.ControllerRelation
+    Pawl.Types.ControlPlayer
     Pawl.Types.CopyException
     Pawl.Types.CopyStackObject
     Pawl.Types.CopyTargets
@@ -1761,6 +1769,7 @@ library types
     Pawl.Types.Player
     Pawl.Types.PlayerAttacksPlayer
     Pawl.Types.PlayerAttacksWith
+    Pawl.Types.PlayerControl
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerCounters
     Pawl.Types.PlayerCounterTally

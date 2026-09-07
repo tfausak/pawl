@@ -1028,6 +1028,7 @@ ownCounts effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
+  Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
@@ -1357,6 +1358,7 @@ effectNestedEffects effect = case effect of
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame {} -> []
   Effect.ControlPlayerNextTurn {} -> []
+  Effect.ControlPlayerThisResolution {} -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice {} -> []
   Effect.MoveToZone {} -> []
@@ -1779,6 +1781,7 @@ effectReplacements effect = case effect of
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
+  Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
@@ -2164,6 +2167,7 @@ effectMintedFaces effect = case effect of
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
+  Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
@@ -4488,6 +4492,7 @@ effectFilters effect = case effect of
   -- -- so an empty list here took a Filter a card author writes out of the lint.
   Effect.RestartGame mRef -> frame SourceHostFramed (concatMap objectRefFilters (Maybe.maybeToList mRef))
   Effect.ControlPlayerNextTurn _ -> []
+  Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> frame SourceHostFramed (objectRefFilters ref)
   -- The riders reach a Filter by TWO roads one level further down than the

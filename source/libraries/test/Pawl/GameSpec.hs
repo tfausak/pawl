@@ -558,7 +558,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
             { GameState.activePlayer = S.bob,
               GameState.phase = Phase.PrecombatMain,
               GameState.priority = Just S.bob,
-              GameState.activeControl = Just (Decider.MkDecider S.alice)
+              GameState.control = S.turnControl S.alice S.bob
             }
         after = snd (Engine.runGamePure slaveAnswer g3 Engine.priorityLoop)
         boltInBobGrave =
@@ -597,7 +597,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         -- Alice's turn: activate Mindslaver at bob; the ability resolves and
         -- installs pending control for bob (CR 723.1).
         afterActivation = snd (Engine.runGamePure gateAnswer gStart Engine.priorityLoop)
-        -- Handoff to bob's turn promotes pendingControl -> activeControl.
+        -- Handoff to bob's turn promotes pendingControl into GameState.control.
         bobsTurn = snd (Engine.runGamePure gateAnswer afterActivation Engine.handoffTurn)
         -- Bob's controlled main phase: alice decides, casting bob's Bolt at bob.
         bobMain = bobsTurn {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
@@ -612,14 +612,14 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
                 (fmap (\i -> Game.lookupObject i bobPlayed) (Game.zoneMembers Zone.Graveyard S.bob bobPlayed))
             )
     Spec.assertEqWith s "CR 723.1: control pending for bob after activation" (Map.lookup S.bob (GameState.pendingControl afterActivation)) (Just (Decider.MkDecider S.alice))
-    Spec.assertEqWith s "CR 723.1: promoted to active control on bob's turn" (GameState.activeControl bobsTurn) (Just (Decider.MkDecider S.alice))
+    Spec.assertEqWith s "CR 723.1: promoted to live control on bob's turn" (GameState.control bobsTurn) (S.turnControl S.alice S.bob)
     Spec.assertEqWith s "CR 723.3: bob is still the active player while controlled" (GameState.activePlayer bobsTurn) S.bob
     Spec.assertEqWith s "CR 723.5: bob's decisions route to alice" (Decide.deciderFor S.bob bobsTurn) (Decider.MkDecider S.alice)
     Spec.assertEqWith s "alice's whole-turn choice moved bob's life" (S.lifeOf S.bob bobPlayed) (Just 17)
     Spec.assertEqWith s "bob's Bolt went to bob's graveyard" boltInBobGrave 1
     Spec.assertEqWith s "bob's Mountain (his resource) is tapped" (S.tappedCount S.bob bobPlayed) 1
     Spec.assertEqWith s "CR 723.1: control lapses at the next turn" (Decide.deciderFor S.bob afterBob) (Decider.MkDecider S.bob)
-    Spec.assertEqWith s "active control cleared after bob's turn" (GameState.activeControl afterBob) Nothing
+    Spec.assertEqWith s "live control cleared after bob's turn" (GameState.control afterBob) Map.empty
 
   Spec.it s "CR 723.5 combat: alice declares bob's attackers, so alice takes the hit" $ do
     -- bob's turn, controlled by alice, with one 2/1 Piker. combatBoardOf sets
@@ -634,7 +634,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         g0 =
           board
             { GameState.activePlayer = S.bob,
-              GameState.activeControl = Just (Decider.MkDecider S.alice),
+              GameState.control = S.turnControl S.alice S.bob,
               GameState.combat = (GameState.combat board) {Combat.Type.defenders = [S.alice]}
             }
         after = S.runCombat controlCombatAnswer g0
@@ -655,7 +655,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
             { GameState.activePlayer = S.bob,
               GameState.phase = Phase.PrecombatMain,
               GameState.priority = Just S.bob,
-              GameState.activeControl = Just (Decider.MkDecider S.alice)
+              GameState.control = S.turnControl S.alice S.bob
             }
         after = snd (Engine.runGamePure slaveAnswer g4 Engine.priorityLoop)
     Spec.assertEqWith s "bob took 3 from his own Bolt" (S.lifeOf S.bob after) (Just 17)
@@ -1350,7 +1350,7 @@ concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
     -- not merely set up, it is OBSERVED: bob is given a land to play so a real
     -- Prompt.ChooseAction fires for him before he concedes, and the answerer
     -- records the Decider that prompt actually carried. A silent regression in
-    -- Decide.deciderFor (activeControl stops being honoured) would make this
+    -- Decide.deciderFor (GameState.control stops being honoured) would make this
     -- record MkDecider bob instead, and the test would catch it even though
     -- the headline outcome (bob departs Conceded, alice wins) would still hold.
     mountain <- S.printingOf s registry "Mountain"
@@ -1361,7 +1361,7 @@ concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
             ( (Setup.emptyGame S.bothPlayers)
                 { GameState.phase = Phase.PrecombatMain,
                   GameState.activePlayer = S.bob,
-                  GameState.activeControl = Just (Decider.MkDecider S.alice)
+                  GameState.control = S.turnControl S.alice S.bob
                 }
             )
         -- (deciders seen for bob's ChooseAction, PlayerIds seen for Concede).
@@ -1539,7 +1539,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
         after = S.runPure S.identityAnswer gone Engine.handoffTurn
     Spec.assertEqWith s "CR 800.4a's second clause already cleared it at bob's departure" (GameState.pendingControl gone) Map.empty
     Spec.assertEqWith s "carol's turn began" (GameState.activePlayer after) S.carol
-    Spec.assertEqWith s "she is uncontrolled" (GameState.activeControl after) Nothing
+    Spec.assertEqWith s "she is uncontrolled" (GameState.control after) Map.empty
     Spec.assertEqWith s "and the stale entry is gone" (GameState.pendingControl after) Map.empty
 
   Spec.it s "CR 800.4b the promotion guard stands on its own: an entry armed AFTER the departure is still not promoted" $ do
@@ -1554,7 +1554,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
         armed = gone {GameState.pendingControl = Map.singleton S.carol (Decider.MkDecider S.bob)}
         after = S.runPure S.identityAnswer armed Engine.handoffTurn
     Spec.assertEqWith s "carol's turn began" (GameState.activePlayer after) S.carol
-    Spec.assertEqWith s "she is uncontrolled" (GameState.activeControl after) Nothing
+    Spec.assertEqWith s "she is uncontrolled" (GameState.control after) Map.empty
     Spec.assertEqWith s "and the stale entry is gone" (GameState.pendingControl after) Map.empty
 
   Spec.it s "CR 723.1b a pending control whose decider is still playing IS promoted" $ do
@@ -1563,7 +1563,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     let armed = S.threePlayerGame {GameState.pendingControl = Map.singleton S.bob (Decider.MkDecider S.alice)}
         after = S.runPure S.identityAnswer armed Engine.handoffTurn
     Spec.assertEqWith s "bob's turn began" (GameState.activePlayer after) S.bob
-    Spec.assertEqWith s "alice controls him" (GameState.activeControl after) (Just (Decider.MkDecider S.alice))
+    Spec.assertEqWith s "alice controls him" (GameState.control after) (S.turnControl S.alice S.bob)
 
   Spec.it s "CR 800.4a nextStillPlaying finds the successor of a player who has ALREADY departed" $ do
     -- The unit-level statement of #143's first half. Bob's seat is looked up

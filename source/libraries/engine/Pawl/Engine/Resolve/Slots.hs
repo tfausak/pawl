@@ -46,6 +46,7 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Count as Count.Type
@@ -512,6 +513,7 @@ effectObjectRefs effect = case effect of
   -- CR 727.5's exemption, absent when nothing is exempt.
   Effect.RestartGame exempt -> Maybe.maybeToList exempt
   Effect.ControlPlayerNextTurn {} -> []
+  Effect.ControlPlayerThisResolution {} -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> [ref]
   Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> [ref]
   Effect.Attach {} -> []
@@ -669,6 +671,7 @@ effectPlayerRefs effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.RestartGame {} -> []
   Effect.ControlPlayerNextTurn {} -> []
+  Effect.ControlPlayerThisResolution {} -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice {} -> []
   Effect.Attach {} -> []
@@ -852,6 +855,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
   Effect.RestartGame _ -> Map.empty
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
+  Effect.ControlPlayerThisResolution (ControlPlayer.MkControlPlayer slot _) -> oneSlot slot
   -- The three slot fields are DEFINITIONS, not reads; they belong to boundSlots
   -- below.
   Effect.Destroy {} -> Map.empty
@@ -1309,6 +1313,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RestartGame _ -> True
   Effect.ControlPlayerNextTurn _ -> True
+  Effect.ControlPlayerThisResolution _ -> True
   Effect.Destroy {} -> True
   Effect.Sacrifice _ -> True
   Effect.TurnFaceDown _ -> True
@@ -1518,6 +1523,7 @@ readsX = any effectReadsX
       Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
       Effect.RestartGame _ -> False
       Effect.ControlPlayerNextTurn _ -> False
+      Effect.ControlPlayerThisResolution _ -> False
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
       Effect.TurnFaceDown _ -> False
@@ -1706,6 +1712,7 @@ boundSlots effect = case effect of
   Effect.PlayerSacrifices {} -> Set.empty
   Effect.RestartGame _ -> Set.empty
   Effect.ControlPlayerNextTurn _ -> Set.empty
+  Effect.ControlPlayerThisResolution _ -> Set.empty
   Effect.Sacrifice _ -> Set.empty
   Effect.TurnFaceDown _ -> Set.empty
   Effect.TurnFaceUp _ -> Set.empty

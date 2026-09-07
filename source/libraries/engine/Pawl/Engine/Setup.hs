@@ -234,7 +234,7 @@ emptyGame order =
           GameState.drawsThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
           GameState.pendingControl = Map.empty,
-          GameState.activeControl = Nothing,
+          GameState.control = Map.empty,
           GameState.monarch = Nothing,
           GameState.initiative = Nothing,
           -- CR 731.1: "the game starts with neither designation".
@@ -742,7 +742,7 @@ restartGame perform exempt starter = do
             GameState.drawsThisTurn = mempty,
             GameState.activatedThisTurn = mempty,
             GameState.pendingControl = Map.empty,
-            GameState.activeControl = Nothing,
+            GameState.control = Map.empty,
             GameState.monarch = Nothing,
             GameState.initiative = Nothing,
             -- CR 727.1 / 731.1: the restarted game is a new game, which starts
@@ -955,7 +955,7 @@ subgameStateFrom starter parent =
           GameState.drawsThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
           GameState.pendingControl = Map.empty,
-          GameState.activeControl = Nothing,
+          GameState.control = Map.empty,
           GameState.monarch = Nothing,
           GameState.initiative = Nothing,
           -- CR 729.1a / 731.1: the subgame is its own game, so it starts with

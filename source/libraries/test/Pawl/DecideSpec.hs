@@ -15,7 +15,7 @@ spec s = Spec.describe s "Pawl.Engine.Decide" $ do
     Spec.assertEq s (Decide.deciderFor S.alice gs) $ Decider.MkDecider S.alice
 
   Spec.describe s "CR 723.3: an active controlled player's decisions route to the controller" $ do
-    let gs = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = S.bob, GameState.activeControl = Just (Decider.MkDecider S.alice)}
+    let gs = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = S.bob, GameState.control = S.turnControl S.alice S.bob}
 
     Spec.it s "bob's decisions route to alice" $ do
       Spec.assertEq s (Decide.deciderFor S.bob gs) $ Decider.MkDecider S.alice
@@ -24,5 +24,5 @@ spec s = Spec.describe s "Pawl.Engine.Decide" $ do
       Spec.assertEq s (Decide.deciderFor S.alice gs) $ Decider.MkDecider S.alice
 
   Spec.it s "control applies only to the active player" $ do
-    let gs = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = S.alice, GameState.activeControl = Just (Decider.MkDecider S.alice), GameState.pendingControl = Map.empty}
+    let gs = (Setup.emptyGame S.bothPlayers) {GameState.activePlayer = S.alice, GameState.control = S.turnControl S.alice S.alice, GameState.pendingControl = Map.empty}
     Spec.assertEq s (Decide.deciderFor S.bob gs) $ Decider.MkDecider S.bob

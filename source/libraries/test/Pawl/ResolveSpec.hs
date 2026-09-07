@@ -2235,7 +2235,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         bobsTurn = snd (Engine.runGamePure S.identityAnswer resolved Engine.handoffTurn)
         afterBob = snd (Engine.runGamePure S.identityAnswer bobsTurn Engine.handoffTurn)
     Spec.assertEqWith s "control pending for bob" (Map.lookup S.bob (GameState.pendingControl resolved)) (Just (Decider.MkDecider S.alice))
-    Spec.assertEqWith s "promoted on bob's turn" (GameState.activeControl bobsTurn) (Just (Decider.MkDecider S.alice))
+    Spec.assertEqWith s "promoted on bob's turn" (GameState.control bobsTurn) (S.turnControl S.alice S.bob)
     Spec.assertEqWith s "bob's decisions route to alice" (Decide.deciderFor S.bob bobsTurn) (Decider.MkDecider S.alice)
     Spec.assertEqWith s "control expired after bob's turn" (Decide.deciderFor S.bob afterBob) (Decider.MkDecider S.bob)
   Spec.it s "CR 723.1a: a second player-controlling effect overwrites the first (last created wins)" $ do

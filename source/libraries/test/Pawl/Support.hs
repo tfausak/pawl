@@ -67,6 +67,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -102,6 +103,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -457,6 +459,19 @@ threePlayers = alice NonEmpty.:| [bob, carol]
 -- priority tests, mirroring what `Setup.emptyGame bothPlayers` is for two.
 threePlayerGame :: GameState.GameState
 threePlayerGame = Setup.emptyGame threePlayers
+
+-- CR 723.1's control row as GameState.control holds it: `decider` makes
+-- `controlled`'s choices for a whole turn, with no CR 723.7 restriction. What
+-- Mindslaver installs, and what a test hand-building a controlled board wants.
+turnControl :: PlayerId.PlayerId -> PlayerId.PlayerId -> Map.Map PlayerId.PlayerId PlayerControl.PlayerControl
+turnControl decider controlled =
+  Map.singleton
+    controlled
+    PlayerControl.MkPlayerControl
+      { PlayerControl.decider = Decider.MkDecider decider,
+        PlayerControl.duration = ControlDuration.UntilTurnEnds,
+        PlayerControl.manaFromLandsOnly = False
+      }
 
 -- Every attack option turned OFF, leaving CR 507.1's choice of ONE defending
 -- player. The one thing that differs from the board handed in, so a case about
@@ -3100,7 +3115,7 @@ oneMountainState mountain ph =
           GameState.drawsThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
           GameState.pendingControl = Map.empty,
-          GameState.activeControl = Nothing,
+          GameState.control = Map.empty,
           GameState.monarch = Nothing,
           GameState.initiative = Nothing,
           GameState.daytime = Nothing,

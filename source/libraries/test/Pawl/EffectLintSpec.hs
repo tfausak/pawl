@@ -230,6 +230,7 @@ ownQuantities effect = case effect of
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> [quantity]
   Effect.RestartGame _ -> []
   Effect.ControlPlayerNextTurn _ -> []
+  Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   -- The entry riders' counts, which Resolve.slotsOf reads and ownCounts does
@@ -1114,6 +1115,7 @@ effectObjectRefs effect = case effect of
   -- nothing.
   Effect.RestartGame mRef -> read_ (Maybe.maybeToList mRef)
   Effect.ControlPlayerNextTurn {} -> []
+  Effect.ControlPlayerThisResolution {} -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
   Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
   -- THE gather that asks, and the one that elides the random arm (#1733).
@@ -1692,7 +1694,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         -- the enumeration is checkable by reading down that file.
         --
         -- One shape of singular reader is deliberately absent:
-        -- Effect.ControlPlayerNextTurn,
+        -- Effect.ControlPlayerNextTurn, Effect.ControlPlayerThisResolution,
         -- MonarchTarget's InSlot and ExchangeSides' WithController match
         -- Recipient.ToPlayer, and no binder in boundPlurally mints a player slot.
         --

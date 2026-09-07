@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.CarryOver as CarryOver
+import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
@@ -25,6 +26,7 @@ import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
@@ -35,10 +37,35 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
 
--- The runner-aware resolve-the-top-of-stack: CR 729.1a's "the spell or ability
--- that created the subgame" names both kinds of object, so the injected runner
--- goes to the spell branch and to all three ability branches alike; see #137.
--- Engine.priorityLoop supplies playSubgame.
+-- The runner-aware resolve-the-top-of-stack: resolve one object, then let go of
+-- the control its resolution held (CR 723.2).
+resolveTopWith :: Game Result -> Game ()
+resolveTopWith runSubgame = do
+  resolveOneWith runSubgame
+  State.modify' endResolutionControl
+
+-- CR 723.2's lapse -- "until Word of Command finishes resolving". Applied after
+-- resolveOneWith rather than inside its spell branch, since either kind of
+-- object could carry the opcode, and this is the one place that knows a
+-- resolution is over.
+--
+-- Every UntilResolutionEnds row and not just the resolving object's, because a
+-- resolution is not re-entrant: nothing runs between the effect that wrote a row
+-- and this call except the rest of that same resolution. The CR 723.1 rows are
+-- untouched, their expiry being Pawl.Engine.Engine.beginTurnOf's.
+endResolutionControl :: GameState.GameState -> GameState.GameState
+endResolutionControl gs =
+  gs
+    { GameState.control =
+        Map.filter
+          ((/= ControlDuration.UntilResolutionEnds) . PlayerControl.duration)
+          (GameState.control gs)
+    }
+
+-- One object resolves. CR 729.1a's "the spell or ability that created the
+-- subgame" names both kinds of object, so the injected runner goes to the spell
+-- branch and to all three ability branches alike; see #137. Engine.priorityLoop
+-- supplies playSubgame.
 --
 -- CR 608.3: a resolving permanent spell becomes a permanent on the battlefield;
 -- anything else resolves its effects and then goes to its owner's graveyard
@@ -48,8 +75,8 @@ import qualified Pawl.Types.Zone as Zone
 -- off the type line -- and never on the card's identity. There must never be a
 -- `case card of ...` here; that is the fusion of the closed and open halves
 -- that sinks the project.
-resolveTopWith :: Game Result -> Game ()
-resolveTopWith runSubgame = do
+resolveOneWith :: Game Result -> Game ()
+resolveOneWith runSubgame = do
   gs <- State.get
   case GameState.stack gs of
     [] -> pure ()
