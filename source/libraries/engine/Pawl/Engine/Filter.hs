@@ -91,8 +91,11 @@ data View = MkView
     -- there -- a mana cost is printed on the card and rule 202.3 names no zone
     -- -- which is what lets ManaValueAtMost filter a graveyard.
     --
-    -- Nothing where there is no card to read: a player view, or an object with
-    -- no card behind it such as an ability on the stack.
+    -- Just for every OBJECT, an ability on the stack included: CR 109.1 makes
+    -- one an object and CR 202.3a gives an object with no mana cost a 0
+    -- (Pawl.CounterspellSpec's Synthetic Weigh the Trigger group). Nothing where
+    -- there is no object at all -- a player view, or an event snapshot carrying
+    -- none.
     manaValue :: Maybe Integer,
     controller :: Maybe PlayerId.PlayerId,
     -- CR 108.3 / 110.2: the candidate's OWNER -- the player who started the game
@@ -1289,7 +1292,8 @@ matches context view predicate = case predicate of
   -- an animated land has a mana value of 0 and so an EVEN one.
   --
   -- Vacuously False where there is no mana value at all, exactly as the atom
-  -- above is: a player, or an object with no card behind it.
+  -- above is: a player, or an event snapshot carrying none. An ability on the
+  -- stack is NOT that case -- CR 202.3a's 0 is even, and it matches.
   Filter.ManaValueIsEven -> maybe False even (manaValue view)
   -- CR 202.3 against the slot's computed bound. Vacuously False for a candidate
   -- with no mana value at all, PowerLessThanSource's posture: it is not "a card
