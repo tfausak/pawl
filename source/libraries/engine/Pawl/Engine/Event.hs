@@ -2941,8 +2941,9 @@ apply batch candidate event =
     (ReplacementEffect.UntapR _, _) -> pure (Just event)
     -- CR 614.1a: the RESIZING arms leave the event standing at a rewritten loss,
     -- which is what makes them composable: CR 616.2's next iteration re-collects
-    -- against the rewritten loss, and a second row can act on it again. The last
-    -- arm cancels instead, and is the exception the two above are read against.
+    -- against the rewritten loss, and a second row can act on it again. The two
+    -- arms after them cancel instead, and are the exception the resizing pair is
+    -- read against.
     --
     -- No arm here touches the DAMAGE, on the CR 120.4c road. By CR 120.4b it has
     -- already been dealt, and Pawl.Engine.Damage.applyDamage still gains a
@@ -2976,7 +2977,8 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         pure (Just (ProposedEvent.WouldLoseLife cause pid (Replacement.scale scaling n)))
       -- CR 614.6 with CR 119.4: Ashiok, Wicked Manipulator's "exile that many
-      -- cards from the top of your library instead". THE ONE ARM THAT CANCELS:
+      -- cards from the top of your library instead". A CANCELLING ARM, as
+      -- GainInstead below is:
       -- rule 614.6's "if an event is replaced, it never happens", so no life is
       -- lost, no CR 119.4 subtraction is made and no GameEvent.LifeLost is
       -- recorded -- Nothing, not a loss rewritten to nothing. What the payment
@@ -3006,6 +3008,23 @@ apply batch candidate event =
           Just you -> do
             Monad.mapM_ (`changeZone` Zone.Exile) (take (Natural.toIntSaturating n) (Game.zoneMembers Zone.Library you gs))
             pure Nothing
+      -- CR 614.6 with CR 728.1a: Strong, the Brutish Thespian's "you gain life
+      -- rather than lose life from radiation". THE SECOND ARM THAT CANCELS, the
+      -- one above for its reason: the loss never happens, so no life total goes
+      -- down and no GameEvent.LifeLost is recorded.
+      --
+      -- The gain goes through resolveLifeGain, CR 614.1's funnel for the gain
+      -- class -- the DrawR arm's GainLife road below and for its reason: the life
+      -- this rewrite substitutes is a life gain event like any other, so a
+      -- LifeGainR row resizes it.
+      --
+      -- The seat is the one the EVENT named, which for the producer is CR 109.5's
+      -- "you" as well: its pattern is LifeLossPattern's Yours.
+      LifeLossRewrite.GainInstead -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        settled <- resolveLifeGain pid n
+        changeLife pid (toInteger settled)
+        pure Nothing
     -- Unreachable: `applies` admits LifeLossR only against WouldLoseLife.
     (ReplacementEffect.LifeLossR {}, _) -> pure (Just event)
     -- CR 614.1a: Boon Reflection's "you gain twice that much life instead". The
@@ -5639,19 +5658,32 @@ counterOne source controller oid = do
 -- players in the same breath, so one event over a Recipient beats two events.
 --
 -- The KIND is passed in rather than derived. Rule 601.2c's parenthetical is about
--- spells (CR 112.1) while CR 602.2b and CR 603.3d bring abilities (CR 113.3) to
--- the same step, and only the caller knows which it is putting on the stack;
--- the matcher that later reads this has no GameState to ask.
+-- spells (CR 112.1) while CR 602.2b and CR 603.3d bring CR 113.3b's and CR
+-- 113.3c's abilities to the same step, and only the caller knows which it is
+-- putting on the stack; the matcher that later reads this has no GameState to
+-- ask.
 --
 -- CALLED AFTER THE ANNOUNCEMENT SUCCEEDS rather than at rule 601.2c's own
 -- position in the sequence. The rule puts the trigger before the costs are paid
 -- but holds the ability off the stack "until the spell has finished being cast",
--- and CR 601.2 rewinds the whole announcement if it does not -- so a trigger
--- recorded here and one recorded earlier differ only in a case where the earlier
--- one would have to be taken back.
+-- and CR 601.2 rewinds the whole announcement if it does not.
+--
+-- The position IS observable, and not only through a rewind: this runs after the
+-- costs are paid, so an activation whose cost removes the creature it also
+-- targeted -- Rune-Brand Juggler sacrificing the suspected creature its own
+-- ability names -- records the event with that permanent already gone, where CR
+-- 601.2c made it a target while it stood (gap #3418).
+--
+-- BRACKETED, which is what makes CR 603.2c's first sentence readable: rule
+-- 601.2c makes the chosen objects targets in one announcement, so every event
+-- this loop records shares one Pawl.Types.EventGroup and
+-- Event.Trigger.oncePerBatch can collapse a batch condition to one firing.
+-- Unbracketed, a batch-scoped arm is inert -- each recipient gets a group of its
+-- own and fires the ability again. Per-occurrence siblings are unaffected:
+-- eventTriggers keys them Nothing, so ward on two creatures still fires twice.
 becameTarget :: ObjectId -> StackObjectKind.StackObjectKind -> PlayerId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Game ()
 becameTarget source kind controller chosen =
-  Foldable.for_ (concatMap Set.toAscList (Map.elems chosen)) $ \targeted ->
+  simultaneously . Foldable.for_ (concatMap Set.toAscList (Map.elems chosen)) $ \targeted ->
     State.modify'
       . recordEvent
       $ GameEvent.BecameTarget
@@ -6849,6 +6881,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- Nor is the batch reading of the same rule: CR 601.2c's announcement is not
+  -- an ability triggering however many permanents it named.
+  TriggerCondition.PermanentsBecomeTargeted {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
@@ -7141,6 +7176,9 @@ controllerTurnScoped cond = case cond of
   -- Its player-side sibling likewise: a spell can name its controller on anybody's
   -- turn.
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- And the bystander batch reading likewise: an activated ability can name a
+  -- creature on anybody's turn.
+  TriggerCondition.PermanentsBecomeTargeted {} -> False
   -- CR 714.3c's turn-based action falls on the Saga controller's own turn, but
   -- nothing restricts this CONDITION to it: CR 714.3a's entry replacement can put
   -- a Saga's last lore counter on during anybody's turn, and the watcher is not

@@ -37,8 +37,9 @@ data LifeLossRewrite
     Scaled Scaling.Scaling
   | -- | Ashiok, Wicked Manipulator's "exile that many cards from the top of your
     -- library instead": CR 614.6's other shape, where the loss does not happen at
-    -- all and a different action takes its place. Every arm above rewrites the
-    -- event's AMOUNT and leaves a life loss standing; this one removes the event.
+    -- all and a different action takes its place. The two arms above rewrite the
+    -- event's AMOUNT and leave a life loss standing; this one and GainInstead
+    -- below remove the event.
     --
     -- Payload-free, because rule 614.6's substituted action is fixed by the
     -- printed clause down to its count: the number of cards is the proposed
@@ -51,4 +52,16 @@ data LifeLossRewrite
     -- stated against the PROPOSED AMOUNT and no Pawl.Types.Condition on the
     -- printed ability can see that.
     ExileFromTopOfYourLibrary
+  | -- | Strong, the Brutish Thespian's "you gain life rather than lose life from
+    -- radiation": CR 614.6's substituted action again, where the loss does not
+    -- happen and a life GAIN of the same size takes its place.
+    --
+    -- Payload-free for ExileFromTopOfYourLibrary's reason: the amount gained is
+    -- the amount that would have been lost, which the proposed event already
+    -- carries, and the seat is the one the event named.
+    --
+    -- The substituted gain goes through Pawl.Engine.Event.resolveLifeGain, CR
+    -- 614.1's funnel for the gain class, so a Pawl.Types.LifeGainR row resizes it
+    -- -- Pawl.Types.DrawRewrite's GainLife arm for its reason.
+    GainInstead
   deriving (Eq, Ord, Show)

@@ -166,6 +166,8 @@ import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -203,6 +205,7 @@ import qualified Pawl.Types.PerCreature as PerCreature
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
+import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -601,7 +604,7 @@ playerRefPositions =
     ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
     ("surveil", Effect.Surveil (playerQuantity "su"), [plantedPlayer "su"]),
     ("fateseal", Effect.Fateseal (playerQuantity "fs"), [plantedPlayer "fs"]),
-    ("lose-life", Effect.LoseLife (playerQuantity "ll"), [plantedPlayer "ll"]),
+    ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect), [plantedPlayer "ll"]),
     ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
     ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
     ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
@@ -996,6 +999,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Its player-side sibling carries a PlayerRelation and a StackObjectKind, and
   -- no Count either.
   TriggerCondition.ControllerBecomesTarget {} -> []
+  -- Nor does the bystander batch reading, which carries a Filter and a
+  -- StackObjectKind.
+  TriggerCondition.PermanentsBecomeTargeted {} -> []
 
 -- Every Count reachable from one effect: the Quantities nested in its
 -- ObjectRefs, its own Quantity/Duration fields, and -- for Create/CreateEmblem
@@ -1062,7 +1068,7 @@ ownCounts effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
     Discard.These {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -1821,7 +1827,7 @@ effectReplacements effect = case effect of
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
   Effect.Discard {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
@@ -2221,7 +2227,7 @@ effectMintedFaces effect = case effect of
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
   Effect.Discard {} -> []
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
@@ -3448,6 +3454,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- targeting object's controller and a kind read off the event, so there is no
   -- Filter here either.
   TriggerCondition.ControllerBecomesTarget {} -> []
+  -- The bystander batch reading DOES carry one, and it is card text like any
+  -- other: Professor Hojo's "creatures you control".
+  TriggerCondition.PermanentsBecomeTargeted payload -> unframed [PermanentsBecomeTargeted.filter payload]
 
 -- Every SlotName a TriggerCondition names OUTRIGHT. Exhaustive with no
 -- fallthrough, triggerConditionCounts' shape and for its reason: a condition
@@ -3542,6 +3551,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfCast -> []
   TriggerCondition.SelfBecomesTargeted _ -> []
   TriggerCondition.ControllerBecomesTarget _ -> []
+  TriggerCondition.PermanentsBecomeTargeted _ -> []
   TriggerCondition.SelfHalfUnlocked _ -> []
   TriggerCondition.RoomFullyUnlocked _ -> []
   -- Recursive, for triggerConditionCounts' reason: a branch of an AnyOf may be
@@ -4620,7 +4630,7 @@ effectFilters effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
     Discard.These ref -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _) -> frame Unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)

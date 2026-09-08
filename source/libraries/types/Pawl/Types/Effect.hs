@@ -37,6 +37,7 @@ import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
+import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
@@ -240,9 +241,10 @@ data Effect card ability
   | -- | CR 701.9: the slot's target player discards this many, choosing which
     -- (CR 701.9b); a hand smaller than the count discards all of it (CR 609.3).
     Discard Discard.Discard
-  | -- | CR 119.3: the players the PlayerRef names each lose this much life --
-    -- not damage aimed at a player, CR 119.2 running one way only.
-    LoseLife PlayerQuantity.PlayerQuantity
+  | -- | CR 119.3: the players the LifeLoss names each lose this much life -- not
+    -- damage aimed at a player, CR 119.2 running one way only -- and, for rule
+    -- 728.1's ability alone, say so as CR 728.1a's loss rather than as CR 119.3's.
+    LoseLife LifeLoss.LifeLoss
   | -- | CR 119.3: the players the PlayerRef names each gain this much life,
     -- LoseLife's mirror but for the sign.
     GainLife PlayerQuantity.PlayerQuantity

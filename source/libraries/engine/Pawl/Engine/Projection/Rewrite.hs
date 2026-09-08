@@ -87,6 +87,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
+import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
@@ -105,6 +106,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
+import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -484,7 +486,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted x -> Effect.Discard (Discard.Counted x {CountedDiscard.quantity = rewriteQuantity pairs (CountedDiscard.quantity x)})
     Discard.These ref -> Effect.Discard (Discard.These (rewriteObjectRef pairs ref))
-  Effect.LoseLife x -> Effect.LoseLife (rewritePlayerQuantity pairs x)
+  Effect.LoseLife x -> Effect.LoseLife x {LifeLoss.quantity = rewriteQuantity pairs (LifeLoss.quantity x)}
   Effect.GainLife x -> Effect.GainLife (rewritePlayerQuantity pairs x)
   Effect.ExchangeLifeTotals _ -> effect
   Effect.SetLifeTotal x -> Effect.SetLifeTotal (rewritePlayerQuantity pairs x)
@@ -1348,6 +1350,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfCast -> condition
   TriggerCondition.SelfBecomesTargeted _ -> condition
   TriggerCondition.ControllerBecomesTarget {} -> condition
+  TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted f kind) -> TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted (Filter.rewrite pairs f) kind)
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerCycles _ -> condition
   TriggerCondition.PlayerDrawsNthCard {} -> condition

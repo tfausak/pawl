@@ -76,6 +76,8 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal
@@ -97,7 +99,6 @@ import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
-import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
@@ -2862,9 +2863,10 @@ afflict n =
   where
     effect =
       Effect.LoseLife
-        ( PlayerQuantity.MkPlayerQuantity
+        ( LifeLoss.MkLifeLoss
             (PlayerRef.InSlot Binding.triggerPlayer)
             (Quantity.Literal (toInteger n))
+            LifeLossCause.ByEffect
         )
 
 -- CR 702.134a, the first minted ability that TARGETS. A REAL choice, since with

@@ -11,7 +11,7 @@ import qualified Pawl.Types.StackObjectKind as StackObjectKind
 -- a spell trigger at this point ...)". Recorded by Pawl.Engine.Event.becameTarget,
 -- the one funnel every announcement goes through, once per targeted recipient.
 -- CR 602.2b and CR 603.3d put an activated and a triggered ability through the
--- same rule, which is what `kind` distinguishes.
+-- same rule, and `kind` tells all three apart.
 --
 -- An announcement is not the only way in. CR 115.1 has the targets declared "as
 -- part of the process of putting the spell or ability on the stack", and CR
@@ -33,7 +33,7 @@ data BecameTarget = MkBecameTarget
     -- ability object -- not CR 113.7's source permanent -- for an ability, since
     -- that is what a ward trigger counters.
     source :: ObjectId.ObjectId,
-    -- | Which of CR 601.2c's two roads `source` came by. Dormant Gomazoa reads
+    -- | Which of CR 601.2c's announcement roads `source` came by. Dormant Gomazoa reads
     -- "the target of A SPELL" (CR 112.1) where ward and Amulet of Safekeeping read
     -- "a spell or ability",
     -- and the matcher that answers both is pure with no GameState, so the
