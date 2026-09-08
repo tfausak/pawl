@@ -63,6 +63,10 @@ less the `-Wno-*` list in `pawl.cabal`'s `common library` stanza.
   clauses.
 - Avoid using partial functions (`head`, `fromJust`) and writing them
   (non-exhaustive matches, `undefined`, `error`); return `Maybe`/`Either`.
+  Tests may use them, where blowing up is the same as failing *(hlint)*.
+- Avoid `Debug.Trace`, `System.IO.Unsafe`, `Unsafe.Coerce` and
+  `Control.Concurrent`; avoid `throw`, lazy `foldl` and `decodeUtf8` in favor
+  of `Either`, `foldl'` and `decodeUtf8'` *(hlint)*.
 - Prefer `do` notation to `>>=` chains, and monadic `do` (bind each field,
   then `pure Record { title = title, ... }`) to `<$>`/`<*>` for building
   records --- the applicative form silently swaps same-typed fields. Never

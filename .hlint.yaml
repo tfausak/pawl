@@ -52,3 +52,46 @@
   - name: toEnum
     within: []
     message: "Use a named total conversion, such as Data.Char.chr."
+
+# Prefer `case`, but `fromMaybe` is sometimes clearer; the choice is the
+# author's.
+- ignore: {name: "Replace case with fromMaybe"}
+
+# Avoid partial functions. Allowed in tests, where blowing up at runtime is
+# the same as failing.
+- functions:
+  - name:
+    - Data.List.head
+    - Data.List.tail
+    - Data.List.!!
+    - Data.Maybe.fromJust
+    - Prelude.head
+    - Prelude.tail
+    - error
+    - errorWithoutStackTrace
+    - undefined
+    within: ["**.*Spec", Pawl.Support]
+    message: "Return Maybe or Either instead."
+  - name: [read, reads]
+    within: ["**.*Spec", Pawl.Support]
+    message: "Use a total parser, such as Text.Read.readMaybe."
+  - name: Data.Text.Encoding.decodeUtf8
+    within: []
+    message: "Use Data.Text.Encoding.decodeUtf8' instead."
+
+# Avoid throwing from pure code.
+- functions:
+  - name: Control.Exception.throw
+    within: []
+    message: "Return Either, or use throwIO in IO."
+
+# Avoid the lazy left fold, which builds a thunk chain.
+- functions:
+  - name: [Data.Foldable.foldl, Data.List.foldl]
+    within: []
+    message: "Use Data.Foldable.foldl' instead."
+
+# Avoid unsafe and debugging-only modules.
+- modules:
+  - name: [Debug.Trace, System.IO.Unsafe, Unsafe.Coerce, Control.Concurrent]
+    within: []
