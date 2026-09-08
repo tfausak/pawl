@@ -125,6 +125,22 @@ data Quantity
     -- be that player's attacks. CR 805.10a's several attacking players are what
     -- would break that (#2848).
     OpponentsAttacked PlayerRef.PlayerRef
+  | -- | CR 508.1a / 608.2i: how many creatures that player declared as attackers
+    -- this turn, folded from the turn-scoped GameEvent.AttackerDeclared log.
+    --
+    -- Rule 207.2c's raid is this compared against 1, and it is neither of the two
+    -- arms it sits between. OpponentsAttacked counts the OPPONENTS a declaration
+    -- reached, so an attack aimed only at a planeswalker (CR 506.3) answers 0;
+    -- Filter.AttackedThisTurn asks a candidate whether it attacked, so a count
+    -- over the battlefield loses an attacker that has since died. Raid asks
+    -- neither: it asks whether the DECLARATION happened, which only the log
+    -- records.
+    --
+    -- WHO declared is not on the event and does not need to be, OpponentsAttacked's
+    -- reason: CR 506.2 makes the attacking player the active player, and the log's
+    -- extent is one turn, so every declaration in it is the active player's. CR
+    -- 805.10a's several attacking players are what would break that (#2848).
+    AttackersDeclaredThisTurn PlayerRef.PlayerRef
   | -- | CR 701.9a / 608.2i: how many cards that player discarded this turn,
     -- folded from the turn-scoped GameEvent.Discarded log.
     CardsDiscardedThisTurn PlayerRef.PlayerRef

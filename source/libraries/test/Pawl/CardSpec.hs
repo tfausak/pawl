@@ -3092,6 +3092,7 @@ quantityKindFilters quantity = case quantity of
   -- nothing to dig out.
   Quantity.Type.ObjectCountersOfAnyKind -> []
   Quantity.Type.OpponentsAttacked _ -> []
+  Quantity.Type.AttackersDeclaredThisTurn _ -> []
   Quantity.Type.CardsDiscardedThisTurn _ -> []
   Quantity.Type.LifeGainedThisTurn _ -> []
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []

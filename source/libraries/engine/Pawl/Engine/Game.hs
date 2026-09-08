@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
 import qualified Pawl.Types.Asked as Asked
@@ -1933,3 +1934,27 @@ lifeGainOf event = case event of
 lifeGainedThisTurn :: GameState -> PlayerId -> Natural
 lifeGainedThisTurn gs pid =
   sum (fmap snd (filter ((== pid) . fst) (Maybe.mapMaybe (lifeGainOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
+
+-- CR 508.1a / 608.2i: how many creatures this player declared as attackers this
+-- turn. lifeGainedThisTurn's footing -- a fold over GameState.events, whose
+-- extent Pawl.Engine.Engine.beginTurnOf's clearing makes "this turn".
+--
+-- The ATTACKING PLAYER is resolved through CR 506.2 rather than off the event,
+-- which records the attacker and the defender but not the declarer: the active
+-- player is the attacking player, and one turn's log can only hold one active
+-- player's declarations. CR 805.10a's several attacking players would break that
+-- (#2848).
+--
+-- CR 508.4's creature put onto the battlefield attacking stays out, only
+-- Pawl.Engine.Combat.declareAttackers appending the event -- the same scope
+-- Pawl.Engine.Projection.View.declaredIt reads.
+attackersDeclaredThisTurn :: GameState -> PlayerId -> Natural
+attackersDeclaredThisTurn gs pid
+  | GameState.activePlayer gs /= pid = 0
+  | otherwise = Natural.length (filter (isAttackerDeclaration . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+
+-- Does this event record an attacker declaration (CR 508.1k)?
+isAttackerDeclaration :: GameEvent -> Bool
+isAttackerDeclaration event = case event of
+  GameEvent.AttackerDeclared _ -> True
+  _ -> False

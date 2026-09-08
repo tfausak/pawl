@@ -7,6 +7,7 @@
 -- machinery.
 module Pawl.CardTriggerSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -3229,6 +3230,88 @@ aimEveryTargetAt oid p = case p of
 tapStatusOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStatusOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
+-- Raid, and the question neither near-miss asks. CR 207.2c makes the ability word
+-- itself meaningless, so "if you attacked this turn" is ordinary card text and CR
+-- 603.4's intervening "if" is the whole mechanism: the trigger checks the
+-- condition when the permanent enters, and CR 608.2a checks it again on
+-- resolution.
+--
+-- Mardu Skullhunter {1}{B} Creature -- Human Warrior 2/1 (KTK, Oracle text
+-- checked against Scryfall 2026-09-08): "This creature enters tapped. / Raid --
+-- When this creature enters, if you attacked this turn, target opponent discards
+-- a card." Quantity.AttackersDeclaredThisTurn compared against 1 is that clause.
+--
+-- ONE board separates the three readings, which is why it is built the way it is:
+-- alice's Cabal Evangel attacks bob's Jace Beleren and is killed by his blocking
+-- Hill Giant, and the Skullhunter is cast in the postcombat main phase.
+--
+--   * Quantity.OpponentsAttacked counts the OPPONENTS a declaration reached (CR
+--     508.3b), and CR 506.3's planeswalker is not one, so it answers 0 here.
+--   * Filter.AttackedThisTurn asks a CANDIDATE whether it attacked, so a count of
+--     it over the battlefield answers 0 once the attacker has died.
+--   * CR 608.2i's look-back over the turn's declarations answers 1, and bob
+--     discards.
+--
+-- The control leg is the same board with the attack declined, which is the only
+-- difference between the two: the Skullhunter still enters, and bob keeps both
+-- cards.
+marduSkullhunterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+marduSkullhunterSpec s registry = Spec.describe s "MarduSkullhunter" $ do
+  Spec.it s "CR 603.4 raid: an attack aimed at a planeswalker by a creature that then died still discards" $ do
+    built <- S.buildBoardOrFail s registry raidBoard
+    case (aliasIn "jace" built, aliasIn "attacker" built) of
+      (Just jaceId, Just attackerId) -> do
+        let atBlockers = S.runPure (aimAtPlaneswalker jaceId) (S.builtState built) Engine.runStep
+            after = S.runPure (aimAtPlaneswalker jaceId) atBlockers (Monad.replicateM_ 4 Engine.runStep)
+        Spec.assertEqWith s "CR 603.4 / 608.2i: bob discarded, so raid saw the declaration" (S.handSize S.bob after) 1
+        Spec.assertEqWith s "and it really was announced at the planeswalker (CR 508.1b), where OpponentsAttacked counts 0" (Map.lookup attackerId (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertBool s (not (S.onBattlefield attackerId after)) "and the attacker was dead by then, where a Count of Filter.AttackedThisTurn over the battlefield reads 0"
+      _ -> Spec.assertFailure s "fixture should alias bob's Jace and alice's attacker"
+  Spec.it s "CR 603.4 the control leg: with no attack declared the Skullhunter enters and nothing is discarded" $ do
+    built <- S.buildBoardOrFail s registry raidBoard
+    let after = S.runPure decliningAttacks (S.builtState built) (Monad.replicateM_ 5 Engine.runStep)
+    Spec.assertEqWith s "bob keeps both cards" (S.handSize S.bob after) 2
+    -- CR 400.7's new object, so this counts by name rather than by the id the
+    -- fixture aliased in alice's hand.
+    Spec.assertEqWith s "and the Skullhunter still entered, so it is the condition that differs and not the cast" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Mardu Skullhunter")) S.alice after) 1
+
+-- alice at the declare attackers step with one 2/2 to attack with, two Swamps for
+-- the {1}{B}, and the Skullhunter in hand; bob with a Jace Beleren to be attacked,
+-- a 3/3 to block with, and two cards to lose one of. Distinct values throughout:
+-- the blocker outlives the attacker it kills, and bob's hand goes 2 to 1.
+raidBoard :: S.Board
+raidBoard =
+  S.board
+    ( (S.battlefield S.alice [S.settled "attacker" "Cabal Evangel", S.permanent "Swamp", S.permanent "Swamp"])
+        { S.setupHand = Seq.singleton (S.aliased "skullhunter" (S.cardSetup "Mardu Skullhunter"))
+        }
+        NonEmpty.:| [ (S.battlefield S.bob [S.aliased "jace" (S.permanent "Jace Beleren"), S.settled "blocker" "Hill Giant"])
+                        { S.setupHand = Seq.fromList [S.cardSetup "Forest", S.cardSetup "Mountain"]
+                        }
+                    ]
+    )
+    S.alice
+    S.declareAttackers
+
+aliasIn :: String -> S.BuiltBoard -> Maybe ObjectId.ObjectId
+aliasIn name built = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+
+-- S.fightAnswer with CR 508.1b's announcement aimed at the planeswalker rather
+-- than at bob. Everything else is shared with the control answerer below, so the
+-- two boards differ in the declaration alone.
+aimAtPlaneswalker :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtPlaneswalker jaceId p = case p of
+  Prompt.ChooseAttackTarget _ _ _ options ->
+    Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlaneswalker jaceId) (NonEmpty.toList options))
+  _ -> S.fightAnswer p
+
+-- The same answerer with CR 508.1a's choice made empty: alice attacks with
+-- nothing, and still casts.
+decliningAttacks :: Prompt.Prompt r -> r
+decliningAttacks p = case p of
+  Prompt.DeclareAttackers {} -> []
+  _ -> S.fightAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anafenzaAttackSpec s registry
@@ -3259,3 +3342,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   graftedWargearSpec s registry
   sixthSenseSpec s registry
   betrayalSpec s registry
+  marduSkullhunterSpec s registry
