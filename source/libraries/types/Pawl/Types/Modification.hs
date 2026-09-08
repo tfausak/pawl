@@ -207,13 +207,13 @@ data Modification ability
     -- candidate-list-gate half of that rule cannot drift apart.
     SetLandSubtypeToChosen
   | AddLandSubtype Subtype.Subtype -- layer 4, CR 305.7 add (Urborg -> Swamp)
-  | -- | layer 4, CR 205.1a/205.1b set (Turn to Frog -> Frog). A SET over the
-    -- CREATURE types only, which is narrower than either land arm above: CR
-    -- 205.1b keeps the object's other card types and subtypes and replaces only
-    -- its creature types. CR 205.3m is the list of what that reaches.
+  | -- | layer 4, CR 205.1a set (Turn to Frog -> Frog). A SET over the CREATURE
+    -- types only, which is narrower than either land arm above: CR 205.1a
+    -- replaces the object's existing subtypes from that one family and leaves
+    -- its card types alone. CR 205.3m is the list of what that reaches.
     --
     -- AddCreatureSubtype sits beside it, the way AddColor sits beside SetColor
-    -- below. CR 205.1b allows several creature types and this carries exactly
+    -- below. CR 205.1a allows several creature types and this carries exactly
     -- one, the same narrowing SetLandSubtype takes.
     SetCreatureSubtype Subtype.Subtype
   | -- | layer 4, CR 205.1b add (Life and Limb -> Saproling). The ADD beside the
@@ -239,6 +239,19 @@ data Modification ability
     -- denies the granted instance CDA status), so
     -- Pawl.Engine.Projection.grantedDefiningParts mints this arm.
     AddEveryCreatureSubtype
+  | -- | layer 4, CR 613.1d / CR 205.1a: this object loses every creature type.
+    -- "Loses all creature types" (Nameless Inversion) is the printed wording.
+    --
+    -- NULLARY, the mirror of AddEveryCreatureSubtype above and for its reason:
+    -- rule 205.3m's list is the payload and no card enumerates it.
+    --
+    -- A REMOVAL rather than SetCreatureSubtype over an empty set, which is
+    -- LoseAllAbilities' shape: CR 205.1a's last sentence -- "removing an
+    -- object's subtype doesn't affect its card types at all" -- is a statement
+    -- about removal, and it is what keeps a stripped artifact creature an
+    -- artifact. Pawl.ProjectionSpec's "CR 205.1a Nameless Inversion strips the
+    -- Wall type, and the Wall blocks what no Wall may block" proves that.
+    LoseEveryCreatureSubtype
   | -- | layer 4, CR 613.1d / CR 205.1b add, over the subtype families the two
     -- family-tagged adds above cannot reach: CR 205.3g's artifact types (Ygra,
     -- Eater of All's "other creatures are Food artifacts in addition to their

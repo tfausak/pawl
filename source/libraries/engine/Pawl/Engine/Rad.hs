@@ -19,9 +19,10 @@
 -- for a KEYWORD ACTION (CR 701.54) and wrong here, rule 728.1 naming no action
 -- of its own.
 --
--- CR 728.1a's "life loss from radiation" -- the thing Strong, the Brutish
--- Thespian reads -- is NOT here: no card in the pool asks which life loss came
--- from this ability (#856).
+-- CR 728.1a's "life loss from radiation" is the one thing rule 728.1 states that
+-- ordinary vocabulary cannot: the loss below carries
+-- LifeLossCause.ByRadiation, which is what Strong, the Brutish Thespian's
+-- replacement narrows by. Pawl.RadSpec's Strong group proves it.
 module Pawl.Engine.Rad where
 
 import qualified Data.List as List
@@ -44,6 +45,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
@@ -58,7 +61,6 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -160,7 +162,18 @@ ability =
                         -- "for each nonland card milled this way, that player
                         -- loses 1 life" -- one life per card, which is the count
                         -- itself.
-                        Effect.LoseLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot milledSlot)),
+                        --
+                        -- CR 728.1a's cause, the one field of this ability that no
+                        -- card could have written: rule 728.1a makes "life loss
+                        -- from radiation" mean a loss this very ability caused, so
+                        -- the loss says so and Pawl.Engine.Replacement.applies
+                        -- narrows by it.
+                        Effect.LoseLife
+                          ( LifeLoss.MkLifeLoss
+                              (PlayerRef.Relative PlayerRelation.You)
+                              (Quantity.InSlot milledSlot)
+                              LifeLossCause.ByRadiation
+                          ),
                         -- "and removes one rad counter from themselves",
                         -- likewise once per card.
                         Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot))

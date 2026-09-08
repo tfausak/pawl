@@ -16,15 +16,17 @@ module Pawl.Types.LifeLossCause where
 -- about a proposed loss says where it came from, the player and the amount being
 -- identical either way. Only the caller knows.
 --
--- Read by Pawl.Engine.Replacement.applies, and by nothing else.
+-- Read by Pawl.Engine.Replacement.applies, and by nothing else. WRITTEN by
+-- whichever caller reaches Pawl.Engine.Event.resolveLifeLoss, and for the effect
+-- road by Pawl.Types.LifeLoss' own field.
 data LifeLossCause
   = -- | CR 120.3a: the life a damage event causes its player to lose, proposed by
     -- Pawl.Engine.Damage.applyDamage at CR 120.4c's result-processing step. The
     -- DAMAGE itself is settled by then and is not what this rewrites -- which is
     -- why a lifelink source still gains its controller the whole amount dealt.
     ByDamage
-  | -- | CR 119.3: the life an effect causes a player to lose --
-    -- Pawl.Engine.Resolve's Effect.LoseLife arm, and every arm of its that arrives
+  | -- | CR 119.3: the life an effect causes a player to lose -- every printing's
+    -- Effect.LoseLife through Pawl.Engine.Resolve, and every arm of its that arrives
     -- at a lower TOTAL (a set, CR 701.12c's exchange, CR 119.7's redistribution),
     -- rule 119.5 spelling that as the player losing "the necessary amount of
     -- life".
@@ -41,4 +43,13 @@ data LifeLossCause
     -- Pawl.ReplacementSpec's Ashiok group is what proves the grain: a payment is
     -- replaced where damage on the same board is not.
     ByPayment
+  | -- | CR 728.1a: the life rule 728.1's inherent triggered ability costs a
+    -- player, which is the whole of what a card means by "from radiation" --
+    -- Pawl.Engine.Rad.ability, carried on the Pawl.Types.LifeLoss it builds.
+    --
+    -- Its own arm rather than ByEffect's, because rule 728.1a says a printed
+    -- clause narrows by exactly this grain: Strong, the Brutish Thespian gains
+    -- life rather than losing it to radiation, where an ordinary effect's loss
+    -- still takes life. Pawl.RadSpec's Strong group is what proves it.
+    ByRadiation
   deriving (Bounded, Enum, Eq, Ord, Show)

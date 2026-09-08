@@ -7,8 +7,8 @@
 -- proven independently of any card wiring; the card-level proofs live alongside.
 -- Also Pawl.Engine.Subtype, the CR 205.3i land-type and CR 205.3m creature-type
 -- classifications the layer-4 SetLandSubtype, SetCreatureSubtype,
--- AddCreatureSubtype and AddEveryCreatureSubtype arms fold with, and the
--- untagged AddSubtype beside them.
+-- AddCreatureSubtype, AddEveryCreatureSubtype and LoseEveryCreatureSubtype arms
+-- fold with, and the untagged AddSubtype beside them.
 module Pawl.ProjectionSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -2573,6 +2573,40 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member Subtype.Type.Goblin subtypes) "and still the printed Goblin (CR 205.1b: the add keeps the rest)"
     Spec.assertBool s (not (Set.member Subtype.Type.Island subtypes)) "and not a land type"
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId after) "and flying"
+
+  -- CR 205.1a's LAST sentence -- "removing an object's subtype doesn't affect
+  -- its card types at all" -- which is the layer-4 removal beside the add above.
+  -- Nameless Inversion is the card ("target creature gets +3/-3 and loses all
+  -- creature types until end of turn"), and Otarian Juggernaut is the reader:
+  -- its CR 509.1b restriction is "can't be blocked by Walls", so a Wall's
+  -- Wall-ness is observable in a real declare blockers step rather than only in
+  -- a projection.
+  --
+  -- Secret Door is an Artifact Creature -- Wall 0/4, so the +3/-3 leaves a 3/1
+  -- that survives the block, kills the 2/3 Juggernaut, and is still an artifact.
+  -- alice's own Wall of Stone is the control: it is not the target and keeps its
+  -- Wall type. It sits on the ATTACKING side and has defender, so it neither
+  -- attacks nor is ever offered as a blocker -- which is what keeps
+  -- aggressiveAnswer's declaration legal as a whole (CR 509.1b).
+  Spec.it s "CR 205.1a Nameless Inversion strips the Wall type, and the Wall blocks what no Wall may block" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    juggernaut <- S.printingOf s registry "Otarian Juggernaut"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    secretDoor <- S.printingOf s registry "Secret Door"
+    inversion <- S.printingOf s registry "Nameless Inversion"
+    let (base, mine, theirs) = S.combatBoardOf [juggernaut, wallOfStone] [secretDoor]
+    case (mine, theirs) of
+      ([_, wallId], [doorId]) -> do
+        let stripped = castAtCreature doorId inversion (S.landsFor swamp S.alice 2 base)
+            after = S.settleSba (S.fightWith S.aggressiveAnswer stripped)
+        Spec.assertEqWith s "the stripped Door was a legal blocker, so bob took nothing" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "and the 3/1 it became killed the 2/3 Juggernaut" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Otarian Juggernaut")) S.alice after) 0
+        Spec.assertEqWith
+          s
+          "CR 205.1a no creature type left, still an Artifact Creature, and the untargeted Wall keeps its type"
+          (Projection.subtypesOf doorId stripped, Projection.cardTypesOf doorId stripped, Projection.subtypesOf wallId stripped)
+          (Set.empty, Set.fromList [CardType.Artifact, CardType.Creature], Set.singleton Subtype.Type.Wall)
+      _ -> Spec.assertFailure s "fixture should have two attacking printings and one blocker"
 
   -- THE TWO ROUTES, ONE BOARD. CR 604.3a(2) gives CDA status only to an ability
   -- printed on the card it affects (or on a token's creating effect, or acquired

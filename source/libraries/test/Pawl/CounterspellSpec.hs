@@ -2649,8 +2649,9 @@ counterKindWard subtype = CounterKind.Keyword (Keyword.Hexproof (Just (Filter.Ty
 -- target", oracle checked against Scryfall 2026-09-08) is the READER these
 -- groups need: CR 702.11d stops "[quality] spells your opponents control", so
 -- telling a hexproof from Goblins counter from a hexproof from Zombies one needs
--- a spell that is a Goblin and not a Zombie. Wings of Velis Vel, the only other
--- Kindred instant in data/cards/, has changeling and so is both at once.
+-- a spell that is a Goblin and not a Zombie. The other Kindred instants in
+-- data/cards/ -- Wings of Velis Vel and Nameless Inversion -- both have
+-- changeling and so are both at once.
 --
 -- CR 702.11d's other half -- an ability from a [quality] source -- would do as
 -- well, and Kill-Suit Cultist is the pool's Goblin permanent with a targeted

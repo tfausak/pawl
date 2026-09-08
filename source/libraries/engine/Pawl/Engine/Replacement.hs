@@ -839,6 +839,11 @@ breaches gs you rewrite pid n = case rewrite of
   -- the front of that same list.
   LifeLossRewrite.ExileFromTopOfYourLibrary ->
     maybe False (\owner -> Natural.length (Game.zoneMembers Zone.Library owner gs) >= n) you
+  -- Strong, the Brutish Thespian's clause states no applicability at all: a loss
+  -- turned into a gain of the same size always changes the event, and rule 614.6
+  -- removes it whatever the board says. Event.resolveLifeLoss never proposes a
+  -- loss of 0, so there is no zero case to refuse.
+  LifeLossRewrite.GainInstead -> True
 
 -- CR 614.1a: would this rewrite actually change the gain? `breaches` above, for
 -- the gain class -- and simpler, since every arm of Pawl.Types.LifeGainRewrite
@@ -1786,6 +1791,10 @@ readsApplier re = case re of
   -- 704.5j's legend rule does not leave standing. No board can put the two
   -- answers apart, and False would still be the wrong classification.
   ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ LifeLossRewrite.ExileFromTopOfYourLibrary) -> True
+  -- The life goes to the seat the EVENT named and the amount is the event's own,
+  -- so two rows alike in `effect` gain the same player the same life whoever holds
+  -- them -- the resizing arms' answer, not the exiling arm's.
+  ReplacementEffect.LifeLossR (LifeLossR.MkLifeLossR _ LifeLossRewrite.GainInstead) -> False
   -- The gain side's whole rewrite sum, and the two resizing loss arms' answer:
   -- the scaling is the effect's own field and the player is the one the event
   -- named. Cased on the inner sum, LifeLossR's discipline above for its reason.

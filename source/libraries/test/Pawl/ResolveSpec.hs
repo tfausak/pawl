@@ -85,6 +85,8 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -109,7 +111,6 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -3618,7 +3619,7 @@ nonWinnersLose3 :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility 
 nonWinnersLose3 =
   let slot = SlotName.MkSlotName (Text.pack "winner")
    in [ Effect.PlaySubgame slot,
-        Effect.LoseLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.EachPlayerExcept slot) (Quantity.Literal 3))
+        Effect.LoseLife (LifeLoss.MkLifeLoss (PlayerRef.EachPlayerExcept slot) (Quantity.Literal 3) LifeLossCause.ByEffect)
       ]
 
 -- A hand-built {0} sorcery of alice's on the stack, one chosen mode holding

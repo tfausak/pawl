@@ -126,6 +126,10 @@ layer m = case m of
   Modification.AddCreatureSubtype _ -> Layer.Type
   Modification.AddEveryCreatureSubtype -> Layer.Type
   -- CR 613.1d, and a regression fence rather than a proved behaviour: no board
+  -- in the pool orders Nameless Inversion's removal against an effect in
+  -- another layer, so answering any other layer here leaves the suite green.
+  Modification.LoseEveryCreatureSubtype -> Layer.Type
+  -- CR 613.1d, and a regression fence rather than a proved behaviour: no board
   -- in the pool orders the one AddSubtype (Ygra, Eater of All's Food) against an
   -- effect in another layer, so answering any other layer here leaves the suite
   -- green.
@@ -288,6 +292,11 @@ applyModification viewOf src gs oid unitTypes m pc =
         -- (CR 613.3); this runs in timestamp order (CR 613.7).
         Modification.AddEveryCreatureSubtype ->
           pc {PC.subtypes = Set.union (gainableSubtypes unitTypes Subtype.everyCreatureType) (PC.subtypes pc)}
+        -- CR 205.1a's last sentence: the removal reaches CR 205.3m's family and
+        -- nothing else, so PC.cardTypes is untouched here and a stripped
+        -- artifact creature is still an artifact and still a creature.
+        Modification.LoseEveryCreatureSubtype ->
+          pc {PC.subtypes = Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc)}
         -- CR 205.1b's add again, over CR 205.3g's and CR 205.3h's families: the
         -- object keeps every subtype it had. Literally the two adds above, and
         -- deliberately so -- what differs is CR 612.2's gate, which lives on the
@@ -469,6 +478,7 @@ cardTypesAfter m types = case m of
   Modification.SetCreatureSubtype _ -> types
   Modification.AddCreatureSubtype _ -> types
   Modification.AddEveryCreatureSubtype -> types
+  Modification.LoseEveryCreatureSubtype -> types
   Modification.AddSubtype _ -> types
   Modification.ChangeSubtypeWord {} -> types
   Modification.AddSupertype _ -> types
@@ -931,6 +941,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCreatureSubtype _ -> Just m
         Modification.AddEveryCreatureSubtype -> Just m
+        Modification.LoseEveryCreatureSubtype -> Just m
         Modification.AddSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.SetCardType _ -> Just m
@@ -972,6 +983,7 @@ quantitiesOf m = case m of
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCreatureSubtype _ -> []
   Modification.AddEveryCreatureSubtype -> []
+  Modification.LoseEveryCreatureSubtype -> []
   Modification.AddSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.SetCardType _ -> []
@@ -1012,6 +1024,7 @@ setsLandSubtype m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
+  Modification.LoseEveryCreatureSubtype -> False
   -- Not a SET, so CR 305.7 does not fire whatever family the subtype belongs to
   -- -- the same answer AddLandSubtype gives above, and Pawl.CardSpec keeps CR
   -- 205.3i's land types off this arm anyway.
@@ -1811,6 +1824,7 @@ removesAbilities m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
+  Modification.LoseEveryCreatureSubtype -> False
   Modification.AddSubtype _ -> False
   Modification.SetBasePowerToughness {} -> False
   Modification.ModifyPowerToughness {} -> False
@@ -2682,6 +2696,12 @@ modificationWrites m = case m of
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddEveryCreatureSubtype -> Set.singleton Subtypes
+  -- The honest answer -- the arm writes PC.subtypes and nothing else, and CR
+  -- 205.1a's last sentence is why it writes no card type -- but a regression
+  -- fence rather than a proved behaviour: no board in the pool makes another
+  -- effect's affected set depend on a creature type this arm took away, so
+  -- Set.empty here leaves the suite green too.
+  Modification.LoseEveryCreatureSubtype -> Set.singleton Subtypes
   -- The honest answer -- the arm writes PC.subtypes and nothing else -- but a
   -- regression fence rather than a proved behaviour: no board in the pool makes
   -- another effect depend on the one AddSubtype, so Set.empty here leaves the
@@ -2745,6 +2765,7 @@ modificationReads m = case m of
   Modification.SetCreatureSubtype _ -> Set.empty
   Modification.AddCreatureSubtype _ -> Set.empty
   Modification.AddEveryCreatureSubtype -> Set.empty
+  Modification.LoseEveryCreatureSubtype -> Set.empty
   Modification.AddSubtype _ -> Set.empty
   Modification.ChangeSubtypeWord {} -> Set.empty
   Modification.AddCardType _ -> Set.empty
@@ -4105,6 +4126,7 @@ grantsKeywordWhere p m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
+  Modification.LoseEveryCreatureSubtype -> False
   Modification.AddSubtype _ -> False
   Modification.AddCardType _ -> False
   Modification.SetCardType _ -> False
@@ -4168,6 +4190,7 @@ grantsMintingType m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
+  Modification.LoseEveryCreatureSubtype -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
   Modification.SetController _ -> False
