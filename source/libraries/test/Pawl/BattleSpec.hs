@@ -33,7 +33,8 @@
 --
 -- Goblin Piker and Bog Wraith join it for the combat cases, and are the pool's
 -- plainest bodies: a vanilla 2/1 and a 3/3 whose entire text is swampwalk. Neither
--- is a battle, so every case below reads rule 310 rather than the attacker.
+-- is a battle, so attackSpec's cases read rule 310 rather than the attacker.
+-- frontlinerSpec is the one group here that reads an attacker's text on purpose.
 --
 -- And how a battle is defeated: CR 310.6 / 120.3h's damage removing defense
 -- counters, CR 115.4's "any target" admitting one, CR 310.12b's intrinsic Siege
@@ -701,8 +702,8 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
 -- "Whenever this creature attacks a battle, it gets +1/+1 until end of turn") is
 -- the producer. attackSpec's board is what makes the two readings distinguishable:
 -- carol protects the Siege AND is the defending player (CR 310.9d), so a condition
--- reading GameEvent.AttackerDeclared's `defender` fires on both legs below and one
--- reading its `target` fires on neither the second.
+-- reading GameEvent.AttackerDeclared's `defender` pumps on BOTH legs below, where
+-- one reading its `target` pumps only on the first.
 frontlinerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 frontlinerSpec s registry = Spec.describe s "Attacking a battle" $ do
   Spec.it s "CR 508.3a whole card: Thrashing Frontliner declared at the Siege gets +1/+1" $ do

@@ -1792,7 +1792,9 @@ attemptAttackDeclaration perform pid rejected = do
               -- creature was declared attacking, which for a battle is a
               -- permanent whose protector is the defending player (CR 310.9d).
               -- Pawl.BattleSpec's "CR 508.3a whole card: Thrashing Frontliner
-              -- attacking the Siege" is what proves the two are read apart.
+              -- declared at the Siege gets +1/+1" is what proves the two are read
+              -- apart, its falsifier being the same board with the announcement
+              -- aimed at the protector instead.
               State.modify'
                 ( \g ->
                     let declared = Natural.length attacking
