@@ -65,7 +65,7 @@ data Source
     --
     -- Not implemented: CR 730.2g's instant or sorcery component, which keeps a
     -- face-down merged permanent from turning face up (#3392); CR 730.2i/730.2j's
-    -- double-faced components (#874).
+    -- double-faced components (#3428).
     OfMerge (NonEmpty.NonEmpty MergeComponent.MergeComponent)
   | -- | CR 111.3/111.6: a token -- a permanent not represented by a card. Its
     -- characteristics ARE a Card (CR 111.3: effect-defined values are functionally

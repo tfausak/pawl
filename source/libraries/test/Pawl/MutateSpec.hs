@@ -366,7 +366,7 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: it was doubled before the merge too" (countersOn (counted board)) (Just 2)
     Spec.assertEqWith s "setup: and the merged permanent is Cubwarden, which prints no replacement effect" (fmap S.nameOf (Game.cardOf host after)) (Just (CardName.MkCardName (Text.pack "Cubwarden")))
   -- CR 702.140c's choice is only put to a player where it decides something. A
-  -- MELDED target is one the merge refuses (#874) -- CR 712.8g gives such a
+  -- MELDED target is one the merge refuses (#3430) -- CR 712.8g gives such a
   -- permanent only its combined back face, which is no component of it, so there
   -- is no component list to extend -- and the side would be answered and then
   -- thrown away, an elided rule showing up as a real decision. A pair of boards
@@ -489,6 +489,49 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "setup: CR 110.5 the status itself is set" (fmap Object.flipped (Game.lookupObject host after)) (Just True)
     Spec.assertEqWith s "setup: the 1/1 connected, which is what fired the trigger" (S.lifeOf S.bob after) (Just 19)
     Spec.assertEqWith s "setup: the two cards represent one permanent, the flip card on top" (componentNames host after) [CardName.MkCardName (Text.pack "Akki Lavarunner"), CardName.MkCardName (Text.pack "Cubwarden")]
+  -- CR 730.2h over the OTHER order, which is the whole of what this case adds:
+  -- "if a merged permanent contains a flip card" reaches a component ANYWHERE
+  -- among them, where CR 730.2a's topmost component is only where the
+  -- characteristics come from. Cubwarden merges OVER Akki Lavarunner, so the
+  -- merged permanent is a 3/5 Cubwarden carrying CR 702.140e's haste and Akki's
+  -- own flip trigger; it attacks unblocked, and that trigger flips the permanent
+  -- Akki is now the BOTTOM component of.
+  --
+  -- The DISCRIMINATOR is the ability set and not the box, since CR 730.2a leaves
+  -- every characteristic Cubwarden's either way: the flipped reading the merge
+  -- stamped folds Tok-Tok's read in where Akki's was, so protection from red
+  -- arrives and haste goes. Haste is asserted beside it because an
+  -- implementation that reached the alternative half by ADDING it to the merge's
+  -- existing stamp would keep haste and still gain the protection.
+  Spec.it s "CR 730.2h a merged permanent flips for a flip component that is not its topmost one" $ do
+    plains <- S.printingOf s registry "Plains"
+    akki <- S.printingOf s registry "Akki Lavarunner"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    let (host, board, spellId) = mutateBoard plains akki cubwarden
+        merged = merging MutateSide.Over host board spellId
+        after = S.runCombat S.aggressiveAnswer (intoCombat merged)
+    Spec.assertEqWith
+      s
+      "CR 730.2h the bottom component's alternative characteristics apply: Tok-Tok's protection from red arrives and Akki's haste goes"
+      (Projection.hasKeyword protectionFromRed host after, Projection.hasKeyword Keyword.Haste host after)
+      (True, False)
+    Spec.assertEqWith
+      s
+      "CR 730.2a while the topmost component is still what every characteristic comes from: a 3/5 Cubwarden with its own lifelink"
+      (Projection.namesOf host after, S.powerToughnessOf host after, Projection.hasKeyword Keyword.Lifelink host after)
+      (Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")), Just (3, 5), True)
+    -- The fixture facts, after the behaviours: the flip card really was under
+    -- the other component, the flip really happened, the same permanent really
+    -- did read the normal half before it, and the combat that fired the trigger
+    -- really connected.
+    Spec.assertEqWith s "setup: the two cards represent one permanent, the flip card UNDER the other" (componentNames host after) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Akki Lavarunner")]
+    Spec.assertEqWith s "setup: CR 110.5 the status itself is set" (fmap Object.flipped (Game.lookupObject host after)) (Just True)
+    Spec.assertEqWith
+      s
+      "setup: before the flip the same permanent had Akki's haste and no protection from red"
+      (Projection.hasKeyword protectionFromRed host merged, Projection.hasKeyword Keyword.Haste host merged)
+      (False, True)
+    Spec.assertEqWith s "setup: the 3/5 connected, which is what fired the trigger" (S.lifeOf S.bob after) (Just 17)
   -- CR 903.9c's split names "the card that represents it and is a commander",
   -- and CR 111.6 says a token is not a card -- so a merged commander's TOKEN
   -- component is put into the appropriate zone with every other non-commander
@@ -837,6 +880,11 @@ mutateCost = ManaCost.MkManaCost [ManaSymbol.Generic 2, theWhite, theWhite]
 
 theWhite :: ManaSymbol.ManaSymbol
 theWhite = ManaSymbol.OfType (ManaType.Colored Color.White)
+
+-- Tok-Tok, Volcano Born's printed keyword, which the flip cases read to tell the
+-- alternative half apart from the normal one.
+protectionFromRed :: Keyword.Keyword
+protectionFromRed = Keyword.Protection (Filter.Type.HasColor Color.Red)
 
 -- What CR 730.3's split puts into alice's graveyard, by name.
 graveyardNames :: GameState.GameState -> [CardName.CardName]

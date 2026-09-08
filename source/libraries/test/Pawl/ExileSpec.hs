@@ -406,11 +406,17 @@ foretoldBoard s registry = do
 -- that spell exiles cards face down without looking at them first, and its
 -- owner may name none of them.
 --
--- Pawl's Extract Power is STRICTER than printed twice over, and this group proves
--- only the look. Nothing here can spell "without paying their mana costs" for a
--- permission granted over an exiled card (#3433), so its GrantPlayFromExile makes
--- the cards playable at their cost; and CR 406.3a's turn face up at announcement
--- is missing (#3434), so neither card can actually be cast.
+-- Pawl's Extract Power is STRICTER than printed, and this group proves only the
+-- look. Nothing here can spell "without paying their mana costs" for a
+-- permission granted over an exiled card (#3433), so its GrantPlayFromExile
+-- makes the cards playable at their cost.
+--
+-- Not implemented: CR 406.3a's turn face up as the card is played. Both cards
+-- ARE offered and cast today -- Pawl.Engine.Cast.proposedFace branches on
+-- Object.facing, which no exile rider writes, and never on
+-- Object.exiledFaceDown -- so what is missing is the ordering: the cast is
+-- announced while the card is still exiled face down, and nothing consults CR
+-- 406.3b or CR 601.3f there (#3434).
 extractPower :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 extractPower s registry = Spec.describe s "Extract Power" $ do
   Spec.it s "CR 406.3 the player the exiling instruction let look names both cards, and the owner who was shown nothing gets their pile" $ do
