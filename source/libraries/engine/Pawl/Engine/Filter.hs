@@ -2142,8 +2142,9 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- Of those, only Sacrifice has a producer: Dark Heart of the Wood on an
 -- activation cost, and Lithophage on the cost a trigger offers as it resolves
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
--- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents and
--- PutCardFromHandOntoBattlefield arms are a regression fence: no printing pairs
+-- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
+-- ExileCardFromHand and PutCardFromHandOntoBattlefield arms are a regression
+-- fence: no printing pairs
 -- any of them with a basic land type, so no test can falsify them. Magmatic
 -- Insight's "discard a land card" and Hakbal of the Surging Soul's "a land card
 -- from your hand" come closest and are still not one -- CR 612.2 swaps a SUBTYPE
@@ -2158,6 +2159,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> CostComponent.DiscardCards (DiscardCards.MkDiscardCards n (rewrite pairs criterion))
   CostComponent.PutCardFromHandOntoBattlefield criterion -> CostComponent.PutCardFromHandOntoBattlefield (rewrite pairs criterion)
+  CostComponent.ExileCardFromHand criterion -> CostComponent.ExileCardFromHand (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component

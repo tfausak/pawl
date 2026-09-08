@@ -194,7 +194,8 @@ data Prompt r where
   -- in APNAP order (CR 101.4).
   ChooseCardInGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card of their own hand a Pawl.Types.ObjectRef.ChosenCardInHand
-  -- takes; also CostComponent.PutCardFromHandOntoBattlefield's question while
+  -- takes; also CostComponent.PutCardFromHandOntoBattlefield's and
+  -- CostComponent.ExileCardFromHand's question while
   -- a CR 118.12 cost is paid, where the ObjectId is the object the cost is on.
   ChooseCardInHand :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card of a bound group a Pawl.Types.ObjectRef.ChosenCardFromAmong

@@ -109,6 +109,10 @@ data CostComponent keyword
     -- the paying player's graveyard matching the Filter, which CR 404.2's fixed
     -- order identifies without a prompt.
     ExileTopFromGraveyard (Filter.Filter keyword)
+  | -- | CR 406.2 out of a hidden zone / Cadaverous Bloom: the paying player
+    -- exiles one card matching the Filter from their own hand, which the payer
+    -- chooses.
+    ExileCardFromHand (Filter.Filter keyword)
   | -- | CR 701.17a as a cost / Millikin: the paying player mills this many cards.
     -- The only component that moves a card out of a library, which CR 605.1a reads
     -- to bar a mana ability and CR 601.2h reads to put the payment in its second
