@@ -455,6 +455,11 @@ data Keyword
     -- target slot and CR 730's merge are minted from this constructor rather
     -- than printed.
     Mutate (Cost.Cost Keyword)
+  | -- | 702.89a: "If enchanted permanent would be destroyed, instead remove all
+    -- damage marked on it and destroy this Aura." A CR 614.1 destruction
+    -- replacement, minted from this constructor onto the Aura rather than
+    -- printed; CR 702.89b's "totem armor" is the same ability's old name.
+    UmbraArmor
   deriving (Eq, Ord, Show)
 
 -- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one

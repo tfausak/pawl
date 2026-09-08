@@ -514,6 +514,35 @@ admits :: Regenerability.Regenerability -> DestructionCause.DestructionCause -> 
 admits regenerability cause rewrite = case rewrite of
   DestructionRewrite.Regenerate -> regenerability == Regenerability.Regenerable
   DestructionRewrite.RemoveShieldCounter -> cause == DestructionCause.ByEffect
+  -- CR 702.89a states neither restriction: "if enchanted permanent would be
+  -- destroyed" reaches CR 704.5g's lethal damage and a spell's destroy alike,
+  -- and umbra armor is not a regeneration, so CR 701.19c's prohibition leaves it
+  -- standing.
+  DestructionRewrite.UmbraArmor -> True
+
+-- CR 614.1: which permanent's destruction each rewrite watches for -- the one
+-- fact about a DestructionR that is not in a pattern.
+--
+-- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the ability's own
+-- source, so a regeneration is self-only. CR 122.1c's "this permanent" is the
+-- same self-scope reached from the other direction: the effect is minted onto the
+-- permanent holding the counters. CR 702.89a is the one that is not self-scoped
+-- -- the ability is the Aura's and the event is the enchanted permanent's -- which
+-- is why this is a function of the board rather than an equality.
+--
+-- A function rather than a Filter pattern on the constructor because no card
+-- describes the set: two of the three rules name the source itself and the third
+-- names its attachment.
+scopes :: GameState -> DestructionRewrite.DestructionRewrite -> ObjectId -> ObjectId -> Bool
+scopes gs rewrite src oid = case rewrite of
+  DestructionRewrite.Regenerate -> src == oid
+  DestructionRewrite.RemoveShieldCounter -> src == oid
+  -- CR 702.89a's "enchanted permanent": what the AURA is attached to, read off
+  -- Object.attachedTo. A row whose source is attached to a player (CR 303.4a's
+  -- other Aura shape) matches nothing, which is right -- rule 702.89a's subject
+  -- is a permanent.
+  DestructionRewrite.UmbraArmor ->
+    (Recipient.objectOf =<< (Object.attachedTo =<< Game.lookupObject src gs)) == Just oid
 
 -- CR 615.7: a spent shield is not an applicable prevention effect at all, and is
 -- refused HERE rather than applied for nothing -- as `admits` refuses a
@@ -609,13 +638,10 @@ applies gs event candidate =
             && unspent rewrite
             && admitsRecipient src rewrite de
             && (not (redirects rewrite) || redirectable gs de)
-        -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
-        -- ability's own source, so a destruction replacement is self-only. CR
-        -- 122.1c's "this permanent" is the same self-scope reached from the other
-        -- direction: the effect is minted onto the permanent holding the counters.
-        -- DestructionR carries no pattern because both producers are self-scoped.
+        -- DestructionR carries no pattern: each rewrite names its subject by
+        -- identity or by attachment, which `scopes` reads off the board.
         (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability cause) ->
-          src == oid && admits regenerability cause rewrite
+          scopes gs rewrite src oid && admits regenerability cause rewrite
         (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldPutCounters cause oid kind _) ->
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.

@@ -1238,6 +1238,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   entryBudgetSpec s registry
   warLeechSpec s registry
   faerieSquadronSpec s registry
+  hyenaUmbraSpec s registry
 
 -- Faerie Squadron {U} Creature -- Faerie 1/1, whole text: "Kicker {3}{U} (You may
 -- pay an additional {3}{U} as you cast this spell.) / If this creature was
@@ -2589,3 +2590,73 @@ atDeclareAttackers gs =
 
 attackersIn :: GameState.GameState -> [ObjectId.ObjectId]
 attackersIn gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
+
+-- Murder aimed at `victim`, FILTERED out of the offered set rather than built
+-- from the id (CR 608.2b re-reads the recipient at resolution, and a hand-built
+-- Recipient.ToObject is a different one).
+umbraTarget :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+umbraTarget victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just victim) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- How many of alice's graveyard cards have this printing's name. A ZONE count,
+-- not an id lookup: CR 400.7 mints a new object for the card that arrives, so
+-- the destroyed Aura's battlefield id names nothing there.
+inAliceGraveyard :: Printing.Printing -> GameState.GameState -> Int
+inAliceGraveyard printing gs =
+  let wanted oid = fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName printing)
+   in length (filter wanted (Game.zoneMembers Zone.Graveyard S.alice gs))
+
+-- CR 702.89a: "If enchanted permanent would be destroyed, instead remove all
+-- damage marked on it and destroy this Aura." A destruction replacement whose
+-- SOURCE is not the permanent whose destruction it replaces, which is what
+-- Pawl.Engine.Replacement.scopes exists for.
+hyenaUmbraSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hyenaUmbraSpec s registry = Spec.describe s "Hyena Umbra (CR 702.89a)" $ do
+  -- The pair on ONE board differs in exactly the keyword: two War Mammoths, one
+  -- under Hyena Umbra (3/3 +1/+1 = a 4/4) and one under Unholy Strength (3/3
+  -- +2/+1 = a 5/4), so four damage is CR 704.5g lethal to both and the same SBA
+  -- pass decides both.
+  Spec.it s "CR 704.5g lethal damage destroys the Aura instead, and the marked damage comes off" $ do
+    mammoth <- S.printingOf s registry "War Mammoth"
+    hyenaUmbra <- S.printingOf s registry "Hyena Umbra"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    let base = Setup.emptyGame S.bothPlayers
+        (armored, g1) = S.addPermanent mammoth S.alice base
+        (bare, g2) = S.addPermanent mammoth S.alice g1
+        (umbra, g3) = S.addPermanent hyenaUmbra S.alice g2
+        (strength, g4) = S.addPermanent unholyStrength S.alice g3
+        board = S.attach strength bare (S.attach umbra armored g4)
+        hurt = S.markDamage bare 4 (S.markDamage armored 4 board)
+        settled = S.settleSba hurt
+    Spec.assertEqWith
+      s
+      "CR 702.89a the enchanted creature survives, with the marked damage removed"
+      (S.onBattlefield armored settled, S.damageOf armored settled)
+      (True, Just 0)
+    Spec.assertEqWith
+      s
+      "and the Aura took the destruction instead, so it is in its owner's graveyard"
+      (S.onBattlefield umbra settled, inAliceGraveyard hyenaUmbra settled)
+      (False, 1)
+    Spec.assertBool s (not (S.onBattlefield bare settled)) "control: the Mammoth under an Aura WITHOUT umbra armor died"
+  -- CR 702.89a says "would be destroyed" and names no cause, so the same ability
+  -- covers a spell's destruction too. The case above is CR 704.5g's road into
+  -- Pawl.Engine.Event.destroyInBatch from Sba; this is CR 701.8a's, which a
+  -- resolving Murder reaches through Pawl.Engine.Event.destroy.
+  Spec.it s "CR 701.8a a Murder on the enchanted creature destroys the Aura instead" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    hyenaUmbra <- S.printingOf s registry "Hyena Umbra"
+    murder <- S.printingOf s registry "Murder"
+    let (armored, g1) = S.addPermanent mammoth S.alice (S.landsInPlay swamp 3)
+        (umbra, g2) = S.addPermanent hyenaUmbra S.alice g1
+        (board, spellId) = S.handOne murder (S.attach umbra armored g2)
+        cast = S.runPure (umbraTarget armored) board (S.cast S.alice spellId)
+        after = S.settleSba (S.runPure (umbraTarget armored) cast Stack.resolveTop)
+    Spec.assertBool s (S.onBattlefield armored after) "CR 702.89a the Murder's destruction was replaced, so the Mammoth is still there"
+    Spec.assertEqWith
+      s
+      "and the Aura died in its place"
+      (S.onBattlefield umbra after, inAliceGraveyard hyenaUmbra after)
+      (False, 1)

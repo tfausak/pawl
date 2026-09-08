@@ -586,10 +586,13 @@ engineMintedDamage rewrite = case rewrite of
   DamageRewrite.RunEffects _ -> False
 
 -- The destruction half of the same question. CR 701.19a's regeneration IS printed
--- (Drudge Skeletons), where CR 122.1c's removal is minted.
+-- (Drudge Skeletons), where CR 122.1c's removal and CR 702.89a's umbra armor are
+-- minted -- the latter from Pawl.Types.Keyword's UmbraArmor, which is what a card
+-- writes instead (Hyena Umbra).
 engineMintedDestruction :: DestructionRewrite.DestructionRewrite -> Bool
 engineMintedDestruction rewrite = case rewrite of
   DestructionRewrite.RemoveShieldCounter -> True
+  DestructionRewrite.UmbraArmor -> True
   DestructionRewrite.Regenerate -> False
 
 -- The non-vacuity half of the same lint: is this the replacement that carries a

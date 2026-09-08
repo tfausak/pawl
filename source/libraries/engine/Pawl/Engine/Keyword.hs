@@ -57,6 +57,7 @@ import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
@@ -314,6 +315,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Exert -> []
   -- CR 702.184a is an ACTIVATED ability; battlefieldAbilitiesFor mints it.
   Keyword.Station -> []
+  -- CR 702.89a states a REPLACEMENT and nothing else; see mintedReplacementsFor.
+  Keyword.UmbraArmor -> []
 
 -- CR 702: record WHICH KEYWORD's rules this minted ability is under, which is
 -- Pawl.Types.ActivatedAbility.keyword and what familyGranting below reads.
@@ -456,6 +459,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   -- CR 702.184a's ability puts its counters on "this permanent", so it belongs to
   -- battlefieldAbilitiesFor and not to this hand roster.
   Keyword.Station -> []
+  Keyword.UmbraArmor -> []
 
 -- CR 702.29a's whole ability, minted from the one cost the keyword carries.
 --
@@ -698,6 +702,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   -- CR 702.184a states a whole self-contained ability, so one per instance,
   -- crew's reading above.
   Keyword.Station -> List.genericReplicate count station
+  Keyword.UmbraArmor -> []
 
 -- CR 702.122a's whole ability, minted from the one number the keyword carries.
 --
@@ -1200,6 +1205,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Undying -> []
   -- CR 702.184a permits no casting; the station card is cast for its own cost.
   Keyword.Station -> []
+  Keyword.UmbraArmor -> []
 
 -- | CR 702.127a's SECOND static ability: "this half of this split card can't be
 -- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
@@ -1911,6 +1917,16 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Undying -> []
   -- CR 702.184a replaces nothing: it is an activated ability.
   Keyword.Station -> []
+  -- CR 702.89a's whole content, minted onto the AURA rather than onto what it
+  -- enchants: the ability is the Aura's, so the Aura is the row's source and CR
+  -- 616.1's choice between two umbra armors is a choice between two candidates.
+  -- Pawl.Engine.Replacement.scopes is what turns that source into the rule's
+  -- "enchanted permanent".
+  --
+  -- ONE ROW PER INSTANCE, riot's reading: rule 702.89a states one replacement
+  -- apiece, and the two rows are equal values told apart by the instance ordinal
+  -- Replacement.collect assigns.
+  Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR DestructionRewrite.UmbraArmor)
 
 -- The SHORT-CIRCUIT's voice: Projection.replacementsAffecting skips the whole
 -- board when nothing it walks -- the permanents' COPIABLE rules text, the stored
@@ -2087,6 +2103,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- CR 702.184a restricts no attack or block; CR 721.2b's threshold is what
   -- decides whether the permanent is a creature at all.
   Keyword.Station -> []
+  Keyword.UmbraArmor -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when something
@@ -2256,6 +2273,9 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Reinforce {} -> []
   -- CR 702.184a attaches nothing.
   Keyword.Station -> []
+  -- CR 702.89a says nothing about what the Aura may enchant; each printing
+  -- states its own "enchant creature".
+  Keyword.UmbraArmor -> []
 
 -- CR 702: WHICH RULE MINTED this activated ability, as a family designator --
 -- the classification Pawl.Types.ReduceActivationCost.grantedBy compares, so that
@@ -2411,6 +2431,8 @@ familyOf keyword = case keyword of
   Keyword.Persist -> Nothing
   Keyword.Undying -> Nothing
   Keyword.Station -> Nothing
+  -- CR 702.89a carries no parameter, so there is no family to name it by.
+  Keyword.UmbraArmor -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
