@@ -11,6 +11,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
 -- CR 707.9: the "except ..." clause of a copy effect. Quicksilver Gargantuan,
@@ -47,6 +48,13 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
       CopyException.codec
       (CopyException.AddCardTypes (Set.fromList [CardType.Enchantment, CardType.Artifact]))
       " {\"type\":\"AddCardTypes\",\"value\":[{\"type\":\"Artifact\"},{\"type\":\"Enchantment\"}]} "
+
+  Spec.it s "AddSubtypes round-trips, ascending by subtype" $
+    Common.assertCodec
+      s
+      CopyException.codec
+      (CopyException.AddSubtypes (Set.fromList [Subtype.Shapeshifter, Subtype.Rogue]))
+      " {\"type\":\"AddSubtypes\",\"value\":[{\"type\":\"Rogue\"},{\"type\":\"Shapeshifter\"}]} "
 
   Spec.it s "RemoveSupertypes round-trips, ascending by supertype" $
     Common.assertCodec

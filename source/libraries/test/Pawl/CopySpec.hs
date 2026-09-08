@@ -957,6 +957,70 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "where Azusa herself is still legendary" (PC.supertypes (Projection.project azusaId excepted)) (Set.singleton Supertype.Legendary)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
+  -- THE PROVING TEST for CR 707.9b's ADDITIVE SUBTYPE arm. Wall of Stolen
+  -- Identity {3}{U} Creature -- Shapeshifter Wall 0/0: "You may have this
+  -- creature enter as a copy of any creature on the battlefield, except it's a
+  -- Wall in addition to its other types and has defender."
+  --
+  -- Not implemented: the linked "When you do, tap the copied creature and it
+  -- doesn't untap ..." trigger, CR 707.9g's shape (#3408). Omitting it leaves
+  -- pawl's card stricter than printed -- the clause only ever costs an opponent
+  -- an untap -- and nothing below turns on it.
+  --
+  -- Read at GAMEPLAY level by a card that FILTERS on the subtype: Chaos Charm
+  -- {R}'s first mode is "destroy target Wall", so a permanent the exception did
+  -- not reach is not a legal target for it and the charm falls to its next mode,
+  -- 1 damage.
+  --
+  -- THE COPIED CREATURE IS A HILL GIANT, not the Goblin Piker every case above
+  -- copies: a 2/1 dies to that 1 damage as surely as to the destroy, and the case
+  -- could not then tell the two modes apart. A 3/3 survives it.
+  --
+  -- THE TOKEN is what the charm is aimed at, not the Wall copy itself: CR 707.2
+  -- copies the copiable values, so a subtype WRITTEN INTO the snapshot travels to
+  -- the token where a CR 613 layer-4 write over the Wall copy would be left
+  -- behind.
+  --
+  -- A Clone copying the SAME Giant is the control, on the same board: the copy
+  -- made without the exception, which is no Wall and which the charm could not
+  -- have taken.
+  Spec.it s "a token copy of Wall of Stolen Identity's copy is still a Wall (CR 707.9b)" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    clone <- S.printingOf s registry "Clone"
+    wall <- S.printingOf s registry "Wall of Stolen Identity"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    charm <- S.printingOf s registry "Chaos Charm"
+    let (giantId, board0) = S.addPermanent hillGiant S.alice (S.landsFor mountain S.alice 1 (S.landsInPlay island 3))
+        (_, stagedClone) = S.spellOnStack clone S.alice board0
+        withClone = resolveAndSettle (copyNamed giantId) stagedClone
+        (_, stagedWall) = S.spellOnStack wall S.alice withClone
+        entered = resolveAndSettle (copyNamed giantId) stagedWall
+    case (cloneOnBattlefield entered, newest (printedOnBattlefield "Wall of Stolen Identity" entered)) of
+      (Just cloneId, Just wallId) -> do
+        let minted = castAndResolve (targeting wallId) counterpart entered
+        case tokensOnBattlefield minted of
+          [tokenId] -> do
+            let charmed = castAndResolve (aimByFiltering tokenId) charm minted
+            -- THE GAMEPLAY ASSERTION, ahead of every diagnostic: "destroy target
+            -- Wall" found the token and took it, where the damage mode it would
+            -- otherwise have taken leaves a 3/3 standing.
+            Spec.assertBool s (not (onBattlefield tokenId charmed)) "the token copy was a legal Wall and the charm destroyed it"
+            -- The control on the same board: the copy WITHOUT the exception is
+            -- the Giant and nothing more.
+            Spec.assertBool s (not (Set.member Subtype.Wall (Projection.subtypesOf cloneId charmed))) "the copy without the exception is no Wall"
+            Spec.assertBool s (onBattlefield cloneId charmed) "and it is still on the battlefield"
+            -- Diagnostics, after the behaviour: CR 707.2 ran and CR 205.3's part
+            -- of the type line was joined rather than replaced.
+            Spec.assertEqWith s "the token is the Giant by name (CR 707.2)" (Projection.namesOf tokenId minted) . Set.singleton . CardName.MkCardName $ Text.pack "Hill Giant"
+            Spec.assertEqWith s "and its 3/3" (S.powerToughnessOf tokenId minted) $ Just (3, 3)
+            Spec.assertBool s (Set.member Subtype.Giant (Projection.subtypesOf tokenId minted)) "and keeps the Giant's own subtype"
+            Spec.assertBool s (Set.member Subtype.Wall (Projection.subtypesOf tokenId minted)) "beside the one the exception added"
+            Spec.assertBool s (Set.member Subtype.Wall (Projection.subtypesOf wallId minted)) "as does the copy the token was made from"
+          tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+      _ -> Spec.assertFailure s "the Clone and the Wall should both be on the battlefield"
+
   -- THE PROVING TEST for the copiable stamp. The target is itself a copy, so
   -- its printed card (Clone, a 0/0 with an as-enters copy ability) and its
   -- copiable values (the Piker's) disagree -- and CR 707.2's "as modified by
@@ -1317,6 +1381,84 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the token entered as the Hill Giant's 3/3" (S.powerToughnessOf tokenId minted) $ Just (3, 3)
         Spec.assertEqWith s "carrying one triggered ability (CR 707.9a)" (length (Projection.triggeredAbilitiesOf tokenId minted)) 1
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- THE PROVING TEST for CR 707.9a's "this ability" inside an ACTIVATED ability.
+  -- Dimir Doppelganger {1}{U}{B} Creature -- Shapeshifter 0/2: "{1}{U}{B}: Exile
+  -- target creature card from a graveyard. This creature becomes a copy of that
+  -- card, except it has this ability."
+  --
+  -- Read at GAMEPLAY level over TWO activations, which is the only board that
+  -- discriminates: what the Doppelganger becomes a copy of first (a Goblin Piker)
+  -- has no activated ability of its own, so the exception is the copy's only
+  -- route to a second one. The Hill Giant's 3/3 at the end is "the ability
+  -- reached the copy's copiable values"; the Piker's 2/1 is "it was lost with the
+  -- first copy". A single graveyard card cannot tell the two apart.
+  --
+  -- TWO SEPARATE priority loops, each taking the ability the first time it is
+  -- offered and passing ever after. One loop would let alice announce the second
+  -- activation while the first is still on the stack -- CR 117.3c leaves her
+  -- priority -- and the two would then resolve last-in-first-out off the PRINTED
+  -- ability, which proves nothing. Splitting them makes the second activation
+  -- one the engine could only offer because the copy carries the ability.
+  --
+  -- Driven through the priority loop rather than Activate.activateAbility for
+  -- Littjara Mirrorlake's reason, and the target FILTERED out of the offered set
+  -- rather than built (aimByFiltering's reason).
+  --
+  -- Distinct printed pairs, so no reading is a coincidence: the Doppelganger's
+  -- own 0/2, the Piker's 2/1, the Hill Giant's 3/3.
+  Spec.it s "Dimir Doppelganger's activated ability survives the copy it makes (CR 707.9a)" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    doppelganger <- S.printingOf s registry "Dimir Doppelganger"
+    case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace doppelganger)) of
+      Nothing -> Spec.assertFailure s "Dimir Doppelganger prints no activated ability"
+      Just ability -> do
+        let (pikerCardId, g1) = S.addGraveyardCard piker S.alice (S.landsFor swamp S.alice 2 (S.landsInPlay island 1))
+            (giantCardId, g2) = S.addGraveyardCard hillGiant S.alice g1
+            (doppelId, board) = S.addPermanent doppelganger S.alice g2
+            -- Takes the ability the FIRST time the loop offers it, aims its one
+            -- target slot at `victim`, and passes on every later offer.
+            once :: ObjectId -> (forall r. Prompt.Prompt r -> State.State Int r)
+            once victim p = case p of
+              Prompt.ChooseTargets _ _ _ sets -> pure (fmap (\(_, offered) -> Set.filter ((== Just victim) . Recipient.objectOf) offered) sets)
+              Prompt.ChooseAction {} -> do
+                taken <- State.get
+                case activates doppelId ability p of
+                  A.Pass -> pure A.Pass
+                  action
+                    | taken > (0 :: Int) -> pure A.Pass
+                    | otherwise -> State.put (taken + 1) >> pure action
+              _ -> pure (activates doppelId ability p)
+            -- alice, with priority in her own precombat main phase and the rest
+            -- of the turn ahead -- the placement a second loop needs, since the
+            -- first runs the turn out.
+            readied gs =
+              gs
+                { GameState.priority = Just S.alice,
+                  GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.remaining = S.phasesAfter Phase.PrecombatMain
+                }
+            loop victim gs = State.runState (Engine.runGame (once victim) (readied gs) Engine.priorityLoop) (0 :: Int)
+            ((_, afterFirst), tookFirst) = loop pikerCardId board
+            -- Three more lands: the first loop spent hers, and an untap step is
+            -- not what this case is about.
+            ((_, afterSecond), tookSecond) = loop giantCardId (S.landsFor swamp S.alice 2 (S.landsFor island S.alice 1 afterFirst))
+        -- THE GAMEPLAY ASSERTION, ahead of every proxy: the second card is what
+        -- the Doppelganger is a copy of now, and only the kept ability could have
+        -- put it there.
+        Spec.assertEqWith s "the Doppelganger copied a second card (CR 707.9a)" (S.powerToughnessOf doppelId afterSecond) $ Just (3, 3)
+        Spec.assertEqWith s "and it is that card by name (CR 707.2)" (Projection.namesOf doppelId afterSecond) . Set.singleton . CardName.MkCardName $ Text.pack "Hill Giant"
+        -- Diagnostics, after the behaviour: the first copy really happened, the
+        -- ability was offered in BOTH loops, and each activation exiled the card
+        -- it named (CR 400.7 mints a new id, so the graveyards are read empty
+        -- rather than the exile zone read by these ids).
+        Spec.assertEqWith s "the first activation copied the first card" (S.powerToughnessOf doppelId afterFirst) $ Just (2, 1)
+        Spec.assertEqWith s "the ability was taken once in each loop" (tookFirst, tookSecond) (1, 1)
+        Spec.assertEqWith s "and both graveyard cards were exiled" (sum (fmap length (Map.elems (GameState.graveyard afterSecond)))) 0
 
   -- THE PROVING TEST for CR 305.7's THIRD clause: a land whose subtype is set to a
   -- basic type "loses all abilities generated from its rules text, its old land

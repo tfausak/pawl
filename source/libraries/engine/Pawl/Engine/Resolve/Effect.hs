@@ -1959,20 +1959,16 @@ chooseNewTargetsFor controller copyId = do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
--- CR 707.9a's "this ability", read off the RESOLVING object: rule 603.3 puts a
--- triggered ability on the stack carrying its own text
--- (Pawl.Types.TriggeredAbilitySource), so the words point at a value already in
--- hand.
+-- The carrier CR 707.9a's "this ability" points at: the RESOLVING object's own
+-- Pawl.Types.Source, since rule 602.2a and rule 603.3 both put the ability's text
+-- on the stack object, so the words point at a value already in hand rather than
+-- at a source that may have left (CR 113.7a).
 --
--- A CLASSIFICATION of the resolving object under CR 113.3 and never a question
--- about which ability it is, so the closed half stays closed. Nothing for every
--- other arm: a spell, an emblem and CR 725.2's sourceless trigger have no ability
--- to point at, and an ACTIVATED ability has one this cannot return -- CR 707.9a
--- reaches it too, and it would go in another list (#3325).
-thisTriggeredAbility :: ObjectId -> GameState -> Maybe (TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))
-thisTriggeredAbility resolving gs = case fmap Object.source (Game.lookupObject resolving gs) of
-  Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.ability triggered)
-  _ -> Nothing
+-- The Source itself, unclassified: which of CR 113.3's arms carries an ability,
+-- and which list it joins, is Replacement.applyCopyException's to say, and it
+-- says it by casing on the arm rather than on the ability.
+thisAbilitySource :: ObjectId -> GameState -> Maybe Source.Source
+thisAbilitySource resolving gs = fmap Object.source (Game.lookupObject resolving gs)
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
@@ -4486,7 +4482,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- 707.9b) -- Multiversal Recruitment's "except it isn't
                 -- legendary". "This ability" is the resolving object's, read the
                 -- way the BecomeCopy arm below reads it.
-                Monad.void (Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisTriggeredAbility resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
+                Monad.void (Event.createTokens controller card (Just (Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown src gs))) (Integer.toNaturalSaturating n) TapState.Untapped (EntryRiders.counters frozen))
       _ -> pure ()
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef exceptions) ->
     State.modify' $ \gs ->
@@ -4509,13 +4505,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- excepted ability is part of the copy's own copiable values (CR 707.9a)
       -- rather than an effect layered over them.
       --
-      -- "This ability" is the RESOLVING object's own -- thisTriggeredAbility, off
-      -- Pawl.Types.Source, so the ability is read where CR 603.3 already carries
-      -- it rather than being looked back up on a source that may have left (CR
-      -- 113.7a). Not implemented: a stated duration (#1753).
+      -- "This ability" is the RESOLVING object's own -- thisAbilitySource, off
+      -- Pawl.Types.Source, so the ability is read where CR 602.2a and CR 603.3
+      -- already carry it rather than being looked back up on a source that may
+      -- have left (CR 113.7a). Not implemented: a stated duration (#1753).
       case objectRefObjects legal resolving controller source gs originalRef of
         [original] ->
-          let snapshot = Replacement.applyCopyExceptions (thisTriggeredAbility resolving gs) exceptions (Event.copiedSnapshotWithLastKnown original gs)
+          let snapshot = Replacement.applyCopyExceptions (thisAbilitySource resolving gs) exceptions (Event.copiedSnapshotWithLastKnown original gs)
               write o = o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}
               subjects = objectRefObjects legal resolving controller source gs subjectRef
            in gs {GameState.objects = foldr (Map.adjust write) (GameState.objects gs) subjects}
