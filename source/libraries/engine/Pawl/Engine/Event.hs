@@ -1035,16 +1035,17 @@ eligible predicate source pid gs =
       admitsOutside entry = case OutsideObject.facing entry of
         Facing.FaceDown state -> matchesFace (Card.faceDownFace (FaceDownState.listed state))
         Facing.FaceUp -> admits (OutsideObject.printing entry)
-      fromPool = [OutsideCard.InPool printingId | (printingId, n) <- Map.toAscList pool, n > 0, admits printingId]
+      fromPool = fmap (\(printingId, _) -> OutsideCard.InPool printingId) (filter (\(printingId, n) -> n > 0 && admits printingId) (Map.toAscList pool))
       -- CR 108.3b scopes the reach to the acting player's OWN cards outside the
       -- game -- the owner guard below is that scope, not an ownership check on
       -- the pool (which is already per-player).
       fromOuter =
-        [ OutsideCard.InAnotherGame oid
-        | (oid, entry) <- Map.toAscList (GameState.outsideObjects gs),
-          OutsideObject.owner entry == pid,
-          admitsOutside entry
-        ]
+        fmap
+          (\(oid, _) -> OutsideCard.InAnotherGame oid)
+          ( filter
+              (\(_, entry) -> OutsideObject.owner entry == pid && admitsOutside entry)
+              (Map.toAscList (GameState.outsideObjects gs))
+          )
    in fromPool <> fromOuter
 
 -- CR 400.11c: put a card this player owns from outside the game matching the
@@ -5392,27 +5393,26 @@ reanchor oldId newIds eff = case ContinuousEffect.affected eff of
 lingeringHandover :: ObjectId -> PlayerId -> GameState -> [ContinuousEffect.ContinuousEffect Card]
 lingeringHandover oid lastController gs =
   let lingering :: [(Natural, Duration.Duration)]
-      lingering =
-        [ (n, duration)
-        | (n, sa) <- zip [0 ..] (Projection.staticAbilitiesOf oid gs),
-          duration <- Maybe.maybeToList (StaticAbility.lingers sa)
-        ]
+      lingering = do
+        (n, sa) <- zip [0 ..] (Projection.staticAbilitiesOf oid gs)
+        duration <- Maybe.maybeToList (StaticAbility.lingers sa)
+        pure (n, duration)
    in if null lingering
         then []
-        else
-          [ ContinuousEffect.MkContinuousEffect
+        else do
+          (n, ts, modification, frozen) <- Projection.frozenStaticParts oid gs
+          duration <- fmap snd (filter ((== n) . fst) lingering)
+          -- No bindings to bake a CR 611.2b condition against: this duration is
+          -- a PRINTED static ability's, and no resolution chose anything for it.
+          expiry <- Maybe.maybeToList (Expiry.arm Map.empty lastController oid duration gs)
+          pure
+            ContinuousEffect.MkContinuousEffect
               { ContinuousEffect.source = oid,
                 ContinuousEffect.timestamp = ts,
                 ContinuousEffect.expiry = expiry,
                 ContinuousEffect.modification = modification,
                 ContinuousEffect.affected = Affected.TheseObjects frozen
               }
-          | (n, ts, modification, frozen) <- Projection.frozenStaticParts oid gs,
-            duration <- fmap snd (filter ((== n) . fst) lingering),
-            -- No bindings to bake a CR 611.2b condition against: this duration is
-            -- a PRINTED static ability's, and no resolution chose anything for it.
-            expiry <- Maybe.maybeToList (Expiry.arm Map.empty lastController oid duration gs)
-          ]
 
 -- The single destruction funnel (CR 701.8 / 702.12b): the Destroy opcode and the
 -- CR 704.5g/h state-based actions both flow through here.

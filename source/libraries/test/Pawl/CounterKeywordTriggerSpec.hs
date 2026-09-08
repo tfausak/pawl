@@ -385,10 +385,10 @@ hydraBroodmasterSpec s registry =
       plusOnes = S.counterOf CounterKind.PlusOnePlusOne
       tokenSizes gs =
         List.sort
-          [ S.powerToughnessOf oid gs
-          | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
-            fmap S.nameOf (Game.cardOf oid gs) == Just hydraToken
-          ]
+          ( fmap
+              (\oid -> S.powerToughnessOf oid gs)
+              (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just hydraToken) (Game.zoneMembers Zone.Battlefield S.alice gs))
+          )
       -- CR 601.2b's announcement is the one question the activation asks.
       announcing :: Natural -> Prompt.Prompt r -> r
       announcing x p = case p of
@@ -1303,10 +1303,9 @@ payAtEndStepCounting n gs =
 -- so a token minted by anything else could not be mistaken for hers.
 aetherjetIds :: GameState.GameState -> [ObjectId.ObjectId]
 aetherjetIds gs =
-  [ oid
-  | oid <- S.tokensOf gs,
-    fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Nalaar Aetherjet"))
-  ]
+  filter
+    (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Nalaar Aetherjet")))
+    (S.tokensOf gs)
 
 -- What the filtered condition is FOR: a payload that aims at the creature that
 -- dealt the damage (Pawl.Engine.Binding.combatDamager) rather than at the bearer
@@ -2100,12 +2099,17 @@ rampageSpec s registry =
               let fired after =
                     not
                       ( null
-                          [ ()
-                          | GameEvent.AbilityTriggered record <- S.eventsOf after,
-                            AbilityTriggered.source record == TriggerSource.OfObject pack,
-                            AbilityTriggered.controller record == S.alice,
-                            TriggeredAbility.condition (AbilityTriggered.ability record) == TriggerCondition.SelfBecomesBlocked
-                          ]
+                          ( Maybe.mapMaybe
+                              ( \event -> case event of
+                                  GameEvent.AbilityTriggered record
+                                    | AbilityTriggered.source record == TriggerSource.OfObject pack,
+                                      AbilityTriggered.controller record == S.alice,
+                                      TriggeredAbility.condition (AbilityTriggered.ability record) == TriggerCondition.SelfBecomesBlocked ->
+                                        Just ()
+                                  _ -> Nothing
+                              )
+                              (S.eventsOf after)
+                          )
                       )
               Spec.assertBool s (not (fired (S.runToStep (Phase.Combat CombatStep.CombatDamage) noBlocks gs))) "nothing blocked, so nothing triggered"
               Spec.assertBool s (fired (atDamage gs)) "and the same board with the block taken does trigger"

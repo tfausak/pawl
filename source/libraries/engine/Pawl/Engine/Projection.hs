@@ -1456,7 +1456,7 @@ gatherGiven stripped functioning seed gs =
                   if Set.null (StaticAbility.functionsFrom sa)
                     then Vanguard.functionsFromCommandZone commandId gs
                     else statesZone Zone.Command sa
-             in concat [gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), keeps sa]
+             in concatMap (uncurry (gatherStatic (functioning commandId) commandId (Object.timestamp commandObj) [] (const False))) (filter (\(_, sa) -> keeps sa) (zip [0 :: Natural ..] (Face.staticAbilities face)))
       inCommand = concatMap fromCommandZone (Set.toList (GameState.command gs))
       fromSpell spellId = case Game.lookupObject spellId gs of
         Nothing -> []
@@ -1480,7 +1480,7 @@ gatherGiven stripped functioning seed gs =
                   if Set.null (StaticAbility.functionsFrom sa)
                     then isSpellStatic
                     else statesZone Zone.Stack sa
-             in concat [gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), keeps sa]
+             in concatMap (uncurry (gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] (const False))) (filter (\(_, sa) -> keeps sa) (zip [0 :: Natural ..] (Face.staticAbilities face)))
       spells = concatMap fromSpell (GameState.stack gs)
       fromGraveyardCard cardId = case Game.lookupObject cardId gs of
         Nothing -> []
@@ -1512,7 +1512,7 @@ gatherGiven stripped functioning seed gs =
                     then qualifies sa
                     else statesZone Zone.Graveyard sa
                 indexed = zip [0 :: Natural ..] (Face.staticAbilities face)
-             in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False) n sa | (n, sa) <- indexed, keeps sa]
+             in concatMap (uncurry (gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False))) (filter (\(_, sa) -> keeps sa) indexed)
       graveyards = concatMap fromGraveyardCard (graveyardCards gs)
       -- CR 113.6b/c: the three zones no default in CR 113.6 ever reaches -- the
       -- two HIDDEN ones (CR 400.2) and exile, whose being public buys it no
@@ -1550,7 +1550,7 @@ gatherGiven stripped functioning seed gs =
         Just cardObj -> case Game.faceOfObject gs cardObj of
           Nothing -> []
           Just face ->
-            concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False) n sa | (n, sa) <- zip [0 :: Natural ..] (Face.staticAbilities face), statesZone zone sa]
+            concatMap (uncurry (gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] (const False))) (filter (\(_, sa) -> statesZone zone sa) (zip [0 :: Natural ..] (Face.staticAbilities face)))
       hands = foldZoneCards GameState.hand (fromStatingCard Zone.Hand) gs
       libraries = foldZoneCards GameState.library (fromStatingCard Zone.Library) gs
       -- Grist, the Hunger Tide's CR 113.6c clause names every zone but the
@@ -1698,11 +1698,11 @@ frozenStaticParts src gs =
       -- One entry per ability rather than per part: the parts of an ability
       -- agree on both gAffected and gLowest, so whichever one Map.fromList keeps
       -- asks the same question. Lazy, so only the retained thunk is forced.
-      byAbility = Map.fromList [(n, Set.filter (applies c) (candidatesFor (gAffected c) gs)) | (n, c) <- parts]
+      byAbility = Map.fromList (fmap (\(n, c) -> (n, Set.filter (applies c) (candidatesFor (gAffected c) gs))) parts)
    in -- `parts` order, which is the card's PRINTED order and load-bearing once
       -- these become separate stored effects: the fold applies same-layer parts
       -- sharing one timestamp in list order.
-      [(n, gTimestamp c, gModification c, Map.findWithDefault Set.empty n byAbility) | (n, c) <- parts]
+      fmap (\(n, c) -> (n, gTimestamp c, gModification c, Map.findWithDefault Set.empty n byAbility)) parts
 
 -- The objects an affected set could possibly name, so freezing one need not
 -- project every object in the game. Battlefield-scoped for every arm the
@@ -1875,7 +1875,7 @@ abilitiesRemoved = abilitiesRemovedBy (const True)
 -- level up and settles it by CR 613.8 -- see appliedSetEffects.
 abilitiesRemovedBy :: (Gathered -> Bool) -> [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemovedBy keep cands gs oid =
-  let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c), keep c]
+  let byLowest = Map.fromListWith (<>) (fmap (\c -> (gLowest c, [c])) (filter (\c -> removesAbilities (gModification c) && keep c) cands))
       grants = controlGrants gs
       removesAt (lyr, cs) =
         let partial = projectUpTo lyr cands oid gs
@@ -2024,10 +2024,10 @@ counterGathered gs =
                     gModification = m
                   }
               deltaOf kind sign =
-                [ at kind Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)))
-                | let d = sign * toInteger (Map.findWithDefault 0 kind cs),
-                  d /= 0
-                ]
+                let d = sign * toInteger (Map.findWithDefault 0 kind cs)
+                 in if d /= 0
+                      then [at kind Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)))]
+                      else []
               pt = deltaOf CounterKind.PlusOnePlusOne 1 <> deltaOf CounterKind.MinusOneMinusOne (-1)
               -- CR 122.1j / 613.4c: a hone counter sits on the EQUIPMENT and gives
               -- +1/+0 to the creature that Equipment is attached to, so this is
@@ -2050,10 +2050,10 @@ counterGathered gs =
               -- fold's own depth, so the question is answered by the layers
               -- already applied rather than by re-entering gather.
               honed =
-                [ (at CounterKind.Hone Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal n) (Quantity.Type.Literal 0)))) {gAffected = honeAffected}
-                | let n = toInteger (Map.findWithDefault 0 CounterKind.Hone cs),
-                  n /= 0
-                ]
+                let n = toInteger (Map.findWithDefault 0 CounterKind.Hone cs)
+                 in if n /= 0
+                      then [(at CounterKind.Hone Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal n) (Quantity.Type.Literal 0)))) {gAffected = honeAffected}]
+                      else []
               grantOf (kind, n) = case kind of
                 CounterKind.Keyword kw -> List.genericReplicate n (at kind Layer.Ability (Modification.GainKeyword kw))
                 CounterKind.PlusOnePlusOne -> []
@@ -2146,17 +2146,19 @@ bestowGathered gs =
   let fromObject oid = case Game.lookupObject oid gs of
         Just obj
           | Object.bestowed obj ->
-              [ MkGathered
-                  { gEffect = Nothing,
-                    gSource = oid,
-                    gAffected = Affected.TheseObjects (Set.singleton oid),
-                    gLayer = layer m,
-                    gLowest = layer m,
-                    gTimestamp = Object.timestamp obj,
-                    gModification = m
-                  }
-              | m <- Keyword.bestowModifications
-              ]
+              fmap
+                ( \m ->
+                    MkGathered
+                      { gEffect = Nothing,
+                        gSource = oid,
+                        gAffected = Affected.TheseObjects (Set.singleton oid),
+                        gLayer = layer m,
+                        gLowest = layer m,
+                        gTimestamp = Object.timestamp obj,
+                        gModification = m
+                      }
+                )
+                Keyword.bestowModifications
         _ -> []
    in concatMap fromObject (Set.toList (GameState.battlefield gs) <> GameState.stack gs <> Set.toList (GameState.exile gs) <> Set.toList (GameState.command gs))
         <> foldZoneCards GameState.hand fromObject gs
@@ -3339,12 +3341,11 @@ projectDeciding admits cands =
                   -- Not implemented: the range is `reachable`, which at this
                   -- sublayer is the battlefield alone, so a count cannot read a
                   -- power a CDA defines on a card in another zone (#3109).
-                  definingUnits =
-                    [ definingUnitOf o (Object.timestamp obj) cda
-                    | (o, (p, _)) <- Map.toAscList (Map.insert oid (seeded, decided) otherBoards),
-                      Just obj <- [Game.lookupObject o gs],
-                      Just cda <- [PC.characteristicPT p]
-                    ]
+                  definingUnits = do
+                    (o, (p, _)) <- Map.toAscList (Map.insert oid (seeded, decided) otherBoards)
+                    obj <- Maybe.maybeToList (Game.lookupObject o gs)
+                    cda <- Maybe.maybeToList (PC.characteristicPT p)
+                    pure (definingUnitOf o (Object.timestamp obj) cda)
                   -- Every unit CR 613.8 orders at this layer.
                   pendingHere = fmap unitOf (effectUnits here) <> (if definingMovable then definingUnits else [])
                   -- CR 613.6's memo, populated against `seeded` -- sound only on
@@ -3787,31 +3788,40 @@ stunCounters oid gs = case Game.lookupObject oid gs of
 -- needs, where CR 306.5b's loyalty itself is a rule and stays.
 intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect Card.Type.Card (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
-  [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
-  -- is Filter.IsSource.
-  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Loyalty (Quantity.Type.Literal (toInteger n)))))
-  | Set.member CardType.Planeswalker (PC.cardTypes pc),
-    printed <- Maybe.maybeToList (PC.loyalty pc),
-    let n = case printed of
-          Loyalty.Literal m -> m
-          Loyalty.Variable -> announcedX
-  ]
+  ( -- CR 614.1c: the entering object is the ability's own source, so the pattern
+    -- is Filter.IsSource.
+    if Set.member CardType.Planeswalker (PC.cardTypes pc)
+      then
+        fmap
+          ( \printed ->
+              let n = case printed of
+                    Loyalty.Literal m -> m
+                    Loyalty.Variable -> announcedX
+               in ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Loyalty (Quantity.Type.Literal (toInteger n)))))
+          )
+          (Maybe.maybeToList (PC.loyalty pc))
+      else []
+  )
     -- CR 702.150a's compleated, minted as its own CR 614.1c row so CR 616.1e
     -- orders it against every other row modifying the same entry. Minted only
     -- when life was actually paid, because rule 702.150a's own condition is
     -- "chose to pay life": a row that subtracted nothing would still cost the
     -- controller an ordering prompt.
-    <> [ ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.Compleated phyrexianLifePaid))
-       | Set.member CardType.Planeswalker (PC.cardTypes pc),
-         Map.member Keyword.Type.Compleated (PC.keywords pc),
-         phyrexianLifePaid > 0
-       ]
+    <> ( if Set.member CardType.Planeswalker (PC.cardTypes pc)
+           && Map.member Keyword.Type.Compleated (PC.keywords pc)
+           && phyrexianLifePaid > 0
+           then [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.Compleated phyrexianLifePaid))]
+           else []
+       )
     -- CR 310.4b's intrinsic defense counters -- CR 306.5b's clause one rule
     -- number over, keyed on the projected card type.
-    <> [ ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Defense (Quantity.Type.Literal (toInteger n)))))
-       | Set.member CardType.Battle (PC.cardTypes pc),
-         Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
-       ]
+    <> ( if Set.member CardType.Battle (PC.cardTypes pc)
+           then
+             fmap
+               (\(Defense.MkDefense n) -> ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Defense (Quantity.Type.Literal (toInteger n))))))
+               (Maybe.maybeToList (PC.defense pc))
+           else []
+       )
     -- No CR 612.2a rewrite here either, for abilitiesFromCharacteristics' reason
     -- (gap #2495).
     <> Keyword.mintedReplacementsOf (PC.keywords pc)
@@ -3979,11 +3989,9 @@ replacementsAffecting gs =
         Just obj -> case Game.faceOfObject gs obj of
           Nothing -> []
           Just face ->
-            [ (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr)
-            | pr <- Face.replacementEffects face,
-              statesZoneOfRow zone pr,
-              printedRowLives oid gs pr
-            ]
+            fmap
+              (\pr -> (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr))
+              (filter (\pr -> statesZoneOfRow zone pr && printedRowLives oid gs pr) (Face.replacementEffects face))
       -- The stack has a default where the four zones above have none, so it gets
       -- its own arm: CR 113.6's first sentence functions an instant's or a
       -- sorcery's abilities while the object is on the stack, and CR 113.6b's
@@ -4002,11 +4010,9 @@ replacementsAffecting gs =
                   if Set.null (PrintedReplacement.functionsFrom pr)
                     then isSpellStatic
                     else statesZoneOfRow Zone.Stack pr
-             in [ (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr)
-                | pr <- Face.replacementEffects face,
-                  keeps pr,
-                  printedRowLives oid gs pr
-                ]
+             in fmap
+                  (\pr -> (oid, ReplacementProvenance.Printed, PrintedReplacement.effect pr))
+                  (filter (\pr -> keeps pr && printedRowLives oid gs pr) (Face.replacementEffects face))
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)

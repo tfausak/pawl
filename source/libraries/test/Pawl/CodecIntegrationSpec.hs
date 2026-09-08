@@ -502,11 +502,10 @@ corpusResolver :: Spec.Spec IO n -> IO (CardName.Type.CardName -> Maybe Card.Typ
 corpusResolver s = do
   ps <- S.allPrintings s
   let cards =
-        Map.fromList
-          [ (Face.name face, Printing.Type.card p)
-          | p <- ps,
-            face <- NonEmpty.toList (Card.Type.faces (Printing.Type.card p))
-          ]
+        Map.fromList $ do
+          p <- ps
+          face <- NonEmpty.toList (Card.Type.faces (Printing.Type.card p))
+          pure (Face.name face, Printing.Type.card p)
   pure (`Map.lookup` cards)
 
 -- | Every key Pawl.Codec.GameState writes for S.oneMountainState. Spelled out so

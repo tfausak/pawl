@@ -776,7 +776,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (alices, g2) = S.addHandCard swamp S.alice g1
         (carols, g3) = S.addHandCard swamp S.carol g2
         after = S.runPure S.identityAnswer g3 (mapM_ (\oid -> Event.changeZone oid Zone.Graveyard) [bobs, alices, carols])
-        enchanting = [Object.attachedTo o | o <- Map.elems (GameState.objects after), Object.zone o == Zone.Battlefield, Maybe.isJust (Object.attachedTo o)]
+        enchanting = fmap Object.attachedTo (filter (\o -> Object.zone o == Zone.Battlefield && Maybe.isJust (Object.attachedTo o)) (Map.elems (GameState.objects after)))
     Spec.assertEqWith s "bob's card went to the bottom of bob's library" (namesIn Zone.Library S.bob after) [Just (S.printingName piker), Just (S.printingName swamp)]
     Spec.assertEqWith s "and not to bob's graveyard" (namesIn Zone.Graveyard S.bob after) []
     Spec.assertEqWith s "alice's own card reached her graveyard -- she is not the enchanted player" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName swamp)]
@@ -1384,10 +1384,10 @@ isActivation a = case a of
 -- the exchange a GAIN and a LOSS rather than two assignments, so this is what a
 -- "whenever you gain life" trigger would have to read.
 lifeGains :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
-lifeGains gs = [(pid, n) | GameEvent.LifeGained (LifeChange.MkLifeChange pid n) <- S.eventsOf gs]
+lifeGains gs = Maybe.mapMaybe (\ev -> case ev of GameEvent.LifeGained (LifeChange.MkLifeChange pid n) -> Just (pid, n); _ -> Nothing) (S.eventsOf gs)
 
 lifeLosses :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
-lifeLosses gs = [(pid, n) | GameEvent.LifeLost (LifeChange.MkLifeChange pid n) <- S.eventsOf gs]
+lifeLosses gs = Maybe.mapMaybe (\ev -> case ev of GameEvent.LifeLost (LifeChange.MkLifeChange pid n) -> Just (pid, n); _ -> Nothing) (S.eventsOf gs)
 
 exchangeLifeTotalsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do

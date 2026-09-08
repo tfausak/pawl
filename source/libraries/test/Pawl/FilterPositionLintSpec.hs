@@ -335,7 +335,7 @@ hostFramed framing = case framing of
 -- and Synthetic Aura Diffusion legitimately have one of each.
 canHostSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canHostSubjectCounts card =
-  let total wanted = sum [canHostSubjects f | (framing, f) <- cardFilters card, (framing == AttachDestination) == wanted]
+  let total wanted = sum (fmap (\(_, f) -> canHostSubjects f) (filter (\(framing, _) -> (framing == AttachDestination) == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- Every occurrence of one atom's codec tag in an ENCODED face. The completeness
@@ -381,7 +381,7 @@ amountedSlotAtoms value = case value of
   Value.Array a -> sum (fmap amountedSlotAtoms (Array.unwrap a))
   Value.Object o ->
     let pairs = Object.unwrap o
-        keyed k = [Pair.value pair | pair <- pairs, String.unwrap (Pair.name pair) == Text.pack k]
+        keyed k = fmap Pair.value (filter (\pair -> String.unwrap (Pair.name pair) == Text.pack k) pairs)
         here =
           if null (keyed "pool") || null (keyed "amount")
             then 0
@@ -455,7 +455,7 @@ canAttachToSubjectTag = Text.pack "CanAttachToSubject"
 -- each.
 canAttachToSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canAttachToSubjectCounts card =
-  let total wanted = sum [filterAtoms canAttachToSubjectTag f | (framing, f) <- cardFilters card, (framing == SearchFramed) == wanted]
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms canAttachToSubjectTag f) (filter (\(framing, _) -> (framing == SearchFramed) == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- Filter.CanAttachToSubject is answerable only where the evaluator supplies the
@@ -500,7 +500,7 @@ hasChosenNameTag = Text.pack "HasChosenName"
 -- fact answer. Widen it when a card wants one of them.
 hasChosenNameCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hasChosenNameCounts card =
-  let total wanted = sum [filterAtoms hasChosenNameTag f | (framing, f) <- cardFilters card, elem framing [SearchFramed, MillTallyFramed, SourceHostFramed] == wanted]
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms hasChosenNameTag f) (filter (\(framing, _) -> elem framing [SearchFramed, MillTallyFramed, SourceHostFramed] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 201.4's chosen name is answerable only where Filter.Context.sourceChosenNames
@@ -550,7 +550,7 @@ ofChosenPlayerTag = Text.pack "OfChosenPlayer"
 -- first is what True-Name Nemesis legitimately has one of.
 ofChosenPlayerCounts :: Face.Face Card.Type.Card -> (Int, Int)
 ofChosenPlayerCounts card =
-  let total wanted = sum [filterAtoms ofChosenPlayerTag f | (framing, f) <- cardFilters card, (framing == KeywordFramed) == wanted]
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms ofChosenPlayerTag f) (filter (\(framing, _) -> (framing == KeywordFramed) == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 702.16k's chosen player is answerable only where
@@ -615,7 +615,7 @@ sameNameAsBoundTag = Text.pack "SameNameAsBound"
 -- SlotlessCostFramed and what the hand sweep's own entry is.
 sameNameAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameNameAsBoundCounts card =
-  let total wanted = sum [filterAtoms sameNameAsBoundTag f | (framing, f) <- cardFilters card, elem framing [InTargetSlot, SearchFramed, HandSweepFramed] == wanted]
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameNameAsBoundTag f) (filter (\(framing, _) -> elem framing [InTargetSlot, SearchFramed, HandSweepFramed] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 709.4a's bound-name comparison is answerable only where
@@ -656,7 +656,7 @@ sameControllerAsBoundTag = Text.pack "SameControllerAsBound"
 -- offence; the first is what Bioshift legitimately has one of.
 sameControllerAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameControllerAsBoundCounts card =
-  let total wanted = sum [filterAtoms sameControllerAsBoundTag f | (framing, f) <- cardFilters card, (framing == InTargetSlot) == wanted]
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameControllerAsBoundTag f) (filter (\(framing, _) -> (framing == InTargetSlot) == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 110.2's shared-controller comparison is answerable only where
@@ -686,7 +686,7 @@ hostOfSourceTag = Text.pack "IsHostOfSource"
 -- offence; the first is what Ray of Frost legitimately has three of.
 hostOfSourceCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hostOfSourceCounts card =
-  let total wanted = sum [filterAtoms hostOfSourceTag f | (framing, f) <- cardFilters card, hostFramed framing == wanted]
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms hostOfSourceTag f) (filter (\(framing, _) -> hostFramed framing == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 303.4b's "enchanted" is answerable only where Filter.Context.sourceAttachedTo
@@ -721,7 +721,7 @@ isBoundTag = Text.pack "IsBound"
 -- resolution's slots, and unanswerable in the four that supply none.
 isBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 isBoundCounts card =
-  let total wanted = sum [filterAtoms isBoundTag f | (framing, f) <- cardFilters card, elem framing [OutsideTheGameFramed, KeywordFramed, SlotlessCostFramed, MintedTargetSlot] == wanted]
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms isBoundTag f) (filter (\(framing, _) -> elem framing [OutsideTheGameFramed, KeywordFramed, SlotlessCostFramed, MintedTargetSlot] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 400.11c's candidates are cards outside the game, which no spell or ability
@@ -765,8 +765,8 @@ timesKickedWithCosts value = case value of
   Value.Array a -> concatMap timesKickedWithCosts (Array.unwrap a)
   Value.Object o ->
     let pairs = Object.unwrap o
-        keyed k = [Pair.value pair | pair <- pairs, String.unwrap (Pair.name pair) == Text.pack k]
-        tagged = [() | Value.String t <- keyed "type", String.unwrap t == timesKickedWithTag]
+        keyed k = fmap Pair.value (filter (\pair -> String.unwrap (Pair.name pair) == Text.pack k) pairs)
+        tagged = Maybe.mapMaybe (\v -> case v of Value.String t | String.unwrap t == timesKickedWithTag -> Just (); _ -> Nothing) (keyed "type")
         here = if null tagged then [] else keyed "value"
      in here <> concatMap (timesKickedWithCosts . Pair.value) pairs
   Value.String _ -> []

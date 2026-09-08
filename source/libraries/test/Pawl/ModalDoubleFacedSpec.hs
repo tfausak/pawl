@@ -149,7 +149,7 @@ landPlays actions =
 -- rather than followed by id: the cast spell arrives on the battlefield as a NEW
 -- object (CR 400.7), so the id a case started with is gone by then.
 nonLand :: GameState.GameState -> [ObjectId.ObjectId]
-nonLand gs = [o | o <- Set.toList (GameState.battlefield gs), not (Projection.hasName mountainName o gs)]
+nonLand gs = filter (\o -> not (Projection.hasName mountainName o gs)) (Set.toList (GameState.battlefield gs))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "ModalDoubleFaced" $ do
@@ -183,7 +183,10 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
   Spec.it s "CR 712.11b both faces are offered from a hand" $ do
     birgi <- S.printingOf s registry "Birgi, God of Storytelling"
     mountain <- S.printingOf s registry "Mountain"
-    let namesOffered n = [c | A.Cast _ c _ <- Action.legalActions S.alice (fst (S.handOne birgi (S.landsInPlay mountain n)))]
+    let namesOffered n =
+          Maybe.mapMaybe
+            (\action -> case action of A.Cast _ c _ -> Just c; _ -> Nothing)
+            (Action.legalActions S.alice (fst (S.handOne birgi (S.landsInPlay mountain n))))
     Spec.assertEqWith
       s
       "the card proposes both of its faces"

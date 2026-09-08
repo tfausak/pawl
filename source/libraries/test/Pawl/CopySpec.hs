@@ -1215,7 +1215,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     let outcome buried =
           let graves = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) (S.landsInPlay swamp 9) buried
               after = castAndResolve copyNewest rise graves
-           in ( List.sort [Projection.namesOf oid after | oid <- Set.toList (GameState.battlefield after), Projection.isCreatureOf oid after],
+           in ( List.sort (fmap (\oid -> Projection.namesOf oid after) (filter (\oid -> Projection.isCreatureOf oid after) (Set.toList (GameState.battlefield after)))),
                 List.sort (fmap (fmap Face.name . (`Game.faceOf` after)) (Game.zoneMembers Zone.Graveyard S.alice after))
               )
         pikerFirst = outcome [piker, clone]

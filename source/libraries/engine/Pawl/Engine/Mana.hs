@@ -944,7 +944,7 @@ spendableAs clauses manaType =
     [] -> Set.singleton manaType
     applicable ->
       Set.unions
-        ( [Set.singleton manaType | not (any SpendManaAsThough.only applicable)]
+        ( (if not (any SpendManaAsThough.only applicable) then [Set.singleton manaType] else [])
             <> fmap SpendManaAsThough.asThough applicable
         )
 
@@ -1206,11 +1206,12 @@ leftovers :: [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> [ManaUni
 leftovers clauses steps units =
   let advance pools step =
         Set.fromList
-          [ List.delete unit pool
-          | pool <- Set.toList pools,
-            unit <- Set.toAscList (Set.fromList pool),
-            paysStep clauses step unit
-          ]
+          ( do
+              pool <- Set.toList pools
+              unit <- Set.toAscList (Set.fromList pool)
+              Monad.guard (paysStep clauses step unit)
+              pure (List.delete unit pool)
+          )
    in List.foldl' advance (Set.singleton (List.sort units)) steps
 
 -- The distinct units that could pay the next step and still leave the rest of the
@@ -1221,23 +1222,22 @@ spendable :: [SpendManaAsThough.SpendManaAsThough] -> [Maybe Demand] -> [ManaUni
 spendable clauses steps units = case steps of
   [] -> []
   step : rest ->
-    [ unit
-    | unit <- Set.toAscList (Set.fromList units),
-      paysStep clauses step unit,
-      not (Set.null (leftovers clauses rest (List.delete unit units)))
-    ]
+    filter
+      (\unit -> paysStep clauses step unit && not (Set.null (leftovers clauses rest (List.delete unit units))))
+      (Set.toAscList (Set.fromList units))
 
 -- The resolution a payment out of this pool will take -- the one `spend` settles
 -- on -- as the steps it decomposes into and the life it commits.
 plan :: [SpendManaAsThough.SpendManaAsThough] -> ManaSpending -> Natural -> ManaCost -> Mana -> Maybe ([Maybe Demand], Natural)
 plan clauses spending budget cost (Mana.MkMana units) =
   Maybe.listToMaybe
-    [ (steps, life)
-    | (demands, generic, life) <- resolutions spending cost,
-      life <= budget,
-      let steps = paymentSteps demands generic,
-      not (Set.null (leftovers clauses steps units))
-    ]
+    ( do
+        (demands, generic, life) <- resolutions spending cost
+        Monad.guard (life <= budget)
+        let steps = paymentSteps demands generic
+        Monad.guard (not (Set.null (leftovers clauses steps units)))
+        pure (steps, life)
+    )
 
 -- CR 601.2h: the PLAYER pays the cost, so which mana leaves their pool is theirs
 -- to choose, CR 107.4b's generic symbol included. Answers the pool that is left.
@@ -1448,8 +1448,8 @@ announce subject capacity spending pid oid total outside claimed (ManaCost.MkMan
           gs <- State.get
           let asMana = ManaSymbol.OfType (ManaType.Colored color)
               offers =
-                [PhyrexianPayment.PaysMana | stillPayable done rest gs committed [asMana]]
-                  <> [PhyrexianPayment.PaysLife | stillPayable done rest gs (committed + phyrexianLife) []]
+                (if stillPayable done rest gs committed [asMana] then [PhyrexianPayment.PaysMana] else [])
+                  <> (if stillPayable done rest gs (committed + phyrexianLife) [] then [PhyrexianPayment.PaysLife] else [])
           announced <-
             choose PhyrexianPayment.PaysMana offers $
               Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
@@ -1472,8 +1472,8 @@ announce subject capacity spending pid oid total outside claimed (ManaCost.MkMan
           let halves = hybridHalves (ManaType.Colored l) (ManaType.Colored r)
               payableHalves = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) halves
               offers =
-                [PhyrexianPayment.PaysMana | not (null payableHalves)]
-                  <> [PhyrexianPayment.PaysLife | stillPayable done rest gs (committed + phyrexianLife) []]
+                (if not (null payableHalves) then [PhyrexianPayment.PaysMana] else [])
+                  <> (if stillPayable done rest gs (committed + phyrexianLife) [] then [PhyrexianPayment.PaysLife] else [])
           announced <-
             choose PhyrexianPayment.PaysMana offers $
               Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid symbol
@@ -1494,8 +1494,8 @@ announce subject capacity spending pid oid total outside claimed (ManaCost.MkMan
           let asTyped = ManaSymbol.OfType manaType
               asGeneric = ManaSymbol.Generic monocoloredHybridGeneric
               offers =
-                [HybridPayment.PaysTyped | stillPayable done rest gs committed [asTyped]]
-                  <> [HybridPayment.PaysGeneric | stillPayable done rest gs committed [asGeneric]]
+                (if stillPayable done rest gs committed [asTyped] then [HybridPayment.PaysTyped] else [])
+                  <> (if stillPayable done rest gs committed [asGeneric] then [HybridPayment.PaysGeneric] else [])
           announced <-
             choose HybridPayment.PaysTyped offers $
               Prompt.AnnounceHybridPayment (Decide.deciderFor pid gs) pid oid manaType
@@ -1534,8 +1534,8 @@ completions symbols = case symbols of
   [] -> [([], 0)]
   ManaSymbol.Phyrexian color : rest ->
     let asMana = ManaSymbol.OfType (ManaType.Colored color)
-     in [(asMana : tail_, life) | (tail_, life) <- completions rest]
-          <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
+     in fmap (Bifunctor.first (asMana :)) (completions rest)
+          <> fmap (\(tail_, life) -> (tail_, life + phyrexianLife)) (completions rest)
   -- CR 107.4f's hybrid Phyrexian symbol: three ways rather than two, the arm
   -- above's life route beside one nonhybrid equivalent per component colour.
   -- `hybridHalves` collapses the degenerate pair for the reason it does above.
@@ -1552,26 +1552,26 @@ completions symbols = case symbols of
   -- announceable symbols with a hybrid Phyrexian symbol among them; none does.
   ManaSymbol.HybridPhyrexian (HybridPhyrexian.MkHybridPhyrexian l r) : rest ->
     concatMap
-      (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
+      (\half -> fmap (Bifunctor.first (ManaSymbol.OfType half :)) (completions rest))
       (hybridHalves (ManaType.Colored l) (ManaType.Colored r))
-      <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
+      <> fmap (\(tail_, life) -> (tail_, life + phyrexianLife)) (completions rest)
   -- CR 107.4e's two ways, neither of which commits life. The {2} is a Generic
   -- symbol and not a demand for two mana of the stated type: CR 107.4e says "two
   -- mana of any type", and CR 107.4b says a numerical symbol represents generic
   -- mana, which "can be paid with any type of mana" -- the same permission, which
   -- is why the substitution loses nothing.
   ManaSymbol.MonocoloredHybrid manaType : rest ->
-    [(ManaSymbol.OfType manaType : tail_, life) | (tail_, life) <- completions rest]
-      <> [(ManaSymbol.Generic monocoloredHybridGeneric : tail_, life) | (tail_, life) <- completions rest]
+    fmap (Bifunctor.first (ManaSymbol.OfType manaType :)) (completions rest)
+      <> fmap (Bifunctor.first (ManaSymbol.Generic monocoloredHybridGeneric :)) (completions rest)
   -- CR 107.4e's colour/colour half: one mana of either component type, and
   -- neither way commits life. Expanded here rather than ridden through so that
   -- every completion really is CR 601.2b's NONHYBRID equivalent cost -- the
   -- thing CR 601.2f is defined over.
   ManaSymbol.Hybrid (Hybrid.MkHybrid a b) : rest ->
     concatMap
-      (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
+      (\half -> fmap (Bifunctor.first (ManaSymbol.OfType half :)) (completions rest))
       (hybridHalves a b)
-  other : rest -> [(other : tail_, life) | (tail_, life) <- completions rest]
+  other : rest -> fmap (Bifunctor.first (other :)) (completions rest)
 
 -- CR 107.4e's two ways for a colour/colour hybrid, as the mana types they name.
 -- The ONE place `Hybrid t t` is collapsed: that symbol is degenerate rather than
@@ -1724,10 +1724,16 @@ sourceOptions clauses admitting contended supplies =
       -- OPTIONS, which is what they are: one activation makes one or the other.
       -- A narrow yield holds at most one unit, so the fold is that unit's own
       -- answer and the key is exact.
-      unitLists = [((activations, manaCost, foldMap admitting (unitsOf yield)), unitsOf yield) | (activations, yield, manaCost) <- supplies]
+      unitLists =
+        fmap
+          (\(activations, yield, manaCost) -> ((activations, manaCost, foldMap admitting (unitsOf yield)), unitsOf yield))
+          supplies
       (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
-      grouped = [(key, collapsed admits units) | (key@(_, _, admits), units) <- Map.toList (Map.fromListWith (<>) narrow)]
-      apart = [(key, fmap (rewriteSupply clauses . supplyOf admitting) units) | (key, units) <- wide]
+      grouped =
+        fmap
+          (\(key@(_, _, admits), units) -> (key, collapsed admits units))
+          (Map.toList (Map.fromListWith (<>) narrow))
+      apart = fmap (Bifunctor.second (fmap (rewriteSupply clauses . supplyOf admitting))) wide
       optionsFor ((activations, manaCost, _), offered) =
         let claims = Activations.claims activations
             life = Activations.life activations
@@ -1747,15 +1753,16 @@ sourceOptions clauses admitting contended supplies =
             -- resolution, so the board picks. ManaSpending.AsProduced because rule
             -- 118.14's permission is granted for a CAST, and this is an activation.
             resolved = if eats then resolutions ManaSpending.AsProduced manaCost else [([], 0, 0)]
-         in [ MkSourceOption
-                { optionSupplies = concat (List.genericReplicate k offered),
-                  optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
-                  optionClaims = Claim.scale k claims,
-                  optionLife = k * (life + owed)
-                }
-            | k <- counts,
+         in do
+              k <- counts
               (demands, generic, owed) <- resolved
-            ]
+              pure
+                MkSourceOption
+                  { optionSupplies = concat (List.genericReplicate k offered),
+                    optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
+                    optionClaims = Claim.scale k claims,
+                    optionLife = k * (life + owed)
+                  }
       collapsed admits units =
         if null units
           then []
@@ -1920,7 +1927,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- the cost's own demands -- typed and generic alike -- ask that same set.
       subjects = List.nub (subject : fmap PaymentSubject.Activating sources)
       admittedBy = fmap (\each -> (each, admitsUnder each pid gs)) subjects
-      admitting unit = Set.fromList [each | (each, ok) <- admittedBy, ok unit]
+      admitting unit = Set.fromList (fmap fst (filter (\(_, ok) -> ok unit) admittedBy))
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
       -- halves of the board: a rewrite reaching the pool but not the untapped
       -- sources (or the other way round) would make this disagree with `spend`
@@ -1973,21 +1980,21 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- is the payment this walk was asked about. That map is CR 106.6's other
       -- half -- `admits` pairs a demand with the payment it belongs to before
       -- asking whether the mana admits it.
-      boards =
-        [ ( fmap ((,) (0 :: Natural)) (pooled <> concatMap (optionSupplies . snd) free)
-              <> concat [fmap ((,) k) (optionSupplies option) | (k, (_, option)) <- ranked],
-            concat [fmap ((,) k) (optionDemands option) | (k, (_, option)) <- ranked],
+      boards = do
+        taken <- sequenceA options
+        Monad.guard (Claim.satisfiable (claimed <> concatMap (optionClaims . snd) taken))
+        let (eating, free) = List.partition (not . null . optionDemands . snd) taken
+        order <- orderings eating
+        let ranked = zip [1 :: Natural ..] order
+        let costPosition = 1 + Natural.length eating
+        pure
+          ( fmap ((,) (0 :: Natural)) (pooled <> concatMap (optionSupplies . snd) free)
+              <> concatMap (\(k, (_, option)) -> fmap ((,) k) (optionSupplies option)) ranked,
+            concatMap (\(k, (_, option)) -> fmap ((,) k) (optionDemands option)) ranked,
             costPosition,
-            Map.fromList ((costPosition, subject) : [(k, PaymentSubject.Activating oid) | (k, (oid, _)) <- ranked]),
+            Map.fromList ((costPosition, subject) : fmap (\(k, (oid, _)) -> (k, PaymentSubject.Activating oid)) ranked),
             sum (fmap (optionLife . snd) taken)
           )
-        | taken <- sequenceA options,
-          Claim.satisfiable (claimed <> concatMap (optionClaims . snd) taken),
-          let (eating, free) = List.partition (not . null . optionDemands . snd) taken,
-          order <- orderings eating,
-          let ranked = zip [1 :: Natural ..] order,
-          let costPosition = 1 + Natural.length eating
-        ]
       payable (demands, generic, life) =
         let fits (supplies, eaten, costPosition, subjectAt, spent) =
               let -- Both sides tagged with their position, so Hall's condition

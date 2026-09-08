@@ -2346,15 +2346,17 @@ renderEntry verb = case verb of
   MkBlock blocks ->
     Text.pack "block "
       <> renderList
-        [ renderRef blocker <> Text.pack " blocks " <> renderList (fmap renderRef (Set.toAscList attackers))
-        | (blocker, attackers) <- Map.toAscList blocks
-        ]
+        ( fmap
+            (\(blocker, attackers) -> renderRef blocker <> Text.pack " blocks " <> renderList (fmap renderRef (Set.toAscList attackers)))
+            (Map.toAscList blocks)
+        )
   MkAssignDamage assignment ->
     Text.pack "assign "
       <> renderList
-        [ renderRecipient recipient <> Text.pack (" " <> show amount)
-        | (recipient, amount) <- Map.toAscList assignment
-        ]
+        ( fmap
+            (\(recipient, amount) -> renderRecipient recipient <> Text.pack (" " <> show amount))
+            (Map.toAscList assignment)
+        )
   MkConcede -> Text.pack "concede"
 
 renderList :: [Text.Text] -> Text.Text
@@ -3481,6 +3483,6 @@ allPrintings :: Spec.Spec IO n -> IO [Printing.Printing]
 allPrintings s = do
   root <- Registry.defaultRoot
   loaded <- Registry.loadRoot root
-  case [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded] of
-    [] -> pure [Printing.MkPrinting card | (_, Right card) <- loaded]
+  case Maybe.mapMaybe (\(path, result) -> case result of Left reason -> Just (path <> ": " <> Text.unpack reason); Right _ -> Nothing) loaded of
+    [] -> pure (Maybe.mapMaybe (\(_, result) -> case result of Right card -> Just (Printing.MkPrinting card); Left _ -> Nothing) loaded)
     errs -> Spec.assertFailure s (List.intercalate "\n" errs)

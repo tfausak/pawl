@@ -435,10 +435,9 @@ controlledMatching viewOf context gs inner pid =
 -- attachedViews narrows for the object-side sweep.
 attachersOfPlayer :: GameState -> PlayerId -> [ObjectId]
 attachersOfPlayer gs candidate =
-  [ attacher
-  | attacher <- Set.toList (GameState.battlefield gs),
-    (Game.lookupObject attacher gs >>= Object.attachedTo >>= Recipient.playerOf) == Just candidate
-  ]
+  filter
+    (\attacher -> (Game.lookupObject attacher gs >>= Object.attachedTo >>= Recipient.playerOf) == Just candidate)
+    (Set.toList (GameState.battlefield gs))
 
 keep :: Filter.Type.Filter Keyword.Type.Keyword -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of

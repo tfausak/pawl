@@ -334,17 +334,15 @@ sampleControl = do
   gs <- State.get
   let grants = Projection.controlGrants gs
       sampled =
-        Map.fromList
-          [ (oid, pid)
-          | oid <- Set.toList (GameState.battlefield gs),
-            Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
-          ]
-      changes =
-        [ GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before after)
-        | (oid, after) <- Map.toList sampled,
-          Just before <- [Map.lookup oid (GameState.controlSample gs)],
-          before /= after
-        ]
+        Map.fromList $ do
+          oid <- Set.toList (GameState.battlefield gs)
+          Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
+          pure (oid, pid)
+      changes = do
+        (oid, after) <- Map.toList sampled
+        Just before <- [Map.lookup oid (GameState.controlSample gs)]
+        Monad.guard (before /= after)
+        pure (GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before after))
   State.put gs {GameState.controlSample = sampled}
   -- CR 603.2's simultaneity: two permanents whose control reverted in the same CR
   -- 514.2 sweep changed hands at the same moment, so the batch is one event group.

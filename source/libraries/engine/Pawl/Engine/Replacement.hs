@@ -2539,7 +2539,7 @@ liveDestination gs oid
 printedDestination :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Recipient.Recipient
 printedDestination gs context filter_ =
   let viewOf = Projection.viewsOf gs
-   in case [oid | oid <- Set.toList (GameState.battlefield gs), Filter.matches context (viewOf oid) filter_] of
+   in case filter (\oid -> Filter.matches context (viewOf oid) filter_) (Set.toList (GameState.battlefield gs)) of
         [oid] -> liveDestination gs oid
         _ -> Nothing
 
@@ -2805,7 +2805,10 @@ printedBy candidate = case candidate of
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
   let merge (a1, s1, r1) (a2, _, _) = (Map.unionWith (+) a1 a2, s1, r1)
-      keyed = Map.fromListWith merge [(Prevention.by p, (Prevention.amounts p, Prevention.source p, Prevention.rider p)) | p <- ps]
+      keyed =
+        Map.fromListWith
+          merge
+          (fmap (\p -> (Prevention.by p, (Prevention.amounts p, Prevention.source p, Prevention.rider p))) ps)
       rebuild (by, (amounts, source, rider)) =
         Prevention.MkPrevention {Prevention.by = by, Prevention.source = source, Prevention.amounts = amounts, Prevention.rider = rider}
    in fmap rebuild (Map.toAscList keyed)
@@ -2968,18 +2971,18 @@ contested gs events =
                   ( Map.toList
                       ( Map.fromListWith
                           (<>)
-                          [ (pid, [position])
-                          | (position, event) <- hits,
-                            Just pid <- [chooserOf gs (ProposedEvent.WouldDealDamage event)]
-                          ]
+                          ( Maybe.mapMaybe
+                              (\(position, event) -> fmap (\pid -> (pid, [position])) (chooserOf gs (ProposedEvent.WouldDealDamage event)))
+                              hits
+                          )
                       )
                   )
           _ -> Nothing
       groups = concatMap contestedBy (collect gs (GameState.replacements gs))
       merged = Map.fromListWith (<>) groups
-   in [ (pid, List.sort (List.nub positions))
-      | (pid, positions) <- List.sortOn (seatOf gs . fst) (Map.toList merged)
-      ]
+   in fmap
+        (\(pid, positions) -> (pid, List.sort (List.nub positions)))
+        (List.sortOn (seatOf gs . fst) (Map.toList merged))
 
 -- CR 615.7 / 122.1c: a prevention that a batch can exhaust, as the pair (what it
 -- has left, what a set of events would demand of it) -- both in the unit the

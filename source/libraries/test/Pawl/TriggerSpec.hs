@@ -13,6 +13,7 @@
 
 module Pawl.TriggerSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -2584,8 +2585,10 @@ towershellSkipSpec s registry = Spec.describe s "DelayedOnsetSkipped" $ do
       -- phase leaves none, which is CR 614.6's "if an event is replaced, it never
       -- happens" -- and is why this is read before the turn ends, since
       -- Engine.handoffTurn clears the log.
-      combatStepsOf pid gs =
-        [ph | GameEvent.StepBegan (StepBegan.MkStepBegan ph@(Phase.Combat _) who) <- S.eventsOf gs, who == pid]
+      combatStepsOf pid gs = do
+        GameEvent.StepBegan (StepBegan.MkStepBegan ph@(Phase.Combat _) who) <- S.eventsOf gs
+        Monad.guard (who == pid)
+        pure ph
   -- The control that makes the case below discriminating: the same board and the
   -- same line of play with the Dignitary never cast. S.aggressiveAnswer takes no
   -- action at all, and S.fightAnswer is exactly it plus casting what it can

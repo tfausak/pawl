@@ -1116,7 +1116,11 @@ stillAdmitted pcs grants pools perspective source recipient slot gs =
 aimings :: Map SlotName (Set ObjectId) -> [Map SlotName (Set ObjectId)]
 aimings slots =
   foldr
-    (\(name, objects) rest -> [Map.insert name (Set.singleton object) chosen | object <- Set.toList objects, chosen <- rest])
+    ( \(name, objects) rest -> do
+        object <- Set.toList objects
+        chosen <- rest
+        pure (Map.insert name (Set.singleton object) chosen)
+    )
     [Map.empty]
     (filter (not . Set.null . snd) (Map.toList slots))
 
@@ -1511,11 +1515,9 @@ drawFromPiles perspective picked = do
 -- any other, and drawFromPiles says what judges it afterwards.
 pileMembers :: Maybe PlayerId -> Pile.Pile -> GameState -> [ObjectId]
 pileMembers perspective pile gs =
-  [ oid
-  | oid <- Set.toList (GameState.exile gs),
-    not (Exile.mayChoose perspective oid gs),
-    Exile.pileOf oid gs == Just pile
-  ]
+  filter
+    (\oid -> not (Exile.mayChoose perspective oid gs) && Exile.pileOf oid gs == Just pile)
+    (Set.toList (GameState.exile gs))
 
 -- CR 601.2c: is this answer a legal filling of these slots? Each slot answered
 -- with a number of targets its count allows, nothing named that was not offered,
@@ -1675,7 +1677,12 @@ jointlyFillableGiven pcs grants pools perspective seed source slots sets gs =
          in [lo .. hi]
       assignments =
         List.foldr
-          (\(name, slot) rest -> [Map.insert name option m | size <- sizesOf name slot, option <- subsetsOfSize size (legalOf name), m <- rest])
+          ( \(name, slot) rest -> do
+              size <- sizesOf name slot
+              option <- subsetsOfSize size (legalOf name)
+              m <- rest
+              pure (Map.insert name option m)
+          )
           [Map.empty]
           (Map.toList named)
       coherent chosen =

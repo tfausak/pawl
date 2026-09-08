@@ -49,7 +49,7 @@ gather :: (Ord key) => [key] -> [Set key] -> Instances key
 gather atoms sets =
   MkInstances
     { pairs = Map.fromListWith (+) (fmap (\atom -> (atom, 1)) atoms),
-      groups = Map.fromListWith (+) [(set, 1) | set <- sets, not (Set.null set)]
+      groups = Map.fromListWith (+) (fmap (\set -> (set, 1)) (filter (not . Set.null) sets))
     }
 
 -- Is nothing in force at all? The board almost every game is played on, and what

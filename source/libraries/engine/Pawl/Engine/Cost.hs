@@ -353,14 +353,17 @@ candidateCostsGiven permitted pid name oid gs =
                       -- distinguishes one instance from another.
                       flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
                    in fmap flashback (Keyword.flashbackCosts keywords)
-                        <> [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed | Keyword.hasAftermath keywords]
-                        <> [ CandidateCost.MkCandidateCost
-                               (Just Keyword.Type.JumpStart)
-                               -- CR 702.133a's cost names no quality -- "discard a
-                               -- card" -- so the criterion admits everything.
-                               printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))]}
-                           | Keyword.hasJumpStart keywords
-                           ]
+                        <> (if Keyword.hasAftermath keywords then [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed] else [])
+                        <> ( if Keyword.hasJumpStart keywords
+                               then
+                                 [ CandidateCost.MkCandidateCost
+                                     (Just Keyword.Type.JumpStart)
+                                     -- CR 702.133a's cost names no quality -- "discard a
+                                     -- card" -- so the criterion admits everything.
+                                     printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))]}
+                                 ]
+                               else []
+                           )
                         -- UNTAGGED: an effect's permission states no cost, so
                         -- neither rule 702.34a's clause nor rule 702.133a's is
                         -- satisfied by paying it.
@@ -394,7 +397,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- ManaCost, which has no variable to prompt for.
                 Zone.Hand ->
                   fmap untagged (printed : alternatives)
-                    <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs]
+                    <> (if PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs then [untagged (withoutPayingManaCost face)] else [])
                 _ -> fmap untagged (printed : alternatives)
    in case Game.lookupObject oid gs of
         Nothing -> []
@@ -2779,7 +2782,7 @@ announceToll pid charges =
             let paid =
                   cost
                     { Cost.mana = Just settled,
-                      Cost.components = Cost.components cost <> [CostComponent.PayLife life | life > 0]
+                      Cost.components = Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
                     }
             go ((tag, paid) : done) (committed + life) rest
    in go [] 0 charges

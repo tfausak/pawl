@@ -13,7 +13,9 @@
 -- ActivationProhibition constructor is visible here.
 module Pawl.Engine.Ignore where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
@@ -52,13 +54,19 @@ import qualified Pawl.Types.SpecialAction as SpecialAction
 -- printing grants two -- the four producers print one sentence each -- so the
 -- list is a singleton for every card in the pool.
 ignoreGrants :: ObjectId -> GameState -> [(AbilityName.AbilityName, Cost.Type.Cost Keyword)]
-ignoreGrants oid gs = [(n, c) | SpecialAction.IgnoreThisUntilEndOfTurn n c <- Projection.specialActionsOf oid gs]
+ignoreGrants oid gs =
+  Maybe.mapMaybe
+    ( \action -> case action of
+        SpecialAction.IgnoreThisUntilEndOfTurn n c -> Just (n, c)
+        _ -> Nothing
+    )
+    (Projection.specialActionsOf oid gs)
 
 -- What this permanent charges to be ignored under this ability's name, if its
 -- rules text grants that at all. FIRST grant wins where a face somehow named
 -- one ability twice; no printing does.
 ignoreCostOf :: ObjectId -> AbilityName.AbilityName -> GameState -> Maybe (Cost.Type.Cost Keyword)
-ignoreCostOf oid name gs = case [c | (n, c) <- ignoreGrants oid gs, n == name] of
+ignoreCostOf oid name gs = case fmap snd (filter (\(n, _) -> n == name) (ignoreGrants oid gs)) of
   [] -> Nothing
   c : _ -> Just c
 
@@ -120,12 +128,11 @@ affectedThrough pid oid name gs =
 -- battlefield order -- what Action.Ignore is built from, the shape
 -- Room.unlockable has.
 ignorable :: PlayerId -> GameState -> [(ObjectId, AbilityName.AbilityName)]
-ignorable pid gs =
-  [ (oid, name)
-  | oid <- Set.toAscList (GameState.battlefield gs),
-    (name, _) <- ignoreGrants oid gs,
-    canIgnore pid oid name gs
-  ]
+ignorable pid gs = do
+  oid <- Set.toAscList (GameState.battlefield gs)
+  (name, _) <- ignoreGrants oid gs
+  Monad.guard (canIgnore pid oid name gs)
+  pure (oid, name)
 
 -- CR 116.2d, in the rule's own order: pay the cost, then start ignoring.
 --

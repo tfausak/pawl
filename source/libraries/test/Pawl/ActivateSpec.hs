@@ -3730,7 +3730,7 @@ anyPlayerActivationSpec s registry = Spec.describe s "Any player may activate" $
     stormPrinting <- S.printingOf s registry "Aether Storm"
     let (storm, g0) = S.addPermanent stormPrinting S.alice (Setup.emptyGame S.bothPlayers)
         gs = g0 {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
-        offers = [ab | A.Activate o ab <- Action.legalActions S.bob gs, o == storm]
+        offers = Maybe.mapMaybe (\a -> case a of A.Activate o ab | o == storm -> Just ab; _ -> Nothing) (Action.legalActions S.bob gs)
         step g ab = S.runPure S.identityAnswer (S.runPure S.identityAnswer g (Activate.activateAbility S.bob storm ab)) Stack.resolveTop
         after = S.settleSba (List.foldl' step gs offers)
     Spec.assertBool s (not (S.onBattlefield storm after)) "the enchantment its controller never touched has left the battlefield"

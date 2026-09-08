@@ -195,7 +195,13 @@ lifeGainTriggerSpec s registry =
           childOfNight <- S.printingOf s registry "Child of Night"
           let (oid, gs0) = S.addPermanent childOfNight S.alice (Setup.emptyGame S.bothPlayers)
               evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False False 0 (Just S.alice) DamageKind.Combat
-              gainsIn gs = [p | GameEvent.LifeGained (LifeChange.MkLifeChange p _) <- S.eventsOf gs]
+              gainsIn gs =
+                Maybe.mapMaybe
+                  ( \event -> case event of
+                      GameEvent.LifeGained (LifeChange.MkLifeChange p _) -> Just p
+                      _ -> Nothing
+                  )
+                  (S.eventsOf gs)
               after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
           Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []

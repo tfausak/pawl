@@ -1,6 +1,7 @@
 module Pawl.Engine.Quantity where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
@@ -143,12 +144,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
       -- a Maybe: CR 400.7 makes each arrival a new object, so at most one entry can
       -- name a given id, and folding over the log is what says so rather than
       -- assuming it.
-      entriesOf oid =
-        [ zc
-        | ev <- Foldable.toList (GameState.events gs),
-          Just zc <- [Game.enteredBattlefieldChange (LoggedEvent.event ev)],
-          ZoneChange.object zc == oid
-        ]
+      entriesOf oid = do
+        ev <- Foldable.toList (GameState.events gs)
+        zc <- Maybe.maybeToList (Game.enteredBattlefieldChange (LoggedEvent.event ev))
+        Monad.guard (ZoneChange.object zc == oid)
+        pure zc
    in case quantity of
         Quantity.Literal n -> Just n
         -- CR 202.3 read through the injected view, exactly as the Power arm below is
@@ -786,7 +786,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
           pids <- playersOf (InZone.player inZone)
           casters <- playersOf (CastFrom.caster castFrom)
           owner <- Filter.owner =<< viewOf oid
-          let spells = [ZoneChange.departed zc | zc <- entriesOf oid, ZoneChange.from zc == Zone.Stack]
+          let spells = fmap ZoneChange.departed (filter (\zc -> ZoneChange.from zc == Zone.Stack) (entriesOf oid))
               castFromZone cast =
                 elem (SpellWasCast.spell cast) spells
                   && SpellWasCast.zone cast == Just (InZone.zone inZone)

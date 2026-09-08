@@ -2125,7 +2125,15 @@ printingSpec s registry = Spec.describe s "PrintingTable" $ do
     mountain <- S.printingOf s registry "Mountain"
     let deck = Deck.fromCards (Map.singleton mountain 2)
         gs = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
-        ids = List.nub [p | obj <- Map.elems (GameState.objects gs), Source.OfCard p <- [Object.source obj]]
+        ids =
+          List.nub
+            ( Maybe.mapMaybe
+                ( \obj -> case Object.source obj of
+                    Source.OfCard p -> Just p
+                    _ -> Nothing
+                )
+                (Map.elems (GameState.objects gs))
+            )
     Spec.assertEqWith s "distinct printing ids" (length ids) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -2456,7 +2464,7 @@ wordAnswer pinned p = case p of
 
 -- The deciders recorded for one prompt kind put to one seat, in order.
 askedOf :: String -> PlayerId.PlayerId -> [(String, PlayerId.PlayerId, Maybe Decider.Decider)] -> [Maybe Decider.Decider]
-askedOf kind who seen = [decider | (k, pid, decider) <- seen, k == kind, pid == who]
+askedOf kind who seen = fmap (\(_, _, decider) -> decider) (filter (\(k, pid, _) -> k == kind && pid == who) seen)
 
 -- The controller's strategy: when asked to decide for bob (the CONTROLLED player,
 -- routed because the prompt's Decider is alice), cast the Bolt at bob; otherwise

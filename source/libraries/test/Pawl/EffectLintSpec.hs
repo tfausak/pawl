@@ -1272,7 +1272,7 @@ effectObjectRefs effect =
 -- weaker than printed with nothing on the wire to show it.
 inertChoosers :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [ObjectRef.ObjectRef]
 inertChoosers effect =
-  [ref | (asks, ref) <- effectObjectRefs effect, chooserRef ref, not (asksFor asks ref)]
+  fmap snd (filter (\(asks, ref) -> chooserRef ref && not (asksFor asks ref)) (effectObjectRefs effect))
 
 -- CR 709.4a: a card's faces are referred to BY NAME (Card.faceNamed), so two
 -- faces sharing a name make that reference ambiguous -- faceNamed would return
@@ -1345,7 +1345,11 @@ meldFaceCountOffends card =
 -- closure is a superset of effectFilters' own recursion, which can only subtract
 -- within the effect whose tally it is being subtracted from.
 mintedOwn :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set.Set (Filter.Type.Filter Keyword.Keyword)
-mintedOwn effect = Set.fromList [f | e <- effectWithNested effect, (_, face) <- effectMintedFaces e, (SourceHostFramed, f) <- cardFilters face]
+mintedOwn effect = Set.fromList $ do
+  e <- effectWithNested effect
+  (_, face) <- effectMintedFaces e
+  (SourceHostFramed, f) <- cardFilters face
+  pure f
 
 -- The SourceHostFramed filters a face's resolution effects reach through the
 -- Filter traversal, each effect's minted faces subtracted from that effect's own
@@ -1355,7 +1359,16 @@ mintedOwn effect = Set.fromList [f | e <- effectWithNested effect, (_, face) <- 
 -- a card-wide minted set cancels a filter contributed by any other effect that
 -- happens to carry an equal one. The case below is the counter-example.
 viaFilters :: Face.Face Card.Type.Card -> Set.Set (Filter.Type.Filter Keyword.Keyword)
-viaFilters card = Set.unions [Set.difference (Set.fromList [f | (SourceHostFramed, f) <- effectFilters effect]) (mintedOwn effect) | effect <- cardResolutionEffects card]
+viaFilters card =
+  Set.unions
+    ( fmap
+        ( \effect ->
+            Set.difference
+              (Set.fromList (Maybe.mapMaybe (\pair -> case pair of (SourceHostFramed, f) -> Just f; _ -> Nothing) (effectFilters effect)))
+              (mintedOwn effect)
+        )
+        (cardResolutionEffects card)
+    )
 
 effectLintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 effectLintSpec s registry = Spec.describe s "Lint" $ do
@@ -1826,11 +1839,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
             (concatMap (\effect -> Resolve.effectPlayerRefs effect <> concatMap Resolve.objectRefPlayerRefs (Resolve.effectObjectRefs effect)) effects)
         -- The arity classification itself, shared by the effect leg above and the
         -- clause leg clashesIn folds in below.
-        slotsReadSinglyIn refs =
-          [ slot
-          | ref <- refs,
-            (slot, SlotArity.One) <- Map.toList (Resolve.playerRefSlots ref)
-          ]
+        slotsReadSinglyIn refs = do
+          ref <- refs
+          (slot, SlotArity.One) <- Map.toList (Resolve.playerRefSlots ref)
+          pure slot
         -- The reading side's fifth carrier: a NUMBER. Resolve.quantitySlots'
         -- SlotArity.One entries are exactly the Quantity.AgainstSlot arms, which
         -- aim an inner number at the object a slot names and so reach
@@ -1841,12 +1853,11 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         -- No subtraction of a minted object's text, which readSinglyInFilters
         -- needs: effectQuantities does not descend into the card a Create or a
         -- Conjure carries.
-        readSinglyInQuantities effects =
-          [ slot
-          | effect <- effects,
-            quantity <- effectQuantities effect,
-            (slot, SlotArity.One) <- Map.toList (Resolve.quantitySlots quantity)
-          ]
+        readSinglyInQuantities effects = do
+          effect <- effects
+          quantity <- effectQuantities effect
+          (slot, SlotArity.One) <- Map.toList (Resolve.quantitySlots quantity)
+          pure slot
         -- The three READING sides at once: this resolution's own effects, the
         -- conditions of the delayed abilities it arms, and the PlayerRefs its
         -- CLAUSES hold. CR 603.7c is what puts the second there -- the entry
@@ -2260,7 +2271,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- written anywhere else is (#2740).
   Spec.it s "every ObjectRef position the Filter traversal reaches is one the asking traversal reaches" $ do
     ps <- S.allPrintings s
-    let viaRefs card = Set.fromList [f | (_, ref) <- concatMap effectObjectRefs (cardResolutionEffects card), (SourceHostFramed, f) <- frame SourceHostFramed (objectRefFilters ref)]
+    let viaRefs card = Set.fromList $ do
+          (_, ref) <- concatMap effectObjectRefs (cardResolutionEffects card)
+          (SourceHostFramed, f) <- frame SourceHostFramed (objectRefFilters ref)
+          pure f
         offenders = filter (anyFace (\card -> viaFilters card /= viaRefs card) . Printing.card) ps
     Spec.assertEqWith s "the two ObjectRef traversals agree" (fmap (S.nameOf . Printing.card) offenders) []
     -- The subtraction is PER EFFECT, and this is what says so. Both sides are
@@ -2911,7 +2925,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- sweep without comparing anything.
   Spec.it s "an unlock trigger names one of its own card's faces" $ do
     ps <- S.allPrintings s
-    let doors c = [n | TriggerCondition.SelfHalfUnlocked n <- fmap TriggeredAbility.condition (Face.triggeredAbilities c)]
+    let doors c = Maybe.mapMaybe (\cond -> case TriggeredAbility.condition cond of TriggerCondition.SelfHalfUnlocked n -> Just n; _ -> Nothing) (Face.triggeredAbilities c)
         offends card = any (any (`notElem` fmap Face.name (NonEmpty.toList (Card.Type.faces card))) . doors) (Card.Type.faces card)
         offenders = filter (offends . Printing.card) ps
     Spec.assertBool

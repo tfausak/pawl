@@ -155,11 +155,10 @@ instances candidates targets gs =
       -- CR 612.1: a hacked "Swamps attack each combat if able" requires Islands.
       fromRequirement source changes requirement =
         let subject = AttackRequirement.subject requirement
-            announcements =
-              [ (creature, target)
-              | creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates,
-                target <- admissible source requirement
-              ]
+            announcements = do
+              creature <- filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates
+              target <- admissible source requirement
+              pure (creature, target)
          in if not (inForce source changes requirement)
               then ([], [])
               else case AttackRequirement.arity requirement of
@@ -215,7 +214,7 @@ instances candidates targets gs =
               [] -> []
               lives ->
                 let best = maximum (fmap snd lives)
-                    leaders = [pid | (pid, life) <- lives, life == best]
+                    leaders = fmap fst (filter (\(_, life) -> life == best) lives)
                  in filter (\target -> any (\pid -> target == AttackTarget.OfPlayer pid) leaders) targets
         Just RequiredDefender.ControllerOrTheirPlaneswalkers ->
           -- CR 109.5 fixes the "you" as the source's controller, and CR 306.6
@@ -297,10 +296,9 @@ instances candidates targets gs =
       fromStored active =
         let creature = ActiveAttackRequirement.attacker active
             target = AttackTarget.OfPlayer (ActiveAttackRequirement.defender active)
-         in ( [ (creature, target)
-              | creature `elem` candidates,
-                target `elem` targets
-              ],
+         in ( if elem creature candidates && elem target targets
+                then [(creature, target)]
+                else [],
               []
             )
       -- CR 701.15b, off the THIRD carrier (Object.goadedBy): a goaded creature
@@ -332,12 +330,10 @@ instances candidates targets gs =
       -- because that is the pruning fromStored gets from membership -- only a
       -- creature that can attack can obey either requirement.
       fromGoad creature =
-        ( [ pair
-          | goader <- Set.toList (Goad.goadedBy creature gs),
-            pair <-
-              [(creature, target) | target <- targets]
-                <> [(creature, target) | target <- targets, target /= AttackTarget.OfPlayer goader, isPlayer target]
-          ],
+        ( do
+            goader <- Set.toList (Goad.goadedBy creature gs)
+            fmap (\target -> (creature, target)) targets
+              <> fmap (\target -> (creature, target)) (filter (\target -> target /= AttackTarget.OfPlayer goader && isPlayer target) targets),
           []
         )
       isPlayer target = case target of

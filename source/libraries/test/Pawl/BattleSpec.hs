@@ -1047,7 +1047,7 @@ seizedByProtector ::
   PlayerId.PlayerId ->
   m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 seizedByProtector s registry blockerSeat = do
-  let wraith who = ["Bog Wraith" | who == blockerSeat]
+  let wraith who = if who == blockerSeat then ["Bog Wraith"] else []
   (gs, battle, mine, _, _) <-
     battleCombatOf s registry S.carol S.carol ["Goblin Piker"] (wraith S.bob) (replicate 5 "Mountain" <> wraith S.carol)
   (board, spell) <- seizing s registry S.carol (bothDefending gs)

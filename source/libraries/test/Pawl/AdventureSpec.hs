@@ -12,6 +12,7 @@
 -- through S.soleFaceName and errors on a card with more than one castable half.
 module Pawl.AdventureSpec where
 
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
@@ -71,7 +72,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+    let namesOffered gs = Maybe.mapMaybe (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
         -- An artifact on the battlefield, or Battle Display has no legal target
         -- and is gated out for a reason that has nothing to do with the layout.
         board = snd (S.addPermanent bonesplitter S.alice (S.landsInPlay mountain 2))
@@ -103,7 +104,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    let namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+    let namesOffered gs = Maybe.mapMaybe (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
         -- The Bonesplitter is the Adventure's legal target, without which every
         -- absent offer below would be about targeting instead of about cost.
         artifactAnd n = snd (S.addPermanent bonesplitter S.alice (S.landsInPlay mountain n))
@@ -178,7 +179,7 @@ spec s registry = Spec.describe s "Adventure" $ do
         (gs, oid) = S.handOne shieldbreaker board
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        namesOffered g = [n | A.Cast _ n _ <- Action.legalActions S.alice g]
+        namesOffered g = Maybe.mapMaybe (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice g)
     Spec.assertEqWith
       s
       "an artifact survives, so the Adventure has a legal target"
@@ -210,10 +211,9 @@ spec s registry = Spec.describe s "Adventure" $ do
         let recast = snd (Engine.runGamePure S.identityAnswer resolved (Cast.castSpell S.manaPerformer S.alice exiledId shieldbreakerName Facing.FaceUp))
             entered = snd (Engine.runGamePure S.identityAnswer recast Stack.resolveTop)
             knights =
-              [ o
-              | o <- Set.toList (GameState.battlefield entered),
-                Set.member Subtype.Knight (Projection.subtypesOf o entered)
-              ]
+              filter
+                (\o -> Set.member Subtype.Knight (Projection.subtypesOf o entered))
+                (Set.toList (GameState.battlefield entered))
         Spec.assertEqWith s "exile is empty again" (Game.zoneMembers Zone.Exile S.alice entered) []
         case knights of
           [knightId] -> do

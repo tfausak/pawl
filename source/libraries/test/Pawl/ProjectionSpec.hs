@@ -11,6 +11,7 @@
 -- fold with, and the untagged AddSubtype beside them.
 module Pawl.ProjectionSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -4417,11 +4418,12 @@ levelsOn oid gs = case Game.lookupObject oid gs of
 tappedCount :: GameState.GameState -> Int
 tappedCount gs =
   length
-    [ o
-    | oid <- Set.toList (GameState.battlefield gs),
-      Just o <- [Game.lookupObject oid gs],
-      Object.tapped o == TapState.Tapped
-    ]
+    ( do
+        oid <- Set.toList (GameState.battlefield gs)
+        o <- Maybe.maybeToList (Game.lookupObject oid gs)
+        Monad.guard (Object.tapped o == TapState.Tapped)
+        pure o
+    )
 
 -- The Activate actions offered for one source. Filtered by source rather than
 -- `any isActivate`, so a board with other permanents on it cannot answer for

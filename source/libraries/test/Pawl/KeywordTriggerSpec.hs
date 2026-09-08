@@ -1308,13 +1308,17 @@ creatureBecomesBlockedByAtLeastSpec s registry =
       firedBy :: ObjectId.ObjectId -> GameState.GameState -> Int
       firedBy oid gs =
         length
-          [ ()
-          | GameEvent.AbilityTriggered record <- S.eventsOf gs,
-            AbilityTriggered.source record == TriggerSource.OfObject oid,
-            case TriggeredAbility.condition (AbilityTriggered.ability record) of
-              TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
-              _ -> False
-          ]
+          ( filter
+              ( \event -> case event of
+                  GameEvent.AbilityTriggered record ->
+                    AbilityTriggered.source record == TriggerSource.OfObject oid
+                      && case TriggeredAbility.condition (AbilityTriggered.ability record) of
+                        TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
+                        _ -> False
+                  _ -> False
+              )
+              (S.eventsOf gs)
+          )
    in Spec.describe s "CreatureBecomesBlockedByAtLeast" $ do
         -- The proving test and its control on ONE board: the same Elves, the same
         -- two Giants, the same Seifer, and only the size of the block differs. Two

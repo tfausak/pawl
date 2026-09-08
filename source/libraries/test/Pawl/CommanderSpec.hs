@@ -138,7 +138,7 @@ commanderCastsOf gs = foldMap (fmap toInteger . Map.elems . Player.commanderCast
 -- since every land here is a Mountain tapping for one.
 tappedCount :: GameState.GameState -> Int
 tappedCount gs =
-  length [() | oid <- Set.toList (GameState.battlefield gs), fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped]
+  length (filter (\oid -> fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped) (Set.toList (GameState.battlefield gs)))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
@@ -404,7 +404,7 @@ partnerBoard mountain plains lands commanders =
 -- name is what survives.
 inCommandZoneNamed :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
 inCommandZoneNamed printing gs =
-  [oid | oid <- inCommandZone gs, fmap S.nameOf (Game.cardOf oid gs) == Just (S.nameOf (Printing.card printing))]
+  filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.nameOf (Printing.card printing))) (inCommandZone gs)
 
 -- Cast this commander, resolve it, bin the permanent it became, and settle --
 -- which is CR 903.9a's offer, accepted by `reclaiming`. castAndSettle above
@@ -414,10 +414,7 @@ castAndReclaim :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState 
 castAndReclaim printing oid gs =
   let resolved = S.runPure reclaiming (S.runPure reclaiming gs (S.cast S.alice oid)) Stack.resolveTop
       onBattlefield =
-        [ o
-        | o <- Set.toAscList (GameState.battlefield resolved),
-          fmap S.nameOf (Game.cardOf o resolved) == Just (S.nameOf (Printing.card printing))
-        ]
+        filter (\o -> fmap S.nameOf (Game.cardOf o resolved) == Just (S.nameOf (Printing.card printing))) (Set.toAscList (GameState.battlefield resolved))
       binned = List.foldl' (\g o -> S.runPure reclaiming g (Event.changeZone o Zone.Graveyard)) resolved onBattlefield
    in S.runPure reclaiming binned Engine.settleForPriority
 

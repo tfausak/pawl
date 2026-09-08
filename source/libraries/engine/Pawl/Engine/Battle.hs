@@ -345,7 +345,7 @@ siegeDefeat =
 -- rule 310.4b hangs off the CARD TYPE, where 310.12b hangs off an ability the rules
 -- grant, and layer 6 removes abilities.
 triggeredAbilitiesOf :: PC.ProjectedCharacteristics -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-triggeredAbilitiesOf pc = [siegeDefeat | Set.member Subtype.Siege (battleTypes pc)]
+triggeredAbilitiesOf pc = if Set.member Subtype.Siege (battleTypes pc) then [siegeDefeat] else []
 
 -- CR 122.1g / 310.4c: the defense counters on a permanent. Zero for an object the
 -- game does not hold, the answer Saga.loreOn gives for rule 714.3.

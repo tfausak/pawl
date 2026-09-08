@@ -3016,12 +3016,12 @@ twiddleTapState oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
 -- Which branches CR 608.2d actually asked about, in the order asked.
 branchesAnnounced :: [Response.Response] -> [ClauseIndex.ClauseIndex]
-branchesAnnounced responses = [c | Response.ChoseClause c <- responses]
+branchesAnnounced = Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing)
 
 -- And which "may"s CR 603.5 asked about, so a second offer to the losing branch
 -- would show up as a second answer.
 optionalsAnswered :: [Response.Response] -> [OptionalDecision.OptionalDecision]
-optionalsAnswered responses = [d | Response.ChoseOptional d <- responses]
+optionalsAnswered = Maybe.mapMaybe (\r -> case r of Response.ChoseOptional d -> Just d; _ -> Nothing)
 
 -- The board the two Teardrop Kami cases share, built to match twiddleBoard as
 -- closely as an ability can: alice's Kami is the source, bob's Goblin Piker the
@@ -3837,8 +3837,8 @@ wormsSpec s registry =
           Spec.assertEqWith s "CR 608.2c nothing was done, so the enchantment stands" (wormsStands after) 1
           Spec.assertEqWith s "carol's one Mountain is still hers" (lands after) (3, 3, 1)
           Spec.assertEqWith s "and she took no damage in its place" (lives after) (Just 20, Just 20, Just 20)
-          Spec.assertEqWith s "CR 118.3 the cost was offered to the two seats who could pay it and not to carol" [d | Response.ChoseToPay d <- asked] [PaymentDecision.Declines, PaymentDecision.Declines]
-          Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length [c | Response.ChoseClause c <- asked]) 3
+          Spec.assertEqWith s "CR 118.3 the cost was offered to the two seats who could pay it and not to carol" (Maybe.mapMaybe (\r -> case r of Response.ChoseToPay d -> Just d; _ -> Nothing) asked) [PaymentDecision.Declines, PaymentDecision.Declines]
+          Spec.assertEqWith s "CR 608.2d the announcement itself was still put to all three seats" (length (Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing) asked)) 3
 
 -- CR 701.21a's second sentence -- "a player can't sacrifice ... something that's
 -- a permanent they don't control" -- which is what separates an ordinary printed

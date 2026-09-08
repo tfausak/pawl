@@ -161,9 +161,9 @@ theRingEmblem temptations =
               -- the controller order a batch, so nothing rides on it, but the
               -- printed order is the one a reader can check.
               Face.triggeredAbilities =
-                [theRingLootsOnAttack | temptations >= 2]
-                  <> [theRingSacrificesTheBlocker | temptations >= 3]
-                  <> [theRingDrainsOnCombatDamage | temptations >= 4],
+                (if temptations >= 2 then [theRingLootsOnAttack] else [])
+                  <> (if temptations >= 3 then [theRingSacrificesTheBlocker] else [])
+                  <> (if temptations >= 4 then [theRingDrainsOnCombatDamage] else []),
               Face.delayedAbilities =
                 if temptations >= 3
                   then Map.singleton theRingBlockerSacrificeName theRingBlockerSacrifice

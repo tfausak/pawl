@@ -6,6 +6,7 @@
 -- reaches the loop.
 module Pawl.Engine.Event.Match where
 
+import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -185,10 +186,11 @@ turnScopeAdmits teams scope active own = case scope of
 mainPhasesBegun :: GameState -> Natural
 mainPhasesBegun gs =
   Natural.length
-    [ ()
-    | GameEvent.StepBegan (StepBegan.MkStepBegan phase _) <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs)),
-      isMainPhase phase
-    ]
+    ( do
+        GameEvent.StepBegan (StepBegan.MkStepBegan phase _) <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs))
+        Monad.guard (isMainPhase phase)
+        pure ()
+    )
 
 -- CR 505.1: the precombat and postcombat main phases, and no step of any other.
 isMainPhase :: Phase.Phase -> Bool
@@ -2381,7 +2383,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _)
       | blocker == bearer ->
           let admits attacker = maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown attacker gs attacker)
-              blocked = [attacker | (attacker, blockers) <- Map.toList (Combat.blockers (GameState.combat gs)), Set.member bearer blockers]
+              blocked =
+                fmap
+                  fst
+                  (filter (\(_, blockers) -> Set.member bearer blockers) (Map.toList (Combat.blockers (GameState.combat gs))))
            in any admits blocked
     GameEvent.BlocksDeclared {} -> False
     -- The PAIRWISE event is CR 509.3b's, and matching it here would fire once per

@@ -30,7 +30,9 @@
 -- holds the same cards either way, and only how they got there differs.
 module Pawl.ExileSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -514,11 +516,7 @@ flashbackPileBoard s registry = do
       -- Read off the board rather than assumed: CR 400.7 mints a fresh
       -- incarnation as each card is exiled, so the ids the hand held are gone.
       idOf printing =
-        Maybe.listToMaybe
-          [ oid
-          | oid <- faceDownExiled board,
-            namesOf [oid] board == Set.singleton (S.printingName printing)
-          ]
+        List.find (\oid -> namesOf [oid] board == Set.singleton (S.printingName printing)) (faceDownExiled board)
    in pure (idOf think, idOf piker, spellId, twincastId, cancelId, board)
 
 -- throughPile, with CR 406.4's draw answered by the card NAMED rather than by
@@ -635,11 +633,11 @@ twoPileBoard s registry = do
       -- by name and its pile asked of Pawl.Engine.Exile.
       pile =
         Maybe.listToMaybe
-          [ p
-          | oid <- faceDownExiled board,
-            namesOf [oid] board == Set.singleton hidden,
-            p <- Maybe.maybeToList (Exile.pileOf oid board)
-          ]
+          ( do
+              oid <- faceDownExiled board
+              Monad.guard (namesOf [oid] board == Set.singleton hidden)
+              Maybe.maybeToList (Exile.pileOf oid board)
+          )
    in pure (pile, hidden, spellId, board)
 
 -- Every object on the stack resolved, with nobody taking an action.

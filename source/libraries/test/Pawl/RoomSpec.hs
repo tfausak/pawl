@@ -65,6 +65,7 @@ module Pawl.RoomSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -188,13 +189,14 @@ beginEndStep gs =
 -- since CR 400.7 mints a new one as the spell resolves.
 roomPermanent :: GameState.GameState -> [ObjectId.ObjectId]
 roomPermanent gs =
-  [ o
-  | o <- Set.toList (GameState.battlefield gs),
-    let names = Projection.namesOf o gs,
-    -- A door's name, or NO name at all -- which is what a Room with both doors
-    -- shut has (CR 709.5).
-    Set.null names || not (Set.disjoint names (Set.fromList [furnaceName, saunaName]))
-  ]
+  filter
+    ( \o ->
+        let names = Projection.namesOf o gs
+         in -- A door's name, or NO name at all -- which is what a Room with both
+            -- doors shut has (CR 709.5).
+            Set.null names || not (Set.disjoint names (Set.fromList [furnaceName, saunaName]))
+    )
+    (Set.toList (GameState.battlefield gs))
 
 -- The riders an effect that merely puts a permanent onto the battlefield asks
 -- for: CR 110.5b's untapped and face up, no CR 508.1 attacking entry, and CR
@@ -251,7 +253,13 @@ newPermanent before after = Set.toList (Set.difference (GameState.battlefield af
 
 -- Every unlock this player is offered right now, as CR 709.5e's pair.
 unlocksOffered :: GameState.GameState -> [(ObjectId.ObjectId, CardName.CardName)]
-unlocksOffered gs = [(o, n) | A.Unlock o n <- Action.legalActions S.alice gs]
+unlocksOffered gs =
+  Maybe.mapMaybe
+    ( \action -> case action of
+        A.Unlock o n -> Just (o, n)
+        _ -> Nothing
+    )
+    (Action.legalActions S.alice gs)
 
 -- Keys to the House's SECOND ability, "{3}, {T}, Sacrifice this artifact: Lock
 -- or unlock a door of target Room you control. Activate only as a sorcery." The
@@ -367,7 +375,7 @@ spec s registry = Spec.describe s "Room" $ do
     island <- S.printingOf s registry "Island"
     (_, _, rich) <- setUp s registry
     let poor = fst (S.handOne room (S.landsInPlay mountain 2))
-        casts gs = [c | A.Cast _ c _ <- Action.legalActions S.alice gs]
+        casts gs = Maybe.mapMaybe (\action -> case action of A.Cast _ c _ -> Just c; _ -> Nothing) (Action.legalActions S.alice gs)
     Spec.assertEqWith
       s
       "the card proposes both of its halves"

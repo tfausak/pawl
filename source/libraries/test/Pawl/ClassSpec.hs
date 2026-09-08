@@ -48,6 +48,7 @@
 -- Paladin Class for that one group.
 module Pawl.ClassSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -204,7 +205,13 @@ levelOf oid gs = Game.lookupObject oid gs >>= Object.classLevel
 -- enumeration a player is offered. Counts activations of one source, so the
 -- Plains' mana abilities and the Piker cannot be mistaken for one.
 barsOffered :: ObjectId.ObjectId -> GameState.GameState -> Int
-barsOffered oid gs = length [() | Action.Type.Activate o _ <- Action.legalActions S.alice gs, o == oid]
+barsOffered oid gs =
+  length
+    ( do
+        Action.Type.Activate o _ <- Action.legalActions S.alice gs
+        Monad.guard (o == oid)
+        pure ()
+    )
 
 -- Activate the first bar the enumeration offers and resolve it. Stack.resolveTop
 -- rather than the priority loop: the narrowest path that shows the write, with no

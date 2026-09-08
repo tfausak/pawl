@@ -358,10 +358,13 @@ riseOfTheDarkRealmsSpec s registry = Spec.describe s "RiseOfTheDarkRealms" $ do
         -- a reanimated card cannot be found by the id it was buried under.
         reanimated gs =
           List.sort
-            [ (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs)
-            | oid <- Set.toList (GameState.battlefield gs),
-              fmap S.nameOf (Game.cardOf oid gs) /= Just (S.nameOf (Printing.card swamp))
-            ]
+            ( fmap
+                (\oid -> (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs))
+                ( filter
+                    (\oid -> fmap S.nameOf (Game.cardOf oid gs) /= Just (S.nameOf (Printing.card swamp)))
+                    (Set.toList (GameState.battlefield gs))
+                )
+            )
         named = Just . CardName.MkCardName . Text.pack
     Spec.assertEqWith
       s
@@ -449,7 +452,7 @@ angelOfFinalitySpec s registry = Spec.describe s "AngelOfFinality" $ do
         placed = S.runPure atBob entered Engine.placePendingTriggers
         after = S.runPure atBob placed Stack.resolveTop
         named = Just . CardName.MkCardName . Text.pack
-        exiled gs = List.sort [fmap S.nameOf (Game.cardOf oid gs) | oid <- Set.toList (GameState.exile gs)]
+        exiled gs = List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.exile gs)))
     Spec.assertEqWith
       s
       "bob's graveyard is empty and the other two keep every card"
@@ -694,10 +697,10 @@ portOfKarfellSpec s registry =
       -- destination and CR 110.2a is what decides whose the arrival is.
       arrivals gs =
         List.sort
-          [ (fmap S.nameOf (Game.cardOf oid gs), fmap Object.tapped (Game.lookupObject oid gs), Projection.controllerOf oid gs)
-          | oid <- Set.toList (GameState.battlefield gs),
-            notElem (fmap S.nameOf (Game.cardOf oid gs)) [named "Swamp", named "Island"]
-          ]
+          ( fmap
+              (\oid -> (fmap S.nameOf (Game.cardOf oid gs), fmap Object.tapped (Game.lookupObject oid gs), Projection.controllerOf oid gs))
+              (filter (\oid -> notElem (fmap S.nameOf (Game.cardOf oid gs)) [named "Swamp", named "Island"]) (Set.toList (GameState.battlefield gs)))
+          )
       -- The board with nothing returned: carol's creature and nothing else.
       untouched = [(named "Benalish Hero", Just TapState.Untapped, Just S.carol)]
       wasAsked responses =
@@ -895,10 +898,13 @@ graspingTentaclesSpec s registry =
       -- decides whose the arrival is.
       arrivals gs =
         List.sort
-          [ (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs)
-          | oid <- Set.toList (GameState.battlefield gs),
-            notElem (fmap S.nameOf (Game.cardOf oid gs)) [named "Island", named "Swamp"]
-          ]
+          ( fmap
+              (\oid -> (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs))
+              ( filter
+                  (\oid -> notElem (fmap S.nameOf (Game.cardOf oid gs)) [named "Island", named "Swamp"])
+                  (Set.toList (GameState.battlefield gs))
+              )
+          )
       wasAsked responses =
         let isChoice r = case r of
               Response.ChoseCardInGraveyard _ -> True
@@ -1701,12 +1707,11 @@ openTheWaySpec s registry =
       -- The tap state of every battlefield object alice owns that carries this
       -- name. Empty where nothing of that name is there, which is how a card the
       -- walk revealed but did NOT match is told from one it did.
-      tapOf name pid gs =
-        [ Object.tapped o
-        | oid <- Game.zoneMembers Zone.Battlefield pid gs,
-          fmap S.nameOf (Game.cardOf oid gs) == named name,
-          o <- Maybe.maybeToList (Game.lookupObject oid gs)
-        ]
+      tapOf name pid gs = do
+        oid <- Game.zoneMembers Zone.Battlefield pid gs
+        Monad.guard (fmap S.nameOf (Game.cardOf oid gs) == named name)
+        o <- Maybe.maybeToList (Game.lookupObject oid gs)
+        pure (Object.tapped o)
    in Spec.describe s "Open the Way" $ do
         -- The headline, and the case the counted walk exists for. Top to bottom
         -- alice's library is Island, Murder, Swamp, Bird Maiden, Goblin Piker,
@@ -1895,7 +1900,7 @@ carthTheLionSpec s registry =
       -- The stocked card of a given name, by the id S.addLibraryCard minted for
       -- it: the permutation below is built from these rather than from the
       -- batch's own order.
-      idOf ids name = Maybe.fromMaybe S.noSource (Maybe.listToMaybe [oid | (n, oid) <- zip stockNames ids, n == name])
+      idOf ids name = Maybe.fromMaybe S.noSource (Maybe.listToMaybe (fmap snd (filter (\(n, _) -> n == name) (zip stockNames ids))))
       nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
       -- Takes the printed "may" -- clause 1, the reveal and the move to hand;
       -- clause 0 is the look and clause 2 the rest -- answers the group choice
@@ -2038,9 +2043,10 @@ blossomingTortoiseSpec s registry = Spec.describe s "BlossomingTortoise" $ do
           _ -> S.identityAnswer p
         onBattlefield gs1 =
           List.sort
-            [ (fmap S.nameOf (Game.cardOf oid gs1), fmap Object.tapped (Game.lookupObject oid gs1))
-            | oid <- Set.toList (GameState.battlefield gs1)
-            ]
+            ( fmap
+                (\oid -> (fmap S.nameOf (Game.cardOf oid gs1), fmap Object.tapped (Game.lookupObject oid gs1)))
+                (Set.toList (GameState.battlefield gs1))
+            )
     case wanted of
       Nothing -> Spec.assertBool s False "expected three cards in alice's graveyard"
       Just chosen ->

@@ -6,6 +6,7 @@
 -- random. The machinery is Pawl.ResolveSpec.
 module Pawl.InvestigateSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -118,11 +119,9 @@ clueOf gs = case S.tokensOf gs of
 -- more land and changing nothing else.
 untappedPlains :: GameState.GameState -> [ObjectId.ObjectId]
 untappedPlains gs =
-  [ oid
-  | oid <- Set.toList (GameState.battlefield gs),
-    Set.member CardType.Land (Projection.cardTypesOf oid gs),
-    fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
-  ]
+  filter
+    (\oid -> Set.member CardType.Land (Projection.cardTypesOf oid gs) && fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped)
+    (Set.toList (GameState.battlefield gs))
 
 investigateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 investigateSpec s registry = Spec.describe s "Investigate" $ do
@@ -909,11 +908,11 @@ wildEvocationSpec s registry =
       -- so a count alone is green under either reading.
       controllerOfNamed n gs =
         Maybe.listToMaybe
-          [ ctrl
-          | oid <- Game.zoneMembers Zone.Battlefield S.bob gs,
-            fmap Face.name (Game.faceOf oid gs) == Just (named n),
-            ctrl <- Maybe.maybeToList (Projection.controllerOf oid gs)
-          ]
+          ( do
+              oid <- Game.zoneMembers Zone.Battlefield S.bob gs
+              Monad.guard (fmap Face.name (Game.faceOf oid gs) == Just (named n))
+              Maybe.maybeToList (Projection.controllerOf oid gs)
+          )
       zoneOf zone gs = fmap (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers zone S.bob gs)
       bobsHand = zoneOf Zone.Hand
       bobsGraveyard = zoneOf Zone.Graveyard

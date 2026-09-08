@@ -4832,18 +4832,24 @@ modalFilters modal =
 -- too.
 grantedActivatedAbilities :: Face.Face Card.Type.Card -> [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 grantedActivatedAbilities card =
-  [ ability
-  | Modification.GainAbility (GrantedAbility.Activated ability) <- grantedModifications card
-  ]
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.Activated ability) -> Just ability
+        _ -> Nothing
+    )
+    (grantedModifications card)
 
 -- The TRIGGERED half of the same grant, swept for the same reason: Sixth Sense's
 -- quoted "whenever this creature deals combat damage to a player" is text
 -- printed on the Aura.
 grantedTriggeredAbilities :: Face.Face Card.Type.Card -> [TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 grantedTriggeredAbilities card =
-  [ ability
-  | Modification.GainAbility (GrantedAbility.Triggered ability) <- grantedModifications card
-  ]
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.Triggered ability) -> Just ability
+        _ -> Nothing
+    )
+    (grantedModifications card)
 
 -- Every modification this face carries, the shared walk both grant sweeps above
 -- index into. TWO sources, not one: a PRINTED static ability's modifications (CR
@@ -4861,19 +4867,22 @@ grantedTriggeredAbilities card =
 grantedModifications :: Face.Face Card.Type.Card -> [Projection.Modification]
 grantedModifications card =
   let printed =
-        [ modification
-        | static <- Face.staticAbilities card,
-          modification <- Foldable.toList (StaticAbility.modifications static)
-        ]
+        concatMap (Foldable.toList . StaticAbility.modifications) (Face.staticAbilities card)
       -- The WILDCARD-free read of the one Effect arm carrying a Modification;
       -- namedRemovals' caveat applies, a second such arm would escape this.
-      storedIn effects =
-        [ ModifyTarget.modification modify
-        | Effect.ModifyTarget modify <- concatMap effectWithNested effects
-        ]
+      storedIn :: [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> [Projection.Modification]
+      storedIn =
+        concatMap
+          ( Maybe.mapMaybe
+              ( \effect -> case effect of
+                  Effect.ModifyTarget modify -> Just (ModifyTarget.modification modify)
+                  _ -> Nothing
+              )
+              . effectWithNested
+          )
       effectsOf modifications =
-        concatMap (Modal.allEffects . ActivatedAbility.modal) [a | Modification.GainAbility (GrantedAbility.Activated a) <- modifications]
-          <> concatMap (Modal.allEffects . TriggeredAbility.modal) [t | Modification.GainAbility (GrantedAbility.Triggered t) <- modifications]
+        concatMap (Modal.allEffects . ActivatedAbility.modal) (Maybe.mapMaybe (\modification -> case modification of Modification.GainAbility (GrantedAbility.Activated a) -> Just a; _ -> Nothing) modifications)
+          <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Maybe.mapMaybe (\modification -> case modification of Modification.GainAbility (GrantedAbility.Triggered t) -> Just t; _ -> Nothing) modifications)
       deeper modifications =
         if null modifications
           then []
@@ -4887,9 +4896,12 @@ grantedModifications card =
 -- ones Effect.ModifyTarget stores, which is the road both cards take.
 grantedEnchantSlots :: Face.Face Card.Type.Card -> [TargetSlot.TargetSlot]
 grantedEnchantSlots card =
-  [ slot
-  | Modification.GainEnchant slot <- grantedModifications card
-  ]
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainEnchant slot -> Just slot
+        _ -> Nothing
+    )
+    (grantedModifications card)
 
 -- Every enchant slot a face declares, by either road. Pawl.Engine.Projection
 -- seeds ProjectedCharacteristics.enchant from Face.enchant and appends the grants
@@ -5498,11 +5510,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- EntryRewrite.WithCounters row rather than an effect, so Card.allEffects
         -- cannot see this one either.
         entryCountersReadX c =
-          or
-            [ Set.member Binding.variableX (QuantitySlot.slots q)
-            | ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters wc)) <- fmap PrintedReplacement.effect (Face.replacementEffects c),
-              q <- Map.elems (WithCounters.counters wc)
-            ]
+          or $ do
+            ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters wc)) <- fmap PrintedReplacement.effect (Face.replacementEffects c)
+            q <- Map.elems (WithCounters.counters wc)
+            pure (Set.member Binding.variableX (QuantitySlot.slots q))
         readsX c =
           Resolve.readsX (Card.allEffects c)
             || Face.loyalty c == Just Loyalty.Variable
@@ -5629,7 +5640,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
     -- Every FACE of every token, since CR 707.8a's double-faced token names two.
-    let tokensOf face = concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects face]
+    let tokensOf face =
+          concatMap
+            (NonEmpty.toList . Card.Type.faces)
+            ( Maybe.mapMaybe
+                (\effect -> case effect of Effect.Create (Create.MkCreate _ token _ _ _) -> Just token; _ -> Nothing)
+                (cardResolutionEffects face)
+            )
         tokens = concatMap (overFaces tokensOf . Printing.card) ps
     -- Guards the sweep against passing vacuously if Create ever moves out
     -- from under cardResolutionEffects.
@@ -5637,7 +5654,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no token is misnamed" (fmap Face.name (filter tokenNameOffends tokens)) []
   Spec.it s "the lint itself catches a token named without the suffix" $ do
     doomedTraveler <- S.printingOf s registry "Doomed Traveler"
-    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects (S.combinedFace doomedTraveler)] of
+    case concatMap
+      (NonEmpty.toList . Card.Type.faces)
+      ( Maybe.mapMaybe
+          (\effect -> case effect of Effect.Create (Create.MkCreate _ token _ _ _) -> Just token; _ -> Nothing)
+          (cardResolutionEffects (S.combinedFace doomedTraveler))
+      ) of
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
@@ -5652,7 +5674,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- green and only a gameplay assertion in Pawl.ReplacementSpec objected.
   Spec.it s "CR 111.4 the sweep reaches a token nested in a prevention rider" $ do
     inkshield <- S.printingOf s registry "Inkshield"
-    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects (S.combinedFace inkshield)] of
+    case concatMap
+      (NonEmpty.toList . Card.Type.faces)
+      ( Maybe.mapMaybe
+          (\effect -> case effect of Effect.Create (Create.MkCreate _ token _ _ _) -> Just token; _ -> Nothing)
+          (cardResolutionEffects (S.combinedFace inkshield))
+      ) of
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         Spec.assertBool s (tokenNameOffends token {Face.name = CardName.MkCardName $ Text.pack "Inkling"}) "misnamed token detected"
@@ -5663,7 +5690,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- 111.9's mark and nothing else.
   Spec.it s "CR 111.9 a legendary token is named by the card, not by CR 111.4" $ do
     tomb <- S.printingOf s registry "Tomb of Annihilation"
-    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _ _) <- cardResolutionEffects (S.combinedFace tomb)] of
+    case concatMap
+      (NonEmpty.toList . Card.Type.faces)
+      ( Maybe.mapMaybe
+          (\effect -> case effect of Effect.Create (Create.MkCreate _ token _ _ _) -> Just token; _ -> Nothing)
+          (cardResolutionEffects (S.combinedFace tomb))
+      ) of
       [token] -> do
         let typeLine = Face.typeLine token
             mundane = token {Face.typeLine = typeLine {TypeLine.supertypes = Set.delete Supertype.Legendary (TypeLine.supertypes typeLine)}}
@@ -5680,7 +5712,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "the shield's rider is swept"
-      (length [() | Effect.PutCounters {} <- cardResolutionEffects (S.combinedFace testOfFaith)])
+      (length (filter (\effect -> case effect of Effect.PutCounters {} -> True; _ -> False) (cardResolutionEffects (S.combinedFace testOfFaith))))
       1
   -- The closure's OTHER limb with a producer in the pool: CR 608.2f's body.
   -- Soulfire Eruption's exile is nested in a ForEach, so the four MoveToZone
@@ -5693,7 +5725,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "the body's move is swept"
-      [zone | Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ _ _) <- cardResolutionEffects (S.combinedFace soulfireEruption)]
+      ( Maybe.mapMaybe
+          (\effect -> case effect of Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ _ _) -> Just zone; _ -> Nothing)
+          (cardResolutionEffects (S.combinedFace soulfireEruption))
+      )
       [Zone.Exile]
   -- ONE sweep over the whole reserved set, replacing the five per-name
   -- cases this grew out of. Those five each filtered on

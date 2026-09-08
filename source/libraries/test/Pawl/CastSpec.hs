@@ -144,7 +144,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
     let waxWane = Printing.MkPrinting CardSpec.splitCard
-        namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+        namesOffered gs = Maybe.mapMaybe (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
         (green, _) = S.handOne waxWane (S.landsInPlay forest 1)
         (both, _) = S.handOne waxWane (snd (S.addPermanent plains S.alice (S.landsInPlay forest 1)))
     -- CR 709.3: "A player chooses which half of a split card they are casting
@@ -1170,7 +1170,7 @@ grips decision toTap toUntap p = case p of
 
 -- Was CR 702.42a's question actually put to the player, and what did they say?
 entwineAnnouncements :: [Response.Response] -> [EntwineDecision.EntwineDecision]
-entwineAnnouncements responses = [d | Response.AnnouncedEntwine d <- responses]
+entwineAnnouncements = Maybe.mapMaybe (\response -> case response of Response.AnnouncedEntwine d -> Just d; _ -> Nothing)
 
 -- Cast and resolve in one go, keeping the transcript -- the ManaSpec shape, so
 -- an assertion about a prompt reads the answers actually given rather than
@@ -1374,7 +1374,7 @@ bursts decision victim p = case p of
 -- Was CR 702.33a's question actually put to the player, and what did they say?
 -- ONE entry per kicker cost the spell offered, in the order they were asked.
 kickerAnnouncements :: [Response.Response] -> [KickerDecision.KickerDecision]
-kickerAnnouncements responses = [d | Response.AnnouncedKicker d <- responses]
+kickerAnnouncements = Maybe.mapMaybe (\response -> case response of Response.AnnouncedKicker d -> Just d; _ -> Nothing)
 
 -- CR 702.33c: answers every kicker question with the same count. Everything else
 -- defers to S.identityAnswer.
@@ -1721,7 +1721,7 @@ furies decision victim p = case p of
   _ -> S.identityAnswer p
 
 buybackAnnouncements :: [Response.Response] -> [BuybackDecision.BuybackDecision]
-buybackAnnouncements responses = [d | Response.AnnouncedBuyback d <- responses]
+buybackAnnouncements = Maybe.mapMaybe (\response -> case response of Response.AnnouncedBuyback d -> Just d; _ -> Nothing)
 
 -- CR 616.1e: rule 702.27a's rewrite is a replacement effect (CR 614.1a), so a row
 -- another OBJECT contributes to the same CR 608.2n move races it. Rest in Peace
@@ -2968,11 +2968,12 @@ pickpocketSpec s registry =
       (board, stolen, candidates, vessel) <- pickpocketBoard s registry
       let (after, (offered, offers)) = runPickpocket stolen board
           vessels owner =
-            [ oid
-            | oid <- Set.toList (GameState.battlefield after),
-              S.soleFaceName oid after == S.printingName vessel,
-              fmap Object.owner (Game.lookupObject oid after) == Just owner
-            ]
+            filter
+              ( \oid ->
+                  S.soleFaceName oid after == S.printingName vessel
+                    && fmap Object.owner (Game.lookupObject oid after) == Just owner
+              )
+              (Set.toList (GameState.battlefield after))
       -- The gameplay reading, first: a card BOB owns is a permanent ALICE
       -- controls, and it got there by being cast. CR 400.3 is why the two seats
       -- are the whole point -- the Vessel was never in a pile of alice's.
@@ -3053,10 +3054,7 @@ anyTypeSpec s registry = Spec.describe s "PickpocketAnyType" $ do
     (board, stolen, piker) <- anyTypeBoard s registry 2
     let (after, (_, offers)) = runPickpocket stolen board
         pikers =
-          [ oid
-          | oid <- Set.toList (GameState.battlefield after),
-            S.soleFaceName oid after == S.printingName piker
-          ]
+          filter (\oid -> S.soleFaceName oid after == S.printingName piker) (Set.toList (GameState.battlefield after))
     -- The gameplay reading, ahead of every proxy: alice produces no red mana at
     -- all, and the Piker is on the battlefield under her control anyway.
     case pikers of

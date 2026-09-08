@@ -1290,7 +1290,7 @@ declaredAbilityNames face =
 -- name, and every printed producer prints exactly one grant.
 ignoredAbilityNames :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
 ignoredAbilityNames face =
-  Set.fromList [name | SpecialAction.IgnoreThisUntilEndOfTurn name _ <- Face.specialActions face]
+  Set.fromList (Maybe.mapMaybe (\action -> case action of SpecialAction.IgnoreThisUntilEndOfTurn name _ -> Just name; _ -> Nothing) (Face.specialActions face))
 
 -- Every AbilityName a face's IGNORABLE abilities declare -- the other side of
 -- that join. SEVERAL rows may carry one name, which is Damping Engine's one

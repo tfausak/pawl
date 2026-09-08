@@ -1583,19 +1583,19 @@ castFromGraveyardReplacementsOf keywords castFor =
       -- against EVERY flashback the card has, which is how one with two flashback
       -- abilities answers for the cost it was cast for rather than for the least
       -- of them.
-      [castFromGraveyardExile | any (paidFor . Keyword.Flashback) (flashbackCosts keywords)]
+      (if any (paidFor . Keyword.Flashback) (flashbackCosts keywords) then [castFromGraveyardExile] else [])
         -- CR 702.127a's THIRD static ability, word for word CR 702.34a's second
         -- ability, so it is the same effect and not a sibling. The one of the
         -- three that does NOT read `castFor`: rule 702.127a conditions its exile
         -- on the zone alone, so an aftermath half cast from a graveyard for any
         -- cost is exiled.
-        <> [castFromGraveyardExile | Set.member Keyword.Aftermath keywords]
+        <> (if Set.member Keyword.Aftermath keywords then [castFromGraveyardExile] else [])
         -- CR 702.133a's SECOND static ability, the third rule to print that
         -- sentence and so the third to share the one effect. Its "using its
         -- jump-start ability" reads the same record flashback's clause does: the
         -- jump-start candidate is the printed cost plus rule 702.133a's discard,
         -- which a permission offering the printed cost alone is not.
-        <> [castFromGraveyardExile | hasJumpStart keywords, paidFor Keyword.JumpStart]
+        <> (if hasJumpStart keywords && paidFor Keyword.JumpStart then [castFromGraveyardExile] else [])
 
 castFromGraveyardExile :: ReplacementEffect Card (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
 castFromGraveyardExile =
@@ -1625,7 +1625,7 @@ castFromGraveyardExile =
 -- meaning is a static ability is rare enough that a hundred-arm case would say
 -- nothing a reader could not get from the rule number.
 mintedStaticAbilitiesOf :: Set Keyword -> [StaticAbility.StaticAbility Card]
-mintedStaticAbilitiesOf keywords = [livingMetal | Set.member Keyword.LivingMetal keywords]
+mintedStaticAbilitiesOf keywords = if Set.member Keyword.LivingMetal keywords then [livingMetal] else []
 
 -- CR 702.161a: "During your turn, this permanent is an artifact creature in
 -- addition to its other types."

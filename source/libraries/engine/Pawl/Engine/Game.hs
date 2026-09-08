@@ -1821,11 +1821,13 @@ wasDealtDamageThisTurn gs pid = any ((== Just pid) . damagedPlayer . LoggedEvent
 damageDealtToPlayerThisTurn :: GameState -> PlayerId -> Natural
 damageDealtToPlayerThisTurn gs pid =
   sum
-    [ amount
-    | logged <- Foldable.toList (GameState.events gs),
-      Just (recipient, amount) <- [damageDealt (LoggedEvent.event logged)],
-      Recipient.playerOf recipient == Just pid
-    ]
+    ( Maybe.mapMaybe
+        ( \logged -> case damageDealt (LoggedEvent.event logged) of
+            Just (recipient, amount) | Recipient.playerOf recipient == Just pid -> Just amount
+            _ -> Nothing
+        )
+        (Foldable.toList (GameState.events gs))
+    )
 
 -- CR 120.1 / 608.2i: how much damage was dealt to this OBJECT this turn --
 -- wasDealtDamageThisTurn's twin over CR 120.1's other three recipients, summing
@@ -1843,11 +1845,13 @@ damageDealtToPlayerThisTurn gs pid =
 damageDealtToThisTurn :: GameState -> ObjectId -> Natural
 damageDealtToThisTurn gs oid =
   sum
-    [ amount
-    | logged <- Foldable.toList (GameState.events gs),
-      Just (recipient, amount) <- [damageDealt (LoggedEvent.event logged)],
-      Recipient.objectOf recipient == Just oid
-    ]
+    ( Maybe.mapMaybe
+        ( \logged -> case damageDealt (LoggedEvent.event logged) of
+            Just (recipient, amount) | Recipient.objectOf recipient == Just oid -> Just amount
+            _ -> Nothing
+        )
+        (Foldable.toList (GameState.events gs))
+    )
 
 -- The player an event describes GAINING LIFE, and how much (CR 119.3).
 --

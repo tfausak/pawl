@@ -6,6 +6,7 @@
 -- and attack declarations. The machinery is Pawl.TriggerSpec.
 module Pawl.EventTriggerSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -1013,12 +1014,11 @@ counterTriggerSpec s registry =
               answer = answerWith victimId
               cast = S.runPure answer gs (S.cast S.bob cancelId)
               untapped g =
-                length
-                  [ oid
-                  | oid <- Game.zoneMembers Zone.Battlefield S.bob g,
-                    Just obj <- [Game.lookupObject oid g],
-                    Object.tapped obj == TapState.Untapped
-                  ]
+                length $ do
+                  oid <- Game.zoneMembers Zone.Battlefield S.bob g
+                  Just obj <- [Game.lookupObject oid g]
+                  Monad.guard (Object.tapped obj == TapState.Untapped)
+                  pure oid
           -- Three Islands and the Baral start untapped; paying {U}{U} taps two.
           Spec.assertEqWith s "four untapped permanents before" (untapped gs) 4
           Spec.assertEqWith s "two after, so only two Islands were tapped" (untapped cast) 2
@@ -1240,7 +1240,10 @@ whisperingWizardSpec s registry =
       -- CR 603.3b's own record of an ability triggering, counted for one source.
       -- The Spirit count says what RESOLVED; this says what TRIGGERED, which is
       -- what the rider limits.
-      firedBy oid gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, AbilityTriggered.source record == TriggerSource.OfObject oid]
+      firedBy oid gs = length $ do
+        GameEvent.AbilityTriggered record <- S.eventsOf gs
+        Monad.guard (AbilityTriggered.source record == TriggerSource.OfObject oid)
+        pure ()
       board island bearer n =
         let withLands = S.landsFor island S.alice 10 S.threePlayerGame
             addBearer (ids, g) _ = let (oid, g') = S.addPermanent bearer S.alice g in (ids <> [oid], g')

@@ -57,7 +57,13 @@ objectsWantedTwice :: [Set.Set ObjectId] -> Set.Set ObjectId
 objectsWantedTwice pools =
   Map.keysSet
     . Map.filter (> (1 :: Natural))
-    $ Map.fromListWith (+) [(oid, 1) | pool <- pools, oid <- Set.toList pool]
+    $ Map.fromListWith
+      (+)
+      ( do
+          pool <- pools
+          oid <- Set.toList pool
+          pure (oid, 1)
+      )
 
 -- The same question asked of whole CLAIMS rather than of one axis's merged
 -- pools, and asked GROUPWISE: the groups are one per mana source plus the claims
@@ -75,10 +81,19 @@ contested groups =
     . Map.filter (> (1 :: Natural))
     $ Map.fromListWith
       (+)
-      [ (key, 1)
-      | group <- groups,
-        key <- Set.toList (Set.fromList [(Claim.axis claim, oid) | claim <- group, oid <- Set.toList (Claim.pool claim)])
-      ]
+      ( do
+          group <- groups
+          key <-
+            Set.toList
+              ( Set.fromList
+                  ( do
+                      claim <- group
+                      oid <- Set.toList (Claim.pool claim)
+                      pure (Claim.axis claim, oid)
+                  )
+              )
+          pure (key, 1)
+      )
 
 -- Whether any of these claims draws on an object `contested` above marked.
 contends :: Set.Set (ClaimAxis.ClaimAxis, ObjectId) -> [Claim] -> Bool

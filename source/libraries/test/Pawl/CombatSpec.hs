@@ -2241,7 +2241,12 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           ( Combat.blockersOf first after,
             Combat.blockersOf second after,
             Combat.blockersOf third after,
-            [n | GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared b n) <- S.eventsOf after, b == guard]
+            Maybe.mapMaybe
+              ( \event -> case event of
+                  GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared b n) | b == guard -> Just n
+                  _ -> Nothing
+              )
+              (S.eventsOf after)
           )
           (Set.singleton guard, Set.singleton guard, Set.singleton guard, [3])
       _ -> Spec.assertFailure s "fixture should have three attackers and one blocker"

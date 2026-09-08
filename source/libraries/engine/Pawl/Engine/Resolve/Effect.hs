@@ -624,7 +624,7 @@ settleArrivals zone placement targets =
                 Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor owner gs) owner oid)
             pure ((Just owner, position), oid)
       arrange settled key = do
-        let batch = [oid | (k, oid) <- settled, k == key]
+        let batch = fmap snd (filter (\(k, _) -> k == key) settled)
             (mOwner, position) = key
         case (mOwner, batch) of
           (Just owner, _ : _ : _) -> do
@@ -2081,9 +2081,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Zero is dropped rather than dealt (CR 120.8), the same guard the
         -- DealDamage arm above writes.
         let blow dealer victim amount =
-              [ Damage.damageEvent gs DamageKind.Noncombat dealer (Recipient.ToCreature victim) (Integer.toNaturalSaturating amount)
-              | amount > 0
-              ]
+              if amount > 0
+                then [Damage.damageEvent gs DamageKind.Noncombat dealer (Recipient.ToCreature victim) (Integer.toNaturalSaturating amount)]
+                else []
             events
               -- CR 701.14c: "if a creature fights itself, it deals damage to
               -- itself equal to TWICE its power" -- ONE event, not two of its
@@ -2769,7 +2769,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- them the card meant. Pawl.CardSpec's lint keeps data/cards/ to counts
       -- this can answer for.
       Foldable.for_ (RollDie.other rollDie) $ \other ->
-        case [result | (i, result) <- zip [0 ..] results, i /= index] of
+        case fmap snd (filter (\(i, _) -> i /= index) (zip [0 ..] results)) of
           [rest] -> State.modify' (bindAmountSlot source other rest)
           _ -> pure ()
       State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
@@ -5089,17 +5089,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let blockers = objectRefObjects legal resolving controller source gs blockerRef
             attackers = objectRefObjects legal resolving controller source gs attackerRef
             (ts, gs1) = Game.freshTimestamp gs
-            stored =
-              [ ActiveBlockRequirement.MkActiveBlockRequirement
+            stored = do
+              blocker <- blockers
+              attacker <- attackers
+              pure
+                ActiveBlockRequirement.MkActiveBlockRequirement
                   { ActiveBlockRequirement.source = source,
                     ActiveBlockRequirement.timestamp = ts,
                     ActiveBlockRequirement.expiry = expiry,
                     ActiveBlockRequirement.blocker = blocker,
                     ActiveBlockRequirement.attacker = attacker
                   }
-              | blocker <- blockers,
-                attacker <- attackers
-              ]
          in gs1 {GameState.blockRequirements = stored <> GameState.blockRequirements gs1}
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated duration ref) ->
     -- CR 701.19c / 611.1: store one prohibition per permanent the ref names.
@@ -5117,14 +5117,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let objects = objectRefObjects legal resolving controller source gs ref
             (ts, gs1) = Game.freshTimestamp gs
             stored =
-              [ ActiveUnregeneratable.MkActiveUnregeneratable
-                  { ActiveUnregeneratable.source = source,
-                    ActiveUnregeneratable.timestamp = ts,
-                    ActiveUnregeneratable.expiry = expiry,
-                    ActiveUnregeneratable.object = object
-                  }
-              | object <- objects
-              ]
+              fmap
+                ( \object ->
+                    ActiveUnregeneratable.MkActiveUnregeneratable
+                      { ActiveUnregeneratable.source = source,
+                        ActiveUnregeneratable.timestamp = ts,
+                        ActiveUnregeneratable.expiry = expiry,
+                        ActiveUnregeneratable.object = object
+                      }
+                )
+                objects
          in gs1 {GameState.unregeneratables = stored <> GameState.unregeneratables gs1}
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock duration ref) ->
     -- CR 509.1b / 611.1: store one restriction per permanent the ref names.
@@ -5143,14 +5145,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let objects = objectRefObjects legal resolving controller source gs ref
             (ts, gs1) = Game.freshTimestamp gs
             stored =
-              [ ActiveBlockProhibition.MkActiveBlockProhibition
-                  { ActiveBlockProhibition.source = source,
-                    ActiveBlockProhibition.timestamp = ts,
-                    ActiveBlockProhibition.expiry = expiry,
-                    ActiveBlockProhibition.object = object
-                  }
-              | object <- objects
-              ]
+              fmap
+                ( \object ->
+                    ActiveBlockProhibition.MkActiveBlockProhibition
+                      { ActiveBlockProhibition.source = source,
+                        ActiveBlockProhibition.timestamp = ts,
+                        ActiveBlockProhibition.expiry = expiry,
+                        ActiveBlockProhibition.object = object
+                      }
+                )
+                objects
          in gs1 {GameState.blockProhibitions = stored <> GameState.blockProhibitions gs1}
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration ref) ->
     -- CR 602.2 / 611.1: store one prohibition per permanent the ref names.
@@ -5170,14 +5174,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let objects = objectRefObjects legal resolving controller source gs ref
             (ts, gs1) = Game.freshTimestamp gs
             stored =
-              [ ActiveActivationProhibition.MkActiveActivationProhibition
-                  { ActiveActivationProhibition.source = source,
-                    ActiveActivationProhibition.timestamp = ts,
-                    ActiveActivationProhibition.expiry = expiry,
-                    ActiveActivationProhibition.object = object
-                  }
-              | object <- objects
-              ]
+              fmap
+                ( \object ->
+                    ActiveActivationProhibition.MkActiveActivationProhibition
+                      { ActiveActivationProhibition.source = source,
+                        ActiveActivationProhibition.timestamp = ts,
+                        ActiveActivationProhibition.expiry = expiry,
+                        ActiveActivationProhibition.object = object
+                      }
+                )
+                objects
          in gs1 {GameState.activationProhibitions = stored <> GameState.activationProhibitions gs1}
   Effect.ForbidAttack (ForbidAttack.MkForbidAttack duration affected aimedAt) ->
     -- CR 508.1c / 611.1: store one restriction per permanent a Named ref names,
@@ -5209,16 +5215,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               RestrictedCreatures.Matching f -> [RestrictedCreatures.Matching (Filter.bakeBound (Binding.playersIn legal) f)]
             (ts, gs1) = Game.freshTimestamp gs
             stored =
-              [ ActiveAttackProhibition.MkActiveAttackProhibition
-                  { ActiveAttackProhibition.source = source,
-                    ActiveAttackProhibition.controller = controller,
-                    ActiveAttackProhibition.timestamp = ts,
-                    ActiveAttackProhibition.expiry = expiry,
-                    ActiveAttackProhibition.affected = subject,
-                    ActiveAttackProhibition.aimedAt = aimedAt
-                  }
-              | subject <- subjects
-              ]
+              fmap
+                ( \subject ->
+                    ActiveAttackProhibition.MkActiveAttackProhibition
+                      { ActiveAttackProhibition.source = source,
+                        ActiveAttackProhibition.controller = controller,
+                        ActiveAttackProhibition.timestamp = ts,
+                        ActiveAttackProhibition.expiry = expiry,
+                        ActiveAttackProhibition.affected = subject,
+                        ActiveAttackProhibition.aimedAt = aimedAt
+                      }
+                )
+                subjects
          in gs1 {GameState.attackProhibitions = stored <> GameState.attackProhibitions gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
     -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair the
@@ -5235,17 +5243,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- opcode reads one, CR 608.2b's empty answer included.
             defenders = playerRefPlayers legal controller gs defenderRef
             (ts, gs1) = Game.freshTimestamp gs
-            stored =
-              [ ActiveAttackRequirement.MkActiveAttackRequirement
+            stored = do
+              attacker <- attackers
+              defender <- defenders
+              pure
+                ActiveAttackRequirement.MkActiveAttackRequirement
                   { ActiveAttackRequirement.source = source,
                     ActiveAttackRequirement.timestamp = ts,
                     ActiveAttackRequirement.expiry = expiry,
                     ActiveAttackRequirement.attacker = attacker,
                     ActiveAttackRequirement.defender = defender
                   }
-              | attacker <- attackers,
-                defender <- defenders
-              ]
          in gs1 {GameState.attackRequirements = stored <> GameState.attackRequirements gs1}
   Effect.CreateEmblem card -> do
     -- CR 114.2: the resolving controller gets the emblem, minted by

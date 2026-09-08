@@ -24,6 +24,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Paths_pawl as Paths
@@ -116,24 +117,27 @@ slugFor = Slug.fromText . CardName.unwrap
 -- pawl ships; this holds over whatever root a caller points at.
 index :: [(FilePath, Either Text.Text Card.Card)] -> Either [String] (Map.Map Slug.Slug Card.Card)
 index loaded =
-  let parsed = [(path, card) | (path, Right card) <- loaded]
-      keyed = [(slugFor (Face.name face), (path, card)) | (path, card) <- parsed, face <- NonEmpty.toList (Card.faces card)]
-      unparsed = [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded]
-      claims = Map.fromListWith (<>) [(slug, [path]) | (slug, (path, _)) <- keyed]
+  let parsed = Maybe.mapMaybe (\entry -> case entry of (path, Right card) -> Just (path, card); _ -> Nothing) loaded
+      keyed = do
+        (path, card) <- parsed
+        face <- NonEmpty.toList (Card.faces card)
+        pure (slugFor (Face.name face), (path, card))
+      unparsed = Maybe.mapMaybe (\entry -> case entry of (path, Left reason) -> Just (path <> ": " <> Text.unpack reason); _ -> Nothing) loaded
+      claims = Map.fromListWith (<>) (fmap (\(slug, (path, _)) -> (slug, [path])) keyed)
       -- A single path claiming its own slug more than once is one card
       -- repeating a face name, not two cards colliding -- List.nub tells the
       -- two apart so the message names what actually happened instead of
       -- rendering the same path twice, which reads like a bug in the report
       -- rather than a description of the pool.
       ambiguous =
-        [ case List.nub (List.sort paths) of
-            [one] -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> one <> ", which repeats it across " <> show (length paths) <> " of its own faces"
-            distinct -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> List.intercalate ", " distinct
-        | (slug, paths) <- Map.toAscList claims,
-          length paths > 1
-        ]
+        fmap
+          ( \(slug, paths) -> case List.nub (List.sort paths) of
+              [one] -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> one <> ", which repeats it across " <> show (length paths) <> " of its own faces"
+              distinct -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> List.intercalate ", " distinct
+          )
+          (filter (\(_, paths) -> length paths > 1) (Map.toAscList claims))
    in case unparsed <> ambiguous of
-        [] -> Right (Map.fromList [(slug, card) | (slug, (_, card)) <- keyed])
+        [] -> Right (Map.fromList (fmap (\(slug, (_, card)) -> (slug, card)) keyed))
         problems -> Left problems
 
 -- Where the file for a given slug lives, one file per card. What the slug IS

@@ -88,7 +88,10 @@ cloneName = CardName.MkCardName (Text.pack "Clone")
 -- Pawl.AdventureSpec's read of the same menu, and the shape CR 722.3's claim is
 -- about: the inset frame is not among the things a player may cast.
 namesOffered :: GameState.GameState -> [CardName.CardName]
-namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
+namesOffered gs =
+  Maybe.mapMaybe
+    (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing)
+    (Action.legalActions S.alice gs)
 
 -- The exiled objects that are CR 722.3c's copy, by id. Read off
 -- Object.preparedCopyOf rather than off the name, so a case can tell "the copy is
@@ -96,11 +99,9 @@ namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
 -- rule's own subject rather than a coincidence of naming.
 prepareCopies :: GameState.GameState -> [ObjectId.ObjectId]
 prepareCopies gs =
-  [ oid
-  | oid <- Set.toList (GameState.exile gs),
-    Just obj <- [Game.lookupObject oid gs],
-    Just _ <- [Object.preparedCopyOf obj]
-  ]
+  filter
+    (\oid -> case Game.lookupObject oid gs of Nothing -> False; Just obj -> Maybe.isJust (Object.preparedCopyOf obj))
+    (Set.toList (GameState.exile gs))
 
 -- The newest battlefield permanent whose PRINTED card is a Clone -- read off the
 -- printing rather than off the projection, which is exactly the name a copy no
@@ -265,11 +266,9 @@ twincastDuel =
 -- than to a count, so a board carrying two prepared permanents can name either.
 copyFor :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
 copyFor permanentId gs =
-  [ oid
-  | oid <- prepareCopies gs,
-    Just obj <- [Game.lookupObject oid gs],
-    Object.preparedCopyOf obj == Just permanentId
-  ]
+  filter
+    (\oid -> case Game.lookupObject oid gs of Nothing -> False; Just obj -> Object.preparedCopyOf obj == Just permanentId)
+    (prepareCopies gs)
 
 -- Pin one recipient by FILTERING the offered set, never by building one (#222):
 -- CR 608.2b re-reads what was chosen, and a hand-built recipient naming the same

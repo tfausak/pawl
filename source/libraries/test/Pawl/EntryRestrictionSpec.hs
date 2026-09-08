@@ -32,6 +32,7 @@
 module Pawl.EntryRestrictionSpec where
 
 import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
@@ -65,9 +66,7 @@ spec s registry = do
 arrivals :: GameState.GameState -> GameState.GameState -> [Maybe CardName.CardName]
 arrivals before after =
   List.sort
-    [ fmap S.nameOf (Game.cardOf oid after)
-    | oid <- Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before))
-    ]
+    (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before))))
 
 -- Where an id is now, and what card it still is. Read as a PAIR because the two
 -- questions are what separate a refusal from a redirect: a redirect leaves the
@@ -100,7 +99,7 @@ exhumeCase s registry = do
       run spell gs =
         let ((_, after), responses) = Replay.record S.identityAnswer gs (S.cast S.alice spell >> Stack.resolveTop)
          in (after, responses)
-      asked responses = length [() | Response.ChoseCardInGraveyard _ <- responses]
+      asked responses = length (Maybe.mapMaybe (\response -> case response of Response.ChoseCardInGraveyard _ -> Just (); _ -> Nothing) responses)
       fixtures = do
         exhume <- S.printingOf s registry "Exhume"
         swamp <- S.printingOf s registry "Swamp"
@@ -155,7 +154,7 @@ exhumeCase s registry = do
       s
       "CR 400.4a each card remains in its previous zone, as the same object"
       (fmap (`whereIs` after) graves)
-      [(Just Zone.Graveyard, Just (S.printingName printing)) | (printing, _) <- buried]
+      (fmap (\(printing, _) -> (Just Zone.Graveyard, Just (S.printingName printing))) buried)
 
 -- THE CONTROL LEG for EntryRestriction.origins. A hardcast Goblin Piker is a
 -- creature card that is NOT in a graveyard or a library -- it is a spell on the
@@ -333,8 +332,7 @@ tokenCase s registry = do
 -- The card names in one player's zone. Local rather than hoisted into
 -- Pawl.Support, which rebuilds every spec in the tree.
 namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
-namesIn zone pid gs =
-  [ S.nameOf card
-  | oid <- Game.zoneMembers zone pid gs,
-    card <- foldMap pure (Game.cardOf oid gs)
-  ]
+namesIn zone pid gs = do
+  oid <- Game.zoneMembers zone pid gs
+  card <- foldMap pure (Game.cardOf oid gs)
+  pure (S.nameOf card)

@@ -484,7 +484,7 @@ legendGroups pcs gs =
           | Set.member Supertype.Legendary (PC.supertypes pc) ->
               case Projection.controllerOf oid gs of
                 Nothing -> []
-                Just controller -> [((controller, name), [oid]) | name <- Set.toList (PC.names pc)]
+                Just controller -> fmap (\name -> ((controller, name), [oid])) (Set.toList (PC.names pc))
           | otherwise -> []
       keyed = concatMap legendary (Set.toList (GameState.battlefield gs))
       byKey = Map.fromListWith (<>) keyed
@@ -991,14 +991,13 @@ performStateBasedActions = Event.simultaneously $ do
       -- single kind and rule 704.5q removes both, which is Damage's posture for a
       -- permanent that is a battle and a planeswalker at once.
       countersOn kind oid g = maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid g)
-      annihilationRemovals =
-        [ GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now)
-        | (oid, _) <- annihilations,
-          kind <- [CounterKind.PlusOnePlusOne, CounterKind.MinusOneMinusOne],
-          let was = countersOn kind oid drained,
-          let now = countersOn kind oid balanced,
-          was > now
-        ]
+      annihilationRemovals = do
+        (oid, _) <- annihilations
+        kind <- [CounterKind.PlusOnePlusOne, CounterKind.MinusOneMinusOne]
+        let was = countersOn kind oid drained
+            now = countersOn kind oid balanced
+        Monad.guard (was > now)
+        pure (GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind was now))
       recorded = List.foldl' (flip Event.recordEvent) balanced annihilationRemovals
       -- CR 704.5aa: "that player's speed becomes 1", applied to the players
       -- classified from the pre-pass board above. Applied LATE like every other

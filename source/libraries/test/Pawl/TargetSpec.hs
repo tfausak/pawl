@@ -2589,11 +2589,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         -- The Regent's BATTLEFIELD id: CR 400.7 makes the resolved permanent a
         -- new object, so the hand id above cannot name it.
         regentOn gs =
-          Maybe.listToMaybe
-            [ oid
-            | oid <- Set.toList (GameState.battlefield gs),
-              fmap Face.name (Game.faceOf oid gs) == Just (S.printingName regent)
-            ]
+          List.find (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (S.printingName regent)) (Set.toList (GameState.battlefield gs))
         castRegent = S.runPure S.identityAnswer board (S.cast S.alice regentCardId)
         entered = S.runPure S.identityAnswer castRegent Stack.resolveTop
         -- THE WINDOW: the Regent is on the battlefield and its enters trigger is
@@ -2773,11 +2769,9 @@ abolisherOf :: GameState.GameState -> ObjectId.ObjectId
 abolisherOf gs =
   Maybe.fromMaybe
     S.noSource
-    ( Maybe.listToMaybe
-        [ oid
-        | oid <- Set.toList (GameState.battlefield gs),
-          fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Razorfin Abolisher"))
-        ]
+    ( List.find
+        (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Razorfin Abolisher")))
+        (Set.toList (GameState.battlefield gs))
     )
 
 -- The printed names of the cards in `pid`'s hand. CR 400.7 makes the returned

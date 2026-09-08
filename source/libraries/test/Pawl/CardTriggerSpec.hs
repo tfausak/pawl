@@ -908,7 +908,7 @@ everWatchingThresholdSpec s registry =
       -- clause is checked at the GATHER, so an ability it rejects "does nothing"
       -- and never becomes a trigger to record. Asserted beside the hand because
       -- the hand alone cannot tell a clause that held from a draw that failed.
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
       -- bob active and declaring, with `defending` settled as CR 506.2a's one
       -- defending player. combatBoardOf's tail of steps, so S.runToStep can walk
       -- from the declare attackers step to the next one.
@@ -1053,7 +1053,7 @@ seiferSpec s registry =
       -- legal target and CR 603.3d removes it. The count is the closest
       -- observable there is, and it is what the two silent boards below lead
       -- with.
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
    in Spec.describe s "Seifer, Balamb Rival" $ do
         -- The proving test: alice attacks bob, so rule 508.3e's two subjects are
         -- alice and bob, and the goad lands on the Giant the trigger named.
@@ -1161,7 +1161,7 @@ luluSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       stunOn oid gs = fmap (Map.findWithDefault 0 CounterKind.Stun . Object.counters) (Game.lookupObject oid gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
    in Spec.describe s "Lulu, Stern Guardian" $ do
         -- The proving test: alice picks bob, so rule 508.3e's two subjects are
         -- alice and bob and the trigger fires. TWO Pikers so the target slot is
@@ -1237,7 +1237,7 @@ marauderTollSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
       fixture = do
         piker <- S.printingOf s registry "Goblin Piker"
         toll <- S.printingOf s registry "Synthetic Marauder's Toll"
@@ -1296,7 +1296,7 @@ reprisalLedgerSpec s registry =
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      fired gs = length [() | GameEvent.AbilityTriggered record <- S.eventsOf gs, isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record))]
+      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
       fixture = do
         piker <- S.printingOf s registry "Goblin Piker"
         ledger <- S.printingOf s registry "Synthetic Reprisal Ledger"
@@ -3046,9 +3046,7 @@ sixthSenseAnswer p = case p of
 handNames :: PlayerId.PlayerId -> GameState.GameState -> [String]
 handNames pid gs =
   List.sort
-    [ Text.unpack (CardName.unwrap (S.soleFaceName oid gs))
-    | oid <- Game.zoneMembers Zone.Hand pid gs
-    ]
+    (fmap (\oid -> Text.unpack (CardName.unwrap (S.soleFaceName oid gs))) (Game.zoneMembers Zone.Hand pid gs))
 
 -- CR 701.26a's "becomes tapped", over a whole card. Betrayal ({U} Enchantment --
 -- Aura, "Enchant creature an opponent controls / Whenever enchanted creature

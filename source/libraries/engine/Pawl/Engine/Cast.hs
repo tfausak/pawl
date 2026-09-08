@@ -1371,7 +1371,7 @@ castableSpells pid gs =
           -- down and ANNOUNCE THAT YOU'RE USING A MORPH ABILITY" -- so the
           -- facing this proposes carries FaceDownReason.Morphed, and CR 701.40b's
           -- procedure is closed to the permanent it becomes.
-          : [Facing.faceDown FaceDownReason.Morphed | Maybe.isJust (Keyword.morphCost (Face.keywords face))]
+          : (if Maybe.isJust (Keyword.morphCost (Face.keywords face)) then [Facing.faceDown FaceDownReason.Morphed] else [])
             -- CR 702.168b names its own allower the same way -- "turn the card face
             -- down and ANNOUNCE THAT YOU ARE USING A DISGUISE ABILITY" -- and lists
             -- ward {2} where rule 702.37c lists nothing, so this facing carries both
@@ -1384,12 +1384,14 @@ castableSpells pid gs =
             -- printing with both would be the card that refutes it, and the rules
             -- allow one (CR 701.58c and CR 701.58d put both procedures on one
             -- permanent).
-            <> [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue} | Maybe.isJust (Keyword.disguiseCost (Face.keywords face))]
-      proposals oid =
-        [ (oid, Face.name face, facing)
-        | face <- foldMap Card.castableFaces (Game.cardOf oid gs),
-          facing <- facings face
-        ]
+            <> ( if Maybe.isJust (Keyword.disguiseCost (Face.keywords face))
+                   then [Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}]
+                   else []
+               )
+      proposals oid = do
+        face <- foldMap Card.castableFaces (Game.cardOf oid gs)
+        facing <- facings face
+        pure (oid, Face.name face, facing)
       -- CR 702.102a's third offer, beside the two halves and never instead of
       -- them: "if a player casts a split card with fuse FROM THEIR HAND, the
       -- player may choose to cast both halves of that split card rather than
@@ -1411,12 +1413,11 @@ castableSpells pid gs =
       -- HAND alone, which is rule 702.102a's own zone -- the ability "applies
       -- while the card with fuse is in a player's hand" -- so a fuse card in a
       -- graveyard or exile offers its halves and nothing more.
-      fusedProposals zone oid =
-        [ (oid, Face.name face, Facing.FaceUp)
-        | zone == Zone.Hand,
-          card <- Maybe.maybeToList (Game.cardOf oid gs),
-          face <- Maybe.maybeToList (Card.fusedFace card)
-        ]
+      fusedProposals zone oid = do
+        Monad.guard (zone == Zone.Hand)
+        card <- Maybe.maybeToList (Game.cardOf oid gs)
+        face <- Maybe.maybeToList (Card.fusedFace card)
+        pure (oid, Face.name face, Facing.FaceUp)
       offered zone oid = filter (\(_, name, facing) -> castable pid oid name facing gs) (proposals oid <> fusedProposals zone oid)
       inZone zone = concatMap (offered zone) (zoneCandidates zone pid gs)
    in concatMap inZone castZones

@@ -259,7 +259,7 @@ legalActions pid gs =
       --
       -- A list of at most one, where the two above are a list per card: rule
       -- 116.2g's subject is the one companion CR 103.2b let this player reveal.
-      companions = [Action.PutCompanionIntoHand | Companion.canTake pid gs]
+      companions = if Companion.canTake pid gs then [Action.PutCompanionIntoHand] else []
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile

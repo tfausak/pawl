@@ -152,7 +152,7 @@ instances able candidates attackers gs =
               Just clause -> filter (named source (rewrite clause)) these
             subjects = narrow BlockRequirement.subject candidates
             wanted = narrow BlockRequirement.attacker attackers
-            blockersOf attacker = [(blocker, attacker) | blocker <- subjects, able blocker attacker]
+            blockersOf attacker = fmap (\blocker -> (blocker, attacker)) (filter (\blocker -> able blocker attacker) subjects)
          in if not (inForce source changes requirement)
               then ([], [])
               else case BlockRequirement.arity requirement of
@@ -200,11 +200,9 @@ instances able candidates attackers gs =
       fromStored active =
         let blocker = ActiveBlockRequirement.blocker active
             attacker = ActiveBlockRequirement.attacker active
-         in ( [ (blocker, attacker)
-              | blocker `elem` candidates,
-                attacker `elem` attackers,
-                able blocker attacker
-              ],
+         in ( if elem blocker candidates && elem attacker attackers && able blocker attacker
+                then [(blocker, attacker)]
+                else [],
               []
             )
       gathered =

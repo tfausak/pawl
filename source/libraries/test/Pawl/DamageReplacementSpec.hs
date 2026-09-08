@@ -1111,7 +1111,7 @@ glitteringLionSpec s registry = Spec.describe s "Glittering Lion (CR 613.1f)" $ 
   Spec.it s "CR 602.1b bob activates alice's Lion, and his Piker's 2 then kills it" $ do
     (lion, attacker, g) <- board
     let offered = g {GameState.priority = Just S.bob, GameState.phase = Phase.PrecombatMain}
-        offers = [ab | Action.Activate o ab <- Action.legalActions S.bob offered, o == lion]
+        offers = Maybe.mapMaybe (\a -> case a of Action.Activate o ab | o == lion -> Just ab; _ -> Nothing) (Action.legalActions S.bob offered)
         step gs ability = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (Activate.activateAbility S.bob lion ability)) Stack.resolveTop
         resolved = List.foldl' step offered offers
         after = dealAndCheck lion attacker resolved
@@ -2497,11 +2497,11 @@ castInOrder names victim p = case p of
 -- where the damage landed could not tell a redirect aimed at the right creature
 -- from one that always aims at the first attacker.
 redirectRows :: GameState.GameState -> [(Maybe DamageKind.DamageKind, Maybe Recipient.Recipient, Recipient.Recipient)]
-redirectRows gs =
-  [ (DamagePattern.whichKind pat, DamagePattern.whichRecipient pat, dest)
-  | active <- GameState.replacements gs,
-    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect dest) _) <- [ActiveReplacement.effect active]
-  ]
+redirectRows gs = do
+  active <- GameState.replacements gs
+  case ActiveReplacement.effect active of
+    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect dest) _) -> pure (DamagePattern.whichKind pat, DamagePattern.whichRecipient pat, dest)
+    _ -> []
 
 -- CR 614.9: "Some effects replace damage dealt to one battle, creature,
 -- planeswalker, or player with the same damage dealt to another ...; such
@@ -2627,11 +2627,11 @@ turnTheTablesSpec s registry = Spec.describe s "Turn the Tables (CR 614.9)" $ do
 -- fourth element there would have moved every Turn the Tables tuple, and this is
 -- a proxy for one group rather than a field those cases assert on.
 redirectSources :: GameState.GameState -> [Maybe ObjectId.ObjectId]
-redirectSources gs =
-  [ DamagePattern.whichSource pat
-  | active <- GameState.replacements gs,
-    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect _) _) <- [ActiveReplacement.effect active]
-  ]
+redirectSources gs = do
+  active <- GameState.replacements gs
+  case ActiveReplacement.effect active of
+    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect _) _) -> pure (DamagePattern.whichSource pat)
+    _ -> []
 
 -- CR 609.7a's chosen source on CR 614.9's REDIRECTION, whose producer is
 -- Oracle's Attendants ({3}{W} Creature -- Human Soldier, 1/5: "{T}: All damage
@@ -2713,11 +2713,11 @@ oraclesAttendantsSpec s registry = Spec.describe s "Oracle's Attendants (CR 614.
 -- watched source): redirectRows' twin for DamageRewrite.RedirectNext, read back
 -- off the store so a case can tell a spent row from one never installed.
 countedRedirectRows :: GameState.GameState -> [(Natural.Natural, Maybe Recipient.Recipient, Recipient.Recipient, Maybe ObjectId.ObjectId)]
-countedRedirectRows gs =
-  [ (remaining, DamagePattern.whichRecipient pat, dest, DamagePattern.whichSource pat)
-  | active <- GameState.replacements gs,
-    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.RedirectNext remaining dest) _) <- [ActiveReplacement.effect active]
-  ]
+countedRedirectRows gs = do
+  active <- GameState.replacements gs
+  case ActiveReplacement.effect active of
+    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.RedirectNext remaining dest) _) -> pure (remaining, DamagePattern.whichRecipient pat, dest, DamagePattern.whichSource pat)
+    _ -> []
 
 -- Carom's two slots aimed by NAME, `from` at the victim and `to` at the haven,
 -- each filtered out of its offered set rather than built.

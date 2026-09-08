@@ -1179,10 +1179,9 @@ merfolkSeerSpec s registry = Spec.describe s "MerfolkSeer" $ do
 -- an id taken before the cast, since CR 400.7 mints a new object on the way in.
 byNameOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
 byNameOnBattlefield name gs =
-  [ oid
-  | oid <- Set.toList (GameState.battlefield gs),
-    fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))
-  ]
+  filter
+    (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name)))
+    (Set.toList (GameState.battlefield gs))
 
 -- Fortress Kin-Guard cast from alice's hand off two Plains and resolved, with its
 -- CR 603.6a enters trigger settled onto the stack but NOT resolved -- zombieUpkeep's

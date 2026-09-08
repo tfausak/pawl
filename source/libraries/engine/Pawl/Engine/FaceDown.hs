@@ -204,11 +204,11 @@ canTurnFaceUp pid procedure oid gs =
 -- (docs/design.md's second invariant).
 turnableFaceUp :: PlayerId -> GameState -> [(ObjectId, TurnUpProcedure)]
 turnableFaceUp pid gs =
-  [ (oid, procedure)
-  | oid <- Set.toAscList (GameState.battlefield gs),
-    procedure <- [TurnUpProcedure.Morph, TurnUpProcedure.Disguise, TurnUpProcedure.Manifest],
-    canTurnFaceUp pid procedure oid gs
-  ]
+  do
+    oid <- Set.toAscList (GameState.battlefield gs)
+    procedure <- [TurnUpProcedure.Morph, TurnUpProcedure.Disguise, TurnUpProcedure.Manifest]
+    Monad.guard (canTurnFaceUp pid procedure oid gs)
+    pure (oid, procedure)
 
 -- CR 702.37e, CR 702.168d and CR 701.40b, in the order all three rules share:
 -- show all players what the procedure's cost is, pay it, then turn the permanent
