@@ -1189,7 +1189,7 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 -- card is no permanent and no spell, so anything asking its controller gets its
 -- owner. OwnedBy is here because it is the printed word, and the pair the case
 -- CAN tell apart is You against any player -- bob's exiled card is what that
--- turns on. The same filter's Not IsToken is the printed "cards" (CR 111.6) and
+-- turns on. That same -7 filter's Not IsToken is the printed "cards" (CR 111.6) and
 -- no case can read it either: CR 111.7's state-based action takes a token out of
 -- exile before any ability could count it.
 --
