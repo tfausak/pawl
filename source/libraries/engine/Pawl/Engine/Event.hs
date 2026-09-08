@@ -5639,19 +5639,32 @@ counterOne source controller oid = do
 -- players in the same breath, so one event over a Recipient beats two events.
 --
 -- The KIND is passed in rather than derived. Rule 601.2c's parenthetical is about
--- spells (CR 112.1) while CR 602.2b and CR 603.3d bring abilities (CR 113.3) to
--- the same step, and only the caller knows which it is putting on the stack;
--- the matcher that later reads this has no GameState to ask.
+-- spells (CR 112.1) while CR 602.2b and CR 603.3d bring CR 113.3b's and CR
+-- 113.3c's abilities to the same step, and only the caller knows which it is
+-- putting on the stack; the matcher that later reads this has no GameState to
+-- ask.
 --
 -- CALLED AFTER THE ANNOUNCEMENT SUCCEEDS rather than at rule 601.2c's own
 -- position in the sequence. The rule puts the trigger before the costs are paid
 -- but holds the ability off the stack "until the spell has finished being cast",
--- and CR 601.2 rewinds the whole announcement if it does not -- so a trigger
--- recorded here and one recorded earlier differ only in a case where the earlier
--- one would have to be taken back.
+-- and CR 601.2 rewinds the whole announcement if it does not.
+--
+-- The position IS observable, and not only through a rewind: this runs after the
+-- costs are paid, so an activation whose cost removes the creature it also
+-- targeted -- Rune-Brand Juggler sacrificing the suspected creature its own
+-- ability names -- records the event with that permanent already gone, where CR
+-- 601.2c made it a target while it stood (gap #3418).
+--
+-- BRACKETED, which is what makes CR 603.2c's first sentence readable: rule
+-- 601.2c makes the chosen objects targets in one announcement, so every event
+-- this loop records shares one Pawl.Types.EventGroup and
+-- Event.Trigger.oncePerBatch can collapse a batch condition to one firing.
+-- Unbracketed, a batch-scoped arm is inert -- each recipient gets a group of its
+-- own and fires the ability again. Per-occurrence siblings are unaffected:
+-- eventTriggers keys them Nothing, so ward on two creatures still fires twice.
 becameTarget :: ObjectId -> StackObjectKind.StackObjectKind -> PlayerId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Game ()
 becameTarget source kind controller chosen =
-  Foldable.for_ (concatMap Set.toAscList (Map.elems chosen)) $ \targeted ->
+  simultaneously . Foldable.for_ (concatMap Set.toAscList (Map.elems chosen)) $ \targeted ->
     State.modify'
       . recordEvent
       $ GameEvent.BecameTarget
@@ -6849,6 +6862,9 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfBecomesTargeted _ -> False
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- Nor is the batch reading of the same rule: CR 601.2c's announcement is not
+  -- an ability triggering however many permanents it named.
+  TriggerCondition.PermanentsBecomeTargeted {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
@@ -7141,6 +7157,9 @@ controllerTurnScoped cond = case cond of
   -- Its player-side sibling likewise: a spell can name its controller on anybody's
   -- turn.
   TriggerCondition.ControllerBecomesTarget {} -> False
+  -- And the bystander batch reading likewise: an activated ability can name a
+  -- creature on anybody's turn.
+  TriggerCondition.PermanentsBecomeTargeted {} -> False
   -- CR 714.3c's turn-based action falls on the Saga controller's own turn, but
   -- nothing restricts this CONDITION to it: CR 714.3a's entry replacement can put
   -- a Saga's last lore counter on during anybody's turn, and the watcher is not

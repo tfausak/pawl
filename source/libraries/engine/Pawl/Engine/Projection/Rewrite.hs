@@ -105,6 +105,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
+import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -1346,6 +1347,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfCast -> condition
   TriggerCondition.SelfBecomesTargeted _ -> condition
   TriggerCondition.ControllerBecomesTarget {} -> condition
+  TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted f kind) -> TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted (Filter.rewrite pairs f) kind)
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerCycles _ -> condition
   TriggerCondition.PlayerDrawsNthCard {} -> condition

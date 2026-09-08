@@ -23,6 +23,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
+import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -730,6 +731,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.ControllerBecomesTarget (ControllerBecomesTarget.MkControllerBecomesTarget {ControllerBecomesTarget.relation = PlayerRelation.AnyPlayer, ControllerBecomesTarget.kind = Just StackObjectKind.Spell}))
       " {\"type\":\"ControllerBecomesTarget\",\"value\":{\"relation\":{\"type\":\"AnyPlayer\"},\"kind\":{\"type\":\"Spell\"}}} "
+  -- CR 603.2c's batch reading of the same rule with a Filter over the targeted
+  -- permanents: Professor Hojo's. Hand-written like every Arm.tagged arm.
+  Spec.it s "PermanentsBecomeTargeted round-trips with its Filter and its kind" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted {PermanentsBecomeTargeted.filter = Filter.ControlledBy PlayerRelation.You, PermanentsBecomeTargeted.kind = Just StackObjectKind.ActivatedAbility}))
+      " {\"type\":\"PermanentsBecomeTargeted\",\"value\":{\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"kind\":{\"type\":\"ActivatedAbility\"}}} "
   Spec.it s "SelfCast" $
     Common.assertCodec
       s
