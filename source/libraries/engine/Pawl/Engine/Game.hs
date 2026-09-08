@@ -1070,6 +1070,11 @@ flipPermanent oid gs
 -- a permanent that copied an unflipped flip card carries the flip trigger and
 -- can never flip. Whether the rules allow such a copy to flip at all is a
 -- question the CR does not settle (#3366).
+--
+-- Not implemented: a MERGED permanent whose flip component is not the topmost
+-- one. CR 730.2h admits a flip card anywhere among the components, and `cardOf`
+-- answers with the topmost's alone (CR 730.2a), so a flip card merged under
+-- another component cannot flip (#874).
 flipsOver :: ObjectId -> GameState -> Bool
 flipsOver oid gs =
   Set.member oid (GameState.battlefield gs)
