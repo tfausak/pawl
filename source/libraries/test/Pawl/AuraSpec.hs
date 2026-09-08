@@ -670,7 +670,7 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- THREE SEATS, because the set is "enchanted player controls" and a two-player
   -- board collapses that onto "not the Aura's controller": carol's own Piker is
   -- what a set that dropped the controller conjunct would sweep up too.
-  Spec.it s "CR 613.1b/303.4m whole card: Synthetic Puppeteer's Yoke hands over every permanent the enchanted player controls" $ do
+  Spec.it s "CR 613.1b/303.4m a static grant reached through the enchanted player hands over every permanent they control" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     forest <- S.printingOf s registry "Forest"
     yoke <- S.printingOf s registry "Synthetic Puppeteer's Yoke"
