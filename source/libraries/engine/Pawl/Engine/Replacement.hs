@@ -2908,10 +2908,20 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing
     DamageRewrite.RedirectMatching _ -> Nothing
-    -- CR 614.3's use count is the only thing a run-effects rewrite spends, and
-    -- that is counted in APPLICATIONS rather than in damage, so no batch of
-    -- events can exhaust it in the unit this pair is asked in.
-    DamageRewrite.RunEffects _ -> Nothing
+    -- CR 614.3's use count is what a run-effects rewrite spends, and it is
+    -- counted in APPLICATIONS -- CR 122.1c's unit above, not CR 615.7's -- so a
+    -- ONCE row meeting two simultaneous events it admits is exhausted by either
+    -- and the shielded object's controller chooses which (CR 616.1). Kill-Suit
+    -- Cultist's "the next time" is such a row.
+    --
+    -- An UNLIMITED one has nothing to allocate, Fog's answer above: it replaces
+    -- every event it admits and the order cannot matter. Nothing for a
+    -- permanent's static replacement ability too, which carries no lifetime at
+    -- all and whose `consume` is a no-op.
+    DamageRewrite.RunEffects _ -> case fmap snd (ReplacementCandidate.lifetime candidate) of
+      Just Uses.Once -> Just (1, Int.toNaturalSaturating . length)
+      Just Uses.Unlimited -> Nothing
+      Nothing -> Nothing
   ReplacementEffect.ZoneChangeR {} -> Nothing
   ReplacementEffect.EntryR {} -> Nothing
   ReplacementEffect.DestructionR _ -> Nothing

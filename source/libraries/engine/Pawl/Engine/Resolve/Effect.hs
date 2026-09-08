@@ -2106,7 +2106,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- ONE batch: CR 701.14a's "each of those creatures deals damage" is one
         -- action, so the two blows land simultaneously and a creature that dies
         -- to the first still dealt the second.
-        Monad.unless (null events) (Damage.applyDamage events)
+        Monad.unless (null events) $ do
+          Damage.applyDamage events
+          -- The DealDamage arm's two drains, and for its reasons: a fight is an
+          -- ordinary damage event, so a rewrite or a shield that applied to it
+          -- runs inside this resolution rather than waiting for the next one.
+          -- CR 614.1a's instead-effects first, then CR 615.5's riders.
+          runDamageRewriteEffects
+          runPreventionRiders
       _ -> pure ()
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     State.modify' $ \gs ->
@@ -6890,8 +6897,8 @@ applyEffect = applyEffectWith noSubgame
 
 -- CR 615.5: run the additional effect of every prevention that has just been
 -- applied. Drains GameState.pendingPreventionRiders, which Pawl.Engine.Damage
--- filled -- that module is below this one and cannot run a card's effects. Both
--- callers run it before the board can be observed and before the next
+-- filled -- that module is below this one and cannot run a card's effects. Every
+-- caller runs it before the board can be observed and before the next
 -- state-based action check, and that ordering IS the rule: a 1/1 dealt 6 through
 -- Test of Faith ends as a 4/4 rather than dying to CR 704.5g first. Emptied
 -- BEFORE the riders run, so a rider whose own damage is prevented appends to a
@@ -6934,11 +6941,16 @@ runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \r
 -- Emptied before the effects run, so an effect whose own damage is replaced
 -- appends to a fresh queue instead of being re-run here.
 --
--- Both callers run it BEFORE runPreventionRiders and before the next state-based
--- action check: the replaced event and the rest of its batch were simultaneous
--- (CR 616.1), so what happens instead of it lands before CR 704.5g reads the
--- board. What that ordering does NOT give is CR 614.1's own placement, inside
--- the event; no card in the pool can observe the difference, every producer's
+-- Every caller runs it BEFORE runPreventionRiders and before the next
+-- state-based action check: the replaced event and the rest of its batch were
+-- simultaneous (CR 616.1), so what happens instead of it lands before CR 704.5g
+-- reads the board. One caller per road into Damage.applyDamage -- the
+-- Effect.DealDamage and Effect.Fight arms above and Pawl.Engine.Engine's combat
+-- damage step -- which is what keeps GameState.pendingDamageEffects empty at
+-- every priority window.
+--
+-- What that ordering does NOT give is CR 614.1's own placement, inside the
+-- event; no card in the pool can observe the difference, every producer's
 -- effects being destructions the SBA pass would reach anyway.
 runDamageRewriteEffects :: Game ()
 runDamageRewriteEffects = do

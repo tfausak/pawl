@@ -36,8 +36,10 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -53,6 +55,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
@@ -3263,27 +3266,53 @@ queensBayPaladinSpec s registry = Spec.describe s "Queen's Bay Paladin (CR 122.1
 --
 -- A REAL untap step throughout (Engine.runTurnBasedActions at CR 502.3), not a
 -- direct call to the funnel.
+-- Aim every target slot at one object, FILTERED out of the offered set rather
+-- than built: an aim the ability's own pool excludes leaves the slot empty
+-- instead of quietly becoming a legal one (castDeflection's shape).
+aimingAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingAt victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (\r -> Recipient.objectOf r == Just victim) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Activate Kill-Suit Cultist's one ability at `victim` and resolve it, leaving
+-- the CR 614.3 row on the board. The {B} comes off whatever land the caller put
+-- in play and the Cultist sacrifices itself, both through `identityAnswer`.
+shieldWith :: ObjectId.ObjectId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> GameState.GameState -> GameState.GameState
+shieldWith cultistId victim ability gs =
+  S.runPure (aimingAt victim) gs {GameState.priority = Just S.alice} (Activate.activateAbility S.alice cultistId ability Monad.>> Stack.resolveTop)
+
+-- Attack with everything, block every attacker with every blocker, and settle a
+-- contested batch by SOURCE -- deflectionCombat's shape, ordering by source
+-- rather than by recipient because the batch below shares one recipient.
+blockAllAndOrder :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+blockAllAndOrder wanted p = case p of
+  Prompt.DeclareAttackers _ _ ids -> ids
+  Prompt.DeclareBlockers _ _ blockers attackers -> Map.fromList (fmap (\b -> (b, Set.fromList attackers)) blockers)
+  Prompt.OrderDamage _ _ events ->
+    let rank e = Maybe.fromMaybe (length wanted) (List.elemIndex (DamageEvent.source e) wanted)
+     in fmap fst (List.sortOn (rank . snd) (zip [0 ..] events))
+  _ -> S.identityAnswer p
+
 -- CR 614.1a's "instead" with an ACTION rather than an amount or a destination:
 -- Kill-Suit Cultist's "{B}, Sacrifice this creature: The next time damage would
 -- be dealt to target creature this turn, destroy that creature instead". The one
 -- printing whose damage replacement RUNS a card's effects, and the one whose
 -- nested effect names the slot its own ability targeted.
---
--- A gameplay-level board (design.md section 4) driven through the priority loop:
--- bob's Child of Night attacks, alice's Wall of Stone blocks, and the shield
--- alice installed on the Wall meets that combat damage.
---
--- The Wall is 0/8, so 2 damage would leave it standing -- which is what makes the
--- destruction attributable to this rewrite rather than to CR 704.5g. The
--- lifelink is the other half of the same board: CR 120.3f gains life for damage
--- DEALT, so an implementation that destroyed the Wall and dealt the damage too
--- would show bob at 22.
---
--- Three creatures are in the target pool when the ability is announced, so the
--- Cultist's target is a real choice rather than the one option a prompt would
--- short-circuit.
-killSuitCultistSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+killSuitCultistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 killSuitCultistSpec s registry = Spec.describe s "Kill-Suit Cultist (CR 614.1a)" $ do
+  -- A gameplay-level board (design.md section 4) driven through the priority
+  -- loop: bob's Child of Night attacks, alice's Wall of Stone blocks, and the
+  -- shield alice installed on the Wall meets that combat damage.
+  --
+  -- The Wall is 0/8, so 2 damage would leave it standing -- which is what makes
+  -- the destruction attributable to this rewrite rather than to CR 704.5g. The
+  -- lifelink is the other half of the same board: CR 120.3f gains life for
+  -- damage DEALT, so an implementation that destroyed the Wall and dealt the
+  -- damage too would show bob at 22.
+  --
+  -- Three creatures are in the target pool when the ability is announced, so the
+  -- Cultist's target is a real choice rather than the one option a prompt would
+  -- short-circuit.
   let cultist = S.aliasRef "cultist"
       swamp = S.aliasRef "swamp"
       wall = S.aliasRef "wall"
@@ -3316,10 +3345,88 @@ killSuitCultistSpec s registry = Spec.describe s "Kill-Suit Cultist (CR 614.1a)"
     -- CR 120.3f: lifelink gains life for damage DEALT. The replacement means
     -- none was, so a destroy-AND-deal implementation shows 22 here.
     Spec.assertEqWith s "and no damage was dealt: the lifelinker's controller gained nothing" (S.lifeOf S.bob after) (Just 20)
-    -- CR 614.3's use count, which is the whole of "the next time": the row is
-    -- dropped by the application rather than by its UntilEndOfTurn duration,
-    -- which this combat never reaches.
-    Spec.assertEqWith s "and the shield is spent after the one application" (length (GameState.replacements after)) 0
+  -- CR 614.3's "used up", at gameplay level rather than as a count of rows: the
+  -- shield covers the FIRST event and the second lands whole.
+  --
+  -- Darksteel Myr is what makes a second event reachable at all. CR 701.8c: an
+  -- indestructible permanent cannot be destroyed, so what the rewrite runs does
+  -- nothing to it -- and the ROW is used up all the same, which is the half CR
+  -- 614.3 states and this board reads.
+  Spec.it s "CR 614.3 the row covers the next damage event and no later one" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    swampPrinting <- S.printingOf s registry "Swamp"
+    cultistPrinting <- S.printingOf s registry "Kill-Suit Cultist"
+    myr <- S.printingOf s registry "Darksteel Myr"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let base = S.landsFor swampPrinting S.alice 1 (S.landsInPlay mountain 2)
+        (cultistId, g1) = S.addPermanent cultistPrinting S.alice base
+        (myrId, g2) = S.addPermanent myr S.bob g1
+        (g3, firstBolt) = S.handOne bolt g2
+        (g4, secondBolt) = S.handOne bolt g3
+    case Face.activatedAbilities (S.combinedFace cultistPrinting) of
+      [] -> Spec.assertFailure s "Kill-Suit Cultist should declare one activated ability"
+      ability : _ -> do
+        let shielded = shieldWith cultistId myrId ability g4
+            afterFirst = castAndResolve (aimingAt myrId) shielded firstBolt
+            afterSecond = castAndResolve (aimingAt myrId) afterFirst secondBolt
+        Spec.assertEqWith s "the first Bolt is replaced: nothing is marked on the Myr" (S.damageOf myrId afterFirst) (Just 0)
+        Spec.assertEqWith s "and the second lands whole, the row having been used up" (S.damageOf myrId afterSecond) (Just 3)
+  -- CR 701.14a's fight is an ordinary damage event, so what a rewrite runs in its
+  -- place happens INSIDE the resolution that dealt it. The board reads the state
+  -- the instant Prey Upon finishes resolving: bob's 0/8 Wall took 2 from a 2/1
+  -- and would survive CR 704.5g, so a Wall still on the battlefield here is a
+  -- destroy left sitting on the queue.
+  Spec.it s "CR 701.14a the fight's replacement runs before its own resolution ends" $ do
+    forest <- S.printingOf s registry "Forest"
+    swampPrinting <- S.printingOf s registry "Swamp"
+    cultistPrinting <- S.printingOf s registry "Kill-Suit Cultist"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallPrinting <- S.printingOf s registry "Wall of Stone"
+    preyUpon <- S.printingOf s registry "Prey Upon"
+    let base = S.landsFor swampPrinting S.alice 1 (S.landsInPlay forest 1)
+        (cultistId, g1) = S.addPermanent cultistPrinting S.alice base
+        (_, g2) = S.addPermanent piker S.alice g1
+        (wallId, g3) = S.addPermanent wallPrinting S.bob g2
+        (g4, preyId) = S.handOne preyUpon g3
+    case Face.activatedAbilities (S.combinedFace cultistPrinting) of
+      [] -> Spec.assertFailure s "Kill-Suit Cultist should declare one activated ability"
+      ability : _ -> do
+        let shielded = shieldWith cultistId wallId ability g4
+            fought = castAndResolve S.identityAnswer shielded preyId
+        Spec.assertBool s (not (Set.member wallId (GameState.battlefield fought))) "the Wall is gone as the fight's own resolution ends"
+        Spec.assertEqWith s "and it was destroyed rather than dealt the 2 a 0/8 survives" (S.damageOf wallId fought) Nothing
+  -- CR 616.1: a ONCE row that admits two simultaneous events is exhausted by
+  -- either, so the shielded object's controller chooses which one it replaces --
+  -- Replacement.contestedResource counts this row in APPLICATIONS, CR 122.1c's
+  -- unit rather than CR 615.7's.
+  --
+  -- The two orderings differ in nothing but the answer, and alice's life is what
+  -- separates them: CR 120.3f gains her 2 for the lifelinker's damage exactly
+  -- when the Piker's event is the one replaced. An engine that reported no
+  -- contested resource settles the batch by APNAP alone and answers the same
+  -- both times.
+  Spec.it s "CR 616.1 the shielded creature's controller picks which of two simultaneous events the row replaces" $ do
+    swampPrinting <- S.printingOf s registry "Swamp"
+    cultistPrinting <- S.printingOf s registry "Kill-Suit Cultist"
+    childOfNight <- S.printingOf s registry "Child of Night"
+    piker <- S.printingOf s registry "Goblin Piker"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    let (gs0, mine, theirs) = S.combatBoardOf [childOfNight, piker] [palaceGuard]
+        withSwamp = S.landsFor swampPrinting S.alice 1 gs0
+        (cultistId, g1) = S.addPermanent cultistPrinting S.alice withSwamp
+    case (Face.activatedAbilities (S.combinedFace cultistPrinting), mine, theirs) of
+      (ability : _, [lifelinker, plainAttacker], [guardId]) -> do
+        let shielded = (shieldWith cultistId guardId ability g1) {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
+            strike order = S.runCombat (blockAllAndOrder order) shielded
+            lifelinkerReplaced = strike [lifelinker, plainAttacker]
+            pikerReplaced = strike [plainAttacker, lifelinker]
+        Spec.assertEqWith s "replacing the lifelinker's event gains alice nothing" (S.lifeOf S.alice lifelinkerReplaced) (Just 20)
+        Spec.assertEqWith s "replacing the other one leaves the lifelink to land" (S.lifeOf S.alice pikerReplaced) (Just 22)
+        Spec.assertBool
+          s
+          (wasAskedToOrderDamage (answersFor (blockAllAndOrder [lifelinker, plainAttacker]) shielded S.combatGame))
+          "the Guard's controller was asked which of the two events the one-use row replaces"
+      _ -> Spec.assertFailure s "fixture should have two attackers, a Palace Guard and one activated ability"
 
 cryogenicStasisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" $ do
