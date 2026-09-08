@@ -1279,7 +1279,8 @@ replacementRowSlots re =
 -- through their own recursion rather than flattened.
 --
 -- No wildcard, replacementRowReads' discipline: an arm that comes to nest a
--- program must answer here rather than have its reads go undeclared.
+-- program must answer here rather than have its reads go undeclared. The two
+-- rewrite types are asked through exhaustive helpers below for the same reason.
 --
 -- NO BOARD OBSERVES IT: the pool's one nested program is Kill-Suit Cultist's
 -- destruction of a slot, and the DamageR pattern beside it names that same slot
@@ -1289,13 +1290,10 @@ replacementRowSlots re =
 -- row's pattern does not name (#1962).
 replacementRowEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementRowEffects re = case re of
-  ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) -> case rewrite of
-    EntryRewrite.RunEffects effects -> Foldable.toList effects
-    _ -> []
-  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite riders) ->
-    Foldable.toList riders <> case rewrite of
-      DamageRewrite.RunEffects effects -> Foldable.toList effects
-      _ -> []
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) -> entryRewriteEffects rewrite
+  -- CR 615.5's rider and CR 614.1a's instead-effects both, and in that order:
+  -- the rider is the card's own field beside the rewrite.
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite riders) -> Foldable.toList riders <> damageRewriteEffects rewrite
   ReplacementEffect.ZoneChangeR _ -> []
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.CounterR _ -> []
@@ -1307,6 +1305,49 @@ replacementRowEffects re = case re of
   ReplacementEffect.DrawR _ -> []
   ReplacementEffect.DrawCountR _ -> []
   ReplacementEffect.PhaseR _ -> []
+
+-- The program an ENTRY rewrite runs. entryRewriteReads' discipline: no wildcard,
+-- so a second arm that nests one is asked here rather than losing its reads.
+entryRewriteEffects :: EntryRewrite.EntryRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+entryRewriteEffects rewrite = case rewrite of
+  EntryRewrite.RunEffects effects -> Foldable.toList effects
+  EntryRewrite.AsCopy _ -> []
+  EntryRewrite.ChoiceOf _ -> []
+  EntryRewrite.ChoiceByCoinFlip _ -> []
+  EntryRewrite.ChooseColor -> []
+  EntryRewrite.ChooseBasicLandType -> []
+  EntryRewrite.ChoosePlayer -> []
+  EntryRewrite.ChooseCardNames _ -> []
+  EntryRewrite.ChooseCardName _ -> []
+  EntryRewrite.WithCounters _ -> []
+  EntryRewrite.WithKeywords _ -> []
+  EntryRewrite.UnderSourceControl -> []
+  EntryRewrite.SacrificeAnyNumber _ -> []
+  EntryRewrite.ExileFromGraveyard _ -> []
+  EntryRewrite.Riot -> []
+  EntryRewrite.ReadAhead -> []
+  EntryRewrite.Unleash -> []
+  EntryRewrite.Bloodthirst _ -> []
+  EntryRewrite.Compleated _ -> []
+  EntryRewrite.Tapped -> []
+  EntryRewrite.PayLifeOrTapped _ -> []
+  EntryRewrite.RevealOrTapped _ -> []
+  EntryRewrite.EntersTransformed -> []
+
+-- The program a DAMAGE rewrite runs. entryRewriteEffects' twin, and its
+-- discipline: no wildcard.
+damageRewriteEffects :: DamageRewrite.DamageRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+damageRewriteEffects rewrite = case rewrite of
+  DamageRewrite.RunEffects effects -> Foldable.toList effects
+  DamageRewrite.PreventAll -> []
+  DamageRewrite.PreventRemovingShieldCounter -> []
+  DamageRewrite.PreventNext _ -> []
+  DamageRewrite.PreventAllBut _ -> []
+  DamageRewrite.SetAmount _ -> []
+  DamageRewrite.Scale _ -> []
+  DamageRewrite.Redirect _ -> []
+  DamageRewrite.RedirectNext _ _ -> []
+  DamageRewrite.RedirectMatching _ -> []
 
 -- The Filters a damage REWRITE holds, which is CR 614.9's printed destination and
 -- nothing else. No wildcard, replacementRowSlots' discipline: a later rewrite
