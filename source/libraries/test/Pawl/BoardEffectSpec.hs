@@ -1649,6 +1649,102 @@ gloriousProtectorSpec s registry =
                   Spec.assertEqWith s "the Bird Maiden is still in exile" (exiledNames settled) [Just (named "Bird Maiden")]
                   Spec.assertEqWith s "and the watch still stands" (Map.size (GameState.movedUntilSourceLeaves settled)) 1
 
+-- The Oblivion Ring family's opponent-facing half, which Glorious Protector above
+-- structurally cannot reach: its gather is "creatures YOU control", so every card
+-- it exiles is one alice both owns and controls, and CR 610.3c -- "an object
+-- returned to the battlefield this way returns under its owner's control" -- says
+-- nothing observable on that board.
+--
+-- Banisher Priest {1}{W}{W} Creature -- Human Cleric 2/2 is the producer: "when
+-- this creature enters, exile target creature an opponent controls until this
+-- creature leaves the battlefield". It is the corpus's first TARGETED move
+-- carrying a CR 610.3 duration, and the first whose victim belongs to another
+-- seat.
+--
+-- Three seats, because "an opponent" and "the other player" are one player on
+-- two: bob's Hill Giant is the target, and carol's Goblin Piker is a creature an
+-- opponent controls that was not named, so "the target" and "every opponent's
+-- creature" differ. Two candidates also make the announcement a real choice
+-- rather than a short-circuit.
+--
+-- CR 610.3c is a REGRESSION FENCE here and not a proof: the return runs through
+-- the zone-change door that names no controller, so CR 110.2a's default makes it
+-- the owner by construction and no mutation of Pawl.Engine.MoveDuration can spell
+-- the other reading -- the watch remembers the source and the zone, and the
+-- exiling ability's controller is not recorded. What the leg does separate is
+-- "returns to whoever exiled it", which is what the OUTBOUND move does (Resolve's
+-- MoveToZone arm hands the funnel `Just controller`): an engine reusing that on
+-- the way back puts the Giant on alice's battlefield.
+banisherPriestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+banisherPriestSpec s registry =
+  let named = CardName.MkCardName . Text.pack
+      -- The names a seat CONTROLS (CR 110.2a), which Game.zoneMembers -- indexed
+      -- by OWNER (CR 108.3) -- cannot answer.
+      controlledNames pid gs =
+        List.sort
+          [ fmap S.nameOf (Game.cardOf oid gs)
+          | oid <- Set.toList (GameState.battlefield gs),
+            Projection.controllerOf oid gs == Just pid
+          ]
+      exiledNames gs = List.sort (concatMap (\pid -> namesIn Zone.Exile pid gs) [S.alice, S.bob, S.carol])
+      permanentNamed name gs =
+        List.find
+          (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (named name))
+          (Set.toList (GameState.battlefield gs))
+      -- alice: three Plains and the Priest in hand. bob: a Hill Giant. carol: a
+      -- Goblin Piker. Nothing else triggers.
+      board priest plains giant piker =
+        let g0 = S.landsFor plains S.alice 3 S.threePlayerGame
+            (_, g1) = S.addPermanent giant S.bob g0
+            (_, g2) = S.addPermanent piker S.carol g1
+         in S.handOne priest g2
+      -- Name bob's Giant out of the OFFERED set rather than building a recipient:
+      -- CR 608.2b re-reads the announcement at resolution, and a hand-built
+      -- Recipient.ToObject of the same permanent is a different recipient from the
+      -- ToCreature a Creatures pool offers.
+      targeting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      targeting oid p = case p of
+        Prompt.ChooseTargets _ _ _ sets ->
+          fmap (\(_, legal) -> Set.filter ((== Just oid) . Recipient.objectOf) legal) sets
+        _ -> S.identityAnswer p
+      cast :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> GameState.GameState
+      cast answer (withSpell, spell) =
+        let afterCast = S.runPure answer withSpell (S.cast S.alice spell)
+         in S.runPure answer afterCast Engine.priorityLoop
+      printings = do
+        priest <- S.printingOf s registry "Banisher Priest"
+        plains <- S.printingOf s registry "Plains"
+        giant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (board priest plains giant piker)
+      -- Cast the Priest naming bob's Giant, and hand back the board with the
+      -- Giant in exile and the Priest still alive.
+      exiledBoard = do
+        staged <- printings
+        pure (fmap (\giant -> cast (targeting giant) staged) (permanentNamed "Hill Giant" (fst staged)))
+   in Spec.describe s "BanisherPriest" $ do
+        -- CR 603.3d: the trigger's announcement named ONE of the two creatures
+        -- alice's opponents control, and the duration holds it there while the
+        -- Priest lives.
+        Spec.it s "CR 610.3 only the named creature is exiled, and it stays there while the Priest lives" $ do
+          mExiled <- exiledBoard
+          case mExiled of
+            Nothing -> Spec.assertFailure s "fixture should give bob a Hill Giant"
+            Just exiled -> do
+              Spec.assertEqWith s "bob's Giant, and only it, is in exile" (exiledNames exiled) [Just (named "Hill Giant")]
+              Spec.assertEqWith s "and carol's Piker, an opponent's creature that was not named, stays put" (controlledNames S.carol exiled) [Just (named "Goblin Piker")]
+        -- The headline: CR 610.3c's "under its owner's control", read on the one
+        -- board Glorious Protector cannot build.
+        Spec.it s "CR 610.3c the Priest's death returns the Giant to bob, its owner, and not to alice who exiled it" $ do
+          mExiled <- exiledBoard
+          case mExiled >>= (\exiled -> fmap ((,) exiled) (permanentNamed "Banisher Priest" exiled)) of
+            Nothing -> Spec.assertFailure s "the Priest should be on the battlefield with the Giant exiled"
+            Just (exiled, priest) -> do
+              let killed = S.runPure S.identityAnswer exiled (Event.destroy Regenerability.Regenerable [priest])
+                  after = S.runPure S.identityAnswer killed Engine.priorityLoop
+              Spec.assertEqWith s "the Giant is back on the battlefield under bob's control" (controlledNames S.bob after) [Just (named "Hill Giant")]
+              Spec.assertEqWith s "and alice, who exiled it, controls only her three Plains" (controlledNames S.alice after) (List.sort (fmap (Just . named) ["Plains", "Plains", "Plains"]))
+
 -- ObjectRef.EachCardInYourLibrary under Effect.MoveToZone: CR 400.12's
 -- whole-zone instruction over CR 400.1's other hidden per-player zone, where
 -- Ignorant Bliss' EachCardInYourHand takes the first.
@@ -2131,8 +2227,8 @@ auraThiefSpec s registry =
           Spec.assertEqWith s "bob's, taken from him, start their clock over" (fmap sicknessOf theirs) (fmap (const (Just Sickness.Sick)) theirs)
           Spec.assertEqWith s "alice's own was never interrupted" (fmap sicknessOf hers) (fmap (const (Just (Sickness.Settled S.alice))) hers)
         -- The card is named Aura Thief, so an Aura is the case worth proving,
-        -- and Control Magic is one of `data/cards/`'s two control-granting Auras
-        -- (Confiscate is the other). CR 109.5:
+        -- and Control Magic is one of `data/cards/`'s control-granting Auras
+        -- (Confiscate and Synthetic Puppeteer's Yoke are the others). CR 109.5:
         -- "For a static ability, [you] is the current controller of the object
         -- it's on" -- so taking the Aura takes what the Aura grants, WITHOUT
         -- moving the Aura. That is the whole content of the printed reminder
@@ -3436,6 +3532,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   skullwinderSpec s registry
   elvishPiperSpec s registry
   gloriousProtectorSpec s registry
+  banisherPriestSpec s registry
   levelerSpec s registry
   calderaBreakerSpec s registry
   trumpetBlastSpec s registry

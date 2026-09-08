@@ -1487,10 +1487,11 @@ data ControlGrant = MkControlGrant
 --
 -- The ability list is staticAbilitiesOf, so a copy's control-granting text is
 -- read (CR 707.2a) -- which staticAbilitiesOf can supply without breaking the
--- rule above, being projection-free itself. No case observes that: every pooled
--- control grant is on an Aura (Confiscate, Control Magic), and a copy of an Aura
--- would enter attached to nothing and be put into a graveyard by CR 704.5m, so
--- the pool has no board where a copy holds one. A regression fence, kept because
+-- rule above, being projection-free itself. No case observes that: the pool's
+-- attachment grants (Confiscate, Control Magic, Synthetic Puppeteer's Yoke) are
+-- Auras, and a copy of an Aura would enter attached to nothing and be put into a
+-- graveyard by CR 704.5m, while no test stamps a copy binding on Synthetic
+-- Goblin Dominion, the one that is not an Aura. A regression fence, kept because
 -- the three walks over abilitySources must agree on which list they read.
 --
 -- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects
@@ -1521,6 +1522,13 @@ controlGrants gs =
 -- Filter.IsHostOfSource be answered anywhere a source and a GameState are in hand.
 hostOf :: ObjectId -> GameState -> Maybe ObjectId
 hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
+
+-- CR 303.4b's other destination: WHICH PLAYER this object is attached to --
+-- what an enchant-player Aura "enchants". hostOf's twin, Nothing where the
+-- object is attached to nothing or to an object. Like hostOf, no projection,
+-- read live off Object.attachedTo, so controlNames below may ask it.
+enchantedPlayerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
+enchantedPlayerOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.playerOf
 
 -- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2
 -- control effects, last timestamp wins (CR 613.7). Stored continuous effects and
@@ -1570,8 +1578,10 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 -- asks. Both go back through controllerOfGiven, never through the projection
 -- (see controlGrants).
 --
--- Not implemented: MatchingAnywhere, MatchingOffBattlefield and
--- AttachedPlayerControls, which stay empty and so grant nothing (#1927).
+-- Not implemented: MatchingAnywhere and MatchingOffBattlefield, which stay empty
+-- and so grant nothing (#1927). CR 109.4 gives a controller only to an object on
+-- the battlefield or the stack, so the part of either set a control grant could
+-- observe is the part those two arms share with Matching's own.
 controlNames :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Affected.Affected -> Set ObjectId
 controlNames grants visited gs source a = case a of
   Affected.TheseObjects s -> s
@@ -1586,7 +1596,22 @@ controlNames grants visited gs source a = case a of
   Affected.Matching f -> Set.filter (matchesLeanly grants visited gs source f) (GameState.battlefield gs)
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.MatchingOffBattlefield _ -> Set.empty
-  Affected.AttachedPlayerControls _ -> Set.empty
+  -- CR 303.4b / 303.4m through a PLAYER: what the enchanted player controls,
+  -- read as Matching's battlefield walk narrowed by the candidate's own
+  -- controller. Both halves are dynamic (CR 611.3a), and the controller half is
+  -- the lean fold's, never the projection's -- the same visited set, so a
+  -- candidate under question answers its owner rather than re-entering.
+  --
+  -- The battlefield bound is the arm's own, and it is what answers CR 702.26b
+  -- for a phased-out permanent, which Pawl.Engine.Phasing.phaseOut removes from
+  -- that set. Pawl.PhasingSpec's "CR 702.26b a phased-out permanent leaves a
+  -- control grant reached through its controller" proves it.
+  Affected.AttachedPlayerControls f -> case enchantedPlayerOf source gs of
+    Nothing -> Set.empty
+    Just pid ->
+      Set.filter
+        (\oid -> controllerOfGiven grants visited oid gs == Just pid && matchesLeanly grants visited gs source f oid)
+        (GameState.battlefield gs)
 
 -- Does `oid` match a layer-2 affected set's Filter, read at the copiable values
 -- controlNames explains and with CR 109.5's "you" bound to the SOURCE's
@@ -1599,12 +1624,16 @@ controlNames grants visited gs source a = case a of
 --
 -- Both of those controller reads are REGRESSION FENCES rather than proved
 -- behaviour: a filter only forces either one by asking about control, and
--- `data/cards/`'s one predicate control grant is Synthetic Goblin Dominion's
--- "You control all Goblins", whose filter does not. Blanking the perspective
--- leaves the suite green. The card that would prove them is #197's shape, a
--- control-dependent conjunct under a control grant, and it would also be the
--- first board on which this recursion is more than linear: each candidate whose
--- controller is forced re-enters the fold, which walks the battlefield again.
+-- neither of `data/cards/`'s two predicate control grants asks -- Synthetic
+-- Goblin Dominion's "You control all Goblins" and Synthetic Puppeteer's Yoke's
+-- filterless "all permanents". Blanking the perspective leaves the suite green.
+-- The card that would prove them is #197's shape, a control-dependent conjunct
+-- under a control grant.
+--
+-- The recursion this opens -- each candidate whose controller is forced
+-- re-enters the fold, which walks the battlefield again -- is already reached by
+-- controlNames' AttachedPlayerControls arm, which asks every battlefield
+-- candidate's controller outside this function.
 matchesLeanly :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesLeanly grants visited gs source f oid =
   Filter.matches
