@@ -38,6 +38,7 @@ import qualified Pawl.Codec.MonarchWatch as MonarchWatch
 import qualified Pawl.Codec.Object as Object
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.OutsideObject as OutsideObject
+import qualified Pawl.Codec.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Codec.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PhasedOut as PhasedOut
@@ -126,6 +127,7 @@ codec resolve = Fields.object $ do
   continuousEffects <- Fields.defaulted "continuousEffects" [] (Common.list (ContinuousEffect.codec Card.codec)) GameState.continuousEffects
   replacements <- Fields.defaulted "replacements" [] (Common.list ActiveReplacement.codec) GameState.replacements
   pendingPreventionRiders <- Fields.defaulted "pendingPreventionRiders" Seq.empty (Common.seq Prevention.codec) GameState.pendingPreventionRiders
+  pendingDamageEffects <- Fields.defaulted "pendingDamageEffects" Seq.empty (Common.seq PendingDamageEffect.codec) GameState.pendingDamageEffects
   ambientAmounts <- Fields.defaulted "ambientAmounts" Map.empty (Common.textMap SlotName.Type.unwrap (Right . SlotName.Type.MkSlotName) Common.natural) GameState.ambientAmounts
   detachedBindings <- Fields.defaulted "detachedBindings" Map.empty (Common.naturalMap ObjectId.codec Binding.codecMap) GameState.detachedBindings
   pendingEntryEffects <- Fields.defaulted "pendingEntryEffects" Seq.empty (Common.seq PendingEntryEffect.codec) GameState.pendingEntryEffects
@@ -202,6 +204,7 @@ codec resolve = Fields.object $ do
         GameState.continuousEffects = continuousEffects,
         GameState.replacements = replacements,
         GameState.pendingPreventionRiders = pendingPreventionRiders,
+        GameState.pendingDamageEffects = pendingDamageEffects,
         GameState.ambientAmounts = ambientAmounts,
         GameState.detachedBindings = detachedBindings,
         GameState.pendingEntryEffects = pendingEntryEffects,

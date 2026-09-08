@@ -1,5 +1,6 @@
 module Pawl.Types.DamageRewrite where
 
+import qualified Data.Sequence as Seq
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -49,13 +50,23 @@ import qualified Pawl.Types.Scaling as Scaling
 -- name an ObjectId, so Resolve's RedirectDamage arm is the one producer, and
 -- Pawl.CardSpec's engineOnlyOffends is what keeps the corpus off it.
 --
+-- RunEffects is CR 614.1a's "instead" with an ACTION rather than an amount or a
+-- destination -- Kill-Suit Cultist's "destroy that creature instead". The damage
+-- event does not happen and the effects run in its place. NOT a prevention: the
+-- clause never says "prevent" (CR 615.1a), so `prevents` refuses it and CR
+-- 615.13's trigger never sees it.
+--
+-- Parametric in the EFFECT for the reason Pawl.Types.DamageR gives, and the arm
+-- that forces the parameter onto this type; Pawl.Types.EntryRewrite's RunEffects
+-- is the same arm one rewrite type over.
+--
 -- RedirectMatching is the CARD-PRINTED half of that same question, and the two
 -- are not one arm for DamagePattern's `whichRecipient` / `whatRecipient`
 -- reason: Redirect names an id the engine baked, where this one DESCRIBES the
 -- destination by characteristic -- Pariah's "is dealt to enchanted creature
 -- instead" is `Filter.IsHostOfSource`, and a permanent redirecting to itself
 -- (Palisade Giant) would write `Filter.IsSource`.
-data DamageRewrite
+data DamageRewrite effect
   = PreventAll
   | -- | CR 122.1c: "if damage would be dealt to this permanent, prevent that
     -- damage and remove a shield counter from it". A prevention (it says
@@ -128,4 +139,11 @@ data DamageRewrite
     -- above. A card that printed a static one on a permanent would refute this,
     -- and would want a player half here the way DamagePattern has one.
     RedirectMatching (Filter.Filter Keyword.Keyword)
+  | -- | CR 614.1a / Kill-Suit Cultist: the damage does not happen and these
+    -- effects run instead, in printed order.
+    --
+    -- QUEUED rather than run where the rewrite applies, for the reason
+    -- Pawl.Types.PendingDamageEffect gives: the module that applies a
+    -- replacement is below the one that can run a card's effects.
+    RunEffects (Seq.Seq effect)
   deriving (Eq, Ord, Show)

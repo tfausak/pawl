@@ -144,6 +144,7 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.OutsideObject as OutsideObject
+import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
@@ -1628,6 +1629,7 @@ applyInertly candidate rewrite event = do
     DamageRewrite.Redirect _ -> pure ()
     DamageRewrite.RedirectNext _ _ -> pure ()
     DamageRewrite.RedirectMatching _ -> pure ()
+    DamageRewrite.RunEffects _ -> pure ()
   pure (Just event)
 
 -- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
@@ -2842,6 +2844,47 @@ apply batch candidate event =
         pure . Just $ case Replacement.printedDestination gs (Replacement.candidateContext gs candidate) filter_ of
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
+      -- CR 614.1a's "instead" with an ACTION rather than an amount or a
+      -- destination -- Kill-Suit Cultist's "destroy that creature instead". The
+      -- damage event does not happen, which is PreventAll's Nothing above, and
+      -- the effects run in its place.
+      --
+      -- NOT a prevention: the clause never says "prevent" (CR 615.1a), so
+      -- `Replacement.prevents` refuses this rewrite, `preventionBy` records no
+      -- Pawl.Types.Prevention and CR 615.13's trigger never fires.
+      --
+      -- QUEUED, not run here, for the reason EntryRewrite.RunEffects' arm above
+      -- gives: this module is below Pawl.Engine.Resolve and cannot run a card's
+      -- effects. The environment goes onto the queue with them, since the ability
+      -- that installed the row is long gone (CR 400.7); see
+      -- Pawl.Types.PendingDamageEffect.
+      --
+      -- The row's SLOTS carry CR 601.2c's target forward, which is what makes
+      -- "that creature" nameable at the event, and they are objects rather than
+      -- recipients (Pawl.Types.ActiveReplacement.slots), so the tag is rebuilt
+      -- generically -- Recipient.objectOf is what every reader of an
+      -- ObjectRef.InSlot asks, and it admits ToObject.
+      DamageRewrite.RunEffects effects -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        case ReplacementCandidate.controller candidate of
+          -- CR 109.5 has nobody to answer with: a permanent-sourced candidate
+          -- whose source has left the board (see ReplacementCandidate.controller).
+          -- The damage is replaced all the same -- CR 614.1's "instead" is not
+          -- conditional on the performer -- and nothing runs.
+          Nothing -> pure Nothing
+          Just controller -> do
+            State.modify' $ \g ->
+              g
+                { GameState.pendingDamageEffects =
+                    GameState.pendingDamageEffects g
+                      Seq.|> PendingDamageEffect.MkPendingDamageEffect
+                        { PendingDamageEffect.effects = effects,
+                          PendingDamageEffect.targets = fmap (Set.map Recipient.ToObject) (ReplacementCandidate.slots candidate),
+                          PendingDamageEffect.controller = controller,
+                          PendingDamageEffect.source = ReplacementCandidate.source candidate
+                        }
+                }
+            pure Nothing
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR {}, _) -> pure (Just event)
     -- CR 701.19a / 122.1c: under either arm the DESTRUCTION does not happen, so

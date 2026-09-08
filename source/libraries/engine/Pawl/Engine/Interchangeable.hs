@@ -145,6 +145,7 @@ quiet gs =
     && null (GameState.ignoredAbilities gs)
     && Seq.null (GameState.delayedTriggers gs)
     && Seq.null (GameState.pendingPreventionRiders gs)
+    && Seq.null (GameState.pendingDamageEffects gs)
     && Seq.null (GameState.pendingEntryEffects gs)
     && Seq.null (GameState.broughtIn gs)
     && Set.null (GameState.enteringBeside gs)

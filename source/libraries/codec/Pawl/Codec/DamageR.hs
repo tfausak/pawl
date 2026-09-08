@@ -23,7 +23,7 @@ codec ::
   Codec.Codec (DamageR.DamageR effect)
 codec effectCodec = Fields.object $ do
   matching <- Fields.required "matching" DamagePattern.codec DamageR.matching
-  rewrite <- Fields.required "rewrite" DamageRewrite.codec DamageR.rewrite
+  rewrite <- Fields.required "rewrite" (DamageRewrite.codec effectCodec) DamageR.rewrite
   riders <- Fields.defaulted "riders" Seq.empty (Common.seq effectCodec) DamageR.riders
   pure
     DamageR.MkDamageR

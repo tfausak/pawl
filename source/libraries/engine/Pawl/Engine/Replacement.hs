@@ -522,7 +522,13 @@ admits regenerability cause rewrite = case rewrite of
 -- `setShield` drops a floating row the moment it reaches 0, so the only 0 that
 -- can reach this test is one written into card data -- which
 -- Pawl.Types.DamageRewrite forbids. Total rather than partial.
-unspent :: DamageRewrite.DamageRewrite -> Bool
+-- The one instantiation of Pawl.Types.DamageRewrite this module works at, its
+-- effect parameter filled in as Pawl.Types.Face declares it. Named for
+-- Pawl.Engine.Projection.Rewrite's `Modification`: the parameter is a
+-- module-cycle device, so no caller here ever varies it.
+type Rewrite = DamageRewrite.DamageRewrite (Effect.Effect Card (GrantedAbility.GrantedAbility Card))
+
+unspent :: Rewrite -> Bool
 unspent rewrite = case rewrite of
   DamageRewrite.PreventNext remaining -> remaining > 0
   DamageRewrite.PreventAll -> True
@@ -545,6 +551,10 @@ unspent rewrite = case rewrite of
   DamageRewrite.RedirectMatching _ -> True
   -- The counted redirection is spent as PreventNext is, in damage.
   DamageRewrite.RedirectNext remaining _ -> remaining > 0
+  -- CR 614.1a's "instead [do something]" stores no amount either: Kill-Suit
+  -- Cultist's "the next time" is Uses.Once on the row that carries it, which the
+  -- CR 614.3 use count spends rather than this.
+  DamageRewrite.RunEffects _ -> True
 
 -- CR 122.1c: does this damage rewrite admit the event's RECIPIENT? The shield's
 -- prevention says "if damage would be dealt to THIS permanent", and that
@@ -557,7 +567,7 @@ unspent rewrite = case rewrite of
 -- (Fog shields no one in particular; CR 615.7's row names its recipient in the
 -- pattern). Exhaustive, so a later rewrite with a scope of its own is asked here
 -- rather than silently given every recipient.
-admitsRecipient :: ObjectId -> DamageRewrite.DamageRewrite -> DamageEvent.DamageEvent -> Bool
+admitsRecipient :: ObjectId -> Rewrite -> DamageEvent.DamageEvent -> Bool
 admitsRecipient src rewrite de = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> Recipient.objectOf (DamageEvent.target de) == Just src
   DamageRewrite.PreventAll -> True
@@ -568,6 +578,7 @@ admitsRecipient src rewrite de = case rewrite of
   DamageRewrite.Redirect _ -> True
   DamageRewrite.RedirectNext _ _ -> True
   DamageRewrite.RedirectMatching _ -> True
+  DamageRewrite.RunEffects _ -> True
 
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 applies gs event candidate =
@@ -2178,7 +2189,7 @@ consume identity_ = case identity_ of
 -- which is spent in the same unit -- and the 0 that drops the row is read off
 -- `remainingOf`, so the two counted rewrites cannot disagree about when a row
 -- is used up.
-setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> DamageRewrite.DamageRewrite -> Game ()
+setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card (GrantedAbility.GrantedAbility Card)) -> Rewrite -> Game ()
 setShield identity_ damageR spent = case identity_ of
   CandidateId.OfPermanent {} -> pure ()
   CandidateId.OfFloating floating ->
@@ -2202,7 +2213,7 @@ setShield identity_ damageR spent = case identity_ of
 -- A CLASSIFICATION of effects, in `prevents`' genre: one arm per constructor,
 -- no wildcard, so a third counted rewrite is asked here rather than never
 -- dropped at 0.
-remainingOf :: DamageRewrite.DamageRewrite -> Maybe Natural
+remainingOf :: Rewrite -> Maybe Natural
 remainingOf rewrite = case rewrite of
   DamageRewrite.PreventNext remaining -> Just remaining
   DamageRewrite.RedirectNext remaining _ -> Just remaining
@@ -2213,6 +2224,7 @@ remainingOf rewrite = case rewrite of
   DamageRewrite.Scale _ -> Nothing
   DamageRewrite.Redirect _ -> Nothing
   DamageRewrite.RedirectMatching _ -> Nothing
+  DamageRewrite.RunEffects _ -> Nothing
 
 -- CR 614.9 over the counted shape CR 615.7 states for preventions -- the
 -- redirect's own countdown rests on Harm's Way's rulings: how much of this
@@ -2245,6 +2257,9 @@ partialCoverage gs candidate event = case (ReplacementCandidate.effect candidate
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing
+    -- CR 614.1a's "instead [do something]" takes the event whole, however large:
+    -- the effects replace it rather than covering some of its damage.
+    DamageRewrite.RunEffects _ -> Nothing
     DamageRewrite.RedirectMatching _ -> Nothing
   _ -> Nothing
 
@@ -2279,7 +2294,7 @@ splitDamage covered event = case event of
 -- 615.12's unpreventable damage is still met by a prevention effect, which is
 -- still a prevention effect for having prevented nothing of it. `preventable`
 -- below is the other half, and `inertPrevention` asks them together.
-prevents :: DamageRewrite.DamageRewrite -> Bool
+prevents :: Rewrite -> Bool
 prevents rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventAll -> True
@@ -2299,6 +2314,10 @@ prevents rewrite = case rewrite of
   -- "prevent": the 2 it moves is dealt, one recipient over.
   DamageRewrite.RedirectNext _ _ -> False
   DamageRewrite.RedirectMatching _ -> False
+  -- Kill-Suit Cultist says "destroy that creature instead" and never "prevent",
+  -- so CR 615.1a keeps this one out too -- though, unlike a redirect, no damage
+  -- is dealt anywhere. CR 615.13's trigger does not see it.
+  DamageRewrite.RunEffects _ -> False
 
 -- CR 615.12: applied to damage that CAN'T be prevented, does this rewrite still
 -- spend what `contestedResource` counts? The rule's middle and last sentences
@@ -2314,7 +2333,7 @@ prevents rewrite = case rewrite of
 -- A CLASSIFICATION of effects, in `prevents`' genre: one arm per constructor, no
 -- wildcard, so a new prevention rewrite with an additional effect breaks the
 -- build here.
-spentInertly :: DamageRewrite.DamageRewrite -> Bool
+spentInertly :: Rewrite -> Bool
 spentInertly rewrite = case rewrite of
   DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.PreventNext _ -> False
@@ -2333,6 +2352,7 @@ spentInertly rewrite = case rewrite of
   DamageRewrite.Redirect _ -> False
   DamageRewrite.RedirectNext _ _ -> False
   DamageRewrite.RedirectMatching _ -> False
+  DamageRewrite.RunEffects _ -> False
 
 -- CR 614.9: the destination a redirection effect may still use, re-derived
 -- against the CURRENT state at redirect time. Nothing is the rule's guard --
@@ -2454,7 +2474,7 @@ patternContext gs src = Filter.contextFor (Game.teams gs) (src >>= \oid -> Proje
 -- of `prevents` and `spentInertly` above: one arm per constructor, no wildcard,
 -- so a second rewrite that moves a damage event's recipient is asked here rather
 -- than silently escaping a card's prohibition.
-redirects :: DamageRewrite.DamageRewrite -> Bool
+redirects :: Rewrite -> Bool
 redirects rewrite = case rewrite of
   DamageRewrite.Redirect _ -> True
   -- The same rule with the destination described rather than named, so a card
@@ -2470,6 +2490,9 @@ redirects rewrite = case rewrite of
   -- deals the damage "instead to another permanent or player".
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
+  -- The effects run in the damage's place, so nothing is dealt to anybody: no
+  -- recipient moves and CR 614.9's prohibition has nothing to stop.
+  DamageRewrite.RunEffects _ -> False
 
 -- CR 614.9: may a redirection effect move this damage event, or does a card
 -- forbid it (Lava Burst)?
@@ -2514,7 +2537,7 @@ redirectable gs de = not (any (\(src, pat) -> matchesDamagePattern gs (patternCo
 -- "this pair is not a prevention of damage" -- preventionBy's arrangement, for
 -- preventionBy's reason: the per-constructor obligation is discharged by
 -- `prevents`, which this delegates to.
-inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Maybe DamageRewrite.DamageRewrite
+inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Maybe Rewrite
 inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate, event) of
   (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de)
     | prevents rewrite && not (preventable gs de) ->
@@ -2548,7 +2571,7 @@ inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate
 -- The wildcard is over (effect, event) PAIRS, where it is the only way to say
 -- "this pair is not a prevention of damage"; the per-constructor obligation this
 -- module carries is discharged by `prevents` above, which the guard delegates to.
-preventionBy :: Maybe DamageRewrite.DamageRewrite -> ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
+preventionBy :: Maybe Rewrite -> ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
 preventionBy inert candidate before after = case (ReplacementCandidate.effect candidate, before) of
   (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de)
     | prevents rewrite ->
@@ -2885,6 +2908,10 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing
     DamageRewrite.RedirectMatching _ -> Nothing
+    -- CR 614.3's use count is the only thing a run-effects rewrite spends, and
+    -- that is counted in APPLICATIONS rather than in damage, so no batch of
+    -- events can exhaust it in the unit this pair is asked in.
+    DamageRewrite.RunEffects _ -> Nothing
   ReplacementEffect.ZoneChangeR {} -> Nothing
   ReplacementEffect.EntryR {} -> Nothing
   ReplacementEffect.DestructionR _ -> Nothing

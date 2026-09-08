@@ -1150,8 +1150,10 @@ conditionSlots condition = case condition of
 --
 -- No wildcard: an arm added to Pawl.Types.ReplacementEffect must answer here, and
 -- the ones carrying neither Filter nor Quantity say so rather than falling
--- through. Not implemented: the nested EFFECTS an EntryR rewrite or a DamageR
--- rider carries read slots of their own and are not walked (gap #1962).
+-- through. The nested EFFECTS a rewrite or a CR 615.5 rider carries are NOT here
+-- and are not missing: what one of those reads is a whole effect's worth of
+-- reads rather than a Filter or a Quantity, so replacementRowEffects below
+-- declares them and replacementRowSlots joins slotsOf over the answer.
 replacementRowReads :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 replacementRowReads re = case re of
   -- The rewrite is a Zone and two Bools (Pawl.Types.ZoneChangeR): nothing that can
@@ -1232,8 +1234,8 @@ entryRewriteReads rewrite = case rewrite of
   EntryRewrite.PayLifeOrTapped _ -> ([], [])
   EntryRewrite.RevealOrTapped filter_ -> ([filter_], [])
   EntryRewrite.EntersTransformed -> ([], [])
-  -- Not implemented: the nested effects read slots of their own and neither this
-  -- answer nor slotsOf reports them (gap #1962).
+  -- The nested effects' reads are replacementRowEffects' answer rather than this
+  -- one's, for the reason replacementRowReads' header gives.
   EntryRewrite.RunEffects _ -> ([], [])
 
 -- What a TURN-UP rewrite reads. entryRewriteReads' two shapes and its discipline:
@@ -1264,13 +1266,46 @@ drawRewriteReads rewrite = case rewrite of
 replacementRowSlots :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Map.Map SlotName SlotArity
 replacementRowSlots re =
   let (filters, quantities) = replacementRowReads re
-   in joinSlots (fmap filterSlotsOf filters <> fmap quantitySlots quantities)
+   in joinSlots (fmap filterSlotsOf filters <> fmap quantitySlots quantities <> fmap slotsOf (replacementRowEffects re))
+
+-- The card-authored EFFECT PROGRAMS one waiting row carries: CR 614.1c's "as
+-- [this permanent] enters, [do something]", CR 614.1a's "instead [do something]"
+-- (Kill-Suit Cultist), and CR 615.5's additional effect on a DamageR.
+--
+-- Declared apart from replacementRowReads beside it because what a nested effect
+-- reads is not a Filter or a Quantity but a whole effect's worth of reads --
+-- slotsOf's answer -- and the three consumers that ask what a row reads
+-- (replacementRowSlots above, slotsAreExhaustive and readsX below) each want it
+-- through their own recursion rather than flattened.
+--
+-- No wildcard, replacementRowReads' discipline: an arm that comes to nest a
+-- program must answer here rather than have its reads go undeclared.
+replacementRowEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+replacementRowEffects re = case re of
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) -> case rewrite of
+    EntryRewrite.RunEffects effects -> Foldable.toList effects
+    _ -> []
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite riders) ->
+    Foldable.toList riders <> case rewrite of
+      DamageRewrite.RunEffects effects -> Foldable.toList effects
+      _ -> []
+  ReplacementEffect.ZoneChangeR _ -> []
+  ReplacementEffect.DestructionR _ -> []
+  ReplacementEffect.CounterR _ -> []
+  ReplacementEffect.TokenR _ -> []
+  ReplacementEffect.TurnUpR _ -> []
+  ReplacementEffect.UntapR _ -> []
+  ReplacementEffect.LifeLossR _ -> []
+  ReplacementEffect.LifeGainR _ -> []
+  ReplacementEffect.DrawR _ -> []
+  ReplacementEffect.DrawCountR _ -> []
+  ReplacementEffect.PhaseR _ -> []
 
 -- The Filters a damage REWRITE holds, which is CR 614.9's printed destination and
 -- nothing else. No wildcard, replacementRowSlots' discipline: a later rewrite
 -- describing something must answer here rather than have its slot reads go
 -- undeclared.
-damageRewriteFilters :: DamageRewrite.DamageRewrite -> [Filter.Type.Filter Keyword.Type.Keyword]
+damageRewriteFilters :: DamageRewrite.DamageRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Filter.Type.Filter Keyword.Type.Keyword]
 damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.RedirectMatching f -> [f]
   DamageRewrite.Redirect _ -> []
@@ -1281,6 +1316,9 @@ damageRewriteFilters rewrite = case rewrite of
   DamageRewrite.PreventAllBut _ -> []
   DamageRewrite.SetAmount _ -> []
   DamageRewrite.Scale _ -> []
+  -- The nested effects are replacementRowEffects' answer above, not a Filter of
+  -- the rewrite's own.
+  DamageRewrite.RunEffects _ -> []
 
 -- One Filter's slot reads, at arity One -- the same shape modeSlots folds over a
 -- mode's target-slot Filters.
@@ -1383,14 +1421,14 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.CopyStackObject {} -> True
   -- The ReplacementEffect's own reads are replacementRowReads', and slotsOf
   -- reports them through replacementRowSlots: its Filters name no target slot, and
-  -- the Quantities a counter rewrite counts with are asked here. Not implemented:
-  -- the effects a rewrite or a CR 615.5 rider nests under this opcode read slots
-  -- of their own and neither this answer nor slotsOf reports them; every
-  -- Effect.Replace in data/cards/ nests none (gap #1962).
+  -- the Quantities a counter rewrite counts with are asked here. The effects a
+  -- rewrite or a CR 615.5 rider nests are asked through their own recursion, the
+  -- posture the two prevention opcodes below take with their riders.
   Effect.Replace (Replace.MkReplace duration _ _ condition re) ->
     durationSlotsAreExhaustive duration
       && all conditionSlotsAreExhaustive condition
       && all Quantity.slotsAreExhaustive (snd (replacementRowReads re))
+      && all slotsAreExhaustive (replacementRowEffects re)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ _ _ _ _ quantity rider) ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
@@ -1588,7 +1626,9 @@ readsX = any effectReadsX
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _) -> any Quantity.readsX (quantity : riderQuantities riders)
       Effect.BecomeCopy {} -> False
       Effect.CopyStackObject {} -> False
-      Effect.Replace {} -> False
+      -- CR 601.2b's X reaches the effects a rewrite or a CR 615.5 rider nests,
+      -- the two prevention opcodes' posture with their own riders.
+      Effect.Replace (Replace.MkReplace _ _ _ _ re) -> readsX (replacementRowEffects re)
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too.
       Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ _ _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
@@ -1771,7 +1811,9 @@ boundSlots effect = case effect of
   Effect.RedistributeLifeTotals -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.DecreaseSpeed {} -> Set.empty
-  Effect.Replace {} -> Set.empty
+  -- A name the nested effects author, the two prevention opcodes' posture with
+  -- their own riders.
+  Effect.Replace (Replace.MkReplace _ _ _ _ re) -> foldMap boundSlots (replacementRowEffects re)
   Effect.SkipNextPhase {} -> Set.empty
   -- The shield itself binds nothing; CR 615.5's rider is an effect list, so a
   -- name IT authors is a name this card authors. Both shields.

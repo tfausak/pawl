@@ -16,7 +16,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 -- Pawl.Types.Face declares the field.
 data DamageR effect = MkDamageR
   { matching :: DamagePattern.DamagePattern,
-    rewrite :: DamageRewrite.DamageRewrite,
+    rewrite :: DamageRewrite.DamageRewrite effect,
     -- | CR 615.5's additional effect -- Stormwild Capridor's "put a +1/+1
     -- counter on this creature for each 1 damage prevented this way". Empty for
     -- every other replacement in the pool, so the key is elided rather than
