@@ -19,7 +19,7 @@ import qualified Pawl.Types.PrintingId as PrintingId
 -- shapes rule 730.2's sentence names, and no more.
 --
 -- Not implemented: CR 707.10's copy of a mutating creature spell, which rule
--- 730.2's "or copy" admits as a component (#874).
+-- 730.2's "or copy" admits as a component (#3431).
 data MergeComponent
   = -- | CR 108.2: a card component, named by its entry in GameState.printings.
     OfCard {printing :: PrintingId.PrintingId}

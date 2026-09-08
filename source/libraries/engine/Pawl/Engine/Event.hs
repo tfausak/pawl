@@ -6401,9 +6401,9 @@ meldable victims gs = do
 -- decided here or nowhere.
 --
 -- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
--- turned face up (#3392); CR 730.2i/730.2j's double-faced components. A spell
--- with no printing behind it -- CR 707.10's copy of a mutating creature spell --
--- refuses here rather than merging (#874).
+-- turned face up (#3392); CR 730.2i/730.2j's double-faced components (#3428). A
+-- spell with no printing behind it -- CR 707.10's copy of a mutating creature
+-- spell -- refuses here rather than merging (#3431).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -6473,7 +6473,7 @@ merge sid target side = do
 -- Not implemented: a MELDED component, whose characteristics come off an
 -- interned combined face that is no component of it (CR 712.8g), so there is no
 -- component list to extend -- a mutating creature spell targeting one does not
--- merge (#874).
+-- merge (#3430).
 mergeComponents :: Source.Source -> Maybe [MergeComponent.MergeComponent]
 mergeComponents source = case source of
   Source.OfCard pid -> Just [MergeComponent.OfCard pid]

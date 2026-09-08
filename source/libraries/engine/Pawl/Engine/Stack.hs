@@ -406,7 +406,7 @@ resolveCardBacked runSubgame oid rest printingId = do
                 -- A merge that REFUSES (Event.mergeable's own note: a target no
                 -- component list can be read off) falls through to the ordinary
                 -- entry below, so the spell resolves as the creature spell it
-                -- also is rather than being lost (#874). Asked BEFORE the side
+                -- also is rather than being lost (#3430). Asked BEFORE the side
                 -- is, so a player is never put a question whose answer the
                 -- refusal would then discard.
                   case mutatingTarget oid gs1 of
