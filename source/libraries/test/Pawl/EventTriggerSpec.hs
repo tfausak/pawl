@@ -1387,8 +1387,8 @@ whisperingWizardSpec s registry =
 -- TWO of alice's turns, because one cannot tell the readings apart: the rider is
 -- spent on the first firing whichever window it names, so only a SECOND turn's
 -- trigger event separates "once each turn" (which would fire again) from "once"
--- (which does not). CR 603.2b's step record is what the handoff clears, so the
--- second turn is also where a per-turn record would silently re-arm.
+-- (which does not). CR 603.3b's log is what the handoff clears, so the second
+-- turn is also where a per-turn record would silently re-arm.
 --
 -- The creature is tapped by hand on each of alice's turns rather than by
 -- attacking: CR 508.1f's tap is a fine way to satisfy the intervening "if", but
@@ -1396,10 +1396,10 @@ whisperingWizardSpec s registry =
 -- about neither. Both turns tap it the same way, so the tap is never what
 -- separates them.
 --
--- The reading is Projection.keywordsOf, which counts INSTANCES: CR 122.1b's
--- keyword counter grants one instance apiece, so one counter reads as Just 1 and
--- the per-turn reading's two counters would read as Just 2. A bare "it flies"
--- cannot tell them apart and is not the assertion.
+-- The reading is Projection.keywordsOf, which counts INSTANCES, and a CR 122.1b
+-- keyword counter grants one apiece -- so one counter reads as Just 1 where the
+-- per-turn reading's two counters would read as Just 2. A bare "it flies" cannot
+-- tell the two apart and is not the assertion.
 acrobaticCheerleaderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 acrobaticCheerleaderSpec s registry =
   let -- Run whole steps until `phase` is the CURRENT one and has NOT yet run --
