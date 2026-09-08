@@ -685,6 +685,45 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
     Spec.assertBool s (Combat.canAttack S.alice creature settled) "alice attacks with the creature the enchanted player owns"
     Spec.assertEqWith s "his Forest is hers too -- permanents, not creatures -- and carol's Piker is nobody's business" (fmap (\oid -> Projection.controllerOf oid settled) [land, hers]) [Just S.alice, Just S.carol]
     Spec.assertEqWith s "CR 604.2: the Yoke leaves and bob has his Piker back" (Projection.controllerOf creature gone) (Just S.bob)
+  -- CR 613.8a/613.8b: the Yoke's set is what the enchanted player controls read
+  -- AFTER every layer-2 effect it depends on. Applying Control Magic changes
+  -- what the Yoke applies to, and the Yoke changes nothing about Control Magic
+  -- -- it enchants bob, not carol -- so the Yoke is the dependent effect and
+  -- waits. Both timestamp orders are built, because dependency overrides CR
+  -- 613.7 and a fold that only took the latest timestamp would pass the second
+  -- board while failing the first.
+  --
+  -- THREE SEATS: carol holds the Control Magic, and on two seats she would
+  -- collapse onto the Yoke's controller, leaving the Piker alice's however the
+  -- fold ordered the two effects. The Forest is the control -- nothing else
+  -- reaches it, so it still moves, and the Yoke is granting rather than inert.
+  --
+  -- Gameplay-level on carol's own turn: whoever the fold hands the Piker to is
+  -- the player Pawl.Engine.Combat.canAttack lets attack with it.
+  Spec.it s "CR 613.8a/613.8b a permanent already stolen from the enchanted player is not handed over again" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    yoke <- S.printingOf s registry "Synthetic Puppeteer's Yoke"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    -- CR 613.7d: each permanent takes a fresh timestamp as it is placed, so the
+    -- order these two go down in IS the order CR 613.7 would apply them in. The
+    -- fixture's attach does not re-stamp the Aura (CR 613.7e), which changes
+    -- nothing here: each Aura is attached in the same breath it is placed.
+    let (creature, withCreature) = S.addPermanent piker S.bob S.threePlayerGame
+        (land, withLand) = S.addPermanent forest S.bob withCreature
+        steal gs = let (m, g) = S.addPermanent controlMagic S.carol gs in S.attach m creature g
+        yoked gs = let (a, g) = S.addPermanent yoke S.alice gs in S.attachTo a (Recipient.ToPlayer S.bob) g
+        stealFirst = yoked (steal withLand)
+        yokeFirst = steal (yoked withLand)
+        carolsTurn = stealFirst {GameState.activePlayer = S.carol}
+        settled = S.runPure S.identityAnswer carolsTurn (Engine.settleAll S.carol)
+    Spec.assertBool s (Combat.canAttack S.carol creature settled) "carol, who took the Piker before the Yoke was attached at all, is the one who may attack with it"
+    Spec.assertEqWith s "CR 613.8b the Yoke waits on the earlier Control Magic, so only the Forest moves" (fmap (\oid -> Projection.controllerOf oid stealFirst) [creature, land]) [Just S.carol, Just S.alice]
+    -- A FENCE rather than a second proof: with the Yoke stamped first, CR 613.7
+    -- alone already puts Control Magic last, so this reads carol whether the
+    -- fold honours the dependency or only the timestamps. It is here to fail a
+    -- future fix that reorders by timestamp and calls that CR 613.8b.
+    Spec.assertEqWith s "CR 613.7 the other timestamp order leaves the Piker carol's too" (Projection.controllerOf creature yokeFirst) (Just S.carol)
   -- CR 704.5m's remaining clause, and the one only an enchant-player Aura can
   -- reach: CR 303.4c spells it out as "the player it was attached to has left
   -- the game". Three seats, because CR 104.2a ends a two-player game the

@@ -618,6 +618,14 @@ affectsWith grants peers source oid a partial gs = case a of
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
   -- the enchanted player's. The candidate's controller is bound once and used
   -- twice.
+  --
+  -- The FINISHED control answer, layer 2 included -- which is not what
+  -- Projection.View.controlNames' arm reads, and deliberately so. This one
+  -- answers for the layers AFTER 2 (CR 613.8a confines a dependency to one
+  -- layer), where the controller a candidate has is the one layer 2 left it; a
+  -- control grant reading its own output is what CR 613.8b's ordering is for,
+  -- and controlNames does that ordering there. So the two arms differ exactly on
+  -- a candidate this source itself takes, and neither is the other's bug.
   Affected.AttachedPlayerControls f -> case enchantedPlayerOf source gs of
     Just pid ->
       let controller = controllerOfGiven grants Set.empty oid gs
