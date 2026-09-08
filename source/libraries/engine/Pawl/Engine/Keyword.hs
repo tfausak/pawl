@@ -568,17 +568,6 @@ reinforce n cost =
 reinforceTarget :: SlotName.SlotName
 reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 
--- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
--- sibling one zone over.
---
--- POST-LAYER keywords, unlike handAbilitiesOf's printed ones, and the contrast is
--- CR 113.6 again: this ability functions on the battlefield, which the projection
--- does reach. So Humility takes crew away at CR 613.1f layer 6 for free.
---
--- One ability PER INSTANCE, rule 702.70b's reading rather than rule 702.164b's: CR
--- 702.122a states a whole self-contained ability, so a permanent with crew twice
--- has two of them to activate and two thresholds. Order is the Map's, for
--- triggeredAbilitiesOf's reason.
 -- CR 702.49a's whole ability: "[Cost], Reveal this card from your hand, Return an
 -- unblocked attacking creature you control to its owner's hand: Put this card
 -- onto the battlefield from your hand tapped and attacking."
@@ -589,8 +578,9 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 -- the two reveals -- the cost's and rule 602.2a's -- one duration, "from the time
 -- the spell or ability is announced until the time it leaves the stack", so the
 -- component would only reveal a card that is already revealed. Nothing in
--- Pawl.Types.CostComponent reveals anything (#3017), and this ability is why that
--- gap has no producer.
+-- Pawl.Types.CostComponent reveals anything; that gap is a different shape --
+-- revealing ANOTHER card the payer chooses, as Silvergill Adept's additional cost
+-- does -- and ninjutsu is not one of its producers, see #3017.
 --
 -- THE RETURN is Pawl.Types.CostComponent's ReturnPermanents, appended to the
 -- printed cost the way cycling appends its discard: rule 702.49a puts it before
@@ -599,13 +589,13 @@ reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
 -- 400.3 is what makes the destination its OWNER's hand rather than the
 -- activator's.
 --
--- "AN UNBLOCKED ATTACKING CREATURE YOU CONTROL" is four conjuncts and not three:
--- CR 509.1h makes a creature blocked the moment a blocker is declared for it, and
--- CR 506.1 leaves an attacking creature attacking after its blocker leaves
--- combat, so Not IsBlocked has to be asked beside IsAttacking. The creature
--- clause is rule 702.49a's own word and is not redundant with IsAttacking: a
--- permanent that stops being a creature while attacking stays an attacking
--- creature under CR 506.4 only while it is a creature.
+-- "AN UNBLOCKED ATTACKING CREATURE YOU CONTROL" is four conjuncts and not three.
+-- CR 509.1h is why unblocked has to be asked beside attacking: a creature blocked
+-- at the declaration "remains blocked even if all the creatures blocking it are
+-- removed from combat", so it is attacking and not returnable at the same time.
+-- The creature conjunct is rule 702.49a's own word: CR 506.4 removes an attacking
+-- permanent from combat when it stops being a creature, so it is not redundant
+-- with IsAttacking so much as the same fact asked from the other side.
 --
 -- THE EFFECT is Reassembling Skeleton's shape one zone over -- a MoveToZone of
 -- the ability's own source, whose `origin` states the zone CR 113.6m functions it
@@ -677,6 +667,17 @@ ninjutsu cost =
           ActivatedAbility.keyword = Nothing
         }
 
+-- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
+-- sibling one zone over.
+--
+-- POST-LAYER keywords, unlike handAbilitiesOf's printed ones, and the contrast is
+-- CR 113.6 again: this ability functions on the battlefield, which the projection
+-- does reach. So Humility takes crew away at CR 613.1f layer 6 for free.
+--
+-- One ability PER INSTANCE, rule 702.70b's reading rather than rule 702.164b's: CR
+-- 702.122a states a whole self-contained ability, so a permanent with crew twice
+-- has two of them to activate and two thresholds. Order is the Map's, for
+-- triggeredAbilitiesOf's reason.
 battlefieldAbilitiesOf :: Map Keyword Natural -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map.toAscList counts)
 
