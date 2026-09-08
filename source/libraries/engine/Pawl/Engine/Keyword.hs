@@ -731,7 +731,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
 -- crew cost from the same component printed outside one
 -- (data/cards/synthetic-crewed-battery.json). Pawl.Engine.Cost.tapCandidates is
 -- what supplies the set it reads, and Pawl.CrewSpec's "CR 702.122d a creature
--- Revoke Privileges enchants can't be tapped to crew" is the proving test.
+-- Revoke Privileges enchants is not offered to pay" is the proving test.
 crew :: Natural -> ActivatedAbility Card (GrantedAbility.GrantedAbility Card)
 crew n =
   let criterion =
