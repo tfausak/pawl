@@ -1562,7 +1562,9 @@ controllerOf oid gs = controllerOfGiven (controlGrants gs) Set.empty oid gs
 -- is a CR 613.8b loop-escape analog, not an implementation of it (#946):
 -- deriving a grant's player asks for its SOURCE's controller, which can re-enter
 -- this function, and re-entering an object already under question returns its
--- owner so a cycle grants nothing.
+-- owner so a cycle grants nothing. It is not the only escape: controlNames'
+-- AttachedPlayerControls arm shortens the GRANT list instead, so that a
+-- candidate's earlier control effects stay visible.
 controllerOfGiven :: [ControlGrant] -> Set ObjectId -> ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
@@ -1620,8 +1622,29 @@ controlNames grants visited gs source a = case a of
   -- CR 303.4b / 303.4m through a PLAYER: what the enchanted player controls,
   -- read as Matching's battlefield walk narrowed by the candidate's own
   -- controller. Both halves are dynamic (CR 611.3a), and the controller half is
-  -- the lean fold's, never the projection's -- the same visited set, so a
-  -- candidate under question answers its owner rather than re-entering.
+  -- the lean fold's, never the projection's.
+  --
+  -- That half is asked under the grant list MINUS this source's own grants, and
+  -- under a FRESH visited set rather than the caller's. CR 613.8a: applying
+  -- another layer-2 control effect changes what this one applies to, so this one
+  -- depends on it and CR 613.8b makes it wait until just after, whatever the two
+  -- timestamps are (CR 613.7). Carrying the caller's visited set instead would
+  -- answer the candidate under question its DEFAULT controller and hand over a
+  -- permanent Control Magic had already taken; Pawl.AuraSpec's "CR 613.8a/613.8b
+  -- a permanent already stolen from the enchanted player is not handed over
+  -- again" proves it does not. The reverse dependency is what is absent: an
+  -- attachment grant (CR 303.4m) changes who controls a candidate here, while
+  -- nothing this effect does changes whose attachment that grant reads.
+  --
+  -- Dropping the source's own grants is also the loop escape, at the granularity
+  -- the loop actually has: the nested read runs on a STRICTLY shorter grant
+  -- list, so the recursion is well founded even with the visited set reset. Two
+  -- Yokes, each enchanting the other's controller, terminate by that peeling
+  -- rather than by CR 613.8b's dependency-loop clause, which would apply them in
+  -- timestamp order (#946). The fold's STORED half cannot reach this arm at all:
+  -- the one producer of a Modification.SetController writes an
+  -- Affected.TheseObjects set (Pawl.Engine.Resolve.Effect) and no card may
+  -- author one (#199), so no stored effect keeps the list from shrinking.
   --
   -- The battlefield bound is the arm's own, and it is what answers CR 702.26b
   -- for a phased-out permanent, which Pawl.Engine.Phasing.phaseOut removes from
@@ -1630,9 +1653,10 @@ controlNames grants visited gs source a = case a of
   Affected.AttachedPlayerControls f -> case enchantedPlayerOf source gs of
     Nothing -> Set.empty
     Just pid ->
-      Set.filter
-        (\oid -> controllerOfGiven grants visited oid gs == Just pid && matchesLeanly grants visited gs source f oid)
-        (GameState.battlefield gs)
+      let others = filter (\g -> cgSource g /= source) grants
+       in Set.filter
+            (\oid -> controllerOfGiven others Set.empty oid gs == Just pid && matchesLeanly grants visited gs source f oid)
+            (GameState.battlefield gs)
 
 -- Does `oid` match a layer-2 affected set's Filter, read at the copiable values
 -- controlNames explains and with CR 109.5's "you" bound to the SOURCE's
@@ -1654,7 +1678,13 @@ controlNames grants visited gs source a = case a of
 -- The recursion this opens -- each candidate whose controller is forced
 -- re-enters the fold, which walks the battlefield again -- is already reached by
 -- controlNames' AttachedPlayerControls arm, which asks every battlefield
--- candidate's controller outside this function.
+-- candidate's controller outside this function. That arm escapes the loop by
+-- shortening the GRANT list instead, which is why it can see an earlier control
+-- effect on the candidate under question and this function cannot: here the
+-- collapse to the object's owner is all that stands between a control-dependent
+-- conjunct and the fold that is asking. A filter that had to see CR 613.8b's
+-- ordering would need the same treatment; the card that would ask for it is the
+-- #197 shape named above, which the pool does not have.
 matchesLeanly :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesLeanly grants visited gs source f oid =
   Filter.matches
