@@ -3331,9 +3331,10 @@ yurlokSpec s registry = Spec.describe s "Yurlok of Scorch Thrash" $ do
         board = g4 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
         castByAlice = S.runPure (tapsYurlok yurlokId forestId) board (S.cast S.alice devilId)
         after = S.runPure (tapsYurlok yurlokId forestId) castByAlice (S.cast S.bob blastId)
-    -- CR 108.4 off the stack objects rather than the two hand ids: CR 601.2a
-    -- moves the card and pawl mints the spell its own object, so who CONTROLS
-    -- what is on the stack is the question, and it is the one the rule asks.
+    -- CR 112.2 off the stack objects rather than the two hand ids: CR 601.2a
+    -- moves the card and pawl mints the spell its own object, so "the player who
+    -- put it on the stack" is the question, and paying for it is what put it
+    -- there.
     Spec.assertEqWith s "CR 106.4 bob pays for his own instant out of the {B}{R}{G} the Yurlok put in HIS pool while alice was paying for hers" (fmap (\oid -> Projection.controllerOf oid after) (GameState.stack after)) [Just S.bob, Just S.alice]
     Spec.assertEqWith s "CR 106.4 and carol, who spent none of hers, is still holding the same three" (poolTypes S.carol after) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
 

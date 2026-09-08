@@ -396,6 +396,10 @@ manaSuppliesGiven capacity pcs pid oid gs =
           -- payer among the rest, so its share is the whole yield; a route
           -- naming an opponent alone supplies nothing.
           --
+          -- `pid` stands in for the CONTROLLER recipientsOf resolves against,
+          -- and is one: manaSourcesGiven offers only what the asking player
+          -- controls, so every oid that reaches here is theirs (CR 110.2).
+          --
           -- Still a supply of NO units rather than no supply at all: dropping
           -- the triple would take the source off payableResolutionsGiven's
           -- `sequenceA` and with it every board, where an empty one is just a

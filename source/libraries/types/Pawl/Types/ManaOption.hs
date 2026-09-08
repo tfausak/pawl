@@ -67,11 +67,10 @@ data ManaOption = MkManaOption
     --
     -- A Map and not a list of pairs, so two additions naming one reference
     -- collapse into one entry and Eq on the option stays the question "does this
-    -- put the same mana in the same pools": Shizuko, Caller of Autumn spells
+    -- put the same mana in the same pools" -- Shizuko, Caller of Autumn spells
     -- {G}{G}{G} as three additions where another printing would write one of
-    -- count 3, and those are one option. Printed order survives WITHIN a
-    -- recipient's units, which is the only order CR 106.4 can observe -- two
-    -- pools have no order between them.
+    -- count 3. Printed order survives WITHIN a recipient's units, which is the
+    -- only order CR 106.4 can observe: two pools have no order between them.
     yield :: Map.Map PlayerRef.PlayerRef Mana.Mana,
     -- | CR 405.6c: what else this activation does -- everything the chosen mode
     -- says that is not a mana production. Ancient Tomb's "This land deals 2
