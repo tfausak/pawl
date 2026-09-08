@@ -440,9 +440,9 @@ extractPower s registry = Spec.describe s "Extract Power" $ do
           (Set.fromList [S.alice, S.bob])
       Nothing -> Spec.assertFailure s "Synthetic Blind Reclamation should print one target slot"
 
--- alice casts Extract Power off six Islands. Each library is stocked with a
--- DIFFERENT card so the two exiled cards are told apart by owner, and with a
--- second card beneath so neither library empties (CR 104.3c).
+-- alice casts Extract Power off six Islands. Each library's top card is a
+-- DIFFERENT one, so a failure names which seat's card came out where, and each
+-- holds a second card beneath it so neither library empties (CR 104.3c).
 castExtractPower :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 castExtractPower s registry = do
   power <- S.printingOf s registry "Extract Power"
