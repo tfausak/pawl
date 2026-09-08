@@ -134,7 +134,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.AddLandSubtype Subtype.Swamp)
       " {\"type\":\"AddLandSubtype\",\"value\":{\"type\":\"Swamp\"}} "
-  -- layer 4, CR 205.1a/205.1b set (Turn to Frog -> Frog).
+  -- layer 4, CR 205.1a set (Turn to Frog -> Frog).
   Spec.it s "SetCreatureSubtype" $
     Common.assertCodec
       s
@@ -155,6 +155,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.AddEveryCreatureSubtype
       " {\"type\":\"AddEveryCreatureSubtype\"} "
+  -- layer 4, CR 205.1a removal over the whole of CR 205.3m (Nameless Inversion).
+  Spec.it s "LoseEveryCreatureSubtype" $
+    Common.assertCodec
+      s
+      codec
+      Modification.LoseEveryCreatureSubtype
+      " {\"type\":\"LoseEveryCreatureSubtype\"} "
   -- layer 4, CR 205.1b add outside the land and creature families (Ygra, Eater
   -- of All). A different subtype from every arm above, so a codec that crossed
   -- this arm with one of them cannot pass both.
