@@ -1704,11 +1704,11 @@ copyOnStackOf source = case source of
   -- reading pawl can observe; Pawl.PreparationSpec's "CR 722.3d Twincast copies
   -- the cast Jump and the copy is a Jump of its own" is what proves it.
   Source.OfCardCopy pid -> Just (Source.OfSpellCopy pid, StackObjectKind.Spell)
-  Source.OfAbility a -> Just (Source.OfAbility a, StackObjectKind.Ability)
-  Source.OfTrigger t -> Just (Source.OfTrigger t, StackObjectKind.Ability)
+  Source.OfAbility a -> Just (Source.OfAbility a, StackObjectKind.ActivatedAbility)
+  Source.OfTrigger t -> Just (Source.OfTrigger t, StackObjectKind.TriggeredAbility)
   -- CR 725.2's sourceless triggered ability is a triggered ability all the same,
   -- and Pawl.Engine.Target.abilityRecipients offers it, so it copies like one.
-  Source.OfInherentTrigger t -> Just (Source.OfInherentTrigger t, StackObjectKind.Ability)
+  Source.OfInherentTrigger t -> Just (Source.OfInherentTrigger t, StackObjectKind.TriggeredAbility)
   -- CR 707.10 copies what is ON THE STACK, and none of these three ever is: a
   -- melded permanent and a token are put onto the battlefield (CR 701.42a, CR
   -- 111.1) and an emblem into the command zone (CR 114.1). CR 202.3c's copy of a
@@ -4585,7 +4585,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- read it back off.
                 stampCopiable = case kind of
                   StackObjectKind.Spell -> Binding.setCopy (Event.copiedSnapshot original gs)
-                  StackObjectKind.Ability -> id
+                  StackObjectKind.ActivatedAbility -> id
+                  StackObjectKind.TriggeredAbility -> id
                 copy =
                   obj
                     { Object.source = copySource,

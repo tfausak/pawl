@@ -307,6 +307,7 @@ import qualified Pawl.Codec.PermanentCandidateSpec
 import qualified Pawl.Codec.PermanentSacrificedSpec
 import qualified Pawl.Codec.PermanentTappedForManaSpec
 import qualified Pawl.Codec.PermanentWasSacrificedSpec
+import qualified Pawl.Codec.PermanentsBecomeTargetedSpec
 import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
@@ -923,6 +924,7 @@ spec s registry = do
   Pawl.Codec.PermanentSacrificedSpec.spec s
   Pawl.Codec.PermanentTappedForManaSpec.spec s
   Pawl.Codec.PermanentWasSacrificedSpec.spec s
+  Pawl.Codec.PermanentsBecomeTargetedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
   Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s

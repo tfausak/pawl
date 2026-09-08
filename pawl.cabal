@@ -661,6 +661,8 @@ library codec
     Pawl.Codec.PermanentCandidateSpec
     Pawl.Codec.PermanentSacrificed
     Pawl.Codec.PermanentSacrificedSpec
+    Pawl.Codec.PermanentsBecomeTargeted
+    Pawl.Codec.PermanentsBecomeTargetedSpec
     Pawl.Codec.PermanentTappedForMana
     Pawl.Codec.PermanentTappedForManaSpec
     Pawl.Codec.PermanentWasSacrificed
@@ -1793,6 +1795,7 @@ library types
     Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.PermanentCandidate
     Pawl.Types.PermanentSacrificed
+    Pawl.Types.PermanentsBecomeTargeted
     Pawl.Types.PermanentTappedForMana
     Pawl.Types.PermanentWasSacrificed
     Pawl.Types.Phase

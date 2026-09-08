@@ -409,8 +409,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject (ObjectId.MkObjectId 9)) (ObjectId.MkObjectId 10) StackObjectKind.Ability (PlayerId.MkPlayerId 2)))
-      " {\"type\":\"BecameTarget\",\"value\":{\"targeted\":{\"type\":\"ToObject\",\"value\":9},\"source\":10,\"kind\":{\"type\":\"Ability\"},\"controller\":2}} "
+      (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject (ObjectId.MkObjectId 9)) (ObjectId.MkObjectId 10) StackObjectKind.ActivatedAbility (PlayerId.MkPlayerId 2)))
+      " {\"type\":\"BecameTarget\",\"value\":{\"targeted\":{\"type\":\"ToObject\",\"value\":9},\"source\":10,\"kind\":{\"type\":\"ActivatedAbility\"},\"controller\":2}} "
   -- CR 115.1's other kind of target, and CR 112.1's other kind of stack object:
   -- Dormant Gomazoa's event, which the object case above cannot stand in for
   -- since both fields differ.
