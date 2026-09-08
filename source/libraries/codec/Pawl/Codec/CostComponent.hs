@@ -61,5 +61,6 @@ codec keywordCodec =
       Arm.nullary "ExileThis" CostComponent.ExileThis,
       Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard (\x -> case x of CostComponent.ExileCardsFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard (\x -> case x of CostComponent.ExileTopFromGraveyard y -> Just y; _ -> Nothing),
+      Arm.payload "ExileCardFromHand" (Filter.codec keywordCodec) CostComponent.ExileCardFromHand (\x -> case x of CostComponent.ExileCardFromHand y -> Just y; _ -> Nothing),
       Arm.payload "MillCards" Common.natural CostComponent.MillCards (\x -> case x of CostComponent.MillCards y -> Just y; _ -> Nothing)
     ]
