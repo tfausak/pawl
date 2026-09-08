@@ -28,7 +28,9 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
+import Pawl.PreventionSpec (newestNamed)
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -50,6 +52,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -2630,6 +2633,214 @@ stifleBoard island stifle sorcerer lands stifles = case soleActivatedAbility sor
         activated = S.runPure atAlice (withStifles {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob srcId ability)
      in Just (stifleIds, srcId, activated)
 
+-- CR 612.1 reaching a word inside a COUNTER KIND. CR 122.1b's keyword counter
+-- carries a keyword, and "hexproof from [quality]" (CR 702.11d) is the one
+-- variant rule 122.1b's enumeration admits that also holds a word CR 612.2 can
+-- swap: landwalk and protection are not on that enumeration and are not variants
+-- of anything on it, so the islandwalk counter #1840's body drafted could not
+-- exist.
+counterKindWard :: Subtype.Subtype -> CounterKind.CounterKind Keyword.Keyword
+counterKindWard subtype = CounterKind.Keyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype subtype)))
+
+-- May bob's Tarfire target `oid`? 'Nothing' when the card declares no target
+-- slot at all, so a False below is never a spell that could target nothing.
+--
+-- Tarfire ({R} Kindred Instant -- Goblin, "Tarfire deals 2 damage to any
+-- target", oracle checked against Scryfall 2026-09-08) is the READER these three
+-- groups need, and the only printing that can be one: CR 702.11d stops
+-- "[quality] spells your opponents control", so telling a hexproof from Goblins
+-- counter from a hexproof from Zombies one needs a spell that is a Goblin and
+-- not a Zombie. Wings of Velis Vel, the pool's other Kindred instant, has
+-- changeling and so is both at once, and no Goblin or Zombie permanent in
+-- data/cards/ carries a targeted activated ability.
+--
+-- bob casts it, so CR 702.11d's "your opponents control" is satisfied against
+-- alice's creature rather than being the reason for a negative.
+tarfireReaches :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> ObjectId.ObjectId -> GameState.GameState -> m (Maybe Bool)
+tarfireReaches s registry oid gs = do
+  tarfire <- S.printingOf s registry "Tarfire"
+  pure $ case S.spellTargetSlot tarfire of
+    Nothing -> Nothing
+    Just theSlot ->
+      let (spellId, onStack) = S.spellOnStack tarfire S.bob gs
+       in Just (Set.member (Recipient.ToCreature oid) (Target.legalRecipients (Just S.bob) spellId theSlot onStack))
+
+-- Filters every offered target set down to `oid`, whatever recipient tag the
+-- pool offered it under -- never a hand-built recipient, which CR 608.2b's
+-- re-read at resolution would drop with no error.
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Synthetic Warded Homecoming {2}{W} Sorcery, whole text: "Return target
+-- creature card from your graveyard to the battlefield. It enters with a
+-- hexproof from Zombies counter on it." SYNTHETIC because no printing puts a
+-- counter naming a swappable word on an entering permanent: Scryfall
+-- @o:/hexproof from [a-z]+ counter/@ and @o:"hexproof from" o:counter@,
+-- 2026-09-08, return nothing and Veil of Summer respectively, and Veil names no
+-- counter. Nothing in the CR forbids the card -- rule 122.1b admits hexproof's
+-- variants as counters and rule 122.6 covers an object given counters as it enters, which
+-- Perennation already does with a plain hexproof counter.
+--
+-- The rider's KEY is what this drives: Projection's rewriteEntryRiders, which
+-- Effect.MoveToZone, Effect.Create and Effect.CreateCopy all route through.
+--
+-- Synthetic Twinward Homecoming is the same card with a second rider -- one
+-- hexproof from Zombies counter and TWO hexproof from Skeletons ones -- for the
+-- collision half of the same rewrite. THE COUNTS ARE UNEQUAL, so an arbitrary
+-- survivor is caught whichever row it kept: the merged tally is three and
+-- neither printed count is. Pawl.EntryReplacementSpec's Synthetic Warding Beacon
+-- is the same case over rewriteWithCounters.
+--
+-- Three Plains and an Island: {2}{W} and the Evolution's {U}, so neither payment
+-- can strand the other.
+homecomingChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (Maybe ObjectId.ObjectId, GameState.GameState)
+homecomingChain s registry cardName swap = do
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  homecoming <- S.printingOf s registry cardName
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let g1 = S.landsFor island S.alice 1 (S.landsInPlay plains 3)
+      (pikerCardId, g2) = S.addGraveyardCard piker S.alice g1
+      (homecomingId, g3) = S.addHandCard homecoming S.alice g2
+      (evolutionId, g4) = S.addHandCard artificialEvolution S.alice g3
+      onStack = S.runPure (aimAtObject pikerCardId) g4 (S.cast S.alice homecomingId)
+      after = resolveHacked swap onStack evolutionId
+  pure (newestNamed (S.printingName piker) after, after)
+
+-- Synthetic Warding Sigil {W} Instant, whole text: "Put a hexproof from Zombies
+-- counter on target creature." Effect.PutCounters' kind. Synthetic for Warded
+-- Homecoming's reason and by the same queries.
+--
+-- A Plains and an Island: {W} and the Evolution's {U}.
+wardingSigilChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, GameState.GameState)
+wardingSigilChain s registry swap = do
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  sigil <- S.printingOf s registry "Synthetic Warding Sigil"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let g1 = S.landsFor island S.alice 1 (S.landsInPlay plains 1)
+      (pikerId, g2) = S.addPermanent piker S.alice g1
+      (sigilId, g3) = S.addHandCard sigil S.alice g2
+      (evolutionId, g4) = S.addHandCard artificialEvolution S.alice g3
+      onStack = S.runPure (aimAtCreature pikerId) g4 (S.cast S.alice sigilId)
+  pure (pikerId, resolveHacked swap onStack evolutionId)
+
+-- Synthetic Erode the Warding {U} Instant, whole text: "Remove a hexproof from
+-- Zombies counter from target creature." Effect.RemoveCounters' kind. Synthetic
+-- for Warded Homecoming's reason and by the same queries; #1840's body drafted
+-- an islandwalk counter instead, which CR 122.1b's enumeration does not admit.
+--
+-- The Piker already bears a hexproof from GOBLINS counter, so the hacked spell
+-- removes it and the unhacked one names a kind the creature does not have. The
+-- two boards differ in the swap alone.
+--
+-- Two Islands: {U} and the Evolution's {U}.
+erodeTheWardingChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m (ObjectId.ObjectId, GameState.GameState)
+erodeTheWardingChain s registry swap = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  erode <- S.printingOf s registry "Synthetic Erode the Warding"
+  artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+  let (pikerId, g1) = S.addPermanent piker S.alice (S.landsInPlay island 2)
+      g2 = S.addCounter (counterKindWard Subtype.Goblin) 1 pikerId g1
+      (erodeId, g3) = S.addHandCard erode S.alice g2
+      (evolutionId, g4) = S.addHandCard artificialEvolution S.alice g3
+      onStack = S.runPure (aimAtCreature pikerId) g4 (S.cast S.alice erodeId)
+  pure (pikerId, resolveHacked swap onStack evolutionId)
+
+-- Optionally cast the Artificial Evolution in `evolutionId` at whatever is on
+-- top of the stack, swapping Zombie for Goblin, and resolve it; then resolve the
+-- spell underneath either way.
+resolveHacked :: Maybe (Subtype.Subtype, Subtype.Subtype) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveHacked swap onStack evolutionId =
+  let spellId = case GameState.stack onStack of
+        top : _ -> top
+        [] -> ObjectId.MkObjectId 999
+      evolved = case swap of
+        Nothing -> onStack
+        Just (from, to) ->
+          S.runPure (evolveAt spellId from to) onStack $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+   in S.runPure S.identityAnswer evolved Stack.resolveTop
+
+-- CR 612.1 through the three opcodes that name a COUNTER KIND, one group each.
+-- Every case reads the kind at GAMEPLAY level first -- whether bob's Goblin
+-- Tarfire may target the creature (CR 702.11d) -- and only then off the counter
+-- map, so a proxy cannot absorb a mutation ahead of the behaviour.
+counterKindTextChangeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+counterKindTextChangeSpec s registry = Spec.describe s "CounterKindTextChange" $ do
+  -- The control: unhacked, the rider keeps its printed Zombies, which is no
+  -- protection at all from a Goblin spell.
+  Spec.it s "CR 122.6 unhacked, the returned creature enters with the printed hexproof from Zombies counter" $ do
+    (entered, after) <- homecomingChain s registry "Synthetic Warded Homecoming" Nothing
+    case entered of
+      Nothing -> Spec.assertFailure s "the Goblin Piker did not return to the battlefield"
+      Just pikerId -> do
+        reaches <- tarfireReaches s registry pikerId after
+        Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire may target it" reaches (Just True)
+        Spec.assertEqWith s "one hexproof from Zombies counter" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 1
+        Spec.assertEqWith s "and no hexproof from Goblins counter" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 0
+  -- The rule. Same board, one Artificial Evolution on the Homecoming SPELL.
+  Spec.it s "CR 612.1 hacked Zombie -> Goblin, the entry rider's counter is a hexproof from Goblins counter" $ do
+    (entered, after) <- homecomingChain s registry "Synthetic Warded Homecoming" (Just (Subtype.Zombie, Subtype.Goblin))
+    case entered of
+      Nothing -> Spec.assertFailure s "the Goblin Piker did not return to the battlefield"
+      Just pikerId -> do
+        reaches <- tarfireReaches s registry pikerId after
+        Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire may NOT target it" reaches (Just False)
+        Spec.assertEqWith s "one hexproof from Goblins counter" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 1
+        Spec.assertEqWith s "and none of the printed hexproof from Zombies" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 0
+  -- CR 122.1's last sentence -- "counters with the same name or description are
+  -- interchangeable" -- through the same rewrite: a swap that collides two rider
+  -- keys must MERGE their tallies rather than keep an arbitrary survivor. Read
+  -- off the counter map, which is what the merge IS; the targeting reader above
+  -- cannot tell three counters of a kind from one.
+  Spec.it s "CR 122.1 hacked Zombie -> Skeleton, the two colliding riders merge into one tally of three" $ do
+    (entered, after) <- homecomingChain s registry "Synthetic Twinward Homecoming" (Just (Subtype.Zombie, Subtype.Skeleton))
+    case entered of
+      Nothing -> Spec.assertFailure s "the Goblin Piker did not return to the battlefield"
+      Just pikerId -> do
+        Spec.assertEqWith s "all three counters on hexproof from Skeletons" (S.counterOf (counterKindWard Subtype.Skeleton) pikerId after) 3
+        Spec.assertEqWith s "and no hexproof from Zombies counter left" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 0
+  -- The control: unhacked, the two qualities stay two kinds at their printed
+  -- counts, so the merge above is the swap's doing and not the card's.
+  Spec.it s "CR 122.6 unhacked, the two riders stay two kinds at one and two" $ do
+    (entered, after) <- homecomingChain s registry "Synthetic Twinward Homecoming" Nothing
+    case entered of
+      Nothing -> Spec.assertFailure s "the Goblin Piker did not return to the battlefield"
+      Just pikerId -> do
+        Spec.assertEqWith s "one hexproof from Zombies counter" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 1
+        Spec.assertEqWith s "two hexproof from Skeletons counters" (S.counterOf (counterKindWard Subtype.Skeleton) pikerId after) 2
+  Spec.it s "CR 122.1b unhacked, PutCounters puts the printed hexproof from Zombies counter on" $ do
+    (pikerId, after) <- wardingSigilChain s registry Nothing
+    reaches <- tarfireReaches s registry pikerId after
+    Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire may target it" reaches (Just True)
+    Spec.assertEqWith s "one hexproof from Zombies counter" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 1
+    Spec.assertEqWith s "and no hexproof from Goblins counter" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 0
+  Spec.it s "CR 612.1 hacked Zombie -> Goblin, PutCounters puts a hexproof from Goblins counter on" $ do
+    (pikerId, after) <- wardingSigilChain s registry (Just (Subtype.Zombie, Subtype.Goblin))
+    reaches <- tarfireReaches s registry pikerId after
+    Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire may NOT target it" reaches (Just False)
+    Spec.assertEqWith s "one hexproof from Goblins counter" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 1
+    Spec.assertEqWith s "and none of the printed hexproof from Zombies" (S.counterOf (counterKindWard Subtype.Zombie) pikerId after) 0
+  -- RemoveCounters, whose two boards differ in the swap alone: the Piker's
+  -- counter is a hexproof from Goblins one on both.
+  Spec.it s "CR 122.1b unhacked, RemoveCounters names a kind the creature does not have and takes nothing" $ do
+    (pikerId, after) <- erodeTheWardingChain s registry Nothing
+    reaches <- tarfireReaches s registry pikerId after
+    Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire still may NOT target it" reaches (Just False)
+    Spec.assertEqWith s "the hexproof from Goblins counter is still there" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 1
+  Spec.it s "CR 612.1 hacked Zombie -> Goblin, RemoveCounters takes the hexproof from Goblins counter off" $ do
+    (pikerId, after) <- erodeTheWardingChain s registry (Just (Subtype.Zombie, Subtype.Goblin))
+    reaches <- tarfireReaches s registry pikerId after
+    Spec.assertEqWith s "CR 702.11d bob's Goblin Tarfire may target it once more" reaches (Just True)
+    Spec.assertEqWith s "no hexproof from Goblins counter left" (S.counterOf (counterKindWard Subtype.Goblin) pikerId after) 0
+
 -- CR 701.6a covers "a spell or ability", and Stifle ({U} Instant, "Counter
 -- target activated or triggered ability. (Mana abilities can't be targeted.)")
 -- is the first card in the pool that reaches the second half. Cancel proved the
@@ -3155,6 +3366,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   magicalHackTimingSpec s registry
   magicalHackDurationSpec s registry
   artificialEvolutionSpec s registry
+  counterKindTextChangeSpec s registry
   stifleSpec s registry
   squelchSpec s registry
   weighTheTriggerSpec s registry
