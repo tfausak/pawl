@@ -3691,6 +3691,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.AttackedThisTurn -> []
   Filter.Type.MilledThisTurn -> []
   Filter.Type.DealtDamageThisTurn -> []
+  Filter.Type.ControlledSinceTurnBegan -> []
   -- DESCENT, for ControlsMoreThanYou's reason.
   Filter.Type.AttachedTo f -> filterSlotsReadSingly f
   -- DESCENT, for the atom above's reason.

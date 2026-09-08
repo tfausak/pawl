@@ -2044,9 +2044,17 @@ battlefieldMatching :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId 
 battlefieldMatching legal resolving controller source gs filter_ =
   let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
       viewOf = Projection.viewsOf gs
+      -- CR 603.2's player slots baked in, exactly as Pawl.Engine.Target.bakeSlots
+      -- does it for a MODE's target filter and off the same map: Filter.matches
+      -- answers Filter.ControlledByBound False wherever it reaches one, so an
+      -- unbaked "that player controls" sweeps nobody rather than sweeping wrong.
+      -- Total War's "destroy all untapped non-Wall creatures that player
+      -- controls" is the phrase, and Pawl.CardTriggerSpec's Total War group is
+      -- what proves it.
+      baked = Filter.bakeBound (Binding.playerSlots (slotBindings resolving gs)) filter_
       matching =
         filter
-          (\oid -> Filter.matches context (viewOf oid) filter_)
+          (\oid -> Filter.matches context (viewOf oid) baked)
           (Set.toList (GameState.battlefield gs))
       order = Game.apnapOrder gs
       last_ = length order

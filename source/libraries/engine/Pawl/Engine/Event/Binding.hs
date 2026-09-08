@@ -415,6 +415,12 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- is the only thing it carries.
   (TriggerCondition.PlayerAttacks _, GameEvent.AttackersDeclared attacker) ->
     Binding.setAttackingPlayer attacker Map.empty
+  -- CR 508.3c's subject, the same slot off the same event as the arm above: the
+  -- Filter narrows WHICH attackers made the condition fire and says nothing about
+  -- who declared them, so "that player" still needs the seat. Total War reads it
+  -- twice over, for "that player controls" and for the creatures it spares.
+  (TriggerCondition.PlayerAttacksWith {}, GameEvent.AttackersDeclared attacker) ->
+    Binding.setAttackingPlayer attacker Map.empty
   -- CR 508.3e's TWO subjects, both off the one event. Whom the declaration was
   -- aimed at goes under the reserved "that player" slot, which is what the
   -- phrase means in Seifer, Balamb Rival's "goad target creature that player
@@ -1147,11 +1153,13 @@ eventBindingSlots cond = case cond of
   -- Unconditional, as this classification has to be: every
   -- GameEvent.AttackersDeclared carries a PlayerId.
   TriggerCondition.PlayerAttacks _ -> Set.singleton Binding.attackingPlayer
-  -- The creatures are not bound, for the arm above's reason: rule 508.3c's
-  -- Filter names a SET of them. Not implemented: the declaring player, which the
-  -- same GameEvent.AttackersDeclared carries and the arm above stamps as
-  -- Binding.attackingPlayer -- Total War's "that player" reads it (#2937).
-  TriggerCondition.PlayerAttacksWith {} -> Set.empty
+  -- The DECLARING player and not the creatures, for the arm above's reason: rule
+  -- 508.3c's Filter names a SET of them, where the player it makes its subject is
+  -- one seat. Total War's "that player controls" is the phrase.
+  --
+  -- Unconditional, as this classification has to be: every
+  -- GameEvent.AttackersDeclared carries a PlayerId.
+  TriggerCondition.PlayerAttacksWith {} -> Set.singleton Binding.attackingPlayer
   -- BOTH of rule 508.3e's players: the attacked one under the reserved "that
   -- player" slot, which Seifer, Balamb Rival's "that player controls" reads, and
   -- the attacking one under the slot the PlayerAttacks arm above uses, which

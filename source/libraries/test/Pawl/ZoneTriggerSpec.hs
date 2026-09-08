@@ -2075,14 +2075,14 @@ representativeEvents cond =
         -- Nothing is bound off it, which is the floor eventBindingSlots claims.
         TriggerCondition.SelfIsAttacked -> one (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked S.bob (AttackTarget.OfPlaneswalker departed)))
         -- CR 508.3d's third arity: the once-per-DECLARATION event, naming the
-        -- player who declared. Nothing is bound off it -- rule 508.3d names a set
-        -- of creatures rather than one -- so this pins an EMPTY floor, which is
-        -- the pin the two arms above would break if either grew a binding here.
-        -- carol serves every relation, the floor being empty either way.
+        -- player who declared, which is the ONLY thing it carries -- rule 508.3d
+        -- names a set of creatures rather than one, so the floor this pins is
+        -- Binding.attackingPlayer alone. carol serves every relation, the floor
+        -- being the same either way.
         TriggerCondition.PlayerAttacks _ -> one (GameEvent.AttackersDeclared S.carol)
-        -- The same declaration event once more, and the same EMPTY floor: rule
-        -- 508.3c's Filter narrows the creatures rather than naming one, so there
-        -- is nothing to bind here either.
+        -- The same declaration event once more, and the same floor: rule 508.3c's
+        -- Filter narrows the creatures rather than naming one, so the declaring
+        -- player is all there is to bind here too.
         TriggerCondition.PlayerAttacksWith {} -> one (GameEvent.AttackersDeclared S.carol)
         -- The GROUPED event once more, and the same PLAYER slot the arm three
         -- above pins -- CR 508.3e's ATTACKED player, which is bob here and not
