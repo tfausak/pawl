@@ -536,7 +536,7 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
             (pantherId, g1) = S.addPermanent panther S.alice lands
             (pikerId, g2) = S.addPermanent piker S.alice g1
             (_, g3) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice g2))
-            seated = foldl (\gs (p, pid) -> snd (S.addPermanent p pid gs)) g3 extras
+            seated = List.foldl' (\gs (p, pid) -> snd (S.addPermanent p pid gs)) g3 extras
             ready = seated {GameState.priority = Just S.alice}
         pure $ do
           landId <- newestNamed mountainName ready
@@ -673,7 +673,7 @@ everyKindSpec s registry = Spec.describe s "CR 122.5 moving every kind of counte
         let lands = S.landsFor swamp S.alice 1 (S.landsInPlay island 2)
             (giverId, g1) = S.addPermanent wall S.bob lands
             (takerId, g2) = S.addPermanent wall S.alice g1
-            seated = foldl (\gs (p, pid) -> snd (S.addPermanent p pid gs)) g2 seats
+            seated = List.foldl' (\gs (p, pid) -> snd (S.addPermanent p pid gs)) g2 seats
             (staged, spellId) = S.handOne fateTransfer seated
         pure (giverId, takerId, spellId, counters giverId staged)
       -- Cast and resolve, the whole spell.
@@ -952,7 +952,7 @@ namedAnyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of c
         let (bandarId, g1) = S.addPermanent bandar S.alice (S.landsInPlay forest 1)
             (takerId, g2) = S.addPermanent wall S.alice g1
             (_, g3) = S.addPermanent wall S.bob g2
-            seated = foldl (\gs p -> snd (S.addPermanent p S.alice gs)) g3 seats
+            seated = List.foldl' (\gs p -> snd (S.addPermanent p S.alice gs)) g3 seats
         pure (bandarId, takerId, counters bandarId seated)
       -- alice's upkeep begins, the printed trigger goes on the stack and resolves
       -- -- Pawl.CounterspellSpec's bitterblossomChain, with the prompt count
@@ -1224,7 +1224,7 @@ groupSourceSpec s registry = Spec.describe s "CR 122.5 moving counters off a gro
             (bobWall, g2) = S.addPermanent wall S.bob g1
             (bobPiker, g3) = S.addPermanent piker S.bob g2
             (aliceIsland, g4) = S.addPermanent island S.alice g3
-            seated = foldl (\gs p -> snd (S.addPermanent p S.alice gs)) g4 seats
+            seated = List.foldl' (\gs p -> snd (S.addPermanent p S.alice gs)) g4 seats
             (cannibalId, g5) = S.entersWithTrigger cannibal S.alice (stock aliceWall bobWall bobPiker aliceIsland seated)
             -- The card's own entry rider, supplied by hand: S.addPermanent places
             -- a permanent without running CR 614.1c's replacement, and a 0/0
@@ -1378,7 +1378,7 @@ upToOneSpec s registry = Spec.describe s "CR 122.5 moving up to one counter off 
             (bobWall, g3) = S.addPermanent wall S.bob g2
             (carolPiker, g4) = S.addPermanent piker S.carol g3
             (carolWall, g5) = S.addPermanent wall S.carol g4
-            seated = foldl (\gs pr -> snd (S.addPermanent pr S.alice gs)) g5 seats
+            seated = List.foldl' (\gs pr -> snd (S.addPermanent pr S.alice gs)) g5 seats
             (held, g6) = S.addHandCard takesies S.alice seated
             stocked =
               S.addCounter CounterKind.Shield 9 destination

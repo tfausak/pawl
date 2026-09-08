@@ -29,6 +29,7 @@
 -- toughness is greater.
 module Pawl.StationSpec where
 
+import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
@@ -80,7 +81,7 @@ board :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [Object
 board frigate crew =
   let (frigateId, gs0) = S.addPermanent frigate S.alice S.threePlayerGame
       add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
-      (crewIds, gs1) = foldl add ([], gs0) crew
+      (crewIds, gs1) = List.foldl' add ([], gs0) crew
    in ( frigateId,
         crewIds,
         gs1

@@ -1756,7 +1756,7 @@ jaradDrainBoard jarad swamp forest victim extras =
   let lands = S.landsFor forest S.alice 2 (S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers))
       (jaradId, withJarad) = S.addPermanent jarad S.alice lands
       (preyId, withPrey) = S.addPermanent victim S.alice withJarad
-   in (jaradId, preyId, foldl (\g printing -> snd (S.addPermanent printing S.alice g)) withPrey extras)
+   in (jaradId, preyId, List.foldl' (\g printing -> snd (S.addPermanent printing S.alice g)) withPrey extras)
 
 -- CR 602.2b pays an activation cost at CR 601.2h, so by the time Jarad's drain
 -- resolves the creature it sacrificed is a card in a graveyard and CR 608.2h's
@@ -2689,7 +2689,7 @@ morcantBoard :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, 
 morcantBoard morcant elves =
   let (morcantId, gs0) = S.addPermanent morcant S.alice (Setup.emptyGame S.bothPlayers)
       add (ids, g) p = let (oid, g1) = S.addPermanent p S.alice g in (ids <> [oid], g1)
-      (elfIds, gs1) = foldl add ([], gs0) elves
+      (elfIds, gs1) = List.foldl' add ([], gs0) elves
    in ( morcantId,
         elfIds,
         gs1

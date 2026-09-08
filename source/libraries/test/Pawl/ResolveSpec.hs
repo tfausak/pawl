@@ -3295,7 +3295,7 @@ predictBoard s registry top = do
   let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
       mine printing gs = snd (S.addLibraryCard printing S.alice gs)
       g1 = foldr mine (S.landsInPlay island 2) [piker, piker, piker]
-      g2 = foldl (flip stock) g1 (reverse cards)
+      g2 = List.foldl' (flip stock) g1 (reverse cards)
    in pure (S.handOne predict g2)
 
 -- The cast and its one resolution, and nothing else: the narrowest path that
@@ -3328,7 +3328,7 @@ sphinxBoard s registry top = do
   -- Added last is on top, S.addLibraryCard's order and predictBoard's reason.
   let stock printing gs = snd (S.addLibraryCard printing S.bob gs)
       (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
-      g1 = foldl (flip stock) g0 [piker, piker, card]
+      g1 = List.foldl' (flip stock) g0 [piker, piker, card]
   pure (g1 {GameState.priority = Just S.alice}, Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)), sphinxId)
 
 -- One activation and resolution, the narrowest path that shows the comparison.
@@ -3363,7 +3363,7 @@ twiceSphinx s registry = do
       (sphinxId, g0) = S.addPermanent sphinx S.alice (Setup.emptyGame S.bothPlayers)
       -- Top first: Crucible of Worlds, then a Goblin Piker, then two more to
       -- keep bob off CR 104.3c and to keep the library assertion a count.
-      g1 = foldl (flip stock) g0 [piker, piker, piker, crucible]
+      g1 = List.foldl' (flip stock) g0 [piker, piker, piker, crucible]
       board = g1 {GameState.priority = Just S.alice}
   case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace sphinx)) of
     Nothing -> pure board

@@ -282,7 +282,7 @@ repeatedly f n x = if n <= 0 then x else repeatedly f (n - 1) (f x)
 -- clause.
 afterSkies :: CoinFace.CoinFace -> [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
 afterSkies called skyIds board =
-  S.settleSba (foldl (\g i -> S.runPure (flipAnswer CoinFace.Tails called) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
+  S.settleSba (List.foldl' (\g i -> S.runPure (flipAnswer CoinFace.Tails called) g (S.cast S.alice i >> Stack.resolveTop)) board skyIds)
 
 -- One Winter Sky won: 1 damage to each player and each creature, so both Pikers
 -- die, alice's extra creature and bob's Bird Maiden survive, and nobody draws.

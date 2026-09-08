@@ -7,6 +7,7 @@
 -- DamageDealtToThisTurn.
 module Pawl.ConditionSpec where
 
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -74,7 +75,7 @@ boardOf swamp n =
       step (ids, g) _ =
         let (oid, g2) = S.addPermanent swamp S.alice g
          in (ids <> [oid], g2)
-      (oids, gs) = foldl step ([], gs0) [1 .. n]
+      (oids, gs) = List.foldl' step ([], gs0) [1 .. n]
       table = fmap (\oid -> (oid, Set.empty, Set.singleton Subtype.Swamp, Just S.alice)) oids
    in (S.stubView table, gs)
 

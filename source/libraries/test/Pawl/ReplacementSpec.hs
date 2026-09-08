@@ -356,7 +356,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     swamp <- S.printingOf s registry "Swamp"
     uthdenTroll <- S.printingOf s registry "Uthden Troll"
     terror <- S.printingOf s registry "Terror"
-    let base = foldl (\gs p -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
+    let base = List.foldl' (\gs p -> snd (S.addPermanent p S.alice gs)) (Setup.emptyGame S.bothPlayers) [mountain, swamp, swamp]
         (troll, g1) = S.addPermanent uthdenTroll S.alice base
         -- {R}: Regenerate this creature -- the shield is really activated.
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)

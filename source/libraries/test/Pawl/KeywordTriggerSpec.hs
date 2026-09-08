@@ -65,7 +65,7 @@ poisonousSpec s registry =
   let -- Hang `n` Auras off `host`, each owned by alice. Attached directly rather
       -- than cast: the cast path is proved once, by the whole-card test below.
       hang printing n host gs =
-        foldl
+        List.foldl'
           (\g _ -> let (aura, g1) = S.addPermanent printing S.alice g in S.attach aura host g1)
           gs
           (replicate n ())
@@ -195,7 +195,7 @@ poisonousSpec s registry =
           case S.combatBoardOf [piker] [] of
             (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
             (gs0, attacker : _, _) -> do
-              let withSwamps = foldl (\g _ -> snd (S.addPermanent swamp S.alice g)) gs0 (replicate 4 ())
+              let withSwamps = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) gs0 (replicate 4 ())
                   (spellId, inHand) = S.addHandCard initiation S.alice withSwamps
                   cast = S.runPure S.aggressiveAnswer inHand {GameState.priority = Just S.alice} (S.cast S.alice spellId)
                   resolved = S.runPure S.aggressiveAnswer cast Stack.resolveTop

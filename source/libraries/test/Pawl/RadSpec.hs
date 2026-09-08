@@ -26,6 +26,7 @@
 -- up -- and casting the producer again would prove nothing new about that.
 module Pawl.RadSpec where
 
+import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
@@ -368,7 +369,7 @@ boardOf = foldr (\land gs -> snd (S.addPermanent land S.alice gs)) (Setup.emptyG
 -- The given printings in pid's library, FIRST ONE ON TOP -- S.addLibraryCard
 -- puts each new card at the front, so the list is laid down back to front.
 libraryTopped :: [Printing.Printing] -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
-libraryTopped printings pid gs = foldl (\g p -> snd (S.addLibraryCard p pid g)) gs (reverse printings)
+libraryTopped printings pid gs = List.foldl' (\g p -> snd (S.addLibraryCard p pid g)) gs (reverse printings)
 
 -- The board just after pid's precombat main phase began, settled for priority:
 -- the moment CR 603.4 has decided whether rule 728.1's ability is on the stack,
