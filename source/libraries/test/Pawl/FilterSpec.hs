@@ -75,6 +75,7 @@ blackCreature =
       Filter.declaredBlockerThisCombat = False,
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
+      Filter.controlledSinceTurnBegan = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
@@ -138,6 +139,7 @@ devoidBigCreature =
       Filter.declaredBlockerThisCombat = False,
       Filter.milledThisTurn = False,
       Filter.dealtDamageThisTurn = False,
+      Filter.controlledSinceTurnBegan = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
       Filter.attachedTo = Nothing,
@@ -1354,6 +1356,22 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "reads the same field for a player candidate" $ do
       Spec.assertBool s (Filter.matches self (aPlayer {Filter.dealtDamageThisTurn = True}) Filter.Type.DealtDamageThisTurn) "a damaged player"
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.DealtDamageThisTurn)) "and an undamaged one"
+
+  Spec.describe s "ControlledSinceTurnBegan" $ do
+    Spec.it s "matches a view whose controller settled it" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.controlledSinceTurnBegan = True}) Filter.Type.ControlledSinceTurnBegan) "settled"
+
+    Spec.it s "does not match one their control of began this turn" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ControlledSinceTurnBegan)) "not settled"
+
+    -- Not the look-back axis: CR 302.6's continuity is a present state read off
+    -- Object.sickness, where CR 608.2i's atoms fold the turn's event log.
+    Spec.it s "is not the same axis as AttackedThisTurn" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.ControlledSinceTurnBegan)) "attacked does not imply settled"
+
+    -- CR 302.6's subject is a creature a player CONTROLS, and a player is not one.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.ControlledSinceTurnBegan)) "player"
 
   Spec.describe s "AttachedTo" $ do
     -- Miracle Worker's "target Aura attached to a creature you control", which is

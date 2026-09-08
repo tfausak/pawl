@@ -63,6 +63,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
@@ -743,6 +744,77 @@ militaryIntelligenceSpec s registry =
               Spec.assertEqWith s "and alice's library is exactly as it was stocked" (libraryOf after) ids
               Spec.assertEqWith s "CR 508.1b and bob's two creatures really were declared attacking alice" (sentAt after) (Map.fromList [(theirPikerId, AttackTarget.OfPlayer S.alice), (theirMaidenId, AttackTarget.OfPlayer S.alice)])
             Nothing -> Spec.assertFailure s "fixture should give alice a Military Intelligence and three creatures"
+
+-- CR 508.3c's binding and CR 302.6's continuity, in one card.
+--
+-- Total War {3}{R} Enchantment: "Whenever a player attacks with one or more
+-- creatures, destroy all untapped non-Wall creatures that player controls that
+-- didn't attack, except for creatures the player hasn't controlled continuously
+-- since the beginning of the turn."
+--
+-- BOB is the active player and declares, alice holds the enchantment. That is
+-- what makes "that player" (Binding.attackingPlayer, off CR 508.3c's condition)
+-- discriminating: alice's own untapped non-attacker sits on the same board, and
+-- a payload that read "you" or dropped the slot would destroy it.
+--
+-- bob holds TWO Bird Maidens, identical but for Object.sickness -- one settled
+-- under him, one not. CR 302.6's continuity is the only thing that parts them,
+-- so the pair is what proves Filter.ControlledSinceTurnBegan rather than a board
+-- assembled around a single victim.
+--
+-- The Razorgrass Screen is CR 205.3m's Wall subtype, the card's other exception.
+totalWarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+totalWarSpec s registry =
+  let -- Declares exactly the creatures `plan` names, FILTERED out of what the
+      -- engine offered rather than built, militaryIntelligenceSpec's reason.
+      answering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering plan p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid plan) ids
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      onBattlefield oid gs = Set.member oid (GameState.battlefield gs)
+      -- The state Pawl.Engine.Engine.checkControlContinuity leaves a creature whose
+      -- controller changed this turn in, and CR 400.7 leaves one that entered
+      -- this turn in: S.addPermanent settles what it places, so the board says so
+      -- rather than inheriting it.
+      unsettle oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+      fixture = do
+        war <- S.printingOf s registry "Total War"
+        piker <- S.printingOf s registry "Goblin Piker"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        raven <- S.printingOf s registry "Augury Raven"
+        screen <- S.printingOf s registry "Razorgrass Screen"
+        case S.combatBoardOf [war, piker] [raven, maiden, maiden, screen] of
+          (gs, [_, pikerId], [ravenId, settledId, sickId, screenId]) ->
+            pure (Just (pikerId, ravenId, settledId, sickId, screenId, unsettle sickId gs))
+          _ -> pure Nothing
+      -- combatBoardOf hardcodes alice as the active player; CR 508.1 lets only
+      -- the active player declare, so BOB has to be it for the enchantment's
+      -- bearer to be a bystander.
+      bobsTurn gs =
+        gs
+          { GameState.activePlayer = S.bob,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]}
+          }
+   in Spec.describe s "Total War" $ do
+        Spec.it s "CR 508.3c whole card: the DECLARING player's untapped non-attacker dies and the bearer's does not" $ do
+          built <- fixture
+          case built of
+            Just (pikerId, ravenId, settledId, _, screenId, gs) -> do
+              let after = atBlockers (answering [ravenId]) (bobsTurn gs)
+              Spec.assertBool s (onBattlefield pikerId after) "CR 508.3c: alice's untapped non-attacker is not bob's, and survives"
+              Spec.assertBool s (not (onBattlefield settledId after)) "CR 302.6: bob's settled untapped non-attacker was destroyed"
+              Spec.assertBool s (onBattlefield screenId after) "CR 205.3m: bob's Wall is excepted and survives"
+            Nothing -> Spec.assertFailure s "fixture should give alice a Total War and bob four creatures"
+        Spec.it s "CR 302.6 a creature the declaring player has not controlled since the turn began survives" $ do
+          built <- fixture
+          case built of
+            Just (_, ravenId, settledId, sickId, _, gs) -> do
+              let after = atBlockers (answering [ravenId]) (bobsTurn gs)
+              Spec.assertBool s (onBattlefield sickId after) "CR 302.6: bob's unsettled Bird Maiden survives"
+              Spec.assertBool s (not (onBattlefield settledId after)) "and its settled twin, identical but for that, does not"
+              Spec.assertEqWith s "CR 508.1b and the Raven really was declared attacking alice" (Combat.Type.attackers (GameState.combat after)) (Map.fromList [(ravenId, AttackTarget.OfPlayer S.alice)])
+            Nothing -> Spec.assertFailure s "fixture should give alice a Total War and bob four creatures"
 
 anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 anafenzaAttackSpec s registry =
@@ -3167,6 +3239,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   everWatchingThresholdSpec s registry
   hermesSpec s registry
   militaryIntelligenceSpec s registry
+  totalWarSpec s registry
   seiferSpec s registry
   luluSpec s registry
   marauderTollSpec s registry

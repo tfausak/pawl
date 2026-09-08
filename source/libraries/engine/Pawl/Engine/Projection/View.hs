@@ -72,6 +72,7 @@ import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -177,6 +178,10 @@ viewOfCard face =
           -- a permanent. viewOfCharacteristics is the view that holds an id and
           -- answers.
           Filter.dealtDamageThisTurn = False,
+          -- CR 302.6 asks about an OBJECT a player controls; this builder
+          -- describes a printed FACE, which is none -- `milledThisTurn` above's
+          -- reason.
+          Filter.controlledSinceTurnBegan = False,
           Filter.attachedToView = Nothing,
           -- CR 303.4b's mirror, and Nothing for the same reason: a printed face
           -- is not an object, so no permanent's Object.attachedTo names it.
@@ -309,6 +314,17 @@ declaredIt oid event = case event of
 milledIt :: ObjectId -> GameEvent.GameEvent -> Bool
 milledIt oid event = case event of
   GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
+  _ -> False
+
+-- CR 302.6: has `controller` had this object under their control continuously
+-- since their most recent turn began? Object.sickness is the engine's record of
+-- rule 302.6's condition, and it names a PLAYER because the rule's subject is
+-- one: Pawl.Engine.Engine.checkControlContinuity drops a `Settled p` the moment p stops
+-- controlling the object, so the comparison is what makes a creature stolen this
+-- turn answer False under its NEW controller as well as its old one.
+settledUnder :: ObjectId -> Maybe PlayerId.PlayerId -> GameState -> Bool
+settledUnder oid controller gs = case (Game.lookupObject oid gs, controller) of
+  (Just object, Just pid) -> Object.sickness object == Sickness.Settled pid
   _ -> False
 
 -- Shared assembly: fill a View from a projection's characteristics, a supplied
@@ -525,6 +541,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- 120.3d/120.3e mark none at all for wither or infect, and either creature
       -- was still dealt damage this turn.
       Filter.dealtDamageThisTurn = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs),
+      -- CR 302.6: Object.sickness, compared against the PROJECTED controller
+      -- rather than read as a bare flag -- rule 302.6's subject is a player, so
+      -- `Settled` names one, and Pawl.Engine.Engine.checkControlContinuity drops a
+      -- settle whose player stopped controlling the object.
+      Filter.controlledSinceTurnBegan = settledUnder oid controller gs,
       -- CR 701.3a: not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's characteristics are projected, so it
       -- arrives as a view of its own read through `peers` (CR 613.1). CR 303.4 /

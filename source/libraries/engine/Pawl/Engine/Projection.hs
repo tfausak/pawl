@@ -2361,6 +2361,10 @@ filterReads f = case f of
   Filter.Type.DeclaredBlockerThisCombat -> Set.empty
   Filter.Type.MilledThisTurn -> Set.empty
   Filter.Type.DealtDamageThisTurn -> Set.empty
+  -- Reads the CONTROLLER, which layer 2 moves: CR 302.6's continuity claim is
+  -- about a player, and Pawl.Engine.Engine.checkControlContinuity drops the settle when
+  -- that player stops controlling the object.
+  Filter.Type.ControlledSinceTurnBegan -> Set.singleton Controller
   -- The nest's own reads, declared as if they were the CANDIDATE's even though
   -- they are the HOST's -- exactly right rather than merely safe, for the reason
   -- the note on Aspect above gives. The attachment itself reads nothing, for
@@ -2577,6 +2581,7 @@ filterReadsPeers f = case f of
   Filter.Type.DeclaredBlockerThisCombat -> False
   Filter.Type.MilledThisTurn -> False
   Filter.Type.DealtDamageThisTurn -> False
+  Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.IsToken -> False
