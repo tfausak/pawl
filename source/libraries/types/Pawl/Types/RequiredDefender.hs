@@ -17,22 +17,16 @@ module Pawl.Types.RequiredDefender where
 -- Pawl.Engine.AttackRequirement's `admissible` is where that becomes a filter
 -- over CR 508.1b's announcements rather than a single seat.
 --
--- Two arms, and the sweep that says which printings would want a third:
+-- Three arms, and the sweep that says which printings would want a fourth:
 -- Scryfall `o:/attacks [a-z ]{2,40} if able/ game:paper` (2026-09-05), read
 -- clause by clause. Every other printing narrowing the object either creates
 -- its requirement by RESOLUTION -- Ruhan of the Fomori, Raving Dead, Nahiri the
 -- Unforgiving, Dulcet Sirens -- which is ActiveAttackRequirement's family, or
 -- prints the narrowing as a CR 508.1c RESTRICTION beside an unnarrowed
 -- requirement -- Xantcha, Sleeper Agent, Fealty to the Realm -- which
--- Pawl.Types.CombatRestriction carries. Two would want an arm here: Cogwork
+-- Pawl.Types.CombatRestriction carries. One would want an arm here: Cogwork
 -- Tracker's "a player you noted for cards named Cogwork Tracker", a draft
--- designation with no carrier in pawl at all, and Trove of Temptation's "you or
--- a planeswalker you control".
---
--- Not implemented: an arm naming a player TOGETHER WITH the permanents they
--- control, which is Trove of Temptation's whole object clause; its subject
--- clause is Pawl.Types.RequirementArity.AnySubject, which Seeker of Slaanesh
--- already writes (#3333).
+-- designation with no carrier in pawl at all.
 data RequiredDefender
   = -- | CR 108.4 / 303.4m: the controller of the object the source is attached
     -- to. Names nobody when the source is attached to nothing, or to a player
@@ -42,4 +36,11 @@ data RequiredDefender
     -- greatest life total among them (Galactus, Devourer of Worlds). Names every
     -- opponent tied for the lead, and nobody when there is no opponent left.
     OpponentWithMostLife
+  | -- | CR 109.5 / 306.6: the source's controller, TOGETHER WITH the
+    -- planeswalkers that player controls (Trove of Temptation's "you or a
+    -- planeswalker you control"). The one arm naming permanents as well as a
+    -- seat, so its filter keeps two of CR 506.3's three kinds of announcement at
+    -- one seat and never a battle -- proved by Pawl.CombatCostSpec's "CR 508.1d
+    -- attacking a planeswalker its controller controls obeys the requirement".
+    ControllerOrTheirPlaneswalkers
   deriving (Bounded, Enum, Eq, Ord, Show)

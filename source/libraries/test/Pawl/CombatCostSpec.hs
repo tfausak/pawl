@@ -2216,6 +2216,65 @@ mostLifeRequirementSpec s registry = Spec.describe s "MostLifeRequirement" $ do
         Spec.assertEqWith s "with the totals exchanged the same announcement stands" (announced bobAhead devourer) (Just (AttackTarget.OfPlayer S.bob))
       _ -> Spec.assertFailure s "fixture should have one Galactus"
 
+-- CR 508.1d's OBJECT axis naming a player TOGETHER WITH the permanents that
+-- player controls, proved by Trove of Temptation ("{3}{R} Enchantment / Each
+-- opponent must attack you or a planeswalker you control with at least one
+-- creature each combat if able / At the beginning of your end step, create a
+-- Treasure token"). Alluring Siren above is the opposite reading of the same
+-- board -- "attacks you" is obeyed by the seat alone -- so the two cards are what
+-- make Pawl.Types.RequiredDefender's ControllerOrTheirPlaneswalkers a filter over
+-- CR 508.1b's announcements rather than a seat.
+--
+-- THREE seats and a planeswalker, because that is what makes CR 508.1b offer
+-- alice's one creature three announcements the readings disagree about: bob (the
+-- Trove's controller), bob's Jace Beleren, and carol, whom CR 802.2 leaves just
+-- as attackable. A board with one legal announcement cannot tell any two
+-- readings apart.
+--
+-- The subject clause -- "with at least one creature" -- is
+-- Pawl.Types.RequirementArity.AnySubject, which Seeker of Slaanesh already
+-- writes; only the object clause is new here.
+troveOfTemptationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+troveOfTemptationSpec s registry = Spec.describe s "TroveOfTemptation" $ do
+  Spec.it s "CR 508.1d attacking a planeswalker its controller controls obeys the requirement" $ do
+    trove <- S.printingOf s registry "Trove of Temptation"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs, _) = S.threePlayerCombat [piker] [trove, jace] []
+    case (mine, theirs) of
+      ([attacker], [_, jaceId]) -> do
+        -- threePlayerCombat sits at the beginning of combat with no defending
+        -- player; a direct-call test states the step and CR 802.2's pair itself.
+        let defending gs =
+              gs
+                { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                  GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.bob, S.carol]}
+                }
+            board = defending (S.addCounter CounterKind.Loyalty 3 jaceId base)
+        -- THE GAMEPLAY ASSERTION, and the half no other card in the pool states:
+        -- the announcement against bob's planeswalker obeys "attack you or a
+        -- planeswalker you control", so CR 508.1d admits a declaration that never
+        -- attacks bob himself. An arm keeping CR 506.3's player announcements
+        -- alone makes this declaration obey nothing while attacking bob obeys
+        -- one, and CR 508.1d then refuses it.
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(attacker, AttackTarget.OfPlaneswalker jaceId)] board)
+          "CR 508.1d: announcing bob's Jace obeys 'attack you or a planeswalker you control'"
+        -- The NARROWING, and the anti-vacuity guard on the assertion above: carol
+        -- is a defending player CR 508.1b offers too, and the requirement names
+        -- neither her nor anything she controls. An arm that minted nothing at all
+        -- would leave CR 508.1d's maximum at zero and make this declaration legal.
+        Spec.assertBool
+          s
+          (not (Combat.legalAttackDeclarationAs S.alice [(attacker, AttackTarget.OfPlayer S.carol)] board))
+          "and announcing carol, whom it does not name, obeys nothing"
+        Spec.assertBool
+          s
+          (Combat.legalAttackDeclarationAs S.alice [(attacker, AttackTarget.OfPlayer S.bob)] board)
+          "while announcing bob himself obeys it too"
+      _ -> Spec.assertFailure s "fixture should have alice's attacker and bob's Trove and Jace"
+
 -- CR 508.1d's second shape -- "or that it attacks if some condition is met" --
 -- proved by Otarian Juggernaut, whose whole threshold line is one CR 604.2 "as
 -- long as" clause: "as long as there are seven or more cards in your graveyard,
@@ -2434,6 +2493,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   alluringSirenSpec s registry
   publicEnemySpec s registry
   mostLifeRequirementSpec s registry
+  troveOfTemptationSpec s registry
   conditionalAttackRequirementSpec s registry
   randomOpponentSpec s registry
   declarationRetrySpec s registry

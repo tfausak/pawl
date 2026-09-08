@@ -87,8 +87,9 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 -- obeyed by any single announcement in the set. Its atoms are announcements and
 -- not creatures because CR 508.1d is obeyed by an ANNOUNCEMENT rather than by
 -- attacking as such -- the object axis narrows which announcements count, so a
--- group narrowed on that axis (#3333) is a set of pairs and not a set of
--- creatures.
+-- group narrowed on that axis is a set of pairs and not a set of creatures.
+-- Trove of Temptation is the printing that is both at once, and
+-- Pawl.CombatCostSpec's TroveOfTemptation group proves it.
 --
 -- A FENCE on both halves, because nothing else is one: attackCeiling's scan is
 -- greedy over the pairs, and exact only while a pair requirement is a weight on
@@ -216,6 +217,36 @@ instances candidates targets gs =
                 let best = maximum (fmap snd lives)
                     leaders = [pid | (pid, life) <- lives, life == best]
                  in filter (\target -> any (\pid -> target == AttackTarget.OfPlayer pid) leaders) targets
+        Just RequiredDefender.ControllerOrTheirPlaneswalkers ->
+          -- CR 109.5 fixes the "you" as the source's controller, and CR 306.6
+          -- makes "a planeswalker you control" an announcement CR 508.1b admits
+          -- at that same seat -- so this arm keeps TWO of CR 506.3's three kinds
+          -- rather than one, and the requirement is obeyed by either.
+          --
+          -- Read live off the projection, as every other field here is (CR
+          -- 613.11 puts the effect after every layer): a planeswalker changing
+          -- controller between the beginning of combat and the declaration moves
+          -- with it, and one whose controller is the source's controller enters
+          -- the set.
+          --
+          -- A battle is never kept. CR 310.5 makes it its own kind of
+          -- announcement and CR 310.9d hands it a PROTECTOR rather than a
+          -- controller, so it is not "a planeswalker you control" whoever
+          -- protects it.
+          --
+          -- Pruned by membership like the two arms above: an announcement CR
+          -- 508.1b does not admit this combat is not among `targets`, so it
+          -- contributes no pair.
+          case Projection.controllerOf source gs of
+            Nothing -> []
+            Just you ->
+              filter
+                ( \target -> case target of
+                    AttackTarget.OfPlayer pid -> pid == you
+                    AttackTarget.OfPlaneswalker walker -> Projection.controllerOf walker gs == Just you
+                    AttackTarget.OfBattle _ -> False
+                )
+                targets
       -- CR 119.1, as an Integer and not the Natural Pawl.Engine.Cost.lifeTotalOf
       -- answers with: CR 104.3b lets a total sit below zero until a state-based
       -- action sees it, and a clamp there would order two such seats alike. The
