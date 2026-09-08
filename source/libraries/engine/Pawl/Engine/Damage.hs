@@ -2,6 +2,7 @@ module Pawl.Engine.Damage where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -1104,7 +1105,7 @@ processDamage events = do
       removalsBetween before after =
         concatMap
           (\oid -> concatMap (\kind -> removalOn kind before after oid) [CounterKind.Loyalty, CounterKind.Defense])
-          (List.nub (Maybe.mapMaybe permanentHit survivors))
+          (ListUtils.nubOrd (Maybe.mapMaybe permanentHit survivors))
       -- CR 120.3b / 702.90b, CR 120.3d / 702.90c / 702.80a and CR 120.3g /
       -- 702.164c: the counters a damage event CAUSES, placed through
       -- Event.putCounters and Event.putPlayerCounters -- CR 122.6's two funnels --
@@ -1423,7 +1424,7 @@ lifelinkGains survivors =
           )
           survivors
       totals = Map.fromListWith (+) keyed
-   in fmap (\key -> (snd key, Map.findWithDefault 0 key totals)) (List.nub (fmap fst keyed))
+   in fmap (\key -> (snd key, Map.findWithDefault 0 key totals)) (ListUtils.nubOrd (fmap fst keyed))
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).

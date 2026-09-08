@@ -3,6 +3,7 @@ module Pawl.Engine.Mana where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Bifunctor as Bifunctor
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -343,7 +344,7 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 -- The same yields against a pre-projected board, which is manaRoutesOfGiven's
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
-manaYieldsOfGiven pcs oid gs = List.nub (fmap (Mana.MkMana . yieldUnits) (manaOptionsOfGiven pcs oid gs))
+manaYieldsOfGiven pcs oid gs = ListUtils.nubOrd (fmap (Mana.MkMana . yieldUnits) (manaOptionsOfGiven pcs oid gs))
 
 -- The same yields narrowed to the ones this player could actually get, each with
 -- HOW MANY TIMES they could get it, WHAT ONE of those activations spends, and
@@ -418,7 +419,7 @@ manaSuppliesGiven capacity pcs pid oid gs =
       rankOf (activations, _, manaCost) = (Activations.times activations, null (ManaCost.unwrap manaCost))
    in fmap
         (\yield -> List.maximumBy (Ord.comparing rankOf) (filter ((==) yield . yieldOf) available))
-        (List.nub (fmap yieldOf available))
+        (ListUtils.nubOrd (fmap yieldOf available))
 
 -- Every way this object could be tapped for mana, as the COST CR 602.2b makes
 -- that activation pay paired with the mana it adds -- one entry per (route,
@@ -487,7 +488,7 @@ manaOptionsOfGiven pcs oid gs =
         fmap
           (\parts -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.ability = ability, ManaOption.yield = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty parts, ManaOption.effects = others})
           (traverse (\addition -> fmap ((,) (ManaAddition.player addition) . replicate (Natural.toIntSaturating (ManaAddition.count addition)) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
-   in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
+   in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- Every unit one option adds, whoever gets it, in printed order within each
 -- recipient's share (Pawl.Types.ManaOption.yield).
@@ -589,7 +590,7 @@ typesOf = fmap ManaUnit.manaType . unitsOf
 -- makes Sol Ring read as a choice between two singles, which Pawl.ManaSpec's
 -- solRingSpec is the standing proof against.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
-manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
+manaTypesOf oid gs = ListUtils.nubOrd (concatMap typesOf (manaYieldsOf oid gs))
 
 setPool :: PlayerId -> Mana -> GameState -> GameState
 setPool pid pool gs = gs {GameState.manaPool = Map.insert pid pool (GameState.manaPool gs)}
@@ -1775,7 +1776,7 @@ sourceOptions clauses admitting contended supplies =
                     supplyAdmits = admits
                   }
             ]
-   in List.nub (concatMap optionsFor (grouped <> apart))
+   in ListUtils.nubOrd (concatMap optionsFor (grouped <> apart))
 
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
@@ -1925,7 +1926,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- it, which `admits` reads per demand. Mishra's Workshop's three
       -- colourless are still no supply for the instant it may not buy, because
       -- the cost's own demands -- typed and generic alike -- ask that same set.
-      subjects = List.nub (subject : fmap PaymentSubject.Activating sources)
+      subjects = Set.toList (Set.fromList (subject : fmap PaymentSubject.Activating sources))
       admittedBy = fmap (\each -> (each, admitsUnder each pid gs)) subjects
       admitting unit = Set.fromList (fmap fst (filter (\(_, ok) -> ok unit) admittedBy))
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
@@ -2007,7 +2008,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
                   -- symbol takes any mana (`anyTypeDemand`), but only mana this
                   -- payment may spend, and a count cannot say which supplies it
                   -- may draw on. Multiplicity is what `demandedIn` reads, so the
-                  -- copies cost `List.nub` one element however large the symbol.
+                  -- copies cost `Set.fromList` one element however large the symbol.
                   wanted_ = fmap ((,) costPosition) (demands <> List.genericReplicate generic anyTypeDemand) <> eaten
                   -- CR 106.6 asked of the demand rather than of the mana: WHICH
                   -- payment a demand belongs to is what the restriction asks
@@ -2034,7 +2035,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
                     -- clause over the whole demand set implies it, since a supply
                     -- serving nothing is still counted here.
                     && Natural.length supplies >= Natural.length wanted_
-                    && all hallHolds (List.subsequences (List.nub wanted_))
+                    && all hallHolds (List.subsequences (Set.toList (Set.fromList wanted_)))
          in any fits boards
    in filter payable (resolutions spending cost)
 

@@ -18,6 +18,7 @@ module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -560,13 +561,13 @@ reductionOrders adjustments manaCost =
       orders rs =
         if uniform rs
           then [rs]
-          else concatMap (\r -> fmap (r :) (orders (List.delete r rs))) (List.nub rs)
+          else concatMap (\r -> fmap (r :) (orders (List.delete r rs))) (ListUtils.nubOrd rs)
       withTotal order =
         let reordered = adjustments {CostAdjustments.reductions = order}
          in (reordered, applyAdjustments reordered manaCost)
       manaValue (_, ManaCost.MkManaCost symbols) = sum (fmap Quantity.symbolValue symbols)
       candidates = List.sortOn manaValue (fmap withTotal (orders (CostAdjustments.reductions adjustments)))
-   in case List.nubBy (\x y -> snd x == snd y) candidates of
+   in case ListUtils.nubOrdOn snd candidates of
         entry : rest -> entry NonEmpty.:| rest
         -- Unreachable: `orders` answers at least one order for every list, the
         -- empty one included, so the deduplication has something to keep. Left
@@ -1025,7 +1026,7 @@ reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
 reductionHalvesOf symbol = case symbol of
   ManaSymbol.Generic _ -> Nothing
   ManaSymbol.OfType _ -> Nothing
-  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Just (List.nub [ManaSymbol.OfType a, ManaSymbol.OfType b])
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Just (ListUtils.nubOrd [ManaSymbol.OfType a, ManaSymbol.OfType b])
   ManaSymbol.MonocoloredHybrid manaType ->
     Just [ManaSymbol.OfType manaType, ManaSymbol.Generic Mana.monocoloredHybridGeneric]
   ManaSymbol.Phyrexian _ -> Nothing
@@ -3729,7 +3730,7 @@ payComponent moment slots pid oid component = case component of
   -- Discard effect, which completes an undersized answer: a cost may simply go
   -- unpaid, where an effect has no such out. The answer is read as a SET of card
   -- ids and rejected unless that set is exactly `n` cards drawn from `held`, so
-  -- `List.nub` is what the Set-answered Sacrifice arm already accepts rather than
+  -- `ListUtils.nubOrd` is what the Set-answered Sacrifice arm already accepts rather than
   -- the repair it looks like.
   --
   -- CR 701.9a's move goes through Event.discard, so the card gets a CR 400.7
@@ -3743,7 +3744,7 @@ payComponent moment slots pid oid component = case component of
       if Natural.length held <= n
         then pure held
         else Game.choose (Prompt.ChooseDiscard decider pid held n)
-    let distinct = List.nub chosen
+    let distinct = ListUtils.nubOrd chosen
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do
         Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) distinct

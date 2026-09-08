@@ -684,7 +684,8 @@ chosenBranch :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map Slot
 chosenBranch resolving controller idx cIdx legal picked clause = case Clause.orElse clause of
   Nothing -> pure (Nothing, picked)
   Just orElse ->
-    let branches = NonEmpty.nub (NonEmpty.sort (cIdx NonEmpty.:| [OrElse.sibling orElse]))
+    let other = OrElse.sibling orElse
+        branches = if cIdx == other then NonEmpty.singleton cIdx else NonEmpty.sort (cIdx NonEmpty.:| [other])
         key = NonEmpty.head branches
         won answers = Just (Map.keysSet (Map.filter (== cIdx) answers))
      in case Map.lookup key picked of

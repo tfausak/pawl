@@ -364,14 +364,14 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith
           s
           "CR 608.2f both halves departed, and the two departures carry one EventGroup"
-          (List.sort (fmap snd departures), length (List.nub (fmap fst departures)))
+          (List.sort (fmap snd departures), Set.size (Set.fromList (fmap fst departures)))
           (List.sort [bId, gId], 1)
         -- The control the assertion above needs: this log DOES mint more than one
         -- group, so "one distinct group" is a claim about the exile rather than
         -- about a log that never advances the counter.
         Spec.assertBool
           s
-          (length (List.nub (fmap LoggedEvent.group (Foldable.toList (GameState.events after)))) > 1)
+          (Set.size (Set.fromList (fmap LoggedEvent.group (Foldable.toList (GameState.events after)))) > 1)
           "the log carries more than one EventGroup"
         -- And the batch still melds: the slot the one move bound is what CR
         -- 701.42a's opcode reads (CR 400.7j).

@@ -27,6 +27,7 @@ module Pawl.Engine.Replacement where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -2395,7 +2396,7 @@ oneEventPerRecipient :: [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
 oneEventPerRecipient events =
   let key event = event {DamageEvent.amount = 0}
       total event = sum (fmap DamageEvent.amount (filter (\other -> key other == key event) events))
-   in fmap (\event -> event {DamageEvent.amount = total event}) (List.nubBy (\one two -> key one == key two) events)
+   in fmap (\event -> event {DamageEvent.amount = total event}) (ListUtils.nubOrdOn key events)
 
 -- CR 615.1a: is this damage rewrite a PREVENTION effect, rather than one of CR
 -- 614.1a's replacements? "Effects that use the word 'prevent' are prevention
@@ -2981,7 +2982,7 @@ contested gs events =
       groups = concatMap contestedBy (collect gs (GameState.replacements gs))
       merged = Map.fromListWith (<>) groups
    in fmap
-        (\(pid, positions) -> (pid, List.sort (List.nub positions)))
+        (\(pid, positions) -> (pid, Set.toAscList (Set.fromList positions)))
         (List.sortOn (seatOf gs . fst) (Map.toList merged))
 
 -- CR 615.7 / 122.1c: a prevention that a batch can exhaust, as the pair (what it

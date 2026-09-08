@@ -579,7 +579,7 @@ singularCureSpec s registry =
           Spec.assertEqWith s "so did bob" (S.lifeOf S.bob after) (Just 24)
           Spec.assertEqWith s "every seat started at 20" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
           Spec.assertEqWith s "three gains" (length (gainsIn after)) 3
-          Spec.assertEqWith s "in one event group, so the choice is CR 603.7b's" (length (List.nub (gainsIn after))) 1
+          Spec.assertEqWith s "in one event group, so the choice is CR 603.7b's" (Set.size (Set.fromList (gainsIn after))) 1
           Spec.assertEqWith s "and the entry is spent, having no stated duration" (Seq.length (GameState.delayedTriggers after)) 0
         -- The other half of the pair, differing in exactly one thing -- the
         -- answer. Same board, same batch, bob named instead: an engine that
@@ -600,7 +600,7 @@ singularCureSpec s registry =
           Spec.assertEqWith s "alice kept her 4" (S.lifeOf S.alice after) (Just 24)
           Spec.assertEqWith s "bob kept his" (S.lifeOf S.bob after) (Just 24)
           Spec.assertEqWith s "carol kept hers" (S.lifeOf S.carol after) (Just 24)
-          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (4, 1)
+          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), Set.size (Set.fromList (gainsIn after))) (4, 1)
         -- The plumbing control, and the elision: ONE gain is not a choice, so no
         -- question is raised and the answer above cannot reach it. bob's own
         -- Radiant Fountain gains him 2 and the Cure takes 4, whatever index the
@@ -611,7 +611,7 @@ singularCureSpec s registry =
           Spec.assertEqWith s "bob gained 2 and lost 4" (S.lifeOf S.bob after) (Just 18)
           Spec.assertEqWith s "alice is untouched" (S.lifeOf S.alice after) (Just 20)
           Spec.assertEqWith s "and so is carol" (S.lifeOf S.carol after) (Just 20)
-          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), length (List.nub (gainsIn after))) (1, 1)
+          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), Set.size (Set.fromList (gainsIn after))) (1, 1)
         -- The vacuity guard, falseCureSpec's: the same Peacemaker with NO entry
         -- armed leaves every seat holding its 4 (CR 119.3). Without it a board
         -- where nobody actually gained would read as a passing 24 above.
@@ -717,7 +717,7 @@ apnapDelayedSpec s registry =
           Spec.assertEqWith s "and the two questions were raised in APNAP order" (asked gs) [S.alice, S.bob]
           Spec.assertEqWith s "bob's entry was armed first, so arming order is not APNAP order, and the store still holds it" (armingOrder gs) [S.bob, S.alice]
           Spec.assertEqWith s "setup: every seat started at 20" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
-          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn (after gs)), length (List.nub (gainsIn (after gs)))) (3, 1)
+          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn (after gs)), Set.size (Set.fromList (gainsIn (after gs)))) (3, 1)
           Spec.assertEqWith s "and both entries are spent, neither having a stated duration" (Seq.length (GameState.delayedTriggers (after gs))) 0
         -- The other half of the pair, differing in exactly one thing -- which seat
         -- cast first, and so which entry was armed first. bob casts first, alice
@@ -876,7 +876,7 @@ oneSeatDelayedSpec s registry =
           -- the half of this that must not move, since `outcomes` feeds it.
           Spec.assertEqWith s "one ordering prompt before the questions, over alice's two entries in store order" (offered reverse gs) [(0, fmap TriggerSource.OfObject (armingOrder gs)), (2, fmap TriggerSource.OfObject (armingOrder gs))]
           Spec.assertEqWith s "setup: every seat started at 20" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
-          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn (after reverse gs)), length (List.nub (gainsIn (after reverse gs)))) (3, 1)
+          Spec.assertEqWith s "three gains, in one event group" (length (gainsIn (after reverse gs)), Set.size (Set.fromList (gainsIn (after reverse gs)))) (3, 1)
           Spec.assertEqWith s "and both entries are spent, neither having a stated duration" (Seq.length (GameState.delayedTriggers (after reverse gs))) 0
         -- The other half of the pair, differing in exactly one thing -- the
         -- permutation alice answers with. The Toll is asked first now, so the
@@ -972,7 +972,7 @@ communalVigilSpec s registry =
           Spec.assertEqWith s "alice drew one card for the whole batch" (S.handSize S.alice after) 1
           Spec.assertEqWith s "alice held nothing before" (S.handSize S.alice board) 0
           Spec.assertEqWith s "all three seats really gained their 4" (fmap (\pid -> S.lifeOf pid after) [S.alice, S.bob, S.carol]) [Just 24, Just 24, Just 24]
-          Spec.assertEqWith s "and the three gains were one event group" (length (List.nub (gainsIn after))) 1
+          Spec.assertEqWith s "and the three gains were one event group" (Set.size (Set.fromList (gainsIn after))) 1
           Spec.assertEqWith s "three gains, not one" (length (gainsIn after)) 3
         -- The other half of the pair, differing in exactly one thing -- how many
         -- gains the batch holds. FOUR seats and still one card, where a
@@ -982,7 +982,7 @@ communalVigilSpec s registry =
           let after = resolveEverything board
           Spec.assertEqWith s "alice still drew exactly one" (S.handSize S.alice after) 1
           Spec.assertEqWith s "dave gained his 4 too" (S.lifeOf S.dave after) (Just 24)
-          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), length (List.nub (gainsIn after))) (4, 1)
+          Spec.assertEqWith s "four gains in one event group" (length (gainsIn after), Set.size (Set.fromList (gainsIn after))) (4, 1)
         -- The plumbing control: ONE gain, from Radiant Fountain's "you gain 2
         -- life", draws one card too -- the reading both implementations share.
         -- Without it a Vigil that fired on nothing at all would read as a passing
@@ -992,7 +992,7 @@ communalVigilSpec s registry =
           let after = resolveEverything board
           Spec.assertEqWith s "alice drew her card" (S.handSize S.alice after) 1
           Spec.assertEqWith s "and she is the only seat that gained" (fmap (\pid -> S.lifeOf pid after) [S.alice, S.bob, S.carol]) [Just 22, Just 20, Just 20]
-          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), length (List.nub (gainsIn after))) (1, 1)
+          Spec.assertEqWith s "one gain, one group" (length (gainsIn after), Set.size (Set.fromList (gainsIn after))) (1, 1)
         -- The control that separates "once per event GROUP" from a dedup coarser
         -- than the group -- once ever, or once per turn -- which the boards above
         -- cannot tell apart, each holding one batch. A second Peacemaker enters,
@@ -1009,7 +1009,7 @@ communalVigilSpec s registry =
           Spec.assertEqWith s "alice drew a second card for the second batch" (S.handSize S.alice again) 2
           Spec.assertEqWith s "she held one after the first" (S.handSize S.alice after) 1
           Spec.assertEqWith s "every seat is 8 up over the two batches" (fmap (\pid -> S.lifeOf pid again) [S.alice, S.bob, S.carol]) [Just 28, Just 28, Just 28]
-          Spec.assertEqWith s "and the second batch was one event group" (length (List.nub (gainsIn again))) 1
+          Spec.assertEqWith s "and the second batch was one event group" (Set.size (Set.fromList (gainsIn again))) 1
 
 -- Only `attacker` attacks in the double-block case below, so S.aggressiveAnswer's
 -- blockers all land on it (CR 509.1), and its CR 510.1c division puts one damage
@@ -1117,8 +1117,8 @@ lifelinkGainEventsSpec s registry =
           Spec.assertEqWith s "the Vigil drew once per lifelink source" (S.handSize S.alice after) 2
           Spec.assertEqWith s "alice gained 2 twice" (S.lifeOf S.alice after) (Just 24)
           Spec.assertEqWith s "bob took all three attackers" (S.lifeOf S.bob after) (Just 14)
-          Spec.assertEqWith s "CR 702.15e: two gains, two event groups" (length (gainGroups after), length (List.nub (gainGroups after))) (2, 2)
-          Spec.assertEqWith s "CR 510.2: the three damage events stayed one event group" (length (List.nub (combatDamageGroups after))) 1
+          Spec.assertEqWith s "CR 702.15e: two gains, two event groups" (length (gainGroups after), Set.size (Set.fromList (gainGroups after))) (2, 2)
+          Spec.assertEqWith s "CR 510.2: the three damage events stayed one event group" (Set.size (Set.fromList (combatDamageGroups after))) 1
           Spec.assertEqWith s "and the Pridemate took a counter per gain" (S.counterOf CounterKind.PlusOnePlusOne mate after) 2
         -- The board that differs in one lifelink source: one gain is one event
         -- under either reading, so this is the floor rather than a discrimination.
@@ -1127,7 +1127,7 @@ lifelinkGainEventsSpec s registry =
           Spec.assertEqWith s "the Vigil drew once" (S.handSize S.alice after) 1
           Spec.assertEqWith s "alice gained 2" (S.lifeOf S.alice after) (Just 22)
           Spec.assertEqWith s "bob took both attackers" (S.lifeOf S.bob after) (Just 16)
-          Spec.assertEqWith s "one gain, one group" (length (gainGroups after), length (List.nub (gainGroups after))) (1, 1)
+          Spec.assertEqWith s "one gain, one group" (length (gainGroups after), Set.size (Set.fromList (gainGroups after))) (1, 1)
           Spec.assertEqWith s "and the Pridemate took one counter" (S.counterOf CounterKind.PlusOnePlusOne mate after) 1
         -- The other direction, and the discriminating case: ONE source, two
         -- recipients at once. Two records of 1 is the per-recipient reading.
@@ -1139,12 +1139,12 @@ lifelinkGainEventsSpec s registry =
               Spec.assertEqWith s "the Pridemate took one counter for the one gain" (S.counterOf CounterKind.PlusOnePlusOne mate after) 1
               Spec.assertEqWith s "the Vigil drew once" (S.handSize S.alice after) 1
               Spec.assertEqWith s "CR 702.15b: one gain, of the source's whole damage" (gainAmounts after) [2]
-              Spec.assertEqWith s "one gain, one event group" (length (gainGroups after), length (List.nub (gainGroups after))) (1, 1)
+              Spec.assertEqWith s "one gain, one event group" (length (gainGroups after), Set.size (Set.fromList (gainGroups after))) (1, 1)
               Spec.assertEqWith s "alice gained 2 all told" (S.lifeOf S.alice after) (Just 22)
               -- The precondition the reading rests on: the Child's 2 power really
               -- did reach two recipients in the one step.
-              Spec.assertEqWith s "the Child's 2 power went 1 apiece to two recipients" (length (List.nub (fmap fst (combatDamageBy child after))), fmap snd (combatDamageBy child after)) (2, [1, 1])
-              Spec.assertEqWith s "CR 510.2: the damage stayed one event group" (length (List.nub (combatDamageGroups after))) 1
+              Spec.assertEqWith s "the Child's 2 power went 1 apiece to two recipients" (Set.size (Set.fromList (fmap fst (combatDamageBy child after))), fmap snd (combatDamageBy child after)) (2, [1, 1])
+              Spec.assertEqWith s "CR 510.2: the damage stayed one event group" (Set.size (Set.fromList (combatDamageGroups after))) 1
               Spec.assertEqWith s "bob was not damaged" (S.lifeOf S.bob after) (Just 20)
             _ -> Spec.assertFailure s "fixture should have one attacker"
 
@@ -1201,13 +1201,15 @@ forthEorlingasSpec s registry =
       knights gs = filter (\oid -> Set.member Subtype.Knight (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
       -- The distinct EventGroups the log's combat damage carries.
       combatDamageGroups gs =
-        List.nub
-          ( Maybe.mapMaybe
-              ( \logged -> case LoggedEvent.event logged of
-                  GameEvent.DamageDealt ev | DamageEvent.kind ev == DamageKind.Combat -> Just (LoggedEvent.group logged)
-                  _ -> Nothing
+        Set.toList
+          ( Set.fromList
+              ( Maybe.mapMaybe
+                  ( \logged -> case LoggedEvent.event logged of
+                      GameEvent.DamageDealt ev | DamageEvent.kind ev == DamageKind.Combat -> Just (LoggedEvent.group logged)
+                      _ -> Nothing
+                  )
+                  (Foldable.toList (GameState.events gs))
               )
-              (Foldable.toList (GameState.events gs))
           )
       -- Run whole steps until `done` holds of the board, bounded so a bug cannot
       -- loop forever; wide enough for the two turns the negative below plays.

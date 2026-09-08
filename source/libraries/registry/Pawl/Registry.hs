@@ -25,6 +25,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Paths_pawl as Paths
@@ -125,13 +126,13 @@ index loaded =
       unparsed = Maybe.mapMaybe (\entry -> case entry of (path, Left reason) -> Just (path <> ": " <> Text.unpack reason); _ -> Nothing) loaded
       claims = Map.fromListWith (<>) (fmap (\(slug, (path, _)) -> (slug, [path])) keyed)
       -- A single path claiming its own slug more than once is one card
-      -- repeating a face name, not two cards colliding -- List.nub tells the
-      -- two apart so the message names what actually happened instead of
+      -- repeating a face name, not two cards colliding -- deduplicating tells
+      -- the two apart so the message names what actually happened instead of
       -- rendering the same path twice, which reads like a bug in the report
       -- rather than a description of the pool.
       ambiguous =
         fmap
-          ( \(slug, paths) -> case List.nub (List.sort paths) of
+          ( \(slug, paths) -> case Set.toAscList (Set.fromList paths) of
               [one] -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> one <> ", which repeats it across " <> show (length paths) <> " of its own faces"
               distinct -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> List.intercalate ", " distinct
           )

@@ -1179,7 +1179,7 @@ piaNalaarSpec s registry =
       energy = S.playerCounterOf PlayerCounterKind.Energy S.alice
       -- The distinct EventGroups the log's combat damage carries.
       combatDamageGroups gs =
-        List.nub
+        Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
                   GameEvent.DamageDealt ev | DamageEvent.kind ev == DamageKind.Combat -> Just (LoggedEvent.group logged)
@@ -1193,7 +1193,7 @@ piaNalaarSpec s registry =
           after <- board ["Pia Nalaar, Chief Mechanic", "Palladium Myr", "Spined Thopter"]
           Spec.assertEqWith s "alice got {E}{E} for the step, not {E}{E}{E}{E}" (energy after) 2
           Spec.assertEqWith s "all three connected, for six" (S.lifeOf S.bob after) (Just 14)
-          Spec.assertEqWith s "CR 510.2: the three damage events were one event group" (length (combatDamageGroups after)) 1
+          Spec.assertEqWith s "CR 510.2: the three damage events were one event group" (Set.size (combatDamageGroups after)) 1
         -- The board that differs in one artifact creature: one connecting is one
         -- occurrence under either reading, so this is the negative half's floor
         -- rather than a discrimination.

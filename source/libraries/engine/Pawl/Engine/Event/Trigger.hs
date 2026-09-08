@@ -7,6 +7,7 @@
 module Pawl.Engine.Event.Trigger where
 
 import qualified Control.Monad as Monad
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -2683,7 +2684,7 @@ delayedPending grouped gs =
         -- reads. Pawl.EventTriggerSpec's "the store still holds it" is what pins
         -- that second half.
         let seated = List.sortOn (Replacement.seatOf gs . DelayedTrigger.controller . snd) (zip [0 :: Int ..] (Foldable.toList store))
-            controllers = List.nub (fmap (DelayedTrigger.controller . snd) seated)
+            controllers = ListUtils.nubOrd (fmap (DelayedTrigger.controller . snd) seated)
             -- CR 603.3b's entry, built from a STORE entry: the question is asked
             -- before the entry has fired, so the PendingTrigger that
             -- Pawl.Engine.Engine.entryOf reads does not exist yet.

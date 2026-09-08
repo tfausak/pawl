@@ -80,7 +80,7 @@ data ManaOption = MkManaOption
     -- Part of the OPTION rather than looked up from the source afterwards, for
     -- the same reason the cost is: the option is what the player was offered,
     -- and two routes alike in cost and yield but not in what else they do are
-    -- two options rather than one (List.nub in
+    -- two options rather than one (ListUtils.nubOrd in
     -- Pawl.Engine.Mana.manaOptionsOfGiven compares this too).
     effects :: [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)]
   }

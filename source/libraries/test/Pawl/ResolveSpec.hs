@@ -10,6 +10,7 @@ module Pawl.ResolveSpec where
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1406,7 +1407,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- FOUR matching lands, all DIFFERENT basics, against a search that names no
   -- number: a cap that came from anywhere but the library's own contents would
   -- have to be a literal, and four distinct names make "all four" assertable
-  -- rather than "one, four times" -- List.nub in the executor cannot repair it.
+  -- rather than "one, four times" -- the executor's dedupe cannot repair it.
   -- None of them is the Island the mana came from. The Piker gives the filter a
   -- nonland to reject, so the offer is strictly larger than the largest legal
   -- answer and the prompt cannot short-circuit.
@@ -3477,7 +3478,7 @@ atCarolFinding p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (TargetCount.least . fst) offers
   Prompt.ChooseTargets _ _ _ sets ->
     fmap
-      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
   Prompt.Search _ pid matches cap ->
     if pid == S.carol
@@ -3532,7 +3533,7 @@ atCarolTargeted p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (TargetCount.least . fst) offers
   Prompt.ChooseTargets _ _ _ sets ->
     fmap
-      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
   _ -> S.identityAnswer p
 
@@ -3899,7 +3900,7 @@ sacrificerSpec s registry =
               -- Anti-vacuity: the steal really happened, and the three tokens
               -- really were alice's before it.
               Spec.assertEqWith s "CR 613.1b bob controlled the stolen token when the end step began" (Projection.controllerOf stolen taken) (Just S.bob)
-              Spec.assertEqWith s "CR 111.7 alice made three tokens and controlled all of them" (length (standing armed), List.nub (fmap (`Projection.controllerOf` armed) (standing armed))) (3, [Just S.alice])
+              Spec.assertEqWith s "CR 111.7 alice made three tokens and controlled all of them" (length (standing armed), ListUtils.nubOrd (fmap (`Projection.controllerOf` armed) (standing armed))) (3, [Just S.alice])
             _ -> Spec.assertFailure s "fixture should have made three tokens"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

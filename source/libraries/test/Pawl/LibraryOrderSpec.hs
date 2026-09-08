@@ -7,6 +7,7 @@
 module Pawl.LibraryOrderSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1777,7 +1778,7 @@ targetsPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 targetsPlayer victim p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
     fmap
-      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer victim) (Set.toAscList legal) <> Set.toAscList legal))))
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer victim) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
   _ -> S.identityAnswer p
 

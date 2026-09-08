@@ -699,7 +699,7 @@ spec s registry =
       Spec.assertEqWith
         s
         "and the two entries name one card, not two"
-        (fmap (length . List.nub . fmap fst) offered)
+        (fmap (Set.size . Set.fromList . fmap fst) offered)
         [1]
     Spec.it s "CR 103.5b: taking the FIRST of two actions does the first one's thing" $ do
       twofold <- S.printingOf s registry "Synthetic Twofold Powder"

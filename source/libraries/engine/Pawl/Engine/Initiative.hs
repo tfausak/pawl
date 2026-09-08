@@ -22,6 +22,7 @@
 -- casing on the rulebook, as Pawl.Engine.Dungeon's haddock puts it.
 module Pawl.Engine.Initiative where
 
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -179,8 +180,7 @@ inherentPending events gs =
       -- destroyed is still one of "those creatures".
       handoffs holder =
         let damagers = Maybe.mapMaybe (Event.combatDamagerAgainst holder gs) events
-            sameController a b = snd a == snd b
-         in fmap (\(oid, _) -> sourceless holder combatHandoff (Binding.setTriggerSource oid Map.empty)) (List.nubBy sameController damagers)
+         in fmap (\(oid, _) -> sourceless holder combatHandoff (Binding.setTriggerSource oid Map.empty)) (ListUtils.nubOrdOn snd damagers)
       -- A PARTIAL case with a wildcard, Speed.inherentPending's posture: this
       -- matcher answers about one event shape, and a new GameEvent constructor is
       -- not an event rule 726.2 names.

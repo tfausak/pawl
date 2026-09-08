@@ -3,6 +3,7 @@ module Pawl.Engine.Sba where
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -495,9 +496,9 @@ legendGroups pcs gs =
         first : rest@(_ : _) -> Just (controller, first NonEmpty.:| rest)
         _ -> Nothing
    in -- Sorted above, so two keys over the same permanents produce EQUAL pairs
-      -- and nub collapses them. A member has one controller, so equal member
+      -- and nubOrd collapses them. A member has one controller, so equal member
       -- lists cannot carry different controllers.
-      List.nub (Maybe.mapMaybe toGroup (Map.toList byKey))
+      ListUtils.nubOrd (Maybe.mapMaybe toGroup (Map.toList byKey))
 
 -- CR 704.5j: ask one same-named group's controller which to keep, and return the
 -- rest -- the permanents this pass must put into their OWNERS' graveyards.
@@ -820,7 +821,7 @@ performStateBasedActions = Event.simultaneously $ do
   -- from the board the pass began in, so an animated Rest in Peace this pass is
   -- itself burying still exiles the cards the rest of the batch would put into
   -- graveyards. See Pawl.Engine.Replacement's applyReplacementsIn.
-  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (ListUtils.nubOrd (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
   -- CR 903.9a's ACTION half: "its owner may put it into the command zone". A real
   -- zone change (CR 400.7 mints a fresh incarnation), so it goes through the same
   -- batch funnel as the buries above rather than editing the zone sets -- a

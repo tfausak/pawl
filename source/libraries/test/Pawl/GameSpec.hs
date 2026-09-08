@@ -6,6 +6,7 @@
 module Pawl.GameSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -715,7 +716,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- entry here is outside the controlled window: a control that did not end
     -- would put alice on the later ones.
     Spec.assertBool s (length (askedOf "ChooseAction" S.bob asks) >= 2) "bob was asked for priority both before and after the resolution"
-    Spec.assertEqWith s "CR 723.2: control lapses when Word of Command finishes resolving" (List.nub (askedOf "ChooseAction" S.bob asks)) [Just (Decider.MkDecider S.bob)]
+    Spec.assertEqWith s "CR 723.2: control lapses when Word of Command finishes resolving" (ListUtils.nubOrd (askedOf "ChooseAction" S.bob asks)) [Just (Decider.MkDecider S.bob)]
     Spec.assertEqWith s "and the row is gone from the state" (GameState.control afterAlice) Map.empty
     -- The card was PLAYED: alice made bob cast his own Bolt and aim it at him.
     Spec.assertEqWith s "bob's own Bolt, chosen and aimed by alice, hit bob" (S.lifeOf S.bob afterAlice) (Just 17)
@@ -729,11 +730,11 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- since no mutation of this unit can move it. Asserted here because this is
     -- the board on which another question put to bob went to alice.
     Spec.assertBool s (not (null (askedOf "Concede" S.bob asks))) "bob was asked whether to concede"
-    Spec.assertEqWith s "CR 723.6: no concede question carried a decider" (List.nub (askedOf "Concede" S.bob asks)) [Nothing]
+    Spec.assertEqWith s "CR 723.6: no concede question carried a decider" (ListUtils.nubOrd (askedOf "Concede" S.bob asks)) [Nothing]
     -- And on bob's own next turn, which is where a CR 723.1 control would have
     -- landed instead.
     Spec.assertEqWith s "CR 723.2: bob decides for himself on his own turn" (Decide.deciderFor S.bob bobsTurn) (Decider.MkDecider S.bob)
-    Spec.assertEqWith s "and every question there is his" (List.nub (askedOf "ChooseAction" S.bob bobAsks)) [Just (Decider.MkDecider S.bob)]
+    Spec.assertEqWith s "and every question there is his" (ListUtils.nubOrd (askedOf "ChooseAction" S.bob bobAsks)) [Just (Decider.MkDecider S.bob)]
 
   -- CR 723.1a with the two control lifetimes overlapping, which is the case PR
   -- #3349 got wrong; see #3351. Rule 723.1a's "overwrite" is the
@@ -796,7 +797,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- and again after it has; a resolution raises no priority question, so an
     -- overwritten-and-deleted CR 723.1 row would put BOB on the later ones.
     Spec.assertBool s (length (askedOf "ChooseAction" S.bob asks) >= 2) "bob was asked for priority both before and after the Word of Command resolution"
-    Spec.assertEqWith s "CR 723.1a: alice still decides for bob once Word of Command has finished resolving" (List.nub (askedOf "ChooseAction" S.bob asks)) [Just (Decider.MkDecider S.alice)]
+    Spec.assertEqWith s "CR 723.1a: alice still decides for bob once Word of Command has finished resolving" (ListUtils.nubOrd (askedOf "ChooseAction" S.bob asks)) [Just (Decider.MkDecider S.alice)]
     Spec.assertEqWith s "and the Mindslaver row is what is left on the stack" (GameState.control afterWord) (S.turnControl S.alice S.bob)
     -- The CR 723.2 span really did happen: bob's own Bolt was chosen and cast.
     Spec.assertEqWith s "Word of Command made bob cast his own Bolt at himself" (S.lifeOf S.bob afterWord) (Just 17)
@@ -2126,7 +2127,7 @@ printingSpec s registry = Spec.describe s "PrintingTable" $ do
     let deck = Deck.fromCards (Map.singleton mountain 2)
         gs = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
         ids =
-          List.nub
+          Set.fromList
             ( Maybe.mapMaybe
                 ( \obj -> case Object.source obj of
                     Source.OfCard p -> Just p
@@ -2134,7 +2135,7 @@ printingSpec s registry = Spec.describe s "PrintingTable" $ do
                 )
                 (Map.elems (GameState.objects gs))
             )
-    Spec.assertEqWith s "distinct printing ids" (length ids) 1
+    Spec.assertEqWith s "distinct printing ids" (Set.size ids) 1
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Game" $ do

@@ -85,6 +85,14 @@
     within: []
     message: "Return Either, or use throwIO in IO."
 
+# Avoid quadratic deduplication. A Set is usually the right answer; where
+# first-occurrence order matters, Data.Containers.ListUtils has nubOrd.
+- ignore: {name: "Use nub"}
+- functions:
+  - name: [Data.List.nub, Data.List.nubBy, Data.List.NonEmpty.nub, Data.List.NonEmpty.nubBy]
+    within: []
+    message: "Use a Set, or Data.Containers.ListUtils.nubOrd."
+
 # Avoid the lazy left fold, which builds a thunk chain.
 - functions:
   - name: [Data.Foldable.foldl, Data.List.foldl]

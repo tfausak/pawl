@@ -8,6 +8,7 @@ module Pawl.Engine.Resolve.Effect where
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -648,7 +649,7 @@ settleArrivals zone placement targets =
    in case zone of
         Zone.Library -> do
           settled <- Monad.mapM settleEnd targets
-          fmap concat (Monad.mapM (arrange settled) (List.nub (fmap fst settled)))
+          fmap concat (Monad.mapM (arrange settled) (ListUtils.nubOrd (fmap fst settled)))
         -- No other destination has ends, so nothing to settle and the funnel ignores
         -- the position it is handed.
         _ -> pure (fmap (\oid -> (oid, LibraryPosition.defaultValue)) targets)
@@ -2516,7 +2517,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- your library and graveyard for any number of cards" would
                   -- refute both.
                   let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
-                      picked = List.genericTake capHere . List.nub $ filter (\oid -> List.elem oid matches) answer
+                      picked = List.genericTake capHere . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
                   pure (List.genericTake capHere (picked <> filler))
@@ -4011,7 +4012,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       -- the player could have discarded. Deduplicated too, since the
                       -- answer is a LIST and a card named twice would fill two of the
                       -- n slots; `valid <> filler` permutes `held`, so the take is n.
-                      let valid = List.nub (filter (\c -> elem c held) choices)
+                      let valid = ListUtils.nubOrd (filter (\c -> elem c held) choices)
                           filler = filter (\c -> List.notElem c valid) held
                       pure (victim, List.genericTake count (valid <> filler))
             _ -> pure (victim, [])
@@ -7375,7 +7376,7 @@ scryOne n pid = do
 -- actions, the repair being a question about the ANSWER.
 splitLooked :: [ObjectId] -> ([ObjectId], [ObjectId]) -> ([ObjectId], [ObjectId])
 splitLooked looked (away, kept) =
-  let named xs = List.nub (filter (\c -> List.elem c looked) xs)
+  let named xs = ListUtils.nubOrd (filter (\c -> List.elem c looked) xs)
       leaving = named away
       onTop = filter (\c -> List.notElem c leaving) (named kept)
       unnamed = filter (\c -> List.notElem c leaving && List.notElem c onTop) looked

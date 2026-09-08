@@ -705,7 +705,7 @@ blightSimultaneitySpec s registry =
       -- the two placements not one group, "once for the batch" would be proving
       -- nothing about rule 101.4.
       placementGroups gs =
-        List.nub
+        Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
                   GameEvent.CountersPut change
@@ -753,7 +753,7 @@ blightSimultaneitySpec s registry =
           let after = resolveEverything board
           Spec.assertEqWith s "alice drew one card for the whole batch" (S.handSize S.alice after) 1
           Spec.assertEqWith s "both opponents' Walls took a counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1, Just 1]
-          Spec.assertEqWith s "and the two placements were one event group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "and the two placements were one event group" (Set.size (placementGroups after)) 1
           Spec.assertEqWith s "alice held nothing before" (S.handSize S.alice board) 0
         -- The same card with ONE blighter, which is what says the condition fires
         -- at all rather than the batch case passing because nothing triggered: one
@@ -763,7 +763,7 @@ blightSimultaneitySpec s registry =
           let after = resolveEverything board
           Spec.assertEqWith s "alice drew her card" (S.handSize S.alice after) 1
           Spec.assertEqWith s "bob's Wall took the counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1]
-          Spec.assertEqWith s "one placement, one group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "one placement, one group" (Set.size (placementGroups after)) 1
         -- The control that separates "once per event GROUP" from a dedup coarser
         -- than the group -- once ever, or once per turn -- which the boards above
         -- cannot tell apart, each holding one batch. alice's Dawnhand Dissident is
@@ -788,7 +788,7 @@ blightSimultaneitySpec s registry =
           Spec.assertEqWith s "alice drew a second card for the second batch" (S.handSize S.alice again) 2
           Spec.assertEqWith s "she held one after the first" (S.handSize S.alice after) 1
           Spec.assertEqWith s "both Walls took a second counter" (fmap (\oid -> minusCountersOn oid again) walls) [Just 2, Just 2]
-          Spec.assertEqWith s "and the second batch was one event group" (length (placementGroups again)) 1
+          Spec.assertEqWith s "and the second batch was one event group" (Set.size (placementGroups again)) 1
 
 -- CR 603.2c's SECOND sentence, where blightSimultaneitySpec above proves its
 -- first: "whenever one or more -1/-1 counters are put on A CREATURE" names each
@@ -821,7 +821,7 @@ perCreatureCountersSpec s registry =
       -- assumed. Were the placements not one group, "twice out of one batch" would
       -- be proving nothing.
       placementGroups gs =
-        List.nub
+        Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
                   GameEvent.CountersPut change
@@ -862,7 +862,7 @@ perCreatureCountersSpec s registry =
           let after = resolveEverything board
           Spec.assertEqWith s "the Tools took a charge counter for each creature the batch touched" (S.counterOf charge toolsId after) 2
           Spec.assertEqWith s "both opponents' Walls took a -1/-1 counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1, Just 1]
-          Spec.assertEqWith s "and the two placements were one event group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "and the two placements were one event group" (Set.size (placementGroups after)) 1
           Spec.assertEqWith s "the Tools carried no charge counter before" (S.counterOf charge toolsId board) 0
         -- The same card with ONE blighter, which is the reading both implementations
         -- share: one creature, one trigger. What it rules out is a Tools that fires
@@ -873,7 +873,7 @@ perCreatureCountersSpec s registry =
           let after = resolveEverything board
           Spec.assertEqWith s "the Tools took one charge counter" (S.counterOf charge toolsId after) 1
           Spec.assertEqWith s "bob's Wall took the counter" (fmap (\oid -> minusCountersOn oid after) walls) [Just 1]
-          Spec.assertEqWith s "one placement, one group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "one placement, one group" (Set.size (placementGroups after)) 1
         -- The other half of "ONE OR MORE counters ... on a creature": two counters
         -- landing on ONE creature at once is one placement and so one trigger, where
         -- a per-COUNTER reading would fire twice. Dawnhand Dissident's second
@@ -902,7 +902,7 @@ perCreatureCountersSpec s registry =
           let after = resolveEverything activated
           Spec.assertEqWith s "the Tools took ONE charge counter for the two counters that landed together" (S.counterOf charge toolsId after) 1
           Spec.assertEqWith s "the Wall took both -1/-1 counters" (minusCountersOn wallId after) (Just 2)
-          Spec.assertEqWith s "in one placement, so one event group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "in one placement, so one event group" (Set.size (placementGroups after)) 1
 
 -- CR 608.2f over the OTHER road a batch of counters is placed by: one written
 -- Effect.PutCounters instruction whose ObjectRef sweeps a set, where
@@ -948,7 +948,7 @@ sweptCountersSpec s registry =
       -- blightSimultaneitySpec's copy: the precondition each case rests on,
       -- asserted rather than assumed.
       placementGroups gs =
-        List.nub
+        Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
                   GameEvent.CountersPut change
@@ -1000,7 +1000,7 @@ sweptCountersSpec s registry =
           Spec.assertEqWith s "alice drew one card for the whole sweep" (S.handSize S.alice after) 1
           Spec.assertEqWith s "the Tools fired once per creature off that same batch" (S.counterOf charge toolsId after) 5
           Spec.assertEqWith s "all five creatures took a -1/-1 counter" (fmap (\oid -> minusCountersOn oid after) (aliceWalls <> [bobWall, snuffersId])) [Just 1, Just 1, Just 1, Just 1, Just 1]
-          Spec.assertEqWith s "and the five placements were one event group" (length (placementGroups after)) 1
+          Spec.assertEqWith s "and the five placements were one event group" (Set.size (placementGroups after)) 1
           Spec.assertEqWith s "alice held nothing before" (S.handSize S.alice board) 0
         -- The control the case above needs, and the one thing it cannot say: a
         -- bracket drawn around the whole RESOLUTION rather than around one
@@ -1035,7 +1035,7 @@ sweptCountersSpec s registry =
               after = resolveEverything resolved
           Spec.assertEqWith s "alice drew one card for each clause" (S.handSize S.alice after) 2
           Spec.assertEqWith s "the Goblin and the Zombie each took a counter" (fmap (\oid -> minusCountersOn oid after) [goblin, zombie]) [Just 1, Just 1]
-          Spec.assertEqWith s "in two event groups, both inside one scan" (length (placementGroups resolved)) 2
+          Spec.assertEqWith s "in two event groups, both inside one scan" (Set.size (placementGroups resolved)) 2
           Spec.assertEqWith s "her hand was empty once the Wilting was cast" (S.handSize S.alice resolved) 0
 
 -- CR 701.68 blight as a COST (CostComponent.Blight), which is the position most of

@@ -964,7 +964,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         sampledAt eventGroup = Map.keysSet (Map.findWithDefault Map.empty eventGroup (GameState.battlefieldWhenTriggered after))
         groupOf oid = fmap fst (List.find (\entry -> snd entry == oid) left)
     Spec.assertEqWith s "both left, in crossing order rather than id order" (fmap snd left) [earlyCrosser, lateCrosser]
-    Spec.assertEqWith s "CR 603.10a: they are two event groups, not one simultaneous batch" (length (List.nub (fmap fst left))) 2
+    Spec.assertEqWith s "CR 603.10a: they are two event groups, not one simultaneous batch" (Set.size (Set.fromList (fmap fst left))) 2
     -- The running board, read out of the sample CR 603.10 takes at each event. A
     -- batch that deleted both and only then recorded answers False to the first
     -- of these, and a main-game ability watching the LATE crosser leave the

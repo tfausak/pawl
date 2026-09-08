@@ -1282,7 +1282,7 @@ inertChoosers effect =
 distinctFaceNamesOffends :: Card.Type.Card -> Bool
 distinctFaceNamesOffends card =
   let names = fmap Face.name (NonEmpty.toList (Card.Type.faces card))
-   in length (List.nub names) /= length names
+   in Set.size (Set.fromList names) /= length names
 
 -- CR 709.5a: "Each half of a split card with a shared type line shares the types
 -- and subtypes listed on that card's shared type line." pawl stores that
@@ -1453,7 +1453,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- (#797).
   Spec.it s "every enchant ability on a card draws from the same pool" $ do
     ps <- S.allPrintings s
-    let offends c = length (List.nub (fmap TargetSlot.pool (Face.enchant c))) > 1
+    let offends c = Set.size (Set.fromList (fmap TargetSlot.pool (Face.enchant c))) > 1
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card mixes enchant pools, since CR 702.5c intersects them and Pool is not closed under intersection" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSlots binds the enchant slot under this name (Task 6), so a

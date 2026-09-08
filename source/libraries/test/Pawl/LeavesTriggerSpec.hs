@@ -408,7 +408,7 @@ permanentsReturnedToHandSpec s registry =
       sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
       -- The distinct EventGroups the log's battlefield-to-hand moves carry.
       returnGroups gs =
-        List.nub
+        Set.fromList
           ( Maybe.mapMaybe
               ( \logged -> case LoggedEvent.event logged of
                   GameEvent.Moved (Moved.MkMoved zc _ _) | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Hand -> Just (LoggedEvent.group logged)
@@ -426,7 +426,7 @@ permanentsReturnedToHandSpec s registry =
               after = resolveWholeStack settled
           Spec.assertEqWith s "alice holds the two artifacts and ONE draw each from Tameshi and the Ledger, not two from the Ledger" (S.handSize S.alice after) 4
           Spec.assertEqWith s "Justice grew once per artifact, the singular reading of the same event" (sizeOf justiceId after) (Just 4, Just 4)
-          Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (length (returnGroups settled)) 1
+          Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (Set.size (returnGroups settled)) 1
           Spec.assertEqWith s "four triggers reached the stack: Tameshi's and the Ledger's once each, Justice's twice" (length (GameState.stack settled)) 4
           Spec.assertEqWith s "alice's hand was Retract alone before" (S.handSize S.alice withRetract) 1
         -- The printed "noncreature", the condition's own Filter: one board, two
@@ -454,7 +454,7 @@ permanentsReturnedToHandSpec s registry =
           let gone = S.runPure S.identityAnswer withRetract (Event.simultaneously (Event.changeZone tameshiId Zone.Hand >> Event.changeZone solRingId Zone.Hand))
               after = resolveWholeStack (S.runPure S.identityAnswer gone Engine.settleForPriority)
           Spec.assertEqWith s "alice holds Retract, Tameshi, the Sol Ring, Tameshi's draw and the Ledger's" (S.handSize S.alice after) 5
-          Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (length (returnGroups gone)) 1
+          Spec.assertEqWith s "CR 608.2f: the two returns were one event group" (Set.size (returnGroups gone)) 1
 
 -- CR 603.10a's third look-back family: Kishla Skimmer {G}{U} Creature -- Bird
 -- Scout, 2/2, "Flying / Whenever a card leaves your graveyard during your turn,

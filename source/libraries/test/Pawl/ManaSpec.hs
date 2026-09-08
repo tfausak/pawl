@@ -1866,7 +1866,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
         free = S.runPure (buysBlack False) gs (Cost.tapForMana S.manaPerformer confluenceId)
         bought = S.runPure (buysBlack True) gs (Cost.tapForMana S.manaPerformer confluenceId)
     Spec.assertEqWith s "both ways of adding black are offered" (length blacks) 2
-    Spec.assertEqWith s "charging two different costs" (length (List.nub (fmap ManaOption.cost blacks))) 2
+    Spec.assertEqWith s "charging two different costs" (Set.size (Set.fromList (fmap ManaOption.cost blacks))) 2
     Spec.assertEqWith s "the free one: black in the pool" (poolTypes S.alice free) [ManaType.Colored Color.Black]
     Spec.assertEqWith s "the free one: and all 20 life" (S.lifeOf S.alice free) (Just 20)
     Spec.assertEqWith s "the bought one: the same black" (poolTypes S.alice bought) [ManaType.Colored Color.Black]

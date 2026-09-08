@@ -16,6 +16,7 @@
 module Pawl.TurnSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -102,7 +103,7 @@ turnSpec s = Spec.describe s "Turn" $ do
       (Turn.spliceExtraCleanup Turn.combatAndMainPhase)
       (Phase.Ending EndingStep.Cleanup Seq.<| Turn.combatAndMainPhase)
   Spec.it s "a turn never revisits a phase" $
-    Spec.assertEqWith s "no repeats" (List.nub Turn.allPhases) Turn.allPhases
+    Spec.assertEqWith s "no repeats" (ListUtils.nubOrd Turn.allPhases) Turn.allPhases
 
 turnDataSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 turnDataSpec s = Spec.describe s "TurnData" $ do

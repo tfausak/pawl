@@ -4,6 +4,7 @@ import qualified Control.Applicative as Applicative
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Bifunctor as Bifunctor
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -1597,7 +1598,7 @@ attemptAttackDeclaration perform pid rejected = do
         -- Deduplicated too: CR 508.1a's declaration is a SET, and the event
         -- fold below would otherwise record a creature's declaration twice and
         -- make CR 506.5's count disagree with it.
-        offered = List.nub (filter isCandidate chosen)
+        offered = ListUtils.nubOrd (filter isCandidate chosen)
     -- CR 508.1b: the announcement, one question per chosen creature, in the
     -- rule's own order -- BEFORE CR 508.1c's restrictions and CR 508.1d's
     -- requirements, which is what a requirement naming its object (Alluring
