@@ -1,5 +1,6 @@
 module Pawl.Types.ManaOption where
 
+import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Card as Card
@@ -8,6 +9,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | CR 106.12: ONE way to tap a permanent for mana -- the cost CR 602.2b makes
 -- that activation pay, paired with the whole yield it adds.
@@ -49,7 +51,27 @@ data ManaOption = MkManaOption
     -- | CR 602.5b: the ability this route is one selection of, or Nothing for CR
     -- 305.6's intrinsic one. See the note above the record.
     ability :: Maybe (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)),
-    yield :: Mana.Mana,
+    -- | CR 106.4: WHO gets WHAT -- the mana this activation adds, keyed by the
+    -- reference each AddMana named its recipient with. Llanowar Elves' is a
+    -- single @Relative You@ entry; Yurlok of Scorch Thrash's "Each player adds
+    -- {B}{R}{G}" is a single @EachPlayer@ one, which is a different set of
+    -- pools.
+    --
+    -- Keyed by the REFERENCE and not by a resolved PlayerId, because an option
+    -- is enumerated off the card (Pawl.Engine.Mana.manaOptionsOfGiven) and the
+    -- roster it names is a fact about the board at the moment the ability is
+    -- activated. Pawl.Engine.Mana.recipientsOf is the one resolver both the
+    -- payment (Pawl.Engine.Cost.tapForManaWith) and the supply model
+    -- (Pawl.Engine.Mana.manaSuppliesGiven) read it through, so they cannot
+    -- disagree about whose pool a route fills.
+    --
+    -- A Map and not a list of pairs, so two additions naming one reference
+    -- collapse into one entry and Eq on the option stays the question "does this
+    -- put the same mana in the same pools" -- Shizuko, Caller of Autumn spells
+    -- {G}{G}{G} as three additions where another printing would write one of
+    -- count 3. Printed order survives WITHIN a recipient's units, which is the
+    -- only order CR 106.4 can observe: two pools have no order between them.
+    yield :: Map.Map PlayerRef.PlayerRef Mana.Mana,
     -- | CR 405.6c: what else this activation does -- everything the chosen mode
     -- says that is not a mana production. Ancient Tomb's "This land deals 2
     -- damage to you", which Pawl.Engine.Cost.tapForManaWith runs through its

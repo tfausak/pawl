@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Trigger as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana.Engine
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
@@ -770,11 +771,16 @@ isCreatureRecipient r = case r of
 -- The FIRST such option, where a source offers one yield for two costs (an
 -- Urborg'd Mana Confluence). A fixture that cares which cost it pays picks the
 -- candidate itself; ManaSpec's Urborg'd Mana Confluence is the one that does.
+--
+-- RECIPIENT-BLIND (Mana.Engine.yieldUnits): a fixture says which mana it wants
+-- the source tapped for, not whose pool it lands in. A fixture that cares about
+-- the recipient asserts on the pools afterwards -- ManaSpec's Yurlok group is
+-- the one that does.
 optionYielding :: Mana.Mana -> NonEmpty.NonEmpty ManaOption.ManaOption -> ManaOption.ManaOption
 optionYielding wanted candidates =
   Maybe.fromMaybe
     (NonEmpty.head candidates)
-    (List.find ((==) wanted . ManaOption.yield) (NonEmpty.toList candidates))
+    (List.find ((==) (Mana.unwrap wanted) . Mana.Engine.yieldUnits) (NonEmpty.toList candidates))
 
 -- CR 601.2c: answer a Prompt.ChooseTargets offer by taking each slot's announced
 -- number of recipients, the ones the predicate admits first and the smallest of
@@ -2063,7 +2069,8 @@ answerActionChoice key verb choices asked =
         Prompt.ChooseExtraManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
         Prompt.ChooseManaYield _ _ _ candidates -> case Seq.viewl (choiceManaYields choices) of
           Seq.EmptyL -> unexpected
-          wanted Seq.:< rest -> case filter ((== wanted) . ManaOption.yield) (NonEmpty.toList candidates) of
+          -- Recipient-blind, optionYielding's reason.
+          wanted Seq.:< rest -> case filter ((== Mana.unwrap wanted) . Mana.Engine.yieldUnits) (NonEmpty.toList candidates) of
             [option] -> do
               updateActionChoices (\current -> current {choiceManaYields = rest})
               pure option

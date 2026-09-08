@@ -45,7 +45,6 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
@@ -1695,7 +1694,7 @@ counteredWith answer victim cancel island alicesBoard =
 blackYield :: Prompt.Prompt r -> r
 blackYield p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    let isBlack option = fmap ManaUnit.manaType (Mana.Type.unwrap (ManaOption.yield option)) == [ManaType.Colored Color.Black]
+    let isBlack option = fmap ManaUnit.manaType (Mana.yieldUnits option) == [ManaType.Colored Color.Black]
      in Maybe.fromMaybe (NonEmpty.head candidates) (List.find isBlack (NonEmpty.toList candidates))
   _ -> S.identityAnswer p
 

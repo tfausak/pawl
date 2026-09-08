@@ -3244,14 +3244,15 @@ tapForManaWith perform inFlight oid = do
   case Game.lookupObject oid gs of
     Nothing -> pure False
     Just obj -> do
-      -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
-      -- the permanent's controller, and that same player makes the colour choice
-      -- and pays the cost. Falls back to owner in the impossible case where
-      -- lookupObject found the object but controllerOf answers Nothing.
+      -- CR 109.4a/110.2: the mana ability's controller is the permanent's
+      -- controller, and that player makes the colour choice and pays the cost.
+      -- Falls back to owner in the impossible case where lookupObject found the
+      -- object but controllerOf answers Nothing.
       --
-      -- Not implemented: the recipient an AddMana payload may NAME (CR 106.4).
-      -- This path adds the whole yield to `controller`; a resolving ability
-      -- reads the reference instead (#1673).
+      -- Not whose POOL the mana lands in, which each AddMana's own reference
+      -- names (CR 106.4) and CR 109.5 makes this player only by default:
+      -- Yurlok of Scorch Thrash's "Each player adds {B}{R}{G}" fills the whole
+      -- table's. See the Payment.Paid branch below.
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
           -- ONE gather of the player's effects for every option this permanent
           -- offers, rather than one per option: `manaActivations` would take its
@@ -3294,7 +3295,23 @@ tapForManaWith perform inFlight oid = do
             -- read, so the payment's own slots are dropped here. The ability
             -- itself has no object either -- see `perform` below.
             Payment.Paid _ -> do
-              State.modify' (Mana.addMana controller (Mana.unitsOf (ManaOption.yield chosen)))
+              -- CR 106.4: each share goes to the players its own reference
+              -- names, resolved through Mana.recipientsOf -- the same function
+              -- Mana.manaSuppliesGiven keeps the payer's share by, so the offer
+              -- and the payment cannot disagree about whose pool a route fills.
+              -- Yurlok of Scorch Thrash is the printing that observes it, and
+              -- Pawl.ManaSpec's Yurlok group is what proves it.
+              --
+              -- ORDER across recipients is unobservable: a pool is a multiset
+              -- (Pawl.Types.Mana) and CR 101.4's ordering rule is about
+              -- CHOICES, of which the addition itself makes none.
+              State.modify'
+                ( \gs' ->
+                    List.foldl'
+                      (\acc (ref, mana) -> List.foldl' (\inner recipient -> Mana.addMana recipient (Mana.unitsOf mana) inner) acc (Mana.recipientsOf controller oid gs' ref))
+                      gs'
+                      (Map.toList (ManaOption.yield chosen))
+                )
               -- CR 405.6c: "if a mana ability both produces mana and has another
               -- effect, the mana is produced and the other effect happens
               -- immediately" -- so the rest of the chosen mode runs HERE, inside
@@ -3334,7 +3351,10 @@ tapForManaWith perform inFlight oid = do
               -- The events, not the board: a permanent tapped by {T} is also
               -- tapped by Icy Manipulator, and Pawl.Engine.Event.tap has already
               -- written GameEvent.BecameTapped for both.
-              Monad.when (List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null (Mana.unitsOf (ManaOption.yield chosen)))) $
+              -- Mana.yieldUnits and not the payer's share: CR 106.12a asks
+              -- whether the activation PRODUCED mana, which it did whoever's
+              -- pool it went to.
+              Monad.when (List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null (Mana.yieldUnits chosen))) $
                 applyManaTriggers perform oid
               pure True
 
@@ -3437,6 +3457,12 @@ payActivation perform inFlight pid oid cost = do
 --
 -- FILTERED, NOT TRUSTED: honouring an option the source does not offer would
 -- mint mana out of nothing, or charge the wrong cost for it.
+--
+-- Not implemented: CR 106.4's colour choice made by the RECIPIENT where the
+-- addition names somebody other than the activator. `pid` here is the
+-- controller, which CR 109.5 makes the chooser for every printing in
+-- `data/cards/`: Yurlok of Scorch Thrash's three additions are each a fixed
+-- type, so its `EachPlayer` recipients choose nothing (#3081).
 chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty ManaOption.ManaOption -> GameState -> Game ManaOption.ManaOption
 chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only

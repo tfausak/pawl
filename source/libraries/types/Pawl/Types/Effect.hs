@@ -114,10 +114,10 @@ data Effect card ability
     -- ManaProduction names -- one fixed type, or one colour its controller
     -- chooses (CR 105.4).
     --
-    -- Not implemented: a mana ability's payment route (Cost.tapForMana, CR
-    -- 605.3b) reads the production, the retention and both of CR 106.6's
-    -- clauses, and ignores the recipient (#1673); everything else resolves
-    -- through Resolve.applyEffect, which reads the whole record.
+    -- Not implemented: on a mana ability's payment route (Cost.tapForMana, CR
+    -- 605.3b) a recipient naming a BINDING SLOT names nobody, that activation
+    -- having no object to have bound one (#3081). Every other reference is
+    -- resolved there (Mana.recipientsOf), as it is under Resolve.applyEffect.
     AddMana ManaAddition.ManaAddition
   | -- | CR 605.3: each player the payload names activates a mana ability of each
     -- permanent they control that its filter matches (Drain Power).
