@@ -3263,6 +3263,64 @@ queensBayPaladinSpec s registry = Spec.describe s "Queen's Bay Paladin (CR 122.1
 --
 -- A REAL untap step throughout (Engine.runTurnBasedActions at CR 502.3), not a
 -- direct call to the funnel.
+-- CR 614.1a's "instead" with an ACTION rather than an amount or a destination:
+-- Kill-Suit Cultist's "{B}, Sacrifice this creature: The next time damage would
+-- be dealt to target creature this turn, destroy that creature instead". The one
+-- printing whose damage replacement RUNS a card's effects, and the one whose
+-- nested effect names the slot its own ability targeted.
+--
+-- A gameplay-level board (design.md section 4) driven through the priority loop:
+-- bob's Child of Night attacks, alice's Wall of Stone blocks, and the shield
+-- alice installed on the Wall meets that combat damage.
+--
+-- The Wall is 0/8, so 2 damage would leave it standing -- which is what makes the
+-- destruction attributable to this rewrite rather than to CR 704.5g. The
+-- lifelink is the other half of the same board: CR 120.3f gains life for damage
+-- DEALT, so an implementation that destroyed the Wall and dealt the damage too
+-- would show bob at 22.
+--
+-- Three creatures are in the target pool when the ability is announced, so the
+-- Cultist's target is a real choice rather than the one option a prompt would
+-- short-circuit.
+killSuitCultistSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+killSuitCultistSpec s registry = Spec.describe s "Kill-Suit Cultist (CR 614.1a)" $ do
+  let cultist = S.aliasRef "cultist"
+      swamp = S.aliasRef "swamp"
+      wall = S.aliasRef "wall"
+      attacker = S.aliasRef "attacker"
+      -- bob is the active player, so the Cultist's CR 508.1d requirement
+      -- ("attacks each combat if able") never comes up and the sacrifice is the
+      -- only thing that removes it.
+      cultistBoard =
+        S.board
+          ( S.battlefield S.alice [S.settled "cultist" "Kill-Suit Cultist", S.settled "swamp" "Swamp", S.settled "wall" "Wall of Stone"]
+              NonEmpty.:| [S.battlefield S.bob [S.settled "attacker" "Child of Night"]]
+          )
+          S.bob
+          S.beginningOfCombat
+      choices =
+        S.noChoices
+          { S.choiceTargets = Just [S.MkObjectTarget wall],
+            S.choiceManaSources = Seq.singleton (Just swamp)
+          }
+      script =
+        S.turn
+          1
+          [ S.on S.beginningOfCombat S.alice (S.activateAction cultist choices),
+            S.on S.declareAttackers S.bob (S.attack [attacker]),
+            S.on S.declareBlockers S.alice (S.block [(wall, attacker)])
+          ]
+  Spec.it s "CR 614.1a whole card: the blocking Wall is destroyed instead of being dealt 2" $ do
+    after <- S.play s registry cultistBoard script S.combatGame
+    Spec.assertEqWith s "the 0/8 Wall is gone, which 2 combat damage could never have done" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Wall of Stone")) S.alice after) 0
+    -- CR 120.3f: lifelink gains life for damage DEALT. The replacement means
+    -- none was, so a destroy-AND-deal implementation shows 22 here.
+    Spec.assertEqWith s "and no damage was dealt: the lifelinker's controller gained nothing" (S.lifeOf S.bob after) (Just 20)
+    -- CR 614.3's use count, which is the whole of "the next time": the row is
+    -- dropped by the application rather than by its UntilEndOfTurn duration,
+    -- which this combat never reaches.
+    Spec.assertEqWith s "and the shield is spent after the one application" (length (GameState.replacements after)) 0
+
 cryogenicStasisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cryogenicStasisSpec s registry = Spec.describe s "Cryogenic Stasis (CR 122.1d)" $ do
   -- alice is the active player, so CR 502.3's turn-based action is asked about
@@ -3346,3 +3404,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   lavaBurstSpec s registry
   queensBayPaladinSpec s registry
   cryogenicStasisSpec s registry
+  killSuitCultistSpec s registry

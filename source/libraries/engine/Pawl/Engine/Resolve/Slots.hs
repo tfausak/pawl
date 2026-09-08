@@ -1280,6 +1280,13 @@ replacementRowSlots re =
 --
 -- No wildcard, replacementRowReads' discipline: an arm that comes to nest a
 -- program must answer here rather than have its reads go undeclared.
+--
+-- NO BOARD OBSERVES IT: the pool's one nested program is Kill-Suit Cultist's
+-- destruction of a slot, and the DamageR pattern beside it names that same slot
+-- (Filter.IsBound), so the capture already carries it and neutralizing this
+-- answer leaves the suite green. A regression fence rather than a proven
+-- behaviour; what would prove it is a card whose nested effect reads a slot its
+-- row's pattern does not name (#1962).
 replacementRowEffects :: ReplacementEffect.ReplacementEffect Card.Type.Card (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 replacementRowEffects re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite) -> case rewrite of

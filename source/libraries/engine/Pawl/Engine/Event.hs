@@ -102,6 +102,7 @@ import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.Effect as Effect.Type
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -118,6 +119,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility.Type
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -1599,7 +1601,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
 -- build here rather than silently losing it. The three that `Replacement.prevents`
 -- refuses are unreachable, since `Replacement.inertPrevention` answers Just only
 -- for a rewrite that prevents.
-applyInertly :: ReplacementCandidate -> DamageRewrite.DamageRewrite -> ProposedEvent -> Game (Maybe ProposedEvent)
+applyInertly :: ReplacementCandidate -> DamageRewrite.DamageRewrite (Effect.Type.Effect Card (GrantedAbility.Type.GrantedAbility Card)) -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyInertly candidate rewrite event = do
   case rewrite of
     -- CR 122.1c's "prevent that damage and remove a shield counter from it". The

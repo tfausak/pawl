@@ -200,6 +200,7 @@ import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -219,7 +220,6 @@ import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.Prevention as Prevention
-import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -1250,7 +1250,7 @@ referentsOfReplacement re = case re of
 -- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination
 -- and nothing else. damageRewriteFilters' discipline: no wildcard, so a later
 -- rewrite naming a recipient must answer here.
-damageRewriteRecipients :: DamageRewrite.DamageRewrite (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [Recipient]
+damageRewriteRecipients :: DamageRewrite.DamageRewrite effect -> [Recipient]
 damageRewriteRecipients rewrite = case rewrite of
   DamageRewrite.RedirectMatching _ -> []
   DamageRewrite.Redirect recipient -> [recipient]
