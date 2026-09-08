@@ -203,6 +203,8 @@ library codec
     Pawl.Codec.CantSearchLibraries
     Pawl.Codec.CantSearchLibrariesSpec
     Pawl.Codec.Card
+    Pawl.Codec.CardArrivedIn
+    Pawl.Codec.CardArrivedInSpec
     Pawl.Codec.CardLeavesGraveyard
     Pawl.Codec.CardLeavesGraveyardSpec
     Pawl.Codec.CardName
@@ -1525,6 +1527,7 @@ library types
     Pawl.Types.CantBeRegenerated
     Pawl.Types.CantSearchLibraries
     Pawl.Types.Card
+    Pawl.Types.CardArrivedIn
     Pawl.Types.CardLeavesGraveyard
     Pawl.Types.CardName
     Pawl.Types.CardType

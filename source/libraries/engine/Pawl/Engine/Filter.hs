@@ -113,7 +113,8 @@ data View = MkView
     --
     -- Not strictly more across every view: the event-snapshot view below is the
     -- one where the order reverses, Count.viewOfSnapshot filling `controller`
-    -- off CR 608.2h's record and leaving this Nothing, see #1069.
+    -- off CR 608.2h's record where a cast leaves the owner beside it Nothing,
+    -- see #1069.
     --
     -- Nothing only where there is no OBJECT to read it off: a player view, an
     -- event snapshot, or a printed card being matched by a search, which CR
