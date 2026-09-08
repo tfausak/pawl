@@ -1190,15 +1190,11 @@ zoneOfComponent component = case component of
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.DiscardCards {} -> Nothing
-  -- Nothing, and NOT Just Zone.Hand, for the reason the arms above give and the
-  -- reason PutCardFromHandOntoBattlefield below repeats: CR 113.6m asks about an
-  -- ability that moves THE OBJECT IT'S ON, and this moves another card out of
-  -- the payer's hand.
-  CostComponent.ExileCardFromHand _ -> Nothing
   -- Nothing, and NOT Just Zone.Hand as DiscardThis above answers, for the same
   -- reason the arms above give: CR 113.6m asks about an ability that moves THE
-  -- OBJECT IT'S ON, and this moves another card out of the payer's hand.
+  -- OBJECT IT'S ON, and these move another card out of the payer's hand.
   CostComponent.PutCardFromHandOntoBattlefield _ -> Nothing
+  CostComponent.ExileCardFromHand _ -> Nothing
   -- Nothing, and NOT Just Zone.Library, for the arms above's reason: CR 701.17a
   -- mills the cards on top of the paying player's library, which are OTHER cards
   -- than the object the cost is on -- a Millikin on the battlefield is not in the
@@ -1238,9 +1234,9 @@ componentStatesHiddenQuality component = case component of
   -- Magmatic Insight's "discard a land card" states one, Cathartic Reunion's
   -- "discard two cards" does not.
   CostComponent.DiscardCards d -> Filter.statesAQuality (DiscardCards.whichCards d)
-  -- The second: CR 406.2's exile reads the same hidden hand, so the quality the
-  -- criterion states is what decides. Cadaverous Bloom's "a card" states none,
-  -- and Holistic Wisdom's would.
+  -- The second: CR 406.2's exile reads the same hidden hand, so the criterion
+  -- decides -- Jhoira of the Ghitu's "a nonland card" states a quality,
+  -- Cadaverous Bloom's "a card" does not.
   CostComponent.ExileCardFromHand criterion -> Filter.statesAQuality criterion
   -- The third: CR 118.12's hand-to-battlefield cost reads the same hidden zone,
   -- and every printing of it names a quality -- Hakbal of the Surging Soul's "a

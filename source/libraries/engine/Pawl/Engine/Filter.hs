@@ -2144,8 +2144,8 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
 -- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
 -- ExileCardFromHand and PutCardFromHandOntoBattlefield arms are a regression
--- fence: no printing pairs
--- any of them with a basic land type, so no test can falsify them. Magmatic
+-- fence: no printing pairs any of them with a basic land type, so no test can
+-- falsify them. Magmatic
 -- Insight's "discard a land card" and Hakbal of the Surging Soul's "a land card
 -- from your hand" come closest and are still not one -- CR 612.2 swaps a SUBTYPE
 -- word, and the land CARD TYPE is not one.
