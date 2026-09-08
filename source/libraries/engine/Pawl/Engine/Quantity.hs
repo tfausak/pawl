@@ -941,8 +941,8 @@ objectSlots quantity = case quantity of
   Quantity.Plus (Plus.MkPlus a b) -> Set.union (objectSlots a) (objectSlots b)
   Quantity.Halved (Halved.MkHalved _ inner) -> objectSlots inner
   Quantity.Negate a -> objectSlots a
-  -- DESCENT into a Greatest's per-member number, which may aim at a slot of its
-  -- own; the other two aggregations carry no number to ask.
+  -- DESCENT into a Greatest's or a Total's per-member number, which may aim at a
+  -- slot of its own; the other aggregations carry no number to ask.
   Quantity.Count c -> QuantitySlot.foldCount objectSlots c
   -- Every remaining arm names no slot at all, QuantitySlot.slots saying the same
   -- of each: the references they carry are PlayerRefs, which name a target slot

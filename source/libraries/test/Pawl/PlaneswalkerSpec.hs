@@ -1171,15 +1171,27 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 --   -2: "Create two 1/1 black Nightmare creature tokens with 'At the beginning of
 --       combat on your turn, if a card was put into exile this turn, put a +1/+1
 --       counter on this token.'"
+--   -7: "Target player exiles the top X cards of their library, where X is the
+--       total mana value of cards you own in exile."
 --
 -- Its static replacement -- "if you would pay life while your library has at
 -- least that many cards in it, exile that many cards from the top of your library
 -- instead" -- is Pawl.LifeReplacementSpec's, and stays there.
 --
--- Not implemented: the -7, "target player exiles the top X cards of their
--- library, where X is the total mana value of cards you own in exile" -- X is a
--- SUM over a scope and Pawl.Types.Aggregation has no summing arm (#3108). That
--- leaves pawl's Ashiok STRICTER than printed.
+-- The -7's X is Aggregation.Total over Scope.InZone Exile: "cards you own" is
+-- CR 108.3's ownership, so the filter carries Filter.OwnedBy You and the scope
+-- names the whole shared exile (CR 400.1), which is the only way an InZone scope
+-- may name it. The minus-seven case below is what proves the SUM: its exile
+-- holds two cards of unequal mana value, so Members, Greatest and Total each
+-- answer a different number.
+--
+-- CR 108.4a is why that case cannot tell OwnedBy from ControlledBy: an exiled
+-- card is no permanent and no spell, so anything asking its controller gets its
+-- owner. OwnedBy is here because it is the printed word, and the pair the case
+-- CAN tell apart is You against any player -- bob's exiled card is what that
+-- turns on. The same filter's Not IsToken is the printed "cards" (CR 111.6) and
+-- no case can read it either: CR 111.7's state-based action takes a token out of
+-- exile before any ability could count it.
 --
 -- The -2's token clause reads EventShape.CardArrivedIn as an intervening "if":
 -- the printed sentence names only where the card ARRIVED, so the origin is not
@@ -1194,9 +1206,10 @@ gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
 -- the card-versus-token half is the filter's. The CR 111.6 pair below is what
 -- proves it: two boards holding the same objects, differing only in whether the
 -- one permanent exiled that turn was a card.
-ashiokPlusOne, ashiokMinusTwo :: Int
+ashiokPlusOne, ashiokMinusTwo, ashiokMinusSeven :: Int
 ashiokPlusOne = 0
 ashiokMinusTwo = 1
+ashiokMinusSeven = 2
 
 -- Ashiok on the battlefield under alice's control at the printed loyalty 5, with
 -- `stock` in her library BOTTOM FIRST (S.addLibraryCard puts each new card on
@@ -1214,6 +1227,42 @@ takingNth :: Int -> Prompt.Prompt r -> r
 takingNth n p = case p of
   Prompt.ChooseCardFromAmong _ _ _ offered ->
     Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+  _ -> S.identityAnswer p
+
+-- Ashiok under alice's control at NINE loyalty; `yours` and `theirs` go into
+-- alice's and BOB's shares of the one exile zone, and `stock` into CAROL's
+-- library, bottom first (S.addLibraryCard puts each new card on top). Nine rather
+-- than the printed 5 because the -7's cost needs more than five, and rather than
+-- exactly seven so the counters the cost took are read against a survivor instead
+-- of against CR 704.5i's zero.
+--
+-- Bob's share is what makes CR 108.3's "cards you own" load-bearing: exile is
+-- shared (CR 400.1), so a count that named the zone without the ownership
+-- conjunct would fold his cards in too.
+ashiokMinusSevenBoard ::
+  Printing.Printing ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  (ObjectId.ObjectId, GameState.GameState)
+ashiokMinusSevenBoard ashiok yours theirs stock =
+  let exile pid = List.foldl' (\g p -> snd (S.addExiledCard p pid g))
+      mine = exile S.alice S.threePlayerGame yours
+      his = exile S.bob mine theirs
+      stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.carol g)) his stock
+      (oid, placed) = S.addPermanent ashiok S.alice stocked
+   in (oid, S.addCounter CounterKind.Loyalty 9 oid placed)
+
+-- The -7's one ask: which player it targets. FILTERED out of the set the engine
+-- offered rather than built, so CR 608.2b's re-read at resolution keeps it.
+targetingPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+targetingPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    let naming (n, candidates) =
+          Set.fromList
+            . take (Natural.toIntSaturating n)
+            $ filter (\r -> Recipient.playerOf r == Just pid) (Set.toList candidates)
+     in fmap naming sets
   _ -> S.identityAnswer p
 
 -- Whether a logged event is CR 603.2's record that an ability triggered.
@@ -1376,3 +1425,44 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
     Spec.assertEqWith s "one Nightmare left" (length tokens) 1
     mapM_ (\oid -> Spec.assertEqWith s "which is still 1/1" (S.powerToughnessOf oid after) (Just (1, 1))) tokens
     mapM_ (\oid -> Spec.assertEqWith s "with no +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne oid after) 0) tokens
+
+  -- The -7. Its X is a SUM, and the board is what makes the sum visible: alice
+  -- owns two cards in exile of UNEQUAL mana value -- Bad Moon's 2 and Bird
+  -- Maiden's 3 -- so Aggregation.Members answers 2, Aggregation.Greatest 3 and
+  -- Aggregation.Total 5. Carol's library holds six cards, one more than the sum,
+  -- so each of those three readings leaves a different library behind and the
+  -- top-of-library read is not saturated.
+  --
+  -- BOB owns a third exiled card, a Goblin Piker of mana value 2, which nothing
+  -- but CR 108.3's ownership conjunct excludes: a count over the shared exile
+  -- without it reads 7 and takes carol's library whole.
+  --
+  -- CAROL is the target, on the third seat: with two seats "target player", "you"
+  -- and the active player collapse, and it is ALICE's exile the count reads, so
+  -- the two halves of the sentence have to sit on different players to be told
+  -- apart.
+  Spec.it s "CR 107.3 / 202.3 the -7's X is the total mana value of the cards you own in exile" $ do
+    ashiok <- S.printingOf s registry "Ashiok, Wicked Manipulator"
+    moon <- S.printingOf s registry "Bad Moon"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    ornithopter <- S.printingOf s registry "Ornithopter"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let named = Just . CardName.MkCardName . Text.pack
+        (ashiokId, board) =
+          ashiokMinusSevenBoard
+            ashiok
+            [moon, maiden]
+            [piker]
+            [ornithopter, plains, island, forest, mountain, swamp]
+        after = useLoyaltyAbility (targetingPlayer S.carol) ashiokMinusSeven ashiok ashiokId board
+    Spec.assertEqWith s "X was 5, the TOTAL mana value of the cards ALICE owns in exile and neither the count nor the greatest of them, so only carol's bottom card is left" (namesIn Zone.Library S.carol after) [named "Ornithopter"]
+    Spec.assertEqWith s "and the five that left her library are in exile" (Set.fromList (namesIn Zone.Exile S.carol after)) (Set.fromList (fmap named ["Swamp", "Mountain", "Forest", "Island", "Plains"]))
+    Spec.assertEqWith s "alice's own two exiled cards, which the count read, were not the ones exiled" (Set.fromList (namesIn Zone.Exile S.alice after)) (Set.fromList (fmap named ["Bad Moon", "Bird Maiden"]))
+    Spec.assertEqWith s "bob's exiled card, which the count did not read, is still his" (namesIn Zone.Exile S.bob after) [named "Goblin Piker"]
+    Spec.assertEqWith s "carol's exile was empty before the ability resolved" (namesIn Zone.Exile S.carol board) []
+    Spec.assertEqWith s "CR 606.4: seven loyalty counters came off" (S.counterOf CounterKind.Loyalty ashiokId after) 2

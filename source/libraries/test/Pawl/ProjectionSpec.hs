@@ -1773,7 +1773,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- names, zones, counters, life or mana value, never a power. The two that read
   -- a power -- Sutured Ghoul and Wretched Bonemass, o:"power and toughness are
   -- each equal to the total power" -- read the EXILED cards used to make them,
-  -- which needs a summing Aggregation (#3108) and an exile-set binding first.
+  -- which needs an entry exile taking more than one card first (#3293).
   Spec.it s "CR 613.8a a P/T-defining ability reads the power another one defines" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"

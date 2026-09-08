@@ -2811,6 +2811,7 @@ aggregationReads a = case a of
   Aggregation.Members -> Set.empty
   Aggregation.DistinctCardTypes -> Set.singleton Types
   Aggregation.Greatest q -> quantityReads q
+  Aggregation.Total q -> quantityReads q
 
 -- What could move `c`'s affected set -- Nothing when nothing can. A TheseObjects
 -- set names ids (CR 611.2c) and an Attached one reads its source's attachment
