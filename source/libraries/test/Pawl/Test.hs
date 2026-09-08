@@ -78,6 +78,7 @@ import qualified Pawl.Codec.CantAttackPlayerSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CantBeRegeneratedSpec
 import qualified Pawl.Codec.CantSearchLibrariesSpec
+import qualified Pawl.Codec.CardArrivedInSpec
 import qualified Pawl.Codec.CardLeavesGraveyardSpec
 import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardSpec
@@ -695,6 +696,7 @@ spec s registry = do
   Pawl.Codec.CantBeBlockedBySpec.spec s
   Pawl.Codec.CantBeRegeneratedSpec.spec s
   Pawl.Codec.CantSearchLibrariesSpec.spec s
+  Pawl.Codec.CardArrivedInSpec.spec s
   Pawl.Codec.CardLeavesGraveyardSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s

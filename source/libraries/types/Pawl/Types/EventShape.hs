@@ -1,7 +1,7 @@
 module Pawl.Types.EventShape where
 
+import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.MovedBetween as MovedBetween
-import qualified Pawl.Types.Zone as Zone
 
 -- | Which recorded events a history count folds over. GameState.events is cleared
 -- at the turn change (Pawl.Engine.Engine), an engine choice made under CR 608.2i
@@ -33,20 +33,17 @@ data EventShape
     -- arrivals under that shape would make Khabal Ghoul's "each creature that
     -- died this turn" see three.
     --
-    -- ONE zone and it is the DESTINATION, where MovedBetween names both ends.
+    -- ONE DESTINATION, where MovedBetween names both ends, and beside it the
+    -- origins that do NOT count rather than the ones that do -- see the payload.
     -- CR 712.21e's "changed zones" puts no condition on where a card came from,
-    -- and the pool's producers ask the same way -- "put into graveyards from
-    -- anywhere", and Ashiok, Wicked Manipulator's Nightmare token's "if a card was
-    -- put into exile this turn" (Pawl.PlaneswalkerSpec's AshiokLoyalty group is
-    -- what proves the origin is not read: it exiles out of a HAND).
-    -- CR 903.9c is what makes the destination the load-bearing half:
-    -- a melded commander's two cards can land in two different zones, and only
-    -- the one that arrived in the named zone is counted.
-    --
-    -- Not implemented: an origin RESTRICTION -- Dimir Strandcatcher's "from
-    -- anywhere other than the battlefield" -- which would need an origin set
-    -- beside this zone rather than a second shape (#3151).
-    CardArrivedIn Zone.Zone
+    -- and most of the pool's producers ask the same way -- "put into graveyards
+    -- from anywhere", and Ashiok, Wicked Manipulator's Nightmare token's "if a
+    -- card was put into exile this turn" (Pawl.PlaneswalkerSpec's AshiokLoyalty
+    -- group is what proves an empty exclusion does not read the origin: it exiles
+    -- out of a HAND). CR 903.9c is what makes the destination the load-bearing
+    -- half: a melded commander's two cards can land in two different zones, and
+    -- only the one that arrived in the named zone is counted.
+    CardArrivedIn CardArrivedIn.CardArrivedIn
   | -- | CR 601.2i: a spell became cast. What "for each spell you've cast this
     -- turn" folds over (Aetherflux Reservoir).
     --
