@@ -13,8 +13,10 @@ import qualified Pawl.Types.StackObjectKind as StackObjectKind
 -- shape: both narrow one rule 601.2c announcement and differ only in how far.
 data PermanentsBecomeTargeted = MkPermanentsBecomeTargeted
   { -- | The permanents the condition watches, read live off the battlefield --
-    -- CR 601.2c makes them targets while they are still there, so there is no CR
-    -- 608.2h last known information to recover.
+    -- CR 601.2c makes them targets while they are still there.
+    --
+    -- Not implemented: the read at the announcement's own moment rather than at
+    -- the CR 117.5 boundary the batch is gathered on (#3418).
     filter :: Filter.Filter Keyword.Keyword,
     -- | Which of CR 601.2c's announcement roads, the sibling
     -- Pawl.Types.ControllerBecomesTarget's field one recipient over. Nothing is

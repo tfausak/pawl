@@ -5341,8 +5341,12 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- The LIVE view rather than viewWithLastKnown, and the same membership test
   -- says so: CR 601.2c makes the object a target while it is still where the
-  -- announcement found it, and a permanent gone by the CR 117.5 boundary is one
-  -- this condition's printing no longer asks about.
+  -- announcement found it.
+  --
+  -- Not implemented: the announcement's own moment. CR 603.2 fires the ability
+  -- when the event occurs, while this reads the board at the CR 117.5 boundary
+  -- that follows, so a permanent named as a target and buried by CR 704 before
+  -- the gather is invisible here (#3418).
   --
   -- Firing ONCE for the whole announcement is Event.Trigger.batchScoped's
   -- answer and not this function's: matchesTriggerGiven sees one event at a

@@ -5640,9 +5640,9 @@ counterOne source controller oid = do
 --
 -- The KIND is passed in rather than derived. Rule 601.2c's parenthetical is about
 -- spells (CR 112.1) while CR 602.2b and CR 603.3d bring CR 113.3b's and CR
--- 113.3c's abilities to
--- the same step, and only the caller knows which it is putting on the stack;
--- the matcher that later reads this has no GameState to ask.
+-- 113.3c's abilities to the same step, and only the caller knows which it is
+-- putting on the stack; the matcher that later reads this has no GameState to
+-- ask.
 --
 -- CALLED AFTER THE ANNOUNCEMENT SUCCEEDS rather than at rule 601.2c's own
 -- position in the sequence. The rule puts the trigger before the costs are paid
