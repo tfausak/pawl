@@ -19,6 +19,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerLimit" $ do
       TriggerLimit.codec
       TriggerLimit.OncePerTurn
       " {\"type\":\"OncePerTurn\"} "
+  Spec.it s "OncePerGame" $
+    Common.assertCodec
+      s
+      TriggerLimit.codec
+      TriggerLimit.OncePerGame
+      " {\"type\":\"OncePerGame\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

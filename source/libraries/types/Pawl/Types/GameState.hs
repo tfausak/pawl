@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -251,6 +252,13 @@ data GameState = MkGameState
     -- identically worded twin is the caveat Object.activatedOnce's haddock states
     -- about the same key.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
+    -- | The printed rider "This ability triggers only once"
+    -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
+    -- ability carrying that rider, as the same record CR 603.3b's log carries.
+    -- A stored set rather than the log, because `events` is cleared at the turn
+    -- handoff and this record must outlive it; Pawl.Engine.Engine.withinTriggerLimit
+    -- derives its key from these exactly as it does from the log.
+    triggeredThisGame :: Set.Set AbilityTriggered.AbilityTriggered,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
     -- controlled; last created wins (CR 723.1a), promoted into `control` at
     -- that player's turn (CR 723.1b).

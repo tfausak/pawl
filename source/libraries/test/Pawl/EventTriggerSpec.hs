@@ -16,7 +16,8 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -35,6 +36,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -741,7 +743,7 @@ controllerAtTriggerSpec s registry =
       let (megrimId, _, conscriptsId, gs) = conscriptBoard mountain piker megrim conscripts
           after = toCleanup (aimedCast conscriptsId megrimId) gs
       Spec.assertEqWith s "CR 514.1 trimmed alice to her maximum hand size, so a discard really happened" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
-      Spec.assertEqWith s "CR 514.2 gave the Megrim back, which is what the boundary read would have seen" (Projection.controllerOf megrimId after) (Just S.bob)
+      Spec.assertEqWith s "CR 514.2 gave the Megrim back, which is what the boundary read would have seen" (Projection.View.controllerOf megrimId after) (Just S.bob)
       Spec.assertEqWith s "CR 603.3a alice controlled it at CR 514.1, so 'an opponent' was bob and nothing triggered" (S.lifeOf S.alice after) (Just 20)
       Spec.assertEqWith s "and bob, who discarded nothing, is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.it s "CR 109.5 the twin: the same cast aimed at alice's own Mountain leaves the Megrim with bob, and her discard costs her 2" $ do
@@ -752,7 +754,7 @@ controllerAtTriggerSpec s registry =
       let (megrimId, landId, conscriptsId, gs) = conscriptBoard mountain piker megrim conscripts
           after = toCleanup (aimedCast conscriptsId landId) gs
       Spec.assertEqWith s "the same one discard" (length (Game.zoneMembers Zone.Hand S.alice after)) 7
-      Spec.assertEqWith s "bob held the Megrim throughout" (Projection.controllerOf megrimId after) (Just S.bob)
+      Spec.assertEqWith s "bob held the Megrim throughout" (Projection.View.controllerOf megrimId after) (Just S.bob)
       Spec.assertEqWith s "so alice's discard IS an opponent's, and the trigger deals her 2" (S.lifeOf S.alice after) (Just 18)
     Spec.it s "the control leg: no Conscripts cast at all, and the Megrim still fires" $ do
       mountain <- S.printingOf s registry "Mountain"
@@ -1207,7 +1209,7 @@ youngPyromancerSpec s registry =
 -- The printed rider "This ability triggers only once each turn"
 -- (Pawl.Types.TriggerLimit), on top of the trigger event the group above covers.
 -- No comprehensive rule states the clause; CR 702.179d is where the rulebook
--- prints it verbatim, and Pawl.Engine.Engine.withinTurnLimit is what spends it.
+-- prints it verbatim, and Pawl.Engine.Engine.withinTriggerLimit is what spends it.
 --
 -- Whispering Wizard, {3}{U} Creature -- Human Wizard 3/2: "Whenever you cast a
 -- noncreature spell, create a 1/1 white Spirit creature token with flying. This
@@ -1370,6 +1372,79 @@ whisperingWizardSpec s registry =
           Spec.assertEqWith s "with no Spirit token" (spiritsOf S.alice creatureCast) 0
           Spec.assertEqWith s "the noncreature cast that follows still fires" (fmap (`firedBy` after) bearers) [1]
           Spec.assertEqWith s "and makes its Spirit" (spiritsOf S.alice after) 1
+
+-- The other printed rider, "This ability triggers only once" -- once per GAME
+-- rather than once per turn (Pawl.Types.TriggerLimit's OncePerGame). No
+-- comprehensive rule states it either; it is the per-turn clause of
+-- `whisperingWizardSpec` above with the window widened, and
+-- Pawl.Engine.Engine.withinTriggerLimit spends both.
+--
+-- Acrobatic Cheerleader, {1}{W} Creature -- Human Survivor 2/2: "Survival -- At
+-- the beginning of your second main phase, if this creature is tapped, put a
+-- flying counter on it. This ability triggers only once." Nothing of the card is
+-- omitted; the ability word is flavor (CR 207.2c).
+--
+-- TWO of alice's turns, because one cannot tell the readings apart: the rider is
+-- spent on the first firing whichever window it names, so only a SECOND turn's
+-- trigger event separates "once each turn" (which would fire again) from "once"
+-- (which does not). CR 603.3b's log is what the handoff clears, so the second
+-- turn is also where a per-turn record would silently re-arm.
+--
+-- The creature is tapped by hand on each of alice's turns rather than by
+-- attacking: CR 508.1f's tap is a fine way to satisfy the intervening "if", but
+-- an attack puts a combat damage step between the two readings and the case is
+-- about neither. Both turns tap it the same way, so the tap is never what
+-- separates them.
+--
+-- The reading is Projection.keywordsOf, which counts INSTANCES, and a CR 122.1b
+-- keyword counter grants one apiece -- so one counter reads as Just 1 where the
+-- per-turn reading's two counters would read as Just 2. A bare "it flies" cannot
+-- tell the two apart and is not the assertion.
+acrobaticCheerleaderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+acrobaticCheerleaderSpec s registry =
+  let -- Run whole steps until `phase` is the CURRENT one and has NOT yet run --
+      -- Engine.runStep runs GameState.phase and only then advances -- so a case
+      -- can read the board as a step begins. Bounded so a fixture that never
+      -- reaches the step ends rather than hangs.
+      stepUntil done gs0 =
+        let go n g =
+              if n <= (0 :: Int) || done g
+                then g
+                else go (n - 1) (snd (Engine.runGamePure S.identityAnswer g Engine.runStep))
+         in go 40 gs0
+      atPhase p g = GameState.phase g == p
+      alicesPrecombatMain g = GameState.activePlayer g == S.alice && atPhase Phase.PrecombatMain g
+      oneStep = snd . (\g -> Engine.runGamePure S.identityAnswer g Engine.runStep)
+      tapState oid g = fmap Object.tapped (Map.lookup oid (GameState.objects g))
+      board cheerleader plains =
+        let (oid, withCheerleader) = S.addPermanent cheerleader S.alice (Setup.emptyGame S.bothPlayers)
+            stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard plains pid g')) g [1 .. (12 :: Int)]
+            stocked = List.foldl' stock withCheerleader [S.alice, S.bob]
+         in ( oid,
+              S.tapObject
+                oid
+                stocked
+                  { GameState.phase = Phase.PrecombatMain,
+                    GameState.activePlayer = S.alice,
+                    GameState.priority = Just S.alice
+                  }
+            )
+   in Spec.describe s "TriggerLimit" $ do
+        Spec.it s "Acrobatic Cheerleader's rider is spent for the whole game, not the turn" $ do
+          cheerleader <- S.printingOf s registry "Acrobatic Cheerleader"
+          plains <- S.printingOf s registry "Plains"
+          let (oid, gs) = board cheerleader plains
+              firstMain = stepUntil (atPhase Phase.PostcombatMain) gs
+              fired = oneStep firstMain
+              -- Through alice's ending phase, bob's whole turn, and alice's untap
+              -- step, which is what untaps the creature again.
+              nextTurn = stepUntil alicesPrecombatMain fired
+              retapped = S.tapObject oid nextTurn
+              secondMain = stepUntil (atPhase Phase.PostcombatMain) retapped
+              after = oneStep secondMain
+          Spec.assertEqWith s "one instance of flying across both of alice's second main phases" (Map.lookup Keyword.Flying (Projection.keywordsOf oid after)) (Just 1)
+          Spec.assertEqWith s "the first of the two is where it triggered" (Map.lookup Keyword.Flying (Projection.keywordsOf oid fired)) (Just 1)
+          Spec.assertEqWith s "and the second really offered the trigger again, tapped as its second main phase began" (GameState.phase secondMain, tapState oid secondMain, GameState.activePlayer secondMain) (Phase.PostcombatMain, Just TapState.Tapped, S.alice)
 
 -- The rider on ONE of two abilities a single object bears. Both watch the same
 -- event, one prints the rider and one does not, and the unlimited one firing must
@@ -2068,6 +2143,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   youngPyromancerSpec s registry
   whisperingWizardSpec s registry
   twinnedVigilSpec s registry
+  acrobaticCheerleaderSpec s registry
   clarionSpiritSpec s registry
   desolationTwinSpec s registry
   presenceOfTheMasterSpec s registry

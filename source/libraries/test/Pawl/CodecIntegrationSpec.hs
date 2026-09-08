@@ -8,6 +8,7 @@ module Pawl.CodecIntegrationSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Condition as Condition
@@ -32,6 +33,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName.Type
@@ -65,6 +67,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -320,6 +323,27 @@ gameStateRoundTripSpec s registry = do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, _) = S.combatBoard piker 2 1
     roundTrips "a declared attack" gs
+
+  -- GameState.triggeredThisGame: the spent record behind the printed rider "This
+  -- ability triggers only once" (Pawl.Types.TriggerLimit's OncePerGame), and the
+  -- one field the turn handoff deliberately does not clear. An EMPTY set round
+  -- trips whether or not the codec names the field at all, so the case carries a
+  -- record -- built from the card's own ability, since that value is what the key
+  -- is compared by.
+  Spec.it s "a spent once-per-game trigger rider round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    cheerleader <- S.printingOf s registry "Acrobatic Cheerleader"
+    let (oid, gs) = S.addPermanent cheerleader S.alice (S.oneMountainState mountain Phase.PrecombatMain)
+    case Face.triggeredAbilities (S.combinedFace cheerleader) of
+      [] -> Spec.assertFailure s "Acrobatic Cheerleader should declare one triggered ability"
+      ability : _ ->
+        let spent =
+              AbilityTriggered.MkAbilityTriggered
+                { AbilityTriggered.source = TriggerSource.OfObject oid,
+                  AbilityTriggered.controller = S.alice,
+                  AbilityTriggered.ability = ability
+                }
+         in roundTrips "a spent per-game rider" gs {GameState.triggeredThisGame = Set.singleton spent}
 
   Spec.it s "a non-empty stack round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
